@@ -1,0 +1,1293 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta name="robots" content="noindex,nofollow"/>
+  <title>OmniFM Dashboard</title>
+  <link rel="icon" type="image/png" href="/img/bot-1.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;800&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <style>
+    /* ===== RESET & BASE ===== */
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#050505;--surface:#0A0A0A;--card:#111111;--card2:#161616;
+      --cyan:#00F0FF;--green:#39FF14;--amber:#FFB800;--purple:#BD00FF;--red:#FF2A2A;--blue:#5865F2;
+      --text:#FFFFFF;--text2:#A1A1AA;--muted:#52525B;
+      --border:rgba(255,255,255,0.08);--border-h:rgba(255,255,255,0.15);
+      --sidebar-w:240px;--topbar-h:60px;
+    }
+    html{scroll-behavior:smooth}
+    body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;-webkit-font-smoothing:antialiased;min-height:100vh}
+    ::selection{background:rgba(0,240,255,0.25)}
+    ::-webkit-scrollbar{width:5px}
+    ::-webkit-scrollbar-track{background:var(--bg)}
+    ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.12);border-radius:3px}
+    a{color:inherit;text-decoration:none}
+    button{font-family:inherit;cursor:pointer}
+    input,select,textarea{font-family:inherit}
+
+    /* ===== LAYOUT ===== */
+    #app{display:flex;min-height:100vh}
+
+    /* ===== SIDEBAR ===== */
+    .sidebar{
+      width:var(--sidebar-w);flex-shrink:0;
+      background:var(--surface);border-right:1px solid var(--border);
+      display:flex;flex-direction:column;
+      position:fixed;top:0;left:0;bottom:0;z-index:40;
+      transition:transform .3s;
+    }
+    .sidebar-logo{
+      display:flex;align-items:center;gap:10px;
+      padding:20px 20px 16px;
+      font-family:'Orbitron',sans-serif;font-weight:800;font-size:15px;letter-spacing:.05em;
+      border-bottom:1px solid var(--border);
+    }
+    .sidebar-logo em{color:var(--cyan);font-style:normal}
+    .sidebar-logo svg{flex-shrink:0}
+
+    /* Server Switcher */
+    .server-switcher{
+      padding:12px 16px;border-bottom:1px solid var(--border);
+    }
+    .server-switcher-label{font-size:10px;font-weight:700;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin-bottom:8px}
+    .server-select{
+      width:100%;background:var(--card);border:1px solid var(--border);
+      border-radius:10px;color:var(--text);padding:10px 12px;font-size:13px;
+      outline:none;cursor:pointer;appearance:none;
+      background-image:url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 7L11 1' stroke='%2352525B' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;
+    }
+    .server-select:focus{border-color:rgba(0,240,255,0.3)}
+
+    /* Nav */
+    .sidebar-nav{flex:1;padding:12px 0;overflow-y:auto}
+    .nav-section-label{font-size:10px;font-weight:700;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;padding:8px 20px 4px}
+    .nav-item{
+      display:flex;align-items:center;gap:12px;
+      padding:10px 20px;font-size:14px;font-weight:500;color:var(--text2);
+      cursor:pointer;transition:background .15s,color .15s;border-radius:0;
+      border-left:2px solid transparent;
+    }
+    .nav-item:hover{background:rgba(255,255,255,0.04);color:var(--text)}
+    .nav-item.active{background:rgba(0,240,255,0.06);color:var(--cyan);border-left-color:var(--cyan)}
+    .nav-item svg{flex-shrink:0;opacity:.7}
+    .nav-item.active svg{opacity:1}
+    .nav-badge{margin-left:auto;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(255,184,0,0.15);color:var(--amber);font-family:'Orbitron',sans-serif}
+    .nav-badge.pro{background:rgba(255,184,0,0.15);color:var(--amber)}
+    .nav-badge.ultimate{background:rgba(189,0,255,0.15);color:var(--purple)}
+
+    /* Sidebar Footer */
+    .sidebar-footer{padding:16px;border-top:1px solid var(--border)}
+    .user-info{display:flex;align-items:center;gap:10px}
+    .user-avatar{width:36px;height:36px;border-radius:50%;background:var(--card2);border:1px solid var(--border);overflow:hidden;flex-shrink:0}
+    .user-avatar img{width:100%;height:100%;object-fit:cover}
+    .user-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .user-tag{font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+    .logout-btn{margin-left:auto;background:none;border:none;color:var(--muted);padding:6px;border-radius:8px;transition:color .2s,background .2s;flex-shrink:0}
+    .logout-btn:hover{color:var(--red);background:rgba(255,42,42,0.08)}
+
+    /* ===== MAIN CONTENT ===== */
+    .main{
+      margin-left:var(--sidebar-w);flex:1;
+      display:flex;flex-direction:column;min-height:100vh;
+    }
+
+    /* Topbar */
+    .topbar{
+      height:var(--topbar-h);display:flex;align-items:center;justify-content:space-between;
+      padding:0 28px;border-bottom:1px solid var(--border);
+      background:rgba(5,5,5,0.8);backdrop-filter:blur(20px);
+      position:sticky;top:0;z-index:30;
+    }
+    .topbar-title{font-family:'Orbitron',sans-serif;font-size:14px;font-weight:700;letter-spacing:.05em}
+    .topbar-actions{display:flex;align-items:center;gap:12px}
+    .topbar-plan-badge{
+      font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;
+      letter-spacing:.1em;padding:4px 12px;border-radius:20px;
+    }
+    .plan-free{background:rgba(255,255,255,0.06);color:var(--text2);border:1px solid var(--border)}
+    .plan-pro{background:rgba(255,184,0,0.12);color:var(--amber);border:1px solid rgba(255,184,0,0.25)}
+    .plan-ultimate{background:rgba(189,0,255,0.12);color:var(--purple);border:1px solid rgba(189,0,255,0.25)}
+    .mobile-menu-btn{display:none;background:none;border:none;color:var(--text);padding:4px}
+
+    /* Page Content */
+    .page{padding:28px;flex:1;display:none}
+    .page.active{display:block}
+
+    /* ===== CARDS ===== */
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px}
+    .card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+    .card-title{font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--text2);text-transform:uppercase}
+    .card-value{font-family:'JetBrains Mono',monospace;font-size:28px;font-weight:700}
+    .card-sub{font-size:12px;color:var(--muted);margin-top:4px}
+
+    /* Stats Grid */
+    .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;margin-bottom:24px}
+
+    /* ===== TABLES ===== */
+    .table-wrap{overflow-x:auto;border-radius:12px;border:1px solid var(--border)}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th{padding:10px 16px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border);background:var(--card2);white-space:nowrap}
+    td{padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.04);color:var(--text2)}
+    tr:last-child td{border-bottom:none}
+    tr:hover td{background:rgba(255,255,255,0.02)}
+
+    /* ===== BADGES ===== */
+    .badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px}
+    .badge-online{background:rgba(57,255,20,0.1);color:var(--green);border:1px solid rgba(57,255,20,0.2)}
+    .badge-offline{background:rgba(255,42,42,0.1);color:var(--red);border:1px solid rgba(255,42,42,0.2)}
+    .badge-pro{background:rgba(255,184,0,0.1);color:var(--amber);border:1px solid rgba(255,184,0,0.2)}
+    .badge-ultimate{background:rgba(189,0,255,0.1);color:var(--purple);border:1px solid rgba(189,0,255,0.2)}
+    .badge-free{background:rgba(255,255,255,0.06);color:var(--text2);border:1px solid var(--border)}
+    .dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+    .dot-green{background:var(--green);box-shadow:0 0 6px rgba(57,255,20,0.5)}
+    .dot-red{background:var(--red)}
+    .dot-amber{background:var(--amber)}
+
+    /* ===== BUTTONS ===== */
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;border:none;transition:opacity .15s,transform .15s}
+    .btn:hover{opacity:.9;transform:scale(1.02)}
+    .btn-primary{background:var(--cyan);color:#050505}
+    .btn-amber{background:var(--amber);color:#050505}
+    .btn-purple{background:var(--purple);color:#fff}
+    .btn-ghost{background:rgba(255,255,255,0.06);color:var(--text);border:1px solid var(--border)}
+    .btn-danger{background:rgba(255,42,42,0.12);color:var(--red);border:1px solid rgba(255,42,42,0.2)}
+    .btn-sm{padding:6px 12px;font-size:12px;border-radius:8px}
+
+    /* ===== FORMS ===== */
+    .form-group{margin-bottom:16px}
+    .form-label{display:block;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+    .form-input{width:100%;background:var(--card2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:12px 14px;font-size:14px;outline:none;transition:border-color .2s}
+    .form-input:focus{border-color:rgba(0,240,255,0.4)}
+    .form-input::placeholder{color:var(--muted)}
+    .form-select{width:100%;background:var(--card2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:12px 14px;font-size:14px;outline:none;appearance:none;cursor:pointer}
+    .form-hint{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5}
+    .form-toggle{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--card2);border:1px solid var(--border);border-radius:10px;cursor:pointer}
+    .toggle-switch{width:40px;height:22px;border-radius:11px;background:var(--muted);position:relative;transition:background .2s;flex-shrink:0}
+    .toggle-switch.on{background:var(--cyan)}
+    .toggle-switch::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s}
+    .toggle-switch.on::after{transform:translateX(18px)}
+
+    /* ===== SECTION HEADERS ===== */
+    .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+    .section-title{font-family:'Orbitron',sans-serif;font-size:16px;font-weight:800;letter-spacing:.03em}
+    .section-sub{font-size:13px;color:var(--muted);margin-top:4px}
+
+    /* ===== ALERTS ===== */
+    .alert{padding:14px 16px;border-radius:12px;font-size:13px;margin-bottom:16px;display:flex;align-items:flex-start;gap:10px}
+    .alert-info{background:rgba(0,240,255,0.06);border:1px solid rgba(0,240,255,0.15);color:var(--cyan)}
+    .alert-warn{background:rgba(255,184,0,0.06);border:1px solid rgba(255,184,0,0.15);color:var(--amber)}
+    .alert-error{background:rgba(255,42,42,0.06);border:1px solid rgba(255,42,42,0.15);color:var(--red)}
+    .alert-success{background:rgba(57,255,20,0.06);border:1px solid rgba(57,255,20,0.15);color:var(--green)}
+
+    /* ===== LOGIN PAGE ===== */
+    #loginPage{
+      display:none;position:fixed;inset:0;z-index:100;
+      background:var(--bg);
+      align-items:center;justify-content:center;
+      flex-direction:column;gap:0;
+    }
+    #loginPage.visible{display:flex}
+    .login-card{
+      background:var(--surface);border:1px solid var(--border);border-radius:24px;
+      padding:48px 40px;max-width:420px;width:100%;text-align:center;
+    }
+    .login-logo{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:32px;font-family:'Orbitron',sans-serif;font-weight:800;font-size:20px}
+    .login-logo em{color:var(--cyan);font-style:normal}
+    .login-title{font-family:'Orbitron',sans-serif;font-size:18px;font-weight:800;margin-bottom:8px}
+    .login-sub{font-size:14px;color:var(--text2);margin-bottom:32px;line-height:1.6}
+    .discord-btn{
+      display:flex;align-items:center;justify-content:center;gap:12px;
+      width:100%;padding:16px 24px;border-radius:14px;
+      background:#5865F2;color:#fff;border:none;
+      font-size:15px;font-weight:700;cursor:pointer;
+      transition:background .2s,transform .15s;
+    }
+    .discord-btn:hover{background:#4752c4;transform:scale(1.02)}
+    .login-note{font-size:11px;color:var(--muted);margin-top:16px;line-height:1.6}
+
+    /* ===== LOADING ===== */
+    .loading-spinner{display:flex;align-items:center;justify-content:center;padding:60px;color:var(--muted);gap:12px;font-size:14px}
+    .spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--cyan);border-radius:50%;animation:spin .8s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* ===== EMPTY STATE ===== */
+    .empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+    .empty-state svg{margin-bottom:16px;opacity:.4}
+    .empty-state h3{font-size:16px;font-weight:600;color:var(--text2);margin-bottom:8px}
+    .empty-state p{font-size:13px;line-height:1.6}
+
+    /* ===== OVERVIEW PAGE ===== */
+    .live-status-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:24px}
+    .live-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;display:flex;align-items:center;gap:14px}
+    .live-card-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .live-card-info{flex:1;min-width:0}
+    .live-card-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .live-card-sub{font-size:12px;color:var(--muted);margin-top:2px}
+
+    /* ===== LICENSE PAGE ===== */
+    .license-hero{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:28px;margin-bottom:24px}
+    .license-plan-name{font-family:'Orbitron',sans-serif;font-size:24px;font-weight:800;margin-bottom:4px}
+    .license-meta{display:flex;flex-wrap:wrap;gap:20px;margin-top:16px}
+    .license-meta-item{display:flex;flex-direction:column;gap:4px}
+    .license-meta-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+    .license-meta-value{font-size:14px;font-weight:600;font-family:'JetBrains Mono',monospace}
+
+    /* ===== SETTINGS PAGE ===== */
+    .settings-section{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px}
+    .settings-section-title{font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--text2);text-transform:uppercase;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+
+    /* ===== EVENTS PAGE ===== */
+    .event-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px;display:flex;align-items:center;gap:16px}
+    .event-time{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--cyan);flex-shrink:0;min-width:80px}
+    .event-info{flex:1;min-width:0}
+    .event-name{font-size:14px;font-weight:600}
+    .event-sub{font-size:12px;color:var(--muted);margin-top:2px}
+    .event-actions{display:flex;gap:8px;flex-shrink:0}
+
+    /* ===== MOBILE ===== */
+    @media(max-width:768px){
+      .sidebar{transform:translateX(-100%)}
+      .sidebar.open{transform:translateX(0)}
+      .main{margin-left:0}
+      .mobile-menu-btn{display:block}
+      .page{padding:16px}
+      .stats-grid{grid-template-columns:1fr 1fr}
+      .live-status-grid{grid-template-columns:1fr}
+    }
+    @media(max-width:480px){
+      .stats-grid{grid-template-columns:1fr}
+      .login-card{padding:32px 24px}
+    }
+
+    /* ===== UPGRADE BANNER ===== */
+    .upgrade-banner{
+      background:linear-gradient(135deg,rgba(255,184,0,0.08),rgba(189,0,255,0.06));
+      border:1px solid rgba(255,184,0,0.2);border-radius:16px;
+      padding:20px 24px;margin-bottom:24px;
+      display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    }
+    .upgrade-banner-text h3{font-family:'Orbitron',sans-serif;font-size:14px;font-weight:700;color:var(--amber);margin-bottom:4px}
+    .upgrade-banner-text p{font-size:13px;color:var(--text2)}
+
+    /* ===== TOAST ===== */
+    #toast{
+      position:fixed;bottom:24px;right:24px;z-index:999;
+      display:flex;flex-direction:column;gap:8px;pointer-events:none;
+    }
+    .toast-item{
+      background:var(--card);border:1px solid var(--border);border-radius:12px;
+      padding:12px 16px;font-size:13px;font-weight:500;
+      display:flex;align-items:center;gap:10px;
+      animation:toastIn .3s ease;pointer-events:auto;
+      max-width:320px;
+    }
+    .toast-success{border-color:rgba(57,255,20,0.3);color:var(--green)}
+    .toast-error{border-color:rgba(255,42,42,0.3);color:var(--red)}
+    .toast-info{border-color:rgba(0,240,255,0.3);color:var(--cyan)}
+    @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+    /* ===== SIDEBAR OVERLAY (mobile) ===== */
+    #sidebarOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:39}
+    #sidebarOverlay.visible{display:block}
+  </style>
+</head>
+<body>
+
+<!-- Login Page -->
+<div id="loginPage">
+  <div class="login-card">
+    <div class="login-logo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00F0FF" stroke-width="2"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg>
+      OMNI<em>FM</em>
+    </div>
+    <h1 class="login-title">Dashboard</h1>
+    <p class="login-sub">Melde dich mit deinem Discord-Account an um deinen Server zu verwalten.</p>
+    <button class="discord-btn" id="loginBtn">
+      <svg width="20" height="16" viewBox="0 0 71 55" fill="currentColor"><path d="M60.1 4.9A58.5 58.5 0 0045.4.2a.2.2 0 00-.2.1 40.8 40.8 0 00-1.8 3.7 54 54 0 00-16.2 0A37.3 37.3 0 0025.4.3a.2.2 0 00-.2-.1A58.4 58.4 0 0010.5 5 59.6 59.6 0 00.4 45a.3.3 0 00.1.2 58.7 58.7 0 0017.7 9 .2.2 0 00.3-.1 42 42 0 003.6-5.9.2.2 0 00-.1-.3 38.7 38.7 0 01-5.5-2.6.2.2 0 01 0-.4l1.1-.9a.2.2 0 01.2 0 41.9 41.9 0 0035.6 0 .2.2 0 01.3 0l1 .9a.2.2 0 010 .3 36.4 36.4 0 01-5.5 2.7.2.2 0 00-.1.3 47.2 47.2 0 003.6 5.8.2.2 0 00.3.1A58.5 58.5 0 0070 45.2a.3.3 0 00.1-.2c1.6-16.4-2.6-30.6-11-43.2zM23.7 37c-3.7 0-6.8-3.4-6.8-7.7s3-7.6 6.8-7.6 6.9 3.4 6.8 7.6c0 4.3-3 7.7-6.8 7.7zm25.2 0c-3.7 0-6.8-3.4-6.8-7.7s3-7.6 6.8-7.6 6.9 3.4 6.8 7.6c0 4.3-3 7.7-6.8 7.7z"/></svg>
+      Mit Discord anmelden
+    </button>
+    <p class="login-note">Nur Server auf denen du Admin-Rechte hast werden angezeigt.<br>Pro/Ultimate-Features erfordern eine aktive Lizenz.</p>
+    <p id="loginError" style="color:#FF2A2A;font-size:12px;margin-top:12px;display:none"></p>
+  </div>
+</div>
+
+<!-- Sidebar Overlay (mobile) -->
+<div id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<!-- App -->
+<div id="app" style="display:none">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00F0FF" stroke-width="2"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49"/></svg>
+      OMNI<em>FM</em>
+    </div>
+
+    <div class="server-switcher">
+      <div class="server-switcher-label">Server</div>
+      <select class="server-select" id="serverSelect" onchange="onServerChange()">
+        <option value="">Server wählen...</option>
+      </select>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Übersicht</div>
+      <div class="nav-item active" data-page="overview" onclick="showPage('overview')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Übersicht
+      </div>
+      <div class="nav-item" data-page="stats" onclick="showPage('stats')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Statistiken
+        <span class="nav-badge pro">PRO</span>
+      </div>
+
+      <div class="nav-section-label" style="margin-top:8px">Verwaltung</div>
+      <div class="nav-item" data-page="license" onclick="showPage('license')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+        Lizenz
+      </div>
+      <div class="nav-item" data-page="events" onclick="showPage('events')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Events
+        <span class="nav-badge pro">PRO</span>
+      </div>
+      <div class="nav-item" data-page="custom-stations" onclick="showPage('custom-stations')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49"/></svg>
+        Custom Stationen
+        <span class="nav-badge ultimate">ULT</span>
+      </div>
+      <div class="nav-item" data-page="perms" onclick="showPage('perms')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Berechtigungen
+        <span class="nav-badge pro">PRO</span>
+      </div>
+
+      <div class="nav-section-label" style="margin-top:8px">Einstellungen</div>
+      <div class="nav-item" data-page="settings" onclick="showPage('settings')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Einstellungen
+        <span class="nav-badge pro">PRO</span>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="userAvatar">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#52525B" stroke-width="2" style="margin:8px"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div class="user-name" id="userName">–</div>
+          <div class="user-tag" id="userTag">–</div>
+        </div>
+        <button class="logout-btn" onclick="logout()" title="Abmelden">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <!-- Topbar -->
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="mobile-menu-btn" onclick="openSidebar()">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <span class="topbar-title" id="topbarTitle">Übersicht</span>
+      </div>
+      <div class="topbar-actions">
+        <span class="topbar-plan-badge plan-free" id="planBadge">FREE</span>
+        <a href="/" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding:6px 10px;border-radius:8px;border:1px solid var(--border);transition:color .2s" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--muted)'">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          Startseite
+        </a>
+      </div>
+    </div>
+
+    <!-- ===== OVERVIEW PAGE ===== -->
+    <div class="page active" id="page-overview">
+      <div class="section-header">
+        <div>
+          <h1 class="section-title">Übersicht</h1>
+          <p class="section-sub" id="overviewServerName">Wähle einen Server aus</p>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="loadOverview()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.08-4.43"/></svg>
+          Aktualisieren
+        </button>
+      </div>
+
+      <div id="overviewContent">
+        <div class="empty-state">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          <h3>Kein Server ausgewählt</h3>
+          <p>Wähle oben links einen Server aus um die Übersicht zu sehen.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== STATS PAGE ===== -->
+    <div class="page" id="page-stats">
+      <div class="section-header">
+        <div>
+          <h1 class="section-title">Statistiken</h1>
+          <p class="section-sub">Hörer, Sessions und Incidents</p>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="loadStats()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.08-4.43"/></svg>
+          Aktualisieren
+        </button>
+      </div>
+      <div id="statsContent"><div class="loading-spinner"><div class="spinner"></div> Lade...</div></div>
+    </div>
+
+    <!-- ===== LICENSE PAGE ===== -->
+    <div class="page" id="page-license">
+      <div class="section-header">
+        <div>
+          <h1 class="section-title">Lizenz</h1>
+          <p class="section-sub">Plan, Ablaufdatum und Server-Verknüpfung</p>
+        </div>
+      </div>
+      <div id="licenseContent"><div class="loading-spinner"><div class="spinner"></div> Lade...</div></div>
+    </div>
+
+    <!-- ===== EVENTS PAGE ===== -->
+    <div class="page" id="page-events">
+      <div class="section-header">
+        <div>
+          <h1 class="section-title">Events</h1>
+          <p class="section-sub">Geplante Auto-Starts mit Wiederholung</p>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="showCreateEvent()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Event erstellen
+        </button>
+      </div>
+      <div id="eventsContent"><div class="loading-spinner"><div class="spinner"></div> Lade...</div></div>
+    </div>
+
+    <!-- ===== CUSTOM STATIONS PAGE ===== -->
+    <div class="page" id="page-custom-stations">
+      <div class="section-header">
+        <div>
+          <h1 class="section-title">Custom Stationen</h1>
+          <p class="section-sub">Eigene Stream-URLs hinzufügen (Ultimate)</p>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="showAddStation()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Station hinzufügen
+        </button>
+      </div>
+      <div id="customStationsContent"><div class="loading-spinner"><div class="spinner"></div> Lade...</div></div>
+    </div>
+
+    <!-- ===== PERMS PAGE ===== -->
+    <div class="page" id="page-perms">
+      <div class="section-header">
+        <div>
+          <h1 class="section-title">Berechtigungen</h1>
+          <p class="section-sub">Rollen-Rechte für Commands verwalten</p>
+        </div>
+      </div>
+      <div id="permsContent"><div class="loading-spinner"><div class="spinner"></div> Lade...</div></div>
+    </div>
+
+    <!-- ===== SETTINGS PAGE ===== -->
+    <div class="page" id="page-settings">
+      <div class="section-header">
+        <div>
+          <h1 class="section-title">Einstellungen</h1>
+          <p class="section-sub">Voice Guard, Failover, Webhooks, Weekly Digest</p>
+        </div>
+      </div>
+      <div id="settingsContent"><div class="loading-spinner"><div class="spinner"></div> Lade...</div></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Toast Container -->
+<div id="toast"></div>
+
+<script>
+// ============================================================
+// OmniFM Dashboard v1.0
+// ============================================================
+
+var state = {
+  session: null,
+  guilds: [],
+  currentGuildId: null,
+  capabilities: null,
+  license: null,
+  plan: 'free',
+};
+
+// --- Helpers ---
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmtDate(iso) {
+  if (!iso) return '–';
+  try { return new Date(iso).toLocaleDateString('de-AT', {day:'2-digit',month:'2-digit',year:'numeric'}); } catch { return iso; }
+}
+function fmtNum(n) {
+  return new Intl.NumberFormat('de-DE').format(Number(n) || 0);
+}
+function fmtUptime(s) {
+  var h = Math.floor(s/3600), m = Math.floor((s%3600)/60);
+  return h > 0 ? h + 'h ' + m + 'm' : m + 'm';
+}
+
+// --- Toast ---
+function toast(msg, type) {
+  var container = document.getElementById('toast');
+  var el = document.createElement('div');
+  el.className = 'toast-item toast-' + (type || 'info');
+  var icon = type === 'success' ? '✓' : type === 'error' ? '✗' : 'ℹ';
+  el.innerHTML = '<span>' + icon + '</span><span>' + esc(msg) + '</span>';
+  container.appendChild(el);
+  setTimeout(function() { el.remove(); }, 4000);
+}
+
+// --- API ---
+async function api(path, opts) {
+  var res = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts || {}));
+  var data = await res.json().catch(function() { return {}; });
+  if (!res.ok) throw Object.assign(new Error(data.error || data.message || 'HTTP ' + res.status), { status: res.status, data });
+  return data;
+}
+
+// --- Auth ---
+async function initAuth() {
+  // Check for OAuth callback
+  var params = new URLSearchParams(location.search);
+  var authError = params.get('auth_error');
+  if (authError) {
+    document.getElementById('loginError').textContent = decodeURIComponent(authError);
+    document.getElementById('loginError').style.display = 'block';
+    history.replaceState({}, '', location.pathname);
+  }
+
+  try {
+    var data = await api('/api/dashboard/guilds');
+    state.guilds = data.guilds || [];
+    if (state.guilds.length > 0) {
+      showApp();
+    } else {
+      showLogin();
+    }
+  } catch (e) {
+    if (e.status === 401) {
+      showLogin();
+    } else {
+      showLogin();
+      document.getElementById('loginError').textContent = 'Verbindungsfehler: ' + e.message;
+      document.getElementById('loginError').style.display = 'block';
+    }
+  }
+}
+
+function showLogin() {
+  document.getElementById('loginPage').classList.add('visible');
+  document.getElementById('app').style.display = 'none';
+}
+
+function showApp() {
+  document.getElementById('loginPage').classList.remove('visible');
+  document.getElementById('app').style.display = 'flex';
+  populateServerSelect();
+  if (state.guilds.length > 0) {
+    var savedGuild = localStorage.getItem('omnifm_dashboard_guild');
+    var guild = state.guilds.find(function(g) { return g.id === savedGuild; }) || state.guilds[0];
+    document.getElementById('serverSelect').value = guild.id;
+    selectGuild(guild.id);
+  }
+}
+
+document.getElementById('loginBtn').addEventListener('click', async function() {
+  try {
+    var data = await api('/api/auth/discord/login?nextPage=/dashboard');
+    if (data.redirectUrl) {
+      window.location.href = data.redirectUrl;
+    }
+  } catch (e) {
+    document.getElementById('loginError').textContent = e.message;
+    document.getElementById('loginError').style.display = 'block';
+  }
+});
+
+function logout() {
+  fetch('/api/auth/discord/logout', { method: 'POST' })
+    .finally(function() { window.location.href = '/dashboard'; });
+}
+
+// --- Server Select ---
+function populateServerSelect() {
+  var sel = document.getElementById('serverSelect');
+  sel.innerHTML = '';
+  state.guilds.forEach(function(g) {
+    var opt = document.createElement('option');
+    opt.value = g.id;
+    opt.textContent = g.name || g.id;
+    sel.appendChild(opt);
+  });
+}
+
+function onServerChange() {
+  var guildId = document.getElementById('serverSelect').value;
+  if (guildId) selectGuild(guildId);
+}
+
+async function selectGuild(guildId) {
+  state.currentGuildId = guildId;
+  localStorage.setItem('omnifm_dashboard_guild', guildId);
+  var guild = state.guilds.find(function(g) { return g.id === guildId; });
+  document.getElementById('overviewServerName').textContent = guild ? guild.name : guildId;
+
+  // Load capabilities
+  try {
+    var caps = await api('/api/dashboard/capabilities?serverId=' + guildId);
+    state.capabilities = caps;
+    state.plan = caps.plan || 'free';
+    updatePlanBadge(state.plan);
+  } catch (e) {
+    state.capabilities = null;
+    state.plan = 'free';
+    updatePlanBadge('free');
+  }
+
+  // Reload current page
+  var activePage = document.querySelector('.nav-item.active');
+  if (activePage) loadPage(activePage.dataset.page);
+}
+
+function updatePlanBadge(plan) {
+  var badge = document.getElementById('planBadge');
+  badge.textContent = plan.toUpperCase();
+  badge.className = 'topbar-plan-badge plan-' + plan;
+}
+
+// --- Navigation ---
+var PAGE_TITLES = {
+  overview: 'Übersicht',
+  stats: 'Statistiken',
+  license: 'Lizenz',
+  events: 'Events',
+  'custom-stations': 'Custom Stationen',
+  perms: 'Berechtigungen',
+  settings: 'Einstellungen',
+};
+
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
+  var pageEl = document.getElementById('page-' + page);
+  if (pageEl) pageEl.classList.add('active');
+  var navEl = document.querySelector('[data-page="' + page + '"]');
+  if (navEl) navEl.classList.add('active');
+  document.getElementById('topbarTitle').textContent = PAGE_TITLES[page] || page;
+  loadPage(page);
+  closeSidebar();
+  history.replaceState({}, '', '/dashboard?page=' + page + (state.currentGuildId ? '&server=' + state.currentGuildId : ''));
+}
+
+function loadPage(page) {
+  if (!state.currentGuildId) return;
+  if (page === 'overview') loadOverview();
+  else if (page === 'stats') loadStats();
+  else if (page === 'license') loadLicense();
+  else if (page === 'events') loadEvents();
+  else if (page === 'custom-stations') loadCustomStations();
+  else if (page === 'perms') loadPerms();
+  else if (page === 'settings') loadSettings();
+}
+
+// --- Mobile Sidebar ---
+function openSidebar() {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebarOverlay').classList.add('visible');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('visible');
+}
+
+// --- Pro Gate ---
+function requirePro(el) {
+  if (state.plan === 'free') {
+    el.innerHTML = buildUpgradeBanner('Pro', 'Diese Funktion ist ab Pro verfügbar.', 'pro');
+    return true;
+  }
+  return false;
+}
+function requireUltimate(el) {
+  if (state.plan !== 'ultimate') {
+    el.innerHTML = buildUpgradeBanner('Ultimate', 'Diese Funktion ist nur für Ultimate-Nutzer verfügbar.', 'ultimate');
+    return true;
+  }
+  return false;
+}
+function buildUpgradeBanner(plan, msg, tier) {
+  var color = tier === 'ultimate' ? 'var(--purple)' : 'var(--amber)';
+  return '<div class="upgrade-banner"><div class="upgrade-banner-text"><h3>' + plan + ' erforderlich</h3><p>' + esc(msg) + '</p></div>'
+    + '<a href="/#premium" class="btn" style="background:' + color + ';color:' + (tier === 'ultimate' ? '#fff' : '#050505') + ';border:none">Upgrade</a></div>';
+}
+
+// ============================================================
+// OVERVIEW
+// ============================================================
+async function loadOverview() {
+  var el = document.getElementById('overviewContent');
+  if (!state.currentGuildId) return;
+  el.innerHTML = '<div class="loading-spinner"><div class="spinner"></div> Lade...</div>';
+  try {
+    var data = await api('/api/dashboard/stats?serverId=' + state.currentGuildId);
+    renderOverview(el, data);
+  } catch (e) {
+    el.innerHTML = '<div class="alert alert-error"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' + esc(e.message) + '</div>';
+  }
+}
+
+function renderOverview(el, data) {
+  var stats = data.stats || {};
+  var bots = data.bots || [];
+  var html = '';
+
+  // Stats Cards
+  html += '<div class="stats-grid">';
+  html += statCard('Gesamte Sessions', fmtNum(stats.totalSessions || 0), 'var(--cyan)', svgIcon('clock'));
+  html += statCard('Gesamte Hörer', fmtNum(stats.totalListeners || 0), 'var(--green)', svgIcon('users'));
+  html += statCard('Ø Session-Dauer', formatDuration(stats.avgSessionDurationMs), 'var(--amber)', svgIcon('timer'));
+  html += statCard('Aktive Verbindungen', fmtNum(stats.activeConnections || 0), 'var(--purple)', svgIcon('radio'));
+  html += '</div>';
+
+  // Live Bot Status
+  if (bots.length > 0) {
+    html += '<h2 style="font-family:Orbitron,sans-serif;font-size:13px;font-weight:700;letter-spacing:.08em;color:var(--text2);text-transform:uppercase;margin-bottom:12px">Live Bot Status</h2>';
+    html += '<div class="live-status-grid">';
+    bots.forEach(function(bot) {
+      var color = bot.online ? 'var(--green)' : 'var(--muted)';
+      html += '<div class="live-card">'
+        + '<div class="live-card-icon" style="background:' + (bot.online ? 'rgba(57,255,20,0.08)' : 'rgba(255,255,255,0.04)') + ';border:1px solid ' + (bot.online ? 'rgba(57,255,20,0.2)' : 'var(--border)') + '">'
+        + '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="' + color + '" stroke-width="2"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49"/></svg>'
+        + '</div>'
+        + '<div class="live-card-info">'
+        + '<div class="live-card-name">' + esc(bot.name || 'Bot') + '</div>'
+        + '<div class="live-card-sub">'
+        + (bot.online
+          ? '<span class="dot dot-green" style="margin-right:5px"></span>Online · ' + (bot.playing ? '▶ ' + esc(bot.station || 'Spielt') : 'Bereit')
+          : '<span class="dot dot-red" style="margin-right:5px"></span>Offline')
+        + '</div>'
+        + '</div>'
+        + (bot.uptime ? '<div style="font-size:11px;color:var(--muted);font-family:JetBrains Mono,monospace;flex-shrink:0">' + fmtUptime(bot.uptime) + '</div>' : '')
+        + '</div>';
+    });
+    html += '</div>';
+  }
+
+  // Top Stations
+  if (stats.topStations && stats.topStations.length > 0) {
+    html += '<div class="card" style="margin-top:20px">';
+    html += '<div class="card-header"><span class="card-title">Top Stationen</span></div>';
+    html += '<div class="table-wrap"><table><thead><tr><th>Station</th><th>Sessions</th><th>Hörer</th></tr></thead><tbody>';
+    stats.topStations.slice(0, 10).forEach(function(s) {
+      html += '<tr><td><strong>' + esc(s.name || s.key) + '</strong></td><td>' + fmtNum(s.sessions) + '</td><td>' + fmtNum(s.listeners) + '</td></tr>';
+    });
+    html += '</tbody></table></div></div>';
+  }
+
+  el.innerHTML = html;
+}
+
+function statCard(label, value, color, icon) {
+  return '<div class="card">'
+    + '<div class="card-header"><span class="card-title">' + esc(label) + '</span>' + icon + '</div>'
+    + '<div class="card-value" style="color:' + color + '">' + value + '</div>'
+    + '</div>';
+}
+
+function formatDuration(ms) {
+  if (!ms) return '–';
+  var s = Math.floor(ms / 1000);
+  var m = Math.floor(s / 60);
+  var h = Math.floor(m / 60);
+  if (h > 0) return h + 'h ' + (m % 60) + 'm';
+  return m + 'm ' + (s % 60) + 's';
+}
+
+function svgIcon(name) {
+  var icons = {
+    clock: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+    users: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+    timer: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+    radio: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49"/></svg>',
+  };
+  return icons[name] || '';
+}
+
+// ============================================================
+// STATS
+// ============================================================
+async function loadStats() {
+  var el = document.getElementById('statsContent');
+  if (!state.currentGuildId) return;
+  if (requirePro(el)) return;
+  el.innerHTML = '<div class="loading-spinner"><div class="spinner"></div> Lade...</div>';
+  try {
+    var data = await api('/api/dashboard/stats?serverId=' + state.currentGuildId + '&detail=1');
+    renderStats(el, data);
+  } catch (e) {
+    el.innerHTML = '<div class="alert alert-error">' + esc(e.message) + '</div>';
+  }
+}
+
+function renderStats(el, data) {
+  var stats = data.stats || {};
+  var incidents = data.incidents || [];
+  var html = '';
+
+  html += '<div class="stats-grid">';
+  html += statCard('Sessions (7 Tage)', fmtNum(stats.sessions7d || 0), 'var(--cyan)', svgIcon('clock'));
+  html += statCard('Sessions (30 Tage)', fmtNum(stats.sessions30d || 0), 'var(--green)', svgIcon('clock'));
+  html += statCard('Einzigartige Hörer', fmtNum(stats.uniqueListeners || 0), 'var(--amber)', svgIcon('users'));
+  html += statCard('Reconnects', fmtNum(stats.reconnects || 0), 'var(--purple)', svgIcon('radio'));
+  html += '</div>';
+
+  if (incidents.length > 0) {
+    html += '<div class="card">';
+    html += '<div class="card-header"><span class="card-title">Incidents</span>'
+      + '<button class="btn btn-ghost btn-sm" onclick="loadStats()">Aktualisieren</button></div>';
+    html += '<div class="table-wrap"><table><thead><tr><th>Zeit</th><th>Typ</th><th>Nachricht</th><th>Status</th></tr></thead><tbody>';
+    incidents.forEach(function(inc) {
+      var statusColor = inc.status === 'open' ? 'var(--red)' : 'var(--green)';
+      html += '<tr>'
+        + '<td style="font-size:11px;color:var(--muted);white-space:nowrap">' + esc(fmtDate(inc.timestamp)) + '</td>'
+        + '<td><span class="badge badge-' + (inc.level === 'ERROR' ? 'offline' : 'free') + '">' + esc(inc.level || 'INFO') + '</span></td>'
+        + '<td style="max-width:400px">' + esc(inc.message || '') + '</td>'
+        + '<td><span style="color:' + statusColor + ';font-size:12px;font-weight:600">' + esc(inc.status || 'open') + '</span></td>'
+        + '</tr>';
+    });
+    html += '</tbody></table></div></div>';
+  } else {
+    html += '<div class="alert alert-success"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Keine Incidents – alles läuft stabil!</div>';
+  }
+
+  el.innerHTML = html;
+}
+
+// ============================================================
+// LICENSE
+// ============================================================
+async function loadLicense() {
+  var el = document.getElementById('licenseContent');
+  if (!state.currentGuildId) return;
+  el.innerHTML = '<div class="loading-spinner"><div class="spinner"></div> Lade...</div>';
+  try {
+    var data = await api('/api/dashboard/license?serverId=' + state.currentGuildId);
+    renderLicense(el, data);
+  } catch (e) {
+    el.innerHTML = '<div class="alert alert-error">' + esc(e.message) + '</div>';
+  }
+}
+
+function renderLicense(el, data) {
+  var lic = data.license || {};
+  var plan = lic.plan || lic.tier || 'free';
+  var planColors = { free: 'var(--text2)', pro: 'var(--amber)', ultimate: 'var(--purple)' };
+  var color = planColors[plan] || 'var(--text2)';
+  var isActive = lic.active && !lic.expired;
+  var html = '';
+
+  html += '<div class="license-hero">';
+  html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">';
+  html += '<div style="width:48px;height:48px;border-radius:14px;background:' + color + '12;border:1px solid ' + color + '30;display:flex;align-items:center;justify-content:center">';
+  html += '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="' + color + '" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>';
+  html += '</div>';
+  html += '<div>';
+  html += '<div class="license-plan-name" style="color:' + color + '">' + plan.toUpperCase() + '</div>';
+  html += '<div style="font-size:13px;color:var(--muted)">' + (isActive ? '✓ Aktiv' : '✗ Inaktiv / Abgelaufen') + '</div>';
+  html += '</div></div>';
+
+  html += '<div class="license-meta">';
+  if (lic.expiresAt) {
+    html += metaItem('Läuft ab', fmtDate(lic.expiresAt));
+  }
+  if (lic.seats) {
+    html += metaItem('Server', lic.seats + ' Server');
+  }
+  if (lic.contactEmail) {
+    html += metaItem('E-Mail', lic.contactEmail);
+  }
+  if (lic.licenseKey) {
+    html += metaItem('Lizenz-Key', lic.licenseKey.slice(0, 8) + '…');
+  }
+  html += '</div>';
+  html += '</div>';
+
+  // Linked Servers
+  if (lic.linkedServerIds && lic.linkedServerIds.length > 0) {
+    html += '<div class="card" style="margin-bottom:16px">';
+    html += '<div class="card-header"><span class="card-title">Verknüpfte Server</span></div>';
+    lic.linkedServerIds.forEach(function(sid) {
+      var isCurrent = sid === state.currentGuildId;
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">'
+        + '<span style="font-family:JetBrains Mono,monospace;font-size:13px">' + esc(sid) + (isCurrent ? ' <span style="color:var(--cyan);font-size:11px">(dieser Server)</span>' : '') + '</span>'
+        + (!isCurrent ? '<button class="btn btn-danger btn-sm" onclick="unlinkServer(\'' + esc(sid) + '\')">Trennen</button>' : '')
+        + '</div>';
+    });
+    html += '</div>';
+  }
+
+  // Actions
+  if (plan === 'free') {
+    html += '<div class="upgrade-banner"><div class="upgrade-banner-text"><h3>Upgrade auf Pro oder Ultimate</h3><p>Mehr Bots, bessere Audioqualität, schnellerer Reconnect und exklusive Features.</p></div>'
+      + '<a href="/#premium" class="btn btn-amber">Upgrade</a></div>';
+  } else {
+    html += '<div class="card">';
+    html += '<div class="card-header"><span class="card-title">E-Mail aktualisieren</span></div>';
+    html += '<div class="form-group"><label class="form-label">Neue E-Mail</label><input type="email" class="form-input" id="licenseEmailInput" placeholder="neue@email.de" value="' + esc(lic.contactEmail || '') + '"/></div>';
+    html += '<button class="btn btn-primary" onclick="updateLicenseEmail()">Speichern</button>';
+    html += '</div>';
+  }
+
+  el.innerHTML = html;
+}
+
+function metaItem(label, value) {
+  return '<div class="license-meta-item"><span class="license-meta-label">' + esc(label) + '</span><span class="license-meta-value">' + esc(value) + '</span></div>';
+}
+
+async function updateLicenseEmail() {
+  var email = document.getElementById('licenseEmailInput').value.trim();
+  if (!email) return;
+  try {
+    await api('/api/dashboard/license/email?serverId=' + state.currentGuildId, {
+      method: 'POST',
+      body: JSON.stringify({ email })
+    });
+    toast('E-Mail aktualisiert!', 'success');
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
+async function unlinkServer(serverId) {
+  if (!confirm('Server ' + serverId + ' wirklich trennen?')) return;
+  try {
+    await api('/api/dashboard/license/unlink?serverId=' + state.currentGuildId, {
+      method: 'POST',
+      body: JSON.stringify({ targetServerId: serverId })
+    });
+    toast('Server getrennt!', 'success');
+    loadLicense();
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
+// ============================================================
+// EVENTS
+// ============================================================
+async function loadEvents() {
+  var el = document.getElementById('eventsContent');
+  if (!state.currentGuildId) return;
+  if (requirePro(el)) return;
+  el.innerHTML = '<div class="loading-spinner"><div class="spinner"></div> Lade...</div>';
+  try {
+    var data = await api('/api/dashboard/events?serverId=' + state.currentGuildId);
+    renderEvents(el, data);
+  } catch (e) {
+    el.innerHTML = '<div class="alert alert-error">' + esc(e.message) + '</div>';
+  }
+}
+
+function renderEvents(el, data) {
+  var events = data.events || [];
+  if (events.length === 0) {
+    el.innerHTML = '<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><h3>Keine Events</h3><p>Erstelle geplante Auto-Starts mit /event create oder über den Button oben.</p></div>';
+    return;
+  }
+  var html = '';
+  events.forEach(function(ev) {
+    html += '<div class="event-card">'
+      + '<div class="event-time">' + esc(ev.time || ev.cron || '–') + '</div>'
+      + '<div class="event-info">'
+      + '<div class="event-name">' + esc(ev.station || ev.stationKey || '–') + '</div>'
+      + '<div class="event-sub">' + esc(ev.channel || '') + (ev.timezone ? ' · ' + ev.timezone : '') + (ev.repeat ? ' · ' + ev.repeat : '') + '</div>'
+      + '</div>'
+      + '<div class="event-actions">'
+      + '<button class="btn btn-danger btn-sm" onclick="deleteEvent(\'' + esc(ev.id) + '\')">Löschen</button>'
+      + '</div>'
+      + '</div>';
+  });
+  el.innerHTML = html;
+}
+
+async function deleteEvent(id) {
+  if (!confirm('Event wirklich löschen?')) return;
+  try {
+    await api('/api/dashboard/events/' + encodeURIComponent(id) + '?serverId=' + state.currentGuildId, { method: 'DELETE' });
+    toast('Event gelöscht!', 'success');
+    loadEvents();
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
+function showCreateEvent() {
+  toast('Nutze /event create im Discord um Events zu erstellen.', 'info');
+}
+
+// ============================================================
+// CUSTOM STATIONS
+// ============================================================
+async function loadCustomStations() {
+  var el = document.getElementById('customStationsContent');
+  if (!state.currentGuildId) return;
+  if (requireUltimate(el)) return;
+  el.innerHTML = '<div class="loading-spinner"><div class="spinner"></div> Lade...</div>';
+  try {
+    var data = await api('/api/dashboard/custom-stations?serverId=' + state.currentGuildId);
+    renderCustomStations(el, data);
+  } catch (e) {
+    el.innerHTML = '<div class="alert alert-error">' + esc(e.message) + '</div>';
+  }
+}
+
+function renderCustomStations(el, data) {
+  var stations = data.stations || [];
+  var limit = data.limit || 50;
+  var html = '<div class="alert alert-info" style="margin-bottom:16px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' + stations.length + ' / ' + limit + ' Custom Stationen verwendet</div>';
+
+  if (stations.length === 0) {
+    html += '<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49"/></svg><h3>Keine Custom Stationen</h3><p>Füge eigene Stream-URLs mit /addstation oder über den Button oben hinzu.</p></div>';
+    el.innerHTML = html;
+    return;
+  }
+
+  html += '<div class="table-wrap"><table><thead><tr><th>Key</th><th>Name</th><th>URL</th><th>Aktion</th></tr></thead><tbody>';
+  stations.forEach(function(s) {
+    html += '<tr>'
+      + '<td style="font-family:JetBrains Mono,monospace;font-size:12px;color:var(--muted)">' + esc(s.key) + '</td>'
+      + '<td><strong>' + esc(s.name) + '</strong></td>'
+      + '<td style="font-size:12px;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(s.url || '–') + '</td>'
+      + '<td><button class="btn btn-danger btn-sm" onclick="deleteCustomStation(\'' + esc(s.key) + '\')">Entfernen</button></td>'
+      + '</tr>';
+  });
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
+async function deleteCustomStation(key) {
+  if (!confirm('Station "' + key + '" wirklich entfernen?')) return;
+  try {
+    await api('/api/dashboard/custom-stations/' + encodeURIComponent(key) + '?serverId=' + state.currentGuildId, { method: 'DELETE' });
+    toast('Station entfernt!', 'success');
+    loadCustomStations();
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
+function showAddStation() {
+  toast('Nutze /addstation im Discord um Custom Stationen hinzuzufügen.', 'info');
+}
+
+// ============================================================
+// PERMS
+// ============================================================
+async function loadPerms() {
+  var el = document.getElementById('permsContent');
+  if (!state.currentGuildId) return;
+  if (requirePro(el)) return;
+  el.innerHTML = '<div class="loading-spinner"><div class="spinner"></div> Lade...</div>';
+  try {
+    var data = await api('/api/dashboard/perms?serverId=' + state.currentGuildId);
+    renderPerms(el, data);
+  } catch (e) {
+    el.innerHTML = '<div class="alert alert-error">' + esc(e.message) + '</div>';
+  }
+}
+
+function renderPerms(el, data) {
+  var perms = data.perms || [];
+  var html = '<div class="alert alert-info" style="margin-bottom:16px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Berechtigungen können auch mit /perm im Discord verwaltet werden.</div>';
+
+  if (perms.length === 0) {
+    html += '<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><h3>Keine Berechtigungen konfiguriert</h3><p>Standardmäßig können alle Nutzer alle Commands verwenden.</p></div>';
+    el.innerHTML = html;
+    return;
+  }
+
+  html += '<div class="table-wrap"><table><thead><tr><th>Command</th><th>Rolle</th><th>Erlaubt</th></tr></thead><tbody>';
+  perms.forEach(function(p) {
+    html += '<tr>'
+      + '<td><span style="font-family:JetBrains Mono,monospace;font-size:12px;color:var(--cyan)">' + esc(p.command) + '</span></td>'
+      + '<td>' + esc(p.roleName || p.roleId) + '</td>'
+      + '<td><span style="color:' + (p.allow ? 'var(--green)' : 'var(--red)') + ';font-weight:600">' + (p.allow ? '✓ Ja' : '✗ Nein') + '</span></td>'
+      + '</tr>';
+  });
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
+// ============================================================
+// SETTINGS
+// ============================================================
+async function loadSettings() {
+  var el = document.getElementById('settingsContent');
+  if (!state.currentGuildId) return;
+  if (requirePro(el)) return;
+  el.innerHTML = '<div class="loading-spinner"><div class="spinner"></div> Lade...</div>';
+  try {
+    var data = await api('/api/dashboard/settings?serverId=' + state.currentGuildId);
+    renderSettings(el, data);
+  } catch (e) {
+    el.innerHTML = '<div class="alert alert-error">' + esc(e.message) + '</div>';
+  }
+}
+
+function renderSettings(el, data) {
+  var settings = data.settings || {};
+  var vg = settings.voiceGuard || {};
+  var failover = settings.failover || {};
+  var webhook = settings.exportsWebhook || {};
+  var digest = settings.weeklyDigest || {};
+
+  var html = '';
+
+  // Voice Guard
+  html += '<div class="settings-section">';
+  html += '<div class="settings-section-title">Voice Guard</div>';
+  html += '<p style="font-size:13px;color:var(--text2);margin-bottom:16px">Stoppt die Wiedergabe automatisch wenn der Channel leer ist.</p>';
+  html += toggleRow('Voice Guard aktiviert', vg.enabled, 'voiceGuardEnabled');
+  html += '<div class="form-group" style="margin-top:12px"><label class="form-label">Timeout (Sekunden)</label><input type="number" class="form-input" id="voiceGuardTimeout" value="' + (vg.timeoutSeconds || 300) + '" min="30" max="3600"/></div>';
+  html += '<button class="btn btn-primary" style="margin-top:8px" onclick="saveVoiceGuard()">Speichern</button>';
+  html += '</div>';
+
+  // Failover Station
+  html += '<div class="settings-section">';
+  html += '<div class="settings-section-title">Failover Station</div>';
+  html += '<p style="font-size:13px;color:var(--text2);margin-bottom:16px">Fallback-Station wenn der primäre Stream ausfällt.</p>';
+  html += '<div class="form-group"><label class="form-label">Failover Station Key</label><input type="text" class="form-input" id="failoverStation" placeholder="z.B. lofi-hip-hop" value="' + esc(failover.stationKey || '') + '"/></div>';
+  html += '<button class="btn btn-primary" onclick="saveFailover()">Speichern</button>';
+  html += '</div>';
+
+  // Exports Webhook
+  html += '<div class="settings-section">';
+  html += '<div class="settings-section-title">Export Webhook</div>';
+  html += '<p style="font-size:13px;color:var(--text2);margin-bottom:16px">Sendet Events (Stream-Start/Stop, Incidents) an eine Webhook-URL.</p>';
+  html += '<div class="form-group"><label class="form-label">Webhook URL</label><input type="url" class="form-input" id="webhookUrl" placeholder="https://discord.com/api/webhooks/..." value="' + esc(webhook.url || '') + '"/></div>';
+  html += '<button class="btn btn-primary" onclick="saveWebhook()">Speichern</button>';
+  html += '</div>';
+
+  // Weekly Digest
+  html += '<div class="settings-section">';
+  html += '<div class="settings-section-title">Weekly Digest</div>';
+  html += '<p style="font-size:13px;color:var(--text2);margin-bottom:16px">Wöchentliche Zusammenfassung per E-Mail oder Discord-Channel.</p>';
+  html += toggleRow('Weekly Digest aktiviert', digest.enabled, 'digestEnabled');
+  html += '<div class="form-group" style="margin-top:12px"><label class="form-label">Kanal ID (optional)</label><input type="text" class="form-input" id="digestChannelId" placeholder="Discord Channel ID" value="' + esc(digest.channelId || '') + '"/></div>';
+  html += '<button class="btn btn-primary" onclick="saveDigest()">Speichern</button>';
+  html += '</div>';
+
+  el.innerHTML = html;
+}
+
+function toggleRow(label, value, id) {
+  return '<div class="form-toggle" onclick="toggleSwitch(\'' + id + '\')">'
+    + '<span style="font-size:14px;font-weight:500">' + esc(label) + '</span>'
+    + '<div class="toggle-switch ' + (value ? 'on' : '') + '" id="toggle-' + id + '" data-value="' + (value ? '1' : '0') + '"></div>'
+    + '</div>';
+}
+
+function toggleSwitch(id) {
+  var el = document.getElementById('toggle-' + id);
+  var isOn = el.dataset.value === '1';
+  el.dataset.value = isOn ? '0' : '1';
+  el.classList.toggle('on', !isOn);
+}
+
+function getToggle(id) {
+  var el = document.getElementById('toggle-' + id);
+  return el ? el.dataset.value === '1' : false;
+}
+
+async function saveVoiceGuard() {
+  try {
+    await api('/api/dashboard/settings?serverId=' + state.currentGuildId, {
+      method: 'POST',
+      body: JSON.stringify({
+        voiceGuard: {
+          enabled: getToggle('voiceGuardEnabled'),
+          timeoutSeconds: parseInt(document.getElementById('voiceGuardTimeout').value) || 300
+        }
+      })
+    });
+    toast('Voice Guard gespeichert!', 'success');
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function saveFailover() {
+  try {
+    await api('/api/dashboard/settings?serverId=' + state.currentGuildId, {
+      method: 'POST',
+      body: JSON.stringify({ failover: { stationKey: document.getElementById('failoverStation').value.trim() } })
+    });
+    toast('Failover Station gespeichert!', 'success');
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function saveWebhook() {
+  try {
+    await api('/api/dashboard/settings?serverId=' + state.currentGuildId, {
+      method: 'POST',
+      body: JSON.stringify({ exportsWebhook: { url: document.getElementById('webhookUrl').value.trim() } })
+    });
+    toast('Webhook gespeichert!', 'success');
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function saveDigest() {
+  try {
+    await api('/api/dashboard/settings?serverId=' + state.currentGuildId, {
+      method: 'POST',
+      body: JSON.stringify({
+        weeklyDigest: {
+          enabled: getToggle('digestEnabled'),
+          channelId: document.getElementById('digestChannelId').value.trim()
+        }
+      })
+    });
+    toast('Weekly Digest gespeichert!', 'success');
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+// ============================================================
+// INIT
+// ============================================================
+(function init() {
+  // Restore page from URL
+  var params = new URLSearchParams(location.search);
+  var page = params.get('page');
+  var server = params.get('server');
+  if (server) state.currentGuildId = server;
+
+  initAuth().then(function() {
+    if (page && document.getElementById('page-' + page)) {
+      showPage(page);
+    }
+  });
+})();
+</script>
+</body>
+</html>

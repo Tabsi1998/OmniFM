@@ -120,6 +120,12 @@
         <div class="hero-stat"><span class="stat-num" id="statStations">0</span><span class="stat-label">STATIONEN</span></div>
         <div class="hero-stat"><span class="stat-num" id="statBots">0</span><span class="stat-label">BOTS</span></div>
       </div>
+
+      <!-- Scroll Indicator -->
+      <div id="scrollIndicator" style="position:absolute;bottom:28px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;transition:opacity 0.4s;cursor:pointer" onclick="document.getElementById('bots').scrollIntoView({behavior:'smooth'})">
+        <span style="font-size:10px;font-weight:600;letter-spacing:0.15em;color:rgba(255,255,255,0.3);font-family:'Orbitron',sans-serif">SCROLL</span>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(0,240,255,0.5)" stroke-width="2" style="animation:scrollBounce 1.8s ease-in-out infinite"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
     </section>
 
     <!-- Bots Directory -->

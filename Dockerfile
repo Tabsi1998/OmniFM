@@ -6,7 +6,8 @@ FROM node:22-slim AS frontend-builder
 WORKDIR /frontend
 
 COPY frontend/package*.json ./
-RUN npm ci
+# npm ci für reproduzierbare Builds; package-lock.json muss aktuell sein
+RUN npm ci --no-audit --no-fund
 
 COPY frontend/ ./
 RUN npm run build

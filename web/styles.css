@@ -212,6 +212,38 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);ove
 .footer-gh:hover{color:#fff}
 .footer-love{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
 
+/* ===== SCROLL BOUNCE ANIMATION ===== */
+@keyframes scrollBounce {
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(6px)}
+}
+
+/* ===== NAVBAR SCROLL OFFSET FIX ===== */
+/* Sections bekommen padding-top = Navbar-Höhe (64px) + extra Abstand */
+section[id]{scroll-margin-top:80px}
+
+/* ===== STATION ITEM HOVER SLIDE ===== */
+.station-item{transition:background .2s,border-color .2s,transform .15s}
+.station-item:hover,.station-item:active{transform:translateX(4px)}
+
+/* ===== PREMIUM CARD MOBILE HERVORHEBUNG ===== */
+@media(max-width:900px){
+  .premium-card.featured{
+    border-color:rgba(255,184,0,0.4)!important;
+    background:rgba(255,184,0,0.04)!important;
+    position:relative;
+  }
+  .premium-card.featured::before{
+    content:'EMPFOHLEN';
+    position:absolute;
+    top:-12px;left:50%;transform:translateX(-50%);
+    background:#FFB800;color:#050505;
+    font-family:'Orbitron',sans-serif;font-size:9px;font-weight:800;
+    letter-spacing:0.12em;padding:4px 14px;border-radius:20px;
+    white-space:nowrap;
+  }
+}
+
 /* ===== MOBILE RESPONSIVE ===== */
 @media(max-width:900px){
   .features-grid{grid-template-columns:1fr 1fr}

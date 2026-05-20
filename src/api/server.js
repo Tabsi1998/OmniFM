@@ -3195,12 +3195,25 @@ function startWebServer(runtimes) {
 
     // --- Static file serving from the built frontend ---
     const normalizedPathname = normalizeSpaPathname(requestUrl.pathname);
+
+    // Dashboard SPA: /dashboard und /dashboard/* → dashboard.html
+    if (normalizedPathname === "/dashboard" || normalizedPathname.startsWith("/dashboard/")) {
+      const dashboardFile = path.join(webDir, "dashboard.html");
+      sendStaticFile(res, dashboardFile, { headOnly: req.method === "HEAD" });
+      return;
+    }
+
     const shouldServeSpaEntry = SPA_ENTRY_PATHS.has(normalizedPathname);
     const staticPath = shouldServeSpaEntry
       ? "index.html"
       : (normalizedPathname === "/" ? "index.html" : normalizedPathname.replace(/^\/+/, ""));
     const filePath = path.join(webDir, staticPath);
-    sendStaticFile(res, filePath, { headOnly: req.method === "HEAD" });
+
+    // 404-Fallback: Wenn statische Datei nicht existiert → 404.html
+    sendStaticFile(res, filePath, {
+      headOnly: req.method === "HEAD",
+      notFoundPath: path.join(webDir, "404.html"),
+    });
   });
 
   server.listen(webInternalPort, webBind, () => {

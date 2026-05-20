@@ -1572,3 +1572,95 @@ var _initialLoadTimer = setTimeout(function() {
 
 refresh().then(function() { clearTimeout(_initialLoadTimer); });
 setInterval(refresh, 15000);
+
+// --- Count-Up Animation für Hero-Stats ---
+var _countUpDone = false;
+function animateCounter(el, target, duration) {
+  if (!el) return;
+  var start = 0;
+  var startTime = null;
+  var num = Number(target) || 0;
+  if (num === 0) { el.textContent = '0'; return; }
+  function step(ts) {
+    if (!startTime) startTime = ts;
+    var progress = Math.min((ts - startTime) / (duration || 1200), 1);
+    // Ease-out cubic
+    var eased = 1 - Math.pow(1 - progress, 3);
+    var current = Math.round(eased * num);
+    el.textContent = new Intl.NumberFormat(APP_LOCALE).format(current);
+    if (progress < 1) requestAnimationFrame(step);
+    else el.textContent = new Intl.NumberFormat(APP_LOCALE).format(num);
+  }
+  requestAnimationFrame(step);
+}
+
+// Überschreibe fmtInt für Stats nach erstem Laden mit Animation
+var _origStatServers = document.getElementById('statServers');
+var _origStatStations = document.getElementById('statStations');
+var _origStatBots = document.getElementById('statBots');
+
+var _refreshOriginal = refresh;
+refresh = async function() {
+  try {
+    var results = await Promise.all([
+      fetchJson('/api/bots', 8000),
+      fetchJson('/api/stations', 8000),
+    ]);
+    var botsRes = results[0];
+    var stationsRes = results[1];
+    var bots = botsRes.bots || [];
+    var totals = botsRes.totals || {};
+    var stations = stationsRes.stations || [];
+
+    _lastRefreshOk = true;
+    _apiErrorShown = false;
+
+    renderBots(bots);
+    renderStations(stations);
+    renderFooterStats({ ...totals, bots: bots.length, stations: allStations.length });
+
+    var serverEl = document.getElementById('statServers');
+    var stationEl = document.getElementById('statStations');
+    var botEl = document.getElementById('statBots');
+
+    if (!_countUpDone) {
+      _countUpDone = true;
+      animateCounter(serverEl, totals.servers || 0, 1200);
+      animateCounter(stationEl, allStations.length, 1400);
+      animateCounter(botEl, bots.length, 1000);
+    } else {
+      if (serverEl) serverEl.textContent = fmtInt(totals.servers);
+      if (stationEl) stationEl.textContent = fmtInt(allStations.length);
+      if (botEl) botEl.textContent = fmtInt(bots.length);
+    }
+  } catch (e) {
+    console.error(tr('API Fehler:', 'API error:'), e);
+    if (!_lastRefreshOk) showApiError();
+  }
+};
+
+// --- Scroll-Indicator ausblenden ---
+window.addEventListener('scroll', function() {
+  var ind = document.getElementById('scrollIndicator');
+  if (ind) {
+    ind.style.opacity = window.scrollY > 80 ? '0' : '1';
+    ind.style.pointerEvents = window.scrollY > 80 ? 'none' : 'auto';
+  }
+}, { passive: true });
+
+// --- Station-Suche Debounce ---
+(function patchStationSearch() {
+  var searchEl = document.getElementById('stationSearch');
+  if (!searchEl) return;
+  // Entferne alten Listener und ersetze mit Debounce
+  var newEl = searchEl.cloneNode(true);
+  searchEl.parentNode.replaceChild(newEl, searchEl);
+  var debounceTimer;
+  newEl.addEventListener('input', function(e) {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(function() {
+      stationsDisplayCount = STATIONS_PER_PAGE;
+      filterStations(e.target.value);
+    }, 150);
+  });
+})();
