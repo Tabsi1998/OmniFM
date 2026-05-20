@@ -2992,6 +2992,10 @@ async function normalizeDashboardEventInput(body, {
 
 const ADMIN_TOKEN = String(process.env.ADMIN_TOKEN || "").trim();
 
+// WICHTIG: _runtimes muss VOR createAdminRoutesHandler deklariert sein,
+// da der getter sonst in die TDZ (Temporal Dead Zone) läuft.
+let _runtimes = [];
+
 const handleAdminRoutes = createAdminRoutesHandler({
   ADMIN_TOKEN,
   getStationHealthReport,
@@ -3004,8 +3008,6 @@ const handleAdminRoutes = createAdminRoutesHandler({
   get runtimes() { return _runtimes; },
   getRecentOperatorIncidents,
 });
-
-let _runtimes = [];
 
 function startWebServer(runtimes) {
   _runtimes = runtimes;
