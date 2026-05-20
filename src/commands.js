@@ -111,28 +111,28 @@ export function buildCommandBuilders() {
     "Voice- oder Stage-Channel (optional)",
     [ChannelType.GuildVoice, ChannelType.GuildStageVoice]
   );
-  withIntegerOption(play, "bot", "Worker bot slot (for example 1-16, optional)", "Worker-Bot-Slot (z. B. 1-16, optional)");
+  withIntegerOption(play, "bot", "Visible OmniFM bot number (for example 2 for OmniFM 2, optional)", "Sichtbare OmniFM-Botnummer (z. B. 2 fuer OmniFM 2, optional)");
 
   const pause = describe(
     new SlashCommandBuilder().setName("pause"),
     "Pause playback",
     "Wiedergabe pausieren"
   );
-  withIntegerOption(pause, "bot", "Worker bot slot (optional)", "Worker-Bot-Slot (optional)");
+  withIntegerOption(pause, "bot", "Visible OmniFM bot number (optional)", "Sichtbare OmniFM-Botnummer (optional)");
 
   const resume = describe(
     new SlashCommandBuilder().setName("resume"),
     "Resume playback",
     "Wiedergabe fortsetzen"
   );
-  withIntegerOption(resume, "bot", "Worker bot slot (optional)", "Worker-Bot-Slot (optional)");
+  withIntegerOption(resume, "bot", "Visible OmniFM bot number (optional)", "Sichtbare OmniFM-Botnummer (optional)");
 
   const stop = describe(
     new SlashCommandBuilder().setName("stop"),
     "Stop playback and leave the channel",
     "Stoppen und Channel verlassen"
   );
-  withIntegerOption(stop, "bot", "Worker bot slot (optional)", "Worker-Bot-Slot (optional)");
+  withIntegerOption(stop, "bot", "Visible OmniFM bot number (optional)", "Sichtbare OmniFM-Botnummer (optional)");
   withBooleanOption(stop, "all", "Stop all workers (optional)", "Alle Worker stoppen (optional)");
 
   const stations = describe(
@@ -146,7 +146,7 @@ export function buildCommandBuilders() {
     "Show what is currently playing",
     "Zeigt, was gerade läuft"
   );
-  withIntegerOption(now, "bot", "Worker bot slot (optional)", "Worker-Bot-Slot (optional)");
+  withIntegerOption(now, "bot", "Visible OmniFM bot number (optional)", "Sichtbare OmniFM-Botnummer (optional)");
 
   const stats = describe(
     new SlashCommandBuilder().setName("stats"),
@@ -160,7 +160,7 @@ export function buildCommandBuilders() {
     "Zeigt die zuletzt erkannten Songs"
   );
   withIntegerOption(history, "limit", "Number of entries (1-20)", "Anzahl Einträge (1-20)");
-  withIntegerOption(history, "bot", "Worker bot slot (optional)", "Worker-Bot-Slot (optional)");
+  withIntegerOption(history, "bot", "Visible OmniFM bot number (optional)", "Sichtbare OmniFM-Botnummer (optional)");
 
   const setvolume = describe(
     new SlashCommandBuilder().setName("setvolume"),
@@ -168,7 +168,7 @@ export function buildCommandBuilders() {
     "Lautstärke setzen (0-100)"
   );
   withIntegerOption(setvolume, "value", "0 to 100", "0 bis 100", { required: true });
-  withIntegerOption(setvolume, "bot", "Worker bot slot (optional)", "Worker-Bot-Slot (optional)");
+  withIntegerOption(setvolume, "bot", "Visible OmniFM bot number (optional)", "Sichtbare OmniFM-Botnummer (optional)");
 
   const status = describe(
     new SlashCommandBuilder().setName("status"),

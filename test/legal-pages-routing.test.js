@@ -55,6 +55,33 @@ function setEnv(overrides) {
   };
 }
 
+function createAdminRuntimeStub() {
+  const guilds = new Map([[
+    "123456789012345678",
+    { id: "123456789012345678", name: "Admin Test Guild", memberCount: 42 },
+  ]]);
+
+  return {
+    role: "commander",
+    startedAt: Date.now() - 10_000,
+    config: { name: "OmniFM Admin Test" },
+    client: {
+      isReady: () => true,
+      guilds: { cache: guilds },
+    },
+    collectStats: () => ({
+      servers: 1,
+      connections: 2,
+      listeners: 3,
+    }),
+    getState: () => ({
+      playing: true,
+      currentStationKey: "rock",
+      volume: 70,
+    }),
+  };
+}
+
 test("pageRouting resolves aliases and localized legal paths", () => {
   assert.equal(resolvePageFromUrl("https://omnifm.xyz/?page=imprint"), "imprint");
   assert.equal(resolvePageFromUrl("https://omnifm.xyz/?page=terms"), "terms");
@@ -95,7 +122,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     "utf8"
   );
 
-  const server = startWebServer([]);
+  const server = startWebServer([createAdminRuntimeStub()]);
   await once(server, "listening");
   const address = server.address();
   const port = typeof address === "object" && address ? address.port : 0;
@@ -115,11 +142,22 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
 
     const adminPanelResponse = await fetch(`http://127.0.0.1:${port}/admin?token=admin-route-token`);
     assert.equal(adminPanelResponse.status, 200);
-    assert.match(await adminPanelResponse.text(), /OMNIFM ADMIN/);
+    const adminPanelHtml = await adminPanelResponse.text();
+    assert.match(adminPanelHtml, /OMNIFM ADMIN/);
+    assert.match(adminPanelHtml, /stationSearch/);
+    assert.match(adminPanelHtml, /copyText/);
 
     const adminOverviewResponse = await fetch(`http://127.0.0.1:${port}/api/admin/overview?token=admin-route-token`);
     assert.equal(adminOverviewResponse.status, 200);
-    assert.equal((await adminOverviewResponse.json()).bots.length, 0);
+    const adminOverview = await adminOverviewResponse.json();
+    assert.equal(adminOverview.bots.length, 1);
+    assert.equal(adminOverview.bots[0].guilds, 1);
+    assert.ok(adminOverview.stations.total > 0);
+
+    const adminGuildsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/guilds?token=admin-route-token`);
+    assert.equal(adminGuildsResponse.status, 200);
+    const adminGuilds = await adminGuildsResponse.json();
+    assert.equal(adminGuilds.total, 1);
 
     const termsApiResponse = await fetch(`http://127.0.0.1:${port}/api/terms`);
     assert.equal(termsApiResponse.status, 200);

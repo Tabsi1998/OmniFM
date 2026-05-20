@@ -907,7 +907,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
     const requestedBot = interaction.options.getInteger("bot");
     if (runtime.role === "commander" && runtime.workerManager) {
       const workers = requestedBot
-        ? [runtime.workerManager.getWorkerByIndex(requestedBot)].filter(Boolean)
+        ? [runtime.workerManager.getWorkerByIndex(requestedBot, { prefer: "botIndex" })].filter(Boolean)
         : runtime.workerManager.getStreamingWorkers(interaction.guildId);
       if (workers.length === 0) {
         await interaction.reply(buildNoticePayload({
@@ -927,6 +927,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
         if (!result?.ok) failures.push(`${w.config?.name || "Worker"}: ${result?.error || "pause_failed"}`);
         else pausedWorkers.push(w);
       }
+      await runtime.workerManager.refreshRemoteStates?.({ force: true })?.catch?.(() => null);
       if (failures.length === workers.length) {
         await interaction.reply(buildNoticePayload({
           t,
@@ -978,7 +979,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
     const requestedBot = interaction.options.getInteger("bot");
     if (runtime.role === "commander" && runtime.workerManager) {
       const workers = requestedBot
-        ? [runtime.workerManager.getWorkerByIndex(requestedBot)].filter(Boolean)
+        ? [runtime.workerManager.getWorkerByIndex(requestedBot, { prefer: "botIndex" })].filter(Boolean)
         : runtime.workerManager.getStreamingWorkers(interaction.guildId);
       if (workers.length === 0) {
         await interaction.reply(buildNoticePayload({
@@ -998,6 +999,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
         if (!result?.ok) failures.push(`${w.config?.name || "Worker"}: ${result?.error || "resume_failed"}`);
         else resumedWorkers.push(w);
       }
+      await runtime.workerManager.refreshRemoteStates?.({ force: true })?.catch?.(() => null);
       if (failures.length === workers.length) {
         await interaction.reply(buildNoticePayload({
           t,
@@ -1053,7 +1055,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
       
       // Priorität 1: Explizit bot: Parameter
       if (requestedBot) {
-        const worker = runtime.workerManager.getWorkerByIndex(requestedBot);
+        const worker = runtime.workerManager.getWorkerByIndex(requestedBot, { prefer: "botIndex" });
         if (!worker) {
           // Worker-Index nicht gefunden / nicht konfiguriert
           await interaction.reply(buildNoticePayload({
@@ -1076,6 +1078,28 @@ export async function handleRuntimeInteraction(runtime, interaction) {
           }));
           return;
         }
+        const streamingWorkers = runtime.workerManager.getStreamingWorkers(guildId);
+        if (!streamingWorkers.includes(worker)) {
+          await interaction.reply(buildNoticePayload({
+            t,
+            language,
+            tone: "info",
+            title: t("ðŸ›‘ Dieser Bot streamt nicht", "ðŸ›‘ This bot is not streaming"),
+            description: t(
+              `**${worker.config?.name || `Bot ${requestedBot}`}** streamt aktuell nicht auf diesem Server.`,
+              `**${worker.config?.name || `Bot ${requestedBot}`}** is not currently streaming on this server.`
+            ),
+            fields: streamingWorkers.length > 0
+              ? [{
+                name: t("Aktive Worker", "Active workers"),
+                value: clipText(formatWorkerList(streamingWorkers), 1024),
+                inline: false,
+              }]
+              : [],
+            quickActions: { includePlay: true, includeStations: true, includeWorkers: true },
+          }));
+          return;
+        }
         workers = [worker];
       }
       // PrioritÃ¤t 2: all: true Parameter
@@ -1095,7 +1119,29 @@ export async function handleRuntimeInteraction(runtime, interaction) {
             const info = worker.getGuildInfo(guildId);
             return String(info?.channelId || "").trim() === userChannelId;
           });
-          workers = matchingWorkers.length > 0 ? matchingWorkers : allStreamingWorkers.slice(0, 1);
+          if (matchingWorkers.length > 0) {
+            workers = matchingWorkers;
+          } else {
+            await interaction.reply(buildNoticePayload({
+              t,
+              language,
+              tone: "info",
+              title: t("ðŸ›‘ Kein Worker in deinem Channel", "ðŸ›‘ No worker in your channel"),
+              description: t(
+                "In deinem Voice-Channel wurde kein aktiver OmniFM-Worker gefunden. Nutze `/stop bot:<botnummer>` oder `/stop all:true`, damit nichts Falsches gestoppt wird.",
+                "No active OmniFM worker was found in your voice channel. Use `/stop bot:<bot number>` or `/stop all:true` so the wrong stream is not stopped."
+              ),
+              fields: allStreamingWorkers.length > 0
+                ? [{
+                  name: t("Aktive Worker", "Active workers"),
+                  value: clipText(formatWorkerList(allStreamingWorkers), 1024),
+                  inline: false,
+                }]
+                : [],
+              quickActions: { includePlay: true, includeStations: true, includeWorkers: true },
+            }));
+            return;
+          }
         } else {
           // User nicht im Channel â†’ Error
           await interaction.reply(buildNoticePayload({
@@ -1138,6 +1184,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
         if (!result?.ok) failures.push(`${w.config?.name || "Worker"}: ${result?.error || "stop_failed"}`);
         else stoppedWorkers.push(w);
       }
+      await runtime.workerManager.refreshRemoteStates?.({ force: true })?.catch?.(() => null);
       if (failures.length === workers.length) {
         await interaction.reply(buildNoticePayload({
           t,
@@ -1195,7 +1242,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
       let targetWorkers = [];
 
       if (Number.isInteger(requestedBot)) {
-        const check = runtime.workerManager.canUseWorker(requestedBot, interaction.guildId, guildTier);
+        const check = runtime.workerManager.canUseWorker(requestedBot, interaction.guildId, guildTier, { prefer: "botIndex" });
         if (!check.ok) {
           const reasons = {
             tier: t(`Worker ${requestedBot} erfordert ein hoeheres Abo (max: ${check.maxIndex}).`, `Worker ${requestedBot} requires a higher plan (max: ${check.maxIndex}).`),
@@ -2334,6 +2381,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
       station: interaction.options.getString("station"),
       requestedVoiceChannel: interaction.options.getChannel("voice"),
       requestedBotIndex: interaction.options.getInteger("bot"),
+      requestedWorkerSelectionMode: "botIndex",
       openWizardWhenIncomplete: true,
     });
     return;

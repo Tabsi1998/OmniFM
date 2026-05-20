@@ -3006,6 +3006,7 @@ let _runtimes = [];
 
 const handleAdminRoutes = createAdminRoutesHandler({
   resolveAdminToken: resolveAdminPanelToken,
+  getRuntimes: () => _runtimes,
   getStationHealthReport,
   listLicenses,
   patchLicenseById,
@@ -3013,7 +3014,6 @@ const handleAdminRoutes = createAdminRoutesHandler({
   log,
   methodNotAllowed,
   sendJson,
-  get runtimes() { return _runtimes; },
   getRecentOperatorIncidents,
 });
 

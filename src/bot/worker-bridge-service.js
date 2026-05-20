@@ -123,6 +123,9 @@ class WorkerBridgeService {
 
       try {
         const result = await this.executeCommand(command);
+        await this.publishSnapshot().catch((err) => {
+          log("WARN", `[${this.runtime.config.name}] Worker-Bridge Snapshot nach Command fehlgeschlagen: ${err?.message || err}`);
+        });
         await completeWorkerCommand(command.commandId, result || { ok: true });
       } catch (err) {
         await failWorkerCommand(command.commandId, err);

@@ -4316,6 +4316,25 @@ test("worker manager reuses the worker already streaming in the requested channe
   assert.equal(manager.findStreamingWorkerByChannel("guild-1", "voice-9"), null);
 });
 
+test("worker manager resolves visible bot numbers separately from internal worker slots", () => {
+  const workerForBot2 = {
+    config: { index: 2, name: "OmniFM 2" },
+    guildState: new Map(),
+  };
+  const workerForBot3 = {
+    config: { index: 3, name: "OmniFM 3" },
+    guildState: new Map(),
+  };
+
+  const manager = new WorkerManager([workerForBot2, workerForBot3]);
+
+  assert.equal(manager.resolveWorker(2, { prefer: "botIndex" }).worker, workerForBot2);
+  assert.equal(manager.resolveWorker(2, { prefer: "slot" }).worker, workerForBot3);
+  assert.equal(manager.resolveWorker(1, { prefer: "botIndex" }), null);
+  assert.equal(manager.getWorkerByIndex(3, { prefer: "botIndex" }), workerForBot3);
+  assert.equal(manager.getWorkerByIndex(1, { prefer: "slot" }), workerForBot2);
+});
+
 test("worker manager keeps reconnecting workers reserved for their remembered voice channel", async () => {
   const reconnectingWorker = {
     config: { index: 2 },
@@ -4911,7 +4930,7 @@ test("executeRuntimePlay does not block explicit remote workers on a synthetic c
   assert.match(String(finalReply?.embeds?.[0]?.data?.description || ""), /Worker 2/);
 });
 
-test("executeRuntimePlay refreshes remote worker states before commander worker selection", async () => {
+test("executeRuntimePlay refreshes remote worker states before and after commander worker selection", async () => {
   let refreshCalls = 0;
   const replies = [];
   const remoteWorker = {
@@ -5000,7 +5019,7 @@ test("executeRuntimePlay refreshes remote worker states before commander worker 
     openWizardWhenIncomplete: false,
   });
 
-  assert.equal(refreshCalls, 1);
+  assert.equal(refreshCalls, 2);
   assert.equal(replies.at(-1)?.embeds?.[0]?.data?.title, "✅ Stream started");
 });
 

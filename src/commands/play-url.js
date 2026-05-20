@@ -8,7 +8,7 @@
 // ============================================================
 
 import { MessageFlags } from "discord.js";
-import { requireFeature } from "../core/entitlements.js";
+import { getTier, requireFeature } from "../core/entitlements.js";
 import { validateCustomStationUrl } from "../custom-stations.js";
 import { clipText, sanitizeUrlForLog } from "../lib/helpers.js";
 import { BRAND } from "../config/plans.js";
@@ -189,8 +189,18 @@ async function handlePlayUrlCommand(runtime, interaction) {
   // Wenn kein Worker läuft, Commander selbst oder ersten Worker nutzen
   if (!targetRuntime) {
     if (runtime.role === "commander" && runtime.workerManager) {
-      const workers = runtime.workerManager.workers || [];
-      targetRuntime = workers[0] || runtime;
+      const guildTier = getTier(guildId);
+      targetRuntime = await runtime.workerManager.findConnectedWorkerByChannel?.(guildId, voiceChannel.id, guildTier)
+        || runtime.workerManager.findFreeWorker(guildId, guildTier);
+      if (!targetRuntime) {
+        await interaction.editReply({
+          content: t(
+            "❌ Kein freier Worker ist auf diesem Server verfuegbar. Lade einen Worker ein oder stoppe zuerst einen laufenden Stream.",
+            "❌ No free worker is available on this server. Invite a worker or stop an existing stream first."
+          ),
+        });
+        return true;
+      }
     } else {
       targetRuntime = runtime;
     }

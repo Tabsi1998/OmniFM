@@ -2787,9 +2787,15 @@ class BotRuntime {
       await this.workerManager.refreshRemoteStates().catch(() => null);
     }
 
-    const requestedWorkerIndex = this.getIntegerOptionFlexible(interaction, ["bot", "worker"]);
+    const requestedBotIndex = this.getIntegerOptionFlexible(interaction, ["bot"]);
+    const requestedSlotIndex = requestedBotIndex === null
+      ? this.getIntegerOptionFlexible(interaction, ["worker"])
+      : null;
+    const requestedWorkerIndex = requestedBotIndex ?? requestedSlotIndex;
     if (requestedWorkerIndex !== null) {
-      const resolvedWorker = this.workerManager.resolveWorker(requestedWorkerIndex);
+      const resolvedWorker = this.workerManager.resolveWorker(requestedWorkerIndex, {
+        prefer: requestedBotIndex !== null ? "botIndex" : "slot",
+      });
       const streamingWorkers = this.workerManager.getStreamingWorkers(guildId);
       const isStreamingWorker = resolvedWorker?.worker && streamingWorkers.includes(resolvedWorker.worker);
       if (!resolvedWorker?.worker || !isStreamingWorker) {
@@ -2933,7 +2939,7 @@ class BotRuntime {
     for (const status of statuses) {
       const slot = Number(status?.index || 0);
       if (!slot) continue;
-      const worker = this.workerManager.getWorkerByIndex(slot);
+      const worker = this.workerManager.getWorkerByIndex(slot, { prefer: "slot" });
       const requiredTier = this.getWorkerRequiredTierBySlot(slot);
       const tierLocked = slot > maxIndex;
       const resolvedClientId = String(worker?.getApplicationId?.() || worker?.config?.clientId || status?.clientId || "").trim();

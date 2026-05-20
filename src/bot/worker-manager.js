@@ -89,16 +89,29 @@ class WorkerManager {
 
   /**
    * Resolve input index to worker + slot.
-   * Primary mode is worker-slot (1..N). For compatibility, BOT_N index is accepted as fallback.
+   * Slot mode is used by internal worker menus; botIndex mode is used by slash `bot:` options.
    */
-  resolveWorker(inputIndex) {
-    const bySlot = this.getWorkerBySlot(inputIndex);
-    if (bySlot) {
-      return { worker: bySlot, workerSlot: this.getWorkerSlot(bySlot), mode: "slot" };
-    }
-    const byBotIndex = this.getWorkerByBotIndex(inputIndex);
-    if (byBotIndex) {
-      return { worker: byBotIndex, workerSlot: this.getWorkerSlot(byBotIndex), mode: "botIndex" };
+  resolveWorker(inputIndex, options = {}) {
+    const prefer = String(options?.prefer || "slot").trim() === "botIndex" ? "botIndex" : "slot";
+    const resolvers = prefer === "botIndex"
+      ? [
+        () => this.getWorkerByBotIndex(inputIndex),
+      ]
+      : [
+        () => this.getWorkerBySlot(inputIndex),
+        () => this.getWorkerByBotIndex(inputIndex),
+      ];
+
+    for (const resolve of resolvers) {
+      const worker = resolve();
+      if (!worker) continue;
+      return {
+        worker,
+        workerSlot: this.getWorkerSlot(worker),
+        mode: Number(worker?.config?.index || 0) === Number.parseInt(String(inputIndex || ""), 10)
+          ? "botIndex"
+          : "slot",
+      };
     }
     return null;
   }
@@ -150,8 +163,8 @@ class WorkerManager {
   /**
    * Get a specific worker by slot (preferred) or BOT_N index (fallback).
    */
-  getWorkerByIndex(index) {
-    return this.resolveWorker(index)?.worker || null;
+  getWorkerByIndex(index, options = {}) {
+    return this.resolveWorker(index, options)?.worker || null;
   }
 
   async refreshRemoteStates({ force = false } = {}) {
@@ -320,9 +333,9 @@ class WorkerManager {
   /**
    * Check if a specific worker can be used in a guild for a given tier.
    */
-  canUseWorker(workerIndex, guildId, tier = "free") {
+  canUseWorker(workerIndex, guildId, tier = "free", options = {}) {
     const maxIndex = this.getMaxWorkerIndex(tier);
-    const resolved = this.resolveWorker(workerIndex);
+    const resolved = this.resolveWorker(workerIndex, options);
     if (!resolved) {
       return { ok: false, reason: "not_configured", maxIndex };
     }

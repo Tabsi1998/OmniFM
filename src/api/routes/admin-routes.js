@@ -25,10 +25,21 @@ export function createAdminRoutesHandler(deps) {
     log,
     methodNotAllowed,
     sendJson,
-    runtimes,
     getRecentOperatorIncidents,
     resolveAdminToken,
   } = deps;
+
+  function getRuntimes() {
+    const value = typeof deps.getRuntimes === "function"
+      ? deps.getRuntimes()
+      : deps.runtimes;
+    return Array.isArray(value) ? value : [];
+  }
+
+  function getStationCatalogCount() {
+    const stationsData = loadStations?.() || {};
+    return Object.keys(stationsData?.stations || {}).length;
+  }
 
   /**
    * Prüft ob der Request einen gültigen Admin-Token hat.
@@ -76,7 +87,7 @@ export function createAdminRoutesHandler(deps) {
     if (pathname === "/api/admin/overview" || pathname === "/api/admin") {
       if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
 
-      const botStats = (runtimes || []).map((r) => {
+      const botStats = getRuntimes().map((r) => {
         const stats = r.collectStats?.() || {};
         return {
           name: r.config?.name || "?",
@@ -95,13 +106,14 @@ export function createAdminRoutesHandler(deps) {
       const expiredLicenses = licenseList.filter((l) => l?.expired || (l?.expiresAt && new Date(l.expiresAt) < new Date())).length;
 
       const stationHealth = getStationHealthReport?.() || [];
+      const stationCatalogCount = getStationCatalogCount();
       const stationsUp = stationHealth.filter((s) => s.status === "up").length;
       const stationsDown = stationHealth.filter((s) => s.status === "down").length;
 
       sendJson(res, 200, {
         bots: botStats,
         licenses: { total: licenseList.length, active: activeLicenses, expired: expiredLicenses },
-        stations: { total: stationHealth.length, up: stationsUp, down: stationsDown },
+        stations: { total: Math.max(stationCatalogCount, stationHealth.length), up: stationsUp, down: stationsDown },
         serverTime: new Date().toISOString(),
       });
       return true;
@@ -145,7 +157,7 @@ export function createAdminRoutesHandler(deps) {
     if (pathname === "/api/admin/guilds") {
       if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
       const guilds = [];
-      for (const runtime of (runtimes || [])) {
+      for (const runtime of getRuntimes()) {
         if (!runtime.client?.isReady?.()) continue;
         for (const [guildId, guild] of (runtime.client.guilds?.cache || new Map()).entries()) {
           const state = runtime.getState?.(guildId) || {};
@@ -253,6 +265,20 @@ function buildAdminHtml() {
     .form-row{margin-bottom:12px}
     .form-row label{display:block;font-size:11px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px}
     .form-actions{display:flex;gap:8px;margin-top:16px}
+    .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid #222;background:#0d0d0d}
+    .toolbar input,.toolbar select{width:auto;min-width:170px;background:#1a1a1a;border:1px solid #333;border-radius:8px;color:#fff;padding:8px 10px;font-size:12px;outline:none}
+    .toolbar input{min-width:240px;flex:1}
+    .summary-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;padding:14px 16px;border-bottom:1px solid #222;background:#0f0f0f}
+    .summary-pill{border:1px solid #222;background:#151515;border-radius:10px;padding:10px 12px}
+    .summary-pill strong{display:block;font-size:18px;font-family:monospace}
+    .summary-pill span{display:block;margin-top:3px;font-size:11px;color:#71717a;text-transform:uppercase;letter-spacing:0.08em}
+    .problem-row td{background:rgba(255,42,42,0.06)}
+    .warning-row td{background:rgba(255,184,0,0.05)}
+    .row-actions{display:flex;gap:6px;flex-wrap:wrap}
+    .mini-btn{border:1px solid #333;background:#1a1a1a;color:#d4d4d8;border-radius:7px;padding:4px 8px;font-size:11px;cursor:pointer}
+    .mini-btn:hover{border-color:#00F0FF;color:#fff}
+    .station-url{max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#71717a;font-family:monospace;font-size:11px}
+    .empty-state{padding:32px 16px;text-align:center;color:#71717a;font-size:13px}
   </style>
 </head>
 <body>
@@ -270,17 +296,17 @@ function buildAdminHtml() {
       <div class="card"><h3>Bots Online</h3><div class="val cyan" id="statBots">–</div><div class="sub">von gesamt</div></div>
       <div class="card"><h3>Guilds</h3><div class="val green" id="statGuilds">–</div><div class="sub">aktive Server</div></div>
       <div class="card"><h3>Lizenzen</h3><div class="val amber" id="statLicenses">–</div><div class="sub">aktiv / gesamt</div></div>
-      <div class="card"><h3>Stationen</h3><div class="val" id="statStations">–</div><div class="sub">UP / DOWN</div></div>
+      <div class="card"><h3>Stationen</h3><div class="val" id="statStations">–</div><div class="sub" id="statStationsSub">UP / DOWN</div></div>
     </div>
 
     <!-- Tabs -->
     <div class="section">
       <div class="tabs">
-        <button class="tab active" onclick="showTab('bots')">🤖 Bots</button>
-        <button class="tab" onclick="showTab('guilds')">🏠 Guilds</button>
-        <button class="tab" onclick="showTab('licenses')">🔑 Lizenzen</button>
-        <button class="tab" onclick="showTab('stations')">📻 Stationen</button>
-        <button class="tab" onclick="showTab('logs')">📋 Logs</button>
+        <button class="tab active" onclick="showTab('bots', this)">🤖 Bots</button>
+        <button class="tab" onclick="showTab('guilds', this)">🏠 Guilds</button>
+        <button class="tab" onclick="showTab('licenses', this)">🔑 Lizenzen</button>
+        <button class="tab" onclick="showTab('stations', this)">📻 Stationen</button>
+        <button class="tab" onclick="showTab('logs', this)">📋 Logs</button>
       </div>
       <div id="content"><div class="loading">Lade Daten...</div></div>
     </div>
@@ -327,11 +353,17 @@ function buildAdminHtml() {
 
     let currentTab = 'bots';
     let cachedData = {};
+    let stationFilters = { search: '', health: 'all', tier: 'all' };
 
-    function showTab(tab) {
+    function showTab(tab, trigger) {
       currentTab = tab;
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      event.target.classList.add('active');
+      if (trigger) trigger.classList.add('active');
+      else {
+        const index = ['bots','guilds','licenses','stations','logs'].indexOf(tab);
+        const buttons = document.querySelectorAll('.tab');
+        if (buttons[index]) buttons[index].classList.add('active');
+      }
       renderTab(tab);
     }
 
@@ -380,15 +412,52 @@ function buildAdminHtml() {
           }).join('') + '</tbody></table>';
       } else if (tab === 'stations') {
         if (!d.stations) { el.innerHTML = '<div class="loading">Lade...</div>'; return; }
-        el.innerHTML = '<table><thead><tr><th>Key</th><th>Name</th><th>Tier</th><th>Health</th><th>Antwortzeit</th><th>Fehler</th></tr></thead><tbody>' +
-          d.stations.stations.map(s => '<tr>' +
-            '<td style="font-family:monospace;font-size:11px;color:#71717a">' + esc(s.key) + '</td>' +
-            '<td><b>' + esc(s.name) + '</b></td>' +
-            '<td style="color:' + planColor(s.tier) + ';font-size:11px;font-weight:700">' + esc(s.tier||'free') + '</td>' +
-            '<td>' + healthBadge(s.health) + '</td>' +
-            '<td style="font-size:12px;color:#71717a">' + (s.health?.responseTimeMs != null ? s.health.responseTimeMs + 'ms' : '–') + '</td>' +
-            '<td style="font-size:12px;color:' + (s.health?.consecutiveFailures > 0 ? '#FF2A2A' : '#52525b') + '">' + (s.health?.consecutiveFailures || 0) + '</td>' +
-          '</tr>').join('') + '</tbody></table>';
+        const stations = (d.stations.stations || []).slice().sort(sortStations);
+        const filteredStations = stations.filter(matchesStationFilter);
+        const summary = buildStationSummary(stations);
+        el.innerHTML =
+          '<div class="summary-row">' +
+            summaryPill(summary.total, 'Gesamt', '') +
+            summaryPill(summary.up, 'Online', 'green') +
+            summaryPill(summary.down, 'Defekt', 'red') +
+            summaryPill(summary.unknown, 'Nicht geprüft', 'amber') +
+          '</div>' +
+          '<div class="toolbar">' +
+            '<input id="stationSearch" type="text" placeholder="Station suchen: Key, Name, Genre, URL..." value="' + escAttr(stationFilters.search) + '" oninput="setStationFilter(\\'search\\', this.value)"/>' +
+            '<select id="stationHealthFilter" onchange="setStationFilter(\\'health\\', this.value)">' +
+              option('all', 'Alle, Probleme oben', stationFilters.health) +
+              option('down', 'Nur defekt', stationFilters.health) +
+              option('unknown', 'Nur nicht geprüft', stationFilters.health) +
+              option('up', 'Nur online', stationFilters.health) +
+            '</select>' +
+            '<select id="stationTierFilter" onchange="setStationFilter(\\'tier\\', this.value)">' +
+              option('all', 'Alle Pläne', stationFilters.tier) +
+              option('free', 'Free', stationFilters.tier) +
+              option('pro', 'Pro', stationFilters.tier) +
+              option('ultimate', 'Ultimate', stationFilters.tier) +
+            '</select>' +
+          '</div>' +
+          (filteredStations.length
+            ? '<table><thead><tr><th>Status</th><th>Key</th><th>Name</th><th>Tier</th><th>Antwortzeit</th><th>Fehler</th><th>Stream</th><th>Aktionen</th></tr></thead><tbody>' +
+              filteredStations.map(s => {
+                const status = getStationHealthState(s);
+                const rowClass = status === 'down' ? ' class="problem-row"' : (status === 'unknown' ? ' class="warning-row"' : '');
+                return '<tr' + rowClass + '>' +
+                  '<td>' + healthBadge(s.health) + '</td>' +
+                  '<td style="font-family:monospace;font-size:11px;color:#71717a">' + esc(s.key) + '</td>' +
+                  '<td><b>' + esc(s.name) + '</b><div style="font-size:11px;color:#52525b">' + esc(s.genre || '') + '</div></td>' +
+                  '<td style="color:' + planColor(s.tier) + ';font-size:11px;font-weight:700">' + esc(s.tier||'free') + '</td>' +
+                  '<td style="font-size:12px;color:#71717a">' + (s.health?.responseTimeMs != null ? s.health.responseTimeMs + 'ms' : '–') + '</td>' +
+                  '<td style="font-size:12px;color:' + (s.health?.consecutiveFailures > 0 ? '#FF2A2A' : '#52525b') + '">' + (s.health?.consecutiveFailures || 0) + '</td>' +
+                  '<td><div class="station-url" title="' + escAttr(s.url || '') + '">' + esc(s.url || '–') + '</div></td>' +
+                  '<td><div class="row-actions">' +
+                    (s.url ? '<a class="mini-btn" href="' + escAttr(s.url) + '" target="_blank" rel="noopener">Öffnen</a>' : '') +
+                    '<button class="mini-btn" onclick="copyText(' + JSON.stringify(s.key) + ')">Key</button>' +
+                    (s.url ? '<button class="mini-btn" onclick="copyText(' + JSON.stringify(s.url) + ')">URL</button>' : '') +
+                  '</div></td>' +
+                '</tr>';
+              }).join('') + '</tbody></table>'
+            : '<div class="empty-state">Keine Station passt zu diesen Filtern.</div>');
       } else if (tab === 'logs') {
         if (!d.logs) { el.innerHTML = '<div class="loading">Lade...</div>'; return; }
         const incidents = d.logs.incidents || [];
@@ -417,8 +486,11 @@ function buildAdminHtml() {
           const totalGuilds = o.bots.reduce((s,b) => s + b.guilds, 0);
           document.getElementById('statGuilds').textContent = totalGuilds;
           document.getElementById('statLicenses').textContent = o.licenses.active + '/' + o.licenses.total;
-          document.getElementById('statStations').textContent = o.stations.up + ' UP / ' + o.stations.down + ' DOWN';
-          document.getElementById('statStations').className = 'val ' + (o.stations.down > 0 ? 'amber' : 'green');
+          const stationTotal = Number(o.stations.total || 0) || 0;
+          const stationUnknown = Math.max(0, stationTotal - Number(o.stations.up || 0) - Number(o.stations.down || 0));
+          document.getElementById('statStations').textContent = stationTotal;
+          document.getElementById('statStationsSub').textContent = o.stations.up + ' online / ' + o.stations.down + ' defekt / ' + stationUnknown + ' offen';
+          document.getElementById('statStations').className = 'val ' + (o.stations.down > 0 ? 'red' : stationUnknown > 0 ? 'amber' : 'green');
           document.getElementById('serverTime').textContent = new Date(o.serverTime).toLocaleTimeString('de-AT');
         }
         if (guilds.status === 'fulfilled') cachedData.guilds = guilds.value;
@@ -483,6 +555,68 @@ function buildAdminHtml() {
     function esc(s) {
       return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
+    function escAttr(s) {
+      return esc(s).replace(/'/g,'&#39;');
+    }
+    function option(value, label, selected) {
+      return '<option value="' + escAttr(value) + '"' + (String(value) === String(selected) ? ' selected' : '') + '>' + esc(label) + '</option>';
+    }
+    function setStationFilter(key, value) {
+      stationFilters[key] = String(value || '').trim();
+      renderTab('stations');
+    }
+    function getStationHealthState(station) {
+      const status = String(station?.health?.status || '').trim().toLowerCase();
+      if (status === 'up' || status === 'down') return status;
+      return 'unknown';
+    }
+    function stationHealthRank(station) {
+      const status = getStationHealthState(station);
+      if (status === 'down') return 0;
+      if (status === 'unknown') return 1;
+      return 2;
+    }
+    function sortStations(a, b) {
+      const byHealth = stationHealthRank(a) - stationHealthRank(b);
+      if (byHealth) return byHealth;
+      const failures = Number(b?.health?.consecutiveFailures || 0) - Number(a?.health?.consecutiveFailures || 0);
+      if (failures) return failures;
+      return String(a?.key || '').localeCompare(String(b?.key || ''));
+    }
+    function matchesStationFilter(station) {
+      const health = getStationHealthState(station);
+      if (stationFilters.health !== 'all' && health !== stationFilters.health) return false;
+      if (stationFilters.tier !== 'all' && String(station?.tier || 'free') !== stationFilters.tier) return false;
+      const needle = String(stationFilters.search || '').toLowerCase();
+      if (!needle) return true;
+      return [station?.key, station?.name, station?.genre, station?.tier, station?.url]
+        .some((value) => String(value || '').toLowerCase().includes(needle));
+    }
+    function buildStationSummary(stations) {
+      return (stations || []).reduce((acc, station) => {
+        acc.total += 1;
+        acc[getStationHealthState(station)] += 1;
+        return acc;
+      }, { total: 0, up: 0, down: 0, unknown: 0 });
+    }
+    function summaryPill(value, label, color) {
+      const cls = color ? ' class="' + escAttr(color) + '"' : '';
+      return '<div class="summary-pill"><strong' + cls + '>' + esc(value) + '</strong><span>' + esc(label) + '</span></div>';
+    }
+    async function copyText(value) {
+      const text = String(value || '');
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        const input = document.createElement('textarea');
+        input.value = text;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        input.remove();
+      }
+    }
     function planColor(p) {
       if (p === 'ultimate') return '#BD00FF';
       if (p === 'pro') return '#FFB800';
@@ -494,10 +628,10 @@ function buildAdminHtml() {
       return '#71717a';
     }
     function healthBadge(h) {
-      if (!h) return '<span class="badge-unknown">–</span>';
+      if (!h) return '<span class="badge-unknown">NICHT GEPRÜFT</span>';
       if (h.status === 'up') return '<span class="badge-up">▲ UP</span>';
       if (h.status === 'down') return '<span class="badge-down">▼ DOWN</span>';
-      return '<span class="badge-unknown">?</span>';
+      return '<span class="badge-unknown">UNKLAR</span>';
     }
     function fmtUptime(s) {
       const h = Math.floor(s/3600), m = Math.floor((s%3600)/60);

@@ -304,7 +304,7 @@ export async function buildRuntimeWorkersStatusPayload(runtime, interaction, { h
   const lines = [];
 
   for (const ws of statuses) {
-    const runtimeWorker = runtime.workerManager.getWorkerByIndex(ws.index);
+    const runtimeWorker = runtime.workerManager.getWorkerByIndex(ws.index, { prefer: "slot" });
     const inGuild = ws.online && runtimeWorker?.client?.guilds?.cache?.has(guildId);
     const streaming = Array.isArray(ws.streams)
       ? ws.streams.find((stream) => stream.guildId === guildId)

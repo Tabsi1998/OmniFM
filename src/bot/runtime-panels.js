@@ -169,7 +169,7 @@ function buildWorkerOptions(runtime, guildId, language, selectedWorkerIndex = nu
   }];
 
   for (let index = 1; index <= Math.min(maxIndex, 16); index += 1) {
-    const worker = runtime.workerManager.getWorkerByIndex(index);
+    const worker = runtime.workerManager.getWorkerByIndex(index, { prefer: "slot" });
     options.push({
       label: clipText(worker?.config?.name || `Worker ${index}`, 90),
       value: String(index),
@@ -191,7 +191,7 @@ function getSelectedWorkerLabel(runtime, workerIndex, language) {
   if (!Number.isInteger(workerIndex)) {
     return language === "de" ? "Automatisch" : "Automatic";
   }
-  const worker = runtime.workerManager?.getWorkerByIndex?.(workerIndex);
+  const worker = runtime.workerManager?.getWorkerByIndex?.(workerIndex, { prefer: "slot" });
   return worker?.config?.name || `Worker ${workerIndex}`;
 }
 
@@ -579,6 +579,7 @@ export async function executeRuntimePlay(runtime, interaction, {
   requestedVoiceChannel = null,
   requestedVoiceChannelId = null,
   requestedBotIndex = null,
+  requestedWorkerSelectionMode = "slot",
   openWizardWhenIncomplete = false,
   wizardHint = "",
 } = {}) {
@@ -670,7 +671,9 @@ export async function executeRuntimePlay(runtime, interaction, {
     let worker;
     let reusingExistingWorker = false;
     if (requestedBotIndex) {
-      const check = runtime.workerManager.canUseWorker(requestedBotIndex, guildId, playable.guildTier);
+      const check = runtime.workerManager.canUseWorker(requestedBotIndex, guildId, playable.guildTier, {
+        prefer: requestedWorkerSelectionMode === "botIndex" ? "botIndex" : "slot",
+      });
       if (!check.ok) {
         const reasons = {
           tier: t(`Worker ${requestedBotIndex} erfordert ein hoeheres Abo (max: ${check.maxIndex}).`, `Worker ${requestedBotIndex} requires a higher plan (max: ${check.maxIndex}).`),
@@ -746,6 +749,9 @@ export async function executeRuntimePlay(runtime, interaction, {
     if (!result.ok) {
       await runtime.respondInteraction(interaction, { content: t(`Fehler: ${result.error}`, `Error: ${result.error}`) });
       return;
+    }
+    if (typeof runtime.workerManager.refreshRemoteStates === "function") {
+      await runtime.workerManager.refreshRemoteStates({ force: true }).catch(() => null);
     }
     const tierConfig = getTierConfig(guildId);
     const tierLabel = tierConfig.tier !== "free" ? ` [${tierConfig.name} ${tierConfig.bitrate}]` : "";
