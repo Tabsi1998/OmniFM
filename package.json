@@ -29,7 +29,7 @@
     "dotenv": "^17.4.2",
     "libsodium-wrappers": "^0.8.4",
     "mongodb": "^7.1.1",
-    "nodemailer": "^8.0.5",
+    "nodemailer": "^8.0.8",
     "sodium-native": "^5.1.0",
     "stripe": "^22.0.2"
   }
