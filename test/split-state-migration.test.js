@@ -8,19 +8,6 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const monolithStatePath = path.join(repoRoot, "bot-state.json");
 const monolithBackupPath = `${monolithStatePath}.bak`;
 
-function snapshotOptionalTextFile(filePath) {
-  return fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf8") : null;
-}
-
-function restoreOptionalTextFile(filePath, snapshot) {
-  if (snapshot === null) {
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-    return;
-  }
-  fs.writeFileSync(filePath, snapshot, "utf8");
-}
 
 function setEnv(overrides) {
   const previous = new Map();
@@ -48,24 +35,24 @@ async function importFreshBotStateModule() {
 
 test("split bot state lazily migrates legacy monolith state on first access", async (t) => {
   const botId = "bot-7";
-  const splitDirName = `bot-state-migration-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const splitDirPath = path.join(repoRoot, splitDirName);
+  const stateDirName = `bot-state-migration-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const stateDirPath = path.join(repoRoot, stateDirName);
+  const monolithStatePath = path.join(stateDirPath, "bot-state.json");
+  const splitDirPath = path.join(stateDirPath, "split");
   const splitStatePath = path.join(splitDirPath, `${botId}.json`);
-  const stateSnapshot = snapshotOptionalTextFile(monolithStatePath);
-  const backupSnapshot = snapshotOptionalTextFile(monolithBackupPath);
   const restoreEnv = setEnv({
     BOT_PROCESS_ROLE: "worker",
-    BOT_STATE_SPLIT_DIR: splitDirName,
+    BOT_STATE_SPLIT_DIR: splitDirPath,
+    OMNIFM_BOT_STATE_FILE: monolithStatePath,
   });
 
   t.after(() => {
     restoreEnv();
-    restoreOptionalTextFile(monolithStatePath, stateSnapshot);
-    restoreOptionalTextFile(monolithBackupPath, backupSnapshot);
-    fs.rmSync(splitDirPath, { recursive: true, force: true });
+    fs.rmSync(stateDirPath, { recursive: true, force: true });
   });
 
-  fs.rmSync(splitDirPath, { recursive: true, force: true });
+  fs.rmSync(stateDirPath, { recursive: true, force: true });
+  fs.mkdirSync(stateDirPath, { recursive: true });
   fs.writeFileSync(monolithStatePath, JSON.stringify({
     [botId]: {
       "guild-1": {
