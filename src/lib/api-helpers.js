@@ -281,6 +281,21 @@ function getRequestOrigin(req) {
   return `${proto}://${host}`;
 }
 
+function getRequestHostOriginCandidates(req) {
+  const host = sanitizeHostHeader(req.headers.host);
+  if (!host) return [];
+  const candidates = new Set();
+  const requestOrigin = getRequestOrigin(req);
+  if (requestOrigin) candidates.add(requestOrigin);
+
+  // Behind TLS-terminating reverse proxies Node can see an HTTP socket while
+  // the browser correctly sends Origin: https://host. Keep the host strict,
+  // but allow both schemes for the same Host header.
+  candidates.add(`https://${host}`);
+  candidates.add(`http://${host}`);
+  return [...candidates];
+}
+
 function toOrigin(rawUrl) {
   try {
     const parsed = new URL(String(rawUrl || "").trim());
@@ -446,7 +461,7 @@ function buildAllowedApiOrigins(publicUrl, req) {
     ...configured,
     publicUrl,
     ...buildWebDomainOriginCandidates(),
-    getRequestOrigin(req),
+    ...getRequestHostOriginCandidates(req),
   ];
 
   if (shouldIncludeDefaultLocalOrigins(publicUrl, configured)) {

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  applyCors,
   buildContentSecurityPolicy,
   buildPermissionsPolicy,
   getCommonSecurityHeaders,
@@ -95,4 +96,51 @@ test("policy builders return compact header strings", () => {
   assert.doesNotMatch(buildContentSecurityPolicy(), /\n/);
   assert.match(buildPermissionsPolicy(), /geolocation=\(\), gyroscope=\(\)/);
   assert.doesNotMatch(buildPermissionsPolicy(), /\n/);
+});
+
+test("CORS accepts HTTPS browser origin for the same reverse-proxied host", () => {
+  const restoreEnv = setEnv({
+    PUBLIC_WEB_URL: "",
+    WEB_DOMAIN: "",
+    CORS_ALLOWED_ORIGINS: "",
+    CORS_ORIGINS: "",
+  });
+
+  try {
+    const headers = new Map();
+    const res = {
+      setHeader(name, value) {
+        headers.set(String(name).toLowerCase(), value);
+      },
+    };
+    const req = {
+      headers: {
+        host: "omnifm.xyz",
+        origin: "https://omnifm.xyz",
+      },
+      socket: { encrypted: false },
+    };
+
+    assert.equal(applyCors(req, res, ""), true);
+    assert.equal(headers.get("access-control-allow-origin"), "https://omnifm.xyz");
+
+    const blockedHeaders = new Map();
+    const blockedRes = {
+      setHeader(name, value) {
+        blockedHeaders.set(String(name).toLowerCase(), value);
+      },
+    };
+    const blockedReq = {
+      headers: {
+        host: "omnifm.xyz",
+        origin: "https://evil.example",
+      },
+      socket: { encrypted: false },
+    };
+
+    assert.equal(applyCors(blockedReq, blockedRes, ""), false);
+    assert.equal(blockedHeaders.get("access-control-allow-origin"), undefined);
+  } finally {
+    restoreEnv();
+  }
 });
