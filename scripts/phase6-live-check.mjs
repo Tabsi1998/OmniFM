@@ -108,6 +108,104 @@ async function fetchJson(baseUrl, path, adminToken) {
   }
 }
 
+async function fetchText(baseUrl, path) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(`${baseUrl}${path}`, {
+      method: "GET",
+      signal: controller.signal,
+    });
+    return {
+      ok: response.ok,
+      status: response.status,
+      text: await response.text(),
+      contentType: response.headers.get("content-type") || "",
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      text: "",
+      contentType: "",
+      error: error?.message || String(error),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function inspectSeo(baseUrl) {
+  const checks = [
+    {
+      name: "robots.txt",
+      path: "/robots.txt",
+      assertions: [
+        { label: "user-agent", regex: /User-agent:\s*\*/i },
+        { label: "sitemap", regex: /Sitemap:\s*https:\/\/omnifm\.xyz\/sitemap\.xml/i },
+      ],
+    },
+    {
+      name: "sitemap.xml",
+      path: "/sitemap.xml",
+      assertions: [
+        { label: "home loc", regex: /<loc>https:\/\/omnifm\.xyz\/<\/loc>/i },
+        { label: "dashboard loc", regex: /<loc>https:\/\/omnifm\.xyz\/dashboard<\/loc>/i },
+        { label: "privacy loc", regex: /<loc>https:\/\/omnifm\.xyz\/datenschutz<\/loc>/i },
+      ],
+    },
+    {
+      name: "manifest.json",
+      path: "/manifest.json",
+      assertions: [
+        { label: "app name", regex: /"name"\s*:\s*"OmniFM"/i },
+        { label: "start url", regex: /"start_url"\s*:\s*"\/"/i },
+      ],
+    },
+    {
+      name: "favicon.ico",
+      path: "/favicon.ico",
+      contentType: /image\/(png|x-icon)/i,
+      assertions: [],
+    },
+    {
+      name: "home meta",
+      path: "/",
+      assertions: [
+        { label: "canonical", regex: /<link[^>]+rel=["']canonical["'][^>]+href=["']https:\/\/omnifm\.xyz\//i },
+        { label: "og title", regex: /<meta[^>]+property=["']og:title["']/i },
+        { label: "twitter card", regex: /<meta[^>]+name=["']twitter:card["']/i },
+        { label: "json ld", regex: /application\/ld\+json/i },
+      ],
+    },
+  ];
+
+  let ok = true;
+  for (const check of checks) {
+    const response = await fetchText(baseUrl, check.path);
+    if (!response.ok) {
+      ok = false;
+      logLine("FAIL", `seo ${check.name}: GET ${check.path} failed (${response.status || "network"}): ${response.error || "request failed"}`);
+      continue;
+    }
+    if (check.contentType && !check.contentType.test(response.contentType)) {
+      ok = false;
+      logLine("FAIL", `seo ${check.name}: unexpected contentType=${response.contentType || "unknown"}`);
+      continue;
+    }
+    const missing = check.assertions
+      .filter((assertion) => !assertion.regex.test(response.text))
+      .map((assertion) => assertion.label);
+    if (missing.length > 0) {
+      ok = false;
+      logLine("FAIL", `seo ${check.name}: missing ${missing.join(", ")}`);
+      continue;
+    }
+    logLine("OK", `seo ${check.name}: status=${response.status}, contentType=${response.contentType || "unknown"}`);
+  }
+  return { ok };
+}
+
 function evaluateProvider(name, payload, syncFields) {
   const failures = [];
   const warnings = [];
@@ -271,6 +369,9 @@ async function main() {
 
   logLine("INFO", `baseUrl=${baseUrl}`);
   logLine("INFO", `dockerService=${dockerService}, logSince=${logSince}`);
+
+  const seoResult = await inspectSeo(baseUrl);
+  if (!seoResult.ok) hadFailure = true;
 
   if (!skipApi) {
     if (!adminToken) {

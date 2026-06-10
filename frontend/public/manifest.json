@@ -1,0 +1,19 @@
+{
+  "name": "OmniFM",
+  "short_name": "OmniFM",
+  "description": "24/7 Discord radio with worker-based reliability, dashboard control, and Premium audio.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#050505",
+  "theme_color": "#050505",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/img/bot-1.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

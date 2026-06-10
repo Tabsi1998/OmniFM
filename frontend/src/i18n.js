@@ -7,6 +7,7 @@ import React, {
   useState,
 } from 'react';
 import { buildPageHref, resolvePageFromUrl } from './lib/pageRouting.js';
+import { applySeoMetadata } from './lib/seo.js';
 
 const STORAGE_KEY = 'omnifm.web.locale';
 const DEFAULT_LOCALE = 'en';
@@ -2010,18 +2011,6 @@ function resolveInitialLocale() {
   return normalizeLocale(window.navigator?.language || DEFAULT_LOCALE);
 }
 
-function updateMetaTag(name, content) {
-  if (typeof document === 'undefined') return;
-  const selector = `meta[name="${name}"]`;
-  let tag = document.head.querySelector(selector);
-  if (!tag) {
-    tag = document.createElement('meta');
-    tag.setAttribute('name', name);
-    document.head.appendChild(tag);
-  }
-  tag.setAttribute('content', content);
-}
-
 export function I18nProvider({ children }) {
   const [locale, setLocaleState] = useState(resolveInitialLocale);
   const copy = LOCALE_MESSAGES[locale] || LOCALE_MESSAGES[DEFAULT_LOCALE];
@@ -2066,25 +2055,7 @@ export function I18nProvider({ children }) {
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    document.documentElement.lang = locale;
-    const page = resolvePageFromUrl(window.location.href);
-    if (page === 'imprint') {
-      document.title = copy.legal.pageTitle;
-      updateMetaTag('description', copy.legal.subtitle);
-      return;
-    }
-    if (page === 'privacy') {
-      document.title = copy.privacy.pageTitle;
-      updateMetaTag('description', copy.privacy.subtitle);
-      return;
-    }
-    if (page === 'terms') {
-      document.title = copy.terms.pageTitle;
-      updateMetaTag('description', copy.terms.subtitle);
-      return;
-    }
-    document.title = copy.meta.title;
-    updateMetaTag('description', copy.meta.description);
+    applySeoMetadata({ locale, url: window.location.href });
   }, [copy, locale]);
 
   const contextValue = useMemo(() => ({

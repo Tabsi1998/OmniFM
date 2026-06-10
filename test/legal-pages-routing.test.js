@@ -16,6 +16,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const frontendBuildDir = path.join(repoRoot, "frontend", "build");
 const frontendIndexPath = path.join(frontendBuildDir, "index.html");
+const frontendRobotsPath = path.join(frontendBuildDir, "robots.txt");
+const frontendSitemapPath = path.join(frontendBuildDir, "sitemap.xml");
+const frontendManifestPath = path.join(frontendBuildDir, "manifest.json");
+const frontendBotIconDir = path.join(frontendBuildDir, "img");
+const frontendBotIconPath = path.join(frontendBotIconDir, "bot-1.png");
 
 async function snapshotFile(filePath) {
   try {
@@ -117,12 +122,21 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     TERMS_GOVERNING_LAW: "Law of the Republic of Austria",
   });
   const indexSnapshot = await snapshotFile(frontendIndexPath);
+  const robotsSnapshot = await snapshotFile(frontendRobotsPath);
+  const sitemapSnapshot = await snapshotFile(frontendSitemapPath);
+  const manifestSnapshot = await snapshotFile(frontendManifestPath);
+  const botIconSnapshot = await snapshotFile(frontendBotIconPath);
   await fs.mkdir(frontendBuildDir, { recursive: true });
   await fs.writeFile(
     frontendIndexPath,
     "<!doctype html><html><body>legal-routing-marker</body></html>",
     "utf8"
   );
+  await fs.writeFile(frontendRobotsPath, "User-agent: *\nSitemap: https://omnifm.xyz/sitemap.xml\n", "utf8");
+  await fs.writeFile(frontendSitemapPath, "<?xml version=\"1.0\"?><urlset><url><loc>https://omnifm.xyz/</loc></url></urlset>", "utf8");
+  await fs.writeFile(frontendManifestPath, JSON.stringify({ name: "OmniFM", start_url: "/" }), "utf8");
+  await fs.mkdir(frontendBotIconDir, { recursive: true });
+  await fs.writeFile(frontendBotIconPath, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
 
   const server = startWebServer([createAdminRuntimeStub()]);
   await once(server, "listening");
@@ -137,6 +151,24 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     const dashboardPageResponse = await fetch(`http://127.0.0.1:${port}/dashboard`);
     assert.equal(dashboardPageResponse.status, 200);
     assert.match(await dashboardPageResponse.text(), /legal-routing-marker/);
+
+    const robotsResponse = await fetch(`http://127.0.0.1:${port}/robots.txt`);
+    assert.equal(robotsResponse.status, 200);
+    assert.match(robotsResponse.headers.get("content-type") || "", /text\/plain/i);
+    assert.match(await robotsResponse.text(), /Sitemap: https:\/\/omnifm\.xyz\/sitemap\.xml/);
+
+    const sitemapResponse = await fetch(`http://127.0.0.1:${port}/sitemap.xml`);
+    assert.equal(sitemapResponse.status, 200);
+    assert.match(sitemapResponse.headers.get("content-type") || "", /application\/xml/i);
+    assert.match(await sitemapResponse.text(), /https:\/\/omnifm\.xyz\//);
+
+    const manifestResponse = await fetch(`http://127.0.0.1:${port}/manifest.json`);
+    assert.equal(manifestResponse.status, 200);
+    assert.equal((await manifestResponse.json()).name, "OmniFM");
+
+    const faviconResponse = await fetch(`http://127.0.0.1:${port}/favicon.ico`);
+    assert.equal(faviconResponse.status, 200);
+    assert.match(faviconResponse.headers.get("content-type") || "", /image\/png/i);
 
     const notFoundPageResponse = await fetch(`http://127.0.0.1:${port}/definitely-missing-page`);
     assert.equal(notFoundPageResponse.status, 404);
@@ -212,6 +244,10 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
   } finally {
     await new Promise((resolve) => server.close(resolve));
     await restoreFile(frontendIndexPath, indexSnapshot);
+    await restoreFile(frontendRobotsPath, robotsSnapshot);
+    await restoreFile(frontendSitemapPath, sitemapSnapshot);
+    await restoreFile(frontendManifestPath, manifestSnapshot);
+    await restoreFile(frontendBotIconPath, botIconSnapshot);
     restoreEnv();
   }
 });

@@ -3263,6 +3263,11 @@ function startWebServer(runtimes) {
 
     // --- Static file serving from the built frontend ---
     const normalizedPathname = normalizeSpaPathname(requestUrl.pathname);
+    if (normalizedPathname === "/favicon.ico") {
+      const faviconFile = path.join(webDir, "img", "bot-1.png");
+      sendStaticFile(res, faviconFile, { headOnly: req.method === "HEAD" });
+      return;
+    }
 
     // Dashboard SPA: /dashboard und /dashboard/* → dashboard.html
     if (normalizedPathname === "/dashboard" || normalizedPathname.startsWith("/dashboard/")) {
