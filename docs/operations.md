@@ -91,6 +91,9 @@ Common modes:
 | `./update.sh --offers` | Offer/coupon/direct-grant management |
 | `./update.sh --email` | SMTP setup |
 | `./update.sh --settings` | Main settings menu |
+| `./update.sh --settings admin` | Owner/admin token setup for `/admin` |
+| `./update.sh --settings logs` | Log rotation and Docker cleanup settings |
+| `./update.sh --settings legal` | Imprint/privacy/terms legal settings |
 | `./update.sh --settings commands` | Slash-command settings directly |
 | `./update.sh --dashboard-settings` | Dashboard OAuth setup shortcut |
 | `./update.sh --status` | Interactive admin cockpit |

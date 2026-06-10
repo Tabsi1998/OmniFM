@@ -2136,11 +2136,12 @@ if [[ -z "$MODE" ]]; then
     echo -e "    ${DIM}8${NC})  Speicher cleanup  - Logs/Backups/Docker-Cache aufraeumen"
     echo -e "    ${BOLD}9${NC})  Codes verwalten  - Coupon/Referral/Gratis-Lizenz"
     echo -e "    ${CYAN}0${NC})  Doctor Check     - System, OAuth, JSON, Runtime pruefen"
+    echo -e "    ${RED}a${NC})  Admin Login      - Owner/Admin Token fuer /admin setzen"
     echo -e "    ${MAGENTA}c${NC})  Slash Commands  - Registrierung & Sync konfigurieren"
     echo -e "    ${MAGENTA}d${NC})  Dashboard OAuth - Pro-Dashboard Login/SSO konfigurieren"
     echo -e "    ${DIM}q${NC})  Beenden"
     echo ""
-    read -rp "$(echo -e "  ${CYAN}?${NC} ${BOLD}Auswahl [0-9/c/d/q]${NC}: ")" MODE_CHOICE
+    read -rp "$(echo -e "  ${CYAN}?${NC} ${BOLD}Auswahl [0-9/a/c/d/q]${NC}: ")" MODE_CHOICE
     case "${MODE_CHOICE:-}" in
       0) MODE="--doctor"; break ;;
       1) MODE="--update"; break ;;
@@ -2152,11 +2153,12 @@ if [[ -z "$MODE" ]]; then
       7) MODE="--status"; break ;;
       8) MODE="--cleanup"; break ;;
       9) MODE="--offers"; break ;;
+      a|A) MODE="--settings"; MODE_ARG="admin"; break ;;
       c|C) MODE="--settings"; MODE_ARG="commands"; break ;;
       d|D) MODE="--settings"; MODE_ARG="dashboard"; break ;;
       q|Q|exit|quit) info "Abbruch."; exit 0 ;;
       *)
-        warn "Ungueltige Auswahl '${MODE_CHOICE}'. Bitte 0-9, c, d oder q eingeben."
+        warn "Ungueltige Auswahl '${MODE_CHOICE}'. Bitte 0-9, a, c, d oder q eingeben."
         echo ""
         ;;
     esac
@@ -2496,6 +2498,103 @@ if [[ "$MODE" == "--settings" ]]; then
     ok "Einstellung gespeichert. Neustart ist vorgemerkt (wird am Ende einmal ausgefuehrt)."
   }
 
+  generate_admin_api_token() {
+    if command -v openssl >/dev/null 2>&1; then
+      openssl rand -hex 32
+    elif command -v node >/dev/null 2>&1; then
+      node -e 'console.log(require("crypto").randomBytes(32).toString("hex"))'
+    else
+      date +%s%N | sha256sum | awk '{print $1}'
+    fi
+  }
+
+  print_settings_help() {
+    echo ""
+    info "Settings-Schnellhilfe"
+    echo -e "    ${BOLD}Direkt starten:${NC}"
+    echo -e "      ${GREEN}./update.sh --settings admin${NC}       Owner/Admin Login Token"
+    echo -e "      ${GREEN}./update.sh --settings dashboard${NC}   Discord OAuth / Dashboard"
+    echo -e "      ${GREEN}./update.sh --settings commands${NC}    Slash-Commands & Sync"
+    echo -e "      ${GREEN}./update.sh --settings logs${NC}        Logs & Docker Cleanup"
+    echo -e "      ${GREEN}./update.sh --settings legal${NC}       Impressum, Datenschutz, Terms"
+    echo -e "    ${BOLD}Im Menue gehen auch Text-Aliase:${NC} admin, logs, dashboard, commands, legal, doctor, dbl, botsgg, topgg, recognition, done, exit"
+    echo -e "    ${DIM}Der Owner/Admin Login ist fuer https://deine-domain/admin und nutzt API_ADMIN_TOKEN.${NC}"
+  }
+
+  edit_admin_token_settings() {
+    local new_admin_api_token legacy_admin_api_token generated_default
+    echo ""
+    info "Owner/Admin Login Token"
+    echo -e "    ${DIM}Dieser Token ist das Passwort fuer /admin. Er wird nach dem Login als HttpOnly-Cookie genutzt und steht nicht in der URL.${NC}"
+    if [[ -n "$cur_public_url" ]]; then
+      echo -e "    Admin URL: ${CYAN}${cur_public_url}/admin${NC}"
+    else
+      echo -e "    Admin URL: ${YELLOW}PUBLIC_WEB_URL fehlt noch; nach dem Setzen ist es PUBLIC_WEB_URL/admin.${NC}"
+    fi
+    if [[ -n "$cur_admin_api_token" ]]; then
+      ok "API_ADMIN_TOKEN ist gesetzt. ENTER behaelt den aktuellen Wert."
+      generated_default="n"
+    else
+      warn "API_ADMIN_TOKEN ist noch nicht gesetzt. Ohne Token ist der Owner-Login nicht nutzbar."
+      generated_default="j"
+    fi
+
+    if prompt_yes_no "Neuen sicheren Token automatisch erzeugen?" "$generated_default"; then
+      new_admin_api_token="$(generate_admin_api_token)"
+      ok "Neuer Token erzeugt. Bitte sicher ablegen; nach dem Speichern wird nur noch 'gesetzt' angezeigt."
+      echo -e "    ${CYAN}${new_admin_api_token}${NC}"
+    else
+      new_admin_api_token="$(prompt_default "API Admin Token (ENTER = behalten, '-' = leeren)" "$cur_admin_api_token")"
+      if [[ "$new_admin_api_token" == "-" ]]; then
+        new_admin_api_token=""
+      fi
+    fi
+
+    write_env_line "API_ADMIN_TOKEN" "$new_admin_api_token"
+    legacy_admin_api_token="$(read_env "ADMIN_API_TOKEN" "")"
+    if [[ -n "$legacy_admin_api_token" ]]; then
+      write_env_line "ADMIN_API_TOKEN" "$new_admin_api_token"
+      info "Legacy ADMIN_API_TOKEN wurde synchronisiert, damit kein abweichender alter Token aktiv bleibt."
+    fi
+    ok "Owner/Admin Login Token gespeichert."
+    mark_settings_dirty
+  }
+
+  edit_operations_settings() {
+    local new_log_max_mb new_log_max_files new_log_max_days new_auto_docker_prune new_docker_prune_until
+    echo ""
+    info "Betrieb: Logs & Docker Cleanup"
+    new_log_max_mb="$(prompt_default "Maximale Log-Dateigroesse in MB" "$cur_log_max_mb")"
+    if [[ ! "$new_log_max_mb" =~ ^[0-9]+$ ]] || (( new_log_max_mb < 1 )); then
+      warn "Ungueltiger Wert fuer LOG_MAX_MB. Verwende 5."
+      new_log_max_mb="5"
+    fi
+    new_log_max_files="$(prompt_default "Maximale Anzahl rotierter Log-Dateien" "$cur_log_max_files")"
+    if [[ ! "$new_log_max_files" =~ ^[0-9]+$ ]] || (( new_log_max_files < 1 )); then
+      warn "Ungueltiger Wert fuer LOG_MAX_FILES. Verwende 30."
+      new_log_max_files="30"
+    fi
+    new_log_max_days="$(prompt_default "Log-Aufbewahrung in Tagen" "$cur_log_max_days")"
+    if [[ ! "$new_log_max_days" =~ ^[0-9]+$ ]] || (( new_log_max_days < 1 )); then
+      warn "Ungueltiger Wert fuer LOG_MAX_DAYS. Verwende 14."
+      new_log_max_days="14"
+    fi
+    if prompt_yes_no "Docker Cache automatisch bei Cleanup/Update aufraeumen?" "$(if [[ "$cur_auto_docker_prune" == "0" ]]; then echo n; else echo j; fi)"; then
+      new_auto_docker_prune="1"
+    else
+      new_auto_docker_prune="0"
+    fi
+    new_docker_prune_until="$(prompt_default "Docker Builder prune until" "$cur_docker_prune_until")"
+
+    write_env_line "LOG_MAX_MB" "$new_log_max_mb"
+    write_env_line "LOG_MAX_FILES" "$new_log_max_files"
+    write_env_line "LOG_MAX_DAYS" "$new_log_max_days"
+    write_env_line "AUTO_DOCKER_PRUNE" "$new_auto_docker_prune"
+    write_env_line "DOCKER_BUILDER_PRUNE_UNTIL" "$new_docker_prune_until"
+    ok "Betriebs- und Log-Einstellungen gespeichert."
+    mark_settings_dirty
+  }
+
   while true; do
   echo ""
   echo -e "  ${BOLD}Aktuelle Einstellungen${NC}"
@@ -2733,22 +2832,31 @@ if [[ "$MODE" == "--settings" ]]; then
   echo ""
 
   echo -e "  ${BOLD}Was aendern?${NC}"
-  echo -e "    ${GREEN}1${NC}) Web-Port (extern)"
-  echo -e "    ${CYAN}2${NC}) Domain"
-  echo -e "    ${YELLOW}3${NC}) Public Web URL"
-  echo -e "    ${BOLD}4${NC}) Web-Origin/CORS automatisch reparieren (empfohlen)"
-  echo -e "    ${CYAN}5${NC}) Pro-Testmonat ein/aus"
-  echo -e "    ${YELLOW}6${NC}) DiscordBotList konfigurieren"
-  echo -e "    ${GREEN}7${NC}) Track-Erkennung (AcoustID/MusicBrainz)"
-  echo -e "    ${CYAN}8${NC}) Impressum, Datenschutz & Terms"
-  echo -e "    ${MAGENTA}9${NC}) Dashboard & Discord OAuth"
-  echo -e "    ${GREEN}10${NC}) Slash-Commands & Sync"
-  echo -e "    ${CYAN}11${NC}) Betrieb, Logs & Admin-Token"
-  echo -e "    ${GREEN}12${NC}) Fertig -> einmal neu starten"
-  echo -e "    ${DIM}13${NC}) Fertig ohne Neustart"
-  echo -e "    ${CYAN}14${NC}) Doctor Check (ohne Aenderung)"
-  echo -e "    ${MAGENTA}15${NC}) Discord Bots (bots.gg) konfigurieren"
-  echo -e "    ${GREEN}16${NC}) Top.gg konfigurieren"
+  echo -e "    ${DIM}Schnellstart / Webseite${NC}"
+  echo -e "      ${GREEN}1${NC}) Web-Port (extern)"
+  echo -e "      ${CYAN}2${NC}) Domain"
+  echo -e "      ${YELLOW}3${NC}) Public Web URL"
+  echo -e "      ${BOLD}4${NC}) Web-Origin/CORS automatisch reparieren (empfohlen)"
+  echo -e "      ${CYAN}5${NC}) Pro-Testmonat ein/aus"
+  echo -e "      ${CYAN}8${NC}) Impressum, Datenschutz & Terms"
+  echo -e "      ${MAGENTA}9${NC}) Dashboard & Discord OAuth"
+  echo -e "      ${GREEN}10${NC}) Slash-Commands & Sync"
+  echo -e "      ${RED}17${NC}) Owner/Admin Login Token fuer /admin"
+  echo -e ""
+  echo -e "    ${DIM}Integrationen${NC}"
+  echo -e "      ${YELLOW}6${NC}) DiscordBotList konfigurieren"
+  echo -e "      ${GREEN}7${NC}) Track-Erkennung (AcoustID/MusicBrainz)"
+  echo -e "      ${MAGENTA}15${NC}) Discord Bots (bots.gg) konfigurieren"
+  echo -e "      ${GREEN}16${NC}) Top.gg konfigurieren"
+  echo -e ""
+  echo -e "    ${DIM}Betrieb${NC}"
+  echo -e "      ${CYAN}11${NC}) Logs & Docker Cleanup"
+  echo -e "      ${GREEN}12${NC}) Fertig -> einmal neu starten"
+  echo -e "      ${DIM}13${NC}) Fertig ohne Neustart"
+  echo -e "      ${CYAN}14${NC}) Doctor Check (ohne Aenderung)"
+  echo -e "      ${DIM}18${NC}) Hilfe / Direktbefehle anzeigen"
+  echo ""
+  echo -e "    ${DIM}Aliase statt Zahlen: admin, logs, dashboard, commands, legal, doctor, dbl, botsgg, topgg, recognition, done, exit${NC}"
   echo ""
   if [[ "$MODE_ARG" == "dashboard" && "${_DASHBOARD_SETTINGS_OPENED:-0}" != "1" ]]; then
     _DASHBOARD_SETTINGS_OPENED=1
@@ -2758,9 +2866,46 @@ if [[ "$MODE" == "--settings" ]]; then
     _COMMAND_SETTINGS_OPENED=1
     SET_CHOICE="10"
     info "Direktmodus: Slash-Commands & Sync"
+  elif [[ "$MODE_ARG" == "admin" && "${_ADMIN_SETTINGS_OPENED:-0}" != "1" ]]; then
+    _ADMIN_SETTINGS_OPENED=1
+    SET_CHOICE="17"
+    info "Direktmodus: Owner/Admin Login Token"
+  elif [[ "$MODE_ARG" == "logs" && "${_LOG_SETTINGS_OPENED:-0}" != "1" ]]; then
+    _LOG_SETTINGS_OPENED=1
+    SET_CHOICE="11"
+    info "Direktmodus: Logs & Docker Cleanup"
+  elif [[ "$MODE_ARG" == "legal" && "${_LEGAL_SETTINGS_OPENED:-0}" != "1" ]]; then
+    _LEGAL_SETTINGS_OPENED=1
+    SET_CHOICE="8"
+    info "Direktmodus: Legal / Impressum / Datenschutz"
+  elif [[ "$MODE_ARG" == "doctor" && "${_DOCTOR_SETTINGS_OPENED:-0}" != "1" ]]; then
+    _DOCTOR_SETTINGS_OPENED=1
+    SET_CHOICE="14"
+    info "Direktmodus: Doctor Check"
   else
-    read -rp "$(echo -e "  ${CYAN}?${NC} ${BOLD}Auswahl [1-16]${NC}: ")" SET_CHOICE
+    read -rp "$(echo -e "  ${CYAN}?${NC} ${BOLD}Auswahl [1-18 oder Alias]${NC}: ")" SET_CHOICE
   fi
+
+  case "$(printf "%s" "${SET_CHOICE:-}" | tr '[:upper:]' '[:lower:]' | xargs)" in
+    port|web|web-port) SET_CHOICE="1" ;;
+    domain|dom) SET_CHOICE="2" ;;
+    public|url|public-url|public-web-url) SET_CHOICE="3" ;;
+    origin|cors|fix|repair|reparieren) SET_CHOICE="4" ;;
+    trial|pro-trial|testmonat) SET_CHOICE="5" ;;
+    dbl|discordbotlist|discord-bot-list) SET_CHOICE="6" ;;
+    recognition|audio|track|track-erkennung|acoustid) SET_CHOICE="7" ;;
+    legal|impressum|privacy|datenschutz|terms|nutzungsbedingungen) SET_CHOICE="8" ;;
+    dashboard|oauth|discord-oauth) SET_CHOICE="9" ;;
+    commands|slash|slash-commands|sync) SET_CHOICE="10" ;;
+    logs|ops|betrieb|docker|cleanup|docker-cleanup) SET_CHOICE="11" ;;
+    done|fertig|restart) SET_CHOICE="12" ;;
+    exit|quit|ende|no-restart|ohne-neustart) SET_CHOICE="13" ;;
+    doctor|check|health) SET_CHOICE="14" ;;
+    botsgg|bgg|discord-bots) SET_CHOICE="15" ;;
+    topgg|top.gg) SET_CHOICE="16" ;;
+    admin|owner|login|token|admin-token|owner-token) SET_CHOICE="17" ;;
+    help|hilfe|h|\?) SET_CHOICE="18" ;;
+  esac
 
   case "${SET_CHOICE:-}" in
     1)
@@ -3097,42 +3242,7 @@ if [[ "$MODE" == "--settings" ]]; then
       mark_settings_dirty
       ;;
     11)
-      echo ""
-      info "Betrieb, Logs & Admin-Token"
-      new_log_max_mb="$(prompt_default "Maximale Log-Dateigroesse in MB" "$cur_log_max_mb")"
-      if [[ ! "$new_log_max_mb" =~ ^[0-9]+$ ]] || (( new_log_max_mb < 1 )); then
-        warn "Ungueltiger Wert fuer LOG_MAX_MB. Verwende 5."
-        new_log_max_mb="5"
-      fi
-      new_log_max_files="$(prompt_default "Maximale Anzahl rotierter Log-Dateien" "$cur_log_max_files")"
-      if [[ ! "$new_log_max_files" =~ ^[0-9]+$ ]] || (( new_log_max_files < 1 )); then
-        warn "Ungueltiger Wert fuer LOG_MAX_FILES. Verwende 30."
-        new_log_max_files="30"
-      fi
-      new_log_max_days="$(prompt_default "Log-Aufbewahrung in Tagen" "$cur_log_max_days")"
-      if [[ ! "$new_log_max_days" =~ ^[0-9]+$ ]] || (( new_log_max_days < 1 )); then
-        warn "Ungueltiger Wert fuer LOG_MAX_DAYS. Verwende 14."
-        new_log_max_days="14"
-      fi
-      if prompt_yes_no "Docker Cache automatisch bei Cleanup/Update aufraeumen?" "$(if [[ "$cur_auto_docker_prune" == "0" ]]; then echo n; else echo j; fi)"; then
-        new_auto_docker_prune="1"
-      else
-        new_auto_docker_prune="0"
-      fi
-      new_docker_prune_until="$(prompt_default "Docker Builder prune until" "$cur_docker_prune_until")"
-      new_admin_api_token="$(prompt_default "API Admin Token (ENTER = behalten, '-' = leeren)" "$cur_admin_api_token")"
-      if [[ "$new_admin_api_token" == "-" ]]; then
-        new_admin_api_token=""
-      fi
-
-      write_env_line "LOG_MAX_MB" "$new_log_max_mb"
-      write_env_line "LOG_MAX_FILES" "$new_log_max_files"
-      write_env_line "LOG_MAX_DAYS" "$new_log_max_days"
-      write_env_line "AUTO_DOCKER_PRUNE" "$new_auto_docker_prune"
-      write_env_line "DOCKER_BUILDER_PRUNE_UNTIL" "$new_docker_prune_until"
-      write_env_line "API_ADMIN_TOKEN" "$new_admin_api_token"
-      ok "Betriebs- und Log-Einstellungen gespeichert."
-      mark_settings_dirty
+      edit_operations_settings
       ;;
     12)
       if (( settings_restart_needed == 1 )); then
@@ -3296,14 +3406,21 @@ if [[ "$MODE" == "--settings" ]]; then
       fi
       mark_settings_dirty
       ;;
+    17)
+      edit_admin_token_settings
+      ;;
+    18)
+      print_settings_help
+      continue
+      ;;
     *)
-      warn "Ungueltige Auswahl. Bitte 1-16 waehlen."
+      warn "Ungueltige Auswahl. Bitte 1-18 oder einen Alias wie admin, logs, dashboard, commands, legal, doctor waehlen."
       continue
       ;;
   esac
 
   if (( settings_changed == 1 )); then
-    info "Du kannst weitere Einstellungen bearbeiten oder mit 12/13 beenden."
+    info "Du kannst weitere Einstellungen bearbeiten oder mit 12/13 beenden. Hilfe: 18 oder help."
   fi
 done
 
@@ -3838,6 +3955,9 @@ echo -e "    Premium:          ${GREEN}./update.sh --premium${NC}"
 echo -e "    Codes:            ${GREEN}./update.sh --offers${NC}"
 echo -e "    E-Mail Setup:     ${GREEN}./update.sh --email${NC}"
 echo -e "    Einstellungen:    ${GREEN}./update.sh --settings${NC}"
+echo -e "    Admin Login:      ${GREEN}./update.sh --settings admin${NC}"
+echo -e "    Legal Setup:      ${GREEN}./update.sh --settings legal${NC}"
+echo -e "    Logs/Betrieb:     ${GREEN}./update.sh --settings logs${NC}"
 echo -e "    Slash Commands:   ${GREEN}./update.sh --settings commands${NC}"
 echo -e "    Dashboard OAuth:  ${GREEN}./update.sh --dashboard-settings${NC}"
 echo -e "    Doctor Check:     ${GREEN}./update.sh --doctor${NC}"
