@@ -286,8 +286,10 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.match(adminPanelHtml, /Diagnose/);
     assert.match(adminPanelHtml, /Betrieb/);
     assert.match(adminPanelHtml, /Einstellungen/);
+    assert.match(adminPanelHtml, /Aktionen/);
     assert.match(adminPanelHtml, /renderOperations/);
     assert.match(adminPanelHtml, /renderConfig/);
+    assert.match(adminPanelHtml, /renderJobs/);
 
     const adminOverviewResponse = await fetch(`http://127.0.0.1:${port}/api/admin/overview`, {
       headers: { Cookie: adminCookieHeader },
@@ -358,6 +360,44 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.equal(adminConfigSave.restartRequired, true);
     assert.ok(adminConfigSave.updatedKeys.includes("DEFAULT_LANGUAGE"));
     assert.match(await fs.readFile(ownerEnvFile, "utf8"), /DEFAULT_LANGUAGE=de/);
+
+    const adminJobsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
+      headers: { Cookie: adminCookieHeader },
+    });
+    assert.equal(adminJobsResponse.status, 200);
+    const adminJobs = await adminJobsResponse.json();
+    assert.ok(adminJobs.actions.some((action) => action.id === "rollback-plan"));
+    assert.ok(adminJobs.actions.some((action) => action.id === "split-preflight"));
+
+    const invalidAdminJobResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
+      method: "POST",
+      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ actionId: "rm-random-things" }),
+    });
+    assert.equal(invalidAdminJobResponse.status, 404);
+
+    const adminJobStartResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
+      method: "POST",
+      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ actionId: "rollback-plan" }),
+    });
+    assert.equal(adminJobStartResponse.status, 202);
+    const adminJobStart = await adminJobStartResponse.json();
+    assert.equal(adminJobStart.ok, true);
+    assert.equal(adminJobStart.job.actionId, "rollback-plan");
+
+    let adminJobResult = null;
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const pollResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs/${encodeURIComponent(adminJobStart.job.id)}`, {
+        headers: { Cookie: adminCookieHeader },
+      });
+      assert.equal(pollResponse.status, 200);
+      adminJobResult = await pollResponse.json();
+      if (adminJobResult.job.status !== "running") break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    assert.equal(adminJobResult.job.status, "succeeded");
+    assert.match(adminJobResult.job.output, /Rollback plan:/);
 
     const adminGuildsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/guilds`, {
       headers: { Cookie: adminCookieHeader },

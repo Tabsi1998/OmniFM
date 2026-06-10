@@ -13,6 +13,9 @@
 //   GET  /api/admin/operations   → update.sh/Owner-GUI Paritaetskarte
 //   GET  /api/admin/config       → Owner-Einstellungen ohne Secret-Werte
 //   POST /api/admin/config       → Erlaubte Owner-Einstellungen in .env speichern
+//   GET  /api/admin/jobs         → Erlaubte Owner-Jobs und letzte Laeufe
+//   POST /api/admin/jobs         → Erlaubten Owner-Job starten
+//   GET  /api/admin/jobs/:id     → Einzelnen Owner-Job abrufen
 //   GET  /api/admin/licenses     → Alle Lizenzen
 //   POST /api/admin/licenses/:id → Lizenz patchen (aktivieren, verlängern, sperren)
 //   GET  /api/admin/guilds       → Alle Guilds mit Status
@@ -22,6 +25,7 @@
 // ============================================================
 
 import { getOwnerConfigSnapshot, patchOwnerConfig } from "../../lib/owner-config-store.js";
+import { getOwnerJob, getOwnerJobsSnapshot, startOwnerJob } from "../../lib/owner-job-runner.js";
 
 export function createAdminRoutesHandler(deps) {
   const {
@@ -187,8 +191,8 @@ export function createAdminRoutesHandler(deps) {
         webStatus: "planned",
         risk: "high",
         description: "Code aktualisieren, Container neu bauen und Deploy-Gates ausfuehren.",
-        webEntry: "Noch nicht als Web-Aktion freigeschaltet",
-        nextStep: "Web-Jobqueue mit Confirm-Step, Audit-Log und Rollback-/Log-Ausgabe."
+        webEntry: "Tab Aktionen zeigt Release-Preflight-Plan und Rollback-Plan als sichere Jobs.",
+        nextStep: "Echter Update-Lauf erst mit Confirm-Step, Audit-Log und Rollback-/Log-Ausgabe."
       },
       {
         id: "update-rolling",
@@ -382,11 +386,11 @@ export function createAdminRoutesHandler(deps) {
         area: "Operations",
         title: "Doctor Check",
         cli: "./update.sh --doctor",
-        webStatus: "partial",
+        webStatus: "available",
         risk: "low",
         description: "System, OAuth, JSON, Runtime und Infrastruktur pruefen.",
-        webEntry: "Tab Diagnose und /api/admin/diagnostics",
-        nextStep: "Doctor-Checks mit gleicher Tiefe wie CLI als strukturierte Web-Checks."
+        webEntry: "Tab Aktionen kann update.sh --doctor als begrenzten Owner-Job starten; Tab Diagnose zeigt strukturierte Kurzdiagnose.",
+        nextStep: "Doctor-Ausgabe schrittweise in strukturierte Web-Checks ueberfuehren."
       },
       {
         id: "recognition-test",
@@ -691,6 +695,41 @@ export function createAdminRoutesHandler(deps) {
       return true;
     }
 
+    // GET/POST /api/admin/jobs
+    if (pathname === "/api/admin/jobs") {
+      if (req.method === "GET") {
+        sendJson(res, 200, getOwnerJobsSnapshot());
+        return true;
+      }
+      if (req.method === "POST") {
+        try {
+          const payload = JSON.parse(await readRequestBody(req) || "{}");
+          const actionId = String(payload?.actionId || "").trim();
+          const job = startOwnerJob(actionId);
+          log?.("INFO", `[Owner] Job gestartet: ${job.actionId} (${job.id})`);
+          sendJson(res, 202, { ok: true, job });
+        } catch (err) {
+          sendJson(res, err?.statusCode || 400, { ok: false, error: err?.message || "Owner-Job konnte nicht gestartet werden" });
+        }
+        return true;
+      }
+      methodNotAllowed(res, ["GET", "POST"]);
+      return true;
+    }
+
+    // GET /api/admin/jobs/:id
+    const jobMatch = pathname.match(/^\/api\/admin\/jobs\/([^/]+)$/);
+    if (jobMatch) {
+      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
+      const job = getOwnerJob(decodeURIComponent(jobMatch[1]));
+      if (!job) {
+        sendJson(res, 404, { ok: false, error: "Owner-Job nicht gefunden" });
+        return true;
+      }
+      sendJson(res, 200, { ok: true, job });
+      return true;
+    }
+
     // GET /api/admin/licenses
     if (pathname === "/api/admin/licenses") {
       if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
@@ -920,6 +959,11 @@ function buildAdminHtml() {
     .config-field code{font-size:10px;color:#52525b}
     .config-field input,.config-field select{width:100%;background:#111;border:1px solid #333;color:#e4e4e7;border-radius:7px;padding:8px;font-size:12px}
     .config-status{font-size:12px;color:#71717a;margin-left:8px}
+    .job-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:16px}
+    .job-card{background:#0b0b0b;border:1px solid #202020;border-radius:8px;padding:12px}
+    .job-card h3{font-size:13px;margin-bottom:6px;color:#e4e4e7}
+    .job-card p{font-size:12px;color:#71717a;min-height:34px;margin-bottom:10px}
+    .job-output{white-space:pre-wrap;background:#050505;border:1px solid #222;border-radius:8px;padding:12px;color:#d4d4d8;font-family:'Consolas','JetBrains Mono',monospace;font-size:11px;line-height:1.45;max-height:360px;overflow:auto}
   </style>
 </head>
 <body>
@@ -953,6 +997,7 @@ function buildAdminHtml() {
         <button class="tab" onclick="showTab('logs', this)">📋 Logs</button>
         <button class="tab" onclick="showTab('operations', this)">⚙️ Betrieb</button>
         <button class="tab" onclick="showTab('config', this)">🔧 Einstellungen</button>
+        <button class="tab" onclick="showTab('jobs', this)">▶ Aktionen</button>
       </div>
       <div id="content"><div class="loading">Lade Daten...</div></div>
     </div>
@@ -1013,7 +1058,7 @@ function buildAdminHtml() {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       if (trigger) trigger.classList.add('active');
       else {
-        const index = ['bots','diagnostics','guilds','licenses','stations','logs','operations','config'].indexOf(tab);
+        const index = ['bots','diagnostics','guilds','licenses','stations','logs','operations','config','jobs'].indexOf(tab);
         const buttons = document.querySelectorAll('.tab');
         if (buttons[index]) buttons[index].classList.add('active');
       }
@@ -1130,14 +1175,17 @@ function buildAdminHtml() {
       } else if (tab === 'config') {
         if (!d.config) { el.innerHTML = '<div class="loading">Lade Einstellungen...</div>'; return; }
         el.innerHTML = renderConfig(d.config);
+      } else if (tab === 'jobs') {
+        if (!d.jobs) { el.innerHTML = '<div class="loading">Lade Aktionen...</div>'; return; }
+        el.innerHTML = renderJobs(d.jobs);
       }
     }
 
     async function loadAll() {
       document.getElementById('serverTime').textContent = 'Lädt...';
       try {
-        const [overview, guilds, licenses, stations, logs, diagnostics, operations, config] = await Promise.allSettled([
-          api('overview'), api('guilds'), api('licenses'), api('stations'), api('logs'), api('diagnostics'), api('operations'), api('config')
+        const [overview, guilds, licenses, stations, logs, diagnostics, operations, config, jobs] = await Promise.allSettled([
+          api('overview'), api('guilds'), api('licenses'), api('stations'), api('logs'), api('diagnostics'), api('operations'), api('config'), api('jobs')
         ]);
         if (overview.status === 'fulfilled') {
           cachedData.overview = overview.value;
@@ -1165,6 +1213,7 @@ function buildAdminHtml() {
         if (diagnostics.status === 'fulfilled') cachedData.diagnostics = diagnostics.value;
         if (operations.status === 'fulfilled') cachedData.operations = operations.value;
         if (config.status === 'fulfilled') cachedData.config = config.value;
+        if (jobs.status === 'fulfilled') cachedData.jobs = jobs.value;
         renderTab(currentTab);
       } catch(e) {
         document.getElementById('content').innerHTML = '<div class="error-msg">Fehler: ' + esc(e.message) + '</div>';
@@ -1256,6 +1305,83 @@ function buildAdminHtml() {
           status.style.color = '#FF2A2A';
         }
       }
+    }
+
+    function renderJobs(payload) {
+      const actions = Array.isArray(payload.actions) ? payload.actions : [];
+      const jobs = Array.isArray(payload.jobs) ? payload.jobs : [];
+      const running = jobs.find(job => job.status === 'running');
+      return '<div class="summary-row">' +
+          summaryPill(actions.length, 'Erlaubte Aktionen', '') +
+          summaryPill(payload.running ? 'JA' : 'NEIN', 'Job laeuft', payload.running ? 'amber' : 'green') +
+          summaryPill(jobs.length, 'Letzte Jobs', '') +
+        '</div>' +
+        '<div class="job-grid">' +
+          actions.map(action => '<div class="job-card">' +
+            '<h3>' + esc(action.title || action.id) + '</h3>' +
+            '<p>' + esc(action.description || '') + '</p>' +
+            '<div style="display:flex;gap:8px;align-items:center;justify-content:space-between">' +
+              riskBadge(action.risk) +
+              '<button class="btn btn-cyan" style="font-size:11px;padding:6px 10px" ' + (payload.running ? 'disabled' : '') + ' onclick="startOwnerJob(' + JSON.stringify(action.id) + ')">Starten</button>' +
+            '</div>' +
+            '<div style="margin-top:8px"><span class="cmd">' + esc(action.command || '') + '</span></div>' +
+          '</div>').join('') +
+        '</div>' +
+        '<div class="section-header"><h2>Job-Ausgabe</h2><button class="mini-btn" onclick="refreshJobs()">Aktualisieren</button></div>' +
+        (jobs.length
+          ? '<table><thead><tr><th>Aktion</th><th>Status</th><th>Start</th><th>Dauer</th><th>Exit</th></tr></thead><tbody>' +
+            jobs.slice(0, 10).map(job => '<tr onclick="selectOwnerJob(' + JSON.stringify(job.id) + ')" style="cursor:pointer">' +
+              '<td><b>' + esc(job.title || job.actionId) + '</b><div style="font-size:11px;color:#52525b">' + esc(job.id) + '</div></td>' +
+              '<td>' + jobStatusBadge(job.status) + '</td>' +
+              '<td style="font-size:12px;color:#71717a">' + esc(formatDateTime(job.startedAt)) + '</td>' +
+              '<td style="font-size:12px;color:#71717a">' + (job.durationMs != null ? Math.round(job.durationMs / 1000) + 's' : 'laeuft') + '</td>' +
+              '<td style="font-size:12px;color:#71717a">' + (job.exitCode == null ? '-' : esc(job.exitCode)) + '</td>' +
+            '</tr>').join('') + '</tbody></table>' +
+            '<pre class="job-output" id="jobOutput">' + esc((running || jobs[0])?.output || 'Noch keine Ausgabe.') + '</pre>'
+          : '<div class="empty-state">Noch keine Owner-Jobs gestartet.</div>');
+    }
+
+    async function refreshJobs() {
+      try {
+        cachedData.jobs = await api('jobs');
+        renderTab('jobs');
+        if (cachedData.jobs?.running) setTimeout(refreshJobs, 2500);
+      } catch (e) {
+        document.getElementById('content').innerHTML = '<div class="error-msg">Fehler: ' + esc(e.message) + '</div>';
+      }
+    }
+
+    async function startOwnerJob(actionId) {
+      if (!confirm('Owner-Aktion starten? Es kann immer nur ein Job gleichzeitig laufen.')) return;
+      try {
+        await apiPost('jobs', { actionId });
+        await refreshJobs();
+      } catch (e) {
+        alert('Job konnte nicht gestartet werden: ' + e.message);
+      }
+    }
+
+    async function selectOwnerJob(jobId) {
+      try {
+        const result = await api('jobs/' + encodeURIComponent(jobId));
+        const output = document.getElementById('jobOutput');
+        if (output) output.textContent = result.job?.output || 'Keine Ausgabe.';
+      } catch (e) {
+        alert('Job konnte nicht geladen werden: ' + e.message);
+      }
+    }
+
+    function jobStatusBadge(status) {
+      if (status === 'succeeded') return '<span class="badge-up">OK</span>';
+      if (status === 'running') return '<span class="badge-unknown">LAEUFT</span>';
+      return '<span class="badge-down">FEHLER</span>';
+    }
+
+    function formatDateTime(value) {
+      if (!value) return '-';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+      return date.toLocaleString('de-AT');
     }
 
     function renderOperations(payload) {
