@@ -87,6 +87,24 @@ function createAdminRuntimeStub() {
   };
 }
 
+function assertCommonSecurityHeaders(headers, { expectGoogleAssets = false } = {}) {
+  assert.equal(headers.get("x-content-type-options"), "nosniff");
+  assert.equal(headers.get("x-frame-options"), "DENY");
+  assert.equal(headers.get("referrer-policy"), "no-referrer");
+  assert.equal(headers.get("x-permitted-cross-domain-policies"), "none");
+  assert.match(headers.get("permissions-policy") || "", /camera=\(\).*microphone=\(\)/i);
+
+  const csp = headers.get("content-security-policy") || "";
+  assert.match(csp, /default-src 'self'/);
+  assert.match(csp, /object-src 'none'/);
+  assert.match(csp, /frame-ancestors 'none'/);
+  if (expectGoogleAssets) {
+    assert.match(csp, /googletagmanager\.com/i);
+    assert.match(csp, /google-analytics\.com/i);
+    assert.match(csp, /fonts\.googleapis\.com/i);
+  }
+}
+
 test("pageRouting resolves aliases and localized legal paths", () => {
   assert.equal(resolvePageFromUrl("https://omnifm.xyz/?page=imprint"), "imprint");
   assert.equal(resolvePageFromUrl("https://omnifm.xyz/?page=terms"), "terms");
@@ -155,6 +173,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
   try {
     const termsPageResponse = await fetch(`http://127.0.0.1:${port}/nutzungsbedingungen?lang=de`);
     assert.equal(termsPageResponse.status, 200);
+    assertCommonSecurityHeaders(termsPageResponse.headers, { expectGoogleAssets: true });
     assert.match(await termsPageResponse.text(), /legal-routing-marker/);
 
     const dashboardPageResponse = await fetch(`http://127.0.0.1:${port}/dashboard`);
@@ -175,6 +194,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
 
     const robotsResponse = await fetch(`http://127.0.0.1:${port}/robots.txt`);
     assert.equal(robotsResponse.status, 200);
+    assertCommonSecurityHeaders(robotsResponse.headers);
     assert.match(robotsResponse.headers.get("content-type") || "", /text\/plain/i);
     assert.match(await robotsResponse.text(), /Sitemap: https:\/\/omnifm\.xyz\/sitemap\.xml/);
 
@@ -197,6 +217,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
 
     const adminPanelResponse = await fetch(`http://127.0.0.1:${port}/admin?token=admin-route-token`);
     assert.equal(adminPanelResponse.status, 200);
+    assertCommonSecurityHeaders(adminPanelResponse.headers);
     const adminPanelHtml = await adminPanelResponse.text();
     assert.match(adminPanelHtml, /OMNIFM ADMIN/);
     assert.match(adminPanelHtml, /stationSearch/);
@@ -216,6 +237,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
 
     const termsApiResponse = await fetch(`http://127.0.0.1:${port}/api/terms`);
     assert.equal(termsApiResponse.status, 200);
+    assertCommonSecurityHeaders(termsApiResponse.headers);
     const termsData = await termsApiResponse.json();
 
     const legalApiResponse = await fetch(`http://127.0.0.1:${port}/api/legal`);

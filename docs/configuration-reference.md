@@ -49,6 +49,9 @@ Those are only used when no numbered `BOT_N_*` configuration exists.
 | `CORS_ORIGINS` | Legacy alias | CSV |
 | `CHECKOUT_RETURN_ORIGINS` | Allowed checkout return origins | CSV |
 | `TRUST_PROXY_HEADERS` | Trust `x-forwarded-*` style proxy headers | Useful behind reverse proxies |
+| `SECURITY_HSTS_ENABLED` | Force HSTS on/off | `1` or `0`; auto-detected from HTTPS public URL by default |
+| `HSTS_ENABLED` | Legacy HSTS override alias | `1` or `0` |
+| `SECURITY_HSTS_PRELOAD` | Add HSTS `preload` directive | Only after domain/subdomains are HTTPS-ready |
 | `API_ADMIN_TOKEN` | Admin token for protected API routes | Primary current name |
 | `ADMIN_API_TOKEN` | Legacy admin token alias | Still accepted |
 

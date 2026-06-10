@@ -19,6 +19,7 @@ It is not the production backend and is not part of the CI release gate.
 - [Local Development](docs/local-development.md)
 - [Website Foundation Contract](docs/website-foundation.md)
 - [Google Search Console Workflow](docs/search-console.md)
+- [Security Headers](docs/security-headers.md)
 
 ## What Is Implemented
 

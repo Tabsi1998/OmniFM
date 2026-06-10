@@ -121,6 +121,7 @@ async function fetchText(baseUrl, path) {
       status: response.status,
       text: await response.text(),
       contentType: response.headers.get("content-type") || "",
+      headers: response.headers,
     };
   } catch (error) {
     return {
@@ -128,11 +129,74 @@ async function fetchText(baseUrl, path) {
       status: 0,
       text: "",
       contentType: "",
+      headers: null,
       error: error?.message || String(error),
     };
   } finally {
     clearTimeout(timer);
   }
+}
+
+function isHttpsUrl(rawUrl) {
+  try {
+    return new URL(String(rawUrl || "")).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function requireHeader(headers, name, expectedRegex = /.+/) {
+  const value = headers?.get?.(name) || "";
+  return expectedRegex.test(value) ? "" : `${name}${value ? `=${clipLine(value, 80)}` : "=missing"}`;
+}
+
+async function inspectSecurityHeaders(baseUrl) {
+  const checks = [
+    { name: "home", path: "/" },
+    { name: "api legal", path: "/api/legal" },
+    { name: "robots", path: "/robots.txt" },
+  ];
+  const expectHsts = isHttpsUrl(baseUrl);
+  let ok = true;
+
+  for (const check of checks) {
+    const response = await fetchText(baseUrl, check.path);
+    if (!response.ok) {
+      ok = false;
+      logLine("FAIL", `security ${check.name}: GET ${check.path} failed (${response.status || "network"}): ${response.error || "request failed"}`);
+      continue;
+    }
+
+    const failures = [
+      requireHeader(response.headers, "x-content-type-options", /^nosniff$/i),
+      requireHeader(response.headers, "x-frame-options", /^DENY$/i),
+      requireHeader(response.headers, "referrer-policy", /^no-referrer$/i),
+      requireHeader(response.headers, "permissions-policy", /camera=\(\).*microphone=\(\)/i),
+      requireHeader(response.headers, "content-security-policy", /default-src 'self'.*object-src 'none'.*frame-ancestors 'none'/i),
+    ].filter(Boolean);
+
+    if (expectHsts) {
+      failures.push(requireHeader(response.headers, "strict-transport-security", /max-age=\d+/i));
+    }
+
+    const csp = response.headers?.get?.("content-security-policy") || "";
+    if (check.path === "/" && !/googletagmanager\.com/i.test(csp)) {
+      failures.push("content-security-policy missing googletagmanager.com");
+    }
+    if (check.path === "/" && !/fonts\.googleapis\.com/i.test(csp)) {
+      failures.push("content-security-policy missing fonts.googleapis.com");
+    }
+
+    if (failures.length > 0) {
+      ok = false;
+      logLine("FAIL", `security ${check.name}: ${failures.join("; ")}`);
+      continue;
+    }
+
+    logLine("OK", `security ${check.name}: hardened headers present`);
+  }
+
+  return { ok };
 }
 
 async function inspectSeo(baseUrl) {
@@ -375,6 +439,9 @@ async function main() {
 
   const seoResult = await inspectSeo(baseUrl);
   if (!seoResult.ok) hadFailure = true;
+
+  const securityResult = await inspectSecurityHeaders(baseUrl);
+  if (!securityResult.ok) hadFailure = true;
 
   if (!skipApi) {
     if (!adminToken) {

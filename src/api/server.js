@@ -3079,6 +3079,7 @@ const handleAdminRoutes = createAdminRoutesHandler({
   methodNotAllowed,
   sendJson,
   getRecentOperatorIncidents,
+  getCommonSecurityHeaders,
 });
 
 function startWebServer(runtimes) {

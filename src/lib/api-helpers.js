@@ -17,12 +17,152 @@ import { buildCommandBuilders } from "../commands.js";
 import { buildInviteUrl } from "../bot-config.js";
 
 // ---- Security & HTTP ----
+const CSP_DIRECTIVES = {
+  "default-src": ["'self'"],
+  "base-uri": ["'self'"],
+  "object-src": ["'none'"],
+  "frame-ancestors": ["'none'"],
+  "script-src": [
+    "'self'",
+    "'unsafe-inline'",
+    "https://www.googletagmanager.com",
+    "https://www.google-analytics.com",
+    "https://js.stripe.com",
+  ],
+  "script-src-elem": [
+    "'self'",
+    "'unsafe-inline'",
+    "https://www.googletagmanager.com",
+    "https://www.google-analytics.com",
+    "https://js.stripe.com",
+  ],
+  "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+  "style-src-elem": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+  "font-src": ["'self'", "data:", "https://fonts.gstatic.com"],
+  "img-src": ["'self'", "data:", "blob:", "https:"],
+  "media-src": ["'self'", "data:", "blob:", "https:"],
+  "connect-src": [
+    "'self'",
+    "https://www.googletagmanager.com",
+    "https://www.google-analytics.com",
+    "https://region1.google-analytics.com",
+    "https://api.stripe.com",
+  ],
+  "frame-src": [
+    "'self'",
+    "https://checkout.stripe.com",
+    "https://js.stripe.com",
+    "https://hooks.stripe.com",
+    "https://discord.com",
+  ],
+  "worker-src": ["'self'", "blob:"],
+  "child-src": ["'self'", "blob:"],
+  "manifest-src": ["'self'"],
+  "form-action": ["'self'", "https://checkout.stripe.com", "https://discord.com"],
+};
+
+const PERMISSIONS_POLICY = [
+  "accelerometer=()",
+  "autoplay=(self)",
+  "camera=()",
+  "clipboard-read=()",
+  "clipboard-write=(self)",
+  "display-capture=()",
+  "encrypted-media=()",
+  "fullscreen=(self)",
+  "geolocation=()",
+  "gyroscope=()",
+  "magnetometer=()",
+  "microphone=()",
+  "midi=()",
+  "payment=()",
+  "picture-in-picture=(self)",
+  "publickey-credentials-get=()",
+  "usb=()",
+  "xr-spatial-tracking=()",
+].join(", ");
+
+function parseBooleanEnv(rawValue, fallback = false) {
+  const value = String(rawValue ?? "").trim().toLowerCase();
+  if (!value) return fallback;
+  if (["1", "true", "yes", "on"].includes(value)) return true;
+  if (["0", "false", "no", "off"].includes(value)) return false;
+  return fallback;
+}
+
+function getSecurityPublicHostCandidate() {
+  const publicUrl = String(process.env.PUBLIC_WEB_URL || "").trim();
+  if (publicUrl) {
+    try {
+      const parsed = new URL(publicUrl);
+      return { protocol: parsed.protocol, hostname: parsed.hostname };
+    } catch {
+      return null;
+    }
+  }
+
+  const rawDomain = String(process.env.WEB_DOMAIN || "").trim();
+  if (!rawDomain) return null;
+  const host = rawDomain
+    .replace(/^https?:\/\//i, "")
+    .replace(/\/.*$/, "")
+    .trim();
+  if (!host || /[\s/\\]/.test(host)) return null;
+  const hostWithoutPort = host.replace(/:\d+$/, "");
+  return { protocol: "https:", hostname: hostWithoutPort };
+}
+
+function isLocalSecurityHostname(hostname) {
+  const value = String(hostname || "").trim().toLowerCase();
+  return value === "localhost"
+    || value === "127.0.0.1"
+    || value === "::1"
+    || value.endsWith(".localhost");
+}
+
+function shouldSendStrictTransportSecurity() {
+  const explicit = process.env.SECURITY_HSTS_ENABLED ?? process.env.HSTS_ENABLED;
+  if (explicit !== undefined) {
+    return parseBooleanEnv(explicit, false);
+  }
+
+  const publicHost = getSecurityPublicHostCandidate();
+  if (!publicHost || publicHost.protocol !== "https:") return false;
+  return !isLocalSecurityHostname(publicHost.hostname);
+}
+
+function buildContentSecurityPolicy() {
+  return Object.entries(CSP_DIRECTIVES)
+    .map(([directive, values]) => `${directive} ${values.join(" ")}`)
+    .join("; ");
+}
+
+function buildPermissionsPolicy() {
+  return PERMISSIONS_POLICY;
+}
+
+function buildStrictTransportSecurity() {
+  const base = "max-age=31536000; includeSubDomains";
+  return parseBooleanEnv(process.env.SECURITY_HSTS_PRELOAD || "", false)
+    ? `${base}; preload`
+    : base;
+}
+
 function getCommonSecurityHeaders() {
-  return {
+  const headers = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
+    "Content-Security-Policy": buildContentSecurityPolicy(),
+    "Permissions-Policy": buildPermissionsPolicy(),
+    "X-Permitted-Cross-Domain-Policies": "none",
   };
+
+  if (shouldSendStrictTransportSecurity()) {
+    headers["Strict-Transport-Security"] = buildStrictTransportSecurity();
+  }
+
+  return headers;
 }
 
 function sendJson(res, status, payload) {
@@ -47,12 +187,20 @@ function streamStaticFile(res, resolved, { headOnly = false, statusCode = 200 } 
   try {
     stat = fs.statSync(resolved);
   } catch {
-    res.writeHead(404);
+    res.writeHead(404, {
+      ...getCommonSecurityHeaders(),
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-store",
+    });
     res.end("Not found");
     return;
   }
   if (!stat.isFile()) {
-    res.writeHead(404);
+    res.writeHead(404, {
+      ...getCommonSecurityHeaders(),
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-store",
+    });
     res.end("Not found");
     return;
   }
@@ -87,7 +235,11 @@ function sendStaticFile(res, filePath, { headOnly = false, notFoundPath = "" } =
   const resolvedWebDir = path.resolve(webDir);
   const relativePath = path.relative(resolvedWebDir, resolved);
   if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
-    res.writeHead(403);
+    res.writeHead(403, {
+      ...getCommonSecurityHeaders(),
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-store",
+    });
     res.end("Forbidden");
     return;
   }
@@ -98,7 +250,11 @@ function sendStaticFile(res, filePath, { headOnly = false, notFoundPath = "" } =
       streamStaticFile(res, resolvedNotFound, { headOnly, statusCode: 404 });
       return;
     }
-    res.writeHead(404);
+    res.writeHead(404, {
+      ...getCommonSecurityHeaders(),
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-store",
+    });
     res.end("Not found");
     return;
   }
@@ -666,6 +822,9 @@ function enforceApiRateLimit(req, res, pathname) {
 
 export {
   getCommonSecurityHeaders,
+  buildContentSecurityPolicy,
+  buildPermissionsPolicy,
+  shouldSendStrictTransportSecurity,
   sendJson,
   methodNotAllowed,
   sendStaticFile,

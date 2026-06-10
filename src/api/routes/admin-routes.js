@@ -27,6 +27,7 @@ export function createAdminRoutesHandler(deps) {
     sendJson,
     getRecentOperatorIncidents,
     resolveAdminToken,
+    getCommonSecurityHeaders,
   } = deps;
 
   function getRuntimes() {
@@ -58,7 +59,9 @@ export function createAdminRoutesHandler(deps) {
 
   function unauthorized(res) {
     res.writeHead(401, {
+      ...(typeof getCommonSecurityHeaders === "function" ? getCommonSecurityHeaders() : {}),
       "Content-Type": "text/plain",
+      "Cache-Control": "no-store",
       "WWW-Authenticate": 'Bearer realm="OmniFM Admin"',
     });
     res.end("Unauthorized");
@@ -73,7 +76,11 @@ export function createAdminRoutesHandler(deps) {
       if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
       if (!isAuthorized(req, requestUrl)) { unauthorized(res); return true; }
 
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.writeHead(200, {
+        ...(typeof getCommonSecurityHeaders === "function" ? getCommonSecurityHeaders() : {}),
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+      });
       res.end(buildAdminHtml());
       return true;
     }

@@ -148,6 +148,7 @@ node scripts/phase6-live-check.mjs --base-url https://example.com --admin-token 
 It checks:
 
 - public SEO assets (`robots.txt`, `sitemap.xml`, manifest, favicon, base meta)
+- browser security headers on HTML, static assets, and public API responses
 - DiscordBotList status
 - discord.bots.gg status
 - Top.gg status
@@ -176,6 +177,13 @@ After production deploys that affect routing, metadata, robots, sitemap, or lega
 pages, IT-Tabelander should verify Search Console property status, sitemap
 submission, Indexing/Pages coverage, mobile usability, and Core Web Vitals for
 `https://omnifm.xyz/`.
+
+## Security Headers
+
+Browser security headers are documented in [security-headers.md](security-headers.md).
+Run the live acceptance check after proxy, domain, analytics, checkout, or
+frontend changes so CSP/HSTS/Permissions-Policy regressions are caught before
+Search Console or users see them.
 
 ## Logs And Status
 
