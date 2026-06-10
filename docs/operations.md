@@ -182,7 +182,9 @@ bash ./scripts/compose.sh logs -f omnifm
 
 ## Persisted Runtime Data
 
-The compose files bind-mount these state files from the repository root:
+The compose files bind-mount these state files from the repository root. Except
+for the versioned station catalog `stations.json`, these files are local runtime
+state and must remain ignored by Git.
 
 - `stations.json`
 - `premium.json`
@@ -205,6 +207,16 @@ Split mode additionally mounts:
 
 - `bot-state/`
 - `song-history/`
+
+Before repository maintenance commits, run:
+
+```bash
+npm run test:repo-hygiene
+```
+
+The check fails when local runtime state, backups, locks, logs, or report
+artifacts are accidentally tracked. The canonical Git remote is
+`https://github.com/Tabsi1998/OmniFM.git`.
 
 ## Common Tasks
 

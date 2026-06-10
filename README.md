@@ -214,23 +214,19 @@ The runtime reads `API_ADMIN_TOKEN` or the legacy alias `ADMIN_API_TOKEN`.
 - `data/`: legacy station catalog files used by the older station service layer
 - `web/`: emergency legacy static website fallback, only used when `WEB_ALLOW_LEGACY_FALLBACK=1`; standalone `app.js`/`styles.css` live here, not in `frontend/public`
 
-Important persisted files in the repository root:
+Repository hygiene:
 
-- `stations.json`
-- `premium.json`
-- `bot-state.json`
-- `dashboard.json`
-- `custom-stations.json`
-- `command-permissions.json`
-- `guild-languages.json`
-- `song-history.json`
-- `listening-stats.json`
-- `scheduled-events.json`
-- `coupons.json`
-- `discordbotlist.json`
-- `botsgg.json`
-- `topgg.json`
-- `vote-events.json`
+- Canonical remote: `https://github.com/Tabsi1998/OmniFM.git`
+- Run `npm run test:repo-hygiene` before committing repository maintenance changes.
+- `stations.json` is intentionally versioned as the canonical station catalog.
+- Runtime state in the repository root is local deployment data and must stay ignored:
+  `premium.json`, `bot-state.json`, `dashboard.json`, `custom-stations.json`,
+  `command-permissions.json`, `guild-languages.json`, `song-history.json`,
+  `listening-stats.json`, `scheduled-events.json`, `coupons.json`,
+  `discordbotlist.json`, `botsgg.json`, `topgg.json`, `vote-events.json`,
+  `operator-incidents.json`, and `runtime-incidents.json`.
+- Backup, lock, log, and report artifacts such as `*.json.bak`, `*.lock`,
+  `*.log`, `logs/`, and `test_reports/` must not be committed.
 
 ## Testing
 

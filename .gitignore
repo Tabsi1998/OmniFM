@@ -11,62 +11,44 @@ frontend/build/
 npm-debug.log
 yarn.lock
 
-# Logs, caches, and local runtime folders
+# Logs, caches, reports, and local helper output
+*.log
 logs/
+test_reports/
 .update-backups/
 memory/
-test_reports/
 .emergent/
 .pytest_cache/
 __pycache__/
+backend/__pycache__/
 *.pyc
 *.pyo
 *.pyd
-backend/__pycache__/
 
-# File-store runtime data
+# Runtime file-store data
 bot-state.json
+bot-state/
 dashboard.json
-dashboard.json.bak
 premium.json
-premium.json.bak
 custom-stations.json
-custom-stations.json.bak
 command-permissions.json
-command-permissions.json.bak
 guild-languages.json
-guild-languages.json.bak
 song-history.json
-song-history.json.bak
+song-history/
 listening-stats.json
-listening-stats.json.bak
 scheduled-events.json
-scheduled-events.json.bak
 coupons.json
-coupons.json.bak
 discordbotlist.json
-discordbotlist.json.bak
 botsgg.json
-botsgg.json.bak
 topgg.json
-topgg.json.bak
 vote-events.json
-vote-events.json.bak
+operator-incidents.json
+runtime-incidents.json
+*.json.bak
+*.lock
 
 # Local-only helper artifacts
 .vscode/
 design_guidelines.json
 backend_test.py
 .gitconfig
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*

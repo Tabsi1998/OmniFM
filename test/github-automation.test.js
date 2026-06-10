@@ -53,6 +53,7 @@ test("github automation files and docs stay in sync", async () => {
   expectIncludes(ci, "mongo-smoke:", "ci mongo smoke job missing");
   expectIncludes(ci, "frontend-build:", "ci frontend job missing");
   expectIncludes(ci, "docker-build:", "ci docker job missing");
+  expectIncludes(ci, "npm run test:repo-hygiene", "ci repo hygiene check missing");
 
   const nightly = await readText(".github/workflows/nightly.yml");
   expectIncludes(nightly, "schedule:", "nightly schedule missing");
@@ -107,6 +108,9 @@ test("github automation files and docs stay in sync", async () => {
   expectIncludes(readme, "Recommended required checks for `main`", "README required checks note missing");
   expectIncludes(readme, "`ci`", "README required ci check missing");
   expectIncludes(readme, "`codeql`", "README codeql check missing");
+  expectIncludes(readme, "npm run test:repo-hygiene", "README repo hygiene check missing");
+  expectIncludes(readme, "https://github.com/Tabsi1998/OmniFM.git", "README canonical remote missing");
+  expectIncludes(readme, "`stations.json` is intentionally versioned", "README station catalog ownership missing");
   expectIncludes(readme, "VOICE_CHANNEL_STATUS_REFRESH_MS", "README voice channel refresh setting missing");
 
   const envExample = await readText(".env.example");
