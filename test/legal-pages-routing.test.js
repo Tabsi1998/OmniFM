@@ -252,6 +252,18 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.match(adminCookie, /SameSite=Strict/);
     const adminCookieHeader = adminCookie.split(";")[0];
 
+    const proxiedAdminSessionResponse = await fetch(`http://127.0.0.1:${port}/api/admin/session`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Origin: "https://omnifm.xyz",
+      },
+      body: new URLSearchParams({ token: "admin-route-token" }).toString(),
+      redirect: "manual",
+    });
+    assert.equal(proxiedAdminSessionResponse.status, 303);
+    assert.equal(proxiedAdminSessionResponse.headers.get("location"), "/admin");
+
     const adminPanelResponse = await fetch(`http://127.0.0.1:${port}/admin`, {
       headers: { Cookie: adminCookieHeader },
     });

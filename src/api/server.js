@@ -3102,6 +3102,14 @@ function startWebServer(runtimes) {
       return;
     }
 
+    // Owner/admin routes use their own token/cookie auth and must not be
+    // blocked by generic frontend CORS when a reverse proxy rewrites Host.
+    if (requestUrl.pathname === "/admin" || requestUrl.pathname === "/admin/" || requestUrl.pathname.startsWith("/api/admin/")) {
+      if (await handleAdminRoutes({ req, res, requestUrl })) {
+        return;
+      }
+    }
+
     // CORS
     const originAllowed = applyCors(req, res, publicUrl);
     if (req.method === "OPTIONS") {
