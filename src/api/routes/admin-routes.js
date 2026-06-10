@@ -9,6 +9,7 @@
 //   POST /api/admin/session      → Owner-Login und HttpOnly-Cookie setzen
 //   POST /api/admin/logout       → Owner-Login-Cookie löschen
 //   GET  /api/admin/overview     → Bot-Status, Guilds, Lizenzen
+//   GET  /api/admin/diagnostics  → Owner-Diagnose ohne Secret-Werte
 //   GET  /api/admin/licenses     → Alle Lizenzen
 //   POST /api/admin/licenses/:id → Lizenz patchen (aktivieren, verlängern, sperren)
 //   GET  /api/admin/guilds       → Alle Guilds mit Status
@@ -31,6 +32,7 @@ export function createAdminRoutesHandler(deps) {
     resolveAdminToken,
     getCommonSecurityHeaders,
     getReleaseInfo,
+    getBinaryHealthProbe,
   } = deps;
 
   function getRuntimes() {
@@ -43,6 +45,131 @@ export function createAdminRoutesHandler(deps) {
   function getStationCatalogCount() {
     const stationsData = loadStations?.() || {};
     return Object.keys(stationsData?.stations || {}).length;
+  }
+
+  function hasEnvValue(name) {
+    return String(process.env[name] || "").trim().length > 0;
+  }
+
+  function envAny(names) {
+    return names.some((name) => hasEnvValue(name));
+  }
+
+  function serviceStatus(configured, { required = false } = {}) {
+    if (configured) return "configured";
+    return required ? "missing" : "optional";
+  }
+
+  function collectAdminDiagnostics() {
+    const runtimes = getRuntimes();
+    const runtimeRows = runtimes.map((runtime) => {
+      const stats = runtime.collectStats?.() || {};
+      return {
+        name: runtime.config?.name || "?",
+        role: runtime.role || "worker",
+        workerSlot: runtime.workerSlot ?? runtime.config?.index ?? null,
+        online: Boolean(runtime.client?.isReady?.()),
+        guilds: Number(stats.servers || runtime.client?.guilds?.cache?.size || 0) || 0,
+        connections: Number(stats.connections || 0) || 0,
+        listeners: Number(stats.listeners || 0) || 0,
+        uptime: runtime.startedAt ? Math.floor((Date.now() - runtime.startedAt) / 1000) : null,
+      };
+    });
+
+    const stationsData = loadStations?.() || {};
+    const stationHealth = getStationHealthReport?.() || [];
+    const stationCatalogCount = Object.keys(stationsData?.stations || {}).length;
+    const stationsUp = stationHealth.filter((station) => station.status === "up").length;
+    const stationsDown = stationHealth.filter((station) => station.status === "down").length;
+    const stationTotal = Math.max(stationCatalogCount, stationHealth.length);
+
+    const licenses = Object.values(listLicenses?.() || {});
+    const activeLicenses = licenses.filter((license) => license?.active && !license?.expired).length;
+    const expiredLicenses = licenses.filter((license) => license?.expired || (license?.expiresAt && new Date(license.expiresAt) < new Date())).length;
+    const rawIncidents = getRecentOperatorIncidents?.() || [];
+    const incidents = Array.isArray(rawIncidents)
+      ? rawIncidents
+      : Array.isArray(rawIncidents?.incidents) ? rawIncidents.incidents : [];
+    const binaryProbe = typeof getBinaryHealthProbe === "function" ? getBinaryHealthProbe() : null;
+    const processMode = String(process.env.OMNIFM_PROCESS_MODE || process.env.BOT_MODE || process.env.RUNTIME_ROLE || "monolith").trim().toLowerCase() || "monolith";
+    const mongoRequired = ["split", "commander", "worker"].includes(processMode) || Number(process.env.BOT_COUNT || "1") > 1;
+    const mongoConfigured = hasEnvValue("MONGO_URL") || ["1", "true", "yes"].includes(String(process.env.MONGO_ENABLED || "").trim().toLowerCase());
+    const onlineBots = runtimeRows.filter((runtime) => runtime.online).length;
+    const commanderOnline = runtimeRows.some((runtime) => runtime.role === "commander" && runtime.online);
+    const workers = runtimeRows.filter((runtime) => runtime.role !== "commander");
+    const workersOnline = workers.filter((runtime) => runtime.online).length;
+
+    const alerts = [];
+    if (!resolveConfiguredAdminToken()) alerts.push({ severity: "critical", code: "admin_token_missing", message: "API_ADMIN_TOKEN ist nicht gesetzt." });
+    if (runtimeRows.length === 0) alerts.push({ severity: "critical", code: "no_runtime", message: "Keine Bot-Runtime ist am Webserver registriert." });
+    else if (onlineBots === 0) alerts.push({ severity: "critical", code: "all_bots_offline", message: "Keine Bot-Runtime ist online." });
+    else if (onlineBots < runtimeRows.length) alerts.push({ severity: "warning", code: "bot_offline", message: "Mindestens eine Bot-Runtime ist offline." });
+    if (stationTotal > 0 && stationsDown > 0) alerts.push({ severity: "warning", code: "stations_down", message: `${stationsDown} Station(en) sind im Healthcheck defekt.` });
+    if (mongoRequired && !mongoConfigured) alerts.push({ severity: "critical", code: "mongo_required", message: "Split/Worker-Betrieb braucht MongoDB, aber Mongo ist nicht konfiguriert." });
+    if (binaryProbe?.ffmpeg && binaryProbe.ffmpeg.available === false) alerts.push({ severity: "warning", code: "ffmpeg_missing", message: "ffmpeg wurde nicht gefunden." });
+    if (binaryProbe?.fpcalc && binaryProbe.fpcalc.available === false) alerts.push({ severity: "warning", code: "fpcalc_missing", message: "fpcalc wurde nicht gefunden." });
+
+    const status = alerts.some((alert) => alert.severity === "critical")
+      ? "critical"
+      : alerts.some((alert) => alert.severity === "warning") ? "warning" : "healthy";
+
+    return {
+      status,
+      generatedAt: new Date().toISOString(),
+      runtime: {
+        processMode,
+        node: process.version,
+        platform: `${process.platform}/${process.arch}`,
+        processUptime: Math.floor(process.uptime()),
+        memory: process.memoryUsage(),
+        bots: {
+          total: runtimeRows.length,
+          online: onlineBots,
+          commanderOnline,
+          workersTotal: workers.length,
+          workersOnline,
+        },
+        rows: runtimeRows,
+      },
+      infrastructure: {
+        adminToken: { configured: Boolean(resolveConfiguredAdminToken()), status: serviceStatus(Boolean(resolveConfiguredAdminToken()), { required: true }) },
+        mongo: { configured: mongoConfigured, required: mongoRequired, status: serviceStatus(mongoConfigured, { required: mongoRequired }) },
+        stripe: { configured: envAny(["STRIPE_SECRET_KEY", "STRIPE_API_KEY"]), webhookConfigured: hasEnvValue("STRIPE_WEBHOOK_SECRET"), status: serviceStatus(envAny(["STRIPE_SECRET_KEY", "STRIPE_API_KEY"])) },
+        smtp: { configured: envAny(["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM"]), fromConfigured: hasEnvValue("SMTP_FROM"), status: serviceStatus(envAny(["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM"])) },
+        webhooks: { configured: envAny(["DISCORDBOTLIST_WEBHOOK_SECRET", "TOPGG_WEBHOOK_SECRET", "BOTSGG_WEBHOOK_SECRET"]), status: serviceStatus(envAny(["DISCORDBOTLIST_WEBHOOK_SECRET", "TOPGG_WEBHOOK_SECRET", "BOTSGG_WEBHOOK_SECRET"])) },
+        publicWebUrl: { configured: hasEnvValue("PUBLIC_WEB_URL"), status: serviceStatus(hasEnvValue("PUBLIC_WEB_URL")) },
+      },
+      binaries: binaryProbe ? {
+        checkedAt: binaryProbe.checkedAt ? new Date(binaryProbe.checkedAt).toISOString() : null,
+        ffmpeg: binaryProbe.ffmpeg || null,
+        fpcalc: binaryProbe.fpcalc || null,
+      } : null,
+      stations: {
+        total: stationTotal,
+        catalog: stationCatalogCount,
+        checked: stationHealth.length,
+        up: stationsUp,
+        down: stationsDown,
+        unknown: Math.max(0, stationTotal - stationsUp - stationsDown),
+      },
+      licenses: {
+        total: licenses.length,
+        active: activeLicenses,
+        expired: expiredLicenses,
+      },
+      incidents: {
+        total: incidents.length,
+        errors: incidents.filter((incident) => String(incident?.level || "").toUpperCase() === "ERROR").length,
+        warnings: incidents.filter((incident) => String(incident?.level || "").toUpperCase() === "WARN").length,
+        recent: incidents.slice(0, 10).map((incident) => ({
+          timestamp: incident?.timestamp || incident?.time || null,
+          level: incident?.level || "INFO",
+          message: String(incident?.message || incident?.msg || "").slice(0, 240),
+        })),
+      },
+      release: typeof getReleaseInfo === "function" ? getReleaseInfo() : null,
+      alerts,
+    };
   }
 
   const ADMIN_COOKIE_NAME = "omnifm_owner";
@@ -286,6 +413,13 @@ export function createAdminRoutesHandler(deps) {
       return true;
     }
 
+    // GET /api/admin/diagnostics
+    if (pathname === "/api/admin/diagnostics") {
+      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
+      sendJson(res, 200, collectAdminDiagnostics());
+      return true;
+    }
+
     // GET /api/admin/licenses
     if (pathname === "/api/admin/licenses") {
       if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
@@ -347,7 +481,10 @@ export function createAdminRoutesHandler(deps) {
     // GET /api/admin/logs
     if (pathname === "/api/admin/logs") {
       if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
-      const incidents = getRecentOperatorIncidents?.() || [];
+      const rawIncidents = getRecentOperatorIncidents?.() || [];
+    const incidents = Array.isArray(rawIncidents)
+      ? rawIncidents
+      : Array.isArray(rawIncidents?.incidents) ? rawIncidents.incidents : [];
       sendJson(res, 200, { incidents });
       return true;
     }
@@ -527,6 +664,7 @@ function buildAdminHtml() {
     <div class="section">
       <div class="tabs">
         <button class="tab active" onclick="showTab('bots', this)">🤖 Bots</button>
+        <button class="tab" onclick="showTab('diagnostics', this)">🧭 Diagnose</button>
         <button class="tab" onclick="showTab('guilds', this)">🏠 Guilds</button>
         <button class="tab" onclick="showTab('licenses', this)">🔑 Lizenzen</button>
         <button class="tab" onclick="showTab('stations', this)">📻 Stationen</button>
@@ -589,7 +727,7 @@ function buildAdminHtml() {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       if (trigger) trigger.classList.add('active');
       else {
-        const index = ['bots','guilds','licenses','stations','logs'].indexOf(tab);
+        const index = ['bots','diagnostics','guilds','licenses','stations','logs'].indexOf(tab);
         const buttons = document.querySelectorAll('.tab');
         if (buttons[index]) buttons[index].classList.add('active');
       }
@@ -599,7 +737,10 @@ function buildAdminHtml() {
     function renderTab(tab) {
       const el = document.getElementById('content');
       const d = cachedData;
-      if (tab === 'bots') {
+      if (tab === 'diagnostics') {
+        if (!d.diagnostics) { el.innerHTML = '<div class="loading">Lade Diagnose...</div>'; return; }
+        el.innerHTML = renderDiagnostics(d.diagnostics);
+      } else if (tab === 'bots') {
         if (!d.overview) { el.innerHTML = '<div class="loading">Lade...</div>'; return; }
         el.innerHTML = '<table><thead><tr><th>Bot</th><th>Rolle</th><th>Status</th><th>Guilds</th><th>Verbindungen</th><th>Zuhörer</th><th>Uptime</th></tr></thead><tbody>' +
           d.overview.bots.map(b => '<tr>' +
@@ -703,8 +844,8 @@ function buildAdminHtml() {
     async function loadAll() {
       document.getElementById('serverTime').textContent = 'Lädt...';
       try {
-        const [overview, guilds, licenses, stations, logs] = await Promise.allSettled([
-          api('overview'), api('guilds'), api('licenses'), api('stations'), api('logs')
+        const [overview, guilds, licenses, stations, logs, diagnostics] = await Promise.allSettled([
+          api('overview'), api('guilds'), api('licenses'), api('stations'), api('logs'), api('diagnostics')
         ]);
         if (overview.status === 'fulfilled') {
           cachedData.overview = overview.value;
@@ -729,10 +870,72 @@ function buildAdminHtml() {
         if (licenses.status === 'fulfilled') cachedData.licenses = licenses.value;
         if (stations.status === 'fulfilled') cachedData.stations = stations.value;
         if (logs.status === 'fulfilled') cachedData.logs = logs.value;
+        if (diagnostics.status === 'fulfilled') cachedData.diagnostics = diagnostics.value;
         renderTab(currentTab);
       } catch(e) {
         document.getElementById('content').innerHTML = '<div class="error-msg">Fehler: ' + esc(e.message) + '</div>';
       }
+    }
+
+    function renderDiagnostics(diag) {
+      const runtime = diag.runtime || {};
+      const bots = runtime.bots || {};
+      const infra = diag.infrastructure || {};
+      const binaries = diag.binaries || {};
+      const alerts = diag.alerts || [];
+      const services = [
+        ['Admin Token', infra.adminToken],
+        ['MongoDB', infra.mongo],
+        ['Stripe', infra.stripe],
+        ['SMTP Mail', infra.smtp],
+        ['Vote Webhooks', infra.webhooks],
+        ['Public Web URL', infra.publicWebUrl],
+      ];
+      const binaryRows = [
+        ['ffmpeg', binaries.ffmpeg],
+        ['fpcalc', binaries.fpcalc],
+      ];
+      return '<div class="summary-row">' +
+          summaryPill(diag.status || 'unknown', 'Gesamtstatus', statusColor(diag.status)) +
+          summaryPill((bots.online || 0) + '/' + (bots.total || 0), 'Bots online', (bots.online === bots.total && bots.total > 0) ? 'green' : 'amber') +
+          summaryPill((diag.stations?.down || 0), 'Stationen defekt', (diag.stations?.down || 0) > 0 ? 'red' : 'green') +
+          summaryPill((diag.incidents?.errors || 0), 'Recent Errors', (diag.incidents?.errors || 0) > 0 ? 'red' : 'green') +
+        '</div>' +
+        (alerts.length ? '<div class="toolbar">' + alerts.map(a => '<span class="mini-btn" style="border-color:' + alertColor(a.severity) + ';color:' + alertColor(a.severity) + '">' + esc(a.severity || 'info').toUpperCase() + ': ' + esc(a.message || a.code || '') + '</span>').join('') + '</div>' : '') +
+        '<table><thead><tr><th>Bereich</th><th>Status</th><th>Details</th></tr></thead><tbody>' +
+          '<tr><td><b>Runtime</b></td><td>' + statusBadge(diag.status) + '</td><td style="font-size:12px;color:#71717a">' + esc(runtime.processMode || 'monolith') + ' · Node ' + esc(runtime.node || '') + ' · ' + esc(runtime.platform || '') + ' · Uptime ' + fmtUptime(runtime.processUptime || 0) + '</td></tr>' +
+          '<tr><td><b>Commander / Worker</b></td><td>' + statusBadge(bots.commanderOnline || bots.workersOnline > 0 ? 'healthy' : 'warning') + '</td><td style="font-size:12px;color:#71717a">Commander ' + boolLabel(bots.commanderOnline) + ' · Worker ' + esc(bots.workersOnline || 0) + '/' + esc(bots.workersTotal || 0) + '</td></tr>' +
+          '<tr><td><b>Stationen</b></td><td>' + statusBadge((diag.stations?.down || 0) > 0 ? 'warning' : 'healthy') + '</td><td style="font-size:12px;color:#71717a">Gesamt ' + esc(diag.stations?.total || 0) + ' · geprüft ' + esc(diag.stations?.checked || 0) + ' · online ' + esc(diag.stations?.up || 0) + ' · defekt ' + esc(diag.stations?.down || 0) + '</td></tr>' +
+          '<tr><td><b>Lizenzen</b></td><td>' + statusBadge('healthy') + '</td><td style="font-size:12px;color:#71717a">Aktiv ' + esc(diag.licenses?.active || 0) + ' · abgelaufen ' + esc(diag.licenses?.expired || 0) + ' · gesamt ' + esc(diag.licenses?.total || 0) + '</td></tr>' +
+          services.map(([name, service]) => '<tr><td><b>' + esc(name) + '</b></td><td>' + statusBadge(service?.status) + '</td><td style="font-size:12px;color:#71717a">configured=' + boolLabel(service?.configured) + (service?.required ? ' · required=true' : '') + (service?.webhookConfigured != null ? ' · webhook=' + boolLabel(service.webhookConfigured) : '') + '</td></tr>').join('') +
+          binaryRows.map(([name, binary]) => '<tr><td><b>' + esc(name) + '</b></td><td>' + statusBadge(binary?.available ? 'healthy' : 'warning') + '</td><td style="font-size:12px;color:#71717a">' + esc(binary?.version || 'nicht gefunden') + '</td></tr>').join('') +
+        '</tbody></table>' +
+        '<div class="section-header"><h2>Runtimes</h2><span style="font-size:12px;color:#71717a">' + esc(diag.generatedAt || '') + '</span></div>' +
+        '<table><thead><tr><th>Name</th><th>Rolle</th><th>Status</th><th>Guilds</th><th>Verbindungen</th><th>Zuhörer</th><th>Uptime</th></tr></thead><tbody>' +
+          (runtime.rows || []).map(r => '<tr><td><b>' + esc(r.name) + '</b></td><td style="color:#71717a">' + esc(r.role) + '</td><td>' + statusBadge(r.online ? 'healthy' : 'critical') + '</td><td>' + esc(r.guilds || 0) + '</td><td>' + esc(r.connections || 0) + '</td><td>' + esc(r.listeners || 0) + '</td><td style="color:#71717a">' + (r.uptime != null ? fmtUptime(r.uptime) : '–') + '</td></tr>').join('') +
+        '</tbody></table>';
+    }
+
+    function boolLabel(value) {
+      return value ? 'ja' : 'nein';
+    }
+
+    function statusColor(status) {
+      if (status === 'healthy' || status === 'configured') return 'green';
+      if (status === 'critical' || status === 'missing') return 'red';
+      return 'amber';
+    }
+
+    function alertColor(severity) {
+      if (severity === 'critical') return '#FF2A2A';
+      if (severity === 'warning') return '#FFB800';
+      return '#00F0FF';
+    }
+
+    function statusBadge(status) {
+      const color = statusColor(status);
+      const label = status === 'healthy' ? 'OK' : status === 'configured' ? 'KONFIGURIERT' : status === 'critical' ? 'KRITISCH' : status === 'missing' ? 'FEHLT' : status === 'optional' ? 'OPTIONAL' : 'WARNUNG';
+      return '<span class="' + (color === 'green' ? 'badge-up' : color === 'red' ? 'badge-down' : 'badge-unknown') + '">' + esc(label) + '</span>';
     }
 
     function editLicense(id) {

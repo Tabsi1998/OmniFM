@@ -131,6 +131,29 @@ function normalizeState(rawState) {
   return normalized;
 }
 
+const RETRYABLE_FILE_WRITE_ERRORS = new Set(["EBUSY", "EPERM", "EACCES", "ENOENT"]);
+
+function sleepSync(ms) {
+  const delay = Math.max(1, Number(ms) || 25);
+  const buffer = new SharedArrayBuffer(4);
+  const view = new Int32Array(buffer);
+  Atomics.wait(view, 0, 0, delay);
+}
+
+function withFileWriteRetry(operation, { attempts = 8, retryMs = 25 } = {}) {
+  let lastError = null;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return operation();
+    } catch (err) {
+      lastError = err;
+      if (!RETRYABLE_FILE_WRITE_ERRORS.has(err?.code) || attempt === attempts - 1) throw err;
+      sleepSync(retryMs * (attempt + 1));
+    }
+  }
+  throw lastError;
+}
+
 function readStateFile(filePath) {
   try {
     if (!fs.existsSync(filePath)) return null;
@@ -162,13 +185,13 @@ function saveStateUnlocked(state = ensureState()) {
 
   try {
     if (fs.existsSync(STORE_FILE)) {
-      try { fs.copyFileSync(STORE_FILE, BACKUP_FILE); } catch {}
+      try { withFileWriteRetry(() => fs.copyFileSync(STORE_FILE, BACKUP_FILE)); } catch {}
     }
-    fs.writeFileSync(tmpFile, payload, "utf8");
+    withFileWriteRetry(() => fs.writeFileSync(tmpFile, payload, "utf8"));
     try {
-      fs.renameSync(tmpFile, STORE_FILE);
+      withFileWriteRetry(() => fs.renameSync(tmpFile, STORE_FILE));
     } catch {
-      fs.writeFileSync(STORE_FILE, payload, "utf8");
+      withFileWriteRetry(() => fs.writeFileSync(STORE_FILE, payload, "utf8"));
     }
   } finally {
     try {

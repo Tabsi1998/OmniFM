@@ -43,15 +43,24 @@ export function withFileStoreLock(filePath, fn, options = {}) {
   while (!acquired) {
     try {
       fs.mkdirSync(lockDir);
-      fs.writeFileSync(
-        `${lockDir}/owner`,
-        JSON.stringify({
-          pid: process.pid,
-          createdAt: new Date().toISOString(),
-          filePath,
-        }),
-        "utf8"
-      );
+      try {
+        fs.writeFileSync(
+          `${lockDir}/owner`,
+          JSON.stringify({
+            pid: process.pid,
+            createdAt: new Date().toISOString(),
+            filePath,
+          }),
+          "utf8"
+        );
+      } catch (ownerErr) {
+        try { fs.rmSync(lockDir, { recursive: true, force: true }); } catch {}
+        if (["ENOENT", "EBUSY", "EPERM", "EACCES"].includes(ownerErr?.code)) {
+          sleepSync(retryMs);
+          continue;
+        }
+        throw ownerErr;
+      }
       acquired = true;
       break;
     } catch (err) {

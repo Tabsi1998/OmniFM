@@ -262,6 +262,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.match(adminPanelHtml, /stationSearch/);
     assert.match(adminPanelHtml, /copyText/);
     assert.match(adminPanelHtml, /statRelease/);
+    assert.match(adminPanelHtml, /Diagnose/);
 
     const adminOverviewResponse = await fetch(`http://127.0.0.1:${port}/api/admin/overview`, {
       headers: { Cookie: adminCookieHeader },
@@ -276,6 +277,19 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.equal(adminOverview.release?.branch, "main");
     assert.equal(adminOverview.release?.lastDeployStatus, "success");
     assert.equal(adminOverview.release?.lastLiveSmokeStatus, "success");
+
+    const adminDiagnosticsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/diagnostics`, {
+      headers: { Cookie: adminCookieHeader },
+    });
+    assert.equal(adminDiagnosticsResponse.status, 200);
+    const adminDiagnostics = await adminDiagnosticsResponse.json();
+    assert.equal(adminDiagnostics.runtime.bots.total, 1);
+    assert.equal(adminDiagnostics.runtime.bots.online, 1);
+    assert.equal(adminDiagnostics.infrastructure.adminToken.configured, true);
+    assert.equal(typeof adminDiagnostics.infrastructure.mongo.configured, "boolean");
+    assert.equal(adminDiagnostics.release?.appVersion, "3.0.0");
+    assert.ok(adminDiagnostics.stations.total > 0);
+    assert.ok(Array.isArray(adminDiagnostics.alerts));
 
     const adminGuildsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/guilds`, {
       headers: { Cookie: adminCookieHeader },

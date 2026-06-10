@@ -3083,6 +3083,7 @@ const handleAdminRoutes = createAdminRoutesHandler({
   getRecentOperatorIncidents,
   getCommonSecurityHeaders,
   getReleaseInfo: () => buildReleaseInfo({ frontendBuildStamp, webRootSource }),
+  getBinaryHealthProbe: getHealthBinaryProbe,
 });
 
 function startWebServer(runtimes) {
