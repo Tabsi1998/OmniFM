@@ -188,8 +188,10 @@ Current runtime details worth documenting exactly:
 
 - Public website source: `frontend/`
 - Production build target: `frontend/build`
+- React public assets: `frontend/public`, limited to files that should be copied into the React build
 - Served by the Node backend
 - Legacy static fallback: `web/`, only when `WEB_ALLOW_LEGACY_FALLBACK=1`
+- Legacy standalone assets such as `web/app.js` and `web/styles.css` must not be duplicated in `frontend/public`, otherwise the React build exposes stale `/app.js` and `/styles.css` root files.
 
 Legal pages:
 

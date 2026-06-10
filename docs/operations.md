@@ -235,5 +235,6 @@ Show configured bots:
 
 - `frontend/build` must exist for the production website unless you explicitly allow the legacy fallback.
 - `WEB_ALLOW_LEGACY_FALLBACK=1` is an emergency switch, not the normal frontend path.
+- Do not copy the legacy `web/app.js` or `web/styles.css` into `frontend/public`; Create React App copies public files verbatim into `frontend/build`, which would expose stale root assets in production.
 - Recognition support depends on `ffmpeg`, `fpcalc`, and the recognition env values.
 - The backend can continue with file-based stores when MongoDB is unavailable.

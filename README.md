@@ -203,13 +203,13 @@ The runtime reads `API_ADMIN_TOKEN` or the legacy alias `ADMIN_API_TOKEN`.
 ## Repository Layout
 
 - `src/`: canonical Node.js runtime, API, Discord runtime, stores, services, and entrypoints
-- `frontend/`: React app that builds into `frontend/build`
+- `frontend/`: React app that builds into `frontend/build`; `frontend/public` is only for assets that should ship with the React app
 - `docs/`: project documentation
 - `test/`: Node test suite for the canonical runtime
 - `backend/`: legacy/reference Python backend and tests
 - `scripts/`: Docker/runtime helper scripts
 - `data/`: legacy station catalog files used by the older station service layer
-- `web/`: emergency static website fallback, only used when `WEB_ALLOW_LEGACY_FALLBACK=1`
+- `web/`: emergency legacy static website fallback, only used when `WEB_ALLOW_LEGACY_FALLBACK=1`; standalone `app.js`/`styles.css` live here, not in `frontend/public`
 
 Important persisted files in the repository root:
 
@@ -255,6 +255,7 @@ The Python test path is optional unless you are intentionally working on the leg
 ## Notes
 
 - Production expects `frontend/build` to exist. If it is missing, the runtime only serves `web/` when `WEB_ALLOW_LEGACY_FALLBACK=1`.
+- The normal React deployment must not expose legacy root assets such as `/app.js` or `/styles.css`; those files belong only to the explicit `web/` fallback.
 - Audio recognition is disabled by default and only works when `NOW_PLAYING_RECOGNITION_ENABLED=1`, `ACOUSTID_API_KEY` is set, and `fpcalc` is available.
 - The current runtime reads `STRIPE_SECRET_KEY` or the legacy alias `STRIPE_API_KEY`.
 - License reminder mails are controlled by `EXPIRY_REMINDER_DAYS`.
