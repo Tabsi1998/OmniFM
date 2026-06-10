@@ -15,6 +15,7 @@ import Navbar from './components/Navbar.js';
 import PlanMatrix from './components/PlanMatrix.js';
 import DashboardPortal from './components/DashboardPortal.js';
 import FaqSection from './components/FaqSection.js';
+import CookieConsent from './components/CookieConsent.js';
 import { I18nProvider } from './i18n.js';
 import { buildApiUrl } from './lib/api.js';
 import { getSectionAnchorForPage, resolvePageFromUrl } from './lib/pageRouting.js';
@@ -185,6 +186,7 @@ function AppContent() {
         <Navbar page={currentPage} />
         <ImpressumSection legal={legal} standalone />
         <StatsFooter stats={stats} bots={bots} legal={legal} />
+        <CookieConsent />
       </div>
     );
   }
@@ -196,6 +198,7 @@ function AppContent() {
         <Navbar page={currentPage} />
         <PrivacySection legal={legal} privacy={privacy} standalone />
         <StatsFooter stats={stats} bots={bots} legal={legal} />
+        <CookieConsent />
       </div>
     );
   }
@@ -207,6 +210,7 @@ function AppContent() {
         <Navbar page={currentPage} />
         <TermsSection legal={legal} terms={terms} />
         <StatsFooter stats={stats} bots={bots} legal={legal} />
+        <CookieConsent />
       </div>
     );
   }
@@ -234,6 +238,7 @@ function AppContent() {
       <PlanMatrix />
       <FaqSection />
       <StatsFooter stats={stats} bots={bots} legal={legal} />
+      <CookieConsent />
     </div>
   );
 }

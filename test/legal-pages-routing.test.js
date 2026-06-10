@@ -231,6 +231,9 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.equal(legalData.legal?.legalForm, "Kleinunternehmen");
     assert.equal(privacyData.productName, "OmniFM");
     assert.equal(privacyData.controller?.name, "IT-Tabelander");
+    assert.equal(privacyData.features?.googleAnalyticsEnabled, true);
+    assert.equal(privacyData.features?.googleAnalyticsMeasurementId, "G-J5X0ZZ5E3Z");
+    assert.equal(privacyData.features?.cookieConsentStorageKey, "omnifm.cookieConsent.v1");
     assert.equal(termsData.productName, "OmniFM");
     assert.equal(termsData.operator?.providerName, "IT-Tabelander");
     assert.equal(termsData.contact?.email, "terms@it-tabelander.at");

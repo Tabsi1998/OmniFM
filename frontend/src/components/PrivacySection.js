@@ -373,6 +373,14 @@ function PrivacySection({ legal, privacy }) {
             })}
           />
           <PolicyBlock
+            title={copy.privacy.sections.cookiesTitle}
+            body={copy.privacy.sections.cookiesBody}
+          />
+          <PolicyBlock
+            title={copy.privacy.sections.analyticsTitle}
+            body={copy.privacy.sections.analyticsBody}
+          />
+          <PolicyBlock
             title={copy.privacy.sections.previewTitle}
             body={copy.privacy.sections.previewBody}
           />
