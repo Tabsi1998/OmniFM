@@ -79,6 +79,9 @@ Optional integrations:
 
 The maintained operator-facing template is [`.env.example`](.env.example). The grouped runtime reference is [docs/configuration-reference.md](docs/configuration-reference.md).
 
+For public legal pages, keep product and operator identity separate: `LEGAL_PRODUCT_NAME` is the service name, for example `OmniFM`, while `LEGAL_PROVIDER_NAME` is the legal operator, for example `IT-Tabelander`.
+Replace all placeholder address, email, and website values before production use; obvious sample values are treated as missing by the public Legal APIs.
+
 ## GitHub Automation
 
 This repository ships with GitHub automation for CI, nightly recovery smoke checks, CodeQL, Dependabot, CODEOWNERS, and issue/PR templates.

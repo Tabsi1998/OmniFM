@@ -3,8 +3,9 @@ import { Heart, Radio } from 'lucide-react';
 import { useI18n } from '../i18n.js';
 import { buildPageHref } from '../lib/pageRouting.js';
 
-function StatsFooter({ stats }) {
+function StatsFooter({ stats, legal }) {
   const { copy, locale, formatNumber } = useI18n();
+  const operatorName = String(legal?.legal?.providerName || '').trim();
 
   const footerStats = [
     { label: copy.footer.stats.servers, value: stats.servers || 0, color: '#00F0FF' },
@@ -83,6 +84,11 @@ function StatsFooter({ stats }) {
             <p style={{ margin: 0, color: '#71717A', fontSize: 13, lineHeight: 1.7, maxWidth: 560 }}>
               {copy.footer.liveNote}
             </p>
+            {operatorName && (
+              <p data-testid="footer-operator" style={{ margin: '6px 0 0', color: '#52525B', fontSize: 12, lineHeight: 1.6 }}>
+                {copy.footer.operatedBy({ operator: operatorName })}
+              </p>
+            )}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>

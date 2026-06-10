@@ -102,15 +102,17 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     CORS_ORIGINS: "",
     WEB_DOMAIN: "",
     API_ADMIN_TOKEN: "admin-route-token",
-    LEGAL_PROVIDER_NAME: "OmniFM Test Operator",
-    LEGAL_STREET_ADDRESS: "Test Street 1",
+    LEGAL_PRODUCT_NAME: "OmniFM",
+    LEGAL_PROVIDER_NAME: "IT-Tabelander",
+    LEGAL_LEGAL_FORM: "Kleinunternehmen",
+    LEGAL_STREET_ADDRESS: "Tabelander Street 1",
     LEGAL_POSTAL_CODE: "1010",
     LEGAL_CITY: "Vienna",
-    LEGAL_EMAIL: "legal@example.com",
-    LEGAL_WEBSITE: "https://omnifm.example",
-    PRIVACY_CONTACT_EMAIL: "privacy@example.com",
-    TERMS_CONTACT_EMAIL: "terms@example.com",
-    TERMS_SUPPORT_URL: "https://omnifm.example/terms",
+    LEGAL_EMAIL: "legal@it-tabelander.at",
+    LEGAL_WEBSITE: "https://omnifm.xyz",
+    PRIVACY_CONTACT_EMAIL: "privacy@it-tabelander.at",
+    TERMS_CONTACT_EMAIL: "terms@it-tabelander.at",
+    TERMS_SUPPORT_URL: "https://omnifm.xyz/terms",
     TERMS_EFFECTIVE_DATE: "2026-03-11",
     TERMS_GOVERNING_LAW: "Law of the Republic of Austria",
   });
@@ -163,9 +165,50 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.equal(termsApiResponse.status, 200);
     const termsData = await termsApiResponse.json();
 
-    assert.equal(termsData.operator?.providerName, "OmniFM Test Operator");
-    assert.equal(termsData.contact?.email, "terms@example.com");
-    assert.equal(termsData.contact?.website, "https://omnifm.example/terms");
+    const legalApiResponse = await fetch(`http://127.0.0.1:${port}/api/legal`);
+    assert.equal(legalApiResponse.status, 200);
+    const legalData = await legalApiResponse.json();
+
+    const privacyApiResponse = await fetch(`http://127.0.0.1:${port}/api/privacy`);
+    assert.equal(privacyApiResponse.status, 200);
+    const privacyData = await privacyApiResponse.json();
+
+    assert.equal(legalData.legal?.productName, "OmniFM");
+    assert.equal(legalData.legal?.providerName, "IT-Tabelander");
+    assert.equal(legalData.legal?.legalForm, "Kleinunternehmen");
+    assert.equal(privacyData.productName, "OmniFM");
+    assert.equal(privacyData.controller?.name, "IT-Tabelander");
+    assert.equal(termsData.productName, "OmniFM");
+    assert.equal(termsData.operator?.providerName, "IT-Tabelander");
+    assert.equal(termsData.contact?.email, "terms@it-tabelander.at");
+    assert.equal(termsData.contact?.website, "https://omnifm.xyz/terms");
+
+    const publicLegalPayload = JSON.stringify({ legalData, privacyData, termsData });
+    assert.doesNotMatch(publicLegalPayload, /OmniFM Test Operator|OmniFM Example Operator/i);
+    assert.doesNotMatch(publicLegalPayload, /Fabian Tabelander\s*-\s*OmniFM/i);
+    assert.doesNotMatch(publicLegalPayload, /legal@example\.com|privacy@example\.com|terms@example\.com/i);
+    assert.doesNotMatch(publicLegalPayload, /Example Street|localhost|127\.0\.0\.1/i);
+
+    process.env.LEGAL_PROVIDER_NAME = "OmniFM Example Operator";
+    process.env.LEGAL_STREET_ADDRESS = "Example Street 1";
+    process.env.LEGAL_EMAIL = "legal@example.com";
+    process.env.LEGAL_WEBSITE = "http://localhost:8081";
+    process.env.PUBLIC_WEB_URL = "http://127.0.0.1";
+
+    const placeholderLegalResponse = await fetch(`http://127.0.0.1:${port}/api/legal`);
+    assert.equal(placeholderLegalResponse.status, 200);
+    const placeholderLegalData = await placeholderLegalResponse.json();
+    assert.equal(placeholderLegalData.legal?.productName, "OmniFM");
+    assert.equal(placeholderLegalData.legal?.providerName, "");
+    assert.equal(placeholderLegalData.legal?.streetAddress, "");
+    assert.equal(placeholderLegalData.legal?.email, "");
+    assert.equal(placeholderLegalData.legal?.website, "");
+    assert.deepEqual(
+      placeholderLegalData.missingCoreFields.filter((field) => (
+        field === "providerName" || field === "streetAddress" || field === "email"
+      )),
+      ["providerName", "streetAddress", "email"]
+    );
   } finally {
     await new Promise((resolve) => server.close(resolve));
     await restoreFile(frontendIndexPath, indexSnapshot);

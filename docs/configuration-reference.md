@@ -332,11 +332,14 @@ Required minimum:
 
 | Variable | Purpose |
 | --- | --- |
-| `LEGAL_PROVIDER_NAME` | Operator/provider name |
+| `LEGAL_PRODUCT_NAME` | Public product/service name, for example `OmniFM` |
+| `LEGAL_PROVIDER_NAME` | Legal operator/provider name, for example `IT-Tabelander`; do not put only the product name here |
 | `LEGAL_STREET_ADDRESS` | Street address |
 | `LEGAL_POSTAL_CODE` | Postal code |
 | `LEGAL_CITY` | City |
 | `LEGAL_EMAIL` | Legal contact email |
+
+Obvious placeholder values such as `Example ...`, `*@example.com`, `localhost`, and `127.0.0.1` are treated as missing in public legal payloads so the website does not look legally configured when only sample data was copied.
 
 Common optional fields:
 

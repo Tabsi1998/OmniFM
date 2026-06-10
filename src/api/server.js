@@ -1124,31 +1124,50 @@ function getHealthBinaryProbe() {
   return binaryHealthCache;
 }
 
+function isPublicLegalPlaceholder(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return false;
+  return normalized.includes("example operator")
+    || normalized.startsWith("example ")
+    || normalized.endsWith("@example.com")
+    || normalized.includes("://localhost")
+    || normalized.includes("://127.0.0.1");
+}
+
+function readPublicLegalEnv(name) {
+  const value = String(process.env[name] || "").trim();
+  return isPublicLegalPlaceholder(value) ? "" : value;
+}
+
 function buildPublicLegalNotice() {
-  const publicUrl = String(process.env.PUBLIC_WEB_URL || "").trim();
-  const fallbackEmail = extractMailbox(process.env.SMTP_FROM || "");
+  const publicUrl = readPublicLegalEnv("PUBLIC_WEB_URL");
+  const fallbackEmail = isPublicLegalPlaceholder(process.env.SMTP_FROM)
+    ? ""
+    : extractMailbox(process.env.SMTP_FROM || "");
+  const productName = readPublicLegalEnv("LEGAL_PRODUCT_NAME") || BRAND.name || "OmniFM";
   const legal = {
-    providerName: String(process.env.LEGAL_PROVIDER_NAME || "").trim(),
-    legalForm: String(process.env.LEGAL_LEGAL_FORM || "").trim(),
-    representative: String(process.env.LEGAL_REPRESENTATIVE || "").trim(),
-    streetAddress: String(process.env.LEGAL_STREET_ADDRESS || "").trim(),
-    postalCode: String(process.env.LEGAL_POSTAL_CODE || "").trim(),
-    city: String(process.env.LEGAL_CITY || "").trim(),
-    country: String(process.env.LEGAL_COUNTRY || "").trim(),
-    email: String(process.env.LEGAL_EMAIL || "").trim() || fallbackEmail,
-    phone: String(process.env.LEGAL_PHONE || "").trim(),
-    website: String(process.env.LEGAL_WEBSITE || "").trim() || publicUrl,
-    businessPurpose: String(process.env.LEGAL_BUSINESS_PURPOSE || "").trim(),
-    commercialRegisterNumber: String(process.env.LEGAL_COMMERCIAL_REGISTER_NUMBER || "").trim(),
-    commercialRegisterCourt: String(process.env.LEGAL_COMMERCIAL_REGISTER_COURT || "").trim(),
-    vatId: String(process.env.LEGAL_VAT_ID || "").trim(),
-    supervisoryAuthority: String(process.env.LEGAL_SUPERVISORY_AUTHORITY || "").trim(),
-    chamber: String(process.env.LEGAL_CHAMBER || "").trim(),
-    profession: String(process.env.LEGAL_PROFESSION || "").trim(),
-    professionRules: String(process.env.LEGAL_PROFESSION_RULES || "").trim(),
-    editorialResponsible: String(process.env.LEGAL_EDITORIAL_RESPONSIBLE || "").trim(),
-    mediaOwner: String(process.env.LEGAL_MEDIA_OWNER || "").trim(),
-    mediaLine: String(process.env.LEGAL_MEDIA_LINE || "").trim(),
+    productName,
+    providerName: readPublicLegalEnv("LEGAL_PROVIDER_NAME"),
+    legalForm: readPublicLegalEnv("LEGAL_LEGAL_FORM"),
+    representative: readPublicLegalEnv("LEGAL_REPRESENTATIVE"),
+    streetAddress: readPublicLegalEnv("LEGAL_STREET_ADDRESS"),
+    postalCode: readPublicLegalEnv("LEGAL_POSTAL_CODE"),
+    city: readPublicLegalEnv("LEGAL_CITY"),
+    country: readPublicLegalEnv("LEGAL_COUNTRY"),
+    email: readPublicLegalEnv("LEGAL_EMAIL") || fallbackEmail,
+    phone: readPublicLegalEnv("LEGAL_PHONE"),
+    website: readPublicLegalEnv("LEGAL_WEBSITE") || publicUrl,
+    businessPurpose: readPublicLegalEnv("LEGAL_BUSINESS_PURPOSE"),
+    commercialRegisterNumber: readPublicLegalEnv("LEGAL_COMMERCIAL_REGISTER_NUMBER"),
+    commercialRegisterCourt: readPublicLegalEnv("LEGAL_COMMERCIAL_REGISTER_COURT"),
+    vatId: readPublicLegalEnv("LEGAL_VAT_ID"),
+    supervisoryAuthority: readPublicLegalEnv("LEGAL_SUPERVISORY_AUTHORITY"),
+    chamber: readPublicLegalEnv("LEGAL_CHAMBER"),
+    profession: readPublicLegalEnv("LEGAL_PROFESSION"),
+    professionRules: readPublicLegalEnv("LEGAL_PROFESSION_RULES"),
+    editorialResponsible: readPublicLegalEnv("LEGAL_EDITORIAL_RESPONSIBLE"),
+    mediaOwner: readPublicLegalEnv("LEGAL_MEDIA_OWNER"),
+    mediaLine: readPublicLegalEnv("LEGAL_MEDIA_LINE"),
   };
 
   const missingCoreFields = [];
@@ -1182,37 +1201,37 @@ function buildPublicPrivacyNotice() {
     && Boolean(String(process.env.ACOUSTID_API_KEY || "").trim());
 
   const controller = {
-    name: String(process.env.PRIVACY_CONTROLLER_NAME || "").trim() || legal.providerName,
-    representative: String(process.env.PRIVACY_CONTROLLER_REPRESENTATIVE || "").trim() || legal.representative,
-    streetAddress: String(process.env.PRIVACY_CONTROLLER_STREET_ADDRESS || "").trim() || legal.streetAddress,
-    postalCode: String(process.env.PRIVACY_CONTROLLER_POSTAL_CODE || "").trim() || legal.postalCode,
-    city: String(process.env.PRIVACY_CONTROLLER_CITY || "").trim() || legal.city,
-    country: String(process.env.PRIVACY_CONTROLLER_COUNTRY || "").trim() || legal.country || "Österreich",
-    website: String(process.env.PRIVACY_CONTROLLER_WEBSITE || "").trim() || legal.website,
+    name: readPublicLegalEnv("PRIVACY_CONTROLLER_NAME") || legal.providerName,
+    representative: readPublicLegalEnv("PRIVACY_CONTROLLER_REPRESENTATIVE") || legal.representative,
+    streetAddress: readPublicLegalEnv("PRIVACY_CONTROLLER_STREET_ADDRESS") || legal.streetAddress,
+    postalCode: readPublicLegalEnv("PRIVACY_CONTROLLER_POSTAL_CODE") || legal.postalCode,
+    city: readPublicLegalEnv("PRIVACY_CONTROLLER_CITY") || legal.city,
+    country: readPublicLegalEnv("PRIVACY_CONTROLLER_COUNTRY") || legal.country || "Österreich",
+    website: readPublicLegalEnv("PRIVACY_CONTROLLER_WEBSITE") || legal.website,
   };
 
   const contact = {
-    email: String(process.env.PRIVACY_CONTACT_EMAIL || "").trim() || legal.email,
-    phone: String(process.env.PRIVACY_CONTACT_PHONE || "").trim() || legal.phone,
+    email: readPublicLegalEnv("PRIVACY_CONTACT_EMAIL") || legal.email,
+    phone: readPublicLegalEnv("PRIVACY_CONTACT_PHONE") || legal.phone,
   };
 
   const dpo = {
-    name: String(process.env.PRIVACY_DPO_NAME || "").trim(),
-    email: String(process.env.PRIVACY_DPO_EMAIL || "").trim(),
+    name: readPublicLegalEnv("PRIVACY_DPO_NAME"),
+    email: readPublicLegalEnv("PRIVACY_DPO_EMAIL"),
   };
 
   const hosting = {
-    provider: String(process.env.PRIVACY_HOSTING_PROVIDER || "").trim(),
-    location: String(process.env.PRIVACY_HOSTING_LOCATION || "").trim(),
+    provider: readPublicLegalEnv("PRIVACY_HOSTING_PROVIDER"),
+    location: readPublicLegalEnv("PRIVACY_HOSTING_LOCATION"),
   };
 
   const authority = {
-    name: String(process.env.PRIVACY_AUTHORITY_NAME || "").trim() || "Österreichische Datenschutzbehörde",
-    website: String(process.env.PRIVACY_AUTHORITY_WEBSITE || "").trim() || "https://www.dsb.gv.at/",
+    name: readPublicLegalEnv("PRIVACY_AUTHORITY_NAME") || "Österreichische Datenschutzbehörde",
+    website: readPublicLegalEnv("PRIVACY_AUTHORITY_WEBSITE") || "https://www.dsb.gv.at/",
   };
 
-  const additionalRecipients = String(process.env.PRIVACY_ADDITIONAL_RECIPIENTS || "").trim();
-  const customNote = String(process.env.PRIVACY_CUSTOM_NOTE || "").trim();
+  const additionalRecipients = readPublicLegalEnv("PRIVACY_ADDITIONAL_RECIPIENTS");
+  const customNote = readPublicLegalEnv("PRIVACY_CUSTOM_NOTE");
   const missingCoreFields = [];
 
   if (!controller.name) missingCoreFields.push("controllerName");
@@ -1223,6 +1242,7 @@ function buildPublicPrivacyNotice() {
 
   return {
     controller,
+    productName: legal.productName || String(process.env.LEGAL_PRODUCT_NAME || BRAND.name || "OmniFM").trim(),
     contact,
     dpo,
     hosting,
@@ -1256,8 +1276,10 @@ function buildPublicPrivacyNotice() {
 function buildPublicTermsNotice() {
   const legalNotice = buildPublicLegalNotice();
   const legal = legalNotice.legal || {};
-  const publicUrl = String(process.env.PUBLIC_WEB_URL || "").trim();
-  const fallbackEmail = extractMailbox(process.env.SMTP_FROM || "");
+  const publicUrl = readPublicLegalEnv("PUBLIC_WEB_URL");
+  const fallbackEmail = isPublicLegalPlaceholder(process.env.SMTP_FROM)
+    ? ""
+    : extractMailbox(process.env.SMTP_FROM || "");
   const hasStripe = Boolean(getStripeSecretKey());
   const hasSmtp = Boolean(String(process.env.SMTP_HOST || "").trim());
 
@@ -1269,15 +1291,15 @@ function buildPublicTermsNotice() {
   };
 
   const contact = {
-    email: String(process.env.TERMS_CONTACT_EMAIL || "").trim()
-      || String(process.env.PRIVACY_CONTACT_EMAIL || "").trim()
+    email: readPublicLegalEnv("TERMS_CONTACT_EMAIL")
+      || readPublicLegalEnv("PRIVACY_CONTACT_EMAIL")
       || legal.email
       || fallbackEmail,
-    website: String(process.env.TERMS_SUPPORT_URL || "").trim()
+    website: readPublicLegalEnv("TERMS_SUPPORT_URL")
       || legal.website
       || publicUrl,
-    effectiveDate: String(process.env.TERMS_EFFECTIVE_DATE || "").trim(),
-    governingLaw: String(process.env.TERMS_GOVERNING_LAW || "").trim(),
+    effectiveDate: readPublicLegalEnv("TERMS_EFFECTIVE_DATE"),
+    governingLaw: readPublicLegalEnv("TERMS_GOVERNING_LAW"),
   };
 
   const missingCoreFields = [];
@@ -1287,6 +1309,7 @@ function buildPublicTermsNotice() {
 
   return {
     operator,
+    productName: legal.productName || String(process.env.LEGAL_PRODUCT_NAME || BRAND.name || "OmniFM").trim(),
     contact,
     service: {
       discordBotEnabled: true,
@@ -1301,7 +1324,7 @@ function buildPublicTermsNotice() {
       emailDeliveryEnabled: hasSmtp,
       trialEnabled: isProTrialEnabled(),
     },
-    customNote: String(process.env.TERMS_CUSTOM_NOTE || "").trim(),
+    customNote: readPublicLegalEnv("TERMS_CUSTOM_NOTE"),
     missingCoreFields,
     isConfigured: missingCoreFields.length === 0,
     basis: ["DISCORD_TERMS", "AUSTRIAN_SERVICE_TERMS", "STREAM_RIGHTS_NOTICE"],

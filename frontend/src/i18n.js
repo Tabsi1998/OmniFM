@@ -750,6 +750,7 @@ const LOCALE_MESSAGES = {
         stations: 'Stationen',
       },
       liveNote: 'Die öffentlichen Netzwerkzahlen werden live aus dem Produkt geladen und regelmäßig aktualisiert.',
+      operatedBy: ({ operator }) => `Betrieben von ${operator}.`,
       proofTitle: 'Vertrauen am Ende der Seite',
       proofCards: {
         operations: {
@@ -1706,6 +1707,7 @@ const LOCALE_MESSAGES = {
         stations: 'Stations',
       },
       liveNote: 'Public network numbers are loaded from the live product and refreshed regularly.',
+      operatedBy: ({ operator }) => `Operated by ${operator}.`,
       proofTitle: 'Trust signals at the bottom',
       proofCards: {
         operations: {
