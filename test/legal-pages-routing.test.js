@@ -263,6 +263,8 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.match(adminPanelHtml, /copyText/);
     assert.match(adminPanelHtml, /statRelease/);
     assert.match(adminPanelHtml, /Diagnose/);
+    assert.match(adminPanelHtml, /Betrieb/);
+    assert.match(adminPanelHtml, /renderOperations/);
 
     const adminOverviewResponse = await fetch(`http://127.0.0.1:${port}/api/admin/overview`, {
       headers: { Cookie: adminCookieHeader },
@@ -290,6 +292,20 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.equal(adminDiagnostics.release?.appVersion, "3.0.0");
     assert.ok(adminDiagnostics.stations.total > 0);
     assert.ok(Array.isArray(adminDiagnostics.alerts));
+
+    const adminOperationsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/operations`, {
+      headers: { Cookie: adminCookieHeader },
+    });
+    assert.equal(adminOperationsResponse.status, 200);
+    const adminOperations = await adminOperationsResponse.json();
+    assert.equal(adminOperations.source, "update.sh");
+    assert.ok(adminOperations.total >= 20);
+    assert.ok(Array.isArray(adminOperations.operations));
+    assert.ok(adminOperations.operations.some((operation) => operation.cli === "./update.sh --update"));
+    assert.ok(adminOperations.operations.some((operation) => operation.cli === "./update.sh --settings admin"));
+    assert.ok(adminOperations.operations.some((operation) => operation.cli === "./update.sh --recognition-test <URL>"));
+    assert.ok(adminOperations.summary.available >= 1);
+    assert.ok(adminOperations.summary.planned >= 1);
 
     const adminGuildsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/guilds`, {
       headers: { Cookie: adminCookieHeader },

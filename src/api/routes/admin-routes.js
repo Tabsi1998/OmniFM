@@ -10,6 +10,7 @@
 //   POST /api/admin/logout       → Owner-Login-Cookie löschen
 //   GET  /api/admin/overview     → Bot-Status, Guilds, Lizenzen
 //   GET  /api/admin/diagnostics  → Owner-Diagnose ohne Secret-Werte
+//   GET  /api/admin/operations   → update.sh/Owner-GUI Paritaetskarte
 //   GET  /api/admin/licenses     → Alle Lizenzen
 //   POST /api/admin/licenses/:id → Lizenz patchen (aktivieren, verlängern, sperren)
 //   GET  /api/admin/guilds       → Alle Guilds mit Status
@@ -169,6 +170,243 @@ export function createAdminRoutesHandler(deps) {
       },
       release: typeof getReleaseInfo === "function" ? getReleaseInfo() : null,
       alerts,
+    };
+  }
+
+  function buildOwnerOperationsManifest() {
+    const operations = [
+      {
+        id: "update-full",
+        area: "Deployment",
+        title: "Update & Rebuild",
+        cli: "./update.sh --update",
+        webStatus: "planned",
+        risk: "high",
+        description: "Code aktualisieren, Container neu bauen und Deploy-Gates ausfuehren.",
+        webEntry: "Noch nicht als Web-Aktion freigeschaltet",
+        nextStep: "Web-Jobqueue mit Confirm-Step, Audit-Log und Rollback-/Log-Ausgabe."
+      },
+      {
+        id: "update-rolling",
+        area: "Deployment",
+        title: "Rolling Worker Update",
+        cli: "./update.sh --update-rolling",
+        webStatus: "planned",
+        risk: "high",
+        description: "Worker nacheinander aktualisieren, ohne alles gleichzeitig hart zu stoppen.",
+        webEntry: "Noch nicht als Web-Aktion freigeschaltet",
+        nextStep: "Nur mit laufender Jobqueue, Fortschritt, Timeout und Abbruchschutz."
+      },
+      {
+        id: "update-commander",
+        area: "Deployment",
+        title: "Commander Update",
+        cli: "./update.sh --update-commander",
+        webStatus: "planned",
+        risk: "high",
+        description: "Nur den Commander neu bauen oder neu starten.",
+        webEntry: "Noch nicht als Web-Aktion freigeschaltet",
+        nextStep: "Gezielte Commander-Aktion mit Healthcheck vor/nach dem Lauf."
+      },
+      {
+        id: "bots",
+        area: "Bots",
+        title: "Bots verwalten",
+        cli: "./update.sh --bots",
+        webStatus: "partial",
+        risk: "medium",
+        description: "Bots anzeigen, hinzufuegen, bearbeiten, entfernen, Commander setzen und Rollen pruefen.",
+        webEntry: "Tabs Bots, Diagnose und Guilds zeigen Runtime-/Worker-Zustand bereits read-only.",
+        nextStep: "Bot-Konfiguration editierbar machen, aber Tokens nur write-only und mit Audit-Log."
+      },
+      {
+        id: "bot-show",
+        area: "Bots",
+        title: "Bots anzeigen",
+        cli: "./update.sh --show-bots",
+        webStatus: "available",
+        risk: "low",
+        description: "Konfigurierte Commander-/Worker-Bots und Online-Zustand anzeigen.",
+        webEntry: "Tab Bots und Tab Diagnose",
+        nextStep: "Invite-Links und Rollenmatrix in die Bot-Zeilen aufnehmen."
+      },
+      {
+        id: "bot-mutate",
+        area: "Bots",
+        title: "Bot-Konfiguration aendern",
+        cli: "./update.sh --add-bot / --edit-bot / --remove-bot / --set-commander / --show-roles",
+        webStatus: "planned",
+        risk: "high",
+        description: "Bot-Tokens, Client-IDs, Tiers, Rollen und Commander-Zuweisung pflegen.",
+        webEntry: "Noch nicht als Web-Aktion freigeschaltet",
+        nextStep: "Validierter Bot-Editor mit Token-Maskierung, Confirm-Step und Restart-Hinweis."
+      },
+      {
+        id: "stripe",
+        area: "Billing",
+        title: "Stripe einrichten",
+        cli: "./update.sh --stripe",
+        webStatus: "partial",
+        risk: "high",
+        description: "Stripe Keys, Webhook Secret und Checkout URLs konfigurieren.",
+        webEntry: "Diagnose zeigt nur, ob Stripe und Webhook konfiguriert sind.",
+        nextStep: "Write-only Secret-Editor mit Validierung und keinem Klartext-Readback."
+      },
+      {
+        id: "premium",
+        area: "Billing",
+        title: "Premium verwalten",
+        cli: "./update.sh --premium",
+        webStatus: "partial",
+        risk: "medium",
+        description: "Lizenzen, Plaene, Laufzeiten, Seats und Zuordnungen pflegen.",
+        webEntry: "Tab Lizenzen kann bestehende Lizenzen bearbeiten.",
+        nextStep: "Alle Premium-CLI-Funktionen inkl. neue Lizenz/Trial/Verlaengerung sauber abbilden."
+      },
+      {
+        id: "offers",
+        area: "Billing",
+        title: "Codes verwalten",
+        cli: "./update.sh --offers",
+        webStatus: "planned",
+        risk: "medium",
+        description: "Coupons, Referrals und direkte Gratis-Lizenzen erstellen und pruefen.",
+        webEntry: "Noch nicht als Web-Aktion freigeschaltet",
+        nextStep: "Offer-Editor mit Preview, Limits und Redemption-Status."
+      },
+      {
+        id: "email",
+        area: "Settings",
+        title: "E-Mail/SMTP einrichten",
+        cli: "./update.sh --email",
+        webStatus: "partial",
+        risk: "high",
+        description: "SMTP Host, Port, TLS, Absender und Admin-Mail konfigurieren.",
+        webEntry: "Diagnose zeigt nur, ob SMTP konfiguriert ist.",
+        nextStep: "Write-only SMTP-Editor plus Testmail-Aktion mit Audit-Log."
+      },
+      {
+        id: "settings",
+        area: "Settings",
+        title: "Einstellungen",
+        cli: "./update.sh --settings",
+        webStatus: "partial",
+        risk: "medium",
+        description: "Web-Port, Domain, Public URL, CORS, Trial, Integrationen, Legal, Dashboard, Commands und Betrieb.",
+        webEntry: "Diagnose und diese Operations-Ansicht decken Read-only Status ab.",
+        nextStep: "Config-Editor pro Bereich, Secrets getrennt als write-only."
+      },
+      {
+        id: "settings-admin",
+        area: "Settings",
+        title: "Owner/Admin Login Token",
+        cli: "./update.sh --settings admin",
+        webStatus: "partial",
+        risk: "low",
+        description: "Owner-Login ueber API_ADMIN_TOKEN fuer /admin.",
+        webEntry: "/admin Login und Diagnose Admin Token Status",
+        nextStep: "Token-Rotation im Web nur mit Re-Auth und Anzeige genau einmal."
+      },
+      {
+        id: "settings-dashboard",
+        area: "Settings",
+        title: "Dashboard OAuth",
+        cli: "./update.sh --settings dashboard / --dashboard-settings",
+        webStatus: "partial",
+        risk: "high",
+        description: "Discord OAuth Client, Secret, Redirect und Session Cookie konfigurieren.",
+        webEntry: "Diagnose zeigt Public URL und Grundstatus indirekt.",
+        nextStep: "OAuth-Editor mit Redirect-URI-Hilfe und Secret write-only."
+      },
+      {
+        id: "settings-commands",
+        area: "Settings",
+        title: "Slash Commands & Sync",
+        cli: "./update.sh --settings commands",
+        webStatus: "planned",
+        risk: "medium",
+        description: "Command Registration Mode, Cleanup und Sync-Retry konfigurieren.",
+        webEntry: "Noch nicht als Web-Aktion freigeschaltet",
+        nextStep: "Command-Sync-Status, sichere manuelle Sync-Aktion und Modus-Editor."
+      },
+      {
+        id: "settings-legal",
+        area: "Settings",
+        title: "Legal Setup",
+        cli: "./update.sh --settings legal",
+        webStatus: "planned",
+        risk: "medium",
+        description: "Impressum, Datenschutz und Terms-Angaben pflegen.",
+        webEntry: "Oeffentliche Legal-APIs zeigen die gerenderten Angaben.",
+        nextStep: "Legal-Editor mit Pflichtfeld-Validierung und Vorschau."
+      },
+      {
+        id: "settings-logs",
+        area: "Operations",
+        title: "Logs & Docker Cleanup Settings",
+        cli: "./update.sh --settings logs",
+        webStatus: "partial",
+        risk: "medium",
+        description: "Log-Rotation und Docker-Prune-Vorgaben konfigurieren.",
+        webEntry: "Tab Logs zeigt Operator-Incidents read-only.",
+        nextStep: "Cleanup-Konfiguration editierbar machen und Prune als Job ausfuehren."
+      },
+      {
+        id: "status",
+        area: "Operations",
+        title: "Status & Logs",
+        cli: "./update.sh --status / --status quick / --status live / --status local-live",
+        webStatus: "partial",
+        risk: "low",
+        description: "Status, Health, Logs und Cockpit-Ansichten.",
+        webEntry: "Tabs Bots, Diagnose, Guilds, Stationen und Logs",
+        nextStep: "Live-Log-Streaming und Status-Historie im Web."
+      },
+      {
+        id: "cleanup",
+        area: "Operations",
+        title: "Speicher Cleanup",
+        cli: "./update.sh --cleanup",
+        webStatus: "planned",
+        risk: "high",
+        description: "Logs, Backups und Docker-Cache aufraeumen.",
+        webEntry: "Noch nicht als Web-Aktion freigeschaltet",
+        nextStep: "Dry-run, Confirm-Step, Ergebnisprotokoll und harte Pfadbegrenzung."
+      },
+      {
+        id: "doctor",
+        area: "Operations",
+        title: "Doctor Check",
+        cli: "./update.sh --doctor",
+        webStatus: "partial",
+        risk: "low",
+        description: "System, OAuth, JSON, Runtime und Infrastruktur pruefen.",
+        webEntry: "Tab Diagnose und /api/admin/diagnostics",
+        nextStep: "Doctor-Checks mit gleicher Tiefe wie CLI als strukturierte Web-Checks."
+      },
+      {
+        id: "recognition-test",
+        area: "Audio",
+        title: "Recognition Test",
+        cli: "./update.sh --recognition-test <URL>",
+        webStatus: "planned",
+        risk: "medium",
+        description: "Audio-Fingerprint/Metadata-Test fuer eine Stream-URL.",
+        webEntry: "Noch nicht als Web-Aktion freigeschaltet",
+        nextStep: "URL-Testformular mit Timeout, Ergebnisdetails und Rate-Limit."
+      }
+    ];
+    const summary = operations.reduce((acc, operation) => {
+      acc[operation.webStatus] = (acc[operation.webStatus] || 0) + 1;
+      acc.byArea[operation.area] = (acc.byArea[operation.area] || 0) + 1;
+      return acc;
+    }, { available: 0, partial: 0, planned: 0, byArea: {} });
+    return {
+      generatedAt: new Date().toISOString(),
+      source: "update.sh",
+      total: operations.length,
+      summary,
+      operations
     };
   }
 
@@ -420,6 +658,13 @@ export function createAdminRoutesHandler(deps) {
       return true;
     }
 
+    // GET /api/admin/operations
+    if (pathname === "/api/admin/operations") {
+      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
+      sendJson(res, 200, buildOwnerOperationsManifest());
+      return true;
+    }
+
     // GET /api/admin/licenses
     if (pathname === "/api/admin/licenses") {
       if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
@@ -638,6 +883,7 @@ function buildAdminHtml() {
     .mini-btn:hover{border-color:#00F0FF;color:#fff}
     .station-url{max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#71717a;font-family:monospace;font-size:11px}
     .empty-state{padding:32px 16px;text-align:center;color:#71717a;font-size:13px}
+    .cmd{font-family:'Consolas','JetBrains Mono',monospace;font-size:11px;color:#a1a1aa;background:#090909;border:1px solid #222;border-radius:6px;padding:4px 6px;display:inline-block}
   </style>
 </head>
 <body>
@@ -669,6 +915,7 @@ function buildAdminHtml() {
         <button class="tab" onclick="showTab('licenses', this)">🔑 Lizenzen</button>
         <button class="tab" onclick="showTab('stations', this)">📻 Stationen</button>
         <button class="tab" onclick="showTab('logs', this)">📋 Logs</button>
+        <button class="tab" onclick="showTab('operations', this)">⚙️ Betrieb</button>
       </div>
       <div id="content"><div class="loading">Lade Daten...</div></div>
     </div>
@@ -721,13 +968,14 @@ function buildAdminHtml() {
     let currentTab = 'bots';
     let cachedData = {};
     let stationFilters = { search: '', health: 'all', tier: 'all' };
+    let operationFilters = { search: '', status: 'all', area: 'all' };
 
     function showTab(tab, trigger) {
       currentTab = tab;
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       if (trigger) trigger.classList.add('active');
       else {
-        const index = ['bots','diagnostics','guilds','licenses','stations','logs'].indexOf(tab);
+        const index = ['bots','diagnostics','guilds','licenses','stations','logs','operations'].indexOf(tab);
         const buttons = document.querySelectorAll('.tab');
         if (buttons[index]) buttons[index].classList.add('active');
       }
@@ -838,14 +1086,17 @@ function buildAdminHtml() {
             '<td><span style="color:' + levelColor(i.level) + ';font-size:11px;font-weight:700">' + esc(i.level||'INFO') + '</span></td>' +
             '<td style="font-size:12px;max-width:600px;overflow:hidden;text-overflow:ellipsis">' + esc(String(i.message||i.msg||'')) + '</td>' +
           '</tr>').join('') + '</tbody></table>';
+      } else if (tab === 'operations') {
+        if (!d.operations) { el.innerHTML = '<div class="loading">Lade Betrieb...</div>'; return; }
+        el.innerHTML = renderOperations(d.operations);
       }
     }
 
     async function loadAll() {
       document.getElementById('serverTime').textContent = 'Lädt...';
       try {
-        const [overview, guilds, licenses, stations, logs, diagnostics] = await Promise.allSettled([
-          api('overview'), api('guilds'), api('licenses'), api('stations'), api('logs'), api('diagnostics')
+        const [overview, guilds, licenses, stations, logs, diagnostics, operations] = await Promise.allSettled([
+          api('overview'), api('guilds'), api('licenses'), api('stations'), api('logs'), api('diagnostics'), api('operations')
         ]);
         if (overview.status === 'fulfilled') {
           cachedData.overview = overview.value;
@@ -871,10 +1122,49 @@ function buildAdminHtml() {
         if (stations.status === 'fulfilled') cachedData.stations = stations.value;
         if (logs.status === 'fulfilled') cachedData.logs = logs.value;
         if (diagnostics.status === 'fulfilled') cachedData.diagnostics = diagnostics.value;
+        if (operations.status === 'fulfilled') cachedData.operations = operations.value;
         renderTab(currentTab);
       } catch(e) {
         document.getElementById('content').innerHTML = '<div class="error-msg">Fehler: ' + esc(e.message) + '</div>';
       }
+    }
+
+    function renderOperations(payload) {
+      const operations = Array.isArray(payload.operations) ? payload.operations : [];
+      const filtered = operations.filter(matchesOperationFilter);
+      const areas = Array.from(new Set(operations.map(o => o.area).filter(Boolean))).sort();
+      const summary = payload.summary || {};
+      return '<div class="summary-row">' +
+          summaryPill(payload.total || operations.length, 'update.sh Funktionen', '') +
+          summaryPill(summary.available || 0, 'Web fertig', 'green') +
+          summaryPill(summary.partial || 0, 'Teilweise Web', 'amber') +
+          summaryPill(summary.planned || 0, 'Noch CLI-only', 'red') +
+        '</div>' +
+        '<div class="toolbar">' +
+          '<input id="operationSearch" type="text" placeholder="Funktion suchen: Update, Bots, Stripe, Doctor..." value="' + escAttr(operationFilters.search) + '" oninput="setOperationFilter(\\'search\\', this.value)"/>' +
+          '<select id="operationStatusFilter" onchange="setOperationFilter(\\'status\\', this.value)">' +
+            option('all', 'Alle Status', operationFilters.status) +
+            option('available', 'Web fertig', operationFilters.status) +
+            option('partial', 'Teilweise Web', operationFilters.status) +
+            option('planned', 'Noch CLI-only', operationFilters.status) +
+          '</select>' +
+          '<select id="operationAreaFilter" onchange="setOperationFilter(\\'area\\', this.value)">' +
+            option('all', 'Alle Bereiche', operationFilters.area) +
+            areas.map(area => option(area, area, operationFilters.area)).join('') +
+          '</select>' +
+        '</div>' +
+        (filtered.length
+          ? '<table><thead><tr><th>Bereich</th><th>Funktion</th><th>Web-Stand</th><th>Risiko</th><th>CLI</th><th>Owner-Menue</th><th>Naechster Ausbau</th></tr></thead><tbody>' +
+            filtered.map(op => '<tr>' +
+              '<td style="color:#71717a">' + esc(op.area || '-') + '</td>' +
+              '<td><b>' + esc(op.title || op.id) + '</b><div style="font-size:12px;color:#71717a;margin-top:3px">' + esc(op.description || '') + '</div></td>' +
+              '<td>' + operationStatusBadge(op.webStatus) + '</td>' +
+              '<td>' + riskBadge(op.risk) + '</td>' +
+              '<td><span class="cmd">' + esc(op.cli || '') + '</span></td>' +
+              '<td style="font-size:12px;color:#a1a1aa">' + esc(op.webEntry || '-') + '</td>' +
+              '<td style="font-size:12px;color:#71717a">' + esc(op.nextStep || '-') + '</td>' +
+            '</tr>').join('') + '</tbody></table>'
+          : '<div class="empty-state">Keine Funktion passt zu diesen Filtern.</div>');
     }
 
     function renderDiagnostics(diag) {
@@ -999,6 +1289,28 @@ function buildAdminHtml() {
     function setStationFilter(key, value) {
       stationFilters[key] = String(value || '').trim();
       renderTab('stations');
+    }
+    function setOperationFilter(key, value) {
+      operationFilters[key] = String(value || '').trim();
+      renderTab('operations');
+    }
+    function matchesOperationFilter(operation) {
+      if (operationFilters.status !== 'all' && String(operation?.webStatus || '') !== operationFilters.status) return false;
+      if (operationFilters.area !== 'all' && String(operation?.area || '') !== operationFilters.area) return false;
+      const needle = String(operationFilters.search || '').toLowerCase();
+      if (!needle) return true;
+      return [operation?.id, operation?.area, operation?.title, operation?.description, operation?.cli, operation?.webEntry, operation?.nextStep]
+        .some((value) => String(value || '').toLowerCase().includes(needle));
+    }
+    function operationStatusBadge(status) {
+      if (status === 'available') return '<span class="badge-up">WEB FERTIG</span>';
+      if (status === 'partial') return '<span class="badge-unknown">TEILWEISE</span>';
+      return '<span class="badge-down">CLI-ONLY</span>';
+    }
+    function riskBadge(risk) {
+      if (risk === 'high') return '<span class="badge-down">HOCH</span>';
+      if (risk === 'medium') return '<span class="badge-unknown">MITTEL</span>';
+      return '<span class="badge-up">NIEDRIG</span>';
     }
     function getStationHealthState(station) {
       const status = String(station?.health?.status || '').trim().toLowerCase();
