@@ -95,12 +95,16 @@ async function fetchJson(baseUrl, path, adminToken) {
       ok: response.ok,
       status: response.status,
       body,
+      contentType: response.headers.get("content-type") || "",
+      headers: response.headers,
     };
   } catch (error) {
     return {
       ok: false,
       status: 0,
       body: null,
+      contentType: "",
+      headers: null,
       error: error?.message || String(error),
     };
   } finally {
@@ -148,6 +152,127 @@ function isHttpsUrl(rawUrl) {
 function requireHeader(headers, name, expectedRegex = /.+/) {
   const value = headers?.get?.(name) || "";
   return expectedRegex.test(value) ? "" : `${name}${value ? `=${clipLine(value, 80)}` : "=missing"}`;
+}
+
+function isObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function expectJsonObject(response, name) {
+  if (!response.ok) {
+    return `${name}: request failed (${response.status || "network"}): ${response.error || response.body?.error || "request failed"}`;
+  }
+  if (!/application\/json/i.test(response.contentType || "")) {
+    return `${name}: unexpected contentType=${response.contentType || "unknown"}`;
+  }
+  if (!isObject(response.body)) {
+    return `${name}: JSON object expected`;
+  }
+  return "";
+}
+
+async function inspectCoreRoutes(baseUrl) {
+  let ok = true;
+
+  const spaChecks = [
+    { name: "home", path: "/" },
+    { name: "dashboard", path: "/dashboard" },
+    { name: "imprint", path: "/impressum" },
+  ];
+
+  for (const check of spaChecks) {
+    const response = await fetchText(baseUrl, check.path);
+    const failures = [];
+    if (!response.ok) {
+      failures.push(`GET ${check.path} failed (${response.status || "network"}): ${response.error || "request failed"}`);
+    }
+    if (!/text\/html/i.test(response.contentType || "")) {
+      failures.push(`contentType=${response.contentType || "unknown"}`);
+    }
+    if (!/<div[^>]+id=["']root["']/i.test(response.text || "")) {
+      failures.push("React root marker missing");
+    }
+    if (/src=["']\/app\.js["']|href=["']\/styles\.css["']/i.test(response.text || "")) {
+      failures.push("legacy root asset reference found");
+    }
+
+    if (failures.length > 0) {
+      ok = false;
+      logLine("FAIL", `core spa ${check.name}: ${failures.join("; ")}`);
+      continue;
+    }
+    logLine("OK", `core spa ${check.name}: status=${response.status}, contentType=${response.contentType || "unknown"}`);
+  }
+
+  const healthResponse = await fetchJson(baseUrl, "/api/health");
+  const healthError = expectJsonObject(healthResponse, "health");
+  if (healthError || healthResponse.body?.ok !== true || !Number.isFinite(Number(healthResponse.body?.bots)) || !Number.isFinite(Number(healthResponse.body?.readyBots))) {
+    ok = false;
+    logLine("FAIL", `core api health: ${healthError || `invalid payload ok=${healthResponse.body?.ok}, bots=${healthResponse.body?.bots}, readyBots=${healthResponse.body?.readyBots}`}`);
+  } else {
+    logLine("OK", `core api health: bots=${healthResponse.body.bots}, readyBots=${healthResponse.body.readyBots}`);
+  }
+
+  const stationsResponse = await fetchJson(baseUrl, "/api/stations");
+  const stationsError = expectJsonObject(stationsResponse, "stations");
+  const stationCount = Number(stationsResponse.body?.total ?? stationsResponse.body?.stations?.length ?? 0) || 0;
+  if (stationsError || stationCount <= 0 || !Array.isArray(stationsResponse.body?.stations)) {
+    ok = false;
+    logLine("FAIL", `core api stations: ${stationsError || `invalid station payload total=${stationsResponse.body?.total}`}`);
+  } else {
+    logLine("OK", `core api stations: total=${stationCount}`);
+  }
+
+  const botsResponse = await fetchJson(baseUrl, "/api/bots");
+  const botsError = expectJsonObject(botsResponse, "bots");
+  if (botsError || !Array.isArray(botsResponse.body?.bots) || !isObject(botsResponse.body?.totals)) {
+    ok = false;
+    logLine("FAIL", `core api bots: ${botsError || "invalid bots payload"}`);
+  } else {
+    logLine("OK", `core api bots: bots=${botsResponse.body.bots.length}`);
+  }
+
+  const legalChecks = [
+    { name: "legal", path: "/api/legal" },
+    { name: "privacy", path: "/api/privacy" },
+    { name: "terms", path: "/api/terms" },
+  ];
+
+  for (const check of legalChecks) {
+    const response = await fetchJson(baseUrl, check.path);
+    const jsonError = expectJsonObject(response, check.name);
+    const missing = Array.isArray(response.body?.missingCoreFields) ? response.body.missingCoreFields : [];
+    if (jsonError || response.body?.isConfigured !== true || missing.length > 0) {
+      ok = false;
+      logLine("FAIL", `core api ${check.name}: ${jsonError || `isConfigured=${response.body?.isConfigured}, missing=${missing.join(",") || "unknown"}`}`);
+      continue;
+    }
+    logLine("OK", `core api ${check.name}: configured`);
+  }
+
+  return { ok };
+}
+
+async function inspectLegacyAssets(baseUrl) {
+  const legacyPaths = ["/app.js", "/styles.css"];
+  let ok = true;
+
+  for (const legacyPath of legacyPaths) {
+    const response = await fetchText(baseUrl, legacyPath);
+    if (response.status === 200) {
+      ok = false;
+      logLine("FAIL", `legacy asset ${legacyPath}: unexpectedly reachable with contentType=${response.contentType || "unknown"}`);
+      continue;
+    }
+    if (response.status === 0) {
+      ok = false;
+      logLine("FAIL", `legacy asset ${legacyPath}: network failure: ${response.error || "request failed"}`);
+      continue;
+    }
+    logLine("OK", `legacy asset ${legacyPath}: not served as production asset (status=${response.status})`);
+  }
+
+  return { ok };
 }
 
 async function inspectSecurityHeaders(baseUrl) {
@@ -436,6 +561,12 @@ async function main() {
 
   logLine("INFO", `baseUrl=${baseUrl}`);
   logLine("INFO", `dockerService=${dockerService}, logSince=${logSince}`);
+
+  const coreResult = await inspectCoreRoutes(baseUrl);
+  if (!coreResult.ok) hadFailure = true;
+
+  const legacyAssetResult = await inspectLegacyAssets(baseUrl);
+  if (!legacyAssetResult.ok) hadFailure = true;
 
   const seoResult = await inspectSeo(baseUrl);
   if (!seoResult.ok) hadFailure = true;

@@ -32,6 +32,7 @@ test("github automation files and docs stay in sync", async () => {
     ".github/workflows/ci.yml",
     ".github/workflows/codeql.yml",
     ".github/workflows/dependency-review.yml",
+    ".github/workflows/live-smoke.yml",
     ".github/workflows/nightly.yml",
     ".github/dependabot.yml",
     ".github/CODEOWNERS",
@@ -62,6 +63,25 @@ test("github automation files and docs stay in sync", async () => {
   expectIncludes(nightly, "node-version: [22, 24]", "nightly matrix missing Node 22/24");
   expectMatches(nightly, /actions\/upload-artifact@v\d+/, "nightly artifact upload missing");
   expectIncludes(nightly, "recovery-focus:", "nightly recovery job missing");
+
+  const liveSmoke = await readText(".github/workflows/live-smoke.yml");
+  expectIncludes(liveSmoke, "schedule:", "live smoke schedule missing");
+  expectIncludes(liveSmoke, "workflow_dispatch:", "live smoke dispatch missing");
+  expectIncludes(liveSmoke, "https://omnifm.xyz", "live smoke default domain missing");
+  expectIncludes(liveSmoke, "OMNIFM_LIVE_ADMIN_TOKEN", "live smoke secret missing");
+  expectIncludes(liveSmoke, "scripts/phase6-live-check.mjs", "live smoke script missing");
+  expectIncludes(liveSmoke, "--skip-logs", "live smoke should skip local Docker log scan in GitHub Actions");
+  expectIncludes(liveSmoke, "skip_authenticated_api", "live smoke public-only diagnostic input missing");
+  expectMatches(liveSmoke, /actions\/upload-artifact@v\d+/, "live smoke artifact upload missing");
+
+  const liveCheck = await readText("scripts/phase6-live-check.mjs");
+  expectIncludes(liveCheck, "inspectCoreRoutes", "live check core route inspection missing");
+  expectIncludes(liveCheck, "/api/health", "live check health API missing");
+  expectIncludes(liveCheck, "/api/stations", "live check stations API missing");
+  expectIncludes(liveCheck, "/api/bots", "live check bots API missing");
+  expectIncludes(liveCheck, "/api/legal", "live check legal API missing");
+  expectIncludes(liveCheck, "/app.js", "live check legacy app asset probe missing");
+  expectIncludes(liveCheck, "/styles.css", "live check legacy stylesheet probe missing");
 
   const dockerfile = await readText("Dockerfile");
   expectIncludes(dockerfile, "FROM node:24-slim AS frontend-builder", "Docker frontend builder must stay on Node 24");

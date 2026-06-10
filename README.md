@@ -88,6 +88,7 @@ Replace all placeholder address, email, and website values before production use
 ## GitHub Automation
 
 This repository ships with GitHub automation for CI, nightly recovery smoke checks, CodeQL, Dependabot, CODEOWNERS, and issue/PR templates.
+The `live-smoke` workflow can be run manually or on schedule against `https://omnifm.xyz`; configure the repository secret `OMNIFM_LIVE_ADMIN_TOKEN` for authenticated provider/API checks.
 
 Recommended required checks for `main`:
 

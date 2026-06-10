@@ -147,8 +147,11 @@ node scripts/phase6-live-check.mjs --base-url https://example.com --admin-token 
 
 It checks:
 
+- SPA delivery for `/`, `/dashboard`, and `/impressum`
 - public SEO assets (`robots.txt`, `sitemap.xml`, manifest, favicon, base meta)
 - browser security headers on HTML, static assets, and public API responses
+- public API health, station catalog, bot overview, and legal/privacy/terms configuration
+- absence of legacy root assets such as `/app.js` and `/styles.css`
 - DiscordBotList status
 - discord.bots.gg status
 - Top.gg status
@@ -161,6 +164,18 @@ Supported admin token inputs:
 - `OMNIFM_ADMIN_TOKEN`
 - `API_ADMIN_TOKEN`
 - `ADMIN_API_TOKEN`
+
+GitHub Actions release gate:
+
+- Workflow: `.github/workflows/live-smoke.yml`
+- Schedule: daily against `https://omnifm.xyz`
+- Manual run: Actions -> `live-smoke` -> Run workflow
+- Required repository secret for full checks: `OMNIFM_LIVE_ADMIN_TOKEN`
+- Public-only diagnostic mode: run manually with `skip_authenticated_api=true`
+
+The workflow intentionally passes the admin token through an environment secret
+and does not echo it. Docker log scanning is skipped in GitHub Actions because
+the runner has no access to the production host logs.
 
 ## Search Console
 

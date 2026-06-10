@@ -1,0 +1,65 @@
+name: live-smoke
+
+on:
+  schedule:
+    - cron: "37 4 * * *"
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Public OmniFM base URL to verify
+        required: true
+        default: https://omnifm.xyz
+        type: string
+      skip_authenticated_api:
+        description: Skip admin-token protected provider/API checks
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: live-smoke-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  live-smoke:
+    name: omnifm.xyz live smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BASE_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.base_url || 'https://omnifm.xyz' }}
+      SKIP_AUTHENTICATED_API: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_authenticated_api || false }}
+      OMNIFM_ADMIN_TOKEN: ${{ secrets.OMNIFM_LIVE_ADMIN_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Run live smoke check
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test_reports/live-smoke
+
+          args=(--base-url "$BASE_URL" --skip-logs)
+          if [[ "$SKIP_AUTHENTICATED_API" == "true" ]]; then
+            args+=(--skip-api)
+          elif [[ -z "${OMNIFM_ADMIN_TOKEN:-}" ]]; then
+            echo "::error::Missing repository secret OMNIFM_LIVE_ADMIN_TOKEN. Re-run with skip_authenticated_api=true only for public-only diagnostics."
+            exit 1
+          fi
+
+          node scripts/phase6-live-check.mjs "${args[@]}" 2>&1 | tee test_reports/live-smoke/live-smoke.log
+
+      - name: Upload live smoke log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: live-smoke-log
+          path: test_reports/live-smoke/live-smoke.log
+          if-no-files-found: error
+          retention-days: 14
