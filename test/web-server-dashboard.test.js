@@ -290,7 +290,7 @@ async function requestJson(baseUrl, pathname, { method = "GET", headers = {}, bo
     body,
   });
   const payload = await response.json().catch(() => ({}));
-  return { status: response.status, payload };
+  return { status: response.status, payload, headers: response.headers };
 }
 
 test("dashboard capability, permissions, and health routes work end-to-end", async (t) => {
@@ -554,7 +554,40 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
     }
   });
 
-  const authHeaders = { "x-session-token": sessionToken };
+  const sessionOnlyHeaders = { "x-session-token": sessionToken };
+  const authHeaders = { ...sessionOnlyHeaders, "X-OmniFM-CSRF": "dashboard-intent" };
+
+  const dashboardCorsPreflightResponse = await requestJson(baseUrl, "/api/dashboard/settings", {
+    method: "OPTIONS",
+    headers: {
+      Origin: baseUrl,
+      "Access-Control-Request-Method": "PUT",
+      "Access-Control-Request-Headers": "Content-Type, X-OmniFM-CSRF",
+    },
+  });
+  assert.equal(dashboardCorsPreflightResponse.status, 204);
+  assert.match(
+    dashboardCorsPreflightResponse.headers.get("access-control-allow-headers") || "",
+    /X-OmniFM-CSRF/i
+  );
+
+  const missingCsrfLogoutResponse = await requestJson(baseUrl, "/api/auth/logout", {
+    method: "POST",
+    headers: sessionOnlyHeaders,
+  });
+  assert.equal(missingCsrfLogoutResponse.status, 403);
+  assert.match(missingCsrfLogoutResponse.payload.error, /CSRF.*intent/i);
+
+  const wrongCsrfDashboardMutationResponse = await requestJson(
+    baseUrl,
+    `/api/dashboard/stats/reset?serverId=${GUILD_ID}`,
+    {
+      method: "DELETE",
+      headers: { ...sessionOnlyHeaders, "X-OmniFM-CSRF": "wrong-intent" },
+    }
+  );
+  assert.equal(wrongCsrfDashboardMutationResponse.status, 403);
+  assert.match(wrongCsrfDashboardMutationResponse.payload.error, /CSRF.*intent/i);
 
   const publicHealthResponse = await requestJson(baseUrl, "/api/health");
   assert.equal(publicHealthResponse.status, 200);

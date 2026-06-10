@@ -40,6 +40,18 @@ const EMPTY_EVENT_FORM = Object.freeze({
   createDiscordEvent: false,
   enabled: true,
 });
+const DASHBOARD_CSRF_HEADER = 'X-OmniFM-CSRF';
+const DASHBOARD_CSRF_INTENT = 'dashboard-intent';
+const DASHBOARD_MUTATION_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+function requiresDashboardIntentHeader(path, method) {
+  const normalizedMethod = String(method || 'GET').toUpperCase();
+  if (!DASHBOARD_MUTATION_METHODS.has(normalizedMethod)) return false;
+
+  const normalizedPath = String(path || '');
+  if (normalizedPath === '/api/auth/logout') return true;
+  return normalizedPath.startsWith('/api/dashboard/') && !normalizedPath.startsWith('/api/dashboard/telemetry');
+}
 
 function buildEmptyPermissionsDraft() {
   const base = {};
@@ -106,15 +118,19 @@ function toEventFormState(event) {
 
 async function apiRequestWithLanguage(path, language, options = {}) {
   let response;
+  const method = String(options.method || 'GET').toUpperCase();
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-OmniFM-Language': language,
+    ...(requiresDashboardIntentHeader(path, method) ? { [DASHBOARD_CSRF_HEADER]: DASHBOARD_CSRF_INTENT } : {}),
+    ...(options.headers || {}),
+  };
   try {
     response = await fetch(buildApiUrl(path), {
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-OmniFM-Language': language,
-        ...(options.headers || {}),
-      },
       ...options,
+      method,
+      credentials: 'include',
+      headers,
     });
   } catch (error) {
     throw new Error(resolveDashboardClientErrorMessage(error, language));

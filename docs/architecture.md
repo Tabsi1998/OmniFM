@@ -238,10 +238,22 @@ Public routes require no auth.
 
 Dashboard routes require a valid dashboard session cookie.
 
+Mutating dashboard session routes additionally require the browser intent header
+`X-OmniFM-CSRF: dashboard-intent`. This applies to `POST`, `PUT`, `PATCH`, and
+`DELETE` requests under `/api/dashboard/*` plus `POST /api/auth/logout`. The
+server-to-server telemetry writer at `POST /api/dashboard/telemetry` is not a
+cookie-session route and remains protected by the admin API token instead.
+
 Admin routes use the admin token from `API_ADMIN_TOKEN` or `ADMIN_API_TOKEN` and accept either:
 
 - `X-Admin-Token: <token>`
 - `Authorization: Bearer <token>`
+
+Browser CORS responses allow credentials and include `X-OmniFM-CSRF` in the
+allowed request headers for dashboard mutations. Production deployments must
+set `PUBLIC_WEB_URL` and/or `CORS_ALLOWED_ORIGINS` to the exact frontend origin.
+Dashboard session cookies are HttpOnly; HTTPS deployments use secure cross-site
+cookie attributes, while local development uses the local-safe fallback.
 
 ## Route Inventory
 

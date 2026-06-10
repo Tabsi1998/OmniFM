@@ -57,6 +57,14 @@ Admin auth headers accepted by the runtime:
 - `X-Admin-Token`
 - `Authorization: Bearer <token>`
 
+Dashboard browser mutations use the HttpOnly dashboard session cookie and must
+send `X-OmniFM-CSRF: dashboard-intent` for `POST`, `PUT`, `PATCH`, and `DELETE`
+requests under `/api/dashboard/*` plus `POST /api/auth/logout`. Keep the
+frontend origin in `PUBLIC_WEB_URL` or `CORS_ALLOWED_ORIGINS` exact enough that
+credentialed CORS remains limited to the real site. Behind a reverse proxy,
+ensure HTTPS is visible to the app so production cookies are emitted with the
+secure cross-site attributes.
+
 ## Command Registration
 
 | Variable | Purpose | Notes |

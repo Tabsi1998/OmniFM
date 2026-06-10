@@ -3023,6 +3023,37 @@ function resolveAdminPanelToken() {
   ).trim();
 }
 
+const DASHBOARD_CSRF_HEADER = "x-omnifm-csrf";
+const DASHBOARD_CSRF_INTENT = "dashboard-intent";
+const DASHBOARD_MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+function isDashboardSessionMutation(req, requestUrl) {
+  const method = String(req?.method || "GET").toUpperCase();
+  if (!DASHBOARD_MUTATION_METHODS.has(method)) return false;
+
+  const pathname = String(requestUrl?.pathname || "");
+  if (pathname === "/api/auth/logout") return true;
+  if (pathname === "/api/dashboard/telemetry") return false;
+  return pathname.startsWith("/api/dashboard/");
+}
+
+function enforceDashboardMutationIntent(req, res, requestUrl) {
+  if (!isDashboardSessionMutation(req, requestUrl)) return true;
+
+  const headerValue = String(req.headers[DASHBOARD_CSRF_HEADER] || "").trim();
+  if (headerValue === DASHBOARD_CSRF_INTENT) return true;
+
+  const language = resolveDashboardRequestLanguage(req, requestUrl);
+  sendJson(res, 403, {
+    error: languagePick(
+      language,
+      "Dashboard-Aktion blockiert: CSRF-Intent-Header fehlt oder ist ungültig.",
+      "Dashboard action blocked: CSRF intent header is missing or invalid."
+    ),
+  });
+  return false;
+}
+
 // WICHTIG: _runtimes muss VOR createAdminRoutesHandler deklariert sein,
 // da der getter sonst in die TDZ (Temporal Dead Zone) läuft.
 let _runtimes = [];
@@ -3073,6 +3104,10 @@ function startWebServer(runtimes) {
     }
 
     if (!enforceApiRateLimit(req, res, requestUrl.pathname)) {
+      return;
+    }
+
+    if (!enforceDashboardMutationIntent(req, res, requestUrl)) {
       return;
     }
 

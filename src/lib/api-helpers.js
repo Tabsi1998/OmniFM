@@ -331,7 +331,7 @@ function applyCors(req, res, publicUrl) {
   }
 
   res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Admin-Token, X-Admin-User, X-Session-Token");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Admin-Token, X-Admin-User, X-Session-Token, X-OmniFM-CSRF");
   return originAllowed;
 }
 
