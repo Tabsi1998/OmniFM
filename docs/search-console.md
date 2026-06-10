@@ -11,6 +11,10 @@ tag. Use the exact token Google gives for the real property.
 - Canonical production property: `https://omnifm.xyz/`.
 - Sitemap URL: `https://omnifm.xyz/sitemap.xml`.
 - Robots URL: `https://omnifm.xyz/robots.txt`.
+- Active URL-prefix verification method: HTML meta tag in
+  `frontend/public/index.html`.
+- Active Google verification token:
+  `2ZCoKiPvrZJ_fKLyyE4SDbATwbL6yDX-iwI82ghmpSM`.
 
 ## Property Setup
 
@@ -36,6 +40,15 @@ Fallback setup for URL-prefix verification:
 
 Do not create a generic `google-site-verification.html` placeholder. Google
 verification only works with the exact tokenized filename or exact meta tag.
+
+Current URL-prefix verification:
+
+```html
+<meta name="google-site-verification" content="2ZCoKiPvrZJ_fKLyyE4SDbATwbL6yDX-iwI82ghmpSM" />
+```
+
+Keep this meta tag in the `<head>` of the homepage after verification. Removing
+it can break the Search Console ownership check.
 
 ## Sitemap Submission
 
@@ -86,8 +99,9 @@ npm run seo:search-console
 ```
 
 This repository check validates that the documented Search Console process,
-robots file, sitemap, and documentation links are present. It cannot verify the
-external Google account, DNS record, or submitted sitemap state.
+Google verification meta tag, robots file, sitemap, and documentation links are
+present. It cannot verify the external Google account, DNS record, or submitted
+sitemap state.
 
 ## Official References
 

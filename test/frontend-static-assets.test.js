@@ -54,6 +54,7 @@ test("React public SEO assets and base metadata are present", () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(publicDir, "manifest.json"), "utf8"));
 
   assert.match(indexHtml, /<link rel="canonical" href="https:\/\/omnifm\.xyz\/"/);
+  assert.match(indexHtml, /<meta name="google-site-verification" content="2ZCoKiPvrZJ_fKLyyE4SDbATwbL6yDX-iwI82ghmpSM" \/>/);
   assert.match(indexHtml, /property="og:title"/);
   assert.match(indexHtml, /name="twitter:card"/);
   assert.match(indexHtml, /application\/ld\+json/);
