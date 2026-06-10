@@ -11,6 +11,8 @@
 //   GET  /api/admin/overview     → Bot-Status, Guilds, Lizenzen
 //   GET  /api/admin/diagnostics  → Owner-Diagnose ohne Secret-Werte
 //   GET  /api/admin/operations   → update.sh/Owner-GUI Paritaetskarte
+//   GET  /api/admin/config       → Owner-Einstellungen ohne Secret-Werte
+//   POST /api/admin/config       → Erlaubte Owner-Einstellungen in .env speichern
 //   GET  /api/admin/licenses     → Alle Lizenzen
 //   POST /api/admin/licenses/:id → Lizenz patchen (aktivieren, verlängern, sperren)
 //   GET  /api/admin/guilds       → Alle Guilds mit Status
@@ -18,6 +20,8 @@
 //   GET  /api/admin/stations     → Alle Stationen (inkl. Health-Status)
 //   POST /api/admin/stations     → Station hinzufügen/bearbeiten
 // ============================================================
+
+import { getOwnerConfigSnapshot, patchOwnerConfig } from "../../lib/owner-config-store.js";
 
 export function createAdminRoutesHandler(deps) {
   const {
@@ -665,6 +669,28 @@ export function createAdminRoutesHandler(deps) {
       return true;
     }
 
+    // GET/POST /api/admin/config
+    if (pathname === "/api/admin/config") {
+      if (req.method === "GET") {
+        sendJson(res, 200, getOwnerConfigSnapshot());
+        return true;
+      }
+      if (req.method === "POST" || req.method === "PATCH") {
+        try {
+          const payload = JSON.parse(await readRequestBody(req) || "{}");
+          const snapshot = patchOwnerConfig(payload);
+          const keys = Array.isArray(snapshot.updatedKeys) ? snapshot.updatedKeys.join(", ") : "";
+          log?.("INFO", `[Owner] Einstellungen gespeichert: ${keys || "keine Aenderung"}`);
+          sendJson(res, 200, { ok: true, ...snapshot });
+        } catch (err) {
+          sendJson(res, err?.statusCode || 400, { ok: false, error: err?.message || "Ungueltige Owner-Einstellungen" });
+        }
+        return true;
+      }
+      methodNotAllowed(res, ["GET", "POST", "PATCH"]);
+      return true;
+    }
+
     // GET /api/admin/licenses
     if (pathname === "/api/admin/licenses") {
       if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
@@ -884,6 +910,16 @@ function buildAdminHtml() {
     .station-url{max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#71717a;font-family:monospace;font-size:11px}
     .empty-state{padding:32px 16px;text-align:center;color:#71717a;font-size:13px}
     .cmd{font-family:'Consolas','JetBrains Mono',monospace;font-size:11px;color:#a1a1aa;background:#090909;border:1px solid #222;border-radius:6px;padding:4px 6px;display:inline-block}
+    .config-group{border-top:1px solid #222;padding:16px 0}
+    .config-group:first-child{border-top:0;padding-top:0}
+    .config-group h3{font-size:13px;color:#e4e4e7;margin-bottom:4px}
+    .config-group p{font-size:12px;color:#71717a;margin-bottom:10px}
+    .config-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}
+    .config-field{background:#0b0b0b;border:1px solid #202020;border-radius:8px;padding:10px}
+    .config-field label{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:#a1a1aa;margin-bottom:6px}
+    .config-field code{font-size:10px;color:#52525b}
+    .config-field input,.config-field select{width:100%;background:#111;border:1px solid #333;color:#e4e4e7;border-radius:7px;padding:8px;font-size:12px}
+    .config-status{font-size:12px;color:#71717a;margin-left:8px}
   </style>
 </head>
 <body>
@@ -916,6 +952,7 @@ function buildAdminHtml() {
         <button class="tab" onclick="showTab('stations', this)">📻 Stationen</button>
         <button class="tab" onclick="showTab('logs', this)">📋 Logs</button>
         <button class="tab" onclick="showTab('operations', this)">⚙️ Betrieb</button>
+        <button class="tab" onclick="showTab('config', this)">🔧 Einstellungen</button>
       </div>
       <div id="content"><div class="loading">Lade Daten...</div></div>
     </div>
@@ -961,8 +998,9 @@ function buildAdminHtml() {
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify(body)
       });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
+      const payload = await r.json().catch(() => null);
+      if (!r.ok) throw new Error(payload?.error || ('HTTP ' + r.status));
+      return payload;
     }
 
     let currentTab = 'bots';
@@ -975,7 +1013,7 @@ function buildAdminHtml() {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       if (trigger) trigger.classList.add('active');
       else {
-        const index = ['bots','diagnostics','guilds','licenses','stations','logs','operations'].indexOf(tab);
+        const index = ['bots','diagnostics','guilds','licenses','stations','logs','operations','config'].indexOf(tab);
         const buttons = document.querySelectorAll('.tab');
         if (buttons[index]) buttons[index].classList.add('active');
       }
@@ -1089,14 +1127,17 @@ function buildAdminHtml() {
       } else if (tab === 'operations') {
         if (!d.operations) { el.innerHTML = '<div class="loading">Lade Betrieb...</div>'; return; }
         el.innerHTML = renderOperations(d.operations);
+      } else if (tab === 'config') {
+        if (!d.config) { el.innerHTML = '<div class="loading">Lade Einstellungen...</div>'; return; }
+        el.innerHTML = renderConfig(d.config);
       }
     }
 
     async function loadAll() {
       document.getElementById('serverTime').textContent = 'Lädt...';
       try {
-        const [overview, guilds, licenses, stations, logs, diagnostics, operations] = await Promise.allSettled([
-          api('overview'), api('guilds'), api('licenses'), api('stations'), api('logs'), api('diagnostics'), api('operations')
+        const [overview, guilds, licenses, stations, logs, diagnostics, operations, config] = await Promise.allSettled([
+          api('overview'), api('guilds'), api('licenses'), api('stations'), api('logs'), api('diagnostics'), api('operations'), api('config')
         ]);
         if (overview.status === 'fulfilled') {
           cachedData.overview = overview.value;
@@ -1123,9 +1164,97 @@ function buildAdminHtml() {
         if (logs.status === 'fulfilled') cachedData.logs = logs.value;
         if (diagnostics.status === 'fulfilled') cachedData.diagnostics = diagnostics.value;
         if (operations.status === 'fulfilled') cachedData.operations = operations.value;
+        if (config.status === 'fulfilled') cachedData.config = config.value;
         renderTab(currentTab);
       } catch(e) {
         document.getElementById('content').innerHTML = '<div class="error-msg">Fehler: ' + esc(e.message) + '</div>';
+      }
+    }
+
+    function renderConfig(payload) {
+      const groups = Array.isArray(payload.groups) ? payload.groups : [];
+      const secrets = Array.isArray(payload.secrets) ? payload.secrets : [];
+      const configuredSecrets = secrets.filter(s => s.configured).length;
+      const updated = Array.isArray(payload.updatedKeys) ? payload.updatedKeys : [];
+      return '<div class="summary-row">' +
+          summaryPill(payload.envFile?.writable ? 'OK' : 'FEHLT', '.env schreibbar', payload.envFile?.writable ? 'green' : 'red') +
+          summaryPill(groups.reduce((sum, group) => sum + (group.fields?.length || 0), 0), 'Editierbare Werte', '') +
+          summaryPill(configuredSecrets + '/' + secrets.length, 'Secrets gesetzt', configuredSecrets === secrets.length ? 'green' : 'amber') +
+          summaryPill(payload.restartRequired ? 'JA' : 'NEIN', 'Neustart noetig', payload.restartRequired ? 'amber' : 'green') +
+        '</div>' +
+        '<div class="toolbar">' +
+          '<span class="cmd">' + esc(payload.envFile?.path || '.env') + '</span>' +
+          '<button class="btn btn-cyan" onclick="saveConfig()">Speichern</button>' +
+          '<span id="configSaveStatus" class="config-status">' + (updated.length ? 'Gespeichert: ' + esc(updated.join(', ')) + ' - Container neu starten.' : 'Nur nicht geheime Werte sind editierbar.') + '</span>' +
+        '</div>' +
+        groups.map(group => '<div class="config-group">' +
+          '<h3>' + esc(group.title || group.id) + '</h3>' +
+          '<p>' + esc(group.description || '') + '</p>' +
+          '<div class="config-grid">' + (group.fields || []).map(renderConfigField).join('') + '</div>' +
+        '</div>').join('') +
+        '<div class="config-group">' +
+          '<h3>Secrets</h3>' +
+          '<p>Geheime Werte werden im Owner-Portal nicht angezeigt. Hier siehst du nur, ob sie gesetzt sind.</p>' +
+          '<table><thead><tr><th>Bereich</th><th>Name</th><th>Status</th><th>Quelle</th></tr></thead><tbody>' +
+          secrets.map(secret => '<tr><td style="color:#71717a">' + esc(secret.group || '-') + '</td><td><b>' + esc(secret.label || secret.key) + '</b><div style="font-size:11px;color:#52525b">' + esc(secret.key) + '</div></td><td>' + statusBadge(secret.configured ? 'configured' : 'missing') + '</td><td style="font-size:12px;color:#71717a">' + esc(secret.source || '-') + '</td></tr>').join('') +
+          '</tbody></table>' +
+        '</div>';
+    }
+
+    function renderConfigField(field) {
+      const value = field.value == null ? '' : String(field.value);
+      const source = field.source ? ' · ' + field.source : '';
+      const keyAttr = escAttr(field.key);
+      const label = '<label><span>' + esc(field.label || field.key) + '</span><code>' + esc(field.key) + source + '</code></label>';
+      if (field.type === 'boolean') {
+        return '<div class="config-field">' + label +
+          '<select data-config-key="' + keyAttr + '">' +
+            option('', 'Nicht gesetzt', value) +
+            option('1', 'Aktiv', value) +
+            option('0', 'Aus', value) +
+          '</select></div>';
+      }
+      if (field.type === 'enum' && Array.isArray(field.values)) {
+        return '<div class="config-field">' + label +
+          '<select data-config-key="' + keyAttr + '">' +
+            field.values.map(v => option(v, v, value)).join('') +
+          '</select></div>';
+      }
+      const inputType = field.type === 'integer' ? 'number' : field.type === 'email' ? 'email' : field.type === 'date' ? 'date' : field.type === 'url' ? 'url' : 'text';
+      const attrs = [
+        'data-config-key="' + keyAttr + '"',
+        'type="' + inputType + '"',
+        'value="' + escAttr(value) + '"',
+        field.example ? 'placeholder="' + escAttr(field.example) + '"' : '',
+        field.min != null ? 'min="' + escAttr(field.min) + '"' : '',
+        field.max != null ? 'max="' + escAttr(field.max) + '"' : '',
+      ].filter(Boolean).join(' ');
+      return '<div class="config-field">' + label + '<input ' + attrs + '/></div>';
+    }
+
+    async function saveConfig() {
+      const status = document.getElementById('configSaveStatus');
+      const values = {};
+      document.querySelectorAll('[data-config-key]').forEach((input) => {
+        values[input.getAttribute('data-config-key')] = input.value;
+      });
+      if (status) {
+        status.textContent = 'Speichere...';
+        status.style.color = '#71717a';
+      }
+      try {
+        const result = await apiPost('config', { values });
+        cachedData.config = result;
+        if (status) {
+          status.textContent = 'Gespeichert. Container/Service danach neu starten, damit alle Bereiche die Werte sicher uebernehmen.';
+          status.style.color = '#39FF14';
+        }
+        renderTab('config');
+      } catch (e) {
+        if (status) {
+          status.textContent = 'Fehler: ' + e.message;
+          status.style.color = '#FF2A2A';
+        }
       }
     }
 

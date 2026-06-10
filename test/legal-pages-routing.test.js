@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -125,6 +126,13 @@ test("pageRouting resolves aliases and localized legal paths", () => {
 });
 
 test("startWebServer serves SPA entry for clean legal paths and exposes terms payload", async () => {
+  const ownerEnvDir = await fs.mkdtemp(path.join(os.tmpdir(), "omnifm-admin-config-"));
+  const ownerEnvFile = path.join(ownerEnvDir, ".env");
+  await fs.writeFile(
+    ownerEnvFile,
+    "PUBLIC_WEB_URL=https://omnifm.xyz\nAPI_ADMIN_TOKEN=admin-route-token\nLOG_MAX_MB=5\n",
+    "utf8"
+  );
   const restoreEnv = setEnv({
     WEB_INTERNAL_PORT: "0",
     WEB_PORT: "0",
@@ -152,6 +160,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     OMNIFM_DEPLOYED_AT: "2026-06-10T18:00:00.000Z",
     OMNIFM_LAST_DEPLOY_STATUS: "success",
     OMNIFM_LAST_LIVE_SMOKE_STATUS: "success",
+    OMNIFM_ENV_FILE: ownerEnvFile,
   });
   const indexSnapshot = await snapshotFile(frontendIndexPath);
   const robotsSnapshot = await snapshotFile(frontendRobotsPath);
@@ -276,7 +285,9 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.match(adminPanelHtml, /statRelease/);
     assert.match(adminPanelHtml, /Diagnose/);
     assert.match(adminPanelHtml, /Betrieb/);
+    assert.match(adminPanelHtml, /Einstellungen/);
     assert.match(adminPanelHtml, /renderOperations/);
+    assert.match(adminPanelHtml, /renderConfig/);
 
     const adminOverviewResponse = await fetch(`http://127.0.0.1:${port}/api/admin/overview`, {
       headers: { Cookie: adminCookieHeader },
@@ -318,6 +329,35 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.ok(adminOperations.operations.some((operation) => operation.cli === "./update.sh --recognition-test <URL>"));
     assert.ok(adminOperations.summary.available >= 1);
     assert.ok(adminOperations.summary.planned >= 1);
+
+    const adminConfigResponse = await fetch(`http://127.0.0.1:${port}/api/admin/config`, {
+      headers: { Cookie: adminCookieHeader },
+    });
+    assert.equal(adminConfigResponse.status, 200);
+    const adminConfig = await adminConfigResponse.json();
+    assert.equal(adminConfig.envFile.path, ownerEnvFile);
+    assert.ok(adminConfig.groups.some((group) => group.id === "legal"));
+    assert.ok(adminConfig.groups.some((group) => group.fields.some((field) => field.key === "PUBLIC_WEB_URL")));
+    assert.ok(adminConfig.secrets.some((secret) => secret.key === "API_ADMIN_TOKEN" && secret.configured));
+
+    const adminConfigPatchResponse = await fetch(`http://127.0.0.1:${port}/api/admin/config`, {
+      method: "POST",
+      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ values: { PUBLIC_WEB_URL: "https://omnifm.xyz", DEFAULT_LANGUAGE: "de", API_ADMIN_TOKEN: "must-not-save" } }),
+    });
+    assert.equal(adminConfigPatchResponse.status, 400);
+
+    const adminConfigSaveResponse = await fetch(`http://127.0.0.1:${port}/api/admin/config`, {
+      method: "POST",
+      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ values: { PUBLIC_WEB_URL: "https://omnifm.xyz", DEFAULT_LANGUAGE: "de", LOG_MAX_MB: "9" } }),
+    });
+    assert.equal(adminConfigSaveResponse.status, 200);
+    const adminConfigSave = await adminConfigSaveResponse.json();
+    assert.equal(adminConfigSave.ok, true);
+    assert.equal(adminConfigSave.restartRequired, true);
+    assert.ok(adminConfigSave.updatedKeys.includes("DEFAULT_LANGUAGE"));
+    assert.match(await fs.readFile(ownerEnvFile, "utf8"), /DEFAULT_LANGUAGE=de/);
 
     const adminGuildsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/guilds`, {
       headers: { Cookie: adminCookieHeader },
@@ -385,6 +425,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     await restoreFile(frontendSitemapPath, sitemapSnapshot);
     await restoreFile(frontendManifestPath, manifestSnapshot);
     await restoreFile(frontendBotIconPath, botIconSnapshot);
+    await fs.rm(ownerEnvDir, { recursive: true, force: true });
     restoreEnv();
   }
 });

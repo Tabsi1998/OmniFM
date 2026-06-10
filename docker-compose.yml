@@ -26,6 +26,7 @@ services:
     ports:
       - "${WEB_PORT:-8081}:${WEB_INTERNAL_PORT:-8080}"
     volumes:
+      - ./.env:/app/.env
       - ./stations.json:/app/stations.json
       - ./premium.json:/app/premium.json
       - ./bot-state.json:/app/bot-state.json
