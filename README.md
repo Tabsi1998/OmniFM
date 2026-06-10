@@ -208,12 +208,12 @@ Public routes:
 
 Dashboard, Premium, provider, and admin routes are documented in [docs/architecture.md](docs/architecture.md). Split-mode store ownership and JSON fallback rules are documented in [docs/store-concurrency.md](docs/store-concurrency.md).
 
-Admin API authentication supports:
+Owner/admin access:
 
-- `X-Admin-Token: <token>`
-- `Authorization: Bearer <token>`
-
-The runtime reads `API_ADMIN_TOKEN` or the legacy alias `ADMIN_API_TOKEN`.
+- Open `/admin` directly and sign in with the value from `API_ADMIN_TOKEN` or the legacy alias `ADMIN_API_TOKEN`.
+- The web login stores the token in an HttpOnly `SameSite=Strict` cookie, so normal owner usage does not expose the token in the URL.
+- Programmatic Admin API authentication still supports `X-Admin-Token: <token>` and `Authorization: Bearer <token>`.
+- Legacy `?token=<token>` links are accepted only for compatibility and are redirected to the cookie-based `/admin` session.
 
 ## Repository Layout
 

@@ -2,10 +2,12 @@
 // OmniFM: Admin-Panel API-Routen
 // Zugang: ADMIN_TOKEN, API_ADMIN_TOKEN oder ADMIN_API_TOKEN in .env setzen
 // URL:    /admin  (nicht verlinkt, nur für Betreiber)
-// Auth:   ?token=xxx  ODER  Authorization: Bearer xxx ODER X-Admin-Token
+// Auth:   Owner-Login-Cookie ODER Authorization: Bearer xxx ODER X-Admin-Token ODER legacy ?token=xxx
 //
 // Endpunkte:
-//   GET  /admin                  → Admin-Panel HTML
+//   GET  /admin                  → Owner-Login oder Admin-Panel HTML
+//   POST /api/admin/session      → Owner-Login und HttpOnly-Cookie setzen
+//   POST /api/admin/logout       → Owner-Login-Cookie löschen
 //   GET  /api/admin/overview     → Bot-Status, Guilds, Lizenzen
 //   GET  /api/admin/licenses     → Alle Lizenzen
 //   POST /api/admin/licenses/:id → Lizenz patchen (aktivieren, verlängern, sperren)
@@ -43,19 +45,108 @@ export function createAdminRoutesHandler(deps) {
     return Object.keys(stationsData?.stations || {}).length;
   }
 
-  /**
-   * Prüft ob der Request einen gültigen Admin-Token hat.
-   */
-  function isAuthorized(req, requestUrl) {
-    const adminToken = String(resolveAdminToken?.() || ADMIN_TOKEN || "").trim();
-    if (!adminToken) return false;
+  const ADMIN_COOKIE_NAME = "omnifm_owner";
+  const ADMIN_COOKIE_MAX_AGE_SECONDS = 12 * 60 * 60;
+
+  function resolveConfiguredAdminToken() {
+    return String(resolveAdminToken?.() || ADMIN_TOKEN || "").trim();
+  }
+
+  function parseCookies(cookieHeader) {
+    const cookies = new Map();
+    for (const part of String(cookieHeader || "").split(";")) {
+      const [rawName, ...rawValueParts] = part.trim().split("=");
+      if (!rawName) continue;
+      const rawValue = rawValueParts.join("=");
+      try {
+        cookies.set(rawName, decodeURIComponent(rawValue || ""));
+      } catch {
+        cookies.set(rawName, rawValue || "");
+      }
+    }
+    return cookies;
+  }
+
+  function getAdminTokenFromRequest(req, requestUrl) {
     const authHeader = String(req.headers?.authorization || "").trim();
     const bearerToken = authHeader.startsWith("Bearer ")
       ? authHeader.slice(7).trim()
       : "";
     const headerToken = String(req.headers?.["x-admin-token"] || "").trim();
     const queryToken = String(requestUrl?.searchParams?.get("token") || "").trim();
-    return bearerToken === adminToken || headerToken === adminToken || queryToken === adminToken;
+    const cookieToken = String(parseCookies(req.headers?.cookie).get(ADMIN_COOKIE_NAME) || "").trim();
+    return bearerToken || headerToken || queryToken || cookieToken;
+  }
+
+  function isAdminTokenValue(token) {
+    const adminToken = resolveConfiguredAdminToken();
+    return Boolean(adminToken) && String(token || "").trim() === adminToken;
+  }
+
+  /**
+   * Prüft ob der Request einen gültigen Owner/Admin-Token hat.
+   */
+  function isAuthorized(req, requestUrl) {
+    return isAdminTokenValue(getAdminTokenFromRequest(req, requestUrl));
+  }
+
+  function shouldUseSecureAdminCookie(req) {
+    const forwardedProto = String(req.headers?.["x-forwarded-proto"] || "").toLowerCase();
+    const publicUrl = String(process.env.PUBLIC_WEB_URL || "").toLowerCase();
+    return forwardedProto.split(",")[0].trim() === "https" || publicUrl.startsWith("https://");
+  }
+
+  function buildAdminCookie(token, req) {
+    const secure = shouldUseSecureAdminCookie(req) ? "; Secure" : "";
+    return `${ADMIN_COOKIE_NAME}=${encodeURIComponent(token)}; Max-Age=${ADMIN_COOKIE_MAX_AGE_SECONDS}; Path=/; HttpOnly; SameSite=Strict${secure}`;
+  }
+
+  function clearAdminCookie(req) {
+    const secure = shouldUseSecureAdminCookie(req) ? "; Secure" : "";
+    return `${ADMIN_COOKIE_NAME}=; Max-Age=0; Path=/; HttpOnly; SameSite=Strict${secure}`;
+  }
+
+  function redirect(res, location, extraHeaders = {}) {
+    res.writeHead(303, {
+      ...(typeof getCommonSecurityHeaders === "function" ? getCommonSecurityHeaders() : {}),
+      ...extraHeaders,
+      "Location": location,
+      "Cache-Control": "no-store",
+    });
+    res.end();
+  }
+
+  function sendAdminJson(res, status, payload, extraHeaders = {}) {
+    res.writeHead(status, {
+      ...(typeof getCommonSecurityHeaders === "function" ? getCommonSecurityHeaders() : {}),
+      ...extraHeaders,
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+    });
+    res.end(JSON.stringify(payload));
+  }
+
+  function readRequestBody(req, limitBytes = 4096) {
+    return new Promise((resolve, reject) => {
+      let body = "";
+      req.on("data", (chunk) => {
+        body += chunk;
+        if (body.length > limitBytes) reject(new Error("Request body too large"));
+      });
+      req.on("end", () => resolve(body));
+      req.on("error", reject);
+    });
+  }
+
+  function parseSessionPayload(rawBody, contentType) {
+    if (String(contentType || "").includes("application/x-www-form-urlencoded")) {
+      return Object.fromEntries(new URLSearchParams(rawBody));
+    }
+    try {
+      return JSON.parse(rawBody || "{}");
+    } catch {
+      return {};
+    }
   }
 
   function unauthorized(res) {
@@ -75,7 +166,31 @@ export function createAdminRoutesHandler(deps) {
     // ---- Admin-Panel HTML ----
     if (pathname === "/admin" || pathname === "/admin/") {
       if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
-      if (!isAuthorized(req, requestUrl)) { unauthorized(res); return true; }
+
+      const queryToken = String(requestUrl?.searchParams?.get("token") || "").trim();
+      if (queryToken) {
+        if (isAdminTokenValue(queryToken)) {
+          redirect(res, "/admin", { "Set-Cookie": buildAdminCookie(queryToken, req) });
+          return true;
+        }
+        res.writeHead(401, {
+          ...(typeof getCommonSecurityHeaders === "function" ? getCommonSecurityHeaders() : {}),
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+        });
+        res.end(buildAdminLoginHtml("Der Admin-Token ist ungültig."));
+        return true;
+      }
+
+      if (!isAuthorized(req, requestUrl)) {
+        res.writeHead(200, {
+          ...(typeof getCommonSecurityHeaders === "function" ? getCommonSecurityHeaders() : {}),
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+        });
+        res.end(buildAdminLoginHtml());
+        return true;
+      }
 
       res.writeHead(200, {
         ...(typeof getCommonSecurityHeaders === "function" ? getCommonSecurityHeaders() : {}),
@@ -83,6 +198,49 @@ export function createAdminRoutesHandler(deps) {
         "Cache-Control": "no-store",
       });
       res.end(buildAdminHtml());
+      return true;
+    }
+
+    if (pathname === "/api/admin/session") {
+      if (req.method !== "POST") { methodNotAllowed(res, ["POST"]); return true; }
+      const contentType = String(req.headers?.["content-type"] || "");
+      const wantsHtmlRedirect = contentType.includes("application/x-www-form-urlencoded");
+      try {
+        const payload = parseSessionPayload(await readRequestBody(req), contentType);
+        const token = String(payload?.token || "").trim();
+        if (!isAdminTokenValue(token)) {
+          log?.("WARN", "[Owner] Admin login fehlgeschlagen");
+          if (wantsHtmlRedirect) {
+            res.writeHead(401, {
+              ...(typeof getCommonSecurityHeaders === "function" ? getCommonSecurityHeaders() : {}),
+              "Content-Type": "text/html; charset=utf-8",
+              "Cache-Control": "no-store",
+            });
+            res.end(buildAdminLoginHtml("Der Admin-Token ist ungültig."));
+          } else {
+            sendAdminJson(res, 401, { ok: false, error: "Invalid admin token" });
+          }
+          return true;
+        }
+        log?.("INFO", "[Owner] Admin login erfolgreich");
+        if (wantsHtmlRedirect) {
+          redirect(res, "/admin", { "Set-Cookie": buildAdminCookie(token, req) });
+        } else {
+          sendAdminJson(res, 200, { ok: true, role: "owner" }, { "Set-Cookie": buildAdminCookie(token, req) });
+        }
+        return true;
+      } catch (err) {
+        sendAdminJson(res, 400, { ok: false, error: err?.message || "Invalid login request" });
+        return true;
+      }
+    }
+
+    if (pathname === "/api/admin/logout") {
+      if (req.method !== "POST") { methodNotAllowed(res, ["POST"]); return true; }
+      log?.("INFO", "[Owner] Admin logout");
+      const wantsHtmlRedirect = String(req.headers?.accept || "").includes("text/html");
+      if (wantsHtmlRedirect) redirect(res, "/admin", { "Set-Cookie": clearAdminCookie(req) });
+      else sendAdminJson(res, 200, { ok: true }, { "Set-Cookie": clearAdminCookie(req) });
       return true;
     }
 
@@ -219,6 +377,61 @@ export function createAdminRoutesHandler(deps) {
 }
 
 // ============================================================
+// Owner-Login HTML
+// ============================================================
+function buildAdminLoginHtml(errorMessage = "") {
+  const errorHtml = errorMessage
+    ? `<p class="login-error" role="alert">${escapeHtml(errorMessage)}</p>`
+    : "";
+  return `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>OmniFM Owner Login</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',system-ui,sans-serif;background:#0a0a0a;color:#e4e4e7;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+    .login{width:min(420px,100%);background:#111;border:1px solid #222;border-radius:12px;padding:28px}
+    .brand{display:flex;align-items:center;gap:10px;margin-bottom:20px}
+    .brand h1{font-size:16px;font-weight:800;color:#00F0FF;letter-spacing:.1em}
+    .badge{font-size:10px;background:#FF2A2A;color:#fff;padding:2px 8px;border-radius:20px;font-weight:700}
+    label{display:block;font-size:11px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+    input{width:100%;background:#1a1a1a;border:1px solid #333;border-radius:8px;color:#fff;padding:11px 12px;font-size:14px;outline:none}
+    input:focus{border-color:#00F0FF}
+    button{width:100%;margin-top:14px;background:#00F0FF;color:#050505;border:none;border-radius:8px;padding:11px 14px;font-size:13px;font-weight:800;cursor:pointer}
+    .hint{margin-top:14px;color:#71717a;font-size:12px;line-height:1.5}
+    .login-error{margin-bottom:14px;color:#FF2A2A;font-size:13px}
+  </style>
+</head>
+<body>
+  <main class="login">
+    <div class="brand">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00F0FF" stroke-width="2"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49"/></svg>
+      <h1>OMNIFM OWNER LOGIN</h1>
+      <span class="badge">INTERN</span>
+    </div>
+    ${errorHtml}
+    <form method="post" action="/api/admin/session" autocomplete="off">
+      <label for="adminTokenInput">Admin API Token</label>
+      <input id="adminTokenInput" name="token" type="password" required autofocus autocomplete="current-password"/>
+      <button type="submit">Anmelden</button>
+    </form>
+    <p class="hint">Der Token kommt aus <code>API_ADMIN_TOKEN</code> beziehungsweise <code>ADMIN_API_TOKEN</code>. Nach dem Login wird er als HttpOnly-Cookie gespeichert und nicht in der URL angezeigt.</p>
+  </main>
+</body>
+</html>`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+// ============================================================
 // Admin-Panel HTML (Single-Page, inline CSS+JS, kein Framework)
 // ============================================================
 function buildAdminHtml() {
@@ -297,6 +510,7 @@ function buildAdminHtml() {
     <span class="badge">INTERN</span>
     <span style="margin-left:auto;font-size:12px;color:#52525b" id="serverTime"></span>
     <button class="refresh-btn" onclick="loadAll()">↻ Aktualisieren</button>
+    <button class="refresh-btn" onclick="logoutAdmin()">Logout</button>
   </div>
 
   <div class="container">
@@ -344,6 +558,11 @@ function buildAdminHtml() {
   <script>
     const TOKEN = new URLSearchParams(location.search).get('token') || '';
     const AUTH = TOKEN ? '?token=' + encodeURIComponent(TOKEN) : '';
+
+    async function logoutAdmin() {
+      await fetch('/api/admin/logout' + AUTH, { method: 'POST' }).catch(() => null);
+      window.location.href = '/admin';
+    }
 
     async function api(path) {
       const r = await fetch('/api/admin/' + path + AUTH);

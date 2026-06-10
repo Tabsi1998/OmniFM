@@ -220,7 +220,41 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.equal(notFoundPageResponse.status, 404);
     assert.match(await notFoundPageResponse.text(), /404/);
 
-    const adminPanelResponse = await fetch(`http://127.0.0.1:${port}/admin?token=admin-route-token`);
+    const adminLoginResponse = await fetch(`http://127.0.0.1:${port}/admin`);
+    assert.equal(adminLoginResponse.status, 200);
+    assertCommonSecurityHeaders(adminLoginResponse.headers);
+    const adminLoginHtml = await adminLoginResponse.text();
+    assert.match(adminLoginHtml, /OMNIFM OWNER LOGIN/);
+    assert.match(adminLoginHtml, /adminTokenInput/);
+
+    const adminOverviewUnauthorizedResponse = await fetch(`http://127.0.0.1:${port}/api/admin/overview`);
+    assert.equal(adminOverviewUnauthorizedResponse.status, 401);
+
+    const invalidAdminSessionResponse = await fetch(`http://127.0.0.1:${port}/api/admin/session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token: "wrong-token" }).toString(),
+      redirect: "manual",
+    });
+    assert.equal(invalidAdminSessionResponse.status, 401);
+
+    const adminSessionResponse = await fetch(`http://127.0.0.1:${port}/api/admin/session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token: "admin-route-token" }).toString(),
+      redirect: "manual",
+    });
+    assert.equal(adminSessionResponse.status, 303);
+    assert.equal(adminSessionResponse.headers.get("location"), "/admin");
+    const adminCookie = adminSessionResponse.headers.get("set-cookie") || "";
+    assert.match(adminCookie, /omnifm_owner=admin-route-token/);
+    assert.match(adminCookie, /HttpOnly/);
+    assert.match(adminCookie, /SameSite=Strict/);
+    const adminCookieHeader = adminCookie.split(";")[0];
+
+    const adminPanelResponse = await fetch(`http://127.0.0.1:${port}/admin`, {
+      headers: { Cookie: adminCookieHeader },
+    });
     assert.equal(adminPanelResponse.status, 200);
     assertCommonSecurityHeaders(adminPanelResponse.headers);
     const adminPanelHtml = await adminPanelResponse.text();
@@ -229,7 +263,9 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.match(adminPanelHtml, /copyText/);
     assert.match(adminPanelHtml, /statRelease/);
 
-    const adminOverviewResponse = await fetch(`http://127.0.0.1:${port}/api/admin/overview?token=admin-route-token`);
+    const adminOverviewResponse = await fetch(`http://127.0.0.1:${port}/api/admin/overview`, {
+      headers: { Cookie: adminCookieHeader },
+    });
     assert.equal(adminOverviewResponse.status, 200);
     const adminOverview = await adminOverviewResponse.json();
     assert.equal(adminOverview.bots.length, 1);
@@ -241,7 +277,9 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.equal(adminOverview.release?.lastDeployStatus, "success");
     assert.equal(adminOverview.release?.lastLiveSmokeStatus, "success");
 
-    const adminGuildsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/guilds?token=admin-route-token`);
+    const adminGuildsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/guilds`, {
+      headers: { Cookie: adminCookieHeader },
+    });
     assert.equal(adminGuildsResponse.status, 200);
     const adminGuilds = await adminGuildsResponse.json();
     assert.equal(adminGuilds.total, 1);
