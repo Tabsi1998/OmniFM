@@ -1335,6 +1335,13 @@ function buildPublicTermsNotice() {
 const SPA_ENTRY_PATHS = new Set([
   "/",
   "/dashboard",
+  "/stations",
+  "/sender",
+  "/premium",
+  "/pricing",
+  "/preise",
+  "/faq",
+  "/fragen",
   "/imprint",
   "/impressum",
   "/privacy",

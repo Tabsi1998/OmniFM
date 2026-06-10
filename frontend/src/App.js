@@ -17,7 +17,7 @@ import DashboardPortal from './components/DashboardPortal.js';
 import FaqSection from './components/FaqSection.js';
 import { I18nProvider } from './i18n.js';
 import { buildApiUrl } from './lib/api.js';
-import { resolvePageFromUrl } from './lib/pageRouting.js';
+import { getSectionAnchorForPage, resolvePageFromUrl } from './lib/pageRouting.js';
 
 async function fetchJson(path, signal) {
   const res = await fetch(buildApiUrl(path), {
@@ -55,6 +55,16 @@ function AppContent() {
   const currentPage = typeof window === 'undefined'
     ? 'home'
     : resolvePageFromUrl(window.location.href);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const sectionId = getSectionAnchorForPage(currentPage);
+    if (!sectionId) return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(sectionId)?.scrollIntoView({ block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [currentPage]);
 
   const fetchData = useCallback(async (signal) => {
     const endpoints = [

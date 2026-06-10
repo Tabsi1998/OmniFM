@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { buildStructuredData, getPageSeo } from "../frontend/src/lib/seo.js";
+import { buildStructuredData, getFaqEntries, getPageSeo } from "../frontend/src/lib/seo.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -64,6 +64,9 @@ test("React public SEO assets and base metadata are present", () => {
   assert.match(robotsTxt, /Sitemap: https:\/\/omnifm\.xyz\/sitemap\.xml/);
   assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/<\/loc>/);
   assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/dashboard<\/loc>/);
+  assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/stations<\/loc>/);
+  assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/premium<\/loc>/);
+  assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/faq<\/loc>/);
   assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/impressum<\/loc>/);
   assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/datenschutz<\/loc>/);
   assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/nutzungsbedingungen<\/loc>/);
@@ -85,10 +88,49 @@ test("SEO helper returns route-specific canonical metadata and structured data",
   assert.equal(privacySeo.canonicalUrl, "https://omnifm.xyz/privacy");
   assert.match(privacySeo.title, /Privacy policy/);
 
-  const structuredData = buildStructuredData(homeSeo);
+  const stationsSeo = getPageSeo("stations", "de");
+  assert.equal(stationsSeo.canonicalUrl, "https://omnifm.xyz/stations");
+  assert.match(stationsSeo.title, /Stationen/);
+  assert.match(stationsSeo.description, /Discord-Radio/);
+
+  const premiumSeo = getPageSeo("premium", "en");
+  assert.equal(premiumSeo.canonicalUrl, "https://omnifm.xyz/premium");
+  assert.match(premiumSeo.title, /Free, Pro and Ultimate/);
+  assert.match(premiumSeo.description, /audio quality/i);
+
+  const faqSeo = getPageSeo("faq", "de");
+  assert.equal(faqSeo.canonicalUrl, "https://omnifm.xyz/faq");
+  assert.match(faqSeo.title, /FAQ/);
+
+  const structuredData = buildStructuredData(faqSeo);
   const types = structuredData["@graph"].map((entry) => entry["@type"]);
   assert.ok(types.includes("Organization"));
   assert.ok(types.includes("WebSite"));
   assert.ok(types.includes("SoftwareApplication"));
   assert.ok(types.includes("FAQPage"));
+
+  const organization = structuredData["@graph"].find((entry) => entry["@type"] === "Organization");
+  assert.equal(organization.name, "IT-Tabelander");
+  assert.equal(organization.brand.name, "OmniFM");
+
+  const faqPage = structuredData["@graph"].find((entry) => entry["@type"] === "FAQPage");
+  assert.ok(faqPage.mainEntity.some((entry) => /Was ist OmniFM/.test(entry.name)));
+  assert.ok(faqPage.mainEntity.some((entry) => /Wer betreibt OmniFM/.test(entry.name)));
+
+  const englishFaq = getFaqEntries("en");
+  assert.ok(englishFaq.some((entry) => /Who operates OmniFM/.test(entry.question)));
+});
+
+test("SEO content strategy documents bilingual intents and page goals", () => {
+  const strategy = fs.readFileSync(path.join(repoRoot, "docs", "seo-content-strategy.md"), "utf8");
+
+  assert.match(strategy, /German Intent Map/);
+  assert.match(strategy, /English Intent Map/);
+  assert.match(strategy, /Discord Radio Bot/);
+  assert.match(strategy, /24\/7 Discord music bot/);
+  assert.match(strategy, /\/stations/);
+  assert.match(strategy, /\/premium/);
+  assert.match(strategy, /\/faq/);
+  assert.match(strategy, /OmniFM` is the product name/);
+  assert.match(strategy, /IT-Tabelander` is the operator/);
 });

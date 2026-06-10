@@ -4,6 +4,13 @@ const PAGE_ALIASES = new Map([
   ["home", "home"],
   ["index", "home"],
   ["dashboard", "dashboard"],
+  ["stations", "stations"],
+  ["sender", "stations"],
+  ["premium", "premium"],
+  ["pricing", "premium"],
+  ["preise", "premium"],
+  ["faq", "faq"],
+  ["fragen", "faq"],
   ["imprint", "imprint"],
   ["impressum", "imprint"],
   ["privacy", "privacy"],
@@ -21,6 +28,13 @@ const PATH_ALIASES = new Map([
   ["/index.html", "home"],
   ["/home", "home"],
   ["/dashboard", "dashboard"],
+  ["/stations", "stations"],
+  ["/sender", "stations"],
+  ["/premium", "premium"],
+  ["/pricing", "premium"],
+  ["/preise", "premium"],
+  ["/faq", "faq"],
+  ["/fragen", "faq"],
   ["/imprint", "imprint"],
   ["/impressum", "imprint"],
   ["/privacy", "privacy"],
@@ -65,6 +79,9 @@ export function getCanonicalPagePath(page, locale = "de") {
   const useGerman = normalizedLocale.startsWith("de");
 
   if (normalizedPage === "dashboard") return "/dashboard";
+  if (normalizedPage === "stations") return "/stations";
+  if (normalizedPage === "premium") return "/premium";
+  if (normalizedPage === "faq") return "/faq";
   if (normalizedPage === "imprint") return useGerman ? "/impressum" : "/imprint";
   if (normalizedPage === "privacy") return useGerman ? "/datenschutz" : "/privacy";
   if (normalizedPage === "terms") return useGerman ? "/nutzungsbedingungen" : "/terms";
@@ -91,6 +108,14 @@ export function buildPageHref(locale, page, searchParams = null) {
 
 export function buildHomeHref(locale, hash = "", searchParams = null) {
   return `${buildPageHref(locale, "home", searchParams)}${hash || ""}`;
+}
+
+export function getSectionAnchorForPage(page) {
+  const normalizedPage = normalizePageId(page, DEFAULT_PAGE);
+  if (normalizedPage === "stations") return "stations";
+  if (normalizedPage === "premium") return "premium";
+  if (normalizedPage === "faq") return "faq";
+  return "";
 }
 
 export function getSpaRoutePaths() {

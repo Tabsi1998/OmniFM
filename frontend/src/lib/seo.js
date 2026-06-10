@@ -26,6 +26,39 @@ const PAGE_SEO = {
       description: 'Manage OmniFM servers, events, role permissions, statistics, and Premium features in the dashboard.',
     },
   },
+  stations: {
+    type: 'website',
+    de: {
+      title: 'OmniFM Stationen | Discord Radio Sender',
+      description: 'Entdecke die OmniFM Sender fuer Discord-Radio: freie Stationen, Pro-Katalog und Ultimate-Optionen fuer 24/7 Musik im Voice-Channel.',
+    },
+    en: {
+      title: 'OmniFM Stations | Discord Radio Stations',
+      description: 'Explore OmniFM radio stations for Discord: free stations, the Pro catalog, and Ultimate options for 24/7 music in voice channels.',
+    },
+  },
+  premium: {
+    type: 'website',
+    de: {
+      title: 'OmniFM Preise | Free, Pro und Ultimate',
+      description: 'Vergleiche OmniFM Free, Pro und Ultimate fuer Discord-Radio, Worker-Bots, Dashboard, Audioqualitaet, Reconnect und Custom Stations.',
+    },
+    en: {
+      title: 'OmniFM Pricing | Free, Pro and Ultimate',
+      description: 'Compare OmniFM Free, Pro, and Ultimate for Discord radio, worker bots, dashboard access, audio quality, reconnect behavior, and custom stations.',
+    },
+  },
+  faq: {
+    type: 'article',
+    de: {
+      title: 'OmniFM FAQ | Discord Radio Bot Fragen',
+      description: 'Antworten zu OmniFM, Commander und Worker, Free/Pro/Ultimate, Dashboard, Stationen und 24/7 Discord-Radio.',
+    },
+    en: {
+      title: 'OmniFM FAQ | Discord Radio Bot Questions',
+      description: 'Answers about OmniFM, commander and workers, Free/Pro/Ultimate, dashboard, stations, and 24/7 Discord radio.',
+    },
+  },
   imprint: {
     type: 'article',
     de: {
@@ -61,20 +94,44 @@ const PAGE_SEO = {
   },
 };
 
-const FAQ_ENTRIES = [
-  {
-    question: 'What is OmniFM?',
-    answer: 'OmniFM is a Discord radio bot platform for 24/7 streams, worker-based reliability, dashboard control, and Premium features.',
-  },
-  {
-    question: 'Does OmniFM have a free plan?',
-    answer: 'Yes. The Free plan starts with the commander and worker setup. Pro and Ultimate add more control, reliability, and audio options.',
-  },
-  {
-    question: 'Who operates OmniFM?',
-    answer: 'OmniFM is operated by IT-Tabelander as the product owner and service provider.',
-  },
-];
+const FAQ_ENTRIES = {
+  de: [
+    {
+      question: 'Was ist OmniFM?',
+      answer: 'OmniFM ist ein Discord Radio Bot fuer 24/7 Streams, Commander- und Worker-Bots, Dashboard-Kontrolle und Premium-Funktionen.',
+    },
+    {
+      question: 'Brauche ich fuer OmniFM einen Worker?',
+      answer: 'Ja. Der Commander nimmt Befehle an, waehrend ein Worker den eigentlichen Stream im Voice-Channel ausfuehrt.',
+    },
+    {
+      question: 'Was ist im Free-Plan enthalten?',
+      answer: 'Free startet mit dem Commander- und Worker-Ablauf, freien Stationen und den wichtigsten Befehlen. Pro und Ultimate erweitern Kontrolle, Stabilitaet und Audio-Optionen.',
+    },
+    {
+      question: 'Wer betreibt OmniFM?',
+      answer: 'OmniFM ist das Produkt. Betreiber und Anbieter ist IT-Tabelander.',
+    },
+  ],
+  en: [
+    {
+      question: 'What is OmniFM?',
+      answer: 'OmniFM is a Discord radio bot platform for 24/7 streams, commander and worker bots, dashboard control, and Premium features.',
+    },
+    {
+      question: 'Do I need an OmniFM worker?',
+      answer: 'Yes. The commander accepts commands, while a worker runs the actual stream in the voice channel.',
+    },
+    {
+      question: 'What is included in the Free plan?',
+      answer: 'Free starts with the commander and worker flow, free stations, and the core commands. Pro and Ultimate add more control, reliability, and audio options.',
+    },
+    {
+      question: 'Who operates OmniFM?',
+      answer: 'OmniFM is the product. IT-Tabelander is the operator and service provider.',
+    },
+  ],
+};
 
 function normalizeLocale(locale) {
   return String(locale || 'en').trim().toLowerCase().startsWith('de') ? 'de' : 'en';
@@ -140,6 +197,11 @@ export function getPageSeo(page, locale = 'en') {
   };
 }
 
+export function getFaqEntries(locale = 'en') {
+  const language = normalizeLocale(locale);
+  return FAQ_ENTRIES[language] || FAQ_ENTRIES.en;
+}
+
 export function buildStructuredData(seo) {
   const websiteId = `${SITE_ORIGIN}/#website`;
   const organizationId = `${SITE_ORIGIN}/#organization`;
@@ -184,7 +246,7 @@ export function buildStructuredData(seo) {
       {
         '@type': 'FAQPage',
         '@id': `${SITE_ORIGIN}/#faq`,
-        mainEntity: FAQ_ENTRIES.map((entry) => ({
+        mainEntity: getFaqEntries(seo.language).map((entry) => ({
           '@type': 'Question',
           name: entry.question,
           acceptedAnswer: {

@@ -19,6 +19,10 @@ function Navbar({ page = 'home' }) {
   const navLinks = copy.navbar.links;
   const homeHref = buildHomeHref(locale, '#top');
   const dashboardHref = buildPageHref(locale, 'dashboard');
+  const resolveNavHref = (link) => {
+    if (link.page) return buildPageHref(locale, link.page);
+    return page === 'home' ? link.href : buildHomeHref(locale, link.href);
+  };
 
   return (
     <nav
@@ -75,8 +79,8 @@ function Navbar({ page = 'home' }) {
       >
         {navLinks.map((link) => (
           <a
-            key={link.href}
-            href={page === 'home' ? link.href : buildHomeHref(locale, link.href)}
+            key={link.key}
+            href={resolveNavHref(link)}
             data-testid={`nav-link-${link.key}`}
             style={{
               color: '#A1A1AA',
@@ -212,8 +216,8 @@ function Navbar({ page = 'home' }) {
         >
           {navLinks.map((link) => (
             <a
-              key={link.href}
-              href={page === 'home' ? link.href : buildHomeHref(locale, link.href)}
+              key={link.key}
+              href={resolveNavHref(link)}
               onClick={() => setOpen(false)}
               style={{
                 color: '#A1A1AA',

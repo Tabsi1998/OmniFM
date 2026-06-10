@@ -11,6 +11,27 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://omnifm.xyz/stations</loc>
+    <xhtml:link rel="alternate" hreflang="de" href="https://omnifm.xyz/stations" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://omnifm.xyz/stations" />
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://omnifm.xyz/premium</loc>
+    <xhtml:link rel="alternate" hreflang="de" href="https://omnifm.xyz/premium" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://omnifm.xyz/premium" />
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://omnifm.xyz/faq</loc>
+    <xhtml:link rel="alternate" hreflang="de" href="https://omnifm.xyz/faq" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://omnifm.xyz/faq" />
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://omnifm.xyz/impressum</loc>
     <xhtml:link rel="alternate" hreflang="de" href="https://omnifm.xyz/impressum" />
     <xhtml:link rel="alternate" hreflang="en" href="https://omnifm.xyz/imprint" />

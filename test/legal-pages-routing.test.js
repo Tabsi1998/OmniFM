@@ -92,8 +92,17 @@ test("pageRouting resolves aliases and localized legal paths", () => {
   assert.equal(resolvePageFromUrl("https://omnifm.xyz/?page=terms"), "terms");
   assert.equal(resolvePageFromUrl("https://omnifm.xyz/nutzungsbedingungen?lang=de"), "terms");
   assert.equal(resolvePageFromUrl("https://omnifm.xyz/terms-of-service"), "terms");
+  assert.equal(resolvePageFromUrl("https://omnifm.xyz/stations?lang=de"), "stations");
+  assert.equal(resolvePageFromUrl("https://omnifm.xyz/premium"), "premium");
+  assert.equal(resolvePageFromUrl("https://omnifm.xyz/pricing"), "premium");
+  assert.equal(resolvePageFromUrl("https://omnifm.xyz/faq"), "faq");
   assert.equal(getCanonicalPagePath("terms", "de"), "/nutzungsbedingungen");
+  assert.equal(getCanonicalPagePath("stations", "de"), "/stations");
+  assert.equal(getCanonicalPagePath("premium", "en"), "/premium");
+  assert.equal(getCanonicalPagePath("faq", "de"), "/faq");
   assert.equal(buildPageHref("de", "terms"), "/nutzungsbedingungen?lang=de");
+  assert.equal(buildPageHref("de", "stations"), "/stations?lang=de");
+  assert.equal(buildPageHref("en", "premium"), "/premium?lang=en");
   assert.equal(buildPageHref("en", "privacy"), "/privacy?lang=en");
 });
 
@@ -151,6 +160,18 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     const dashboardPageResponse = await fetch(`http://127.0.0.1:${port}/dashboard`);
     assert.equal(dashboardPageResponse.status, 200);
     assert.match(await dashboardPageResponse.text(), /legal-routing-marker/);
+
+    const stationsPageResponse = await fetch(`http://127.0.0.1:${port}/stations?lang=de`);
+    assert.equal(stationsPageResponse.status, 200);
+    assert.match(await stationsPageResponse.text(), /legal-routing-marker/);
+
+    const premiumPageResponse = await fetch(`http://127.0.0.1:${port}/premium?lang=en`);
+    assert.equal(premiumPageResponse.status, 200);
+    assert.match(await premiumPageResponse.text(), /legal-routing-marker/);
+
+    const faqPageResponse = await fetch(`http://127.0.0.1:${port}/faq`);
+    assert.equal(faqPageResponse.status, 200);
+    assert.match(await faqPageResponse.text(), /legal-routing-marker/);
 
     const robotsResponse = await fetch(`http://127.0.0.1:${port}/robots.txt`);
     assert.equal(robotsResponse.status, 200);
