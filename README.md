@@ -17,6 +17,7 @@ It is not the production backend and is not part of the CI release gate.
 - [Configuration Reference](docs/configuration-reference.md)
 - [Operations and Deployment](docs/operations.md)
 - [Release, Update, and Rollback Process](docs/release-process.md)
+- [Node and Frontend Toolchain](docs/toolchain.md)
 - [Local Development](docs/local-development.md)
 - [Website Foundation Contract](docs/website-foundation.md)
 - [Google Search Console Workflow](docs/search-console.md)

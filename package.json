@@ -5,6 +5,9 @@
   "type": "module",
   "description": "OmniFM - 24/7 Discord Radio Streaming mit Premium Tier-System",
   "main": "src/index.js",
+  "engines": {
+    "node": ">=22 <25"
+  },
   "scripts": {
     "start": "node src/index.js",
     "start:commander": "node src/entrypoints/commander.js",

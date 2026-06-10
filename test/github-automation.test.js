@@ -96,13 +96,24 @@ test("github automation files and docs stay in sync", async () => {
   expectIncludes(releaseProcess, "OMNIFM_LAST_LIVE_SMOKE_STATUS", "release process live smoke metadata missing");
 
   const packageJson = await readText("package.json");
+  expectIncludes(packageJson, "\"node\": \">=22 <25\"", "root package Node engine range missing");
   expectIncludes(packageJson, "release:preflight", "package release preflight script missing");
   expectIncludes(packageJson, "release:postdeploy", "package release postdeploy script missing");
   expectIncludes(packageJson, "release:rollback-plan", "package release rollback script missing");
 
+  const frontendPackageJson = await readText("frontend/package.json");
+  expectIncludes(frontendPackageJson, "\"node\": \">=22 <25\"", "frontend package Node engine range missing");
+  expectIncludes(frontendPackageJson, "\"type\": \"module\"", "frontend package should declare ESM type");
+
   const dockerfile = await readText("Dockerfile");
-  expectIncludes(dockerfile, "FROM node:24-slim AS frontend-builder", "Docker frontend builder must stay on Node 24");
+  expectIncludes(dockerfile, "FROM node:22-slim AS frontend-builder", "Docker frontend builder must stay on Node 22");
   expectIncludes(dockerfile, "FROM node:22-slim", "Docker runtime image missing");
+
+  const toolchainDocs = await readText("docs/toolchain.md");
+  expectIncludes(toolchainDocs, "Frontend production builds use Node.js 22", "toolchain frontend Node contract missing");
+  expectIncludes(toolchainDocs, "DEP0176", "toolchain CRA warning note missing");
+  expectIncludes(toolchainDocs, "react-scripts 5.0.1", "toolchain CRA dependency note missing");
+  expectIncludes(toolchainDocs, "frontend package both run as ES module packages", "toolchain ESM package note missing");
 
   const codeql = await readText(".github/workflows/codeql.yml");
   expectIncludes(codeql, "workflow_dispatch:", "codeql workflow_dispatch missing");
