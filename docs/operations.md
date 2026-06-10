@@ -147,6 +147,7 @@ node scripts/phase6-live-check.mjs --base-url https://example.com --admin-token 
 
 It checks:
 
+- public SEO assets (`robots.txt`, `sitemap.xml`, manifest, favicon, base meta)
 - DiscordBotList status
 - discord.bots.gg status
 - Top.gg status
@@ -159,6 +160,22 @@ Supported admin token inputs:
 - `OMNIFM_ADMIN_TOKEN`
 - `API_ADMIN_TOKEN`
 - `ADMIN_API_TOKEN`
+
+## Search Console
+
+The public website Search Console workflow is documented in
+[search-console.md](search-console.md).
+
+Before website releases, run:
+
+```bash
+npm run seo:search-console
+```
+
+After production deploys that affect routing, metadata, robots, sitemap, or legal
+pages, IT-Tabelander should verify Search Console property status, sitemap
+submission, Indexing/Pages coverage, mobile usability, and Core Web Vitals for
+`https://omnifm.xyz/`.
 
 ## Logs And Status
 
