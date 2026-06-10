@@ -99,6 +99,7 @@ Important warning:
 - `./update.sh --update*` is intended for deployed checkouts.
 - The script resets the local repository to the configured remote branch during the update path.
 - Do not use it on a development checkout with uncommitted work.
+- Do not run write-capable CLI tools against shared JSON files while split containers are running. Store ownership and split-safety rules are documented in [store-concurrency.md](store-concurrency.md).
 
 ## Split Mode Notes
 

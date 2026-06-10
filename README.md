@@ -194,7 +194,7 @@ Public routes:
 - `GET /api/privacy`
 - `GET /api/terms`
 
-Dashboard, Premium, provider, and admin routes are documented in [docs/architecture.md](docs/architecture.md).
+Dashboard, Premium, provider, and admin routes are documented in [docs/architecture.md](docs/architecture.md). Split-mode store ownership and JSON fallback rules are documented in [docs/store-concurrency.md](docs/store-concurrency.md).
 
 Admin API authentication supports:
 

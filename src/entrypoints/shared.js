@@ -7,6 +7,7 @@ import { connect as connectDb } from "../lib/db.js";
 import { TIERS, parseExpiryReminderDays } from "../lib/helpers.js";
 import { loadBotConfigs } from "../bot-config.js";
 import { initStationsStore } from "../stations-store.js";
+import { logStoreConcurrencyReport } from "../lib/store-concurrency.js";
 import {
   getServerLicense,
   initPremiumStore,
@@ -65,6 +66,12 @@ async function initializeSharedServices({ requireMongo = false } = {}) {
   } else {
     log("INFO", "MongoDB ist deaktiviert (MONGO_ENABLED=0 und MONGO_URL nicht gesetzt). Nutze Datei-basierte Stores.");
   }
+
+  logStoreConcurrencyReport({
+    log,
+    mongoConnected,
+    requireMongo,
+  });
 
   if (requireMongo && !mongoConnected) {
     throw new Error("Split-Commander/Worker benoetigt eine aktive MongoDB-Verbindung.");

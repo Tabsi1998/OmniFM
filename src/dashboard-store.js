@@ -1,9 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { withFileStoreLock } from "./lib/file-store-lock.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const STORE_FILE = path.resolve(__dirname, "..", "dashboard.json");
+const STORE_FILE = path.resolve(process.env.OMNIFM_DASHBOARD_FILE || path.resolve(__dirname, "..", "dashboard.json"));
 const BACKUP_FILE = `${STORE_FILE}.bak`;
 
 function emptyState() {
@@ -150,8 +151,12 @@ function ensureState() {
   return stateCache;
 }
 
-function saveState() {
-  const state = ensureState();
+function loadLatestState() {
+  stateCache = readStateFile(STORE_FILE) || readStateFile(BACKUP_FILE) || emptyState();
+  return stateCache;
+}
+
+function saveStateUnlocked(state = ensureState()) {
   const payload = JSON.stringify(normalizeState(state), null, 2) + "\n";
   const tmpFile = `${STORE_FILE}.tmp-${process.pid}-${Date.now()}`;
 
@@ -172,8 +177,18 @@ function saveState() {
   }
 }
 
-function cleanupExpiredAuthEntries(nowTs = Math.floor(Date.now() / 1000)) {
-  const state = ensureState();
+function mutateState(mutator) {
+  return withFileStoreLock(STORE_FILE, () => {
+    const state = loadLatestState();
+    const result = mutator(state) || {};
+    if (result.changed) {
+      saveStateUnlocked(state);
+    }
+    return result.value;
+  });
+}
+
+function cleanupExpiredAuthEntriesFromState(state, nowTs = Math.floor(Date.now() / 1000)) {
   let changed = false;
 
   for (const [token, session] of Object.entries(state.authSessions)) {
@@ -192,71 +207,81 @@ function cleanupExpiredAuthEntries(nowTs = Math.floor(Date.now() / 1000)) {
     }
   }
 
-  if (changed) saveState();
+  return changed;
+}
+
+function cleanupExpiredAuthEntries(nowTs = Math.floor(Date.now() / 1000)) {
+  return mutateState((state) => ({
+    changed: cleanupExpiredAuthEntriesFromState(state, nowTs),
+    value: undefined,
+  }));
 }
 
 export function getDashboardTelemetry(serverId) {
   const guildId = sanitizeSnowflake(serverId);
   if (!guildId) return {};
-  const state = ensureState();
+  const state = loadLatestState();
   return deepClone(state.telemetry[guildId] || {});
 }
 
 export function setDashboardTelemetry(serverId, telemetry) {
   const guildId = sanitizeSnowflake(serverId);
   if (!guildId) return {};
-  const state = ensureState();
-  state.telemetry[guildId] = normalizeTelemetryRow(telemetry);
-  saveState();
-  return deepClone(state.telemetry[guildId]);
+  return mutateState((state) => {
+    state.telemetry[guildId] = normalizeTelemetryRow(telemetry);
+    return { changed: true, value: deepClone(state.telemetry[guildId]) };
+  });
 }
 
 export function setDashboardOauthState(token, payload) {
   const safeToken = sanitizeText(token, 160);
   const stateRow = normalizeOauthState({ ...payload, token: safeToken });
   if (!safeToken || !stateRow) return null;
-  cleanupExpiredAuthEntries();
-  const state = ensureState();
-  state.oauthStates[safeToken] = {
-    nextPage: stateRow.nextPage,
-    language: stateRow.language,
-    origin: stateRow.origin,
-    createdAt: stateRow.createdAt,
-    expiresAt: stateRow.expiresAt,
-  };
-  saveState();
-  return deepClone(state.oauthStates[safeToken]);
+  return mutateState((state) => {
+    cleanupExpiredAuthEntriesFromState(state);
+    state.oauthStates[safeToken] = {
+      nextPage: stateRow.nextPage,
+      language: stateRow.language,
+      origin: stateRow.origin,
+      createdAt: stateRow.createdAt,
+      expiresAt: stateRow.expiresAt,
+    };
+    return { changed: true, value: deepClone(state.oauthStates[safeToken]) };
+  });
 }
 
 export function popDashboardOauthState(token) {
   const safeToken = sanitizeText(token, 160);
   if (!safeToken) return null;
-  cleanupExpiredAuthEntries();
-  const state = ensureState();
-  const value = state.oauthStates[safeToken] || null;
-  if (value) {
-    delete state.oauthStates[safeToken];
-    saveState();
-  }
-  return value ? deepClone(value) : null;
+  return mutateState((state) => {
+    const cleanupChanged = cleanupExpiredAuthEntriesFromState(state);
+    const value = state.oauthStates[safeToken] || null;
+    if (value) {
+      delete state.oauthStates[safeToken];
+    }
+    return {
+      changed: cleanupChanged || Boolean(value),
+      value: value ? deepClone(value) : null,
+    };
+  });
 }
 
 export function setDashboardAuthSession(token, payload) {
   const safeToken = sanitizeText(token, 160);
   const normalizedSession = normalizeAuthSession(payload);
   if (!safeToken || !normalizedSession) return null;
-  cleanupExpiredAuthEntries();
-  const state = ensureState();
-  state.authSessions[safeToken] = normalizedSession;
-  saveState();
-  return deepClone(state.authSessions[safeToken]);
+  return mutateState((state) => {
+    cleanupExpiredAuthEntriesFromState(state);
+    state.authSessions[safeToken] = normalizedSession;
+    return { changed: true, value: deepClone(state.authSessions[safeToken]) };
+  });
 }
 
 export function getDashboardAuthSession(token) {
   const safeToken = sanitizeText(token, 160);
   if (!safeToken) return null;
   cleanupExpiredAuthEntries();
-  const state = ensureState();
+  const state = loadLatestState();
   const session = state.authSessions[safeToken];
   return session ? deepClone(session) : null;
 }
@@ -264,11 +289,11 @@ export function getDashboardAuthSession(token) {
 export function deleteDashboardAuthSession(token) {
   const safeToken = sanitizeText(token, 160);
   if (!safeToken) return false;
-  const state = ensureState();
-  if (!state.authSessions[safeToken]) return false;
-  delete state.authSessions[safeToken];
-  saveState();
-  return true;
+  return mutateState((state) => {
+    if (!state.authSessions[safeToken]) return { changed: false, value: false };
+    delete state.authSessions[safeToken];
+    return { changed: true, value: true };
+  });
 }
 
 export function cleanupDashboardAuthState(nowTs) {

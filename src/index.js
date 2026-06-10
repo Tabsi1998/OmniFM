@@ -18,6 +18,7 @@ import {
   OPERATOR_WEBHOOK_ENABLED,
 } from "./services/operator-webhook.js";
 import { connect as connectDb } from "./lib/db.js";
+import { logStoreConcurrencyReport } from "./lib/store-concurrency.js";
 import { TIERS, parseExpiryReminderDays } from "./lib/helpers.js";
 import { normalizeLanguage, getDefaultLanguage } from "./i18n.js";
 import { loadBotConfigs } from "./bot-config.js";
@@ -77,9 +78,11 @@ try {
 // ---- Optional MongoDB-Verbindung ----
 const mongoUrlConfigured = String(process.env.MONGO_URL || "").trim().length > 0;
 const mongoEnabled = String(process.env.MONGO_ENABLED || "").trim() === "1" || mongoUrlConfigured;
+let mongoConnected = false;
 if (mongoEnabled) {
   try {
     await connectDb();
+    mongoConnected = true;
     log("INFO", "MongoDB-Verbindung fuer Node.js Bot hergestellt.");
     // Migrate legacy JSON data to MongoDB
     const { migrateJsonToMongo } = await import("./listening-stats-store.js");
@@ -93,6 +96,12 @@ if (mongoEnabled) {
 } else {
   log("INFO", "MongoDB ist deaktiviert (MONGO_ENABLED=0 und MONGO_URL nicht gesetzt). Nutze Datei-basierte Stores.");
 }
+
+logStoreConcurrencyReport({
+  log,
+  mongoConnected,
+  requireMongo: false,
+});
 await initPremiumStore();
 await initStationsStore();
 await logRecentOperatorIncidentSummary({

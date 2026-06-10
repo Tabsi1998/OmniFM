@@ -85,6 +85,7 @@ MongoDB usage:
 - Listening stats can migrate from JSON into MongoDB.
 - `guild_settings` in MongoDB is used for dashboard settings such as weekly digest, failover chain, incident alerts, and exports/webhooks.
 - If Mongo is unavailable, file-based stores stay active.
+- Split-mode store ownership is explicit: per-bot runtime files stay per bot, global stores are commander-owned, Mongo-backed, or protected by a file lock. Details live in [store-concurrency.md](store-concurrency.md).
 
 Listening-stats semantics:
 
