@@ -8,7 +8,8 @@ The canonical production runtime is Node.js:
 - Split commander entrypoint: `src/entrypoints/commander.js`
 - Split worker entrypoint: `src/entrypoints/worker.js`
 
-`backend/server.py` stays in the repository as a legacy/reference path and is not the primary production backend.
+`backend/server.py` stays in the repository as an archived legacy/reference path.
+It is not the production backend and is not part of the CI release gate.
 
 ## Documentation
 
@@ -209,7 +210,7 @@ The runtime reads `API_ADMIN_TOKEN` or the legacy alias `ADMIN_API_TOKEN`.
 - `frontend/`: React app that builds into `frontend/build`; `frontend/public` is only for assets that should ship with the React app
 - `docs/`: project documentation
 - `test/`: Node test suite for the canonical runtime
-- `backend/`: legacy/reference Python backend and tests
+- `backend/`: archived legacy/reference Python backend and opt-in tests
 - `scripts/`: Docker/runtime helper scripts
 - `data/`: legacy station catalog files used by the older station service layer
 - `web/`: emergency legacy static website fallback, only used when `WEB_ALLOW_LEGACY_FALLBACK=1`; standalone `app.js`/`styles.css` live here, not in `frontend/public`
@@ -243,13 +244,16 @@ npm --prefix frontend install
 npm --prefix frontend run build
 ```
 
-Legacy/reference Python tests:
+Archived legacy/reference Python tests:
 
 ```bash
-python -m pytest backend/tests -q
+python -m pip install -r backend/requirements.txt
+OMNIFM_RUN_LEGACY_BACKEND_TESTS=1 REACT_APP_BACKEND_URL=http://127.0.0.1:8081 python -m pytest backend/tests -q
 ```
 
-The Python test path is optional unless you are intentionally working on the legacy backend.
+The Python test path is not a release gate. Without
+`OMNIFM_RUN_LEGACY_BACKEND_TESTS=1`, it exits with an explicit message instead
+of silently reporting a fully skipped test run.
 
 ## Notes
 

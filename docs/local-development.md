@@ -81,6 +81,21 @@ Frontend overrides:
 
 Those are frontend dev-server variables and are typically set in `frontend/.env` or the shell that starts `npm run frontend:start`.
 
+## Archived Python Backend
+
+The Python backend in `backend/server.py` is an archived legacy/reference path.
+It is not the production runtime and is not part of the CI release gate.
+
+Only run its old contract tests when intentionally comparing against a live API:
+
+```bash
+python -m pip install -r backend/requirements.txt
+OMNIFM_RUN_LEGACY_BACKEND_TESTS=1 REACT_APP_BACKEND_URL=http://127.0.0.1:8081 python -m pytest backend/tests -q
+```
+
+Without `OMNIFM_RUN_LEGACY_BACKEND_TESTS=1`, the legacy Python tests exit with
+a clear message instead of silently skipping the whole suite.
+
 ## Run Split Mode Locally Without Docker
 
 This is only useful when you want to debug commander and worker processes separately.

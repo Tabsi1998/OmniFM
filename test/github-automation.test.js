@@ -54,6 +54,7 @@ test("github automation files and docs stay in sync", async () => {
   expectIncludes(ci, "frontend-build:", "ci frontend job missing");
   expectIncludes(ci, "docker-build:", "ci docker job missing");
   expectIncludes(ci, "npm run test:repo-hygiene", "ci repo hygiene check missing");
+  expectIncludes(ci, "Python backend under backend/ is archived legacy/reference code", "ci legacy Python decision missing");
 
   const nightly = await readText(".github/workflows/nightly.yml");
   expectIncludes(nightly, "schedule:", "nightly schedule missing");
@@ -111,7 +112,28 @@ test("github automation files and docs stay in sync", async () => {
   expectIncludes(readme, "npm run test:repo-hygiene", "README repo hygiene check missing");
   expectIncludes(readme, "https://github.com/Tabsi1998/OmniFM.git", "README canonical remote missing");
   expectIncludes(readme, "`stations.json` is intentionally versioned", "README station catalog ownership missing");
+  expectIncludes(readme, "OMNIFM_RUN_LEGACY_BACKEND_TESTS=1", "README legacy Python opt-in missing");
   expectIncludes(readme, "VOICE_CHANNEL_STATUS_REFRESH_MS", "README voice channel refresh setting missing");
+
+  const backendReadme = await readText("backend/README.md");
+  expectIncludes(backendReadme, "archived as a legacy/reference implementation", "backend README legacy status missing");
+  expectIncludes(backendReadme, "not part of the CI release gate", "backend README CI status missing");
+  expectIncludes(backendReadme, "OMNIFM_RUN_LEGACY_BACKEND_TESTS=1", "backend README opt-in missing");
+
+  const backendRequirements = await readText("backend/requirements.txt");
+  expectIncludes(backendRequirements, "Legacy/reference backend only", "backend requirements legacy note missing");
+  for (const packageName of ["fastapi", "uvicorn", "python-dotenv", "pymongo", "requests", "pytest"]) {
+    expectMatches(backendRequirements, new RegExp(`^${packageName}==`, "m"), `backend requirements missing ${packageName}`);
+  }
+  assert.equal(
+    backendRequirements.split(/\r?\n/).filter((line) => line.trim() && !line.trim().startsWith("#")).length,
+    6,
+    "backend requirements should stay minimal"
+  );
+
+  const backendConftest = await readText("backend/tests/conftest.py");
+  expectIncludes(backendConftest, "OMNIFM_RUN_LEGACY_BACKEND_TESTS", "backend tests opt-in guard missing");
+  expectIncludes(backendConftest, "pytest.exit", "backend tests should not silently skip by default");
 
   const envExample = await readText(".env.example");
   expectIncludes(envExample, "VOICE_CHANNEL_STATUS_ENABLED=1", "voice channel status flag missing");

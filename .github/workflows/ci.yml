@@ -15,6 +15,8 @@ concurrency:
 permissions:
   contents: read
 
+# The Python backend under backend/ is archived legacy/reference code.
+# CI intentionally gates the canonical Node.js runtime, React frontend, and Docker image only.
 jobs:
   syntax:
     name: syntax (node ${{ matrix.node-version }})

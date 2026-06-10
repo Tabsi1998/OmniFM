@@ -350,6 +350,9 @@ cookie attributes, while local development uses the local-safe fallback.
 
 ## Legacy Paths Kept In The Repository
 
-- `backend/` contains the legacy/reference Python backend and tests.
+- `backend/` contains the archived legacy/reference Python backend and opt-in
+  tests. It is not the production backend and is intentionally not a CI release
+  gate; the canonical backend/API implementation is the Node.js runtime under
+  `src/`.
 - `data/stations.free.json` and `data/stations.pro.json` are used by the older station service layer but are not the canonical station store for the current runtime.
 - `web/` is an emergency frontend fallback and is not served automatically unless explicitly enabled.
