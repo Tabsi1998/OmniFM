@@ -28,6 +28,7 @@ export function createAdminRoutesHandler(deps) {
     getRecentOperatorIncidents,
     resolveAdminToken,
     getCommonSecurityHeaders,
+    getReleaseInfo,
   } = deps;
 
   function getRuntimes() {
@@ -121,6 +122,7 @@ export function createAdminRoutesHandler(deps) {
         bots: botStats,
         licenses: { total: licenseList.length, active: activeLicenses, expired: expiredLicenses },
         stations: { total: Math.max(stationCatalogCount, stationHealth.length), up: stationsUp, down: stationsDown },
+        release: typeof getReleaseInfo === "function" ? getReleaseInfo() : null,
         serverTime: new Date().toISOString(),
       });
       return true;
@@ -304,6 +306,7 @@ function buildAdminHtml() {
       <div class="card"><h3>Guilds</h3><div class="val green" id="statGuilds">–</div><div class="sub">aktive Server</div></div>
       <div class="card"><h3>Lizenzen</h3><div class="val amber" id="statLicenses">–</div><div class="sub">aktiv / gesamt</div></div>
       <div class="card"><h3>Stationen</h3><div class="val" id="statStations">–</div><div class="sub" id="statStationsSub">UP / DOWN</div></div>
+      <div class="card"><h3>Release</h3><div class="val purple" id="statRelease">–</div><div class="sub" id="statReleaseSub">Commit / Status</div></div>
     </div>
 
     <!-- Tabs -->
@@ -498,6 +501,9 @@ function buildAdminHtml() {
           document.getElementById('statStations').textContent = stationTotal;
           document.getElementById('statStationsSub').textContent = o.stations.up + ' online / ' + o.stations.down + ' defekt / ' + stationUnknown + ' offen';
           document.getElementById('statStations').className = 'val ' + (o.stations.down > 0 ? 'red' : stationUnknown > 0 ? 'amber' : 'green');
+          const release = o.release || {};
+          document.getElementById('statRelease').textContent = release.commit || 'unknown';
+          document.getElementById('statReleaseSub').textContent = 'v' + (release.appVersion || 'unknown') + ' / deploy ' + (release.lastDeployStatus || 'unknown') + ' / smoke ' + (release.lastLiveSmokeStatus || 'unknown');
           document.getElementById('serverTime').textContent = new Date(o.serverTime).toLocaleTimeString('de-AT');
         }
         if (guilds.status === 'fulfilled') cachedData.guilds = guilds.value;

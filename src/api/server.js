@@ -36,6 +36,7 @@ import {
 } from "../bot/runtime-live-state.js";
 
 import { log, webDir, webRootSource, frontendBuildStamp, rootDir } from "../lib/logging.js";
+import { buildReleaseInfo } from "../lib/release-info.js";
 import {
   TIERS,
   TIER_RANK,
@@ -638,6 +639,7 @@ const handlePublicRoutes = createPublicRoutesHandler({
   sendJson,
   sendLocalizedError,
   webRootSource,
+  getReleaseInfo: () => buildReleaseInfo({ frontendBuildStamp, webRootSource }),
 });
 
 const handleAuthRoutes = createAuthRoutesHandler({
@@ -3080,6 +3082,7 @@ const handleAdminRoutes = createAdminRoutesHandler({
   sendJson,
   getRecentOperatorIncidents,
   getCommonSecurityHeaders,
+  getReleaseInfo: () => buildReleaseInfo({ frontendBuildStamp, webRootSource }),
 });
 
 function startWebServer(runtimes) {

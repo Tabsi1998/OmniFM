@@ -2245,6 +2245,8 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
   });
   assert.equal(authorizedHealth.status, 200);
   assert.equal(authorizedHealth.payload.discord.readyBots, 1);
+  assert.equal(authorizedHealth.payload.release.appVersion, "3.0.0");
+  assert.match(authorizedHealth.payload.release.releaseGate.postDeploy, /release-gate\.mjs --post-deploy/);
   assert.equal(authorizedHealth.payload.stores.commandPermissions.filePresent, true);
   assert.equal(typeof authorizedHealth.payload.binaries.ffmpeg.available, "boolean");
 

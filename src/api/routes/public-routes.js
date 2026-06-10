@@ -55,6 +55,7 @@ export function createPublicRoutesHandler(deps) {
     getDashboardRequestTranslator,
     getGlobalStats,
     getHealthBinaryProbe,
+    getReleaseInfo,
     getStripeSecretKey,
     isAdminApiRequest,
     languagePick,
@@ -240,6 +241,7 @@ export function createPublicRoutesHandler(deps) {
           webRootSource,
           frontendBuildStamp,
         },
+        release: typeof getReleaseInfo === "function" ? getReleaseInfo() : null,
         discord: {
           bots: runtimes.length,
           readyBots,

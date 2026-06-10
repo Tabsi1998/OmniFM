@@ -8,6 +8,9 @@
 4. Inspect logs with `bash ./scripts/compose.sh logs -f omnifm`.
 5. Run the live acceptance check after important changes.
 
+The full release, update, and rollback checklist is documented in
+[release-process.md](release-process.md).
+
 ## Compose Selection
 
 `scripts/compose.sh` is the normal entry point for Docker Compose commands.
@@ -93,6 +96,14 @@ Common modes:
 | `./update.sh --doctor` | System/runtime diagnostics |
 | `./update.sh --recognition-test <URL>` | Direct audio-recognition test |
 | `./update.sh --cleanup` | Cleanup logs, backups, Docker cache |
+
+Release gate wrappers:
+
+| Command | Purpose |
+| --- | --- |
+| `npm run release:preflight` | Tests, frontend build, audit assessment, and config doctor before production update |
+| `npm run release:postdeploy -- --base-url https://omnifm.xyz` | Live-smoke gate after deployment |
+| `npm run release:rollback-plan` | Prints the rollback checklist |
 
 Important warning:
 

@@ -83,6 +83,23 @@ test("github automation files and docs stay in sync", async () => {
   expectIncludes(liveCheck, "/app.js", "live check legacy app asset probe missing");
   expectIncludes(liveCheck, "/styles.css", "live check legacy stylesheet probe missing");
 
+  const releaseGate = await readText("scripts/release-gate.mjs");
+  expectIncludes(releaseGate, "--preflight", "release gate preflight option missing");
+  expectIncludes(releaseGate, "--post-deploy", "release gate post-deploy option missing");
+  expectIncludes(releaseGate, "--rollback-plan", "release gate rollback plan option missing");
+  expectIncludes(releaseGate, "dependency audit", "release gate audit assessment missing");
+  expectIncludes(releaseGate, "phase6-live-check.mjs", "release gate live smoke hook missing");
+
+  const releaseProcess = await readText("docs/release-process.md");
+  expectIncludes(releaseProcess, "npm run release:preflight", "release process preflight command missing");
+  expectIncludes(releaseProcess, "Rollback", "release process rollback section missing");
+  expectIncludes(releaseProcess, "OMNIFM_LAST_LIVE_SMOKE_STATUS", "release process live smoke metadata missing");
+
+  const packageJson = await readText("package.json");
+  expectIncludes(packageJson, "release:preflight", "package release preflight script missing");
+  expectIncludes(packageJson, "release:postdeploy", "package release postdeploy script missing");
+  expectIncludes(packageJson, "release:rollback-plan", "package release rollback script missing");
+
   const dockerfile = await readText("Dockerfile");
   expectIncludes(dockerfile, "FROM node:24-slim AS frontend-builder", "Docker frontend builder must stay on Node 24");
   expectIncludes(dockerfile, "FROM node:22-slim", "Docker runtime image missing");
@@ -134,6 +151,7 @@ test("github automation files and docs stay in sync", async () => {
   expectIncludes(readme, "`stations.json` is intentionally versioned", "README station catalog ownership missing");
   expectIncludes(readme, "OMNIFM_RUN_LEGACY_BACKEND_TESTS=1", "README legacy Python opt-in missing");
   expectIncludes(readme, "VOICE_CHANNEL_STATUS_REFRESH_MS", "README voice channel refresh setting missing");
+  expectIncludes(readme, "Release, Update, and Rollback Process", "README release process docs link missing");
 
   const backendReadme = await readText("backend/README.md");
   expectIncludes(backendReadme, "archived as a legacy/reference implementation", "backend README legacy status missing");

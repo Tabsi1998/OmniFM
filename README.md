@@ -16,6 +16,7 @@ It is not the production backend and is not part of the CI release gate.
 - [Architecture and API](docs/architecture.md)
 - [Configuration Reference](docs/configuration-reference.md)
 - [Operations and Deployment](docs/operations.md)
+- [Release, Update, and Rollback Process](docs/release-process.md)
 - [Local Development](docs/local-development.md)
 - [Website Foundation Contract](docs/website-foundation.md)
 - [Google Search Console Workflow](docs/search-console.md)
@@ -89,6 +90,7 @@ Replace all placeholder address, email, and website values before production use
 
 This repository ships with GitHub automation for CI, nightly recovery smoke checks, CodeQL, Dependabot, CODEOWNERS, and issue/PR templates.
 The `live-smoke` workflow can be run manually or on schedule against `https://omnifm.xyz`; configure the repository secret `OMNIFM_LIVE_ADMIN_TOKEN` for authenticated provider/API checks.
+Production updates should use `npm run release:preflight` before `./update.sh --update` and `npm run release:postdeploy -- --base-url https://omnifm.xyz` after deployment.
 
 Recommended required checks for `main`:
 

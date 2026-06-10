@@ -68,6 +68,19 @@ credentialed CORS remains limited to the real site. Behind a reverse proxy,
 ensure HTTPS is visible to the app so production cookies are emitted with the
 secure cross-site attributes.
 
+## Release Metadata
+
+| Variable | Purpose | Notes |
+| --- | --- | --- |
+| `OMNIFM_RELEASE_SHA` | Commit SHA shown in owner/admin release status | Falls back to local Git metadata |
+| `OMNIFM_RELEASE_BRANCH` | Branch shown in owner/admin release status | Falls back to local Git metadata |
+| `OMNIFM_DEPLOYED_AT` | Deployment timestamp shown in owner/admin status | ISO timestamp recommended |
+| `OMNIFM_LAST_DEPLOY_STATUS` | Latest deploy status | `success`, `failed`, `running`, or `skipped` |
+| `OMNIFM_LAST_LIVE_SMOKE_STATUS` | Latest live-smoke status | `success`, `failed`, `running`, or `skipped` |
+
+The protected admin panel and `/api/health/detail` expose these values together
+with the app version and frontend build stamp.
+
 ## Command Registration
 
 | Variable | Purpose | Notes |

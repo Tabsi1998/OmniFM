@@ -147,6 +147,11 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     TERMS_SUPPORT_URL: "https://omnifm.xyz/terms",
     TERMS_EFFECTIVE_DATE: "2026-03-11",
     TERMS_GOVERNING_LAW: "Law of the Republic of Austria",
+    OMNIFM_RELEASE_SHA: "abcdef1234567890",
+    OMNIFM_RELEASE_BRANCH: "main",
+    OMNIFM_DEPLOYED_AT: "2026-06-10T18:00:00.000Z",
+    OMNIFM_LAST_DEPLOY_STATUS: "success",
+    OMNIFM_LAST_LIVE_SMOKE_STATUS: "success",
   });
   const indexSnapshot = await snapshotFile(frontendIndexPath);
   const robotsSnapshot = await snapshotFile(frontendRobotsPath);
@@ -222,6 +227,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.match(adminPanelHtml, /OMNIFM ADMIN/);
     assert.match(adminPanelHtml, /stationSearch/);
     assert.match(adminPanelHtml, /copyText/);
+    assert.match(adminPanelHtml, /statRelease/);
 
     const adminOverviewResponse = await fetch(`http://127.0.0.1:${port}/api/admin/overview?token=admin-route-token`);
     assert.equal(adminOverviewResponse.status, 200);
@@ -229,6 +235,11 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.equal(adminOverview.bots.length, 1);
     assert.equal(adminOverview.bots[0].guilds, 1);
     assert.ok(adminOverview.stations.total > 0);
+    assert.equal(adminOverview.release?.appVersion, "3.0.0");
+    assert.equal(adminOverview.release?.commit, "abcdef123456");
+    assert.equal(adminOverview.release?.branch, "main");
+    assert.equal(adminOverview.release?.lastDeployStatus, "success");
+    assert.equal(adminOverview.release?.lastLiveSmokeStatus, "success");
 
     const adminGuildsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/guilds?token=admin-route-token`);
     assert.equal(adminGuildsResponse.status, 200);
