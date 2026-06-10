@@ -1528,6 +1528,35 @@ run_system_doctor() {
     doctor_fail "Keine Bots konfiguriert."
   fi
 
+  # 2b) Split prerequisites
+  local split_check_output split_check_status split_line
+  if command -v node >/dev/null 2>&1 && [[ -f scripts/check-split-requirements.mjs ]]; then
+    split_check_output="$(node scripts/check-split-requirements.mjs --env-file .env 2>&1)"
+    split_check_status=$?
+    while IFS= read -r split_line; do
+      [[ -n "$split_line" ]] || continue
+      case "$split_line" in
+        OK:*)
+          doctor_ok "${split_line#OK: }"
+          ;;
+        WARN:*)
+          doctor_warn "${split_line#WARN: }"
+          ;;
+        FAIL:*)
+          doctor_fail "${split_line#FAIL: }"
+          ;;
+        *)
+          doctor_warn "Split-Preflight: ${split_line}"
+          ;;
+      esac
+    done <<< "$split_check_output"
+    if [[ "$split_check_status" != "0" && -z "$split_check_output" ]]; then
+      doctor_fail "Split-Preflight konnte nicht ausgefuehrt werden."
+    fi
+  else
+    doctor_warn "Split-Preflight nicht geprueft (Node.js oder scripts/check-split-requirements.mjs fehlt)."
+  fi
+
   # 3) Dashboard OAuth
   local cid secret redir
   cid="$(read_env "DISCORD_CLIENT_ID" "")"
@@ -1607,7 +1636,11 @@ run_system_doctor() {
   if docker compose ps --services --filter status=running 2>/dev/null | grep -q "mongodb"; then
     doctor_ok "MongoDB Container laeuft."
   else
-    doctor_warn "MongoDB Container laeuft nicht. Listening-Stats nutzen JSON-Fallback."
+    if [[ "$current_mode" == "split" ]]; then
+      doctor_fail "MongoDB Container laeuft nicht. Split-Commander/Worker starten ohne MongoDB nicht."
+    else
+      doctor_warn "MongoDB Container laeuft nicht. Monolith kann Datei-Fallbacks nutzen."
+    fi
   fi
 
   echo ""

@@ -84,7 +84,8 @@ MongoDB usage:
 - When `MONGO_URL` or `MONGO_ENABLED=1` is set, OmniFM connects to MongoDB.
 - Listening stats can migrate from JSON into MongoDB.
 - `guild_settings` in MongoDB is used for dashboard settings such as weekly digest, failover chain, incident alerts, and exports/webhooks.
-- If Mongo is unavailable, file-based stores stay active.
+- In monolith mode, if Mongo is unavailable, file-based stores stay active for fallback/degraded operation.
+- In split mode, MongoDB is required. Commander and worker entrypoints stop startup instead of using shared JSON files as a multi-process source of truth.
 - Split-mode store ownership is explicit: per-bot runtime files stay per bot, global stores are commander-owned, Mongo-backed, or protected by a file lock. Details live in [store-concurrency.md](store-concurrency.md).
 
 Listening-stats semantics:

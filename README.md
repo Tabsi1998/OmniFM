@@ -125,6 +125,11 @@ Selection rules:
 - `OMNIFM_DEPLOYMENT_MODE=split` forces `docker-compose.split.yml`
 - `OMNIFM_DEPLOYMENT_MODE=auto` picks split when more than one bot is configured and the split compose file exists
 
+Split mode requires MongoDB. Commander and worker entrypoints intentionally stop
+startup when MongoDB is not configured or not reachable, because shared JSON
+fallbacks are not safe as a multi-process source of truth. Monolith mode can use
+file-backed fallback stores for local or degraded operation.
+
 Windows helper:
 
 ```powershell

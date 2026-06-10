@@ -27,6 +27,10 @@ Selection logic:
 - `OMNIFM_DEPLOYMENT_MODE=split` -> `docker-compose.split.yml`
 - `OMNIFM_DEPLOYMENT_MODE=auto` -> split when more than one bot is configured, otherwise monolith
 
+Split mode requires MongoDB. Commander and worker startup fails when MongoDB is
+not configured or unavailable. File-backed fallback stores are supported only
+for monolith/local/degraded operation, not as the split-mode source of truth.
+
 Useful examples:
 
 ```bash
@@ -119,8 +123,16 @@ Split mode becomes useful when you have multiple bots and want isolated worker p
 Important variables:
 
 - `OMNIFM_DEPLOYMENT_MODE=split`
+- `MONGO_URL=mongodb://mongodb:27017` or `MONGO_ENABLED=1`
 - `COMMANDER_BOT_INDEX=<bot number>`
 - `BOT_N_TOKEN`, `BOT_N_CLIENT_ID`, `BOT_N_NAME`, `BOT_N_TIER`
+
+Before switching a host to split mode, run:
+
+```bash
+node scripts/check-split-requirements.mjs --env-file .env
+./update.sh --doctor
+```
 
 Windows helper:
 
@@ -142,6 +154,7 @@ That helper:
 - ensures JSON files exist and contain valid JSON
 - creates `logs/`, `bot-state/`, and `song-history/`
 - waits for MongoDB when `MONGO_URL` is set
+- refuses split commander/worker startup when MongoDB is required but unavailable
 - checks `ffmpeg` and `fpcalc`
 - deploys slash commands when `REGISTER_COMMANDS_ON_BOOT=1`
 - starts `src/index.js`
