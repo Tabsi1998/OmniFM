@@ -76,6 +76,11 @@ function removeAnalyticsCookies() {
   }
 }
 
+function isStaticGoogleTag(script) {
+  return script?.getAttribute?.('data-omnifm-static') === 'true'
+    || script?.dataset?.omnifmStatic === 'true';
+}
+
 export function loadGoogleAnalytics() {
   const win = getSafeWindow();
   const doc = getSafeDocument();
@@ -83,7 +88,6 @@ export function loadGoogleAnalytics() {
 
   win[`ga-disable-${GA_MEASUREMENT_ID}`] = false;
   const gtag = createGtag(win);
-  gtag('js', new Date());
   setGoogleConsentState(true);
 
   if (!doc.getElementById(GOOGLE_TAG_SCRIPT_ID)) {
@@ -108,7 +112,7 @@ export function disableGoogleAnalytics() {
   win[`ga-disable-${GA_MEASUREMENT_ID}`] = true;
   setGoogleConsentState(false);
   const script = doc.getElementById(GOOGLE_TAG_SCRIPT_ID);
-  if (script) script.remove();
+  if (script && !isStaticGoogleTag(script)) script.remove();
   removeAnalyticsCookies();
 }
 

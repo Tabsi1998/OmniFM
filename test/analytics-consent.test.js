@@ -37,6 +37,11 @@ function createBrowserStub() {
         async: false,
         id: "",
         src: "",
+        dataset: {},
+        getAttribute(name) {
+          if (name === "data-omnifm-static") return this.dataset.omnifmStatic === "true" ? "true" : null;
+          return this[name] || null;
+        },
         remove() {
           scripts.delete(this.id);
         },
@@ -104,7 +109,7 @@ test("analytics is not loaded when consent is denied", () => {
   }
 });
 
-test("analytics loads Google tag only after consent and withdrawal disables it", () => {
+test("analytics can load Google tag dynamically and withdrawal disables it", () => {
   const browser = createBrowserStub();
   try {
     assert.equal(browser.document.getElementById(GOOGLE_TAG_SCRIPT_ID), null);
@@ -120,6 +125,25 @@ test("analytics loads Google tag only after consent and withdrawal disables it",
     assert.equal(browser.document.getElementById(GOOGLE_TAG_SCRIPT_ID), null);
     assert.equal(browser.window[`ga-disable-${GA_MEASUREMENT_ID}`], true);
     assert.ok(browser.document.cookie.includes("_ga=;"));
+  } finally {
+    browser.cleanup();
+  }
+});
+
+test("withdrawal keeps the static Google tag available for Google setup checks", () => {
+  const browser = createBrowserStub();
+  try {
+    const staticScript = browser.document.createElement("script");
+    staticScript.id = GOOGLE_TAG_SCRIPT_ID;
+    staticScript.async = true;
+    staticScript.dataset.omnifmStatic = "true";
+    staticScript.src = "https://www.googletagmanager.com/gtag/js?id=G-J5X0ZZ5E3Z";
+    browser.document.head.appendChild(staticScript);
+
+    disableGoogleAnalytics();
+    assert.equal(browser.document.getElementById(GOOGLE_TAG_SCRIPT_ID), staticScript);
+    assert.equal(browser.window[`ga-disable-${GA_MEASUREMENT_ID}`], true);
+    assert.ok(browser.window.dataLayer.some((entry) => entry[0] === "consent" && entry[2].analytics_storage === "denied"));
   } finally {
     browser.cleanup();
   }

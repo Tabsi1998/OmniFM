@@ -55,8 +55,13 @@ test("React public SEO assets and base metadata are present", () => {
 
   assert.match(indexHtml, /<link rel="canonical" href="https:\/\/omnifm\.xyz\/"/);
   assert.match(indexHtml, /<meta name="google-site-verification" content="2ZCoKiPvrZJ_fKLyyE4SDbATwbL6yDX-iwI82ghmpSM" \/>/);
-  assert.doesNotMatch(indexHtml, /googletagmanager\.com\/gtag\/js\?id=G-J5X0ZZ5E3Z/i);
-  assert.doesNotMatch(indexHtml, /gtag\(['"]config['"],\s*['"]G-J5X0ZZ5E3Z/i);
+  assert.match(indexHtml, /gtag\(['"]consent['"],\s*['"]default['"],\s*\{/i);
+  assert.match(indexHtml, /analytics_storage:\s*['"]denied['"]/i);
+  assert.match(indexHtml, /ad_storage:\s*['"]denied['"]/i);
+  assert.match(indexHtml, /ad_user_data:\s*['"]denied['"]/i);
+  assert.match(indexHtml, /ad_personalization:\s*['"]denied['"]/i);
+  assert.match(indexHtml, /googletagmanager\.com\/gtag\/js\?id=G-J5X0ZZ5E3Z/i);
+  assert.match(indexHtml, /gtag\(['"]config['"],\s*['"]G-J5X0ZZ5E3Z/i);
   assert.match(indexHtml, /property="og:title"/);
   assert.match(indexHtml, /name="twitter:card"/);
   assert.match(indexHtml, /application\/ld\+json/);
