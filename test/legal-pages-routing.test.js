@@ -391,6 +391,11 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
       && operation.cli.includes("containers")
       && operation.cli.includes("storage")
     )));
+    assert.ok(adminOperations.operations.some((operation) => (
+      operation.id === "bot-roles"
+      && operation.webStatus === "available"
+      && operation.cli === "./update.sh --show-roles"
+    )));
     assert.ok(adminOperations.summary.available >= 1);
     assert.ok(adminOperations.summary.planned >= 1);
 
@@ -539,6 +544,8 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     ]) {
       assert.ok(adminJobs.actions.some((action) => action.id === actionId && action.requiresConfirmation === false));
     }
+    assert.ok(adminJobs.actions.some((action) => action.id === "bot-config-show" && action.requiresConfirmation === false));
+    assert.ok(adminJobs.actions.some((action) => action.id === "bot-roles-show" && action.requiresConfirmation === false));
     assert.ok(adminJobs.actions.some((action) => action.id === "cleanup-dry-run" && action.requiresConfirmation === false));
     assert.ok(adminJobs.actions.some((action) => (
       action.id === "cleanup-run"

@@ -249,8 +249,19 @@ export function createAdminRoutesHandler(deps) {
         webStatus: "available",
         risk: "low",
         description: "Konfigurierte Commander-/Worker-Bots und Online-Zustand anzeigen.",
-        webEntry: "Tab Bots und Tab Diagnose",
-        nextStep: "Invite-Links und Rollenmatrix in die Bot-Zeilen aufnehmen."
+        webEntry: "Tab Bots und Tab Diagnose; Tab Aktionen kann update.sh --show-bots read-only starten.",
+        nextStep: "Invite-Links in die Bot-Zeilen aufnehmen."
+      },
+      {
+        id: "bot-roles",
+        area: "Bots",
+        title: "Bot-Rollenuebersicht",
+        cli: "./update.sh --show-roles",
+        webStatus: "available",
+        risk: "low",
+        description: "Commander-/Worker-Rollen und Client-Zuordnung pruefen.",
+        webEntry: "Tab Aktionen kann update.sh --show-roles read-only starten; Tab Diagnose zeigt Runtime-Rollen.",
+        nextStep: "Rollenmatrix spaeter strukturiert in den Bot-Tab integrieren."
       },
       {
         id: "bot-mutate",
