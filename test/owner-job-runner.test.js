@@ -23,6 +23,9 @@ test("owner job runner exposes only allowlisted actions and captures output", as
 
   const snapshot = getOwnerJobsSnapshot();
   assert.ok(snapshot.actions.some((action) => action.id === "rollback-plan"));
+  assert.ok(snapshot.actions.some((action) => action.id === "status-quick"));
+  assert.equal(snapshot.actions.find((action) => action.id === "status-quick")?.requiresConfirmation, false);
+  assert.match(snapshot.actions.find((action) => action.id === "status-quick")?.command || "", /update\.sh --status quick/);
   assert.equal(snapshot.actions.find((action) => action.id === "system-doctor")?.requiresConfirmation, true);
   assert.equal(snapshot.actions.find((action) => action.id === "system-doctor")?.confirmationValue, "system-doctor");
   assert.equal(snapshot.actions.find((action) => action.id === "deploy-slash-commands")?.requiresConfirmation, true);
@@ -33,6 +36,9 @@ test("owner job runner exposes only allowlisted actions and captures output", as
   assert.equal(recognitionTest?.inputFields?.some((field) => field.key === "url" && field.type === "url"), true);
   assert.match(recognitionTest?.command || "", /<url>/);
   assert.equal(snapshot.actions.some((action) => /rm\s+-rf|powershell|cmd\.exe/i.test(action.command)), false);
+  assert.equal(snapshot.summary.totalActions, snapshot.actions.length);
+  assert.ok(snapshot.summary.byRisk.low >= 1);
+  assert.ok(snapshot.summary.byArea.Operations >= 1);
 
   const started = startOwnerJob("rollback-plan");
   assert.equal(started.actionId, "rollback-plan");

@@ -378,11 +378,11 @@ export function createAdminRoutesHandler(deps) {
         area: "Operations",
         title: "Status & Logs",
         cli: "./update.sh --status / --status quick / --status live / --status local-live",
-        webStatus: "partial",
+        webStatus: "available",
         risk: "low",
         description: "Status, Health, Logs und Cockpit-Ansichten.",
-        webEntry: "Tabs Bots, Diagnose, Guilds, Stationen und Logs",
-        nextStep: "Live-Log-Streaming und Status-Historie im Web."
+        webEntry: "Tabs Bots, Diagnose, Guilds, Stationen und Logs; Tab Aktionen kann Status Quick nicht-interaktiv starten.",
+        nextStep: "Optional spaeter: Live-Log-Streaming und Status-Historie im Web."
       },
       {
         id: "cleanup",
@@ -1928,15 +1928,22 @@ function buildAdminHtml() {
       const actions = Array.isArray(payload.actions) ? payload.actions : [];
       const jobs = Array.isArray(payload.jobs) ? payload.jobs : [];
       const running = jobs.find(job => job.status === 'running');
+      const summary = payload.summary || {};
+      const byRisk = summary.byRisk || {};
       return '<div class="summary-row">' +
           summaryPill(actions.length, 'Erlaubte Aktionen', '') +
           summaryPill(payload.running ? 'JA' : 'NEIN', 'Job laeuft', payload.running ? 'amber' : 'green') +
           summaryPill(jobs.length, 'Letzte Jobs', '') +
+          summaryPill((byRisk.low || 0) + '/' + (byRisk.medium || 0) + '/' + (byRisk.high || 0), 'Risiko N/M/H', '') +
         '</div>' +
         '<div class="job-grid">' +
           actions.map(action => '<div class="job-card">' +
             '<h3>' + esc(action.title || action.id) + '</h3>' +
             '<p>' + esc(action.description || '') + '</p>' +
+            '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">' +
+              '<span class="mini-btn">' + esc(action.area || 'Allgemein') + '</span>' +
+              (action.requiresConfirmation ? '<span class="mini-btn" style="border-color:#FFB800;color:#FFB800">Confirm</span>' : '<span class="mini-btn" style="border-color:#39FF14;color:#39FF14">Read-only</span>') +
+            '</div>' +
             renderJobInputs(action) +
             '<div style="display:flex;gap:8px;align-items:center;justify-content:space-between">' +
               riskBadge(action.risk) +

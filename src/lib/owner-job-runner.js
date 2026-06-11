@@ -100,6 +100,16 @@ const OWNER_JOB_ACTIONS = [
     description: "Gibt den dokumentierten Rollback-Ablauf aus.",
   },
   {
+    id: "status-quick",
+    title: "Status Quick",
+    area: "Operations",
+    risk: "low",
+    timeoutMs: 60_000,
+    command: "bash",
+    args: ["./update.sh", "--status", "quick"],
+    description: "Fuehrt den nicht-interaktiven update.sh Status-Check mit Runtime, Logs, MongoDB und Speicheruebersicht aus.",
+  },
+  {
     id: "system-doctor",
     title: "System Doctor",
     area: "Betrieb",
@@ -203,13 +213,29 @@ function getOwnerJobActions() {
 
 function getOwnerJobsSnapshot() {
   pruneJobs();
+  const actions = getOwnerJobActions();
+  const publicJobs = Array.from(jobs.values())
+    .sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt)))
+    .map(publicJob);
+  const lastSucceeded = publicJobs.find((job) => job.status === "succeeded");
+  const lastFailed = publicJobs.find((job) => job.status === "failed");
   return {
     generatedAt: new Date().toISOString(),
     running: hasRunningJob(),
-    actions: getOwnerJobActions(),
-    jobs: Array.from(jobs.values())
-      .sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt)))
-      .map(publicJob),
+    summary: actions.reduce((acc, action) => {
+      acc.byRisk[action.risk] = (acc.byRisk[action.risk] || 0) + 1;
+      acc.byArea[action.area] = (acc.byArea[action.area] || 0) + 1;
+      return acc;
+    }, {
+      totalActions: actions.length,
+      totalJobs: publicJobs.length,
+      byRisk: {},
+      byArea: {},
+      lastSucceededAt: lastSucceeded?.finishedAt || null,
+      lastFailedAt: lastFailed?.finishedAt || null,
+    }),
+    actions,
+    jobs: publicJobs,
   };
 }
 
