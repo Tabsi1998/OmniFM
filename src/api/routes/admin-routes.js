@@ -1345,6 +1345,10 @@ function buildAdminHtml() {
     .job-inputs{display:grid;gap:8px;margin:10px 0}
     .job-inputs label{display:grid;gap:5px;font-size:11px;color:#a1a1aa}
     .job-inputs input{width:100%;background:#111;border:1px solid #333;color:#e4e4e7;border-radius:7px;padding:8px;font-size:12px}
+    .job-details{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;padding:12px 16px;background:#090909;border:1px solid #222;border-radius:8px;margin:12px 0}
+    .job-detail{min-width:0}
+    .job-detail span{display:block;font-size:10px;color:#71717a;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px}
+    .job-detail strong{display:block;font-size:12px;color:#d4d4d8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .job-output{white-space:pre-wrap;background:#050505;border:1px solid #222;border-radius:8px;padding:12px;color:#d4d4d8;font-family:'Consolas','JetBrains Mono',monospace;font-size:11px;line-height:1.45;max-height:360px;overflow:auto}
   </style>
 </head>
@@ -1924,16 +1928,39 @@ function buildAdminHtml() {
       }).join('') + '</div>';
     }
 
+    function renderJobDetails(job) {
+      if (!job) return '<div class="job-details" id="jobDetails"><div class="job-detail"><span>Status</span><strong>Kein Job</strong></div></div>';
+      const summary = job.outputSummary || {};
+      const warningColor = Number(summary.warnings || 0) > 0 ? 'amber' : '';
+      const errorColor = Number(summary.errors || 0) > 0 ? 'red' : '';
+      return '<div class="job-details" id="jobDetails">' +
+        '<div class="job-detail"><span>Status</span><strong>' + jobStatusBadge(job.status) + '</strong></div>' +
+        '<div class="job-detail"><span>Aktion</span><strong>' + esc(job.title || job.actionId || '-') + '</strong></div>' +
+        '<div class="job-detail"><span>Start</span><strong>' + esc(formatDateTime(job.startedAt)) + '</strong></div>' +
+        '<div class="job-detail"><span>Dauer</span><strong>' + (job.durationMs != null ? Math.round(job.durationMs / 1000) + 's' : 'laeuft') + '</strong></div>' +
+        '<div class="job-detail"><span>Exit</span><strong>' + (job.exitCode == null ? '-' : esc(job.exitCode)) + '</strong></div>' +
+        '<div class="job-detail"><span>Zeilen</span><strong>' + esc(summary.lines || 0) + (summary.truncated ? ' / gekuerzt' : '') + '</strong></div>' +
+        '<div class="job-detail"><span>Warnungen</span><strong class="' + warningColor + '">' + esc(summary.warnings || 0) + '</strong></div>' +
+        '<div class="job-detail"><span>Fehler</span><strong class="' + errorColor + '">' + esc(summary.errors || 0) + '</strong></div>' +
+        '<div class="job-detail"><span>Letzte Zeile</span><strong title="' + escAttr(summary.lastLine || '-') + '">' + esc(summary.lastLine || '-') + '</strong></div>' +
+      '</div>';
+    }
+
     function renderJobs(payload) {
       const actions = Array.isArray(payload.actions) ? payload.actions : [];
       const jobs = Array.isArray(payload.jobs) ? payload.jobs : [];
       const running = jobs.find(job => job.status === 'running');
+      const selectedJob = running || jobs[0];
       const summary = payload.summary || {};
       const byRisk = summary.byRisk || {};
+      const byStatus = summary.byStatus || {};
+      const outputTotals = summary.outputTotals || {};
       return '<div class="summary-row">' +
           summaryPill(actions.length, 'Erlaubte Aktionen', '') +
           summaryPill(payload.running ? 'JA' : 'NEIN', 'Job laeuft', payload.running ? 'amber' : 'green') +
           summaryPill(jobs.length, 'Letzte Jobs', '') +
+          summaryPill((byStatus.succeeded || 0) + '/' + (byStatus.failed || 0), 'OK/Fehler Jobs', (byStatus.failed || 0) ? 'amber' : 'green') +
+          summaryPill((outputTotals.warnings || 0) + '/' + (outputTotals.errors || 0), 'Warn/Fehler Logs', (outputTotals.errors || 0) ? 'red' : (outputTotals.warnings || 0) ? 'amber' : 'green') +
           summaryPill((byRisk.low || 0) + '/' + (byRisk.medium || 0) + '/' + (byRisk.high || 0), 'Risiko N/M/H', '') +
         '</div>' +
         '<div class="job-grid">' +
@@ -1954,15 +1981,17 @@ function buildAdminHtml() {
         '</div>' +
         '<div class="section-header"><h2>Job-Ausgabe</h2><button class="mini-btn" onclick="refreshJobs()">Aktualisieren</button></div>' +
         (jobs.length
-          ? '<table><thead><tr><th>Aktion</th><th>Status</th><th>Start</th><th>Dauer</th><th>Exit</th></tr></thead><tbody>' +
+          ? '<table><thead><tr><th>Aktion</th><th>Status</th><th>Start</th><th>Dauer</th><th>Exit</th><th>Hinweise</th></tr></thead><tbody>' +
             jobs.slice(0, 10).map(job => '<tr onclick="selectOwnerJob(' + JSON.stringify(job.id) + ')" style="cursor:pointer">' +
               '<td><b>' + esc(job.title || job.actionId) + '</b><div style="font-size:11px;color:#52525b">' + esc(job.id) + '</div></td>' +
               '<td>' + jobStatusBadge(job.status) + '</td>' +
               '<td style="font-size:12px;color:#71717a">' + esc(formatDateTime(job.startedAt)) + '</td>' +
               '<td style="font-size:12px;color:#71717a">' + (job.durationMs != null ? Math.round(job.durationMs / 1000) + 's' : 'laeuft') + '</td>' +
               '<td style="font-size:12px;color:#71717a">' + (job.exitCode == null ? '-' : esc(job.exitCode)) + '</td>' +
+              '<td style="font-size:12px;color:#71717a">W ' + esc(job.outputSummary?.warnings || 0) + ' / F ' + esc(job.outputSummary?.errors || 0) + '<div style="font-size:11px;color:#52525b;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(job.outputSummary?.lastLine || '-') + '</div></td>' +
             '</tr>').join('') + '</tbody></table>' +
-            '<pre class="job-output" id="jobOutput">' + esc((running || jobs[0])?.output || 'Noch keine Ausgabe.') + '</pre>'
+            renderJobDetails(selectedJob) +
+            '<pre class="job-output" id="jobOutput">' + esc(selectedJob?.output || 'Noch keine Ausgabe.') + '</pre>'
           : '<div class="empty-state">Noch keine Owner-Jobs gestartet.</div>');
     }
 
@@ -2009,6 +2038,8 @@ function buildAdminHtml() {
     async function selectOwnerJob(jobId) {
       try {
         const result = await api('jobs/' + encodeURIComponent(jobId));
+        const details = document.getElementById('jobDetails');
+        if (details) details.outerHTML = renderJobDetails(result.job);
         const output = document.getElementById('jobOutput');
         if (output) output.textContent = result.job?.output || 'Keine Ausgabe.';
       } catch (e) {
@@ -2200,7 +2231,7 @@ function buildAdminHtml() {
     }
 
     function esc(s) {
-      return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
     function escAttr(s) {
       return esc(s).replace(/'/g,'&#39;');

@@ -184,6 +184,33 @@ function appendOutput(job, chunk) {
   job.outputTruncated = next.length > MAX_OUTPUT_CHARS;
 }
 
+function buildOutputSummary(output, { truncated = false } = {}) {
+  const lines = stripAnsi(output)
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const counts = lines.reduce((acc, line) => {
+    if (/(\[warn\]|\bwarn(?:ing)?\b|\bachtung\b)/i.test(line)) acc.warnings += 1;
+    if (/(\[fail\]|\[error\]|\berror\b|\bfailed\b|\bfehler\b)/i.test(line)) acc.errors += 1;
+    if (/(\[ok\]|\bsuccess\b|\berfolgreich\b)/i.test(line)) acc.ok += 1;
+    if (/(\[info\]|\binfo\b)/i.test(line)) acc.info += 1;
+    return acc;
+  }, {
+    lines: lines.length,
+    warnings: 0,
+    errors: 0,
+    ok: 0,
+    info: 0,
+  });
+
+  return {
+    ...counts,
+    lastLine: lines.at(-1) || "",
+    truncated: Boolean(truncated),
+  };
+}
+
 function publicJob(job) {
   if (!job) return null;
   return {
@@ -200,6 +227,7 @@ function publicJob(job) {
     timedOut: Boolean(job.timedOut),
     output: job.output,
     outputTruncated: Boolean(job.outputTruncated),
+    outputSummary: buildOutputSummary(job.output, { truncated: job.outputTruncated }),
     error: job.error || null,
   };
 }
@@ -239,6 +267,22 @@ function getOwnerJobsSnapshot() {
     .map(publicJob);
   const lastSucceeded = publicJobs.find((job) => job.status === "succeeded");
   const lastFailed = publicJobs.find((job) => job.status === "failed");
+  const byStatus = publicJobs.reduce((acc, job) => {
+    acc[job.status] = (acc[job.status] || 0) + 1;
+    return acc;
+  }, {
+    running: 0,
+    succeeded: 0,
+    failed: 0,
+  });
+  const outputTotals = publicJobs.reduce((acc, job) => {
+    acc.warnings += job.outputSummary?.warnings || 0;
+    acc.errors += job.outputSummary?.errors || 0;
+    return acc;
+  }, {
+    warnings: 0,
+    errors: 0,
+  });
   return {
     generatedAt: new Date().toISOString(),
     running: hasRunningJob(),
@@ -251,6 +295,9 @@ function getOwnerJobsSnapshot() {
       totalJobs: publicJobs.length,
       byRisk: {},
       byArea: {},
+      byStatus,
+      outputTotals,
+      runningJobId: publicJobs.find((job) => job.status === "running")?.id || null,
       lastSucceededAt: lastSucceeded?.finishedAt || null,
       lastFailedAt: lastFailed?.finishedAt || null,
     }),

@@ -45,15 +45,26 @@ test("owner job runner exposes only allowlisted actions and captures output", as
   assert.equal(snapshot.summary.totalActions, snapshot.actions.length);
   assert.ok(snapshot.summary.byRisk.low >= 1);
   assert.ok(snapshot.summary.byArea.Operations >= 1);
+  assert.deepEqual(snapshot.summary.byStatus, { running: 0, succeeded: 0, failed: 0 });
+  assert.deepEqual(snapshot.summary.outputTotals, { warnings: 0, errors: 0 });
 
   const started = startOwnerJob("rollback-plan");
   assert.equal(started.actionId, "rollback-plan");
   assert.equal(started.status, "running");
+  assert.equal(started.outputSummary.lines, 0);
 
   const completed = await waitForJob(started.id);
   assert.equal(completed.status, "succeeded");
   assert.equal(completed.exitCode, 0);
   assert.match(completed.output, /Rollback plan:/);
+  assert.ok(completed.outputSummary.lines >= 1);
+  assert.equal(typeof completed.outputSummary.lastLine, "string");
+
+  const completedSnapshot = getOwnerJobsSnapshot();
+  assert.equal(completedSnapshot.summary.byStatus.succeeded, 1);
+  assert.equal(completedSnapshot.summary.byStatus.failed, 0);
+  assert.equal(completedSnapshot.summary.byStatus.running, 0);
+  assert.equal(completedSnapshot.summary.outputTotals.errors, completed.outputSummary.errors);
 
   assert.throws(() => startOwnerJob("not-allowed"), /Unbekannte Owner-Aktion/);
   assert.throws(

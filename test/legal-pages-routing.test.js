@@ -532,6 +532,8 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.ok(adminJobs.actions.some((action) => action.id === "split-preflight"));
     assert.equal(adminJobs.summary.totalActions, adminJobs.actions.length);
     assert.ok(adminJobs.summary.byArea.Operations >= 1);
+    assert.deepEqual(adminJobs.summary.byStatus, { running: 0, succeeded: 0, failed: 0 });
+    assert.deepEqual(adminJobs.summary.outputTotals, { warnings: 0, errors: 0 });
     assert.ok(adminJobs.actions.some((action) => (
       action.id === "deploy-slash-commands"
       && action.requiresConfirmation
@@ -631,6 +633,9 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     }
     assert.equal(adminJobResult.job.status, "succeeded");
     assert.match(adminJobResult.job.output, /Rollback plan:/);
+    assert.ok(adminJobResult.job.outputSummary.lines >= 1);
+    assert.equal(typeof adminJobResult.job.outputSummary.lastLine, "string");
+    assert.equal(adminJobResult.job.outputSummary.truncated, false);
 
     const adminAuditAfterJobResponse = await fetch(`http://127.0.0.1:${port}/api/admin/audit`, {
       headers: { Cookie: adminCookieHeader },
