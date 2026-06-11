@@ -97,6 +97,8 @@ function getOwnerJobActions() {
   return OWNER_JOB_ACTIONS.map(({ command, args, ...action }) => ({
     ...action,
     command: [command, ...args].join(" "),
+    requiresConfirmation: action.risk !== "low",
+    confirmationValue: action.risk !== "low" ? action.id : null,
   }));
 }
 

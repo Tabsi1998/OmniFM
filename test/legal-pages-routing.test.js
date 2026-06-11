@@ -442,6 +442,11 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     const adminJobs = await adminJobsResponse.json();
     assert.ok(adminJobs.actions.some((action) => action.id === "rollback-plan"));
     assert.ok(adminJobs.actions.some((action) => action.id === "split-preflight"));
+    assert.ok(adminJobs.actions.some((action) => (
+      action.id === "system-doctor"
+      && action.requiresConfirmation
+      && action.confirmationValue === "system-doctor"
+    )));
 
     const invalidAdminJobResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
       method: "POST",
@@ -449,6 +454,16 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
       body: JSON.stringify({ actionId: "rm-random-things" }),
     });
     assert.equal(invalidAdminJobResponse.status, 404);
+
+    const unconfirmedAdminJobResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
+      method: "POST",
+      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ actionId: "system-doctor" }),
+    });
+    assert.equal(unconfirmedAdminJobResponse.status, 400);
+    const unconfirmedAdminJob = await unconfirmedAdminJobResponse.json();
+    assert.equal(unconfirmedAdminJob.requiresConfirmation, true);
+    assert.equal(unconfirmedAdminJob.confirmationValue, "system-doctor");
 
     const adminJobStartResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
       method: "POST",
@@ -479,6 +494,12 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.equal(adminAuditAfterJobResponse.status, 200);
     const adminAuditAfterJob = await adminAuditAfterJobResponse.json();
     assert.ok(adminAuditAfterJob.events.some((event) => event.action === "owner.job.start" && event.target === "rollback-plan"));
+    assert.ok(adminAuditAfterJob.events.some((event) => (
+      event.action === "owner.job.start"
+      && event.target === "system-doctor"
+      && event.status === "denied"
+      && event.metadata.requiresConfirmation === true
+    )));
     assert.ok(adminAuditAfterJob.events.some((event) => (
       event.action === "owner.job.finish"
       && event.target === "rollback-plan"

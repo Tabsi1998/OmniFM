@@ -800,6 +800,23 @@ export function createAdminRoutesHandler(deps) {
         try {
           const payload = JSON.parse(await readRequestBody(req) || "{}");
           const actionId = String(payload?.actionId || "").trim();
+          const action = getOwnerJobsSnapshot().actions.find((entry) => entry.id === actionId);
+          if (action?.requiresConfirmation && String(payload?.confirm || "").trim() !== action.confirmationValue) {
+            auditOwnerAction(req, {
+              action: "owner.job.start",
+              status: "denied",
+              target: actionId,
+              summary: `Owner-Job ohne passende Bestaetigung abgelehnt: ${actionId}`,
+              metadata: { risk: action.risk, requiresConfirmation: true },
+            });
+            sendJson(res, 400, {
+              ok: false,
+              error: `Bestaetigung erforderlich. Sende confirm=${action.confirmationValue}.`,
+              requiresConfirmation: true,
+              confirmationValue: action.confirmationValue,
+            });
+            return true;
+          }
           const requestAuditMeta = getRequestAuditMeta(req);
           const job = startOwnerJob(actionId, {
             onFinish: (completedJob) => {
@@ -1616,7 +1633,7 @@ function buildAdminHtml() {
             '<p>' + esc(action.description || '') + '</p>' +
             '<div style="display:flex;gap:8px;align-items:center;justify-content:space-between">' +
               riskBadge(action.risk) +
-              '<button class="btn btn-cyan" style="font-size:11px;padding:6px 10px" ' + (payload.running ? 'disabled' : '') + ' onclick="startOwnerJob(' + JSON.stringify(action.id) + ')">Starten</button>' +
+              '<button class="btn btn-cyan" style="font-size:11px;padding:6px 10px" ' + (payload.running ? 'disabled' : '') + ' onclick="startOwnerJob(' + JSON.stringify(action.id) + ',' + JSON.stringify(Boolean(action.requiresConfirmation)) + ',' + JSON.stringify(action.confirmationValue || '') + ')">Starten</button>' +
             '</div>' +
             '<div style="margin-top:8px"><span class="cmd">' + esc(action.command || '') + '</span></div>' +
           '</div>').join('') +
@@ -1645,10 +1662,17 @@ function buildAdminHtml() {
       }
     }
 
-    async function startOwnerJob(actionId) {
-      if (!confirm('Owner-Aktion starten? Es kann immer nur ein Job gleichzeitig laufen.')) return;
+    async function startOwnerJob(actionId, requiresConfirmation, confirmationValue) {
+      let confirmValue = '';
+      if (requiresConfirmation) {
+        const typed = prompt('Diese Owner-Aktion braucht eine Bestätigung. Tippe exakt: ' + confirmationValue);
+        if (typed == null) return;
+        confirmValue = typed.trim();
+      } else if (!confirm('Owner-Aktion starten? Es kann immer nur ein Job gleichzeitig laufen.')) {
+        return;
+      }
       try {
-        await apiPost('jobs', { actionId });
+        await apiPost('jobs', { actionId, confirm: confirmValue });
         await refreshJobs();
       } catch (e) {
         alert('Job konnte nicht gestartet werden: ' + e.message);
