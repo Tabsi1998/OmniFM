@@ -2327,6 +2327,31 @@ if [[ "$MODE" == "--status" ]]; then
     show_live_local_logs 120 2
     exit 0
   fi
+  if [[ "${MODE_ARG:-}" == "containers" ]]; then
+    show_admin_runtime_summary
+    show_container_status_table
+    exit 0
+  fi
+  if [[ "${MODE_ARG:-}" == "health" ]]; then
+    show_admin_health_detail
+    exit 0
+  fi
+  if [[ "${MODE_ARG:-}" == "docker-logs" ]]; then
+    show_recent_container_logs 80
+    exit 0
+  fi
+  if [[ "${MODE_ARG:-}" == "local-logs" ]]; then
+    show_recent_local_logs 80
+    exit 0
+  fi
+  if [[ "${MODE_ARG:-}" == "mongo" ]]; then
+    show_mongodb_runtime_status
+    exit 0
+  fi
+  if [[ "${MODE_ARG:-}" == "storage" ]]; then
+    show_storage_overview
+    exit 0
+  fi
   if [[ "${MODE_ARG:-}" == "quick" || ! -t 0 ]]; then
     show_admin_runtime_summary
     show_container_status_table

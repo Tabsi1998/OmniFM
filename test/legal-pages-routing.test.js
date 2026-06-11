@@ -523,6 +523,16 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     const adminJobs = await adminJobsResponse.json();
     assert.ok(adminJobs.actions.some((action) => action.id === "rollback-plan"));
     assert.ok(adminJobs.actions.some((action) => action.id === "status-quick" && action.requiresConfirmation === false));
+    for (const actionId of [
+      "status-containers",
+      "status-health",
+      "status-docker-logs",
+      "status-local-logs",
+      "status-mongo",
+      "status-storage",
+    ]) {
+      assert.ok(adminJobs.actions.some((action) => action.id === actionId && action.requiresConfirmation === false));
+    }
     assert.ok(adminJobs.actions.some((action) => action.id === "cleanup-dry-run" && action.requiresConfirmation === false));
     assert.ok(adminJobs.actions.some((action) => (
       action.id === "cleanup-run"
