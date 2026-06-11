@@ -22,6 +22,8 @@
 //   POST /api/admin/licenses/:id → Lizenz patchen (aktivieren, verlängern, sperren)
 //   GET  /api/admin/guilds       → Alle Guilds mit Status
 //   GET  /api/admin/logs         → Letzte Operator-Incidents
+//   GET  /api/admin/log-files    → Erlaubte lokale Logdateien
+//   GET  /api/admin/log-files/:name → Tail einer erlaubten lokalen Logdatei
 //   GET  /api/admin/stations     → Alle Stationen (inkl. Health-Status)
 //   POST /api/admin/stations     → Station hinzufügen/bearbeiten
 // ============================================================
@@ -29,6 +31,7 @@
 import { getOwnerConfigSnapshot, patchOwnerConfig, patchOwnerSecrets } from "../../lib/owner-config-store.js";
 import { getOwnerJob, getOwnerJobsSnapshot, startOwnerJob } from "../../lib/owner-job-runner.js";
 import { getOwnerAuditSnapshot, recordOwnerAudit } from "../../lib/owner-audit-store.js";
+import { getOwnerLogFileSnapshot, getOwnerLogFilesSnapshot } from "../../lib/owner-log-files.js";
 
 export function createAdminRoutesHandler(deps) {
   const {
@@ -905,10 +908,36 @@ export function createAdminRoutesHandler(deps) {
     if (pathname === "/api/admin/logs") {
       if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
       const rawIncidents = getRecentOperatorIncidents?.() || [];
-    const incidents = Array.isArray(rawIncidents)
-      ? rawIncidents
-      : Array.isArray(rawIncidents?.incidents) ? rawIncidents.incidents : [];
+      const incidents = Array.isArray(rawIncidents)
+        ? rawIncidents
+        : Array.isArray(rawIncidents?.incidents) ? rawIncidents.incidents : [];
       sendJson(res, 200, { incidents });
+      return true;
+    }
+
+    // GET /api/admin/log-files
+    if (pathname === "/api/admin/log-files") {
+      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
+      try {
+        sendJson(res, 200, await getOwnerLogFilesSnapshot());
+      } catch (err) {
+        sendJson(res, 500, { ok: false, error: err?.message || "Logdateien konnten nicht geladen werden" });
+      }
+      return true;
+    }
+
+    // GET /api/admin/log-files/:name
+    const logFileMatch = pathname.match(/^\/api\/admin\/log-files\/([^/]+)$/);
+    if (logFileMatch) {
+      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
+      try {
+        const limit = Number.parseInt(String(requestUrl?.searchParams?.get("limit") || "300"), 10);
+        const bytes = Number.parseInt(String(requestUrl?.searchParams?.get("bytes") || "80000"), 10);
+        const snapshot = await getOwnerLogFileSnapshot(decodeURIComponent(logFileMatch[1]), { lines: limit, bytes });
+        sendJson(res, 200, snapshot);
+      } catch (err) {
+        sendJson(res, err?.statusCode || 500, { ok: false, error: err?.message || "Logdatei konnte nicht geladen werden" });
+      }
       return true;
     }
 
@@ -1166,6 +1195,7 @@ function buildAdminHtml() {
     let cachedData = {};
     let stationFilters = { search: '', health: 'all', tier: 'all' };
     let operationFilters = { search: '', status: 'all', area: 'all' };
+    let selectedLogFile = '';
 
     function showTab(tab, trigger) {
       currentTab = tab;
@@ -1274,15 +1304,8 @@ function buildAdminHtml() {
               }).join('') + '</tbody></table>'
             : '<div class="empty-state">Keine Station passt zu diesen Filtern.</div>');
       } else if (tab === 'logs') {
-        if (!d.logs) { el.innerHTML = '<div class="loading">Lade...</div>'; return; }
-        const incidents = d.logs.incidents || [];
-        if (!incidents.length) { el.innerHTML = '<div class="loading">Keine Incidents.</div>'; return; }
-        el.innerHTML = '<table><thead><tr><th>Zeit</th><th>Level</th><th>Nachricht</th></tr></thead><tbody>' +
-          incidents.slice(0,100).map(i => '<tr>' +
-            '<td style="font-size:11px;color:#71717a;white-space:nowrap">' + esc(i.timestamp||i.time||'') + '</td>' +
-            '<td><span style="color:' + levelColor(i.level) + ';font-size:11px;font-weight:700">' + esc(i.level||'INFO') + '</span></td>' +
-            '<td style="font-size:12px;max-width:600px;overflow:hidden;text-overflow:ellipsis">' + esc(String(i.message||i.msg||'')) + '</td>' +
-          '</tr>').join('') + '</tbody></table>';
+        if (!d.logs || !d.logFiles) { el.innerHTML = '<div class="loading">Lade Logs...</div>'; return; }
+        el.innerHTML = renderLogs(d.logs, d.logFiles);
       } else if (tab === 'operations') {
         if (!d.operations) { el.innerHTML = '<div class="loading">Lade Betrieb...</div>'; return; }
         el.innerHTML = renderOperations(d.operations);
@@ -1301,8 +1324,8 @@ function buildAdminHtml() {
     async function loadAll() {
       document.getElementById('serverTime').textContent = 'Lädt...';
       try {
-        const [overview, guilds, licenses, stations, logs, diagnostics, operations, config, jobs, audit] = await Promise.allSettled([
-          api('overview'), api('guilds'), api('licenses'), api('stations'), api('logs'), api('diagnostics'), api('operations'), api('config'), api('jobs'), api('audit')
+        const [overview, guilds, licenses, stations, logs, logFiles, diagnostics, operations, config, jobs, audit] = await Promise.allSettled([
+          api('overview'), api('guilds'), api('licenses'), api('stations'), api('logs'), api('log-files'), api('diagnostics'), api('operations'), api('config'), api('jobs'), api('audit')
         ]);
         if (overview.status === 'fulfilled') {
           cachedData.overview = overview.value;
@@ -1327,6 +1350,7 @@ function buildAdminHtml() {
         if (licenses.status === 'fulfilled') cachedData.licenses = licenses.value;
         if (stations.status === 'fulfilled') cachedData.stations = stations.value;
         if (logs.status === 'fulfilled') cachedData.logs = logs.value;
+        if (logFiles.status === 'fulfilled') cachedData.logFiles = logFiles.value;
         if (diagnostics.status === 'fulfilled') cachedData.diagnostics = diagnostics.value;
         if (operations.status === 'fulfilled') cachedData.operations = operations.value;
         if (config.status === 'fulfilled') cachedData.config = config.value;
@@ -1401,6 +1425,74 @@ function buildAdminHtml() {
         field.max != null ? 'max="' + escAttr(field.max) + '"' : '',
       ].filter(Boolean).join(' ');
       return '<div class="config-field">' + label + '<input ' + attrs + '/></div>';
+    }
+
+    function renderLogs(logsPayload, filesPayload) {
+      const incidents = Array.isArray(logsPayload.incidents) ? logsPayload.incidents : [];
+      const files = Array.isArray(filesPayload.files) ? filesPayload.files : [];
+      if (!selectedLogFile && files.length) selectedLogFile = files[0].name;
+      const currentFile = cachedData.currentLogFile;
+      return '<div class="summary-row">' +
+          summaryPill(incidents.length, 'Operator Incidents', incidents.some(i => String(i.level || '').toUpperCase() === 'ERROR') ? 'amber' : 'green') +
+          summaryPill(files.length, 'Logdateien', files.length ? 'green' : 'amber') +
+          summaryPill(filesPayload.logsDir ? 'OK' : 'FEHLT', 'Log-Ordner', filesPayload.logsDir ? 'green' : 'red') +
+          summaryPill(currentFile?.truncated ? 'TAIL' : 'VOLL', 'Anzeige', currentFile?.truncated ? 'amber' : 'green') +
+        '</div>' +
+        '<div class="section-header"><h2>Operator Incidents</h2><span style="font-size:12px;color:#71717a">strukturierte Fehlerereignisse</span></div>' +
+        (incidents.length
+          ? '<table><thead><tr><th>Zeit</th><th>Level</th><th>Nachricht</th></tr></thead><tbody>' +
+            incidents.slice(0,100).map(i => '<tr>' +
+              '<td style="font-size:11px;color:#71717a;white-space:nowrap">' + esc(i.timestamp||i.time||'') + '</td>' +
+              '<td><span style="color:' + levelColor(i.level) + ';font-size:11px;font-weight:700">' + esc(i.level||'INFO') + '</span></td>' +
+              '<td style="font-size:12px;max-width:600px;overflow:hidden;text-overflow:ellipsis">' + esc(String(i.message||i.msg||'')) + '</td>' +
+            '</tr>').join('') + '</tbody></table>'
+          : '<div class="empty-state">Keine Operator-Incidents.</div>') +
+        '<div class="section-header"><h2>Lokale Logdateien</h2><button class="mini-btn" onclick="refreshSelectedLogFile()">Tail aktualisieren</button></div>' +
+        '<div class="toolbar">' +
+          '<select id="ownerLogFileSelect" onchange="selectOwnerLogFile(this.value)">' +
+            files.map(file => option(file.name, file.name + ' · ' + formatBytes(file.size), selectedLogFile)).join('') +
+          '</select>' +
+          '<span class="cmd">' + esc(filesPayload.logsDir || 'logs') + '</span>' +
+        '</div>' +
+        renderCurrentLogFile(currentFile, files);
+    }
+
+    function renderCurrentLogFile(currentFile, files) {
+      if (!files.length) return '<div class="empty-state">Keine erlaubten Logdateien gefunden.</div>';
+      if (!currentFile || currentFile.name !== selectedLogFile) {
+        setTimeout(refreshSelectedLogFile, 0);
+        return '<div class="loading">Lade Log-Tail...</div>';
+      }
+      const rows = Array.isArray(currentFile.lines) ? currentFile.lines : [];
+      return '<div class="toolbar">' +
+          '<span class="cmd">' + esc(currentFile.name) + '</span>' +
+          '<span style="font-size:12px;color:#71717a">Groesse ' + esc(formatBytes(currentFile.size)) + ' · geaendert ' + esc(formatDateTime(currentFile.modifiedAt)) + '</span>' +
+        '</div>' +
+        (rows.length
+          ? '<table><thead><tr><th>Zeit</th><th>Level</th><th>Nachricht</th></tr></thead><tbody>' +
+            rows.map(row => '<tr>' +
+              '<td style="font-size:11px;color:#71717a;white-space:nowrap">' + esc(row.timestamp || '-') + '</td>' +
+              '<td><span style="color:' + levelColor(row.level) + ';font-size:11px;font-weight:700">' + esc(row.level || 'INFO') + '</span></td>' +
+              '<td style="font-size:12px;font-family:Consolas,monospace;white-space:pre-wrap">' + esc(row.message || '') + '</td>' +
+            '</tr>').join('') + '</tbody></table>'
+          : '<div class="empty-state">Diese Logdatei enthaelt keine Zeilen.</div>');
+    }
+
+    async function selectOwnerLogFile(name) {
+      selectedLogFile = String(name || '');
+      cachedData.currentLogFile = null;
+      renderTab('logs');
+      await refreshSelectedLogFile();
+    }
+
+    async function refreshSelectedLogFile() {
+      if (!selectedLogFile) return;
+      try {
+        cachedData.currentLogFile = await api('log-files/' + encodeURIComponent(selectedLogFile));
+      } catch (e) {
+        cachedData.currentLogFile = { name: selectedLogFile, lines: [{ level: 'ERROR', message: e.message }] };
+      }
+      if (currentTab === 'logs') renderTab('logs');
     }
 
     async function saveConfig() {
@@ -1574,6 +1666,13 @@ function buildAdminHtml() {
       const date = new Date(value);
       if (Number.isNaN(date.getTime())) return value;
       return date.toLocaleString('de-AT');
+    }
+
+    function formatBytes(value) {
+      const bytes = Number(value || 0) || 0;
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
+      return (bytes / 1024 / 1024).toFixed(1) + ' MB';
     }
 
     function renderOperations(payload) {

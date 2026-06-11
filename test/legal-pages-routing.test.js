@@ -129,9 +129,16 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
   const ownerEnvDir = await fs.mkdtemp(path.join(os.tmpdir(), "omnifm-admin-config-"));
   const ownerEnvFile = path.join(ownerEnvDir, ".env");
   const ownerAuditFile = path.join(ownerEnvDir, "owner-audit.json");
+  const ownerLogsDir = path.join(ownerEnvDir, "logs");
   await fs.writeFile(
     ownerEnvFile,
     "PUBLIC_WEB_URL=https://omnifm.xyz\nAPI_ADMIN_TOKEN=admin-route-token\nLOG_MAX_MB=5\n",
+    "utf8"
+  );
+  await fs.mkdir(ownerLogsDir, { recursive: true });
+  await fs.writeFile(
+    path.join(ownerLogsDir, "bot.log"),
+    "[2026-06-11T06:00:00.000Z] [INFO] owner test token=must-not-leak\n",
     "utf8"
   );
   const restoreEnv = setEnv({
@@ -163,6 +170,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     OMNIFM_LAST_LIVE_SMOKE_STATUS: "success",
     OMNIFM_ENV_FILE: ownerEnvFile,
     OMNIFM_OWNER_AUDIT_FILE: ownerAuditFile,
+    OMNIFM_OWNER_LOGS_DIR: ownerLogsDir,
     STRIPE_SECRET_KEY: undefined,
     SMTP_PASS: undefined,
     DISCORD_CLIENT_SECRET: undefined,
@@ -298,6 +306,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.match(adminPanelHtml, /saveSecrets/);
     assert.match(adminPanelHtml, /renderJobs/);
     assert.match(adminPanelHtml, /renderAudit/);
+    assert.match(adminPanelHtml, /renderLogs/);
 
     const adminOverviewResponse = await fetch(`http://127.0.0.1:${port}/api/admin/overview`, {
       headers: { Cookie: adminCookieHeader },
@@ -339,6 +348,28 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.ok(adminOperations.operations.some((operation) => operation.cli === "./update.sh --recognition-test <URL>"));
     assert.ok(adminOperations.summary.available >= 1);
     assert.ok(adminOperations.summary.planned >= 1);
+
+    const adminLogFilesResponse = await fetch(`http://127.0.0.1:${port}/api/admin/log-files`, {
+      headers: { Cookie: adminCookieHeader },
+    });
+    assert.equal(adminLogFilesResponse.status, 200);
+    const adminLogFiles = await adminLogFilesResponse.json();
+    assert.equal(adminLogFiles.logsDir, ownerLogsDir);
+    assert.ok(adminLogFiles.files.some((file) => file.name === "bot.log"));
+
+    const adminLogFileResponse = await fetch(`http://127.0.0.1:${port}/api/admin/log-files/bot.log`, {
+      headers: { Cookie: adminCookieHeader },
+    });
+    assert.equal(adminLogFileResponse.status, 200);
+    const adminLogFile = await adminLogFileResponse.json();
+    assert.equal(adminLogFile.name, "bot.log");
+    assert.ok(adminLogFile.lines.some((line) => /owner test/.test(line.message)));
+    assert.doesNotMatch(JSON.stringify(adminLogFile), /must-not-leak/);
+
+    const invalidAdminLogFileResponse = await fetch(`http://127.0.0.1:${port}/api/admin/log-files/..%2F.env`, {
+      headers: { Cookie: adminCookieHeader },
+    });
+    assert.equal(invalidAdminLogFileResponse.status, 404);
 
     const adminConfigResponse = await fetch(`http://127.0.0.1:${port}/api/admin/config`, {
       headers: { Cookie: adminCookieHeader },
