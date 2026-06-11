@@ -800,7 +800,32 @@ export function createAdminRoutesHandler(deps) {
         try {
           const payload = JSON.parse(await readRequestBody(req) || "{}");
           const actionId = String(payload?.actionId || "").trim();
-          const job = startOwnerJob(actionId);
+          const requestAuditMeta = getRequestAuditMeta(req);
+          const job = startOwnerJob(actionId, {
+            onFinish: (completedJob) => {
+              try {
+                recordOwnerAudit({
+                  actor: "owner",
+                  action: "owner.job.finish",
+                  status: completedJob.status === "succeeded" ? "success" : "failed",
+                  target: completedJob.actionId,
+                  summary: `Owner-Job beendet: ${completedJob.actionId} (${completedJob.status})`,
+                  metadata: {
+                    ...requestAuditMeta,
+                    jobId: completedJob.id,
+                    risk: completedJob.risk,
+                    exitCode: completedJob.exitCode,
+                    signal: completedJob.signal,
+                    timedOut: completedJob.timedOut,
+                    durationMs: completedJob.durationMs,
+                    outputTruncated: completedJob.outputTruncated,
+                  },
+                });
+              } catch (err) {
+                log?.("WARN", `[Owner] Job-Abschluss-Audit konnte nicht geschrieben werden: ${err?.message || String(err)}`);
+              }
+            },
+          });
           log?.("INFO", `[Owner] Job gestartet: ${job.actionId} (${job.id})`);
           auditOwnerAction(req, {
             action: "owner.job.start",

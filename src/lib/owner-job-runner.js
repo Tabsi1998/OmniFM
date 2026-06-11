@@ -121,10 +121,13 @@ function finishJob(job, patch = {}) {
   Object.assign(job, patch);
   job.finishedAt = new Date().toISOString();
   job.durationMs = Date.parse(job.finishedAt) - Date.parse(job.startedAt);
+  if (typeof job.onFinish === "function") {
+    job.onFinish(publicJob(job));
+  }
   pruneJobs();
 }
 
-function startOwnerJob(actionId, { actor = "owner" } = {}) {
+function startOwnerJob(actionId, { actor = "owner", onFinish = null } = {}) {
   const action = ACTION_BY_ID.get(String(actionId || ""));
   if (!action) {
     const error = new Error("Unbekannte Owner-Aktion.");
@@ -153,6 +156,7 @@ function startOwnerJob(actionId, { actor = "owner" } = {}) {
     output: "",
     outputTruncated: false,
     error: null,
+    onFinish,
   };
   jobs.set(job.id, job);
 

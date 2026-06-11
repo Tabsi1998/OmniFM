@@ -479,6 +479,13 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.equal(adminAuditAfterJobResponse.status, 200);
     const adminAuditAfterJob = await adminAuditAfterJobResponse.json();
     assert.ok(adminAuditAfterJob.events.some((event) => event.action === "owner.job.start" && event.target === "rollback-plan"));
+    assert.ok(adminAuditAfterJob.events.some((event) => (
+      event.action === "owner.job.finish"
+      && event.target === "rollback-plan"
+      && event.status === "success"
+      && event.metadata.jobId === adminJobStart.job.id
+      && event.metadata.exitCode === 0
+    )));
 
     const adminGuildsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/guilds`, {
       headers: { Cookie: adminCookieHeader },

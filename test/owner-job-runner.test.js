@@ -37,3 +37,21 @@ test("owner job runner exposes only allowlisted actions and captures output", as
   assert.throws(() => startOwnerJob("not-allowed"), /Unbekannte Owner-Aktion/);
   resetOwnerJobsForTests();
 });
+
+test("owner job runner calls finish hook once with sanitized public job", async () => {
+  resetOwnerJobsForTests();
+
+  const finishedJobs = [];
+  const started = startOwnerJob("rollback-plan", {
+    onFinish: (job) => finishedJobs.push(job),
+  });
+
+  const completed = await waitForJob(started.id);
+  assert.equal(completed.status, "succeeded");
+  assert.equal(finishedJobs.length, 1);
+  assert.equal(finishedJobs[0].id, started.id);
+  assert.equal(finishedJobs[0].status, "succeeded");
+  assert.equal(Object.hasOwn(finishedJobs[0], "onFinish"), false);
+
+  resetOwnerJobsForTests();
+});
