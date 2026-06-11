@@ -98,24 +98,60 @@ const GROUPS = [
       { key: "CLEAN_WORKER_GUILD_COMMANDS_ON_BOOT", label: "Worker Guild Commands bereinigen", type: "boolean", example: "0" },
     ],
   },
+  {
+    id: "integrations",
+    title: "Integrationen",
+    description: "Nicht geheime Basisdaten fuer Dashboard OAuth, Stripe, SMTP und Vote-Plattformen.",
+    fields: [
+      { key: "DISCORD_CLIENT_ID", label: "Discord OAuth Client ID", type: "snowflake", example: "123456789012345678" },
+      { key: "DISCORD_REDIRECT_URI", label: "Discord OAuth Redirect URI", type: "url", example: "https://omnifm.xyz/api/auth/discord/callback" },
+      { key: "DISCORD_OAUTH_SCOPES", label: "Discord OAuth Scopes", type: "text", example: "identify guilds" },
+      { key: "DASHBOARD_SESSION_COOKIE", label: "Dashboard Session Cookie", type: "token-name", example: "omnifm_session" },
+      { key: "DASHBOARD_SESSION_TTL_SECONDS", label: "Dashboard Session TTL Sekunden", type: "integer", min: 300, max: 2592000, example: "86400" },
+      { key: "DISCORD_OAUTH_STATE_TTL_SECONDS", label: "OAuth State TTL Sekunden", type: "integer", min: 60, max: 3600, example: "600" },
+      { key: "STRIPE_PUBLIC_KEY", label: "Stripe Public Key", type: "text", example: "pk_live_..." },
+      { key: "SMTP_HOST", label: "SMTP Host", type: "text" },
+      { key: "SMTP_PORT", label: "SMTP Port", type: "integer", min: 1, max: 65535, example: "587" },
+      { key: "SMTP_USER", label: "SMTP User", type: "text" },
+      { key: "SMTP_FROM", label: "SMTP Absender", type: "email" },
+      { key: "SMTP_TLS_MODE", label: "SMTP TLS Modus", type: "enum", values: ["auto", "starttls", "tls", "none"], example: "auto" },
+      { key: "SMTP_TLS_REJECT_UNAUTHORIZED", label: "SMTP TLS Zertifikat pruefen", type: "boolean", example: "1" },
+      { key: "DISCORDBOTLIST_ENABLED", label: "DiscordBotList aktiv", type: "boolean", example: "1" },
+      { key: "DISCORDBOTLIST_BOT_ID", label: "DiscordBotList Bot ID", type: "snowflake" },
+      { key: "DISCORDBOTLIST_SLUG", label: "DiscordBotList Slug", type: "slug", example: "omnifm-dj" },
+      { key: "DISCORDBOTLIST_STATS_SCOPE", label: "DiscordBotList Stats Scope", type: "enum", values: ["commander", "aggregate"], example: "aggregate" },
+      { key: "BOTSGG_ENABLED", label: "Bots.gg aktiv", type: "boolean", example: "1" },
+      { key: "BOTSGG_BOT_ID", label: "Bots.gg Bot ID", type: "snowflake" },
+      { key: "BOTSGG_STATS_SCOPE", label: "Bots.gg Stats Scope", type: "enum", values: ["commander", "aggregate"], example: "aggregate" },
+      { key: "TOPGG_ENABLED", label: "Top.gg aktiv", type: "boolean", example: "1" },
+      { key: "TOPGG_BOT_ID", label: "Top.gg Bot ID", type: "snowflake" },
+      { key: "TOPGG_STATS_SCOPE", label: "Top.gg Stats Scope", type: "enum", values: ["commander", "aggregate"], example: "aggregate" },
+      { key: "TOPGG_VOTE_SYNC_START_DAYS", label: "Top.gg Vote Sync Start Tage", type: "integer", min: 1, max: 365, example: "30" },
+    ],
+  },
 ];
 
 const SECRET_FIELDS = [
-  { group: "Owner", key: "API_ADMIN_TOKEN", label: "Owner API Token" },
-  { group: "Owner", key: "ADMIN_API_TOKEN", label: "Legacy Owner API Token" },
+  { group: "Owner", key: "API_ADMIN_TOKEN", label: "Owner API Token", writeOnly: false },
+  { group: "Owner", key: "ADMIN_API_TOKEN", label: "Legacy Owner API Token", writeOnly: false },
   { group: "Discord", key: "BOT_TOKEN", label: "Discord Bot Token" },
-  { group: "Discord", key: "DISCORD_CLIENT_SECRET", label: "Discord OAuth Secret" },
-  { group: "Stripe", key: "STRIPE_SECRET_KEY", label: "Stripe Secret Key" },
-  { group: "Stripe", key: "STRIPE_WEBHOOK_SECRET", label: "Stripe Webhook Secret" },
-  { group: "Mail", key: "SMTP_PASS", label: "SMTP Passwort" },
-  { group: "Vote Plattformen", key: "DISCORDBOTLIST_WEBHOOK_SECRET", label: "DiscordBotList Webhook Secret" },
-  { group: "Vote Plattformen", key: "BOTSGG_WEBHOOK_SECRET", label: "Bots.gg Webhook Secret" },
-  { group: "Vote Plattformen", key: "TOPGG_WEBHOOK_SECRET", label: "Top.gg Webhook Secret" },
-  { group: "Audio", key: "ACOUSTID_API_KEY", label: "AcoustID API Key" },
+  { group: "Discord", key: "DISCORD_CLIENT_SECRET", label: "Discord OAuth Secret", writeOnly: true },
+  { group: "Stripe", key: "STRIPE_SECRET_KEY", label: "Stripe Secret Key", writeOnly: true },
+  { group: "Stripe", key: "STRIPE_API_KEY", label: "Stripe API Key Legacy", writeOnly: true },
+  { group: "Stripe", key: "STRIPE_WEBHOOK_SECRET", label: "Stripe Webhook Secret", writeOnly: true },
+  { group: "Mail", key: "SMTP_PASS", label: "SMTP Passwort", writeOnly: true },
+  { group: "Vote Plattformen", key: "DISCORDBOTLIST_TOKEN", label: "DiscordBotList Token", writeOnly: true },
+  { group: "Vote Plattformen", key: "DISCORDBOTLIST_WEBHOOK_SECRET", label: "DiscordBotList Webhook Secret", writeOnly: true },
+  { group: "Vote Plattformen", key: "BOTSGG_TOKEN", label: "Bots.gg Token", writeOnly: true },
+  { group: "Vote Plattformen", key: "BOTSGG_WEBHOOK_SECRET", label: "Bots.gg Webhook Secret", writeOnly: true },
+  { group: "Vote Plattformen", key: "TOPGG_TOKEN", label: "Top.gg Token", writeOnly: true },
+  { group: "Vote Plattformen", key: "TOPGG_WEBHOOK_SECRET", label: "Top.gg Webhook Secret", writeOnly: true },
+  { group: "Audio", key: "ACOUSTID_API_KEY", label: "AcoustID API Key", writeOnly: true },
 ];
 
 const FIELD_BY_KEY = new Map(GROUPS.flatMap((group) => group.fields.map((field) => [field.key, { ...field, group: group.id }])));
 const SECRET_KEYS = new Set(SECRET_FIELDS.map((field) => field.key));
+const WRITE_ONLY_SECRET_BY_KEY = new Map(SECRET_FIELDS.filter((field) => field.writeOnly).map((field) => [field.key, field]));
 
 function resolveEnvFilePath() {
   const explicit = String(process.env.OMNIFM_ENV_FILE || "").trim();
@@ -226,6 +262,31 @@ function validateEmail(value, key) {
   return value;
 }
 
+function validateSnowflake(value, key) {
+  if (!value) return "";
+  if (!/^\d{17,22}$/.test(value)) {
+    throw new Error(`${key} muss eine Discord-ID mit 17 bis 22 Ziffern sein.`);
+  }
+  return value;
+}
+
+function validateTokenName(value, key) {
+  if (!value) return "";
+  if (!/^[A-Za-z0-9_.-]{3,80}$/.test(value)) {
+    throw new Error(`${key} darf nur Buchstaben, Zahlen, Punkt, Unterstrich und Bindestrich enthalten.`);
+  }
+  return value;
+}
+
+function validateSlug(value, key) {
+  if (!value) return "";
+  const normalized = value.trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9-]{1,80}$/.test(normalized)) {
+    throw new Error(`${key} muss ein gueltiger Slug sein.`);
+  }
+  return normalized;
+}
+
 function normalizeBoolean(value, key) {
   const normalized = String(value || "").trim().toLowerCase();
   if (["1", "true", "yes", "y", "j", "ja", "on"].includes(normalized)) return "1";
@@ -252,6 +313,9 @@ function normalizeConfigValue(field, rawValue) {
   if (field.type === "origin-list") return validateOriginList(value, field.key);
   if (field.type === "domain") return validateDomain(value, field.key);
   if (field.type === "email") return validateEmail(value, field.key);
+  if (field.type === "snowflake") return validateSnowflake(value, field.key);
+  if (field.type === "token-name") return validateTokenName(value, field.key);
+  if (field.type === "slug") return validateSlug(value, field.key);
   if (field.type === "boolean") return value ? normalizeBoolean(value, field.key) : "";
   if (field.type === "integer") return validateInteger(value, field.key, field);
   if (field.type === "enum") {
@@ -267,6 +331,14 @@ function normalizeConfigValue(field, rawValue) {
   return value;
 }
 
+function normalizeSecretValue(key, rawValue) {
+  const value = stripUnsafeValueCharacters(rawValue);
+  if (!value) return "";
+  if (value.length > MAX_VALUE_LENGTH) throw new Error(`${key} ist zu lang.`);
+  if (value.includes("#")) throw new Error(`${key} darf kein # enthalten, weil .env sonst uneindeutig wird.`);
+  return value;
+}
+
 function serializeEnvLines(parsed, updates) {
   const seen = new Set();
   const lines = parsed.lines.map((line) => {
@@ -279,6 +351,27 @@ function serializeEnvLines(parsed, updates) {
     lines.push(`${key}=${value}`);
   }
   return `${lines.join("\n").replace(/\n*$/, "")}\n`;
+}
+
+function writeEnvUpdates(updates) {
+  const parsed = readEnvFile();
+  const envFile = parsed.envFile;
+  fs.mkdirSync(path.dirname(envFile), { recursive: true });
+
+  if (parsed.exists) {
+    fs.copyFileSync(envFile, `${envFile}.bak-owner`);
+  }
+
+  const content = serializeEnvLines(parsed, updates);
+  const tmpFile = `${envFile}.tmp-${process.pid}-${Date.now()}`;
+  fs.writeFileSync(tmpFile, content, { encoding: "utf8", mode: 0o600 });
+  fs.renameSync(tmpFile, envFile);
+
+  for (const [key, value] of Object.entries(updates)) {
+    process.env[key] = value;
+  }
+
+  return readEnvFile(envFile);
 }
 
 function buildSnapshot(parsed = readEnvFile(), { updatedKeys = [] } = {}) {
@@ -313,7 +406,8 @@ function buildSnapshot(parsed = readEnvFile(), { updatedKeys = [] } = {}) {
         ...field,
         configured: effective.value.trim().length > 0,
         source: effective.source,
-        editable: false,
+        editable: Boolean(field.writeOnly),
+        writeOnly: Boolean(field.writeOnly),
         secret: true,
       };
     }),
@@ -349,24 +443,38 @@ function patchOwnerConfig(input) {
     throw err;
   }
 
-  const parsed = readEnvFile();
-  const envFile = parsed.envFile;
-  fs.mkdirSync(path.dirname(envFile), { recursive: true });
+  return buildSnapshot(writeEnvUpdates(updates), { updatedKeys: Object.keys(updates) });
+}
 
-  if (parsed.exists) {
-    fs.copyFileSync(envFile, `${envFile}.bak-owner`);
+function patchOwnerSecrets(input) {
+  const body = input && typeof input === "object" ? input : {};
+  const values = body.values && typeof body.values === "object" ? body.values : body;
+  const updates = {};
+  const rejected = [];
+
+  for (const [key, rawValue] of Object.entries(values)) {
+    const field = WRITE_ONLY_SECRET_BY_KEY.get(key);
+    if (!field) {
+      rejected.push(`${key} ist kein erlaubtes write-only Secret.`);
+      continue;
+    }
+    const value = normalizeSecretValue(key, rawValue);
+    if (!value) continue;
+    updates[key] = value;
   }
 
-  const content = serializeEnvLines(parsed, updates);
-  const tmpFile = `${envFile}.tmp-${process.pid}-${Date.now()}`;
-  fs.writeFileSync(tmpFile, content, { encoding: "utf8", mode: 0o600 });
-  fs.renameSync(tmpFile, envFile);
-
-  for (const [key, value] of Object.entries(updates)) {
-    process.env[key] = value;
+  if (rejected.length) {
+    const err = new Error(rejected.join(" "));
+    err.statusCode = 400;
+    throw err;
+  }
+  if (Object.keys(updates).length === 0) {
+    const err = new Error("Keine Secret-Werte zum Speichern uebergeben.");
+    err.statusCode = 400;
+    throw err;
   }
 
-  return buildSnapshot(readEnvFile(envFile), { updatedKeys: Object.keys(updates) });
+  return buildSnapshot(writeEnvUpdates(updates), { updatedKeys: Object.keys(updates) });
 }
 
 export {
@@ -374,5 +482,6 @@ export {
   SECRET_FIELDS as OWNER_CONFIG_SECRET_FIELDS,
   getOwnerConfigSnapshot,
   patchOwnerConfig,
+  patchOwnerSecrets,
   resolveEnvFilePath,
 };

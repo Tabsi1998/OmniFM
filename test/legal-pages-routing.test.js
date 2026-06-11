@@ -161,6 +161,9 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     OMNIFM_LAST_DEPLOY_STATUS: "success",
     OMNIFM_LAST_LIVE_SMOKE_STATUS: "success",
     OMNIFM_ENV_FILE: ownerEnvFile,
+    STRIPE_SECRET_KEY: undefined,
+    SMTP_PASS: undefined,
+    DISCORD_CLIENT_SECRET: undefined,
   });
   const indexSnapshot = await snapshotFile(frontendIndexPath);
   const robotsSnapshot = await snapshotFile(frontendRobotsPath);
@@ -289,6 +292,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.match(adminPanelHtml, /Aktionen/);
     assert.match(adminPanelHtml, /renderOperations/);
     assert.match(adminPanelHtml, /renderConfig/);
+    assert.match(adminPanelHtml, /saveSecrets/);
     assert.match(adminPanelHtml, /renderJobs/);
 
     const adminOverviewResponse = await fetch(`http://127.0.0.1:${port}/api/admin/overview`, {
@@ -339,8 +343,11 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     const adminConfig = await adminConfigResponse.json();
     assert.equal(adminConfig.envFile.path, ownerEnvFile);
     assert.ok(adminConfig.groups.some((group) => group.id === "legal"));
+    assert.ok(adminConfig.groups.some((group) => group.id === "integrations"));
     assert.ok(adminConfig.groups.some((group) => group.fields.some((field) => field.key === "PUBLIC_WEB_URL")));
+    assert.ok(adminConfig.groups.some((group) => group.fields.some((field) => field.key === "SMTP_HOST")));
     assert.ok(adminConfig.secrets.some((secret) => secret.key === "API_ADMIN_TOKEN" && secret.configured));
+    assert.ok(adminConfig.secrets.some((secret) => secret.key === "STRIPE_SECRET_KEY" && secret.writeOnly));
 
     const adminConfigPatchResponse = await fetch(`http://127.0.0.1:${port}/api/admin/config`, {
       method: "POST",
@@ -360,6 +367,27 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.equal(adminConfigSave.restartRequired, true);
     assert.ok(adminConfigSave.updatedKeys.includes("DEFAULT_LANGUAGE"));
     assert.match(await fs.readFile(ownerEnvFile, "utf8"), /DEFAULT_LANGUAGE=de/);
+
+    const invalidSecretSaveResponse = await fetch(`http://127.0.0.1:${port}/api/admin/config/secrets`, {
+      method: "POST",
+      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ values: { API_ADMIN_TOKEN: "must-not-save" } }),
+    });
+    assert.equal(invalidSecretSaveResponse.status, 400);
+
+    const secretSaveResponse = await fetch(`http://127.0.0.1:${port}/api/admin/config/secrets`, {
+      method: "POST",
+      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ values: { STRIPE_SECRET_KEY: "sk_live_owner_test", SMTP_PASS: "smtp-owner-test", DISCORD_CLIENT_SECRET: "" } }),
+    });
+    assert.equal(secretSaveResponse.status, 200);
+    const secretSave = await secretSaveResponse.json();
+    assert.equal(secretSave.ok, true);
+    assert.ok(secretSave.updatedKeys.includes("STRIPE_SECRET_KEY"));
+    assert.ok(secretSave.secrets.some((secret) => secret.key === "STRIPE_SECRET_KEY" && secret.configured && !Object.hasOwn(secret, "value")));
+    const secretEnvContent = await fs.readFile(ownerEnvFile, "utf8");
+    assert.match(secretEnvContent, /STRIPE_SECRET_KEY=sk_live_owner_test/);
+    assert.match(secretEnvContent, /SMTP_PASS=smtp-owner-test/);
 
     const adminJobsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
       headers: { Cookie: adminCookieHeader },

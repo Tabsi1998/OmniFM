@@ -7,6 +7,7 @@ import test from "node:test";
 import {
   getOwnerConfigSnapshot,
   patchOwnerConfig,
+  patchOwnerSecrets,
 } from "../src/lib/owner-config-store.js";
 
 function setEnv(overrides) {
@@ -28,7 +29,12 @@ test("owner config snapshot reads editable values and hides secret values", asyn
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omnifm-owner-config-"));
   const envFile = path.join(dir, ".env");
   await fs.writeFile(envFile, "PUBLIC_WEB_URL=https://omnifm.xyz\nAPI_ADMIN_TOKEN=super-secret\n", "utf8");
-  const restoreEnv = setEnv({ OMNIFM_ENV_FILE: envFile });
+  const restoreEnv = setEnv({
+    OMNIFM_ENV_FILE: envFile,
+    STRIPE_SECRET_KEY: undefined,
+    SMTP_PASS: undefined,
+    DISCORD_CLIENT_SECRET: undefined,
+  });
 
   try {
     const snapshot = getOwnerConfigSnapshot();
@@ -88,6 +94,63 @@ test("owner config patch persists allowlisted values and rejects secrets", async
     assert.throws(
       () => patchOwnerConfig({ values: { PUBLIC_WEB_URL: "not a url" } }),
       /gueltige URL/
+    );
+  } finally {
+    restoreEnv();
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("owner config stores write-only secrets without exposing values", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omnifm-owner-config-"));
+  const envFile = path.join(dir, ".env");
+  await fs.writeFile(envFile, "PUBLIC_WEB_URL=https://omnifm.xyz\n", "utf8");
+  const restoreEnv = setEnv({
+    OMNIFM_ENV_FILE: envFile,
+    STRIPE_SECRET_KEY: undefined,
+    SMTP_PASS: undefined,
+    DISCORD_CLIENT_SECRET: undefined,
+  });
+
+  try {
+    const patched = patchOwnerSecrets({
+      values: {
+        STRIPE_SECRET_KEY: "sk_live_owner_secret",
+        SMTP_PASS: "smtp-owner-secret",
+        API_ADMIN_TOKEN: "must-not-write",
+      },
+    });
+    assert.fail(`expected rejection, got ${JSON.stringify(patched)}`);
+  } catch (error) {
+    assert.match(error.message, /API_ADMIN_TOKEN/);
+  }
+
+  try {
+    const patched = patchOwnerSecrets({
+      values: {
+        STRIPE_SECRET_KEY: "sk_live_owner_secret",
+        SMTP_PASS: "smtp-owner-secret",
+        DISCORD_CLIENT_SECRET: "",
+      },
+    });
+    const content = await fs.readFile(envFile, "utf8");
+    const stripeSecret = patched.secrets.find((secret) => secret.key === "STRIPE_SECRET_KEY");
+    const smtpSecret = patched.secrets.find((secret) => secret.key === "SMTP_PASS");
+    const discordSecret = patched.secrets.find((secret) => secret.key === "DISCORD_CLIENT_SECRET");
+
+    assert.equal(patched.restartRequired, true);
+    assert.deepEqual(new Set(patched.updatedKeys), new Set(["STRIPE_SECRET_KEY", "SMTP_PASS"]));
+    assert.match(content, /STRIPE_SECRET_KEY=sk_live_owner_secret/);
+    assert.match(content, /SMTP_PASS=smtp-owner-secret/);
+    assert.equal(stripeSecret.configured, true);
+    assert.equal(stripeSecret.writeOnly, true);
+    assert.equal(smtpSecret.configured, true);
+    assert.equal(discordSecret.configured, false);
+    assert.equal(Object.hasOwn(stripeSecret, "value"), false);
+    assert.equal(process.env.STRIPE_SECRET_KEY, "sk_live_owner_secret");
+    assert.throws(
+      () => patchOwnerSecrets({ values: { STRIPE_WEBHOOK_SECRET: "" } }),
+      /Keine Secret-Werte/
     );
   } finally {
     restoreEnv();

@@ -13,6 +13,7 @@
 //   GET  /api/admin/operations   → update.sh/Owner-GUI Paritaetskarte
 //   GET  /api/admin/config       → Owner-Einstellungen ohne Secret-Werte
 //   POST /api/admin/config       → Erlaubte Owner-Einstellungen in .env speichern
+//   POST /api/admin/config/secrets → Erlaubte Secrets write-only in .env speichern
 //   GET  /api/admin/jobs         → Erlaubte Owner-Jobs und letzte Laeufe
 //   POST /api/admin/jobs         → Erlaubten Owner-Job starten
 //   GET  /api/admin/jobs/:id     → Einzelnen Owner-Job abrufen
@@ -24,7 +25,7 @@
 //   POST /api/admin/stations     → Station hinzufügen/bearbeiten
 // ============================================================
 
-import { getOwnerConfigSnapshot, patchOwnerConfig } from "../../lib/owner-config-store.js";
+import { getOwnerConfigSnapshot, patchOwnerConfig, patchOwnerSecrets } from "../../lib/owner-config-store.js";
 import { getOwnerJob, getOwnerJobsSnapshot, startOwnerJob } from "../../lib/owner-job-runner.js";
 
 export function createAdminRoutesHandler(deps) {
@@ -695,6 +696,21 @@ export function createAdminRoutesHandler(deps) {
       return true;
     }
 
+    // POST /api/admin/config/secrets
+    if (pathname === "/api/admin/config/secrets") {
+      if (req.method !== "POST" && req.method !== "PATCH") { methodNotAllowed(res, ["POST", "PATCH"]); return true; }
+      try {
+        const payload = JSON.parse(await readRequestBody(req) || "{}");
+        const snapshot = patchOwnerSecrets(payload);
+        const keys = Array.isArray(snapshot.updatedKeys) ? snapshot.updatedKeys.join(", ") : "";
+        log?.("INFO", `[Owner] Secrets aktualisiert: ${keys || "keine Aenderung"}`);
+        sendJson(res, 200, { ok: true, ...snapshot });
+      } catch (err) {
+        sendJson(res, err?.statusCode || 400, { ok: false, error: err?.message || "Ungueltige Owner-Secrets" });
+      }
+      return true;
+    }
+
     // GET/POST /api/admin/jobs
     if (pathname === "/api/admin/jobs") {
       if (req.method === "GET") {
@@ -1243,9 +1259,13 @@ function buildAdminHtml() {
         '</div>').join('') +
         '<div class="config-group">' +
           '<h3>Secrets</h3>' +
-          '<p>Geheime Werte werden im Owner-Portal nicht angezeigt. Hier siehst du nur, ob sie gesetzt sind.</p>' +
+          '<p>Geheime Werte werden nie angezeigt. Leere Felder bleiben unveraendert; eingetragene Werte werden write-only gespeichert.</p>' +
+          '<div class="toolbar">' +
+            '<button class="btn btn-amber" onclick="saveSecrets()">Secrets speichern</button>' +
+            '<span id="secretSaveStatus" class="config-status">Owner-Token und Bot-Token bleiben in diesem Schritt read-only.</span>' +
+          '</div>' +
           '<table><thead><tr><th>Bereich</th><th>Name</th><th>Status</th><th>Quelle</th></tr></thead><tbody>' +
-          secrets.map(secret => '<tr><td style="color:#71717a">' + esc(secret.group || '-') + '</td><td><b>' + esc(secret.label || secret.key) + '</b><div style="font-size:11px;color:#52525b">' + esc(secret.key) + '</div></td><td>' + statusBadge(secret.configured ? 'configured' : 'missing') + '</td><td style="font-size:12px;color:#71717a">' + esc(secret.source || '-') + '</td></tr>').join('') +
+          secrets.map(secret => '<tr><td style="color:#71717a">' + esc(secret.group || '-') + '</td><td><b>' + esc(secret.label || secret.key) + '</b><div style="font-size:11px;color:#52525b">' + esc(secret.key) + '</div>' + (secret.writeOnly ? '<input data-secret-key="' + escAttr(secret.key) + '" type="password" autocomplete="new-password" placeholder="Neuen Wert setzen..." style="margin-top:7px;width:100%;background:#111;border:1px solid #333;color:#e4e4e7;border-radius:7px;padding:8px;font-size:12px"/>' : '<div style="font-size:11px;color:#71717a;margin-top:7px">Read-only Status</div>') + '</td><td>' + statusBadge(secret.configured ? 'configured' : 'missing') + '</td><td style="font-size:12px;color:#71717a">' + esc(secret.source || '-') + '</td></tr>').join('') +
           '</tbody></table>' +
         '</div>';
     }
@@ -1296,6 +1316,40 @@ function buildAdminHtml() {
         cachedData.config = result;
         if (status) {
           status.textContent = 'Gespeichert. Container/Service danach neu starten, damit alle Bereiche die Werte sicher uebernehmen.';
+          status.style.color = '#39FF14';
+        }
+        renderTab('config');
+      } catch (e) {
+        if (status) {
+          status.textContent = 'Fehler: ' + e.message;
+          status.style.color = '#FF2A2A';
+        }
+      }
+    }
+
+    async function saveSecrets() {
+      const status = document.getElementById('secretSaveStatus');
+      const values = {};
+      document.querySelectorAll('[data-secret-key]').forEach((input) => {
+        if (String(input.value || '').trim()) values[input.getAttribute('data-secret-key')] = input.value;
+      });
+      if (!Object.keys(values).length) {
+        if (status) {
+          status.textContent = 'Keine neuen Secret-Werte eingetragen.';
+          status.style.color = '#FFB800';
+        }
+        return;
+      }
+      if (!confirm('Secrets write-only speichern? Bestehende leere Felder bleiben unveraendert.')) return;
+      if (status) {
+        status.textContent = 'Speichere Secrets...';
+        status.style.color = '#71717a';
+      }
+      try {
+        const result = await apiPost('config/secrets', { values });
+        cachedData.config = result;
+        if (status) {
+          status.textContent = 'Secrets gespeichert. Container/Service danach neu starten, damit alle Bereiche die Werte sicher uebernehmen.';
           status.style.color = '#39FF14';
         }
         renderTab('config');
