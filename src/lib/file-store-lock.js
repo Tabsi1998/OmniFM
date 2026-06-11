@@ -111,7 +111,7 @@ export function withFileStoreLock(filePath, fn, options = {}) {
   } finally {
     try {
       const owner = parseLockOwner(readLockOwner(lockDir));
-      if (!owner.id || owner.id === ownerId) {
+      if (owner.id === ownerId) {
         fs.rmSync(lockDir, { recursive: true, force: true });
       }
     } catch {

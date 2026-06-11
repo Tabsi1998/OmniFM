@@ -90,3 +90,19 @@ test("file store lock cleanup does not remove a lock owned by another process", 
 
   assert.equal(await fs.stat(lockDir).then((stat) => stat.isDirectory()), true);
 });
+
+test("file store lock cleanup keeps ownerless replacement locks for stale recovery", async (t) => {
+  const { tempDir, filePath } = await makeTempStore();
+  const lockDir = getFileStoreLockPath(filePath);
+
+  t.after(async () => {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  withFileStoreLock(filePath, () => {
+    fsSync.rmSync(lockDir, { recursive: true, force: true });
+    fsSync.mkdirSync(lockDir);
+  });
+
+  assert.equal(await fs.stat(lockDir).then((stat) => stat.isDirectory()), true);
+});
