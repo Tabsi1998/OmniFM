@@ -47,6 +47,16 @@ const OWNER_JOB_ACTIONS = [
     args: ["./update.sh", "--doctor"],
     description: "Fuehrt den bestehenden update.sh Doctor aus. Kann fehlende Runtime-JSON-Dateien reparieren.",
   },
+  {
+    id: "deploy-slash-commands",
+    title: "Slash-Commands deployen",
+    area: "Commands",
+    risk: "medium",
+    timeoutMs: 120_000,
+    command: process.execPath,
+    args: ["src/deploy-commands.js"],
+    description: "Fuehrt den bestehenden Slash-Command-Deploy aus und synchronisiert Discord Application Commands nach Konfiguration.",
+  },
 ];
 
 const ACTION_BY_ID = new Map(OWNER_JOB_ACTIONS.map((action) => [action.id, action]));

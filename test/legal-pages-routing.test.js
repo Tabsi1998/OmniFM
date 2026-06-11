@@ -348,6 +348,9 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.ok(adminOperations.operations.some((operation) => operation.cli === "./update.sh --update"));
     assert.ok(adminOperations.operations.some((operation) => operation.cli === "./update.sh --settings admin"));
     assert.ok(adminOperations.operations.some((operation) => operation.cli === "./update.sh --recognition-test <URL>"));
+    assert.ok(adminOperations.operations.some((operation) => (
+      operation.id === "settings-commands" && operation.webStatus === "available"
+    )));
     assert.ok(adminOperations.summary.available >= 1);
     assert.ok(adminOperations.summary.planned >= 1);
 
@@ -474,6 +477,11 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.ok(adminJobs.actions.some((action) => action.id === "rollback-plan"));
     assert.ok(adminJobs.actions.some((action) => action.id === "split-preflight"));
     assert.ok(adminJobs.actions.some((action) => (
+      action.id === "deploy-slash-commands"
+      && action.requiresConfirmation
+      && action.confirmationValue === "deploy-slash-commands"
+    )));
+    assert.ok(adminJobs.actions.some((action) => (
       action.id === "system-doctor"
       && action.requiresConfirmation
       && action.confirmationValue === "system-doctor"
@@ -495,6 +503,16 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     const unconfirmedAdminJob = await unconfirmedAdminJobResponse.json();
     assert.equal(unconfirmedAdminJob.requiresConfirmation, true);
     assert.equal(unconfirmedAdminJob.confirmationValue, "system-doctor");
+
+    const unconfirmedCommandDeployResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
+      method: "POST",
+      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ actionId: "deploy-slash-commands" }),
+    });
+    assert.equal(unconfirmedCommandDeployResponse.status, 400);
+    const unconfirmedCommandDeploy = await unconfirmedCommandDeployResponse.json();
+    assert.equal(unconfirmedCommandDeploy.requiresConfirmation, true);
+    assert.equal(unconfirmedCommandDeploy.confirmationValue, "deploy-slash-commands");
 
     const adminJobStartResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
       method: "POST",
@@ -528,6 +546,12 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.ok(adminAuditAfterJob.events.some((event) => (
       event.action === "owner.job.start"
       && event.target === "system-doctor"
+      && event.status === "denied"
+      && event.metadata.requiresConfirmation === true
+    )));
+    assert.ok(adminAuditAfterJob.events.some((event) => (
+      event.action === "owner.job.start"
+      && event.target === "deploy-slash-commands"
       && event.status === "denied"
       && event.metadata.requiresConfirmation === true
     )));

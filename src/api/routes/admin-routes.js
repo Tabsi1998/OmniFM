@@ -340,11 +340,11 @@ export function createAdminRoutesHandler(deps) {
         area: "Settings",
         title: "Slash Commands & Sync",
         cli: "./update.sh --settings commands",
-        webStatus: "planned",
+        webStatus: "available",
         risk: "medium",
         description: "Command Registration Mode, Cleanup und Sync-Retry konfigurieren.",
-        webEntry: "Noch nicht als Web-Aktion freigeschaltet",
-        nextStep: "Command-Sync-Status, sichere manuelle Sync-Aktion und Modus-Editor."
+        webEntry: "Tab Einstellungen kann Command-Modus, Cleanup-Flags und Sync-Retry speichern; Tab Aktionen kann Slash-Commands bestaetigt deployen.",
+        nextStep: "Optional spaeter: Command-Sync-Ergebnis strukturierter auswerten."
       },
       {
         id: "settings-legal",

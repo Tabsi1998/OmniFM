@@ -25,6 +25,8 @@ test("owner job runner exposes only allowlisted actions and captures output", as
   assert.ok(snapshot.actions.some((action) => action.id === "rollback-plan"));
   assert.equal(snapshot.actions.find((action) => action.id === "system-doctor")?.requiresConfirmation, true);
   assert.equal(snapshot.actions.find((action) => action.id === "system-doctor")?.confirmationValue, "system-doctor");
+  assert.equal(snapshot.actions.find((action) => action.id === "deploy-slash-commands")?.requiresConfirmation, true);
+  assert.equal(snapshot.actions.find((action) => action.id === "deploy-slash-commands")?.confirmationValue, "deploy-slash-commands");
   assert.equal(snapshot.actions.some((action) => /rm\s+-rf|powershell|cmd\.exe/i.test(action.command)), false);
 
   const started = startOwnerJob("rollback-plan");
