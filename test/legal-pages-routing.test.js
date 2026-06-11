@@ -414,7 +414,8 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.ok(adminOperations.operations.some((operation) => (
       operation.id === "offers"
       && operation.webStatus === "partial"
-      && /read-only/i.test(operation.webEntry)
+      && /Confirm/.test(operation.webEntry)
+      && /Audit/.test(operation.webEntry)
     )));
     assert.ok(adminOperations.summary.available >= 1);
     assert.ok(adminOperations.summary.planned >= 1);
@@ -452,6 +453,63 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.equal(confirmedOfferActive.offer.code, "OWNERREAD");
     assert.equal(confirmedOfferActive.offer.active, false);
     assert.ok(confirmedOfferActive.snapshot.offers.some((offer) => offer.code === "OWNERREAD" && offer.active === false));
+
+    const unconfirmedOfferSaveResponse = await fetch(`http://127.0.0.1:${port}/api/admin/offers`, {
+      method: "POST",
+      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code: "ownergift",
+        kind: "coupon",
+        fulfillmentMode: "direct_grant",
+        grantPlan: "pro",
+        grantSeats: 1,
+        grantMonths: 1,
+      }),
+    });
+    assert.equal(unconfirmedOfferSaveResponse.status, 400);
+    const unconfirmedOfferSave = await unconfirmedOfferSaveResponse.json();
+    assert.equal(unconfirmedOfferSave.requiresConfirmation, true);
+    assert.equal(unconfirmedOfferSave.confirmationValue, "OWNERGIFT");
+
+    const confirmedOfferSaveResponse = await fetch(`http://127.0.0.1:${port}/api/admin/offers`, {
+      method: "POST",
+      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code: "ownergift",
+        kind: "coupon",
+        active: true,
+        fulfillmentMode: "direct_grant",
+        grantPlan: "pro",
+        grantSeats: 1,
+        grantMonths: 1,
+        ownerLabel: "Owner Gift",
+        note: "created through owner portal route",
+        confirm: "OWNERGIFT",
+      }),
+    });
+    assert.equal(confirmedOfferSaveResponse.status, 200);
+    const confirmedOfferSave = await confirmedOfferSaveResponse.json();
+    assert.equal(confirmedOfferSave.ok, true);
+    assert.equal(confirmedOfferSave.offer.code, "OWNERGIFT");
+    assert.equal(confirmedOfferSave.offer.fulfillmentMode, "direct_grant");
+    assert.equal(confirmedOfferSave.offer.grantPlan, "pro");
+    assert.ok(confirmedOfferSave.snapshot.offers.some((offer) => offer.code === "OWNERGIFT"));
+
+    const confirmedOfferEditResponse = await fetch(`http://127.0.0.1:${port}/api/admin/offers`, {
+      method: "PATCH",
+      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code: "OWNERREAD",
+        note: "edited through owner portal route",
+        confirm: "OWNERREAD",
+      }),
+    });
+    assert.equal(confirmedOfferEditResponse.status, 200);
+    const confirmedOfferEdit = await confirmedOfferEditResponse.json();
+    assert.equal(confirmedOfferEdit.ok, true);
+    assert.equal(confirmedOfferEdit.offer.code, "OWNERREAD");
+    assert.equal(confirmedOfferEdit.offer.percentOff, 10);
+    assert.equal(confirmedOfferEdit.offer.note, "edited through owner portal route");
 
     const adminLogFilesResponse = await fetch(`http://127.0.0.1:${port}/api/admin/log-files`, {
       headers: { Cookie: adminCookieHeader },
@@ -588,6 +646,24 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
       && event.status === "success"
       && event.target === "OWNERREAD"
       && event.metadata.active === false
+    )));
+    assert.ok(adminAudit.events.some((event) => (
+      event.action === "owner.offer.upsert"
+      && event.status === "denied"
+      && event.target === "OWNERGIFT"
+      && event.metadata.requiresConfirmation === true
+    )));
+    assert.ok(adminAudit.events.some((event) => (
+      event.action === "owner.offer.upsert"
+      && event.status === "success"
+      && event.target === "OWNERGIFT"
+      && event.metadata.fulfillmentMode === "direct_grant"
+    )));
+    assert.ok(adminAudit.events.some((event) => (
+      event.action === "owner.offer.upsert"
+      && event.status === "success"
+      && event.target === "OWNERREAD"
+      && event.metadata.partial === true
     )));
     assert.ok(adminAudit.events.some((event) => event.action === "owner.config.update" && event.metadata.updatedKeys.includes("DEFAULT_LANGUAGE")));
     assert.ok(adminAudit.events.some((event) => event.action === "owner.config.secrets.update" && event.metadata.updatedKeys.includes("STRIPE_SECRET_KEY")));

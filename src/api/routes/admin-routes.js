@@ -22,6 +22,7 @@
 //   POST /api/admin/jobs         → Erlaubten Owner-Job starten
 //   GET  /api/admin/jobs/:id     → Einzelnen Owner-Job abrufen
 //   GET  /api/admin/offers       → Coupon/Referral/Gratis-Code Uebersicht
+//   POST /api/admin/offers       → Coupon/Referral/Gratis-Code erstellen/bearbeiten
 //   POST /api/admin/offers/active → Coupon/Referral/Gratis-Code aktiv/inaktiv setzen
 //   GET  /api/admin/licenses     → Alle Lizenzen
 //   POST /api/admin/licenses/:id → Lizenz patchen (aktivieren, verlängern, sperren)
@@ -61,6 +62,7 @@ export function createAdminRoutesHandler(deps) {
     listOffers,
     listRecentRedemptions,
     setOfferActive,
+    upsertOffer,
   } = deps;
 
   function getRuntimes() {
@@ -309,8 +311,8 @@ export function createAdminRoutesHandler(deps) {
         webStatus: "partial",
         risk: "medium",
         description: "Coupons, Referrals und direkte Gratis-Lizenzen erstellen und pruefen.",
-        webEntry: "Tab Codes zeigt Offers und letzte Redemptions read-only.",
-        nextStep: "Offer-Editor mit Preview, Limits, Aktiv/Inaktiv-Schalter und Audit-Log."
+        webEntry: "Tab Codes zeigt Offers/Redemptions und kann Codes mit Limits, Gratis-Lizenz-Feldern, Aktiv/Inaktiv-Schalter, Confirm und Audit speichern.",
+        nextStep: "Offer-Loeschen und strukturierte Checkout-Preview im Owner-Portal ergaenzen."
       },
       {
         id: "email",
@@ -477,6 +479,59 @@ export function createAdminRoutesHandler(deps) {
       offers,
       redemptions,
     };
+  }
+
+  function normalizeOwnerOfferCode(value) {
+    return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 40);
+  }
+
+  function compactStringList(value) {
+    const rawList = Array.isArray(value)
+      ? value
+      : String(value || "").split(/[,\s]+/);
+    return [...new Set(rawList.map((entry) => String(entry || "").trim()).filter(Boolean))];
+  }
+
+  function compactNumberList(value) {
+    return [...new Set(compactStringList(value)
+      .map((entry) => Number.parseInt(String(entry), 10))
+      .filter((entry) => Number.isFinite(entry)))];
+  }
+
+  function optionalNumber(value) {
+    if (value === undefined || value === null || value === "") return undefined;
+    const num = Number(value);
+    return Number.isFinite(num) ? num : undefined;
+  }
+
+  function buildOwnerOfferInput(payload, code) {
+    const input = {
+      code,
+      kind: payload?.kind,
+      active: payload?.active === undefined ? undefined : Boolean(payload.active),
+      fulfillmentMode: payload?.fulfillmentMode ?? payload?.fulfillment_mode,
+      percentOff: optionalNumber(payload?.percentOff ?? payload?.percent_off),
+      amountOffCents: optionalNumber(payload?.amountOffCents ?? payload?.amount_off_cents),
+      grantPlan: payload?.grantPlan ?? payload?.grant_plan,
+      grantSeats: optionalNumber(payload?.grantSeats ?? payload?.grant_seats),
+      grantMonths: optionalNumber(payload?.grantMonths ?? payload?.grant_months),
+      maxRedemptions: optionalNumber(payload?.maxRedemptions ?? payload?.max_redemptions),
+      maxPerEmail: optionalNumber(payload?.maxPerEmail ?? payload?.max_per_email),
+      minMonths: optionalNumber(payload?.minMonths ?? payload?.min_months),
+      startsAt: payload?.startsAt ?? payload?.starts_at,
+      expiresAt: payload?.expiresAt ?? payload?.expires_at,
+      ownerLabel: payload?.ownerLabel ?? payload?.owner_label,
+      note: payload?.note,
+      createdBy: "owner-portal",
+      updatedBy: "owner-portal",
+    };
+    if (payload?.allowedTiers !== undefined || payload?.allowed_tiers !== undefined) {
+      input.allowedTiers = compactStringList(payload?.allowedTiers ?? payload?.allowed_tiers);
+    }
+    if (payload?.allowedSeats !== undefined || payload?.allowed_seats !== undefined) {
+      input.allowedSeats = compactNumberList(payload?.allowedSeats ?? payload?.allowed_seats);
+    }
+    return input;
   }
 
   function compactMissingFields(fields) {
@@ -839,8 +894,68 @@ export function createAdminRoutesHandler(deps) {
 
     // GET /api/admin/offers
     if (pathname === "/api/admin/offers") {
-      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
-      sendJson(res, 200, buildOwnerOffersSnapshot());
+      if (req.method === "GET") {
+        sendJson(res, 200, buildOwnerOffersSnapshot());
+        return true;
+      }
+      if (req.method === "POST" || req.method === "PATCH") {
+        let code = "";
+        try {
+          const payload = JSON.parse(await readRequestBody(req) || "{}");
+          code = normalizeOwnerOfferCode(payload?.code);
+          if (!code) {
+            const error = new Error("Code ist erforderlich.");
+            error.statusCode = 400;
+            throw error;
+          }
+          if (String(payload?.confirm || "").trim().toUpperCase() !== code) {
+            auditOwnerAction(req, {
+              action: "owner.offer.upsert",
+              status: "denied",
+              target: code,
+              summary: `Offer-Speicherung ohne passende Bestaetigung abgelehnt: ${code}`,
+              metadata: { requiresConfirmation: true, partial: req.method === "PATCH" },
+            });
+            sendJson(res, 400, {
+              ok: false,
+              error: `Bestaetigung erforderlich. Tippe exakt ${code}.`,
+              requiresConfirmation: true,
+              confirmationValue: code,
+            });
+            return true;
+          }
+          if (typeof upsertOffer !== "function") {
+            const error = new Error("Offer-Speicherung ist nicht verfuegbar.");
+            error.statusCode = 500;
+            throw error;
+          }
+          const offer = upsertOffer(buildOwnerOfferInput(payload, code), { partial: req.method === "PATCH" });
+          auditOwnerAction(req, {
+            action: "owner.offer.upsert",
+            status: "success",
+            target: code,
+            summary: `Offer gespeichert: ${code}`,
+            metadata: {
+              code,
+              kind: offer?.kind || null,
+              fulfillmentMode: offer?.fulfillmentMode || null,
+              active: offer?.active ?? null,
+              partial: req.method === "PATCH",
+            },
+          });
+          sendJson(res, 200, { ok: true, offer, snapshot: buildOwnerOffersSnapshot() });
+        } catch (err) {
+          auditOwnerAction(req, {
+            action: "owner.offer.upsert",
+            status: "failed",
+            target: code || undefined,
+            summary: err?.message || "Offer konnte nicht gespeichert werden",
+          });
+          sendJson(res, err?.statusCode || 400, { ok: false, error: err?.message || "Offer konnte nicht gespeichert werden" });
+        }
+        return true;
+      }
+      methodNotAllowed(res, ["GET", "POST", "PATCH"]);
       return true;
     }
 
@@ -850,7 +965,7 @@ export function createAdminRoutesHandler(deps) {
       let code = "";
       try {
         const payload = JSON.parse(await readRequestBody(req) || "{}");
-        code = String(payload?.code || "").trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 40);
+        code = normalizeOwnerOfferCode(payload?.code);
         const active = Boolean(payload?.active);
         if (!code) {
           const error = new Error("Code ist erforderlich.");
@@ -1419,7 +1534,7 @@ function buildAdminHtml() {
     .error-msg{padding:16px 20px;color:#FF2A2A;font-size:13px}
     .refresh-btn{font-size:11px;color:#52525b;cursor:pointer;background:none;border:none;padding:4px 8px;border-radius:6px}
     .refresh-btn:hover{color:#fff;background:#1a1a1a}
-    input[type=text],input[type=email]{background:#1a1a1a;border:1px solid #333;border-radius:8px;color:#fff;padding:8px 12px;font-size:13px;outline:none;width:100%}
+    input[type=text],input[type=email],input[type=number],select{background:#1a1a1a;border:1px solid #333;border-radius:8px;color:#fff;padding:8px 12px;font-size:13px;outline:none;width:100%}
     .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:100;align-items:center;justify-content:center}
     .modal.open{display:flex}
     .modal-box{background:#111;border:1px solid #333;border-radius:16px;padding:28px;max-width:480px;width:100%;max-height:80vh;overflow-y:auto}
@@ -1521,6 +1636,36 @@ function buildAdminHtml() {
         <button class="btn btn-red" onclick="revokeLicense()">Sperren</button>
       </div>
       <p id="licenseEditStatus" style="margin-top:10px;font-size:12px;color:#52525b"></p>
+    </div>
+  </div>
+
+  <!-- Code-Edit Modal -->
+  <div class="modal" id="offerModal" onclick="if(event.target===this)closeOfferModal()">
+    <div class="modal-box">
+      <h3>Code bearbeiten</h3>
+      <div class="form-row"><label>Code</label><input type="text" id="offerCode" placeholder="SUMMER25"/></div>
+      <div class="form-row"><label>Typ</label><select id="offerKind"><option value="coupon">Coupon</option><option value="referral">Referral</option></select></div>
+      <div class="form-row"><label>Status</label><select id="offerActive"><option value="true">Aktiv</option><option value="false">Inaktiv</option></select></div>
+      <div class="form-row"><label>Erfuellung</label><select id="offerFulfillment"><option value="discount">Rabatt</option><option value="direct_grant">Gratis-Lizenz</option></select></div>
+      <div class="form-row"><label>Label</label><input type="text" id="offerOwnerLabel" placeholder="Interner Name"/></div>
+      <div class="form-row"><label>Rabatt Prozent</label><input type="number" id="offerPercentOff" min="0" max="95" placeholder="25"/></div>
+      <div class="form-row"><label>Rabatt Cent</label><input type="number" id="offerAmountOffCents" min="0" placeholder="500"/></div>
+      <div class="form-row"><label>Gratis Plan</label><select id="offerGrantPlan"><option value="">-</option><option value="pro">Pro</option><option value="ultimate">Ultimate</option></select></div>
+      <div class="form-row"><label>Gratis Seats</label><input type="number" id="offerGrantSeats" min="1" placeholder="1"/></div>
+      <div class="form-row"><label>Gratis Monate</label><input type="number" id="offerGrantMonths" min="1" placeholder="1"/></div>
+      <div class="form-row"><label>Erlaubte Plaene</label><input type="text" id="offerAllowedTiers" placeholder="pro, ultimate"/></div>
+      <div class="form-row"><label>Erlaubte Seats</label><input type="text" id="offerAllowedSeats" placeholder="1, 2, 3, 5"/></div>
+      <div class="form-row"><label>Min. Monate</label><input type="number" id="offerMinMonths" min="1" placeholder="optional"/></div>
+      <div class="form-row"><label>Max. Einloesungen</label><input type="number" id="offerMaxRedemptions" min="1" placeholder="optional"/></div>
+      <div class="form-row"><label>Max. pro E-Mail</label><input type="number" id="offerMaxPerEmail" min="1" placeholder="optional"/></div>
+      <div class="form-row"><label>Start ISO/Datum</label><input type="text" id="offerStartsAt" placeholder="2026-07-01"/></div>
+      <div class="form-row"><label>Ende ISO/Datum</label><input type="text" id="offerExpiresAt" placeholder="2026-07-31"/></div>
+      <div class="form-row"><label>Notiz</label><input type="text" id="offerNote" placeholder="Interne Notiz..."/></div>
+      <div class="form-actions">
+        <button class="btn btn-cyan" onclick="saveOffer()">Speichern</button>
+        <button class="btn" style="background:#1a1a1a;color:#fff" onclick="closeOfferModal()">Abbrechen</button>
+      </div>
+      <p id="offerEditStatus" style="margin-top:10px;font-size:12px;color:#52525b"></p>
     </div>
   </div>
 
@@ -2239,6 +2384,10 @@ function buildAdminHtml() {
           summaryPill((fulfillment.discount || 0) + '/' + (fulfillment.direct_grant || 0), 'Rabatt/Gratis', '') +
           summaryPill(summary.redemptions || 0, 'Einloesungen', (summary.redemptions || 0) ? 'green' : '') +
         '</div>' +
+        '<div class="toolbar">' +
+          '<button class="btn btn-cyan" onclick="openOfferModal()">Neuer Code</button>' +
+          '<span class="cmd">Owner-Änderungen brauchen Code-Bestätigung und werden auditiert.</span>' +
+        '</div>' +
         (offers.length
           ? '<table><thead><tr><th>Code</th><th>Typ</th><th>Status</th><th>Nutzen</th><th>Regeln</th><th>Einloesungen</th><th>Notiz</th><th>Aktion</th></tr></thead><tbody>' +
             offers.map(offer => '<tr>' +
@@ -2249,7 +2398,10 @@ function buildAdminHtml() {
               '<td style="font-size:12px;color:#71717a;max-width:320px">' + esc(offerRules(offer)) + '</td>' +
               '<td style="font-size:12px;color:#71717a">' + esc(offer.redemptions?.total || 0) + '</td>' +
               '<td style="font-size:12px;color:#71717a;max-width:260px">' + esc(offer.note || '-') + '</td>' +
-              '<td><button class="mini-btn" onclick="setOfferActiveState(' + JSON.stringify(offer.code || '') + ',' + JSON.stringify(!offer.active) + ')">' + (offer.active ? 'Deaktivieren' : 'Aktivieren') + '</button></td>' +
+              '<td><div class="row-actions">' +
+                '<button class="mini-btn" onclick="openOfferModal(' + JSON.stringify(offer.code || '') + ')">Bearbeiten</button>' +
+                '<button class="mini-btn" onclick="setOfferActiveState(' + JSON.stringify(offer.code || '') + ',' + JSON.stringify(!offer.active) + ')">' + (offer.active ? 'Deaktivieren' : 'Aktivieren') + '</button>' +
+              '</div></td>' +
             '</tr>').join('') + '</tbody></table>'
           : '<div class="empty-state">Noch keine Coupon-, Referral- oder Gratis-Codes vorhanden.</div>') +
         '<div class="section-header"><h2>Letzte Einloesungen</h2><span style="font-size:12px;color:#71717a">' + esc(formatDateTime(payload.generatedAt)) + '</span></div>' +
@@ -2265,6 +2417,97 @@ function buildAdminHtml() {
               '<td><span class="cmd">' + esc(String(entry.sessionId || '-').slice(0, 24)) + '</span></td>' +
             '</tr>').join('') + '</tbody></table>'
           : '<div class="empty-state">Noch keine Einloesungen vorhanden.</div>');
+    }
+
+    function normalizeOfferCodeClient(value) {
+      return String(value || '').trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 40);
+    }
+
+    function splitOfferList(value) {
+      return String(value || '').split(/[,\s]+/).map(v => v.trim()).filter(Boolean);
+    }
+
+    function numberOrUndefined(id) {
+      const raw = String(document.getElementById(id)?.value || '').trim();
+      if (!raw) return undefined;
+      const value = Number(raw);
+      return Number.isFinite(value) ? value : undefined;
+    }
+
+    function setOfferInput(id, value) {
+      const input = document.getElementById(id);
+      if (!input) return;
+      if ('value' in input) input.value = value == null ? '' : String(value);
+      else input.textContent = value == null ? '' : String(value);
+    }
+
+    function openOfferModal(code) {
+      const normalized = normalizeOfferCodeClient(code);
+      const offers = Array.isArray(cachedData.offers?.offers) ? cachedData.offers.offers : [];
+      const offer = normalized ? offers.find(item => item.code === normalized) : null;
+      setOfferInput('offerCode', offer?.code || '');
+      setOfferInput('offerKind', offer?.kind || 'coupon');
+      setOfferInput('offerActive', offer?.active === false ? 'false' : 'true');
+      setOfferInput('offerFulfillment', offer?.fulfillmentMode || 'discount');
+      setOfferInput('offerOwnerLabel', offer?.ownerLabel || '');
+      setOfferInput('offerPercentOff', offer?.percentOff || '');
+      setOfferInput('offerAmountOffCents', offer?.amountOffCents || '');
+      setOfferInput('offerGrantPlan', offer?.grantPlan || '');
+      setOfferInput('offerGrantSeats', offer?.grantSeats || '');
+      setOfferInput('offerGrantMonths', offer?.grantMonths || '');
+      setOfferInput('offerAllowedTiers', Array.isArray(offer?.allowedTiers) ? offer.allowedTiers.join(', ') : '');
+      setOfferInput('offerAllowedSeats', Array.isArray(offer?.allowedSeats) ? offer.allowedSeats.join(', ') : '');
+      setOfferInput('offerMinMonths', offer?.minMonths || '');
+      setOfferInput('offerMaxRedemptions', offer?.maxRedemptions || '');
+      setOfferInput('offerMaxPerEmail', offer?.maxPerEmail || '');
+      setOfferInput('offerStartsAt', offer?.startsAt || '');
+      setOfferInput('offerExpiresAt', offer?.expiresAt || '');
+      setOfferInput('offerNote', offer?.note || '');
+      setOfferInput('offerEditStatus', '');
+      document.getElementById('offerModal').classList.add('open');
+    }
+
+    function closeOfferModal() {
+      document.getElementById('offerModal').classList.remove('open');
+    }
+
+    async function saveOffer() {
+      const code = normalizeOfferCodeClient(document.getElementById('offerCode')?.value);
+      if (!code) {
+        setOfferInput('offerEditStatus', 'Code ist erforderlich.');
+        return;
+      }
+      const typed = prompt('Code speichern? Tippe exakt: ' + code);
+      if (typed == null) return;
+      const payload = {
+        code,
+        kind: document.getElementById('offerKind')?.value || 'coupon',
+        active: document.getElementById('offerActive')?.value !== 'false',
+        fulfillmentMode: document.getElementById('offerFulfillment')?.value || 'discount',
+        ownerLabel: document.getElementById('offerOwnerLabel')?.value || '',
+        percentOff: numberOrUndefined('offerPercentOff'),
+        amountOffCents: numberOrUndefined('offerAmountOffCents'),
+        grantPlan: document.getElementById('offerGrantPlan')?.value || '',
+        grantSeats: numberOrUndefined('offerGrantSeats'),
+        grantMonths: numberOrUndefined('offerGrantMonths'),
+        allowedTiers: splitOfferList(document.getElementById('offerAllowedTiers')?.value),
+        allowedSeats: splitOfferList(document.getElementById('offerAllowedSeats')?.value),
+        minMonths: numberOrUndefined('offerMinMonths'),
+        maxRedemptions: numberOrUndefined('offerMaxRedemptions'),
+        maxPerEmail: numberOrUndefined('offerMaxPerEmail'),
+        startsAt: document.getElementById('offerStartsAt')?.value || '',
+        expiresAt: document.getElementById('offerExpiresAt')?.value || '',
+        note: document.getElementById('offerNote')?.value || '',
+        confirm: typed.trim(),
+      };
+      try {
+        const result = await apiPost('offers', payload);
+        cachedData.offers = result.snapshot || await api('offers');
+        closeOfferModal();
+        renderTab('offers');
+      } catch (e) {
+        setOfferInput('offerEditStatus', 'Code konnte nicht gespeichert werden: ' + e.message);
+      }
     }
 
     async function setOfferActiveState(code, active) {

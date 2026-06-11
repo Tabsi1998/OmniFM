@@ -3090,6 +3090,7 @@ const handleAdminRoutes = createAdminRoutesHandler({
   listOffers,
   listRecentRedemptions,
   setOfferActive,
+  upsertOffer,
 });
 
 function startWebServer(runtimes) {
