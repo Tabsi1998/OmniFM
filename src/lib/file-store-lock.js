@@ -55,6 +55,10 @@ function readLockOwner(lockDir) {
   }
 }
 
+function isRetryableLockError(err) {
+  return ["ENOENT", "EBUSY", "EPERM", "EACCES"].includes(err?.code);
+}
+
 export function withFileStoreLock(filePath, fn, options = {}) {
   const lockDir = getLockDir(filePath);
   const ownerId = `${process.pid}:${Date.now()}:${randomUUID()}`;
@@ -89,14 +93,17 @@ export function withFileStoreLock(filePath, fn, options = {}) {
       acquired = true;
       break;
     } catch (err) {
-      if (err?.code !== "EEXIST") throw err;
-      if (isLockStale(lockDir, staleMs)) {
-        try {
-          fs.rmSync(lockDir, { recursive: true, force: true });
-          continue;
-        } catch {
-          // another process may have cleaned it up first
+      if (err?.code === "EEXIST") {
+        if (isLockStale(lockDir, staleMs)) {
+          try {
+            fs.rmSync(lockDir, { recursive: true, force: true });
+            continue;
+          } catch {
+            // another process may have cleaned it up first
+          }
         }
+      } else if (!isRetryableLockError(err)) {
+        throw err;
       }
       if (Date.now() - startedAt >= timeoutMs) {
         const owner = readLockOwner(lockDir);

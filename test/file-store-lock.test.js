@@ -46,6 +46,36 @@ test("file store lock can recover stale locks from dead owners", async (t) => {
   assert.equal(value, "acquired");
 });
 
+test("file store lock retries transient mkdir permission errors", async (t) => {
+  const { tempDir, filePath } = await makeTempStore();
+  const lockDir = getFileStoreLockPath(filePath);
+  const originalMkdirSync = fsSync.mkdirSync;
+  let injected = false;
+
+  t.after(async () => {
+    fsSync.mkdirSync = originalMkdirSync;
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  fsSync.mkdirSync = function mkdirSyncWithTransientError(target, options) {
+    if (!injected && target === lockDir) {
+      injected = true;
+      const error = new Error("transient lock permission error");
+      error.code = "EPERM";
+      throw error;
+    }
+    return originalMkdirSync.call(this, target, options);
+  };
+
+  const value = withFileStoreLock(filePath, () => "acquired", {
+    timeoutMs: 1000,
+    retryMs: 5,
+  });
+
+  assert.equal(value, "acquired");
+  assert.equal(injected, true);
+});
+
 test("file store lock keeps stale-looking locks when the owner process is alive", async (t) => {
   const { tempDir, filePath } = await makeTempStore();
   const lockDir = getFileStoreLockPath(filePath);
