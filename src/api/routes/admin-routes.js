@@ -14,6 +14,7 @@
 //   GET  /api/admin/config       → Owner-Einstellungen ohne Secret-Werte
 //   POST /api/admin/config       → Erlaubte Owner-Einstellungen in .env speichern
 //   POST /api/admin/config/secrets → Erlaubte Secrets write-only in .env speichern
+//   GET  /api/admin/audit        → Owner-Audit-Log ohne Secret-Werte
 //   GET  /api/admin/jobs         → Erlaubte Owner-Jobs und letzte Laeufe
 //   POST /api/admin/jobs         → Erlaubten Owner-Job starten
 //   GET  /api/admin/jobs/:id     → Einzelnen Owner-Job abrufen
@@ -27,6 +28,7 @@
 
 import { getOwnerConfigSnapshot, patchOwnerConfig, patchOwnerSecrets } from "../../lib/owner-config-store.js";
 import { getOwnerJob, getOwnerJobsSnapshot, startOwnerJob } from "../../lib/owner-job-runner.js";
+import { getOwnerAuditSnapshot, recordOwnerAudit } from "../../lib/owner-audit-store.js";
 
 export function createAdminRoutesHandler(deps) {
   const {
@@ -500,6 +502,31 @@ export function createAdminRoutesHandler(deps) {
     res.end(JSON.stringify(payload));
   }
 
+  function getRequestAuditMeta(req) {
+    const forwardedFor = String(req.headers?.["x-forwarded-for"] || "").split(",")[0].trim();
+    return {
+      ip: forwardedFor || req.socket?.remoteAddress || "",
+      userAgent: String(req.headers?.["user-agent"] || "").slice(0, 200),
+      origin: String(req.headers?.origin || "").slice(0, 200),
+    };
+  }
+
+  function auditOwnerAction(req, event) {
+    try {
+      return recordOwnerAudit({
+        actor: "owner",
+        ...event,
+        metadata: {
+          ...getRequestAuditMeta(req),
+          ...(event?.metadata && typeof event.metadata === "object" ? event.metadata : {}),
+        },
+      });
+    } catch (err) {
+      log?.("WARN", `[Owner] Audit konnte nicht geschrieben werden: ${err?.message || String(err)}`);
+      return null;
+    }
+  }
+
   function readRequestBody(req, limitBytes = 4096) {
     return new Promise((resolve, reject) => {
       let body = "";
@@ -584,6 +611,11 @@ export function createAdminRoutesHandler(deps) {
         const token = String(payload?.token || "").trim();
         if (!isAdminTokenValue(token)) {
           log?.("WARN", "[Owner] Admin login fehlgeschlagen");
+          auditOwnerAction(req, {
+            action: "owner.login",
+            status: "failed",
+            summary: "Owner-Login fehlgeschlagen",
+          });
           if (wantsHtmlRedirect) {
             res.writeHead(401, {
               ...(typeof getCommonSecurityHeaders === "function" ? getCommonSecurityHeaders() : {}),
@@ -597,6 +629,11 @@ export function createAdminRoutesHandler(deps) {
           return true;
         }
         log?.("INFO", "[Owner] Admin login erfolgreich");
+        auditOwnerAction(req, {
+          action: "owner.login",
+          status: "success",
+          summary: "Owner-Login erfolgreich",
+        });
         if (wantsHtmlRedirect) {
           redirect(res, "/admin", { "Set-Cookie": buildAdminCookie(token, req) });
         } else {
@@ -612,6 +649,11 @@ export function createAdminRoutesHandler(deps) {
     if (pathname === "/api/admin/logout") {
       if (req.method !== "POST") { methodNotAllowed(res, ["POST"]); return true; }
       log?.("INFO", "[Owner] Admin logout");
+      auditOwnerAction(req, {
+        action: "owner.logout",
+        status: "success",
+        summary: "Owner-Logout",
+      });
       const wantsHtmlRedirect = String(req.headers?.accept || "").includes("text/html");
       if (wantsHtmlRedirect) redirect(res, "/admin", { "Set-Cookie": clearAdminCookie(req) });
       else sendAdminJson(res, 200, { ok: true }, { "Set-Cookie": clearAdminCookie(req) });
@@ -686,8 +728,21 @@ export function createAdminRoutesHandler(deps) {
           const snapshot = patchOwnerConfig(payload);
           const keys = Array.isArray(snapshot.updatedKeys) ? snapshot.updatedKeys.join(", ") : "";
           log?.("INFO", `[Owner] Einstellungen gespeichert: ${keys || "keine Aenderung"}`);
+          auditOwnerAction(req, {
+            action: "owner.config.update",
+            status: "success",
+            target: "env",
+            summary: `Owner-Einstellungen gespeichert: ${keys || "keine Aenderung"}`,
+            metadata: { updatedKeys: snapshot.updatedKeys || [] },
+          });
           sendJson(res, 200, { ok: true, ...snapshot });
         } catch (err) {
+          auditOwnerAction(req, {
+            action: "owner.config.update",
+            status: "failed",
+            target: "env",
+            summary: err?.message || "Ungueltige Owner-Einstellungen",
+          });
           sendJson(res, err?.statusCode || 400, { ok: false, error: err?.message || "Ungueltige Owner-Einstellungen" });
         }
         return true;
@@ -704,10 +759,31 @@ export function createAdminRoutesHandler(deps) {
         const snapshot = patchOwnerSecrets(payload);
         const keys = Array.isArray(snapshot.updatedKeys) ? snapshot.updatedKeys.join(", ") : "";
         log?.("INFO", `[Owner] Secrets aktualisiert: ${keys || "keine Aenderung"}`);
+        auditOwnerAction(req, {
+          action: "owner.config.secrets.update",
+          status: "success",
+          target: "env",
+          summary: `Owner-Secrets aktualisiert: ${keys || "keine Aenderung"}`,
+          metadata: { updatedKeys: snapshot.updatedKeys || [] },
+        });
         sendJson(res, 200, { ok: true, ...snapshot });
       } catch (err) {
+        auditOwnerAction(req, {
+          action: "owner.config.secrets.update",
+          status: "failed",
+          target: "env",
+          summary: err?.message || "Ungueltige Owner-Secrets",
+        });
         sendJson(res, err?.statusCode || 400, { ok: false, error: err?.message || "Ungueltige Owner-Secrets" });
       }
+      return true;
+    }
+
+    // GET /api/admin/audit
+    if (pathname === "/api/admin/audit") {
+      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
+      const limit = Number.parseInt(String(requestUrl?.searchParams?.get("limit") || "100"), 10);
+      sendJson(res, 200, getOwnerAuditSnapshot({ limit }));
       return true;
     }
 
@@ -723,8 +799,20 @@ export function createAdminRoutesHandler(deps) {
           const actionId = String(payload?.actionId || "").trim();
           const job = startOwnerJob(actionId);
           log?.("INFO", `[Owner] Job gestartet: ${job.actionId} (${job.id})`);
+          auditOwnerAction(req, {
+            action: "owner.job.start",
+            status: "success",
+            target: job.actionId,
+            summary: `Owner-Job gestartet: ${job.actionId}`,
+            metadata: { jobId: job.id, risk: job.risk },
+          });
           sendJson(res, 202, { ok: true, job });
         } catch (err) {
+          auditOwnerAction(req, {
+            action: "owner.job.start",
+            status: "failed",
+            summary: err?.message || "Owner-Job konnte nicht gestartet werden",
+          });
           sendJson(res, err?.statusCode || 400, { ok: false, error: err?.message || "Owner-Job konnte nicht gestartet werden" });
         }
         return true;
@@ -759,24 +847,33 @@ export function createAdminRoutesHandler(deps) {
     if (licenseMatch) {
       if (req.method !== "POST" && req.method !== "PATCH") { methodNotAllowed(res, ["POST", "PATCH"]); return true; }
       const licenseId = decodeURIComponent(licenseMatch[1]);
-      let body = "";
-      req.on("data", (chunk) => { body += chunk; });
-      req.on("end", () => {
-        try {
-          const patch = JSON.parse(body || "{}");
-          // Sicherheit: Nur erlaubte Felder patchen
-          const allowed = ["active", "expired", "expiresAt", "plan", "tier", "seats", "linkedServerIds", "contactEmail", "notes"];
-          const safePatch = {};
-          for (const key of allowed) {
-            if (key in patch) safePatch[key] = patch[key];
-          }
-          patchLicenseById?.(licenseId, safePatch);
-          log?.("INFO", `[Admin] Lizenz ${licenseId} gepatcht: ${JSON.stringify(safePatch)}`);
-          sendJson(res, 200, { ok: true, licenseId, patched: safePatch });
-        } catch (err) {
-          sendJson(res, 400, { ok: false, error: err?.message || "Ungültiger Body" });
+      try {
+        const patch = JSON.parse(await readRequestBody(req) || "{}");
+        // Sicherheit: Nur erlaubte Felder patchen
+        const allowed = ["active", "expired", "expiresAt", "plan", "tier", "seats", "linkedServerIds", "contactEmail", "notes"];
+        const safePatch = {};
+        for (const key of allowed) {
+          if (key in patch) safePatch[key] = patch[key];
         }
-      });
+        patchLicenseById?.(licenseId, safePatch);
+        log?.("INFO", `[Admin] Lizenz ${licenseId} gepatcht: ${JSON.stringify(safePatch)}`);
+        auditOwnerAction(req, {
+          action: "owner.license.patch",
+          status: "success",
+          target: licenseId,
+          summary: `Lizenz gepatcht: ${licenseId}`,
+          metadata: { patchedKeys: Object.keys(safePatch) },
+        });
+        sendJson(res, 200, { ok: true, licenseId, patched: safePatch });
+      } catch (err) {
+        auditOwnerAction(req, {
+          action: "owner.license.patch",
+          status: "failed",
+          target: licenseId,
+          summary: err?.message || "Ungueltiger Body",
+        });
+        sendJson(res, 400, { ok: false, error: err?.message || "Ungültiger Body" });
+      }
       return true;
     }
 
@@ -1014,6 +1111,7 @@ function buildAdminHtml() {
         <button class="tab" onclick="showTab('operations', this)">⚙️ Betrieb</button>
         <button class="tab" onclick="showTab('config', this)">🔧 Einstellungen</button>
         <button class="tab" onclick="showTab('jobs', this)">▶ Aktionen</button>
+        <button class="tab" onclick="showTab('audit', this)">🧾 Audit</button>
       </div>
       <div id="content"><div class="loading">Lade Daten...</div></div>
     </div>
@@ -1074,7 +1172,7 @@ function buildAdminHtml() {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       if (trigger) trigger.classList.add('active');
       else {
-        const index = ['bots','diagnostics','guilds','licenses','stations','logs','operations','config','jobs'].indexOf(tab);
+        const index = ['bots','diagnostics','guilds','licenses','stations','logs','operations','config','jobs','audit'].indexOf(tab);
         const buttons = document.querySelectorAll('.tab');
         if (buttons[index]) buttons[index].classList.add('active');
       }
@@ -1194,14 +1292,17 @@ function buildAdminHtml() {
       } else if (tab === 'jobs') {
         if (!d.jobs) { el.innerHTML = '<div class="loading">Lade Aktionen...</div>'; return; }
         el.innerHTML = renderJobs(d.jobs);
+      } else if (tab === 'audit') {
+        if (!d.audit) { el.innerHTML = '<div class="loading">Lade Audit...</div>'; return; }
+        el.innerHTML = renderAudit(d.audit);
       }
     }
 
     async function loadAll() {
       document.getElementById('serverTime').textContent = 'Lädt...';
       try {
-        const [overview, guilds, licenses, stations, logs, diagnostics, operations, config, jobs] = await Promise.allSettled([
-          api('overview'), api('guilds'), api('licenses'), api('stations'), api('logs'), api('diagnostics'), api('operations'), api('config'), api('jobs')
+        const [overview, guilds, licenses, stations, logs, diagnostics, operations, config, jobs, audit] = await Promise.allSettled([
+          api('overview'), api('guilds'), api('licenses'), api('stations'), api('logs'), api('diagnostics'), api('operations'), api('config'), api('jobs'), api('audit')
         ]);
         if (overview.status === 'fulfilled') {
           cachedData.overview = overview.value;
@@ -1230,6 +1331,7 @@ function buildAdminHtml() {
         if (operations.status === 'fulfilled') cachedData.operations = operations.value;
         if (config.status === 'fulfilled') cachedData.config = config.value;
         if (jobs.status === 'fulfilled') cachedData.jobs = jobs.value;
+        if (audit.status === 'fulfilled') cachedData.audit = audit.value;
         renderTab(currentTab);
       } catch(e) {
         document.getElementById('content').innerHTML = '<div class="error-msg">Fehler: ' + esc(e.message) + '</div>';
@@ -1361,6 +1463,27 @@ function buildAdminHtml() {
       }
     }
 
+    function renderAudit(payload) {
+      const events = Array.isArray(payload.events) ? payload.events : [];
+      return '<div class="summary-row">' +
+          summaryPill(payload.total || events.length, 'Audit Events', '') +
+          summaryPill(events.filter(e => e.status === 'failed' || e.status === 'denied').length, 'Fehler/Denied', events.some(e => e.status === 'failed' || e.status === 'denied') ? 'amber' : 'green') +
+          summaryPill(events.length, 'Angezeigt', '') +
+          summaryPill(payload.file ? 'OK' : 'FEHLT', 'Audit-Datei', payload.file ? 'green' : 'red') +
+        '</div>' +
+        (events.length
+          ? '<table><thead><tr><th>Zeit</th><th>Status</th><th>Aktion</th><th>Ziel</th><th>Zusammenfassung</th><th>Meta</th></tr></thead><tbody>' +
+            events.map(event => '<tr>' +
+              '<td style="font-size:11px;color:#71717a;white-space:nowrap">' + esc(formatDateTime(event.timestamp)) + '</td>' +
+              '<td>' + auditStatusBadge(event.status) + '</td>' +
+              '<td><b>' + esc(event.action || '-') + '</b><div style="font-size:11px;color:#52525b">' + esc(event.actor || 'owner') + '</div></td>' +
+              '<td style="font-size:12px;color:#71717a">' + esc(event.target || '-') + '</td>' +
+              '<td style="font-size:12px;max-width:380px">' + esc(event.summary || '-') + '</td>' +
+              '<td><span class="cmd">' + esc(compactJson(event.metadata || {})) + '</span></td>' +
+            '</tr>').join('') + '</tbody></table>'
+          : '<div class="empty-state">Noch keine Owner-Audit-Events.</div>');
+    }
+
     function renderJobs(payload) {
       const actions = Array.isArray(payload.actions) ? payload.actions : [];
       const jobs = Array.isArray(payload.jobs) ? payload.jobs : [];
@@ -1429,6 +1552,21 @@ function buildAdminHtml() {
       if (status === 'succeeded') return '<span class="badge-up">OK</span>';
       if (status === 'running') return '<span class="badge-unknown">LAEUFT</span>';
       return '<span class="badge-down">FEHLER</span>';
+    }
+
+    function auditStatusBadge(status) {
+      if (status === 'success') return '<span class="badge-up">OK</span>';
+      if (status === 'failed' || status === 'denied') return '<span class="badge-down">FEHLER</span>';
+      return '<span class="badge-unknown">INFO</span>';
+    }
+
+    function compactJson(value) {
+      try {
+        const text = JSON.stringify(value || {});
+        return text.length > 160 ? text.slice(0, 157) + '...' : text;
+      } catch {
+        return '{}';
+      }
     }
 
     function formatDateTime(value) {

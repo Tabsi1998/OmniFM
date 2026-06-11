@@ -128,6 +128,7 @@ test("pageRouting resolves aliases and localized legal paths", () => {
 test("startWebServer serves SPA entry for clean legal paths and exposes terms payload", async () => {
   const ownerEnvDir = await fs.mkdtemp(path.join(os.tmpdir(), "omnifm-admin-config-"));
   const ownerEnvFile = path.join(ownerEnvDir, ".env");
+  const ownerAuditFile = path.join(ownerEnvDir, "owner-audit.json");
   await fs.writeFile(
     ownerEnvFile,
     "PUBLIC_WEB_URL=https://omnifm.xyz\nAPI_ADMIN_TOKEN=admin-route-token\nLOG_MAX_MB=5\n",
@@ -161,6 +162,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     OMNIFM_LAST_DEPLOY_STATUS: "success",
     OMNIFM_LAST_LIVE_SMOKE_STATUS: "success",
     OMNIFM_ENV_FILE: ownerEnvFile,
+    OMNIFM_OWNER_AUDIT_FILE: ownerAuditFile,
     STRIPE_SECRET_KEY: undefined,
     SMTP_PASS: undefined,
     DISCORD_CLIENT_SECRET: undefined,
@@ -290,10 +292,12 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.match(adminPanelHtml, /Betrieb/);
     assert.match(adminPanelHtml, /Einstellungen/);
     assert.match(adminPanelHtml, /Aktionen/);
+    assert.match(adminPanelHtml, /Audit/);
     assert.match(adminPanelHtml, /renderOperations/);
     assert.match(adminPanelHtml, /renderConfig/);
     assert.match(adminPanelHtml, /saveSecrets/);
     assert.match(adminPanelHtml, /renderJobs/);
+    assert.match(adminPanelHtml, /renderAudit/);
 
     const adminOverviewResponse = await fetch(`http://127.0.0.1:${port}/api/admin/overview`, {
       headers: { Cookie: adminCookieHeader },
@@ -389,6 +393,17 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.match(secretEnvContent, /STRIPE_SECRET_KEY=sk_live_owner_test/);
     assert.match(secretEnvContent, /SMTP_PASS=smtp-owner-test/);
 
+    const adminAuditResponse = await fetch(`http://127.0.0.1:${port}/api/admin/audit`, {
+      headers: { Cookie: adminCookieHeader },
+    });
+    assert.equal(adminAuditResponse.status, 200);
+    const adminAudit = await adminAuditResponse.json();
+    assert.equal(adminAudit.file, ownerAuditFile);
+    assert.ok(adminAudit.events.some((event) => event.action === "owner.login" && event.status === "success"));
+    assert.ok(adminAudit.events.some((event) => event.action === "owner.config.update" && event.metadata.updatedKeys.includes("DEFAULT_LANGUAGE")));
+    assert.ok(adminAudit.events.some((event) => event.action === "owner.config.secrets.update" && event.metadata.updatedKeys.includes("STRIPE_SECRET_KEY")));
+    assert.doesNotMatch(JSON.stringify(adminAudit), /sk_live_owner_test|smtp-owner-test|admin-route-token/);
+
     const adminJobsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
       headers: { Cookie: adminCookieHeader },
     });
@@ -426,6 +441,13 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     }
     assert.equal(adminJobResult.job.status, "succeeded");
     assert.match(adminJobResult.job.output, /Rollback plan:/);
+
+    const adminAuditAfterJobResponse = await fetch(`http://127.0.0.1:${port}/api/admin/audit`, {
+      headers: { Cookie: adminCookieHeader },
+    });
+    assert.equal(adminAuditAfterJobResponse.status, 200);
+    const adminAuditAfterJob = await adminAuditAfterJobResponse.json();
+    assert.ok(adminAuditAfterJob.events.some((event) => event.action === "owner.job.start" && event.target === "rollback-plan"));
 
     const adminGuildsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/guilds`, {
       headers: { Cookie: adminCookieHeader },
