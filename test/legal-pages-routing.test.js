@@ -396,8 +396,24 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
       && operation.webStatus === "available"
       && operation.cli === "./update.sh --show-roles"
     )));
+    assert.ok(adminOperations.operations.some((operation) => (
+      operation.id === "offers"
+      && operation.webStatus === "partial"
+      && /read-only/i.test(operation.webEntry)
+    )));
     assert.ok(adminOperations.summary.available >= 1);
     assert.ok(adminOperations.summary.planned >= 1);
+
+    const adminOffersResponse = await fetch(`http://127.0.0.1:${port}/api/admin/offers`, {
+      headers: { Cookie: adminCookieHeader },
+    });
+    assert.equal(adminOffersResponse.status, 200);
+    const adminOffers = await adminOffersResponse.json();
+    assert.equal(typeof adminOffers.generatedAt, "string");
+    assert.ok(Array.isArray(adminOffers.offers));
+    assert.ok(Array.isArray(adminOffers.redemptions));
+    assert.equal(typeof adminOffers.summary.total, "number");
+    assert.equal(typeof adminOffers.summary.byFulfillment, "object");
 
     const adminLogFilesResponse = await fetch(`http://127.0.0.1:${port}/api/admin/log-files`, {
       headers: { Cookie: adminCookieHeader },

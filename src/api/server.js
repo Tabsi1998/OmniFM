@@ -3087,6 +3087,8 @@ const handleAdminRoutes = createAdminRoutesHandler({
   buildPublicLegalNotice,
   buildPublicPrivacyNotice,
   buildPublicTermsNotice,
+  listOffers,
+  listRecentRedemptions,
 });
 
 function startWebServer(runtimes) {

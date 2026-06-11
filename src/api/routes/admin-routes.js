@@ -21,6 +21,7 @@
 //   GET  /api/admin/jobs         → Erlaubte Owner-Jobs und letzte Laeufe
 //   POST /api/admin/jobs         → Erlaubten Owner-Job starten
 //   GET  /api/admin/jobs/:id     → Einzelnen Owner-Job abrufen
+//   GET  /api/admin/offers       → Coupon/Referral/Gratis-Code Uebersicht
 //   GET  /api/admin/licenses     → Alle Lizenzen
 //   POST /api/admin/licenses/:id → Lizenz patchen (aktivieren, verlängern, sperren)
 //   GET  /api/admin/guilds       → Alle Guilds mit Status
@@ -56,6 +57,8 @@ export function createAdminRoutesHandler(deps) {
     buildPublicLegalNotice,
     buildPublicPrivacyNotice,
     buildPublicTermsNotice,
+    listOffers,
+    listRecentRedemptions,
   } = deps;
 
   function getRuntimes() {
@@ -301,11 +304,11 @@ export function createAdminRoutesHandler(deps) {
         area: "Billing",
         title: "Codes verwalten",
         cli: "./update.sh --offers",
-        webStatus: "planned",
+        webStatus: "partial",
         risk: "medium",
         description: "Coupons, Referrals und direkte Gratis-Lizenzen erstellen und pruefen.",
-        webEntry: "Noch nicht als Web-Aktion freigeschaltet",
-        nextStep: "Offer-Editor mit Preview, Limits und Redemption-Status."
+        webEntry: "Tab Codes zeigt Offers und letzte Redemptions read-only.",
+        nextStep: "Offer-Editor mit Preview, Limits, Aktiv/Inaktiv-Schalter und Audit-Log."
       },
       {
         id: "email",
@@ -440,6 +443,37 @@ export function createAdminRoutesHandler(deps) {
       total: operations.length,
       summary,
       operations
+    };
+  }
+
+  function buildOwnerOffersSnapshot() {
+    const offers = typeof listOffers === "function"
+      ? listOffers({ includeInactive: true, includeStats: true })
+      : [];
+    const redemptions = typeof listRecentRedemptions === "function"
+      ? listRecentRedemptions(50)
+      : [];
+    const summary = offers.reduce((acc, offer) => {
+      acc.total += 1;
+      if (offer.active) acc.active += 1;
+      else acc.inactive += 1;
+      acc.byKind[offer.kind || "coupon"] = (acc.byKind[offer.kind || "coupon"] || 0) + 1;
+      acc.byFulfillment[offer.fulfillmentMode || "discount"] = (acc.byFulfillment[offer.fulfillmentMode || "discount"] || 0) + 1;
+      acc.redemptions += Number(offer.redemptions?.total || 0);
+      return acc;
+    }, {
+      total: 0,
+      active: 0,
+      inactive: 0,
+      redemptions: 0,
+      byKind: {},
+      byFulfillment: {},
+    });
+    return {
+      generatedAt: new Date().toISOString(),
+      summary,
+      offers,
+      redemptions,
     };
   }
 
@@ -798,6 +832,13 @@ export function createAdminRoutesHandler(deps) {
     if (pathname === "/api/admin/operations") {
       if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
       sendJson(res, 200, buildOwnerOperationsManifest());
+      return true;
+    }
+
+    // GET /api/admin/offers
+    if (pathname === "/api/admin/offers") {
+      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
+      sendJson(res, 200, buildOwnerOffersSnapshot());
       return true;
     }
 
@@ -1390,6 +1431,7 @@ function buildAdminHtml() {
         <button class="tab" onclick="showTab('diagnostics', this)">🧭 Diagnose</button>
         <button class="tab" onclick="showTab('guilds', this)">🏠 Guilds</button>
         <button class="tab" onclick="showTab('licenses', this)">🔑 Lizenzen</button>
+        <button class="tab" onclick="showTab('offers', this)">🏷️ Codes</button>
         <button class="tab" onclick="showTab('stations', this)">📻 Stationen</button>
         <button class="tab" onclick="showTab('logs', this)">📋 Logs</button>
         <button class="tab" onclick="showTab('operations', this)">⚙️ Betrieb</button>
@@ -1457,7 +1499,7 @@ function buildAdminHtml() {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       if (trigger) trigger.classList.add('active');
       else {
-        const index = ['bots','diagnostics','guilds','licenses','stations','logs','operations','config','jobs','audit'].indexOf(tab);
+        const index = ['bots','diagnostics','guilds','licenses','offers','stations','logs','operations','config','jobs','audit'].indexOf(tab);
         const buttons = document.querySelectorAll('.tab');
         if (buttons[index]) buttons[index].classList.add('active');
       }
@@ -1510,6 +1552,9 @@ function buildAdminHtml() {
               '<td><button class="btn btn-amber" style="font-size:11px;padding:4px 10px" onclick="editLicense(' + JSON.stringify(id) + ')">Bearbeiten</button></td>' +
             '</tr>';
           }).join('') + '</tbody></table>';
+      } else if (tab === 'offers') {
+        if (!d.offers) { el.innerHTML = '<div class="loading">Lade Codes...</div>'; return; }
+        el.innerHTML = renderOffers(d.offers);
       } else if (tab === 'stations') {
         if (!d.stations) { el.innerHTML = '<div class="loading">Lade...</div>'; return; }
         const stations = (d.stations.stations || []).slice().sort(sortStations);
@@ -1589,8 +1634,8 @@ function buildAdminHtml() {
     async function loadAll() {
       document.getElementById('serverTime').textContent = 'Lädt...';
       try {
-        const [overview, guilds, licenses, stations, logs, logFiles, diagnostics, operations, config, legal, mail, jobs, audit] = await Promise.allSettled([
-          api('overview'), api('guilds'), api('licenses'), api('stations'), api('logs'), api('log-files'), api('diagnostics'), api('operations'), api('config'), api('legal'), api('mail'), api('jobs'), api('audit')
+        const [overview, guilds, licenses, offers, stations, logs, logFiles, diagnostics, operations, config, legal, mail, jobs, audit] = await Promise.allSettled([
+          api('overview'), api('guilds'), api('licenses'), api('offers'), api('stations'), api('logs'), api('log-files'), api('diagnostics'), api('operations'), api('config'), api('legal'), api('mail'), api('jobs'), api('audit')
         ]);
         if (overview.status === 'fulfilled') {
           cachedData.overview = overview.value;
@@ -1613,6 +1658,7 @@ function buildAdminHtml() {
         }
         if (guilds.status === 'fulfilled') cachedData.guilds = guilds.value;
         if (licenses.status === 'fulfilled') cachedData.licenses = licenses.value;
+        if (offers.status === 'fulfilled') cachedData.offers = offers.value;
         if (stations.status === 'fulfilled') cachedData.stations = stations.value;
         if (logs.status === 'fulfilled') cachedData.logs = logs.value;
         if (logFiles.status === 'fulfilled') cachedData.logFiles = logFiles.value;
@@ -2091,6 +2137,71 @@ function buildAdminHtml() {
       if (bytes < 1024) return bytes + ' B';
       if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
       return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+    }
+
+    function formatMoneyCents(value) {
+      const cents = Number(value || 0) || 0;
+      return (cents / 100).toFixed(2).replace('.', ',') + ' EUR';
+    }
+
+    function offerBenefit(offer) {
+      if (offer?.fulfillmentMode === 'direct_grant') {
+        return 'Gratis ' + String(offer.grantPlan || '-').toUpperCase() + ' · ' + esc(offer.grantMonths || '-') + ' Mon. · ' + esc(offer.grantSeats || '-') + ' Seat(s)';
+      }
+      if (Number(offer?.percentOff || 0) > 0) return esc(offer.percentOff) + '% Rabatt';
+      if (Number(offer?.amountOffCents || 0) > 0) return formatMoneyCents(offer.amountOffCents) + ' Rabatt';
+      return '-';
+    }
+
+    function offerRules(offer) {
+      const rules = [];
+      if (Array.isArray(offer?.allowedTiers) && offer.allowedTiers.length) rules.push('tier=' + offer.allowedTiers.join('/'));
+      if (Array.isArray(offer?.allowedSeats) && offer.allowedSeats.length) rules.push('seats=' + offer.allowedSeats.join('/'));
+      if (Number(offer?.minMonths || 0) > 0) rules.push('min=' + offer.minMonths + 'mo');
+      if (Number(offer?.maxRedemptions || 0) > 0) rules.push('max=' + offer.maxRedemptions);
+      if (Number(offer?.maxPerEmail || 0) > 0) rules.push('email=' + offer.maxPerEmail);
+      if (offer?.startsAt) rules.push('ab=' + String(offer.startsAt).slice(0, 10));
+      if (offer?.expiresAt) rules.push('bis=' + String(offer.expiresAt).slice(0, 10));
+      return rules.join(' · ') || '-';
+    }
+
+    function renderOffers(payload) {
+      const offers = Array.isArray(payload.offers) ? payload.offers : [];
+      const redemptions = Array.isArray(payload.redemptions) ? payload.redemptions : [];
+      const summary = payload.summary || {};
+      const fulfillment = summary.byFulfillment || {};
+      return '<div class="summary-row">' +
+          summaryPill(summary.total || offers.length, 'Codes gesamt', '') +
+          summaryPill(summary.active || 0, 'Aktiv', (summary.active || 0) ? 'green' : 'amber') +
+          summaryPill(summary.inactive || 0, 'Inaktiv', (summary.inactive || 0) ? 'amber' : 'green') +
+          summaryPill((fulfillment.discount || 0) + '/' + (fulfillment.direct_grant || 0), 'Rabatt/Gratis', '') +
+          summaryPill(summary.redemptions || 0, 'Einloesungen', (summary.redemptions || 0) ? 'green' : '') +
+        '</div>' +
+        (offers.length
+          ? '<table><thead><tr><th>Code</th><th>Typ</th><th>Status</th><th>Nutzen</th><th>Regeln</th><th>Einloesungen</th><th>Notiz</th></tr></thead><tbody>' +
+            offers.map(offer => '<tr>' +
+              '<td><b class="cmd">' + esc(offer.code || '-') + '</b><div style="font-size:11px;color:#52525b">' + esc(offer.ownerLabel || '-') + '</div></td>' +
+              '<td style="font-size:12px;color:#71717a">' + esc(offer.kind || 'coupon') + '</td>' +
+              '<td>' + (offer.active ? '<span class="badge-up">AKTIV</span>' : '<span class="badge-unknown">INAKTIV</span>') + '</td>' +
+              '<td style="font-size:12px;color:#d4d4d8">' + offerBenefit(offer) + '</td>' +
+              '<td style="font-size:12px;color:#71717a;max-width:320px">' + esc(offerRules(offer)) + '</td>' +
+              '<td style="font-size:12px;color:#71717a">' + esc(offer.redemptions?.total || 0) + '</td>' +
+              '<td style="font-size:12px;color:#71717a;max-width:260px">' + esc(offer.note || '-') + '</td>' +
+            '</tr>').join('') + '</tbody></table>'
+          : '<div class="empty-state">Noch keine Coupon-, Referral- oder Gratis-Codes vorhanden.</div>') +
+        '<div class="section-header"><h2>Letzte Einloesungen</h2><span style="font-size:12px;color:#71717a">' + esc(formatDateTime(payload.generatedAt)) + '</span></div>' +
+        (redemptions.length
+          ? '<table><thead><tr><th>Zeit</th><th>Code</th><th>Typ</th><th>Plan</th><th>Betrag</th><th>E-Mail</th><th>Session</th></tr></thead><tbody>' +
+            redemptions.slice(0, 25).map(entry => '<tr>' +
+              '<td style="font-size:11px;color:#71717a;white-space:nowrap">' + esc(formatDateTime(entry.processedAt)) + '</td>' +
+              '<td><b>' + esc(entry.code || '-') + '</b></td>' +
+              '<td style="font-size:12px;color:#71717a">' + esc(entry.kind || '-') + '</td>' +
+              '<td style="font-size:12px;color:#71717a">' + esc(entry.tier || '-') + ' / ' + esc(entry.seats || '-') + ' / ' + esc(entry.months || '-') + 'mo</td>' +
+              '<td style="font-size:12px;color:#71717a">' + formatMoneyCents(entry.finalAmountCents || 0) + ' <span style="color:#52525b">(disc ' + formatMoneyCents(entry.discountCents || 0) + ')</span></td>' +
+              '<td style="font-size:12px;color:#71717a">' + esc(entry.email || '-') + '</td>' +
+              '<td><span class="cmd">' + esc(String(entry.sessionId || '-').slice(0, 24)) + '</span></td>' +
+            '</tr>').join('') + '</tbody></table>'
+          : '<div class="empty-state">Noch keine Einloesungen vorhanden.</div>');
     }
 
     function renderOperations(payload) {
