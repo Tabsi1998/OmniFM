@@ -377,11 +377,11 @@ export function createAdminRoutesHandler(deps) {
         id: "status",
         area: "Operations",
         title: "Status & Logs",
-        cli: "./update.sh --status / --status quick / --status live / --status local-live",
+        cli: "./update.sh --status quick|containers|health|docker-logs|local-logs|mongo|storage",
         webStatus: "available",
         risk: "low",
         description: "Status, Health, Logs und Cockpit-Ansichten.",
-        webEntry: "Tabs Bots, Diagnose, Guilds, Stationen und Logs; Tab Aktionen kann Status Quick nicht-interaktiv starten.",
+        webEntry: "Tabs Bots, Diagnose, Guilds, Stationen und Logs; Tab Aktionen kann gezielte update.sh Status-Jobs starten.",
         nextStep: "Optional spaeter: Live-Log-Streaming und Status-Historie im Web."
       },
       {

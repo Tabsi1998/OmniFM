@@ -385,6 +385,12 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.ok(adminOperations.operations.some((operation) => (
       operation.id === "recognition-test" && operation.webStatus === "available"
     )));
+    assert.ok(adminOperations.operations.some((operation) => (
+      operation.id === "status"
+      && operation.webStatus === "available"
+      && operation.cli.includes("containers")
+      && operation.cli.includes("storage")
+    )));
     assert.ok(adminOperations.summary.available >= 1);
     assert.ok(adminOperations.summary.planned >= 1);
 
