@@ -389,11 +389,11 @@ export function createAdminRoutesHandler(deps) {
         area: "Operations",
         title: "Speicher Cleanup",
         cli: "./update.sh --cleanup",
-        webStatus: "planned",
+        webStatus: "partial",
         risk: "high",
         description: "Logs, Backups und Docker-Cache aufraeumen.",
-        webEntry: "Noch nicht als Web-Aktion freigeschaltet",
-        nextStep: "Dry-run, Confirm-Step, Ergebnisprotokoll und harte Pfadbegrenzung."
+        webEntry: "Tab Aktionen kann Cleanup Dry-Run read-only starten; echter Cleanup bleibt CLI-only.",
+        nextStep: "Echten Cleanup erst mit Confirm-Step, Ergebnisprotokoll und harter Pfadbegrenzung freischalten."
       },
       {
         id: "doctor",

@@ -110,6 +110,16 @@ const OWNER_JOB_ACTIONS = [
     description: "Fuehrt den nicht-interaktiven update.sh Status-Check mit Runtime, Logs, MongoDB und Speicheruebersicht aus.",
   },
   {
+    id: "cleanup-dry-run",
+    title: "Cleanup Dry-Run",
+    area: "Operations",
+    risk: "low",
+    timeoutMs: 60_000,
+    command: "bash",
+    args: ["./update.sh", "--cleanup", "dry-run"],
+    description: "Zeigt, welche Logs, Backups und Docker-Caches ein Cleanup betreffen wuerde, ohne etwas zu loeschen.",
+  },
+  {
     id: "system-doctor",
     title: "System Doctor",
     area: "Betrieb",

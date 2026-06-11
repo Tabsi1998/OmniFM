@@ -1424,6 +1424,72 @@ cleanup_docker_cache() {
   docker image prune -f >/dev/null 2>&1 || warn "docker image prune fehlgeschlagen."
 }
 
+show_cleanup_dry_run() {
+  local keep days logs_dir auto_prune prune_until backup_keep
+  keep="$(read_env "LOG_MAX_FILES" "30")"
+  days="$(read_env "LOG_MAX_DAYS" "14")"
+  logs_dir="$(get_logs_dir)"
+  auto_prune="$(read_env "AUTO_DOCKER_PRUNE" "1")"
+  prune_until="$(read_env "DOCKER_BUILDER_PRUNE_UNTIL" "168h")"
+  backup_keep="${UPDATE_BACKUP_KEEP:-20}"
+
+  if [[ ! "$keep" =~ ^[0-9]+$ ]] || (( keep < 1 )); then
+    keep=30
+  fi
+  if [[ ! "$days" =~ ^[0-9]+$ ]] || (( days < 1 )); then
+    days=14
+  fi
+  if [[ ! "$backup_keep" =~ ^[0-9]+$ ]] || (( backup_keep < 5 )); then
+    backup_keep=20
+  fi
+
+  echo ""
+  echo -e "  ${BOLD}Cleanup Dry-Run:${NC}"
+  echo "  ------------------------------------"
+  echo -e "    Modus: ${CYAN}read-only${NC} - es wird nichts geloescht."
+  echo -e "    Log-Regeln: max. ${CYAN}${keep}${NC} Dateien je Typ, aelter als ${CYAN}${days}${NC} Tage entfernen."
+  echo -e "    Backup-Regel: max. ${CYAN}${backup_keep}${NC} Backups je Datei-Typ behalten."
+
+  local backup_remove_count=0
+  local prefix
+  for prefix in ".env" "premium.json" "bot-state.json" "custom-stations.json" "command-permissions.json" "guild-languages.json" "song-history.json" "scheduled-events.json" "coupons.json" "dashboard.json" "discordbotlist.json" "botsgg.json" "topgg.json" "vote-events.json"; do
+    local -a backup_files=()
+    mapfile -t backup_files < <(ls -1t ".update-backups/${prefix}."* 2>/dev/null || true)
+    if (( ${#backup_files[@]} > backup_keep )); then
+      backup_remove_count=$((backup_remove_count + ${#backup_files[@]} - backup_keep))
+    fi
+  done
+  echo -e "    Update-Backups ausserhalb Keep-Limit: ${CYAN}${backup_remove_count}${NC}"
+
+  local log_remove_count=0
+  local log_old_count=0
+  for prefix in bot error; do
+    local -a log_files=()
+    mapfile -t log_files < <(ls -1t "$logs_dir"/"${prefix}"-*.log 2>/dev/null || true)
+    if (( ${#log_files[@]} > keep )); then
+      log_remove_count=$((log_remove_count + ${#log_files[@]} - keep))
+    fi
+    local old_count
+    old_count="$(find "$logs_dir" -maxdepth 1 -type f -name "${prefix}-*.log" -mtime +"$days" 2>/dev/null | wc -l | xargs)"
+    log_old_count=$((log_old_count + ${old_count:-0}))
+  done
+  echo -e "    Rotierte Logs ausserhalb Datei-Limit: ${CYAN}${log_remove_count}${NC}"
+  echo -e "    Rotierte Logs aelter als ${days} Tage: ${CYAN}${log_old_count}${NC}"
+
+  if [[ "$auto_prune" == "0" ]]; then
+    echo -e "    Docker-Prune: ${YELLOW}deaktiviert${NC} (AUTO_DOCKER_PRUNE=0)"
+  else
+    echo -e "    Docker-Prune: ${CYAN}wuerde Build-Cache older than ${prune_until} und dangling Images pruefen${NC}"
+    if docker system df >/dev/null 2>&1; then
+      docker system df 2>/dev/null | sed 's/^/    /'
+    else
+      warn "Docker-Systemuebersicht nicht verfuegbar."
+    fi
+  fi
+
+  show_storage_overview
+}
+
 show_storage_overview() {
   echo ""
   echo -e "  ${BOLD}Speicher-Check:${NC}"
@@ -2236,6 +2302,12 @@ if [[ "$MODE" == "--cleanup" ]]; then
   echo ""
   echo -e "  ${BOLD}Speicher cleanup${NC}"
   echo "  ------------------------------------"
+
+  if [[ "${MODE_ARG:-}" == "dry-run" ]]; then
+    show_cleanup_dry_run
+    ok "Cleanup Dry-Run abgeschlossen."
+    exit 0
+  fi
 
   prune_update_backups
   cleanup_rotated_logs
@@ -3969,6 +4041,7 @@ echo -e "    Live Docker-Log:  ${GREEN}./update.sh --status live${NC}"
 echo -e "    Live Local-Log:   ${GREEN}./update.sh --status local-live${NC}"
 echo -e "    Compose Wrapper:  ${GREEN}bash ./scripts/compose.sh ps${NC}"
 echo -e "    Speicher cleanup: ${GREEN}./update.sh --cleanup${NC}"
+echo -e "    Cleanup Dry-Run:  ${GREEN}./update.sh --cleanup dry-run${NC}"
 echo -e "    Recognition-Test:${GREEN} ./update.sh --recognition-test <URL>${NC}"
 echo -e "    Dieses Menue:     ${GREEN}./update.sh${NC}"
 echo ""
