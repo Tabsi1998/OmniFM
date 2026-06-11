@@ -12,6 +12,7 @@ import {
   getCanonicalPagePath,
   resolvePageFromUrl,
 } from "../frontend/src/lib/pageRouting.js";
+import { upsertOffer } from "../src/coupon-store.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -22,6 +23,8 @@ const frontendSitemapPath = path.join(frontendBuildDir, "sitemap.xml");
 const frontendManifestPath = path.join(frontendBuildDir, "manifest.json");
 const frontendBotIconDir = path.join(frontendBuildDir, "img");
 const frontendBotIconPath = path.join(frontendBotIconDir, "bot-1.png");
+const couponsPath = path.join(repoRoot, "coupons.json");
+const couponsBackupPath = path.join(repoRoot, "coupons.json.bak");
 
 async function snapshotFile(filePath) {
   try {
@@ -181,6 +184,8 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
   const sitemapSnapshot = await snapshotFile(frontendSitemapPath);
   const manifestSnapshot = await snapshotFile(frontendManifestPath);
   const botIconSnapshot = await snapshotFile(frontendBotIconPath);
+  const couponsSnapshot = await snapshotFile(couponsPath);
+  const couponsBackupSnapshot = await snapshotFile(couponsBackupPath);
   await fs.mkdir(frontendBuildDir, { recursive: true });
   await fs.writeFile(
     frontendIndexPath,
@@ -192,6 +197,16 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
   await fs.writeFile(frontendManifestPath, JSON.stringify({ name: "OmniFM", start_url: "/" }), "utf8");
   await fs.mkdir(frontendBotIconDir, { recursive: true });
   await fs.writeFile(frontendBotIconPath, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+  upsertOffer({
+    code: "OWNERREAD",
+    kind: "coupon",
+    active: true,
+    percentOff: 10,
+    ownerLabel: "Owner Route Test",
+    note: "seeded by legal-pages-routing",
+    createdBy: "test-suite",
+    updatedBy: "test-suite",
+  });
 
   const server = startWebServer([createAdminRuntimeStub()]);
   await once(server, "listening");
@@ -414,6 +429,29 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.ok(Array.isArray(adminOffers.redemptions));
     assert.equal(typeof adminOffers.summary.total, "number");
     assert.equal(typeof adminOffers.summary.byFulfillment, "object");
+    assert.ok(adminOffers.offers.some((offer) => offer.code === "OWNERREAD" && offer.active === true));
+
+    const unconfirmedOfferActiveResponse = await fetch(`http://127.0.0.1:${port}/api/admin/offers/active`, {
+      method: "POST",
+      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ code: "OWNERREAD", active: false }),
+    });
+    assert.equal(unconfirmedOfferActiveResponse.status, 400);
+    const unconfirmedOfferActive = await unconfirmedOfferActiveResponse.json();
+    assert.equal(unconfirmedOfferActive.requiresConfirmation, true);
+    assert.equal(unconfirmedOfferActive.confirmationValue, "OWNERREAD");
+
+    const confirmedOfferActiveResponse = await fetch(`http://127.0.0.1:${port}/api/admin/offers/active`, {
+      method: "POST",
+      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ code: "OWNERREAD", active: false, confirm: "OWNERREAD" }),
+    });
+    assert.equal(confirmedOfferActiveResponse.status, 200);
+    const confirmedOfferActive = await confirmedOfferActiveResponse.json();
+    assert.equal(confirmedOfferActive.ok, true);
+    assert.equal(confirmedOfferActive.offer.code, "OWNERREAD");
+    assert.equal(confirmedOfferActive.offer.active, false);
+    assert.ok(confirmedOfferActive.snapshot.offers.some((offer) => offer.code === "OWNERREAD" && offer.active === false));
 
     const adminLogFilesResponse = await fetch(`http://127.0.0.1:${port}/api/admin/log-files`, {
       headers: { Cookie: adminCookieHeader },
@@ -538,6 +576,18 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
       event.action === "owner.mail.test"
       && event.status === "denied"
       && event.metadata.requiresConfirmation === true
+    )));
+    assert.ok(adminAudit.events.some((event) => (
+      event.action === "owner.offer.active"
+      && event.status === "denied"
+      && event.target === "OWNERREAD"
+      && event.metadata.requiresConfirmation === true
+    )));
+    assert.ok(adminAudit.events.some((event) => (
+      event.action === "owner.offer.active"
+      && event.status === "success"
+      && event.target === "OWNERREAD"
+      && event.metadata.active === false
     )));
     assert.ok(adminAudit.events.some((event) => event.action === "owner.config.update" && event.metadata.updatedKeys.includes("DEFAULT_LANGUAGE")));
     assert.ok(adminAudit.events.some((event) => event.action === "owner.config.secrets.update" && event.metadata.updatedKeys.includes("STRIPE_SECRET_KEY")));
@@ -780,6 +830,8 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     await restoreFile(frontendSitemapPath, sitemapSnapshot);
     await restoreFile(frontendManifestPath, manifestSnapshot);
     await restoreFile(frontendBotIconPath, botIconSnapshot);
+    await restoreFile(couponsPath, couponsSnapshot);
+    await restoreFile(couponsBackupPath, couponsBackupSnapshot);
     await fs.rm(ownerEnvDir, { recursive: true, force: true });
     restoreEnv();
   }

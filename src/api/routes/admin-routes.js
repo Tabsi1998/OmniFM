@@ -22,6 +22,7 @@
 //   POST /api/admin/jobs         → Erlaubten Owner-Job starten
 //   GET  /api/admin/jobs/:id     → Einzelnen Owner-Job abrufen
 //   GET  /api/admin/offers       → Coupon/Referral/Gratis-Code Uebersicht
+//   POST /api/admin/offers/active → Coupon/Referral/Gratis-Code aktiv/inaktiv setzen
 //   GET  /api/admin/licenses     → Alle Lizenzen
 //   POST /api/admin/licenses/:id → Lizenz patchen (aktivieren, verlängern, sperren)
 //   GET  /api/admin/guilds       → Alle Guilds mit Status
@@ -59,6 +60,7 @@ export function createAdminRoutesHandler(deps) {
     buildPublicTermsNotice,
     listOffers,
     listRecentRedemptions,
+    setOfferActive,
   } = deps;
 
   function getRuntimes() {
@@ -839,6 +841,66 @@ export function createAdminRoutesHandler(deps) {
     if (pathname === "/api/admin/offers") {
       if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
       sendJson(res, 200, buildOwnerOffersSnapshot());
+      return true;
+    }
+
+    // POST /api/admin/offers/active
+    if (pathname === "/api/admin/offers/active") {
+      if (req.method !== "POST" && req.method !== "PATCH") { methodNotAllowed(res, ["POST", "PATCH"]); return true; }
+      let code = "";
+      try {
+        const payload = JSON.parse(await readRequestBody(req) || "{}");
+        code = String(payload?.code || "").trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 40);
+        const active = Boolean(payload?.active);
+        if (!code) {
+          const error = new Error("Code ist erforderlich.");
+          error.statusCode = 400;
+          throw error;
+        }
+        if (String(payload?.confirm || "").trim().toUpperCase() !== code) {
+          auditOwnerAction(req, {
+            action: "owner.offer.active",
+            status: "denied",
+            target: code,
+            summary: `Offer-Aktivierung ohne passende Bestaetigung abgelehnt: ${code}`,
+            metadata: { requiresConfirmation: true, active },
+          });
+          sendJson(res, 400, {
+            ok: false,
+            error: `Bestaetigung erforderlich. Tippe exakt ${code}.`,
+            requiresConfirmation: true,
+            confirmationValue: code,
+          });
+          return true;
+        }
+        if (typeof setOfferActive !== "function") {
+          const error = new Error("Offer-Aktivierung ist nicht verfuegbar.");
+          error.statusCode = 500;
+          throw error;
+        }
+        const offer = setOfferActive(code, active);
+        if (!offer) {
+          const error = new Error("Code nicht gefunden.");
+          error.statusCode = 404;
+          throw error;
+        }
+        auditOwnerAction(req, {
+          action: "owner.offer.active",
+          status: "success",
+          target: code,
+          summary: `Offer ${active ? "aktiviert" : "deaktiviert"}: ${code}`,
+          metadata: { code, active },
+        });
+        sendJson(res, 200, { ok: true, offer, snapshot: buildOwnerOffersSnapshot() });
+      } catch (err) {
+        auditOwnerAction(req, {
+          action: "owner.offer.active",
+          status: "failed",
+          target: code || undefined,
+          summary: err?.message || "Offer-Status konnte nicht geaendert werden",
+        });
+        sendJson(res, err?.statusCode || 400, { ok: false, error: err?.message || "Offer-Status konnte nicht geaendert werden" });
+      }
       return true;
     }
 
@@ -2178,7 +2240,7 @@ function buildAdminHtml() {
           summaryPill(summary.redemptions || 0, 'Einloesungen', (summary.redemptions || 0) ? 'green' : '') +
         '</div>' +
         (offers.length
-          ? '<table><thead><tr><th>Code</th><th>Typ</th><th>Status</th><th>Nutzen</th><th>Regeln</th><th>Einloesungen</th><th>Notiz</th></tr></thead><tbody>' +
+          ? '<table><thead><tr><th>Code</th><th>Typ</th><th>Status</th><th>Nutzen</th><th>Regeln</th><th>Einloesungen</th><th>Notiz</th><th>Aktion</th></tr></thead><tbody>' +
             offers.map(offer => '<tr>' +
               '<td><b class="cmd">' + esc(offer.code || '-') + '</b><div style="font-size:11px;color:#52525b">' + esc(offer.ownerLabel || '-') + '</div></td>' +
               '<td style="font-size:12px;color:#71717a">' + esc(offer.kind || 'coupon') + '</td>' +
@@ -2187,6 +2249,7 @@ function buildAdminHtml() {
               '<td style="font-size:12px;color:#71717a;max-width:320px">' + esc(offerRules(offer)) + '</td>' +
               '<td style="font-size:12px;color:#71717a">' + esc(offer.redemptions?.total || 0) + '</td>' +
               '<td style="font-size:12px;color:#71717a;max-width:260px">' + esc(offer.note || '-') + '</td>' +
+              '<td><button class="mini-btn" onclick="setOfferActiveState(' + JSON.stringify(offer.code || '') + ',' + JSON.stringify(!offer.active) + ')">' + (offer.active ? 'Deaktivieren' : 'Aktivieren') + '</button></td>' +
             '</tr>').join('') + '</tbody></table>'
           : '<div class="empty-state">Noch keine Coupon-, Referral- oder Gratis-Codes vorhanden.</div>') +
         '<div class="section-header"><h2>Letzte Einloesungen</h2><span style="font-size:12px;color:#71717a">' + esc(formatDateTime(payload.generatedAt)) + '</span></div>' +
@@ -2202,6 +2265,20 @@ function buildAdminHtml() {
               '<td><span class="cmd">' + esc(String(entry.sessionId || '-').slice(0, 24)) + '</span></td>' +
             '</tr>').join('') + '</tbody></table>'
           : '<div class="empty-state">Noch keine Einloesungen vorhanden.</div>');
+    }
+
+    async function setOfferActiveState(code, active) {
+      const normalized = String(code || '').trim().toUpperCase();
+      if (!normalized) return;
+      const typed = prompt((active ? 'Code aktivieren?' : 'Code deaktivieren?') + ' Tippe exakt: ' + normalized);
+      if (typed == null) return;
+      try {
+        const result = await apiPost('offers/active', { code: normalized, active: Boolean(active), confirm: typed.trim() });
+        cachedData.offers = result.snapshot || await api('offers');
+        renderTab('offers');
+      } catch (e) {
+        alert('Code-Status konnte nicht geaendert werden: ' + e.message);
+      }
     }
 
     function renderOperations(payload) {
