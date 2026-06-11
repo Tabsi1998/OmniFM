@@ -14,6 +14,8 @@
 //   GET  /api/admin/config       → Owner-Einstellungen ohne Secret-Werte
 //   POST /api/admin/config       → Erlaubte Owner-Einstellungen in .env speichern
 //   POST /api/admin/config/secrets → Erlaubte Secrets write-only in .env speichern
+//   GET  /api/admin/mail         → SMTP-Status ohne Secret-Werte
+//   POST /api/admin/mail/test    → SMTP-Testmail senden
 //   GET  /api/admin/audit        → Owner-Audit-Log ohne Secret-Werte
 //   GET  /api/admin/jobs         → Erlaubte Owner-Jobs und letzte Laeufe
 //   POST /api/admin/jobs         → Erlaubten Owner-Job starten
@@ -32,6 +34,7 @@ import { getOwnerConfigSnapshot, patchOwnerConfig, patchOwnerSecrets } from "../
 import { getOwnerJob, getOwnerJobsSnapshot, startOwnerJob } from "../../lib/owner-job-runner.js";
 import { getOwnerAuditSnapshot, recordOwnerAudit } from "../../lib/owner-audit-store.js";
 import { getOwnerLogFileSnapshot, getOwnerLogFilesSnapshot } from "../../lib/owner-log-files.js";
+import { TEST_CONFIRMATION_VALUE, getOwnerMailStatus, sendOwnerTestMail } from "../../lib/owner-mail-test.js";
 
 export function createAdminRoutesHandler(deps) {
   const {
@@ -293,11 +296,11 @@ export function createAdminRoutesHandler(deps) {
         area: "Settings",
         title: "E-Mail/SMTP einrichten",
         cli: "./update.sh --email",
-        webStatus: "partial",
+        webStatus: "available",
         risk: "high",
         description: "SMTP Host, Port, TLS, Absender und Admin-Mail konfigurieren.",
-        webEntry: "Diagnose zeigt nur, ob SMTP konfiguriert ist.",
-        nextStep: "Write-only SMTP-Editor plus Testmail-Aktion mit Audit-Log."
+        webEntry: "Tab Einstellungen kann SMTP-Basisdaten und SMTP_PASS write-only speichern und eine bestaetigte Testmail senden.",
+        nextStep: "Optional spaeter: SMTP-Fehlerdiagnose detaillierter strukturieren."
       },
       {
         id: "settings",
@@ -778,6 +781,55 @@ export function createAdminRoutesHandler(deps) {
           summary: err?.message || "Ungueltige Owner-Secrets",
         });
         sendJson(res, err?.statusCode || 400, { ok: false, error: err?.message || "Ungueltige Owner-Secrets" });
+      }
+      return true;
+    }
+
+    // GET /api/admin/mail
+    if (pathname === "/api/admin/mail") {
+      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
+      sendJson(res, 200, getOwnerMailStatus());
+      return true;
+    }
+
+    // POST /api/admin/mail/test
+    if (pathname === "/api/admin/mail/test") {
+      if (req.method !== "POST") { methodNotAllowed(res, ["POST"]); return true; }
+      try {
+        const payload = JSON.parse(await readRequestBody(req) || "{}");
+        if (String(payload?.confirm || "").trim() !== TEST_CONFIRMATION_VALUE) {
+          auditOwnerAction(req, {
+            action: "owner.mail.test",
+            status: "denied",
+            target: String(payload?.to || getOwnerMailStatus().defaultRecipient || ""),
+            summary: "SMTP-Testmail ohne passende Bestaetigung abgelehnt",
+            metadata: { requiresConfirmation: true },
+          });
+          sendJson(res, 400, {
+            ok: false,
+            error: `Bestaetigung erforderlich. Sende confirm=${TEST_CONFIRMATION_VALUE}.`,
+            requiresConfirmation: true,
+            confirmationValue: TEST_CONFIRMATION_VALUE,
+          });
+          return true;
+        }
+        const result = await sendOwnerTestMail(payload);
+        auditOwnerAction(req, {
+          action: "owner.mail.test",
+          status: "success",
+          target: result.to,
+          summary: `SMTP-Testmail gesendet an ${result.toMasked || result.to}`,
+          metadata: { to: result.toMasked || result.to, sentAt: result.sentAt },
+        });
+        sendJson(res, 200, result);
+      } catch (err) {
+        auditOwnerAction(req, {
+          action: "owner.mail.test",
+          status: "failed",
+          target: "",
+          summary: err?.message || "SMTP-Testmail konnte nicht gesendet werden",
+        });
+        sendJson(res, err?.statusCode || 500, { ok: false, error: err?.message || "SMTP-Testmail konnte nicht gesendet werden" });
       }
       return true;
     }
@@ -1366,8 +1418,8 @@ function buildAdminHtml() {
     async function loadAll() {
       document.getElementById('serverTime').textContent = 'Lädt...';
       try {
-        const [overview, guilds, licenses, stations, logs, logFiles, diagnostics, operations, config, jobs, audit] = await Promise.allSettled([
-          api('overview'), api('guilds'), api('licenses'), api('stations'), api('logs'), api('log-files'), api('diagnostics'), api('operations'), api('config'), api('jobs'), api('audit')
+        const [overview, guilds, licenses, stations, logs, logFiles, diagnostics, operations, config, mail, jobs, audit] = await Promise.allSettled([
+          api('overview'), api('guilds'), api('licenses'), api('stations'), api('logs'), api('log-files'), api('diagnostics'), api('operations'), api('config'), api('mail'), api('jobs'), api('audit')
         ]);
         if (overview.status === 'fulfilled') {
           cachedData.overview = overview.value;
@@ -1396,6 +1448,7 @@ function buildAdminHtml() {
         if (diagnostics.status === 'fulfilled') cachedData.diagnostics = diagnostics.value;
         if (operations.status === 'fulfilled') cachedData.operations = operations.value;
         if (config.status === 'fulfilled') cachedData.config = config.value;
+        if (mail.status === 'fulfilled') cachedData.mail = mail.value;
         if (jobs.status === 'fulfilled') cachedData.jobs = jobs.value;
         if (audit.status === 'fulfilled') cachedData.audit = audit.value;
         renderTab(currentTab);
@@ -1409,6 +1462,7 @@ function buildAdminHtml() {
       const secrets = Array.isArray(payload.secrets) ? payload.secrets : [];
       const configuredSecrets = secrets.filter(s => s.configured).length;
       const updated = Array.isArray(payload.updatedKeys) ? payload.updatedKeys : [];
+      const mail = cachedData.mail || {};
       return '<div class="summary-row">' +
           summaryPill(payload.envFile?.writable ? 'OK' : 'FEHLT', '.env schreibbar', payload.envFile?.writable ? 'green' : 'red') +
           summaryPill(groups.reduce((sum, group) => sum + (group.fields?.length || 0), 0), 'Editierbare Werte', '') +
@@ -1419,6 +1473,21 @@ function buildAdminHtml() {
           '<span class="cmd">' + esc(payload.envFile?.path || '.env') + '</span>' +
           '<button class="btn btn-cyan" onclick="saveConfig()">Speichern</button>' +
           '<span id="configSaveStatus" class="config-status">' + (updated.length ? 'Gespeichert: ' + esc(updated.join(', ')) + ' - Container neu starten.' : 'Nur nicht geheime Werte sind editierbar.') + '</span>' +
+        '</div>' +
+        '<div class="config-group">' +
+          '<h3>SMTP Test</h3>' +
+          '<p>Sendet eine echte Testmail ueber die aktuell gesetzte SMTP-Konfiguration. Passwortwerte bleiben write-only.</p>' +
+          '<div class="summary-row">' +
+            summaryPill(mail.configured ? 'OK' : 'FEHLT', 'SMTP konfiguriert', mail.configured ? 'green' : 'red') +
+            summaryPill(mail.host || '-', 'Host', mail.host ? 'green' : 'amber') +
+            summaryPill(mail.defaultRecipientMasked || '-', 'Standard-Empfaenger', mail.defaultRecipient ? 'green' : 'amber') +
+            summaryPill(mail.tlsMode || 'auto', 'TLS Modus', '') +
+          '</div>' +
+          '<div class="toolbar">' +
+            '<input id="smtpTestRecipient" type="email" value="' + escAttr(mail.defaultRecipient || '') + '" placeholder="Empfaenger fuer Testmail"/>' +
+            '<button class="btn btn-amber" onclick="sendSmtpTestMail()">Testmail senden</button>' +
+            '<span id="smtpTestStatus" class="config-status">' + (mail.missing?.length ? 'Fehlt: ' + esc(mail.missing.join(', ')) : 'Bereit fuer SMTP-Test.') + '</span>' +
+          '</div>' +
         '</div>' +
         groups.map(group => '<div class="config-group">' +
           '<h3>' + esc(group.title || group.id) + '</h3>' +
@@ -1589,6 +1658,32 @@ function buildAdminHtml() {
           status.style.color = '#39FF14';
         }
         renderTab('config');
+      } catch (e) {
+        if (status) {
+          status.textContent = 'Fehler: ' + e.message;
+          status.style.color = '#FF2A2A';
+        }
+      }
+    }
+
+    async function sendSmtpTestMail() {
+      const status = document.getElementById('smtpTestStatus');
+      const input = document.getElementById('smtpTestRecipient');
+      const to = String(input?.value || '').trim();
+      const confirmationValue = cachedData.mail?.confirmationValue || 'send-test-email';
+      const typed = prompt('SMTP-Testmail wirklich senden? Tippe exakt: ' + confirmationValue);
+      if (typed == null) return;
+      if (status) {
+        status.textContent = 'Sende Testmail...';
+        status.style.color = '#71717a';
+      }
+      try {
+        const result = await apiPost('mail/test', { to, confirm: typed.trim() });
+        cachedData.mail = await api('mail');
+        if (status) {
+          status.textContent = 'Testmail gesendet an ' + (result.toMasked || result.to || to);
+          status.style.color = '#39FF14';
+        }
       } catch (e) {
         if (status) {
           status.textContent = 'Fehler: ' + e.message;

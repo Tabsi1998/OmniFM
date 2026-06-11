@@ -173,6 +173,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     OMNIFM_OWNER_LOGS_DIR: ownerLogsDir,
     STRIPE_SECRET_KEY: undefined,
     SMTP_PASS: undefined,
+    ADMIN_EMAIL: "owner@it-tabelander.at",
     DISCORD_CLIENT_SECRET: undefined,
   });
   const indexSnapshot = await snapshotFile(frontendIndexPath);
@@ -304,6 +305,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.match(adminPanelHtml, /renderOperations/);
     assert.match(adminPanelHtml, /renderConfig/);
     assert.match(adminPanelHtml, /saveSecrets/);
+    assert.match(adminPanelHtml, /sendSmtpTestMail/);
     assert.match(adminPanelHtml, /renderJobs/);
     assert.match(adminPanelHtml, /renderAudit/);
     assert.match(adminPanelHtml, /renderLogs/);
@@ -381,8 +383,32 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.ok(adminConfig.groups.some((group) => group.id === "integrations"));
     assert.ok(adminConfig.groups.some((group) => group.fields.some((field) => field.key === "PUBLIC_WEB_URL")));
     assert.ok(adminConfig.groups.some((group) => group.fields.some((field) => field.key === "SMTP_HOST")));
+    assert.ok(adminConfig.groups.some((group) => group.fields.some((field) => field.key === "ADMIN_EMAIL")));
+    assert.ok(adminConfig.groups.some((group) => group.fields.some((field) => (
+      field.key === "SMTP_TLS_MODE" && field.values.includes("plain") && field.values.includes("smtps")
+    ))));
     assert.ok(adminConfig.secrets.some((secret) => secret.key === "API_ADMIN_TOKEN" && secret.configured));
     assert.ok(adminConfig.secrets.some((secret) => secret.key === "STRIPE_SECRET_KEY" && secret.writeOnly));
+
+    const adminMailResponse = await fetch(`http://127.0.0.1:${port}/api/admin/mail`, {
+      headers: { Cookie: adminCookieHeader },
+    });
+    assert.equal(adminMailResponse.status, 200);
+    const adminMail = await adminMailResponse.json();
+    assert.equal(adminMail.configured, false);
+    assert.equal(adminMail.defaultRecipient, "owner@it-tabelander.at");
+    assert.equal(adminMail.confirmationValue, "send-test-email");
+    assert.doesNotMatch(JSON.stringify(adminMail), /smtp-owner-test|admin-route-token/);
+
+    const unconfirmedMailTestResponse = await fetch(`http://127.0.0.1:${port}/api/admin/mail/test`, {
+      method: "POST",
+      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ to: "owner@it-tabelander.at" }),
+    });
+    assert.equal(unconfirmedMailTestResponse.status, 400);
+    const unconfirmedMailTest = await unconfirmedMailTestResponse.json();
+    assert.equal(unconfirmedMailTest.requiresConfirmation, true);
+    assert.equal(unconfirmedMailTest.confirmationValue, "send-test-email");
 
     const adminConfigPatchResponse = await fetch(`http://127.0.0.1:${port}/api/admin/config`, {
       method: "POST",
@@ -431,6 +457,11 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     const adminAudit = await adminAuditResponse.json();
     assert.equal(adminAudit.file, ownerAuditFile);
     assert.ok(adminAudit.events.some((event) => event.action === "owner.login" && event.status === "success"));
+    assert.ok(adminAudit.events.some((event) => (
+      event.action === "owner.mail.test"
+      && event.status === "denied"
+      && event.metadata.requiresConfirmation === true
+    )));
     assert.ok(adminAudit.events.some((event) => event.action === "owner.config.update" && event.metadata.updatedKeys.includes("DEFAULT_LANGUAGE")));
     assert.ok(adminAudit.events.some((event) => event.action === "owner.config.secrets.update" && event.metadata.updatedKeys.includes("STRIPE_SECRET_KEY")));
     assert.doesNotMatch(JSON.stringify(adminAudit), /sk_live_owner_test|smtp-owner-test|admin-route-token/);

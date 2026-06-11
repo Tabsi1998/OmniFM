@@ -67,6 +67,8 @@ test("owner config patch persists allowlisted values and rejects secrets", async
         LOG_MAX_MB: "10",
         DEFAULT_LANGUAGE: "de",
         PRO_TRIAL_ENABLED: "ja",
+        ADMIN_EMAIL: "owner@it-tabelander.at",
+        SMTP_TLS_MODE: "none",
       },
     });
     const content = await fs.readFile(envFile, "utf8");
@@ -78,12 +80,16 @@ test("owner config patch persists allowlisted values and rejects secrets", async
       "LOG_MAX_MB",
       "DEFAULT_LANGUAGE",
       "PRO_TRIAL_ENABLED",
+      "ADMIN_EMAIL",
+      "SMTP_TLS_MODE",
     ]));
     assert.match(content, /PUBLIC_WEB_URL=https:\/\/omnifm\.xyz/);
     assert.match(content, /CORS_ALLOWED_ORIGINS=https:\/\/omnifm\.xyz,https:\/\/www\.omnifm\.xyz/);
     assert.match(content, /LOG_MAX_MB=10/);
     assert.match(content, /DEFAULT_LANGUAGE=de/);
     assert.match(content, /PRO_TRIAL_ENABLED=1/);
+    assert.match(content, /ADMIN_EMAIL=owner@it-tabelander\.at/);
+    assert.match(content, /SMTP_TLS_MODE=plain/);
     assert.equal(process.env.PUBLIC_WEB_URL, "https://omnifm.xyz");
     await fs.access(`${envFile}.bak-owner`);
 

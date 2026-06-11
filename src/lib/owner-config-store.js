@@ -114,7 +114,8 @@ const GROUPS = [
       { key: "SMTP_PORT", label: "SMTP Port", type: "integer", min: 1, max: 65535, example: "587" },
       { key: "SMTP_USER", label: "SMTP User", type: "text" },
       { key: "SMTP_FROM", label: "SMTP Absender", type: "email" },
-      { key: "SMTP_TLS_MODE", label: "SMTP TLS Modus", type: "enum", values: ["auto", "starttls", "tls", "none"], example: "auto" },
+      { key: "ADMIN_EMAIL", label: "Admin E-Mail", type: "email" },
+      { key: "SMTP_TLS_MODE", label: "SMTP TLS Modus", type: "enum", values: ["auto", "plain", "starttls", "smtps"], example: "auto" },
       { key: "SMTP_TLS_REJECT_UNAUTHORIZED", label: "SMTP TLS Zertifikat pruefen", type: "boolean", example: "1" },
       { key: "DISCORDBOTLIST_ENABLED", label: "DiscordBotList aktiv", type: "boolean", example: "1" },
       { key: "DISCORDBOTLIST_BOT_ID", label: "DiscordBotList Bot ID", type: "snowflake" },
@@ -319,7 +320,11 @@ function normalizeConfigValue(field, rawValue) {
   if (field.type === "boolean") return value ? normalizeBoolean(value, field.key) : "";
   if (field.type === "integer") return validateInteger(value, field.key, field);
   if (field.type === "enum") {
-    const normalized = value.toLowerCase();
+    let normalized = value.toLowerCase();
+    if (field.key === "SMTP_TLS_MODE") {
+      if (normalized === "tls") normalized = "smtps";
+      if (normalized === "none") normalized = "plain";
+    }
     if (!field.values.includes(normalized)) {
       throw new Error(`${field.key} muss einer dieser Werte sein: ${field.values.join(", ")}.`);
     }
