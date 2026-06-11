@@ -511,6 +511,27 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.equal(confirmedOfferEdit.offer.percentOff, 10);
     assert.equal(confirmedOfferEdit.offer.note, "edited through owner portal route");
 
+    const unconfirmedOfferDeleteResponse = await fetch(`http://127.0.0.1:${port}/api/admin/offers/delete`, {
+      method: "POST",
+      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ code: "ownergift", confirm: "OWNERGIFT" }),
+    });
+    assert.equal(unconfirmedOfferDeleteResponse.status, 400);
+    const unconfirmedOfferDelete = await unconfirmedOfferDeleteResponse.json();
+    assert.equal(unconfirmedOfferDelete.requiresConfirmation, true);
+    assert.equal(unconfirmedOfferDelete.confirmationValue, "DELETE OWNERGIFT");
+
+    const confirmedOfferDeleteResponse = await fetch(`http://127.0.0.1:${port}/api/admin/offers/delete`, {
+      method: "POST",
+      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ code: "ownergift", confirm: "DELETE OWNERGIFT" }),
+    });
+    assert.equal(confirmedOfferDeleteResponse.status, 200);
+    const confirmedOfferDelete = await confirmedOfferDeleteResponse.json();
+    assert.equal(confirmedOfferDelete.ok, true);
+    assert.equal(confirmedOfferDelete.code, "OWNERGIFT");
+    assert.equal(confirmedOfferDelete.snapshot.offers.some((offer) => offer.code === "OWNERGIFT"), false);
+
     const adminLogFilesResponse = await fetch(`http://127.0.0.1:${port}/api/admin/log-files`, {
       headers: { Cookie: adminCookieHeader },
     });
@@ -664,6 +685,17 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
       && event.status === "success"
       && event.target === "OWNERREAD"
       && event.metadata.partial === true
+    )));
+    assert.ok(adminAudit.events.some((event) => (
+      event.action === "owner.offer.delete"
+      && event.status === "denied"
+      && event.target === "OWNERGIFT"
+      && event.metadata.confirmationValue === "DELETE OWNERGIFT"
+    )));
+    assert.ok(adminAudit.events.some((event) => (
+      event.action === "owner.offer.delete"
+      && event.status === "success"
+      && event.target === "OWNERGIFT"
     )));
     assert.ok(adminAudit.events.some((event) => event.action === "owner.config.update" && event.metadata.updatedKeys.includes("DEFAULT_LANGUAGE")));
     assert.ok(adminAudit.events.some((event) => event.action === "owner.config.secrets.update" && event.metadata.updatedKeys.includes("STRIPE_SECRET_KEY")));

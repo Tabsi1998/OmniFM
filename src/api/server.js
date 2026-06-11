@@ -3089,6 +3089,7 @@ const handleAdminRoutes = createAdminRoutesHandler({
   buildPublicTermsNotice,
   listOffers,
   listRecentRedemptions,
+  deleteOffer,
   setOfferActive,
   upsertOffer,
 });

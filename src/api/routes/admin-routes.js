@@ -23,6 +23,7 @@
 //   GET  /api/admin/jobs/:id     → Einzelnen Owner-Job abrufen
 //   GET  /api/admin/offers       → Coupon/Referral/Gratis-Code Uebersicht
 //   POST /api/admin/offers       → Coupon/Referral/Gratis-Code erstellen/bearbeiten
+//   POST /api/admin/offers/delete → Coupon/Referral/Gratis-Code loeschen
 //   POST /api/admin/offers/active → Coupon/Referral/Gratis-Code aktiv/inaktiv setzen
 //   GET  /api/admin/licenses     → Alle Lizenzen
 //   POST /api/admin/licenses/:id → Lizenz patchen (aktivieren, verlängern, sperren)
@@ -61,6 +62,7 @@ export function createAdminRoutesHandler(deps) {
     buildPublicTermsNotice,
     listOffers,
     listRecentRedemptions,
+    deleteOffer,
     setOfferActive,
     upsertOffer,
   } = deps;
@@ -959,6 +961,67 @@ export function createAdminRoutesHandler(deps) {
       return true;
     }
 
+    // POST /api/admin/offers/delete
+    if (pathname === "/api/admin/offers/delete") {
+      if (req.method !== "POST" && req.method !== "DELETE") { methodNotAllowed(res, ["POST", "DELETE"]); return true; }
+      let code = "";
+      let confirmationValue = "";
+      try {
+        const payload = JSON.parse(await readRequestBody(req) || "{}");
+        code = normalizeOwnerOfferCode(payload?.code);
+        confirmationValue = code ? `DELETE ${code}` : "";
+        if (!code) {
+          const error = new Error("Code ist erforderlich.");
+          error.statusCode = 400;
+          throw error;
+        }
+        if (String(payload?.confirm || "").trim().toUpperCase() !== confirmationValue) {
+          auditOwnerAction(req, {
+            action: "owner.offer.delete",
+            status: "denied",
+            target: code,
+            summary: `Offer-Loeschung ohne passende Bestaetigung abgelehnt: ${code}`,
+            metadata: { requiresConfirmation: true, confirmationValue },
+          });
+          sendJson(res, 400, {
+            ok: false,
+            error: `Bestaetigung erforderlich. Tippe exakt ${confirmationValue}.`,
+            requiresConfirmation: true,
+            confirmationValue,
+          });
+          return true;
+        }
+        if (typeof deleteOffer !== "function") {
+          const error = new Error("Offer-Loeschung ist nicht verfuegbar.");
+          error.statusCode = 500;
+          throw error;
+        }
+        const deleted = deleteOffer(code);
+        if (!deleted) {
+          const error = new Error("Code nicht gefunden.");
+          error.statusCode = 404;
+          throw error;
+        }
+        auditOwnerAction(req, {
+          action: "owner.offer.delete",
+          status: "success",
+          target: code,
+          summary: `Offer geloescht: ${code}`,
+          metadata: { code },
+        });
+        sendJson(res, 200, { ok: true, code, snapshot: buildOwnerOffersSnapshot() });
+      } catch (err) {
+        auditOwnerAction(req, {
+          action: "owner.offer.delete",
+          status: "failed",
+          target: code || undefined,
+          summary: err?.message || "Offer konnte nicht geloescht werden",
+        });
+        sendJson(res, err?.statusCode || 400, { ok: false, error: err?.message || "Offer konnte nicht geloescht werden" });
+      }
+      return true;
+    }
+
     // POST /api/admin/offers/active
     if (pathname === "/api/admin/offers/active") {
       if (req.method !== "POST" && req.method !== "PATCH") { methodNotAllowed(res, ["POST", "PATCH"]); return true; }
@@ -1554,6 +1617,8 @@ function buildAdminHtml() {
     .row-actions{display:flex;gap:6px;flex-wrap:wrap}
     .mini-btn{border:1px solid #333;background:#1a1a1a;color:#d4d4d8;border-radius:7px;padding:4px 8px;font-size:11px;cursor:pointer}
     .mini-btn:hover{border-color:#00F0FF;color:#fff}
+    .mini-btn-danger{border-color:#4b1111;color:#ff9a9a}
+    .mini-btn-danger:hover{border-color:#FF2A2A;color:#fff}
     .station-url{max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#71717a;font-family:monospace;font-size:11px}
     .empty-state{padding:32px 16px;text-align:center;color:#71717a;font-size:13px}
     .cmd{font-family:'Consolas','JetBrains Mono',monospace;font-size:11px;color:#a1a1aa;background:#090909;border:1px solid #222;border-radius:6px;padding:4px 6px;display:inline-block}
@@ -2401,6 +2466,7 @@ function buildAdminHtml() {
               '<td><div class="row-actions">' +
                 '<button class="mini-btn" onclick="openOfferModal(' + JSON.stringify(offer.code || '') + ')">Bearbeiten</button>' +
                 '<button class="mini-btn" onclick="setOfferActiveState(' + JSON.stringify(offer.code || '') + ',' + JSON.stringify(!offer.active) + ')">' + (offer.active ? 'Deaktivieren' : 'Aktivieren') + '</button>' +
+                '<button class="mini-btn mini-btn-danger" onclick="deleteOfferCode(' + JSON.stringify(offer.code || '') + ')">Loeschen</button>' +
               '</div></td>' +
             '</tr>').join('') + '</tbody></table>'
           : '<div class="empty-state">Noch keine Coupon-, Referral- oder Gratis-Codes vorhanden.</div>') +
@@ -2521,6 +2587,21 @@ function buildAdminHtml() {
         renderTab('offers');
       } catch (e) {
         alert('Code-Status konnte nicht geaendert werden: ' + e.message);
+      }
+    }
+
+    async function deleteOfferCode(code) {
+      const normalized = normalizeOfferCodeClient(code);
+      if (!normalized) return;
+      const confirmationValue = 'DELETE ' + normalized;
+      const typed = prompt('Code dauerhaft loeschen? Redemptions bleiben zur Nachvollziehbarkeit erhalten. Tippe exakt: ' + confirmationValue);
+      if (typed == null) return;
+      try {
+        const result = await apiPost('offers/delete', { code: normalized, confirm: typed.trim() });
+        cachedData.offers = result.snapshot || await api('offers');
+        renderTab('offers');
+      } catch (e) {
+        alert('Code konnte nicht geloescht werden: ' + e.message);
       }
     }
 
