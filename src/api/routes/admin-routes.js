@@ -406,11 +406,11 @@ export function createAdminRoutesHandler(deps) {
         area: "Audio",
         title: "Recognition Test",
         cli: "./update.sh --recognition-test <URL>",
-        webStatus: "planned",
+        webStatus: "available",
         risk: "medium",
         description: "Audio-Fingerprint/Metadata-Test fuer eine Stream-URL.",
-        webEntry: "Noch nicht als Web-Aktion freigeschaltet",
-        nextStep: "URL-Testformular mit Timeout, Ergebnisdetails und Rate-Limit."
+        webEntry: "Tab Aktionen kann Recognition-Test mit Stream-URL, Confirm und Audit starten.",
+        nextStep: "Ergebnisdetails spaeter strukturierter auswerten und anzeigen."
       }
     ];
     const summary = operations.reduce((acc, operation) => {
@@ -849,9 +849,10 @@ export function createAdminRoutesHandler(deps) {
         return true;
       }
       if (req.method === "POST") {
+        let actionId = "";
         try {
           const payload = JSON.parse(await readRequestBody(req) || "{}");
-          const actionId = String(payload?.actionId || "").trim();
+          actionId = String(payload?.actionId || "").trim();
           const action = getOwnerJobsSnapshot().actions.find((entry) => entry.id === actionId);
           if (action?.requiresConfirmation && String(payload?.confirm || "").trim() !== action.confirmationValue) {
             auditOwnerAction(req, {
@@ -871,6 +872,7 @@ export function createAdminRoutesHandler(deps) {
           }
           const requestAuditMeta = getRequestAuditMeta(req);
           const job = startOwnerJob(actionId, {
+            input: payload?.input && typeof payload.input === "object" ? payload.input : payload,
             onFinish: (completedJob) => {
               try {
                 recordOwnerAudit({
@@ -908,6 +910,7 @@ export function createAdminRoutesHandler(deps) {
           auditOwnerAction(req, {
             action: "owner.job.start",
             status: "failed",
+            target: actionId || undefined,
             summary: err?.message || "Owner-Job konnte nicht gestartet werden",
           });
           sendJson(res, err?.statusCode || 400, { ok: false, error: err?.message || "Owner-Job konnte nicht gestartet werden" });
@@ -1199,6 +1202,9 @@ function buildAdminHtml() {
     .job-card{background:#0b0b0b;border:1px solid #202020;border-radius:8px;padding:12px}
     .job-card h3{font-size:13px;margin-bottom:6px;color:#e4e4e7}
     .job-card p{font-size:12px;color:#71717a;min-height:34px;margin-bottom:10px}
+    .job-inputs{display:grid;gap:8px;margin:10px 0}
+    .job-inputs label{display:grid;gap:5px;font-size:11px;color:#a1a1aa}
+    .job-inputs input{width:100%;background:#111;border:1px solid #333;color:#e4e4e7;border-radius:7px;padding:8px;font-size:12px}
     .job-output{white-space:pre-wrap;background:#050505;border:1px solid #222;border-radius:8px;padding:12px;color:#d4d4d8;font-family:'Consolas','JetBrains Mono',monospace;font-size:11px;line-height:1.45;max-height:360px;overflow:auto}
   </style>
 </head>
@@ -1713,6 +1719,21 @@ function buildAdminHtml() {
           : '<div class="empty-state">Noch keine Owner-Audit-Events.</div>');
     }
 
+    function renderJobInputs(action) {
+      const fields = Array.isArray(action.inputFields) ? action.inputFields : [];
+      if (!fields.length) return '';
+      return '<div class="job-inputs">' + fields.map(field => {
+        const type = field.type === 'url' ? 'url' : field.type === 'email' ? 'email' : field.type === 'integer' ? 'number' : 'text';
+        return '<label>' +
+          '<span>' + esc(field.label || field.key) + '</span>' +
+          '<input data-job-action="' + escAttr(action.id) + '" data-job-input-key="' + escAttr(field.key) + '" type="' + type + '"' +
+            (field.required ? ' required' : '') +
+            (field.placeholder ? ' placeholder="' + escAttr(field.placeholder) + '"' : '') +
+          '/>' +
+        '</label>';
+      }).join('') + '</div>';
+    }
+
     function renderJobs(payload) {
       const actions = Array.isArray(payload.actions) ? payload.actions : [];
       const jobs = Array.isArray(payload.jobs) ? payload.jobs : [];
@@ -1726,6 +1747,7 @@ function buildAdminHtml() {
           actions.map(action => '<div class="job-card">' +
             '<h3>' + esc(action.title || action.id) + '</h3>' +
             '<p>' + esc(action.description || '') + '</p>' +
+            renderJobInputs(action) +
             '<div style="display:flex;gap:8px;align-items:center;justify-content:space-between">' +
               riskBadge(action.risk) +
               '<button class="btn btn-cyan" style="font-size:11px;padding:6px 10px" ' + (payload.running ? 'disabled' : '') + ' onclick="startOwnerJob(' + JSON.stringify(action.id) + ',' + JSON.stringify(Boolean(action.requiresConfirmation)) + ',' + JSON.stringify(action.confirmationValue || '') + ')">Starten</button>' +
@@ -1759,6 +1781,19 @@ function buildAdminHtml() {
 
     async function startOwnerJob(actionId, requiresConfirmation, confirmationValue) {
       let confirmValue = '';
+      const input = {};
+      let missingInput = '';
+      document.querySelectorAll('[data-job-action]').forEach((field) => {
+        if (field.getAttribute('data-job-action') !== actionId) return;
+        const key = field.getAttribute('data-job-input-key');
+        const value = String(field.value || '').trim();
+        if (field.required && !value) missingInput = key || 'Eingabe';
+        if (key) input[key] = value;
+      });
+      if (missingInput) {
+        alert('Pflichtfeld fehlt: ' + missingInput);
+        return;
+      }
       if (requiresConfirmation) {
         const typed = prompt('Diese Owner-Aktion braucht eine Bestätigung. Tippe exakt: ' + confirmationValue);
         if (typed == null) return;
@@ -1767,7 +1802,7 @@ function buildAdminHtml() {
         return;
       }
       try {
-        await apiPost('jobs', { actionId, confirm: confirmValue });
+        await apiPost('jobs', { actionId, confirm: confirmValue, input });
         await refreshJobs();
       } catch (e) {
         alert('Job konnte nicht gestartet werden: ' + e.message);

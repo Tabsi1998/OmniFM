@@ -1,10 +1,72 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import net from "node:net";
 
 import { rootDir } from "./logging.js";
 
 const MAX_OUTPUT_CHARS = 120_000;
 const MAX_RECENT_JOBS = 30;
+
+function isPrivateOrLocalHostname(hostname) {
+  const normalized = String(hostname || "").trim().toLowerCase();
+  if (!normalized || normalized === "localhost" || normalized.endsWith(".localhost") || normalized.endsWith(".local")) return true;
+  const ipVersion = net.isIP(normalized);
+  if (ipVersion === 4) {
+    const parts = normalized.split(".").map((part) => Number.parseInt(part, 10));
+    return parts[0] === 10
+      || parts[0] === 127
+      || (parts[0] === 169 && parts[1] === 254)
+      || (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31)
+      || (parts[0] === 192 && parts[1] === 168)
+      || parts[0] === 0;
+  }
+  if (ipVersion === 6) {
+    return normalized === "::1"
+      || normalized.startsWith("fc")
+      || normalized.startsWith("fd")
+      || normalized.startsWith("fe80:");
+  }
+  return !normalized.includes(".");
+}
+
+function normalizePublicStreamUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    const error = new Error("Stream-URL fehlt.");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (raw.length > 2000) {
+    const error = new Error("Stream-URL ist zu lang.");
+    error.statusCode = 400;
+    throw error;
+  }
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    const error = new Error("Stream-URL muss eine gueltige URL sein.");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    const error = new Error("Stream-URL muss mit http:// oder https:// beginnen.");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (parsed.username || parsed.password) {
+    const error = new Error("Stream-URL darf keine Zugangsdaten enthalten.");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (isPrivateOrLocalHostname(parsed.hostname)) {
+    const error = new Error("Stream-URL darf kein lokales oder privates Ziel sein.");
+    error.statusCode = 400;
+    throw error;
+  }
+  parsed.hash = "";
+  return parsed.toString();
+}
 
 const OWNER_JOB_ACTIONS = [
   {
@@ -57,6 +119,26 @@ const OWNER_JOB_ACTIONS = [
     args: ["src/deploy-commands.js"],
     description: "Fuehrt den bestehenden Slash-Command-Deploy aus und synchronisiert Discord Application Commands nach Konfiguration.",
   },
+  {
+    id: "recognition-test",
+    title: "Audio Recognition Test",
+    area: "Audio",
+    risk: "medium",
+    timeoutMs: 180_000,
+    command: "bash",
+    args: ["./update.sh", "--recognition-test"],
+    inputFields: [
+      {
+        key: "url",
+        label: "Stream URL",
+        type: "url",
+        required: true,
+        placeholder: "https://example.com/radio.mp3",
+      },
+    ],
+    buildArgs: (input) => ["./update.sh", "--recognition-test", normalizePublicStreamUrl(input?.url)],
+    description: "Fuehrt den bestehenden Recognition-Test fuer eine oeffentliche Stream-URL aus.",
+  },
 ];
 
 const ACTION_BY_ID = new Map(OWNER_JOB_ACTIONS.map((action) => [action.id, action]));
@@ -103,10 +185,17 @@ function hasRunningJob() {
   return Array.from(jobs.values()).some((job) => job.status === "running");
 }
 
+function buildCommandPreview(action) {
+  const inputSuffix = Array.isArray(action.inputFields) && action.inputFields.length
+    ? action.inputFields.map((field) => `<${field.key}>`)
+    : [];
+  return [action.command, ...(action.args || []), ...inputSuffix].join(" ");
+}
+
 function getOwnerJobActions() {
-  return OWNER_JOB_ACTIONS.map(({ command, args, ...action }) => ({
+  return OWNER_JOB_ACTIONS.map(({ command, args, buildArgs, ...action }) => ({
     ...action,
-    command: [command, ...args].join(" "),
+    command: buildCommandPreview({ ...action, command, args }),
     requiresConfirmation: action.risk !== "low",
     confirmationValue: action.risk !== "low" ? action.id : null,
   }));
@@ -139,7 +228,7 @@ function finishJob(job, patch = {}) {
   pruneJobs();
 }
 
-function startOwnerJob(actionId, { actor = "owner", onFinish = null } = {}) {
+function startOwnerJob(actionId, { actor = "owner", onFinish = null, input = {} } = {}) {
   const action = ACTION_BY_ID.get(String(actionId || ""));
   if (!action) {
     const error = new Error("Unbekannte Owner-Aktion.");
@@ -151,6 +240,7 @@ function startOwnerJob(actionId, { actor = "owner", onFinish = null } = {}) {
     error.statusCode = 409;
     throw error;
   }
+  const args = typeof action.buildArgs === "function" ? action.buildArgs(input) : action.args;
 
   const job = {
     id: randomUUID(),
@@ -172,7 +262,7 @@ function startOwnerJob(actionId, { actor = "owner", onFinish = null } = {}) {
   };
   jobs.set(job.id, job);
 
-  const child = spawn(action.command, action.args, {
+  const child = spawn(action.command, args, {
     cwd: rootDir,
     shell: false,
     windowsHide: true,

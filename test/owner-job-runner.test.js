@@ -27,6 +27,11 @@ test("owner job runner exposes only allowlisted actions and captures output", as
   assert.equal(snapshot.actions.find((action) => action.id === "system-doctor")?.confirmationValue, "system-doctor");
   assert.equal(snapshot.actions.find((action) => action.id === "deploy-slash-commands")?.requiresConfirmation, true);
   assert.equal(snapshot.actions.find((action) => action.id === "deploy-slash-commands")?.confirmationValue, "deploy-slash-commands");
+  const recognitionTest = snapshot.actions.find((action) => action.id === "recognition-test");
+  assert.equal(recognitionTest?.requiresConfirmation, true);
+  assert.equal(recognitionTest?.confirmationValue, "recognition-test");
+  assert.equal(recognitionTest?.inputFields?.some((field) => field.key === "url" && field.type === "url"), true);
+  assert.match(recognitionTest?.command || "", /<url>/);
   assert.equal(snapshot.actions.some((action) => /rm\s+-rf|powershell|cmd\.exe/i.test(action.command)), false);
 
   const started = startOwnerJob("rollback-plan");
@@ -39,6 +44,10 @@ test("owner job runner exposes only allowlisted actions and captures output", as
   assert.match(completed.output, /Rollback plan:/);
 
   assert.throws(() => startOwnerJob("not-allowed"), /Unbekannte Owner-Aktion/);
+  assert.throws(
+    () => startOwnerJob("recognition-test", { input: { url: "http://localhost:9000/radio.mp3" } }),
+    /lokales oder privates Ziel/,
+  );
   resetOwnerJobsForTests();
 });
 

@@ -351,6 +351,9 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.ok(adminOperations.operations.some((operation) => (
       operation.id === "settings-commands" && operation.webStatus === "available"
     )));
+    assert.ok(adminOperations.operations.some((operation) => (
+      operation.id === "recognition-test" && operation.webStatus === "available"
+    )));
     assert.ok(adminOperations.summary.available >= 1);
     assert.ok(adminOperations.summary.planned >= 1);
 
@@ -486,6 +489,12 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
       && action.requiresConfirmation
       && action.confirmationValue === "system-doctor"
     )));
+    assert.ok(adminJobs.actions.some((action) => (
+      action.id === "recognition-test"
+      && action.requiresConfirmation
+      && action.confirmationValue === "recognition-test"
+      && action.inputFields?.some((field) => field.key === "url" && field.type === "url")
+    )));
 
     const invalidAdminJobResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
       method: "POST",
@@ -513,6 +522,29 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     const unconfirmedCommandDeploy = await unconfirmedCommandDeployResponse.json();
     assert.equal(unconfirmedCommandDeploy.requiresConfirmation, true);
     assert.equal(unconfirmedCommandDeploy.confirmationValue, "deploy-slash-commands");
+
+    const unconfirmedRecognitionResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
+      method: "POST",
+      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ actionId: "recognition-test", input: { url: "https://example.com/radio.mp3" } }),
+    });
+    assert.equal(unconfirmedRecognitionResponse.status, 400);
+    const unconfirmedRecognition = await unconfirmedRecognitionResponse.json();
+    assert.equal(unconfirmedRecognition.requiresConfirmation, true);
+    assert.equal(unconfirmedRecognition.confirmationValue, "recognition-test");
+
+    const privateRecognitionResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
+      method: "POST",
+      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        actionId: "recognition-test",
+        confirm: "recognition-test",
+        input: { url: "http://localhost:9000/radio.mp3" },
+      }),
+    });
+    assert.equal(privateRecognitionResponse.status, 400);
+    const privateRecognition = await privateRecognitionResponse.json();
+    assert.match(privateRecognition.error, /lokales oder privates Ziel/);
 
     const adminJobStartResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
       method: "POST",
@@ -552,6 +584,12 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.ok(adminAuditAfterJob.events.some((event) => (
       event.action === "owner.job.start"
       && event.target === "deploy-slash-commands"
+      && event.status === "denied"
+      && event.metadata.requiresConfirmation === true
+    )));
+    assert.ok(adminAuditAfterJob.events.some((event) => (
+      event.action === "owner.job.start"
+      && event.target === "recognition-test"
       && event.status === "denied"
       && event.metadata.requiresConfirmation === true
     )));
