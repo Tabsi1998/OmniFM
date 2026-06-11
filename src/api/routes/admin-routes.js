@@ -23,6 +23,7 @@
 //   GET  /api/admin/jobs/:id     → Einzelnen Owner-Job abrufen
 //   GET  /api/admin/offers       → Coupon/Referral/Gratis-Code Uebersicht
 //   POST /api/admin/offers       → Coupon/Referral/Gratis-Code erstellen/bearbeiten
+//   POST /api/admin/offers/preview → Coupon/Referral/Gratis-Code Checkout-Vorschau
 //   POST /api/admin/offers/delete → Coupon/Referral/Gratis-Code loeschen
 //   POST /api/admin/offers/active → Coupon/Referral/Gratis-Code aktiv/inaktiv setzen
 //   GET  /api/admin/licenses     → Alle Lizenzen
@@ -63,6 +64,10 @@ export function createAdminRoutesHandler(deps) {
     listOffers,
     listRecentRedemptions,
     deleteOffer,
+    previewCheckoutOffer,
+    calculatePrice,
+    normalizeDuration,
+    normalizeSeats,
     setOfferActive,
     upsertOffer,
   } = deps;
@@ -536,6 +541,45 @@ export function createAdminRoutesHandler(deps) {
     return input;
   }
 
+  function normalizeOwnerOfferPreviewInput(payload) {
+    const tier = String(payload?.tier || "pro").trim().toLowerCase();
+    if (!["pro", "ultimate"].includes(tier)) {
+      const error = new Error("Plan muss pro oder ultimate sein.");
+      error.statusCode = 400;
+      throw error;
+    }
+    const months = typeof normalizeDuration === "function"
+      ? normalizeDuration(payload?.months)
+      : Math.max(1, Number.parseInt(String(payload?.months || "1"), 10) || 1);
+    const seats = typeof normalizeSeats === "function"
+      ? normalizeSeats(payload?.seats)
+      : Math.max(1, Number.parseInt(String(payload?.seats || "1"), 10) || 1);
+    const couponCode = normalizeOwnerOfferCode(payload?.couponCode ?? payload?.coupon ?? payload?.code);
+    const referralCode = normalizeOwnerOfferCode(payload?.referralCode ?? payload?.referral);
+    if (!couponCode && !referralCode) {
+      const error = new Error("Coupon- oder Referral-Code ist erforderlich.");
+      error.statusCode = 400;
+      throw error;
+    }
+    const baseAmountCents = typeof calculatePrice === "function"
+      ? calculatePrice(tier, months, seats)
+      : 0;
+    if (!Number.isFinite(Number(baseAmountCents)) || Number(baseAmountCents) <= 0) {
+      const error = new Error("Preis konnte fuer diese Kombination nicht berechnet werden.");
+      error.statusCode = 400;
+      throw error;
+    }
+    return {
+      tier,
+      months,
+      seats,
+      email: String(payload?.email || "").trim().toLowerCase(),
+      couponCode,
+      referralCode,
+      baseAmountCents: Number(baseAmountCents),
+    };
+  }
+
   function compactMissingFields(fields) {
     return Array.from(new Set((Array.isArray(fields) ? fields : [])
       .map((field) => String(field || "").trim())
@@ -958,6 +1002,68 @@ export function createAdminRoutesHandler(deps) {
         return true;
       }
       methodNotAllowed(res, ["GET", "POST", "PATCH"]);
+      return true;
+    }
+
+    // POST /api/admin/offers/preview
+    if (pathname === "/api/admin/offers/preview") {
+      if (req.method !== "POST") { methodNotAllowed(res, ["POST"]); return true; }
+      let previewInput = null;
+      try {
+        if (typeof previewCheckoutOffer !== "function") {
+          const error = new Error("Offer-Vorschau ist nicht verfuegbar.");
+          error.statusCode = 500;
+          throw error;
+        }
+        const payload = JSON.parse(await readRequestBody(req) || "{}");
+        previewInput = normalizeOwnerOfferPreviewInput(payload);
+        const preview = previewCheckoutOffer(previewInput);
+        const target = previewInput.couponCode || previewInput.referralCode;
+        auditOwnerAction(req, {
+          action: "owner.offer.preview",
+          status: "success",
+          target,
+          summary: `Offer-Vorschau berechnet: ${target}`,
+          metadata: {
+            tier: previewInput.tier,
+            seats: previewInput.seats,
+            months: previewInput.months,
+            couponCode: previewInput.couponCode || null,
+            referralCode: previewInput.referralCode || null,
+            emailProvided: Boolean(previewInput.email),
+            appliedCode: preview?.applied?.code || null,
+            discountCents: Number(preview?.discountCents || 0) || 0,
+            finalAmountCents: Number(preview?.finalAmountCents || 0) || 0,
+          },
+        });
+        sendJson(res, 200, {
+          ok: true,
+          input: {
+            tier: previewInput.tier,
+            seats: previewInput.seats,
+            months: previewInput.months,
+            couponCode: previewInput.couponCode || null,
+            referralCode: previewInput.referralCode || null,
+            emailProvided: Boolean(previewInput.email),
+          },
+          pricing: {
+            baseAmountCents: previewInput.baseAmountCents,
+            discountCents: Number(preview?.discountCents || 0) || 0,
+            finalAmountCents: Number.isFinite(Number(preview?.finalAmountCents))
+              ? Number(preview.finalAmountCents)
+              : previewInput.baseAmountCents,
+          },
+          preview,
+        });
+      } catch (err) {
+        auditOwnerAction(req, {
+          action: "owner.offer.preview",
+          status: "failed",
+          target: previewInput?.couponCode || previewInput?.referralCode || undefined,
+          summary: err?.message || "Offer-Vorschau konnte nicht berechnet werden",
+        });
+        sendJson(res, err?.statusCode || 400, { ok: false, error: err?.message || "Offer-Vorschau konnte nicht berechnet werden" });
+      }
       return true;
     }
 
@@ -1619,6 +1725,12 @@ function buildAdminHtml() {
     .mini-btn:hover{border-color:#00F0FF;color:#fff}
     .mini-btn-danger{border-color:#4b1111;color:#ff9a9a}
     .mini-btn-danger:hover{border-color:#FF2A2A;color:#fff}
+    .offer-preview{padding:14px 16px;border-bottom:1px solid #222;background:#0b0b0b}
+    .offer-preview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end}
+    .offer-preview-grid label{display:grid;gap:5px;font-size:10px;color:#71717a;text-transform:uppercase;letter-spacing:0.08em}
+    .offer-preview-grid input,.offer-preview-grid select{width:100%;min-width:0}
+    .offer-preview-result{margin-top:10px;border:1px solid #222;border-radius:8px;background:#090909;padding:10px;font-size:12px;color:#a1a1aa}
+    .offer-preview-result strong{color:#e4e4e7}
     .station-url{max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#71717a;font-family:monospace;font-size:11px}
     .empty-state{padding:32px 16px;text-align:center;color:#71717a;font-size:13px}
     .cmd{font-family:'Consolas','JetBrains Mono',monospace;font-size:11px;color:#a1a1aa;background:#090909;border:1px solid #222;border-radius:6px;padding:4px 6px;display:inline-block}
@@ -1764,6 +1876,7 @@ function buildAdminHtml() {
     let cachedData = {};
     let stationFilters = { search: '', health: 'all', tier: 'all' };
     let operationFilters = { search: '', status: 'all', area: 'all' };
+    let offerPreviewState = { code: '', kind: 'coupon', tier: 'pro', seats: '1', months: '1', email: '', result: null, error: '' };
     let selectedLogFile = '';
 
     function showTab(tab, trigger) {
@@ -2437,6 +2550,72 @@ function buildAdminHtml() {
       return rules.join(' · ') || '-';
     }
 
+    function offerPreviewReason(reason) {
+      const reasons = {
+        code_missing: 'Kein Code angegeben',
+        offer_not_found: 'Code nicht gefunden',
+        offer_kind_mismatch: 'Typ passt nicht',
+        offer_inactive: 'Code ist inaktiv',
+        offer_not_started: 'Code ist noch nicht gestartet',
+        offer_expired: 'Code ist abgelaufen',
+        offer_tier_mismatch: 'Plan passt nicht',
+        offer_seat_mismatch: 'Seats passen nicht',
+        offer_months_mismatch: 'Laufzeit zu kurz',
+        offer_maxed_out: 'Maximale Einloesungen erreicht',
+        offer_email_limit_reached: 'E-Mail-Limit erreicht',
+        invalid_base_amount: 'Basispreis ungueltig',
+        invalid_discount: 'Rabatt ungueltig',
+      };
+      return reasons[reason] || reason || '-';
+    }
+
+    function renderOfferPreviewPanel() {
+      const state = offerPreviewState || {};
+      const result = state.result || null;
+      const preview = result?.preview || null;
+      const pricing = result?.pricing || {};
+      const applied = preview?.applied || null;
+      const selectedKind = state.kind || 'coupon';
+      const selectedTier = state.tier || 'pro';
+      const selectedSeats = state.seats || '1';
+      const selectedMonths = state.months || '1';
+      const resultHtml = state.error
+        ? '<div class="offer-preview-result"><span class="badge-down">FEHLER</span> ' + esc(state.error) + '</div>'
+        : (result
+          ? '<div class="offer-preview-result">' +
+              '<span class="' + (applied ? 'badge-up' : 'badge-unknown') + '">' + (applied ? 'ANGEWENDET' : 'NICHT ANGEWENDET') + '</span> ' +
+              '<strong>' + esc(applied?.code || state.code || '-') + '</strong>' +
+              '<span style="margin-left:10px">Basis: <strong>' + formatMoneyCents(pricing.baseAmountCents || 0) + '</strong></span>' +
+              '<span style="margin-left:10px">Rabatt: <strong>' + formatMoneyCents(pricing.discountCents || 0) + '</strong></span>' +
+              '<span style="margin-left:10px">Endbetrag: <strong>' + formatMoneyCents(pricing.finalAmountCents || 0) + '</strong></span>' +
+              '<span style="margin-left:10px">Stripe: <strong>' + (preview?.requiresStripe === false ? 'Nein' : 'Ja') + '</strong></span>' +
+              (!applied ? '<div style="margin-top:6px;color:#71717a">Coupon: ' + offerPreviewReason(preview?.coupon?.reason) + ' · Referral: ' + offerPreviewReason(preview?.referral?.reason) + '</div>' : '') +
+            '</div>'
+          : '');
+      return '<div class="offer-preview">' +
+        '<div class="offer-preview-grid">' +
+          '<label>Code<input id="offerPreviewCode" type="text" value="' + escAttr(state.code || '') + '" placeholder="SUMMER25"/></label>' +
+          '<label>Typ<select id="offerPreviewKind">' +
+            option('coupon', 'Coupon', selectedKind) +
+            option('referral', 'Referral', selectedKind) +
+          '</select></label>' +
+          '<label>Plan<select id="offerPreviewTier">' +
+            option('pro', 'Pro', selectedTier) +
+            option('ultimate', 'Ultimate', selectedTier) +
+          '</select></label>' +
+          '<label>Seats<select id="offerPreviewSeats">' +
+            [1,2,3,5].map(value => option(String(value), String(value), selectedSeats)).join('') +
+          '</select></label>' +
+          '<label>Monate<select id="offerPreviewMonths">' +
+            [1,3,12].map(value => option(String(value), String(value), selectedMonths)).join('') +
+          '</select></label>' +
+          '<label>E-Mail optional<input id="offerPreviewEmail" type="email" value="' + escAttr(state.email || '') + '" placeholder="kunde@example.com"/></label>' +
+          '<button class="btn btn-cyan" onclick="runOfferPreview()">Preview</button>' +
+        '</div>' +
+        resultHtml +
+      '</div>';
+    }
+
     function renderOffers(payload) {
       const offers = Array.isArray(payload.offers) ? payload.offers : [];
       const redemptions = Array.isArray(payload.redemptions) ? payload.redemptions : [];
@@ -2453,6 +2632,7 @@ function buildAdminHtml() {
           '<button class="btn btn-cyan" onclick="openOfferModal()">Neuer Code</button>' +
           '<span class="cmd">Owner-Änderungen brauchen Code-Bestätigung und werden auditiert.</span>' +
         '</div>' +
+        renderOfferPreviewPanel() +
         (offers.length
           ? '<table><thead><tr><th>Code</th><th>Typ</th><th>Status</th><th>Nutzen</th><th>Regeln</th><th>Einloesungen</th><th>Notiz</th><th>Aktion</th></tr></thead><tbody>' +
             offers.map(offer => '<tr>' +
@@ -2464,6 +2644,7 @@ function buildAdminHtml() {
               '<td style="font-size:12px;color:#71717a">' + esc(offer.redemptions?.total || 0) + '</td>' +
               '<td style="font-size:12px;color:#71717a;max-width:260px">' + esc(offer.note || '-') + '</td>' +
               '<td><div class="row-actions">' +
+                '<button class="mini-btn" onclick="seedOfferPreview(' + JSON.stringify(offer.code || '') + ',' + JSON.stringify(offer.kind || 'coupon') + ')">Preview</button>' +
                 '<button class="mini-btn" onclick="openOfferModal(' + JSON.stringify(offer.code || '') + ')">Bearbeiten</button>' +
                 '<button class="mini-btn" onclick="setOfferActiveState(' + JSON.stringify(offer.code || '') + ',' + JSON.stringify(!offer.active) + ')">' + (offer.active ? 'Deaktivieren' : 'Aktivieren') + '</button>' +
                 '<button class="mini-btn mini-btn-danger" onclick="deleteOfferCode(' + JSON.stringify(offer.code || '') + ')">Loeschen</button>' +
@@ -2574,6 +2755,49 @@ function buildAdminHtml() {
       } catch (e) {
         setOfferInput('offerEditStatus', 'Code konnte nicht gespeichert werden: ' + e.message);
       }
+    }
+
+    function seedOfferPreview(code, kind) {
+      offerPreviewState.code = normalizeOfferCodeClient(code);
+      offerPreviewState.kind = String(kind || 'coupon').toLowerCase() === 'referral' ? 'referral' : 'coupon';
+      offerPreviewState.result = null;
+      offerPreviewState.error = '';
+      renderTab('offers');
+      setTimeout(() => document.getElementById('offerPreviewCode')?.focus(), 0);
+    }
+
+    async function runOfferPreview() {
+      const code = normalizeOfferCodeClient(document.getElementById('offerPreviewCode')?.value);
+      const kind = String(document.getElementById('offerPreviewKind')?.value || 'coupon').toLowerCase() === 'referral' ? 'referral' : 'coupon';
+      offerPreviewState = {
+        code,
+        kind,
+        tier: document.getElementById('offerPreviewTier')?.value || 'pro',
+        seats: document.getElementById('offerPreviewSeats')?.value || '1',
+        months: document.getElementById('offerPreviewMonths')?.value || '1',
+        email: document.getElementById('offerPreviewEmail')?.value || '',
+        result: null,
+        error: '',
+      };
+      if (!code) {
+        offerPreviewState.error = 'Code ist erforderlich.';
+        renderTab('offers');
+        return;
+      }
+      try {
+        const payload = {
+          tier: offerPreviewState.tier,
+          seats: offerPreviewState.seats,
+          months: offerPreviewState.months,
+          email: offerPreviewState.email,
+        };
+        if (kind === 'referral') payload.referralCode = code;
+        else payload.couponCode = code;
+        offerPreviewState.result = await apiPost('offers/preview', payload);
+      } catch (e) {
+        offerPreviewState.error = e.message;
+      }
+      renderTab('offers');
     }
 
     async function setOfferActiveState(code, active) {

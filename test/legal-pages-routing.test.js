@@ -511,6 +511,26 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.equal(confirmedOfferEdit.offer.percentOff, 10);
     assert.equal(confirmedOfferEdit.offer.note, "edited through owner portal route");
 
+    const offerPreviewResponse = await fetch(`http://127.0.0.1:${port}/api/admin/offers/preview`, {
+      method: "POST",
+      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tier: "pro",
+        seats: 1,
+        months: 1,
+        email: "owner-preview@example.com",
+        couponCode: "ownergift",
+      }),
+    });
+    assert.equal(offerPreviewResponse.status, 200);
+    const offerPreview = await offerPreviewResponse.json();
+    assert.equal(offerPreview.ok, true);
+    assert.equal(offerPreview.preview.applied.code, "OWNERGIFT");
+    assert.equal(offerPreview.preview.applied.kind, "coupon");
+    assert.equal(offerPreview.preview.discountCents > 0, true);
+    assert.equal(offerPreview.pricing.finalAmountCents < offerPreview.pricing.baseAmountCents, true);
+    assert.equal(offerPreview.input.emailProvided, true);
+
     const unconfirmedOfferDeleteResponse = await fetch(`http://127.0.0.1:${port}/api/admin/offers/delete`, {
       method: "POST",
       headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
@@ -685,6 +705,13 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
       && event.status === "success"
       && event.target === "OWNERREAD"
       && event.metadata.partial === true
+    )));
+    assert.ok(adminAudit.events.some((event) => (
+      event.action === "owner.offer.preview"
+      && event.status === "success"
+      && event.target === "OWNERGIFT"
+      && event.metadata.appliedCode === "OWNERGIFT"
+      && event.metadata.emailProvided === true
     )));
     assert.ok(adminAudit.events.some((event) => (
       event.action === "owner.offer.delete"

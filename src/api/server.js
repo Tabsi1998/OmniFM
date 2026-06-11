@@ -166,6 +166,7 @@ import {
   upsertOffer,
   deleteOffer,
   setOfferActive,
+  previewCheckoutOffer,
   listRecentRedemptions,
   getOffer,
   getRedemptionBySession,
@@ -3090,6 +3091,10 @@ const handleAdminRoutes = createAdminRoutesHandler({
   listOffers,
   listRecentRedemptions,
   deleteOffer,
+  previewCheckoutOffer,
+  calculatePrice,
+  normalizeDuration,
+  normalizeSeats,
   setOfferActive,
   upsertOffer,
 });
