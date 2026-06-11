@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { randomUUID } from "node:crypto";
 
 const DEFAULT_TIMEOUT_MS = 5000;
 const DEFAULT_STALE_MS = 30000;
@@ -15,10 +16,32 @@ function getLockDir(filePath) {
   return `${filePath}.lock`;
 }
 
+function parseLockOwner(rawOwner) {
+  try {
+    const parsed = JSON.parse(String(rawOwner || ""));
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function isProcessAlive(pid) {
+  const numericPid = Number.parseInt(String(pid || ""), 10);
+  if (!Number.isFinite(numericPid) || numericPid <= 0) return false;
+  try {
+    process.kill(numericPid, 0);
+    return true;
+  } catch (err) {
+    return err?.code === "EPERM";
+  }
+}
+
 function isLockStale(lockDir, staleMs) {
   try {
     const stat = fs.statSync(lockDir);
-    return Date.now() - stat.mtimeMs > staleMs;
+    if (Date.now() - stat.mtimeMs <= staleMs) return false;
+    const owner = parseLockOwner(readLockOwner(lockDir));
+    return !isProcessAlive(owner.pid);
   } catch {
     return true;
   }
@@ -34,6 +57,7 @@ function readLockOwner(lockDir) {
 
 export function withFileStoreLock(filePath, fn, options = {}) {
   const lockDir = getLockDir(filePath);
+  const ownerId = `${process.pid}:${Date.now()}:${randomUUID()}`;
   const timeoutMs = Math.max(1, Number(options.timeoutMs || DEFAULT_TIMEOUT_MS));
   const staleMs = Math.max(timeoutMs, Number(options.staleMs || DEFAULT_STALE_MS));
   const retryMs = Math.max(1, Number(options.retryMs || DEFAULT_RETRY_MS));
@@ -47,6 +71,7 @@ export function withFileStoreLock(filePath, fn, options = {}) {
         fs.writeFileSync(
           `${lockDir}/owner`,
           JSON.stringify({
+            id: ownerId,
             pid: process.pid,
             createdAt: new Date().toISOString(),
             filePath,
@@ -85,7 +110,10 @@ export function withFileStoreLock(filePath, fn, options = {}) {
     return fn();
   } finally {
     try {
-      fs.rmSync(lockDir, { recursive: true, force: true });
+      const owner = parseLockOwner(readLockOwner(lockDir));
+      if (!owner.id || owner.id === ownerId) {
+        fs.rmSync(lockDir, { recursive: true, force: true });
+      }
     } catch {
       // best-effort cleanup; stale-lock handling covers process crashes
     }
