@@ -1118,6 +1118,12 @@ export function createAdminRoutesHandler(deps) {
       const stationsData = loadStations?.() || {};
       const healthReport = getStationHealthReport?.() || [];
       const healthMap = Object.fromEntries(healthReport.map((h) => [h.key, h]));
+      const defaultStationKey = String(stationsData?.defaultStationKey || "").trim() || null;
+      const fallbackKeys = Array.isArray(stationsData?.fallbackKeys)
+        ? stationsData.fallbackKeys.map((key) => String(key || "").trim()).filter(Boolean)
+        : [];
+      const fallbackSet = new Set(fallbackKeys);
+      const tierSummary = { free: 0, pro: 0, ultimate: 0 };
 
       const stations = Object.entries(stationsData?.stations || {}).map(([key, s]) => ({
         key,
@@ -1125,10 +1131,24 @@ export function createAdminRoutesHandler(deps) {
         url: s.url || null,
         tier: s.tier || "free",
         genre: s.genre || null,
+        isDefault: key === defaultStationKey,
+        isFallback: fallbackSet.has(key),
+        fallbackIndex: fallbackKeys.indexOf(key),
         health: healthMap[key] || null,
-      }));
+      })).map((station) => {
+        if (Object.hasOwn(tierSummary, station.tier)) tierSummary[station.tier] += 1;
+        return station;
+      });
 
-      sendJson(res, 200, { stations, total: stations.length });
+      sendJson(res, 200, {
+        stations,
+        total: stations.length,
+        defaultStationKey,
+        fallbackKeys,
+        locked: Boolean(stationsData?.locked),
+        qualityPreset: stationsData?.qualityPreset || "custom",
+        tierSummary,
+      });
       return true;
     }
 
@@ -1440,6 +1460,10 @@ function buildAdminHtml() {
             summaryPill(summary.up, 'Online', 'green') +
             summaryPill(summary.down, 'Defekt', 'red') +
             summaryPill(summary.unknown, 'Nicht geprüft', 'amber') +
+            summaryPill(d.stations.defaultStationKey || '-', 'Default', d.stations.defaultStationKey ? 'green' : 'amber') +
+            summaryPill((d.stations.fallbackKeys || []).length, 'Fallbacks', (d.stations.fallbackKeys || []).length ? 'green' : 'amber') +
+            summaryPill(d.stations.qualityPreset || 'custom', 'Qualitaet', '') +
+            summaryPill(d.stations.locked ? 'JA' : 'NEIN', 'Locked', d.stations.locked ? 'amber' : 'green') +
           '</div>' +
           '<div class="toolbar">' +
             '<input id="stationSearch" type="text" placeholder="Station suchen: Key, Name, Genre, URL..." value="' + escAttr(stationFilters.search) + '" oninput="setStationFilter(\\'search\\', this.value)"/>' +
@@ -1456,13 +1480,18 @@ function buildAdminHtml() {
               option('ultimate', 'Ultimate', stationFilters.tier) +
             '</select>' +
           '</div>' +
+          '<div class="toolbar">' +
+            '<span class="cmd">Fallback-Kette: ' + esc((d.stations.fallbackKeys || []).join(' -> ') || '-') + '</span>' +
+            '<span class="cmd">Tiers: free=' + esc(d.stations.tierSummary?.free || 0) + ' · pro=' + esc(d.stations.tierSummary?.pro || 0) + ' · ultimate=' + esc(d.stations.tierSummary?.ultimate || 0) + '</span>' +
+          '</div>' +
           (filteredStations.length
-            ? '<table><thead><tr><th>Status</th><th>Key</th><th>Name</th><th>Tier</th><th>Antwortzeit</th><th>Fehler</th><th>Stream</th><th>Aktionen</th></tr></thead><tbody>' +
+            ? '<table><thead><tr><th>Status</th><th>Rolle</th><th>Key</th><th>Name</th><th>Tier</th><th>Antwortzeit</th><th>Fehler</th><th>Stream</th><th>Aktionen</th></tr></thead><tbody>' +
               filteredStations.map(s => {
                 const status = getStationHealthState(s);
                 const rowClass = status === 'down' ? ' class="problem-row"' : (status === 'unknown' ? ' class="warning-row"' : '');
                 return '<tr' + rowClass + '>' +
                   '<td>' + healthBadge(s.health) + '</td>' +
+                  '<td>' + stationRoleBadge(s) + '</td>' +
                   '<td style="font-family:monospace;font-size:11px;color:#71717a">' + esc(s.key) + '</td>' +
                   '<td><b>' + esc(s.name) + '</b><div style="font-size:11px;color:#52525b">' + esc(s.genre || '') + '</div></td>' +
                   '<td style="color:' + planColor(s.tier) + ';font-size:11px;font-weight:700">' + esc(s.tier||'free') + '</td>' +
@@ -2218,6 +2247,12 @@ function buildAdminHtml() {
       if (h.status === 'up') return '<span class="badge-up">▲ UP</span>';
       if (h.status === 'down') return '<span class="badge-down">▼ DOWN</span>';
       return '<span class="badge-unknown">UNKLAR</span>';
+    }
+    function stationRoleBadge(station) {
+      const parts = [];
+      if (station?.isDefault) parts.push('<span class="badge-up">DEFAULT</span>');
+      if (station?.isFallback) parts.push('<span class="badge-unknown">FB ' + esc(Number(station.fallbackIndex) + 1) + '</span>');
+      return parts.join(' ') || '<span style="color:#52525b;font-size:11px">-</span>';
     }
     function fmtUptime(s) {
       const h = Math.floor(s/3600), m = Math.floor((s%3600)/60);

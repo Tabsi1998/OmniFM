@@ -310,6 +310,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.match(adminPanelHtml, /renderJobs/);
     assert.match(adminPanelHtml, /renderAudit/);
     assert.match(adminPanelHtml, /renderLogs/);
+    assert.match(adminPanelHtml, /stationRoleBadge/);
 
     const adminOverviewResponse = await fetch(`http://127.0.0.1:${port}/api/admin/overview`, {
       headers: { Cookie: adminCookieHeader },
@@ -337,6 +338,22 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.equal(adminDiagnostics.release?.appVersion, "3.0.0");
     assert.ok(adminDiagnostics.stations.total > 0);
     assert.ok(Array.isArray(adminDiagnostics.alerts));
+
+    const adminStationsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/stations`, {
+      headers: { Cookie: adminCookieHeader },
+    });
+    assert.equal(adminStationsResponse.status, 200);
+    const adminStations = await adminStationsResponse.json();
+    assert.ok(adminStations.total > 0);
+    assert.ok(Array.isArray(adminStations.stations));
+    assert.equal(typeof adminStations.locked, "boolean");
+    assert.equal(typeof adminStations.qualityPreset, "string");
+    assert.ok(Array.isArray(adminStations.fallbackKeys));
+    assert.equal(typeof adminStations.tierSummary.free, "number");
+    assert.ok(adminStations.stations.some((station) => Object.hasOwn(station, "isDefault")));
+    if (adminStations.defaultStationKey) {
+      assert.ok(adminStations.stations.some((station) => station.key === adminStations.defaultStationKey && station.isDefault));
+    }
 
     const adminOperationsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/operations`, {
       headers: { Cookie: adminCookieHeader },
