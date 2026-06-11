@@ -304,6 +304,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.match(adminPanelHtml, /Audit/);
     assert.match(adminPanelHtml, /renderOperations/);
     assert.match(adminPanelHtml, /renderConfig/);
+    assert.match(adminPanelHtml, /renderLegalReadiness/);
     assert.match(adminPanelHtml, /saveSecrets/);
     assert.match(adminPanelHtml, /sendSmtpTestMail/);
     assert.match(adminPanelHtml, /renderJobs/);
@@ -352,6 +353,9 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
       operation.id === "settings-commands" && operation.webStatus === "available"
     )));
     assert.ok(adminOperations.operations.some((operation) => (
+      operation.id === "settings-legal" && operation.webStatus === "available"
+    )));
+    assert.ok(adminOperations.operations.some((operation) => (
       operation.id === "recognition-test" && operation.webStatus === "available"
     )));
     assert.ok(adminOperations.summary.available >= 1);
@@ -395,6 +399,19 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     ))));
     assert.ok(adminConfig.secrets.some((secret) => secret.key === "API_ADMIN_TOKEN" && secret.configured));
     assert.ok(adminConfig.secrets.some((secret) => secret.key === "STRIPE_SECRET_KEY" && secret.writeOnly));
+
+    const adminLegalResponse = await fetch(`http://127.0.0.1:${port}/api/admin/legal`, {
+      headers: { Cookie: adminCookieHeader },
+    });
+    assert.equal(adminLegalResponse.status, 200);
+    const adminLegal = await adminLegalResponse.json();
+    assert.equal(adminLegal.configured, true);
+    assert.ok(adminLegal.sections.every((section) => section.configured));
+    assert.ok(adminLegal.sections.some((section) => section.id === "legal" && section.route === "/api/legal"));
+    assert.equal(adminLegal.preview.legal.providerName, "IT-Tabelander");
+    assert.equal(adminLegal.preview.privacy.contactEmail, "privacy@it-tabelander.at");
+    assert.equal(adminLegal.preview.terms.contactEmail, "terms@it-tabelander.at");
+    assert.doesNotMatch(JSON.stringify(adminLegal), /admin-route-token|sk_live_owner_test|smtp-owner-test/);
 
     const adminMailResponse = await fetch(`http://127.0.0.1:${port}/api/admin/mail`, {
       headers: { Cookie: adminCookieHeader },

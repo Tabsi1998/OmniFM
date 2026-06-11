@@ -14,6 +14,7 @@
 //   GET  /api/admin/config       → Owner-Einstellungen ohne Secret-Werte
 //   POST /api/admin/config       → Erlaubte Owner-Einstellungen in .env speichern
 //   POST /api/admin/config/secrets → Erlaubte Secrets write-only in .env speichern
+//   GET  /api/admin/legal        → Legal/Privacy/Terms Readiness und Preview
 //   GET  /api/admin/mail         → SMTP-Status ohne Secret-Werte
 //   POST /api/admin/mail/test    → SMTP-Testmail senden
 //   GET  /api/admin/audit        → Owner-Audit-Log ohne Secret-Werte
@@ -51,6 +52,9 @@ export function createAdminRoutesHandler(deps) {
     getCommonSecurityHeaders,
     getReleaseInfo,
     getBinaryHealthProbe,
+    buildPublicLegalNotice,
+    buildPublicPrivacyNotice,
+    buildPublicTermsNotice,
   } = deps;
 
   function getRuntimes() {
@@ -351,11 +355,11 @@ export function createAdminRoutesHandler(deps) {
         area: "Settings",
         title: "Legal Setup",
         cli: "./update.sh --settings legal",
-        webStatus: "planned",
+        webStatus: "available",
         risk: "medium",
         description: "Impressum, Datenschutz und Terms-Angaben pflegen.",
-        webEntry: "Oeffentliche Legal-APIs zeigen die gerenderten Angaben.",
-        nextStep: "Legal-Editor mit Pflichtfeld-Validierung und Vorschau."
+        webEntry: "Tab Einstellungen kann Legal-, Privacy- und Terms-Werte speichern und zeigt Readiness plus Vorschau.",
+        nextStep: "Nach rechtlicher Pruefung nur noch Inhalte pflegen und oeffentliche Seiten erneut pruefen."
       },
       {
         id: "settings-logs",
@@ -424,6 +428,69 @@ export function createAdminRoutesHandler(deps) {
       total: operations.length,
       summary,
       operations
+    };
+  }
+
+  function compactMissingFields(fields) {
+    return Array.from(new Set((Array.isArray(fields) ? fields : [])
+      .map((field) => String(field || "").trim())
+      .filter(Boolean)));
+  }
+
+  function buildOwnerLegalReadiness() {
+    const legal = typeof buildPublicLegalNotice === "function" ? buildPublicLegalNotice() : null;
+    const privacy = typeof buildPublicPrivacyNotice === "function" ? buildPublicPrivacyNotice() : null;
+    const terms = typeof buildPublicTermsNotice === "function" ? buildPublicTermsNotice() : null;
+    const sections = [
+      {
+        id: "legal",
+        title: "Impressum",
+        route: "/api/legal",
+        configured: Boolean(legal?.isConfigured),
+        missingCoreFields: compactMissingFields(legal?.missingCoreFields),
+      },
+      {
+        id: "privacy",
+        title: "Datenschutz",
+        route: "/api/privacy",
+        configured: Boolean(privacy?.isConfigured),
+        missingCoreFields: compactMissingFields(privacy?.missingCoreFields),
+      },
+      {
+        id: "terms",
+        title: "Nutzungsbedingungen",
+        route: "/api/terms",
+        configured: Boolean(terms?.isConfigured),
+        missingCoreFields: compactMissingFields(terms?.missingCoreFields),
+      },
+    ];
+    return {
+      generatedAt: new Date().toISOString(),
+      configured: sections.every((section) => section.configured),
+      sections,
+      preview: {
+        legal: {
+          productName: legal?.legal?.productName || "",
+          providerName: legal?.legal?.providerName || "",
+          legalForm: legal?.legal?.legalForm || "",
+          address: [legal?.legal?.streetAddress, [legal?.legal?.postalCode, legal?.legal?.city].filter(Boolean).join(" ")].filter(Boolean).join(", "),
+          email: legal?.legal?.email || "",
+          website: legal?.legal?.website || "",
+        },
+        privacy: {
+          controllerName: privacy?.controller?.name || "",
+          contactEmail: privacy?.contact?.email || "",
+          hostingProvider: privacy?.hosting?.provider || "",
+          authorityName: privacy?.authority?.name || "",
+        },
+        terms: {
+          providerName: terms?.operator?.providerName || "",
+          contactEmail: terms?.contact?.email || "",
+          website: terms?.contact?.website || "",
+          effectiveDate: terms?.contact?.effectiveDate || "",
+          governingLaw: terms?.contact?.governingLaw || "",
+        },
+      },
     };
   }
 
@@ -754,6 +821,13 @@ export function createAdminRoutesHandler(deps) {
         return true;
       }
       methodNotAllowed(res, ["GET", "POST", "PATCH"]);
+      return true;
+    }
+
+    // GET /api/admin/legal
+    if (pathname === "/api/admin/legal") {
+      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
+      sendJson(res, 200, buildOwnerLegalReadiness());
       return true;
     }
 
@@ -1424,8 +1498,8 @@ function buildAdminHtml() {
     async function loadAll() {
       document.getElementById('serverTime').textContent = 'Lädt...';
       try {
-        const [overview, guilds, licenses, stations, logs, logFiles, diagnostics, operations, config, mail, jobs, audit] = await Promise.allSettled([
-          api('overview'), api('guilds'), api('licenses'), api('stations'), api('logs'), api('log-files'), api('diagnostics'), api('operations'), api('config'), api('mail'), api('jobs'), api('audit')
+        const [overview, guilds, licenses, stations, logs, logFiles, diagnostics, operations, config, legal, mail, jobs, audit] = await Promise.allSettled([
+          api('overview'), api('guilds'), api('licenses'), api('stations'), api('logs'), api('log-files'), api('diagnostics'), api('operations'), api('config'), api('legal'), api('mail'), api('jobs'), api('audit')
         ]);
         if (overview.status === 'fulfilled') {
           cachedData.overview = overview.value;
@@ -1454,6 +1528,7 @@ function buildAdminHtml() {
         if (diagnostics.status === 'fulfilled') cachedData.diagnostics = diagnostics.value;
         if (operations.status === 'fulfilled') cachedData.operations = operations.value;
         if (config.status === 'fulfilled') cachedData.config = config.value;
+        if (legal.status === 'fulfilled') cachedData.legal = legal.value;
         if (mail.status === 'fulfilled') cachedData.mail = mail.value;
         if (jobs.status === 'fulfilled') cachedData.jobs = jobs.value;
         if (audit.status === 'fulfilled') cachedData.audit = audit.value;
@@ -1463,12 +1538,49 @@ function buildAdminHtml() {
       }
     }
 
+    function renderLegalReadiness(payload) {
+      if (!payload) return '<div class="config-group"><h3>Legal Readiness</h3><div class="loading">Lade Legal-Status...</div></div>';
+      const sections = Array.isArray(payload.sections) ? payload.sections : [];
+      const previewRows = [
+        ['Anbieter', payload.preview?.legal?.providerName],
+        ['Rechtsform', payload.preview?.legal?.legalForm],
+        ['Adresse', payload.preview?.legal?.address],
+        ['Legal E-Mail', payload.preview?.legal?.email],
+        ['Webseite', payload.preview?.legal?.website],
+        ['Datenschutz Kontakt', payload.preview?.privacy?.contactEmail],
+        ['Hosting', payload.preview?.privacy?.hostingProvider],
+        ['Terms Kontakt', payload.preview?.terms?.contactEmail],
+        ['Terms URL', payload.preview?.terms?.website],
+        ['Gueltig ab', payload.preview?.terms?.effectiveDate],
+        ['Recht', payload.preview?.terms?.governingLaw],
+      ].filter(row => String(row[1] || '').trim());
+      return '<div class="config-group">' +
+        '<h3>Legal Readiness</h3>' +
+        '<p>Prueft die oeffentlichen Payloads fuer Impressum, Datenschutz und Terms gegen die aktuell geladenen Einstellungen.</p>' +
+        '<div class="summary-row">' +
+          summaryPill(payload.configured ? 'OK' : 'OFFEN', 'Gesamtstatus', payload.configured ? 'green' : 'amber') +
+          sections.map(section => summaryPill(section.configured ? 'OK' : 'FEHLT', section.title || section.id, section.configured ? 'green' : 'red')).join('') +
+        '</div>' +
+        (sections.length ? '<table><thead><tr><th>Bereich</th><th>Route</th><th>Status</th><th>Fehlende Pflichtfelder</th></tr></thead><tbody>' +
+          sections.map(section => '<tr>' +
+            '<td><b>' + esc(section.title || section.id) + '</b></td>' +
+            '<td><span class="cmd">' + esc(section.route || '-') + '</span></td>' +
+            '<td>' + statusBadge(section.configured ? 'configured' : 'missing') + '</td>' +
+            '<td style="font-size:12px;color:#71717a">' + esc((section.missingCoreFields || []).join(', ') || '-') + '</td>' +
+          '</tr>').join('') + '</tbody></table>' : '') +
+        (previewRows.length ? '<table style="margin-top:10px"><thead><tr><th>Vorschau</th><th>Wert</th></tr></thead><tbody>' +
+          previewRows.map(row => '<tr><td style="color:#71717a">' + esc(row[0]) + '</td><td>' + esc(row[1]) + '</td></tr>').join('') +
+          '</tbody></table>' : '<div class="empty-state">Noch keine Legal-Vorschauwerte gesetzt.</div>') +
+      '</div>';
+    }
+
     function renderConfig(payload) {
       const groups = Array.isArray(payload.groups) ? payload.groups : [];
       const secrets = Array.isArray(payload.secrets) ? payload.secrets : [];
       const configuredSecrets = secrets.filter(s => s.configured).length;
       const updated = Array.isArray(payload.updatedKeys) ? payload.updatedKeys : [];
       const mail = cachedData.mail || {};
+      const legal = cachedData.legal || null;
       return '<div class="summary-row">' +
           summaryPill(payload.envFile?.writable ? 'OK' : 'FEHLT', '.env schreibbar', payload.envFile?.writable ? 'green' : 'red') +
           summaryPill(groups.reduce((sum, group) => sum + (group.fields?.length || 0), 0), 'Editierbare Werte', '') +
@@ -1480,6 +1592,7 @@ function buildAdminHtml() {
           '<button class="btn btn-cyan" onclick="saveConfig()">Speichern</button>' +
           '<span id="configSaveStatus" class="config-status">' + (updated.length ? 'Gespeichert: ' + esc(updated.join(', ')) + ' - Container neu starten.' : 'Nur nicht geheime Werte sind editierbar.') + '</span>' +
         '</div>' +
+        renderLegalReadiness(legal) +
         '<div class="config-group">' +
           '<h3>SMTP Test</h3>' +
           '<p>Sendet eine echte Testmail ueber die aktuell gesetzte SMTP-Konfiguration. Passwortwerte bleiben write-only.</p>' +
@@ -1625,6 +1738,7 @@ function buildAdminHtml() {
       try {
         const result = await apiPost('config', { values });
         cachedData.config = result;
+        cachedData.legal = await api('legal').catch(() => cachedData.legal);
         if (status) {
           status.textContent = 'Gespeichert. Container/Service danach neu starten, damit alle Bereiche die Werte sicher uebernehmen.';
           status.style.color = '#39FF14';

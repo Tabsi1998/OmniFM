@@ -3084,6 +3084,9 @@ const handleAdminRoutes = createAdminRoutesHandler({
   getCommonSecurityHeaders,
   getReleaseInfo: () => buildReleaseInfo({ frontendBuildStamp, webRootSource }),
   getBinaryHealthProbe: getHealthBinaryProbe,
+  buildPublicLegalNotice,
+  buildPublicPrivacyNotice,
+  buildPublicTermsNotice,
 });
 
 function startWebServer(runtimes) {
