@@ -311,6 +311,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.match(adminPanelHtml, /renderAudit/);
     assert.match(adminPanelHtml, /renderLogs/);
     assert.match(adminPanelHtml, /stationRoleBadge/);
+    assert.match(adminPanelHtml, /testStationStream/);
 
     const adminOverviewResponse = await fetch(`http://127.0.0.1:${port}/api/admin/overview`, {
       headers: { Cookie: adminCookieHeader },
@@ -354,6 +355,15 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     if (adminStations.defaultStationKey) {
       assert.ok(adminStations.stations.some((station) => station.key === adminStations.defaultStationKey && station.isDefault));
     }
+
+    const missingStationTestResponse = await fetch(`http://127.0.0.1:${port}/api/admin/stations/not-existing/test`, {
+      method: "POST",
+      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    assert.equal(missingStationTestResponse.status, 404);
+    const missingStationTest = await missingStationTestResponse.json();
+    assert.match(missingStationTest.error, /Station nicht gefunden/);
 
     const adminOperationsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/operations`, {
       headers: { Cookie: adminCookieHeader },

@@ -28,7 +28,7 @@
 //   GET  /api/admin/log-files    → Erlaubte lokale Logdateien
 //   GET  /api/admin/log-files/:name → Tail einer erlaubten lokalen Logdatei
 //   GET  /api/admin/stations     → Alle Stationen (inkl. Health-Status)
-//   POST /api/admin/stations     → Station hinzufügen/bearbeiten
+//   POST /api/admin/stations/:key/test → Konfigurierte Station testen
 // ============================================================
 
 import { getOwnerConfigSnapshot, patchOwnerConfig, patchOwnerSecrets } from "../../lib/owner-config-store.js";
@@ -36,6 +36,7 @@ import { getOwnerJob, getOwnerJobsSnapshot, startOwnerJob } from "../../lib/owne
 import { getOwnerAuditSnapshot, recordOwnerAudit } from "../../lib/owner-audit-store.js";
 import { getOwnerLogFileSnapshot, getOwnerLogFilesSnapshot } from "../../lib/owner-log-files.js";
 import { TEST_CONFIRMATION_VALUE, getOwnerMailStatus, sendOwnerTestMail } from "../../lib/owner-mail-test.js";
+import { testOwnerStationStream } from "../../lib/owner-station-test.js";
 
 export function createAdminRoutesHandler(deps) {
   const {
@@ -1152,6 +1153,51 @@ export function createAdminRoutesHandler(deps) {
       return true;
     }
 
+    // POST /api/admin/stations/:key/test
+    const stationTestMatch = pathname.match(/^\/api\/admin\/stations\/([^/]+)\/test$/);
+    if (stationTestMatch) {
+      if (req.method !== "POST") { methodNotAllowed(res, ["POST"]); return true; }
+      const key = decodeURIComponent(stationTestMatch[1]);
+      try {
+        const stationsData = loadStations?.() || {};
+        const station = stationsData?.stations?.[key];
+        if (!station) {
+          const error = new Error("Station nicht gefunden.");
+          error.statusCode = 404;
+          throw error;
+        }
+        const result = await testOwnerStationStream({
+          key,
+          name: station.name || key,
+          url: station.url || "",
+        });
+        auditOwnerAction(req, {
+          action: "owner.station.test",
+          status: result.ok ? "success" : "failed",
+          target: key,
+          summary: `Owner-Station-Test ${result.ok ? "erfolgreich" : "fehlgeschlagen"}: ${key}`,
+          metadata: {
+            station: key,
+            status: result.status,
+            method: result.method,
+            httpStatus: result.httpStatus,
+            responseTimeMs: result.responseTimeMs,
+            error: result.error || null,
+          },
+        });
+        sendJson(res, 200, result);
+      } catch (err) {
+        auditOwnerAction(req, {
+          action: "owner.station.test",
+          status: "failed",
+          target: key,
+          summary: err?.message || "Station-Test konnte nicht ausgefuehrt werden",
+        });
+        sendJson(res, err?.statusCode || 500, { ok: false, error: err?.message || "Station-Test konnte nicht ausgefuehrt werden" });
+      }
+      return true;
+    }
+
     return false;
   };
 }
@@ -1500,6 +1546,7 @@ function buildAdminHtml() {
                   '<td><div class="station-url" title="' + escAttr(s.url || '') + '">' + esc(s.url || '–') + '</div></td>' +
                   '<td><div class="row-actions">' +
                     (s.url ? '<a class="mini-btn" href="' + escAttr(s.url) + '" target="_blank" rel="noopener">Öffnen</a>' : '') +
+                    (s.url ? '<button class="mini-btn" onclick="testStationStream(' + JSON.stringify(s.key) + ')">Test</button>' : '') +
                     '<button class="mini-btn" onclick="copyText(' + JSON.stringify(s.key) + ')">Key</button>' +
                     (s.url ? '<button class="mini-btn" onclick="copyText(' + JSON.stringify(s.url) + ')">URL</button>' : '') +
                   '</div></td>' +
@@ -2230,6 +2277,21 @@ function buildAdminHtml() {
         input.select();
         document.execCommand('copy');
         input.remove();
+      }
+    }
+    async function testStationStream(key) {
+      const stationKey = String(key || '').trim();
+      if (!stationKey) return;
+      try {
+        const result = await apiPost('stations/' + encodeURIComponent(stationKey) + '/test', {});
+        const detail = result.ok
+          ? 'OK: ' + stationKey + ' · HTTP ' + (result.httpStatus || '-') + ' · ' + result.responseTimeMs + 'ms'
+          : 'FEHLER: ' + stationKey + ' · ' + (result.error || result.status || 'unbekannt');
+        alert(detail);
+        cachedData.stations = await api('stations').catch(() => cachedData.stations);
+        renderTab('stations');
+      } catch (e) {
+        alert('Station-Test fehlgeschlagen: ' + e.message);
       }
     }
     function planColor(p) {
