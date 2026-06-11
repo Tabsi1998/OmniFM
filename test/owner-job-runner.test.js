@@ -29,6 +29,9 @@ test("owner job runner exposes only allowlisted actions and captures output", as
   assert.ok(snapshot.actions.some((action) => action.id === "cleanup-dry-run"));
   assert.equal(snapshot.actions.find((action) => action.id === "cleanup-dry-run")?.requiresConfirmation, false);
   assert.match(snapshot.actions.find((action) => action.id === "cleanup-dry-run")?.command || "", /update\.sh --cleanup dry-run/);
+  assert.equal(snapshot.actions.find((action) => action.id === "cleanup-run")?.requiresConfirmation, true);
+  assert.equal(snapshot.actions.find((action) => action.id === "cleanup-run")?.confirmationValue, "cleanup-run");
+  assert.match(snapshot.actions.find((action) => action.id === "cleanup-run")?.command || "", /update\.sh --cleanup$/);
   assert.equal(snapshot.actions.find((action) => action.id === "system-doctor")?.requiresConfirmation, true);
   assert.equal(snapshot.actions.find((action) => action.id === "system-doctor")?.confirmationValue, "system-doctor");
   assert.equal(snapshot.actions.find((action) => action.id === "deploy-slash-commands")?.requiresConfirmation, true);

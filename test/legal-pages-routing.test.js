@@ -524,6 +524,11 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.ok(adminJobs.actions.some((action) => action.id === "rollback-plan"));
     assert.ok(adminJobs.actions.some((action) => action.id === "status-quick" && action.requiresConfirmation === false));
     assert.ok(adminJobs.actions.some((action) => action.id === "cleanup-dry-run" && action.requiresConfirmation === false));
+    assert.ok(adminJobs.actions.some((action) => (
+      action.id === "cleanup-run"
+      && action.requiresConfirmation
+      && action.confirmationValue === "cleanup-run"
+    )));
     assert.ok(adminJobs.actions.some((action) => action.id === "split-preflight"));
     assert.equal(adminJobs.summary.totalActions, adminJobs.actions.length);
     assert.ok(adminJobs.summary.byArea.Operations >= 1);
@@ -580,6 +585,16 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     const unconfirmedRecognition = await unconfirmedRecognitionResponse.json();
     assert.equal(unconfirmedRecognition.requiresConfirmation, true);
     assert.equal(unconfirmedRecognition.confirmationValue, "recognition-test");
+
+    const unconfirmedCleanupResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
+      method: "POST",
+      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ actionId: "cleanup-run" }),
+    });
+    assert.equal(unconfirmedCleanupResponse.status, 400);
+    const unconfirmedCleanup = await unconfirmedCleanupResponse.json();
+    assert.equal(unconfirmedCleanup.requiresConfirmation, true);
+    assert.equal(unconfirmedCleanup.confirmationValue, "cleanup-run");
 
     const privateRecognitionResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
       method: "POST",
@@ -638,6 +653,12 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.ok(adminAuditAfterJob.events.some((event) => (
       event.action === "owner.job.start"
       && event.target === "recognition-test"
+      && event.status === "denied"
+      && event.metadata.requiresConfirmation === true
+    )));
+    assert.ok(adminAuditAfterJob.events.some((event) => (
+      event.action === "owner.job.start"
+      && event.target === "cleanup-run"
       && event.status === "denied"
       && event.metadata.requiresConfirmation === true
     )));

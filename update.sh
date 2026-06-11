@@ -313,6 +313,37 @@ get_logs_dir() {
   printf "%s" "${APP_DIR}/${logs_dir#./}"
 }
 
+resolve_cleanup_path() {
+  local raw_path="$1"
+  if command -v realpath >/dev/null 2>&1; then
+    realpath -m "$raw_path" 2>/dev/null
+    return
+  fi
+  if [[ "$raw_path" == *".."* ]]; then
+    return 1
+  fi
+  printf "%s" "$raw_path"
+}
+
+cleanup_safe_logs_dir() {
+  local logs_dir app_resolved logs_resolved
+  logs_dir="$(get_logs_dir)"
+  app_resolved="$(resolve_cleanup_path "$APP_DIR")" || return 1
+  logs_resolved="$(resolve_cleanup_path "$logs_dir")" || return 1
+
+  case "$logs_resolved" in
+    "$app_resolved"|"$app_resolved"/*)
+      printf "%s" "$logs_resolved"
+      return 0
+      ;;
+    *)
+      fail "LOGS_DIR liegt ausserhalb des Projektverzeichnisses: ${logs_resolved}" >&2
+      warn "Cleanup abgebrochen. Setze LOGS_DIR auf einen Pfad innerhalb von ${app_resolved}." >&2
+      return 1
+      ;;
+  esac
+}
+
 collect_log_files() {
   local prefix="$1"
   local include_current="${2:-1}"
@@ -1390,7 +1421,7 @@ cleanup_rotated_logs() {
   local -a files=()
   keep="$(read_env "LOG_MAX_FILES" "30")"
   days="$(read_env "LOG_MAX_DAYS" "14")"
-  logs_dir="$(get_logs_dir)"
+  logs_dir="$(cleanup_safe_logs_dir)" || return 1
 
   if [[ ! "$keep" =~ ^[0-9]+$ ]] || (( keep < 1 )); then
     keep=30
@@ -1428,7 +1459,7 @@ show_cleanup_dry_run() {
   local keep days logs_dir auto_prune prune_until backup_keep
   keep="$(read_env "LOG_MAX_FILES" "30")"
   days="$(read_env "LOG_MAX_DAYS" "14")"
-  logs_dir="$(get_logs_dir)"
+  logs_dir="$(cleanup_safe_logs_dir)" || logs_dir=""
   auto_prune="$(read_env "AUTO_DOCKER_PRUNE" "1")"
   prune_until="$(read_env "DOCKER_BUILDER_PRUNE_UNTIL" "168h")"
   backup_keep="${UPDATE_BACKUP_KEEP:-20}"
@@ -1463,18 +1494,22 @@ show_cleanup_dry_run() {
 
   local log_remove_count=0
   local log_old_count=0
-  for prefix in bot error; do
-    local -a log_files=()
-    mapfile -t log_files < <(ls -1t "$logs_dir"/"${prefix}"-*.log 2>/dev/null || true)
-    if (( ${#log_files[@]} > keep )); then
-      log_remove_count=$((log_remove_count + ${#log_files[@]} - keep))
-    fi
-    local old_count
-    old_count="$(find "$logs_dir" -maxdepth 1 -type f -name "${prefix}-*.log" -mtime +"$days" 2>/dev/null | wc -l | xargs)"
-    log_old_count=$((log_old_count + ${old_count:-0}))
-  done
-  echo -e "    Rotierte Logs ausserhalb Datei-Limit: ${CYAN}${log_remove_count}${NC}"
-  echo -e "    Rotierte Logs aelter als ${days} Tage: ${CYAN}${log_old_count}${NC}"
+  if [[ -n "$logs_dir" ]]; then
+    for prefix in bot error; do
+      local -a log_files=()
+      mapfile -t log_files < <(ls -1t "$logs_dir"/"${prefix}"-*.log 2>/dev/null || true)
+      if (( ${#log_files[@]} > keep )); then
+        log_remove_count=$((log_remove_count + ${#log_files[@]} - keep))
+      fi
+      local old_count
+      old_count="$(find "$logs_dir" -maxdepth 1 -type f -name "${prefix}-*.log" -mtime +"$days" 2>/dev/null | wc -l | xargs)"
+      log_old_count=$((log_old_count + ${old_count:-0}))
+    done
+    echo -e "    Rotierte Logs ausserhalb Datei-Limit: ${CYAN}${log_remove_count}${NC}"
+    echo -e "    Rotierte Logs aelter als ${days} Tage: ${CYAN}${log_old_count}${NC}"
+  else
+    echo -e "    Rotierte Logs: ${YELLOW}uebersprungen wegen unsicherem LOGS_DIR${NC}"
+  fi
 
   if [[ "$auto_prune" == "0" ]]; then
     echo -e "    Docker-Prune: ${YELLOW}deaktiviert${NC} (AUTO_DOCKER_PRUNE=0)"
@@ -2059,6 +2094,20 @@ run_offers_wizard_now() {
   return 1
 }
 
+if [[ "${1:-}" == "--cleanup" && "${2:-}" == "dry-run" ]]; then
+  echo ""
+  echo -e "${CYAN}${BOLD}"
+  echo "  ╔══════════════════════════════════════════════╗"
+  echo "  ║                                              ║"
+  echo "  ║   OmniFM - Management & Settings            ║"
+  echo "  ║                                              ║"
+  echo "  ╚══════════════════════════════════════════════╝"
+  echo -e "${NC}"
+  show_cleanup_dry_run
+  ok "Cleanup Dry-Run abgeschlossen."
+  exit 0
+fi
+
 sanitize_env_structure
 
 # ============================================================
@@ -2310,7 +2359,10 @@ if [[ "$MODE" == "--cleanup" ]]; then
   fi
 
   prune_update_backups
-  cleanup_rotated_logs
+  if ! cleanup_rotated_logs; then
+    fail "Cleanup abgebrochen."
+    exit 1
+  fi
   if [[ "$(read_env "AUTO_DOCKER_PRUNE" "1")" != "0" ]]; then
     cleanup_docker_cache
   else

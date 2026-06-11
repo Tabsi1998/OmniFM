@@ -120,6 +120,16 @@ const OWNER_JOB_ACTIONS = [
     description: "Zeigt, welche Logs, Backups und Docker-Caches ein Cleanup betreffen wuerde, ohne etwas zu loeschen.",
   },
   {
+    id: "cleanup-run",
+    title: "Cleanup ausfuehren",
+    area: "Operations",
+    risk: "high",
+    timeoutMs: 180_000,
+    command: "bash",
+    args: ["./update.sh", "--cleanup"],
+    description: "Fuehrt den bestehenden Cleanup fuer Backups, rotierte Logs und optional Docker-Cache aus. Nur nach Dry-Run und expliziter Bestaetigung starten.",
+  },
+  {
     id: "system-doctor",
     title: "System Doctor",
     area: "Betrieb",
