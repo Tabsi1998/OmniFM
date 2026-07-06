@@ -11,26 +11,33 @@
 // ============================================================
 
 import { log } from "../lib/logging.js";
+import { fetchWithValidatedRedirects } from "../lib/safe-fetch.js";
 
-const STATION_HEALTH_ENABLED = String(process.env.STATION_HEALTH_ENABLED || "0") === "1";
-const STATION_HEALTH_INTERVAL_MS = Math.max(
-  60_000,
-  Number.parseInt(String(process.env.STATION_HEALTH_INTERVAL_MS || "300000"), 10) || 300_000
-);
-const STATION_HEALTH_TIMEOUT_MS = Math.max(
-  3_000,
-  Number.parseInt(String(process.env.STATION_HEALTH_TIMEOUT_MS || "8000"), 10) || 8_000
-);
-// Maximale Anzahl gleichzeitiger Checks (verhindert Überlastung bei vielen Stationen)
-const STATION_HEALTH_CONCURRENCY = Math.max(
-  1,
-  Math.min(20, Number.parseInt(String(process.env.STATION_HEALTH_CONCURRENCY || "5"), 10) || 5)
-);
+function envFlagEnabled(name, fallback = "0") {
+  return ["1", "true", "yes", "on"].includes(String(process.env[name] || fallback).trim().toLowerCase());
+}
+
+function parseEnvInt(name, fallback, min, max = Number.MAX_SAFE_INTEGER) {
+  const parsed = Number.parseInt(String(process.env[name] || fallback), 10);
+  const value = Number.isFinite(parsed) ? parsed : fallback;
+  return Math.max(min, Math.min(max, value));
+}
+
+function getStationHealthConfig() {
+  return {
+    enabled: envFlagEnabled("STATION_HEALTH_ENABLED"),
+    intervalMs: parseEnvInt("STATION_HEALTH_INTERVAL_MS", 300_000, 60_000),
+    timeoutMs: parseEnvInt("STATION_HEALTH_TIMEOUT_MS", 8_000, 3_000),
+    // Maximale Anzahl gleichzeitiger Checks (verhindert Ueberlastung bei vielen Stationen)
+    concurrency: parseEnvInt("STATION_HEALTH_CONCURRENCY", 5, 1, 20),
+  };
+}
 
 /** @type {Map<string, StationHealthEntry>} */
 const healthReport = new Map();
 
 let healthCheckTimer = null;
+let healthCheckStartupTimer = null;
 let isRunning = false;
 
 /**
@@ -54,6 +61,7 @@ let isRunning = false;
  * @returns {Promise<StationHealthEntry>}
  */
 async function checkStation(key, name, url) {
+  const { timeoutMs } = getStationHealthConfig();
   const startMs = Date.now();
   const previous = healthReport.get(key) || {
     key,
@@ -69,29 +77,27 @@ async function checkStation(key, name, url) {
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), STATION_HEALTH_TIMEOUT_MS);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     let response;
     try {
       // HEAD-Request zuerst – spart Bandbreite
-      response = await fetch(url, {
+      ({ response } = await fetchWithValidatedRedirects(url, {
         method: "HEAD",
         signal: controller.signal,
         headers: { "User-Agent": "OmniFM-HealthCheck/1.0" },
-        redirect: "follow",
-      });
+      }));
     } catch (headErr) {
       // Manche Streams unterstützen kein HEAD → GET mit sofortigem Abbruch
       if (!controller.signal.aborted) {
-        response = await fetch(url, {
+        ({ response } = await fetchWithValidatedRedirects(url, {
           method: "GET",
           signal: controller.signal,
           headers: {
             "User-Agent": "OmniFM-HealthCheck/1.0",
             "Range": "bytes=0-0",
           },
-          redirect: "follow",
-        });
+        }));
         // Sofort abbrechen – wir wollen nur den Status-Code
         controller.abort();
       } else {
@@ -128,7 +134,7 @@ async function checkStation(key, name, url) {
   } catch (err) {
     const responseTimeMs = Date.now() - startMs;
     const isTimeout = err?.name === "AbortError" || String(err?.message || "").includes("abort");
-    const errorMsg = isTimeout ? `Timeout nach ${STATION_HEALTH_TIMEOUT_MS}ms` : String(err?.message || err);
+    const errorMsg = isTimeout ? `Timeout nach ${timeoutMs}ms` : String(err?.message || err);
 
     const entry = {
       key,
@@ -157,6 +163,7 @@ async function checkStation(key, name, url) {
 async function runHealthChecks(stations) {
   if (!stations.length) return;
 
+  const { concurrency } = getStationHealthConfig();
   const queue = [...stations];
   const workers = [];
 
@@ -173,7 +180,7 @@ async function runHealthChecks(stations) {
     }
   };
 
-  for (let i = 0; i < Math.min(STATION_HEALTH_CONCURRENCY, stations.length); i++) {
+  for (let i = 0; i < Math.min(concurrency, stations.length); i++) {
     workers.push(runWorker());
   }
 
@@ -185,7 +192,8 @@ async function runHealthChecks(stations) {
  * @param {() => {stations: Record<string, {name: string, url: string}>}} getStationsFn
  */
 function startStationHealthService(getStationsFn) {
-  if (!STATION_HEALTH_ENABLED) return;
+  const config = getStationHealthConfig();
+  if (!config.enabled) return;
   if (isRunning) return;
   isRunning = true;
 
@@ -209,13 +217,14 @@ function startStationHealthService(getStationsFn) {
   };
 
   // Erster Check nach 30 Sekunden (Bot-Startup abwarten)
-  setTimeout(() => {
+  healthCheckStartupTimer = setTimeout(() => {
     tick();
-    healthCheckTimer = setInterval(tick, STATION_HEALTH_INTERVAL_MS);
+    healthCheckTimer = setInterval(tick, config.intervalMs);
     healthCheckTimer?.unref?.();
   }, 30_000);
+  healthCheckStartupTimer?.unref?.();
 
-  log("INFO", `[StationHealth] Service gestartet (Intervall: ${STATION_HEALTH_INTERVAL_MS / 1000}s, Timeout: ${STATION_HEALTH_TIMEOUT_MS}ms, Parallelität: ${STATION_HEALTH_CONCURRENCY})`);
+  log("INFO", `[StationHealth] Service gestartet (Intervall: ${config.intervalMs / 1000}s, Timeout: ${config.timeoutMs}ms, Parallelitaet: ${config.concurrency})`);
 }
 
 /**
@@ -223,6 +232,10 @@ function startStationHealthService(getStationsFn) {
  */
 function stopStationHealthService() {
   isRunning = false;
+  if (healthCheckStartupTimer) {
+    clearTimeout(healthCheckStartupTimer);
+    healthCheckStartupTimer = null;
+  }
   if (healthCheckTimer) {
     clearInterval(healthCheckTimer);
     healthCheckTimer = null;
@@ -260,9 +273,8 @@ function isStationDown(key) {
 export {
   startStationHealthService,
   stopStationHealthService,
+  getStationHealthConfig,
   getStationHealthReport,
   getStationHealth,
   isStationDown,
-  STATION_HEALTH_ENABLED,
-  STATION_HEALTH_INTERVAL_MS,
 };

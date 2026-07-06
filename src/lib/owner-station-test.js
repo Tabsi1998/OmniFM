@@ -1,3 +1,6 @@
+import { validateCustomStationUrlWithDns } from "../custom-stations.js";
+import { fetchWithValidatedRedirects } from "./safe-fetch.js";
+
 const DEFAULT_TIMEOUT_MS = 8_000;
 const HEAD_FALLBACK_STATUS_CODES = new Set([403, 405, 501]);
 
@@ -47,7 +50,11 @@ function buildFailureResult(station, { url, startedAtMs, method, error, timeoutM
   };
 }
 
-async function testOwnerStationStream(station, { timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl = globalThis.fetch } = {}) {
+async function testOwnerStationStream(station, {
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  fetchImpl = globalThis.fetch,
+  validateUrl = validateCustomStationUrlWithDns,
+} = {}) {
   if (!station || typeof station !== "object") {
     const error = new Error("Station fehlt.");
     error.statusCode = 400;
@@ -71,36 +78,33 @@ async function testOwnerStationStream(station, { timeoutMs = DEFAULT_TIMEOUT_MS,
   try {
     let response;
     try {
-      response = await fetchImpl(url, {
+      ({ response } = await fetchWithValidatedRedirects(url, {
         method,
-        redirect: "follow",
         signal: controller.signal,
         headers: { "User-Agent": "OmniFM-OwnerStationTest/1.0" },
-      });
+      }, { fetchImpl, validateUrl }));
       if (HEAD_FALLBACK_STATUS_CODES.has(Number(response?.status || 0))) {
         method = "GET";
-        response = await fetchImpl(url, {
+        ({ response } = await fetchWithValidatedRedirects(url, {
           method,
-          redirect: "follow",
           signal: controller.signal,
           headers: {
             "User-Agent": "OmniFM-OwnerStationTest/1.0",
             "Range": "bytes=0-0",
           },
-        });
+        }, { fetchImpl, validateUrl }));
       }
     } catch (headError) {
       if (controller.signal.aborted) throw headError;
       method = "GET";
-      response = await fetchImpl(url, {
+      ({ response } = await fetchWithValidatedRedirects(url, {
         method,
-        redirect: "follow",
         signal: controller.signal,
         headers: {
           "User-Agent": "OmniFM-OwnerStationTest/1.0",
           "Range": "bytes=0-0",
         },
-      });
+      }, { fetchImpl, validateUrl }));
     }
 
     const httpStatus = Number(response?.status || 0) || null;

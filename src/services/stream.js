@@ -18,6 +18,7 @@ import {
 } from "../lib/helpers.js";
 import { networkRecoveryCoordinator } from "../core/network-recovery.js";
 import { validateCustomStationUrlWithDns } from "../custom-stations.js";
+import { fetchWithValidatedRedirects } from "../lib/safe-fetch.js";
 
 async function createResource(url, volume, qualityPreset, botName, bitrateOverride, networkScope = null) {
   const urlValidation = await validateCustomStationUrlWithDns(url);
@@ -132,8 +133,7 @@ async function createResource(url, volume, qualityPreset, botName, bitrateOverri
     return { resource, process: ffmpeg };
   }
 
-  const res = await fetch(safeUrl, {
-    redirect: "follow",
+  const { response: res } = await fetchWithValidatedRedirects(safeUrl, {
     headers: { "User-Agent": "OmniFM/3.0" },
     signal: AbortSignal.timeout(10_000)
   });

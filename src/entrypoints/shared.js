@@ -8,6 +8,7 @@ import { TIERS, parseExpiryReminderDays } from "../lib/helpers.js";
 import { loadBotConfigs } from "../bot-config.js";
 import { initStationsStore } from "../stations-store.js";
 import { logStoreConcurrencyReport } from "../lib/store-concurrency.js";
+import { resolveUnhandledRejectionPolicy } from "../lib/process-policy.js";
 import {
   getServerLicense,
   initPremiumStore,
@@ -201,6 +202,9 @@ function installProcessHandlers({
         entry: path.basename(process.argv[1] || "entrypoint.js"),
       },
     });
+    if (resolveUnhandledRejectionPolicy() === "exit") {
+      shutdown("unhandledRejection").finally(() => process.exit(1));
+    }
   });
 
   process.on("uncaughtException", (err) => {

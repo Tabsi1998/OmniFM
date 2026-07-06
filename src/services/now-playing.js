@@ -10,6 +10,7 @@ import {
   NOW_PLAYING_FETCH_TIMEOUT_MS,
   NOW_PLAYING_MAX_METAINT_BYTES,
 } from "../lib/helpers.js";
+import { fetchWithValidatedRedirects } from "../lib/safe-fetch.js";
 import { recognizeTrackFromStream } from "./audio-recognition.js";
 
 const nowPlayingCoverCache = new Map();
@@ -406,15 +407,14 @@ async function fetchStreamSnapshot(url, { includeCover = false, allowRecognition
   let reader = null;
 
   try {
-    res = await fetch(url, {
+    ({ response: res } = await fetchWithValidatedRedirects(url, {
       method: "GET",
       headers: {
         "Icy-MetaData": "1",
         "User-Agent": "OmniFM/3.0"
       },
-      redirect: "follow",
       signal: AbortSignal.timeout(NOW_PLAYING_FETCH_TIMEOUT_MS)
-    });
+    }));
 
     const snapshot = {
       ...empty,

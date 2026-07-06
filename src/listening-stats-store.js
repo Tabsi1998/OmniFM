@@ -280,6 +280,22 @@ function saveStateToFile() {
   }
 }
 
+function isSplitRuntimeProcess() {
+  const role = String(process.env.BOT_PROCESS_ROLE || "").trim().toLowerCase();
+  return role === "commander" || role === "worker";
+}
+
+function shouldWriteJsonFallback({ force = false } = {}) {
+  if (force) return true;
+  return !(isSplitRuntimeProcess() && useMongo());
+}
+
+function saveStateToJsonFallback(options = {}) {
+  if (!shouldWriteJsonFallback(options)) return false;
+  saveStateToFile();
+  return true;
+}
+
 function ensureGuildStatsLocal(guildId) {
   const gid = normalizeGuildId(guildId);
   if (!gid) return null;
@@ -650,10 +666,9 @@ async function mongoSafe(fn) {
   }
 }
 
-// ---- Write to both MongoDB + JSON ----
+// ---- Write to MongoDB and the local JSON fallback when it is safe ----
 async function persistGuildStats(guildId, stats) {
-  // Always write JSON fallback
-  saveStateToFile();
+  saveStateToJsonFallback();
 
   // Write to MongoDB if available
   await mongoSafe(async (db) => {
@@ -856,7 +871,7 @@ export async function endListeningSession(guildId, { botId = "" } = {}) {
   if (stats) {
     await persistGuildStats(gid, stats);
   } else {
-    saveStateToFile();
+    saveStateToJsonFallback();
   }
 
   return completedSession;
@@ -895,7 +910,7 @@ export function recordCommandUsage(guildId, commandName, timestampMs = Date.now(
   if (!stats) return { saved: false, reason: "invalid-guild" };
   incrementBucket(stats.commands, String(commandName || "").trim().toLowerCase(), 1, 80);
   stats.lastCommandAt = Number(timestampMs) || Date.now();
-  saveStateToFile();
+  saveStateToJsonFallback();
 
   // Async MongoDB write
   mongoSafe(async (db) => {
@@ -963,7 +978,7 @@ export function recordStationStart(guildId, {
       peakListeners: normalizeCount(listenerCount),
     });
 
-    saveStateToFile();
+    saveStateToJsonFallback();
   }
 
   // Start a listening session
@@ -1024,7 +1039,7 @@ export function recordGuildListenerSample(guildId, listenerCount, timestampMs = 
     timestamp: new Date(atMs).toISOString(),
   });
   if ((stats.peakListeners || 0) !== previousPeak || fallbackSnapshot?.saved !== false) {
-    saveStateToFile();
+    saveStateToJsonFallback();
   }
 
   mongoSafe(async (db) => {
@@ -1078,7 +1093,7 @@ export function recordConnectionEvent(guildId, {
       details: normalizeText(details, 500) || "",
       timestamp: new Date(atMs).toISOString(),
     });
-    saveStateToFile();
+    saveStateToJsonFallback();
   }
 
   mongoSafe(async (db) => {
@@ -1522,7 +1537,7 @@ export function resetGuildStats(guildId) {
     }
   }
 
-  saveStateToFile();
+  saveStateToJsonFallback({ force: true });
   log("INFO", `Stats fuer Guild ${gid} zurueckgesetzt (inkl. Fallback-Daten).`);
 }
 

@@ -5,6 +5,8 @@ import test from "node:test";
 
 import { testOwnerStationStream } from "../src/lib/owner-station-test.js";
 
+const allowTestUrl = async (url) => ({ ok: true, url });
+
 async function withHttpServer(handler, fn) {
   const server = http.createServer(handler);
   server.listen(0, "127.0.0.1");
@@ -28,7 +30,7 @@ test("owner station stream test reports successful configured station URL", asyn
       key: "localtest",
       name: "Local Test",
       url: `${baseUrl}/stream.mp3`,
-    });
+    }, { validateUrl: allowTestUrl });
 
     assert.equal(result.ok, true);
     assert.equal(result.status, "up");
@@ -56,7 +58,7 @@ test("owner station stream test falls back to ranged GET when HEAD fails", async
       key: "fallback",
       name: "Fallback",
       url: `${baseUrl}/stream.mp3`,
-    });
+    }, { validateUrl: allowTestUrl });
 
     assert.equal(result.ok, true);
     assert.equal(result.status, "up");
@@ -81,7 +83,7 @@ test("owner station stream test falls back to ranged GET when HEAD is not allowe
       key: "head405",
       name: "Head 405",
       url: `${baseUrl}/stream.mp3`,
-    });
+    }, { validateUrl: allowTestUrl });
 
     assert.equal(result.ok, true);
     assert.equal(result.status, "up");
@@ -100,7 +102,7 @@ test("owner station stream test rejects invalid configured URLs before fetching"
 test("owner station stream test returns down result for fetch failures", async () => {
   const result = await testOwnerStationStream(
     { key: "fail", name: "Fail", url: "https://radio.example/live" },
-    { fetchImpl: async () => { throw new Error("network down"); } },
+    { fetchImpl: async () => { throw new Error("network down"); }, validateUrl: allowTestUrl },
   );
 
   assert.equal(result.ok, false);

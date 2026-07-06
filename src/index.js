@@ -19,6 +19,7 @@ import {
 } from "./services/operator-webhook.js";
 import { connect as connectDb } from "./lib/db.js";
 import { logStoreConcurrencyReport } from "./lib/store-concurrency.js";
+import { resolveUnhandledRejectionPolicy } from "./lib/process-policy.js";
 import { TIERS, parseExpiryReminderDays } from "./lib/helpers.js";
 import { normalizeLanguage, getDefaultLanguage } from "./i18n.js";
 import { loadBotConfigs } from "./bot-config.js";
@@ -60,6 +61,7 @@ import {
   syncTopGGStats,
   syncTopGGVotes,
 } from "./services/topgg.js";
+import { startStationHealthService, stopStationHealthService } from "./services/station-health.js";
 
 const EXPIRY_REMINDER_DAYS = parseExpiryReminderDays(process.env.EXPIRY_REMINDER_DAYS);
 installOperatorIncidentRecorder({
@@ -104,6 +106,7 @@ logStoreConcurrencyReport({
 });
 await initPremiumStore();
 await initStationsStore();
+startStationHealthService(loadStations);
 await logRecentOperatorIncidentSummary({
   label: "Owner summary on startup",
 }).catch(() => null);
@@ -562,7 +565,7 @@ startWeeklyDigestService(runtimes);
 
 // ---- Shutdown ----
 let shuttingDown = false;
-async function shutdown(signal) {
+async function shutdown(signal, { exitCode = 0 } = {}) {
   if (shuttingDown) return;
   shuttingDown = true;
   log("INFO", `Shutdown via ${signal}...`);
@@ -579,6 +582,7 @@ async function shutdown(signal) {
   }
   log("INFO", "Bot-State gespeichert.");
 
+  stopStationHealthService();
   webServer.close();
   await Promise.all(runtimes.map((runtime) => runtime.stop()));
   try {
@@ -586,7 +590,7 @@ async function shutdown(signal) {
   } catch {
     // ignore
   }
-  process.exit(0);
+  process.exit(exitCode);
 }
 
 process.on("unhandledRejection", (reason) => {
@@ -597,7 +601,20 @@ process.on("unhandledRejection", (reason) => {
     },
   });
   // Operator-Webhook: Unhandled Rejection
-  notifyCrash("unhandledRejection", reason).catch(() => null);
+  notifyCrash("unhandledRejection", reason)
+    .catch(() => null)
+    .finally(() => {
+      if (resolveUnhandledRejectionPolicy() === "exit") {
+        shutdown("unhandledRejection", { exitCode: 1 }).catch(async () => {
+          try {
+            await getLogWriteQueue();
+          } catch {
+            // ignore
+          }
+          process.exit(1);
+        });
+      }
+    });
 });
 
 process.on("uncaughtException", (err) => {
@@ -609,7 +626,7 @@ process.on("uncaughtException", (err) => {
   });
   // Operator-Webhook: Uncaught Exception
   notifyCrash("uncaughtException", err).catch(() => null);
-  shutdown("uncaughtException").catch(async () => {
+  shutdown("uncaughtException", { exitCode: 1 }).catch(async () => {
     try {
       await getLogWriteQueue();
     } catch {

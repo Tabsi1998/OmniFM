@@ -6,8 +6,21 @@
 // Optionaler Auth-Token: METRICS_TOKEN=geheimestoken
 // ============================================================
 
-const METRICS_ENABLED = String(process.env.METRICS_ENABLED || "0") === "1";
-const METRICS_TOKEN = String(process.env.METRICS_TOKEN || "").trim();
+import { safeTokenEquals } from "../lib/api-helpers.js";
+
+function envFlagEnabled(name, fallback = "0") {
+  return ["1", "true", "yes", "on"].includes(String(process.env[name] || fallback).trim().toLowerCase());
+}
+
+function getMetricsConfig() {
+  return {
+    enabled: envFlagEnabled("METRICS_ENABLED"),
+    token: String(process.env.METRICS_TOKEN || "").trim(),
+    queryTokenEnabled: envFlagEnabled("METRICS_QUERY_TOKEN_ENABLED"),
+  };
+}
+
+const METRICS_ENABLED = getMetricsConfig().enabled;
 
 /**
  * Baut eine Prometheus-kompatible Textantwort aus den Runtime-Daten.
@@ -18,6 +31,7 @@ const METRICS_TOKEN = String(process.env.METRICS_TOKEN || "").trim();
 function buildMetricsText(commanderRuntime, allRuntimes = []) {
   const lines = [];
   const now = Date.now();
+  const commander = commanderRuntime || allRuntimes[0] || {};
 
   const push = (name, help, type, ...samples) => {
     lines.push(`# HELP ${name} ${help}`);
@@ -31,7 +45,7 @@ function buildMetricsText(commanderRuntime, allRuntimes = []) {
   };
 
   // ---- Bot-Uptime ----
-  const uptimeSec = Math.floor((now - (commanderRuntime.startedAt || now)) / 1000);
+  const uptimeSec = Math.floor((now - (commander.startedAt || now)) / 1000);
   push(
     "omnifm_uptime_seconds",
     "Bot uptime in seconds",
@@ -135,6 +149,77 @@ function buildMetricsText(commanderRuntime, allRuntimes = []) {
   return lines.join("\n") + "\n";
 }
 
+function getMetricsRequestToken(req, requestUrl) {
+  const authHeader = String(req?.headers?.authorization || "").trim();
+  const bearerToken = authHeader.startsWith("Bearer ")
+    ? authHeader.slice(7).trim()
+    : "";
+  const headerToken = String(req?.headers?.["x-metrics-token"] || "").trim();
+  const config = getMetricsConfig();
+  const queryToken = config.queryTokenEnabled
+    ? String(requestUrl?.searchParams?.get("token") || "").trim()
+    : "";
+  return bearerToken || headerToken || queryToken;
+}
+
+function isMetricsAuthorized(req, requestUrl) {
+  const config = getMetricsConfig();
+  if (!config.token) return true;
+  return safeTokenEquals(getMetricsRequestToken(req, requestUrl), config.token);
+}
+
+function writeMetricsUnauthorized(res) {
+  if (typeof res.status === "function" && typeof res.set === "function" && typeof res.send === "function") {
+    res
+      .status(401)
+      .set("Content-Type", "text/plain")
+      .send("Unauthorized");
+    return;
+  }
+
+  if (typeof res.writeHead === "function") {
+    res.writeHead(401, {
+      "Content-Type": "text/plain",
+      "Cache-Control": "no-store",
+      "WWW-Authenticate": 'Bearer realm="OmniFM Metrics"',
+    });
+    res.end("Unauthorized");
+  }
+}
+
+function writeMetricsText(res, status, text) {
+  if (typeof res.status === "function") {
+    res
+      .status(status)
+      .set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+      .send(text);
+    return;
+  }
+
+  res.writeHead(status, {
+    "Content-Type": "text/plain; version=0.0.4; charset=utf-8",
+    "Cache-Control": "no-store",
+  });
+  res.end(text);
+}
+
+function handleMetricsRequest(req, res, commanderRuntime, allRuntimes = [], requestUrl = null) {
+  const config = getMetricsConfig();
+  if (!config.enabled) return false;
+
+  if (!isMetricsAuthorized(req, requestUrl)) {
+    writeMetricsUnauthorized(res);
+    return true;
+  }
+
+  try {
+    writeMetricsText(res, 200, buildMetricsText(commanderRuntime, allRuntimes));
+  } catch (err) {
+    writeMetricsText(res, 500, `# ERROR: ${err?.message || err}\n`);
+  }
+  return true;
+}
+
 /**
  * Registriert den /metrics Endpunkt am Express-App-Objekt.
  * @param {import('express').Application} app
@@ -142,31 +227,21 @@ function buildMetricsText(commanderRuntime, allRuntimes = []) {
  * @param {import('../bot/runtime.js').BotRuntime[]} allRuntimes
  */
 function registerMetricsEndpoint(app, commanderRuntime, allRuntimes = []) {
-  if (!METRICS_ENABLED) return;
+  if (!getMetricsConfig().enabled) return;
 
   app.get("/metrics", (req, res) => {
-    // Optionaler Bearer-Token-Schutz
-    if (METRICS_TOKEN) {
-      const authHeader = String(req.headers?.authorization || "").trim();
-      const token = authHeader.startsWith("Bearer ")
-        ? authHeader.slice(7).trim()
-        : String(req.query?.token || "").trim();
-      if (token !== METRICS_TOKEN) {
-        res.status(401).set("Content-Type", "text/plain").send("Unauthorized");
-        return;
-      }
+    const requestUrl = new URL(req.originalUrl || req.url || "/metrics", "http://localhost");
+    if (!isMetricsAuthorized(req, requestUrl)) {
+      writeMetricsUnauthorized(res);
+      return;
     }
 
     try {
-      const text = buildMetricsText(commanderRuntime, allRuntimes);
-      res
-        .status(200)
-        .set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-        .send(text);
+      writeMetricsText(res, 200, buildMetricsText(commanderRuntime, allRuntimes));
     } catch (err) {
       res.status(500).set("Content-Type", "text/plain").send(`# ERROR: ${err?.message || err}\n`);
     }
   });
 }
 
-export { registerMetricsEndpoint, buildMetricsText, METRICS_ENABLED };
+export { registerMetricsEndpoint, handleMetricsRequest, buildMetricsText, getMetricsConfig, METRICS_ENABLED };

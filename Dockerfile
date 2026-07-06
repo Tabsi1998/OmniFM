@@ -41,6 +41,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev
 
 COPY src ./src
+COPY scripts ./scripts
 COPY web ./web
 COPY --from=frontend-builder /frontend/build ./frontend/build
 COPY stations.json ./stations.json
@@ -49,5 +50,7 @@ COPY docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
 ENV NODE_ENV=production
+ENV UNHANDLED_REJECTION_POLICY=exit
 
-CMD ["/app/docker-entrypoint.sh"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+CMD ["node", "/app/src/index.js"]

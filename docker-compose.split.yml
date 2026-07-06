@@ -1,3 +1,9 @@
+x-omnifm-logging: &omnifm_logging
+  driver: "json-file"
+  options:
+    max-size: "${OMNIFM_LOG_MAX_SIZE:-10m}"
+    max-file: "${OMNIFM_LOG_MAX_FILE:-5}"
+
 x-omnifm-volumes: &omnifm_volumes
   - ./stations.json:/app/stations.json
   - ./premium.json:/app/premium.json
@@ -21,6 +27,8 @@ x-omnifm-volumes: &omnifm_volumes
 x-omnifm-worker-base: &omnifm_worker_base
   build: .
   init: true
+  stop_grace_period: 60s
+  logging: *omnifm_logging
   env_file:
     - .env
   command: ["node", "src/entrypoints/worker.js"]
@@ -30,6 +38,12 @@ x-omnifm-worker-base: &omnifm_worker_base
     - BOT_PROCESS_ROLE=worker
   volumes: *omnifm_volumes
   restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "node", "scripts/check-worker-health.mjs"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 120s
   depends_on:
     mongodb:
       condition: service_healthy
@@ -38,6 +52,8 @@ services:
   mongodb:
     image: mongo:7
     container_name: omnifm-mongodb
+    stop_grace_period: 60s
+    logging: *omnifm_logging
     volumes:
       - mongodb_data:/data/db
     restart: unless-stopped
@@ -54,6 +70,8 @@ services:
     build: .
     container_name: omnifm
     init: true
+    stop_grace_period: 60s
+    logging: *omnifm_logging
     env_file:
       - .env
     command: ["node", "src/entrypoints/commander.js"]

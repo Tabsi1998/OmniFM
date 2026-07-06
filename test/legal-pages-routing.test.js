@@ -174,6 +174,11 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     OMNIFM_ENV_FILE: ownerEnvFile,
     OMNIFM_OWNER_AUDIT_FILE: ownerAuditFile,
     OMNIFM_OWNER_LOGS_DIR: ownerLogsDir,
+    ADMIN_QUERY_TOKEN_ENABLED: undefined,
+    OMNIFM_ADMIN_QUERY_TOKEN_ENABLED: undefined,
+    METRICS_ENABLED: undefined,
+    METRICS_TOKEN: undefined,
+    METRICS_QUERY_TOKEN_ENABLED: undefined,
     STRIPE_SECRET_KEY: undefined,
     SMTP_PASS: undefined,
     ADMIN_EMAIL: "owner@it-tabelander.at",
@@ -267,6 +272,35 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
 
     const adminOverviewUnauthorizedResponse = await fetch(`http://127.0.0.1:${port}/api/admin/overview`);
     assert.equal(adminOverviewUnauthorizedResponse.status, 401);
+
+    const adminQueryTokenDisabledResponse = await fetch(`http://127.0.0.1:${port}/admin?token=admin-route-token`, {
+      redirect: "manual",
+    });
+    assert.equal(adminQueryTokenDisabledResponse.status, 303);
+    assert.equal(adminQueryTokenDisabledResponse.headers.get("location"), "/admin");
+    assert.equal(adminQueryTokenDisabledResponse.headers.get("set-cookie"), null);
+
+    process.env.ADMIN_QUERY_TOKEN_ENABLED = "1";
+    const adminQueryTokenLegacyResponse = await fetch(`http://127.0.0.1:${port}/admin?token=admin-route-token`, {
+      redirect: "manual",
+    });
+    assert.equal(adminQueryTokenLegacyResponse.status, 303);
+    assert.equal(adminQueryTokenLegacyResponse.headers.get("location"), "/admin");
+    assert.match(adminQueryTokenLegacyResponse.headers.get("set-cookie") || "", /omnifm_owner=admin-route-token/);
+    delete process.env.ADMIN_QUERY_TOKEN_ENABLED;
+
+    process.env.METRICS_ENABLED = "1";
+    process.env.METRICS_TOKEN = "metrics-route-token";
+    const metricsUnauthorizedResponse = await fetch(`http://127.0.0.1:${port}/metrics`);
+    assert.equal(metricsUnauthorizedResponse.status, 401);
+    const metricsResponse = await fetch(`http://127.0.0.1:${port}/metrics`, {
+      headers: { Authorization: "Bearer metrics-route-token" },
+    });
+    assert.equal(metricsResponse.status, 200);
+    assert.match(metricsResponse.headers.get("content-type") || "", /text\/plain/i);
+    assert.match(await metricsResponse.text(), /omnifm_uptime_seconds/);
+    process.env.METRICS_ENABLED = "0";
+    delete process.env.METRICS_TOKEN;
 
     const invalidAdminSessionResponse = await fetch(`http://127.0.0.1:${port}/api/admin/session`, {
       method: "POST",

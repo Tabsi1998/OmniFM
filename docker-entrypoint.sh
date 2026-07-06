@@ -92,11 +92,6 @@ if [ "${NOW_PLAYING_RECOGNITION_ENABLED:-0}" != "0" ]; then
   fi
 fi
 
-# === Commands registrieren ===
-if [ "$#" -gt 0 ]; then
-  exec "$@"
-fi
-
 # === MongoDB-Verfuegbarkeit pruefen ===
 if [ -n "$MONGO_URL" ]; then
   MONGO_WAIT_SECONDS="${MONGO_WAIT_SECONDS:-30}"
@@ -119,10 +114,13 @@ if [ -n "$MONGO_URL" ]; then
   fi
 fi
 
-if [ "${REGISTER_COMMANDS_ON_BOOT:-1}" = "1" ]; then
+if [ "${REGISTER_COMMANDS_ON_BOOT:-1}" = "1" ] && [ "${BOT_PROCESS_ROLE:-}" != "worker" ]; then
   echo "[INFO] Registriere Discord-Commands..."
   node /app/src/deploy-commands.js || echo "[WARN] Command-Registrierung fehlgeschlagen (ueberspringe)"
 fi
 
 echo "[INFO] Starte OmniFM..."
+if [ "$#" -gt 0 ]; then
+  exec "$@"
+fi
 exec node /app/src/index.js

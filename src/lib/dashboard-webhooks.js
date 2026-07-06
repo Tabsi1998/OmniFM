@@ -1,4 +1,5 @@
 import { validateCustomStationUrlWithDns } from "../custom-stations.js";
+import { fetchWithValidatedRedirects } from "./safe-fetch.js";
 
 const DASHBOARD_EXPORT_WEBHOOK_EVENT_KEYS = Object.freeze([
   "stats_exported",
@@ -173,7 +174,7 @@ async function deliverDashboardWebhook(rawConfig, eventKey, payload) {
   const timeout = setTimeout(() => controller.abort(), 5000);
 
   try {
-    const response = await fetch(config.url, {
+    const { response } = await fetchWithValidatedRedirects(config.url, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -182,6 +183,8 @@ async function deliverDashboardWebhook(rawConfig, eventKey, payload) {
       },
       body: JSON.stringify(payload),
       signal: controller.signal,
+    }, {
+      validateUrl: async (url) => validateDashboardExportsWebhookConfig({ ...config, url }),
     });
 
     let responseText = "";

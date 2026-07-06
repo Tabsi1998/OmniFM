@@ -30,6 +30,7 @@ import { createPremiumOffersRoutesHandler } from "./routes/premium-offers-routes
 import { createPremiumReadRoutesHandler } from "./routes/premium-read-routes.js";
 import { createPublicRoutesHandler } from "./routes/public-routes.js";
 import { createAdminRoutesHandler } from "./routes/admin-routes.js";
+import { handleMetricsRequest } from "../services/metrics.js";
 import {
   isRuntimePlaybackActive,
   isRuntimeVoiceConnected,
@@ -3121,6 +3122,15 @@ function startWebServer(runtimes) {
       if (await handleAdminRoutes({ req, res, requestUrl })) {
         return;
       }
+    }
+
+    if (requestUrl.pathname === "/metrics") {
+      const commanderRuntime = runtimes.find((runtime) => runtime?.role === "commander") || runtimes[0] || null;
+      if (handleMetricsRequest(req, res, commanderRuntime, runtimes, requestUrl)) {
+        return;
+      }
+      sendJson(res, 404, { error: "Metrics endpoint is disabled." });
+      return;
     }
 
     // CORS

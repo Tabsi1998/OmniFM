@@ -2,7 +2,8 @@
 // OmniFM: Admin-Panel API-Routen
 // Zugang: ADMIN_TOKEN, API_ADMIN_TOKEN oder ADMIN_API_TOKEN in .env setzen
 // URL:    /admin  (nicht verlinkt, nur für Betreiber)
-// Auth:   Owner-Login-Cookie ODER Authorization: Bearer xxx ODER X-Admin-Token ODER legacy ?token=xxx
+// Auth:   Owner-Login-Cookie ODER Authorization: Bearer xxx ODER X-Admin-Token
+// Legacy: ?token=xxx nur mit ADMIN_QUERY_TOKEN_ENABLED=1
 //
 // Endpunkte:
 //   GET  /admin                  → Owner-Login oder Admin-Panel HTML
@@ -42,6 +43,7 @@ import { getOwnerAuditSnapshot, recordOwnerAudit } from "../../lib/owner-audit-s
 import { getOwnerLogFileSnapshot, getOwnerLogFilesSnapshot } from "../../lib/owner-log-files.js";
 import { TEST_CONFIRMATION_VALUE, getOwnerMailStatus, sendOwnerTestMail } from "../../lib/owner-mail-test.js";
 import { testOwnerStationStream } from "../../lib/owner-station-test.js";
+import { safeTokenEquals } from "../../lib/api-helpers.js";
 
 export function createAdminRoutesHandler(deps) {
   const {
@@ -650,6 +652,14 @@ export function createAdminRoutesHandler(deps) {
     return String(resolveAdminToken?.() || ADMIN_TOKEN || "").trim();
   }
 
+  function isAdminQueryTokenEnabled() {
+    return ["1", "true", "yes", "on"].includes(String(
+      process.env.ADMIN_QUERY_TOKEN_ENABLED
+      || process.env.OMNIFM_ADMIN_QUERY_TOKEN_ENABLED
+      || "0"
+    ).trim().toLowerCase());
+  }
+
   function parseCookies(cookieHeader) {
     const cookies = new Map();
     for (const part of String(cookieHeader || "").split(";")) {
@@ -671,14 +681,16 @@ export function createAdminRoutesHandler(deps) {
       ? authHeader.slice(7).trim()
       : "";
     const headerToken = String(req.headers?.["x-admin-token"] || "").trim();
-    const queryToken = String(requestUrl?.searchParams?.get("token") || "").trim();
+    const queryToken = isAdminQueryTokenEnabled()
+      ? String(requestUrl?.searchParams?.get("token") || "").trim()
+      : "";
     const cookieToken = String(parseCookies(req.headers?.cookie).get(ADMIN_COOKIE_NAME) || "").trim();
-    return bearerToken || headerToken || queryToken || cookieToken;
+    return bearerToken || headerToken || cookieToken || queryToken;
   }
 
   function isAdminTokenValue(token) {
     const adminToken = resolveConfiguredAdminToken();
-    return Boolean(adminToken) && String(token || "").trim() === adminToken;
+    return Boolean(adminToken) && safeTokenEquals(String(token || "").trim(), adminToken);
   }
 
   /**
@@ -792,6 +804,10 @@ export function createAdminRoutesHandler(deps) {
 
       const queryToken = String(requestUrl?.searchParams?.get("token") || "").trim();
       if (queryToken) {
+        if (!isAdminQueryTokenEnabled()) {
+          redirect(res, "/admin");
+          return true;
+        }
         if (isAdminTokenValue(queryToken)) {
           redirect(res, "/admin", { "Set-Cookie": buildAdminCookie(queryToken, req) });
           return true;
@@ -1847,22 +1863,19 @@ function buildAdminHtml() {
   </div>
 
   <script>
-    const TOKEN = new URLSearchParams(location.search).get('token') || '';
-    const AUTH = TOKEN ? '?token=' + encodeURIComponent(TOKEN) : '';
-
     async function logoutAdmin() {
-      await fetch('/api/admin/logout' + AUTH, { method: 'POST' }).catch(() => null);
+      await fetch('/api/admin/logout', { method: 'POST' }).catch(() => null);
       window.location.href = '/admin';
     }
 
     async function api(path) {
-      const r = await fetch('/api/admin/' + path + AUTH);
+      const r = await fetch('/api/admin/' + path);
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
     }
 
     async function apiPost(path, body) {
-      const r = await fetch('/api/admin/' + path + AUTH, {
+      const r = await fetch('/api/admin/' + path, {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify(body)

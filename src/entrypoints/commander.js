@@ -35,6 +35,7 @@ import {
   syncTopGGStats,
   syncTopGGVotes,
 } from "../services/topgg.js";
+import { startStationHealthService, stopStationHealthService } from "../services/station-health.js";
 import { getDb, isConnected as isMongoConnected } from "../lib/db.js";
 import {
   normalizeWeeklyDigestConfig,
@@ -121,6 +122,7 @@ async function sendWeeklyDigest(runtime, guildId, channelId, language = "de") {
 }
 
 await initializeSharedServices({ requireMongo: true });
+startStationHealthService(loadStations);
 const { commanderConfig, workerConfigs } = resolveBotTopology(process.env);
 
 const remoteWorkers = workerConfigs.map((config) => new RemoteWorkerHandle(config));
@@ -160,6 +162,7 @@ installProcessHandlers({
   webServer,
   extraShutdown: [
     async () => {
+      stopStationHealthService();
       workerManager.stopRemotePolling();
     },
   ],

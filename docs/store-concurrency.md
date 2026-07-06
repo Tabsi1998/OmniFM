@@ -28,6 +28,10 @@ File-backed JSON stores remain useful for local development, migration, diagnost
 
 The same classification is mirrored in `src/lib/store-concurrency.js` and covered by tests.
 
+Song history readers aggregate all `song-history/*.json` files in split mode so
+older per-guild split files remain readable during migration. New split writes
+belong to the owning bot file, not to a guild-named shared file.
+
 ## Operational Rules
 
 - Do not run write-capable CLI tools against shared JSON files while split containers are running.
