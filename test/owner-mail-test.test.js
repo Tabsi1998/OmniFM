@@ -6,6 +6,7 @@ import {
   getOwnerMailStatus,
   sendOwnerTestMail,
 } from "../src/lib/owner-mail-test.js";
+import { getSmtpConfig } from "../src/email.js";
 
 function setEnv(overrides) {
   const previous = new Map();
@@ -41,6 +42,33 @@ test("owner mail status exposes SMTP state without password value", () => {
     assert.equal(status.defaultRecipientMasked, "ow***@example.com");
     assert.equal(status.confirmationValue, TEST_CONFIRMATION_VALUE);
     assert.equal(JSON.stringify(status).includes("smtp-secret"), false);
+  } finally {
+    restore();
+  }
+});
+
+test("SMTP verifies certificates by default and only disables it through an explicit opt-out", () => {
+  const restore = setEnv({
+    SMTP_HOST: "mail.example.com",
+    SMTP_PORT: "25",
+    SMTP_USER: "smtp@example.com",
+    SMTP_PASS: "smtp-secret",
+    SMTP_TLS_MODE: undefined,
+    SMTP_TLS_REJECT_UNAUTHORIZED: undefined,
+  });
+  try {
+    const defaultConfig = getSmtpConfig();
+    assert.equal(defaultConfig.tlsMode, "starttls");
+    assert.equal(defaultConfig.rejectUnauthorized, true);
+    assert.equal(getOwnerMailStatus().rejectUnauthorized, true);
+
+    process.env.SMTP_TLS_MODE = "plain";
+    assert.equal(getSmtpConfig().tlsMode, "plain");
+    assert.equal(getSmtpConfig().rejectUnauthorized, true);
+
+    process.env.SMTP_TLS_REJECT_UNAUTHORIZED = "0";
+    assert.equal(getSmtpConfig().rejectUnauthorized, false);
+    assert.equal(getOwnerMailStatus().rejectUnauthorized, false);
   } finally {
     restore();
   }

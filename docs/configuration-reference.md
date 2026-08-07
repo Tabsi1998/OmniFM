@@ -150,13 +150,12 @@ Related advanced retry/timing knobs used by the runtime:
 | `SMTP_PASS` | SMTP password | Optional |
 | `SMTP_FROM` | Sender address | Optional |
 | `ADMIN_EMAIL` | Internal notification address | Optional |
+| `SMTP_TLS_MODE` | SMTP transport mode | `auto` uses SMTPS on port `465`, otherwise required STARTTLS. Use `plain` only for a deliberately unencrypted legacy server. |
+| `SMTP_TLS_REJECT_UNAUTHORIZED` | Verify the SMTP server certificate | Defaults to `1`. Set `0` only for an explicitly accepted temporary legacy exception; it disables certificate validation. |
+| `SMTP_TLS_CA_PATH` | PEM file for a private certificate authority | Prefer this to disabling certificate validation. |
+| `SMTP_TLS_SERVERNAME` | TLS SNI/certificate hostname | Set when the certificate hostname differs from `SMTP_HOST`. |
 
-Extended SMTP/TLS variables used by code:
-
-- `SMTP_TLS_MODE`
-- `SMTP_TLS_CA_PATH`
-- `SMTP_TLS_SERVERNAME`
-- `SMTP_TLS_REJECT_UNAUTHORIZED`
+The owner configuration UI also defaults TLS certificate verification to enabled. `plain` remains available for a deliberate compatibility exception, but it disables TLS transport entirely; it is not a certificate-validation workaround.
 
 Current billing defaults in code:
 
