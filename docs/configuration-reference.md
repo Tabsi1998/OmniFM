@@ -225,6 +225,7 @@ User-configured stream URLs (including custom stations, owner checks, stream met
 - Credentials in URLs, localhost, private/link-local/loopback IPv4 and IPv6 addresses, and private host suffixes are rejected.
 - Each outbound connection performs a fresh DNS check; every DNS answer must be public and the selected, verified address is pinned to that connection.
 - Redirects are followed only for `GET`/`HEAD`, are limited to three hops, and each destination is checked again. Export webhooks reject redirects.
+- `OPERATOR_WEBHOOK_URL` is restricted to an HTTPS Discord `/api/webhooks/<id>/<token>` endpoint; it uses the same pinned transport and rejects redirects.
 - There is deliberately no environment-variable bypass for local webhook targets. Tests inject their own transport instead of weakening production validation.
 
 ## Audio Recognition

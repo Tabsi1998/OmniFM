@@ -1,71 +1,26 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import net from "node:net";
 
 import { rootDir } from "./logging.js";
+import { validateOutboundUrl } from "./safe-outbound-http.js";
 
 const MAX_OUTPUT_CHARS = 120_000;
 const MAX_RECENT_JOBS = 30;
 
-function isPrivateOrLocalHostname(hostname) {
-  const normalized = String(hostname || "").trim().toLowerCase();
-  if (!normalized || normalized === "localhost" || normalized.endsWith(".localhost") || normalized.endsWith(".local")) return true;
-  const ipVersion = net.isIP(normalized);
-  if (ipVersion === 4) {
-    const parts = normalized.split(".").map((part) => Number.parseInt(part, 10));
-    return parts[0] === 10
-      || parts[0] === 127
-      || (parts[0] === 169 && parts[1] === 254)
-      || (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31)
-      || (parts[0] === 192 && parts[1] === 168)
-      || parts[0] === 0;
-  }
-  if (ipVersion === 6) {
-    return normalized === "::1"
-      || normalized.startsWith("fc")
-      || normalized.startsWith("fd")
-      || normalized.startsWith("fe80:");
-  }
-  return !normalized.includes(".");
-}
-
 function normalizePublicStreamUrl(value) {
-  const raw = String(value || "").trim();
-  if (!raw) {
-    const error = new Error("Stream-URL fehlt.");
+  const validation = validateOutboundUrl(value, {
+    allowedProtocols: ["http:", "https:"],
+  });
+  if (!validation.ok) {
+    const error = new Error(
+      validation.code === "OUTBOUND_ADDRESS_NOT_ALLOWED" || validation.code === "OUTBOUND_HOST_NOT_ALLOWED"
+        ? "Stream-URL darf kein lokales oder privates Ziel sein."
+        : validation.error
+    );
     error.statusCode = 400;
     throw error;
   }
-  if (raw.length > 2000) {
-    const error = new Error("Stream-URL ist zu lang.");
-    error.statusCode = 400;
-    throw error;
-  }
-  let parsed;
-  try {
-    parsed = new URL(raw);
-  } catch {
-    const error = new Error("Stream-URL muss eine gueltige URL sein.");
-    error.statusCode = 400;
-    throw error;
-  }
-  if (!["http:", "https:"].includes(parsed.protocol)) {
-    const error = new Error("Stream-URL muss mit http:// oder https:// beginnen.");
-    error.statusCode = 400;
-    throw error;
-  }
-  if (parsed.username || parsed.password) {
-    const error = new Error("Stream-URL darf keine Zugangsdaten enthalten.");
-    error.statusCode = 400;
-    throw error;
-  }
-  if (isPrivateOrLocalHostname(parsed.hostname)) {
-    const error = new Error("Stream-URL darf kein lokales oder privates Ziel sein.");
-    error.statusCode = 400;
-    throw error;
-  }
-  parsed.hash = "";
-  return parsed.toString();
+  return validation.url;
 }
 
 const OWNER_JOB_ACTIONS = [

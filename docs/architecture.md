@@ -147,7 +147,7 @@ Metadata flow:
 
 Audio recognition flow:
 
-1. `ffmpeg` captures a short WAV sample from the live stream.
+1. A DNS-pinned `safeFetch` stream is passed to `ffmpeg` through `pipe:0`, which captures a short WAV sample without letting FFmpeg resolve the remote URL itself.
 2. `fpcalc` creates a Chromaprint fingerprint.
 3. AcoustID resolves the fingerprint.
 4. MusicBrainz optionally enriches title, artist, album, and release data.

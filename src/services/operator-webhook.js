@@ -13,11 +13,19 @@
 //   OPERATOR_WEBHOOK_MENTION=<@123456789>  (optional: User/Rolle pingen)
 // ============================================================
 
+import { safeFetch } from "../lib/safe-outbound-http.js";
+
 const OPERATOR_WEBHOOK_URL = String(process.env.OPERATOR_WEBHOOK_URL || "").trim();
 const OPERATOR_WEBHOOK_ENABLED =
   OPERATOR_WEBHOOK_URL.length > 0 &&
   String(process.env.OPERATOR_WEBHOOK_ENABLED || "1") === "1";
 const OPERATOR_WEBHOOK_MENTION = String(process.env.OPERATOR_WEBHOOK_MENTION || "").trim();
+const DISCORD_WEBHOOK_HOSTS = new Set([
+  "discord.com",
+  "discordapp.com",
+  "canary.discord.com",
+  "ptb.discord.com",
+]);
 
 // Farben für Discord-Embeds
 const COLORS = {
@@ -31,26 +39,49 @@ const COLORS = {
 const recentMessages = new Map();
 const DEDUP_WINDOW_MS = 60_000;
 
+function isAllowedOperatorWebhookUrl(rawUrl) {
+  try {
+    const url = new URL(String(rawUrl || "").trim());
+    return url.protocol === "https:"
+      && DISCORD_WEBHOOK_HOSTS.has(url.hostname.toLowerCase())
+      && /^\/api\/webhooks\/[^/]+\/[^/]+/.test(url.pathname);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Sendet eine Webhook-Nachricht an Discord.
  * @param {object} payload Discord Webhook Payload
  * @returns {Promise<boolean>}
  */
-async function sendWebhook(payload) {
-  if (!OPERATOR_WEBHOOK_ENABLED) return false;
-
+async function postOperatorWebhook(url, payload, { fetchImpl = safeFetch } = {}) {
+  const targetUrl = String(url || "").trim();
+  if (!isAllowedOperatorWebhookUrl(targetUrl)) return false;
   try {
-    const res = await fetch(OPERATOR_WEBHOOK_URL, {
+    const res = await fetchImpl(targetUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(8_000),
+      redirect: "error",
+      requireHttps: true,
+      timeoutMs: 8_000,
     });
-    return res.ok;
+    try {
+      await res.body?.cancel?.();
+    } catch {
+      // The webhook result is already known; a body-cleanup failure is harmless.
+    }
+    return Boolean(res.ok);
   } catch {
     // Webhook-Fehler dürfen den Bot nicht crashen
     return false;
   }
+}
+
+async function sendWebhook(payload) {
+  if (!OPERATOR_WEBHOOK_ENABLED) return false;
+  return postOperatorWebhook(OPERATOR_WEBHOOK_URL, payload);
 }
 
 /**
@@ -211,4 +242,6 @@ export {
   notifyStreamErrorSpike,
   notifyStartup,
   OPERATOR_WEBHOOK_ENABLED,
+  isAllowedOperatorWebhookUrl,
+  postOperatorWebhook,
 };

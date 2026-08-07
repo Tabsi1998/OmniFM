@@ -119,6 +119,39 @@ test("safe fetch revalidates every redirect and blocks a private redirect before
   assert.equal(requestCalls, 1);
 });
 
+test("safe fetch removes credential headers when a redirect changes origin", async () => {
+  const requests = [];
+
+  const response = await safeFetch("https://radio.example/start", {
+    headers: {
+      Authorization: "Bearer secret",
+      Cookie: "session=secret",
+      Host: "radio.example",
+      "User-Agent": "OmniFM test",
+    },
+    lookupFn: async () => [{ address: "1.1.1.1", family: 4 }],
+    requestImpl: async (target, request) => {
+      requests.push({ url: target.url.toString(), headers: request.headers });
+      if (requests.length === 1) {
+        return createIncomingResponse(302, {
+          headers: { location: "https://cdn.example/live" },
+          statusMessage: "Found",
+        });
+      }
+      return createIncomingResponse(200, { body: "safe-stream" });
+    },
+  });
+
+  assert.equal(await response.text(), "safe-stream");
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0].headers.Authorization, "Bearer secret");
+  assert.equal(requests[0].headers.Cookie, "session=secret");
+  assert.equal(requests[1].headers.Authorization, undefined);
+  assert.equal(requests[1].headers.Cookie, undefined);
+  assert.equal(requests[1].headers.Host, undefined);
+  assert.equal(requests[1].headers["User-Agent"], "OmniFM test");
+});
+
 test("safe fetch does not expose low-level transport details", async () => {
   await assert.rejects(
     () => safeFetch("https://radio.example/live", {
