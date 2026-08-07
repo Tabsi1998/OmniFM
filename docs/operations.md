@@ -169,7 +169,7 @@ The repository ships with `scripts/phase6-live-check.mjs`.
 Example:
 
 ```bash
-node scripts/phase6-live-check.mjs --base-url https://example.com --admin-token "$API_ADMIN_TOKEN" --docker-service omnifm --log-since 30m
+OMNIFM_LIVE_ADMIN_TOKEN="$API_ADMIN_TOKEN" node scripts/phase6-live-check.mjs --base-url https://example.com --docker-service omnifm --log-since 30m
 ```
 
 It checks:
@@ -185,9 +185,10 @@ It checks:
 - unified vote-event status
 - recent Docker logs for failure patterns
 
-Supported admin token inputs:
+Set the admin token through the environment, never as a command-line argument
+(process listings and shell history can expose command-line values):
 
-- `--admin-token`
+- `OMNIFM_LIVE_ADMIN_TOKEN` (recommended for this check)
 - `OMNIFM_ADMIN_TOKEN`
 - `API_ADMIN_TOKEN`
 - `ADMIN_API_TOKEN`

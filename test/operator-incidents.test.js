@@ -76,6 +76,36 @@ test("operator incidents persist normalized fallback entries", async () => {
   }
 });
 
+test("operator incidents redact direct secret-bearing input before persistence", async () => {
+  const storeSnapshot = snapshotOptionalFile(storePath);
+  const backupSnapshot = snapshotOptionalFile(backupPath);
+  const secret = "operator-incident-secret-123456";
+
+  try {
+    resetOperatorIncidentStateForTests();
+
+    const stored = await recordOperatorIncident({
+      timestamp: "2026-04-21T10:00:00.000Z",
+      summary: `Worker token=${secret} failed`,
+      message: `Endpoint https://api.example/status?access_token=${secret}`,
+      context: {
+        apiToken: secret,
+        authorization: `Bearer ${secret}`,
+      },
+      stackLines: [`Error: password=${secret}`],
+    });
+
+    assert.ok(stored);
+    assert.doesNotMatch(JSON.stringify(stored), new RegExp(secret));
+    const incidents = await getRecentOperatorIncidents(10);
+    assert.doesNotMatch(JSON.stringify(incidents), new RegExp(secret));
+  } finally {
+    resetOperatorIncidentStateForTests();
+    restoreOptionalFile(storePath, storeSnapshot);
+    restoreOptionalFile(backupPath, backupSnapshot);
+  }
+});
+
 test("operator incident recorder subscribes to logError and deduplicates repeated incidents", async () => {
   const storeSnapshot = snapshotOptionalFile(storePath);
   const backupSnapshot = snapshotOptionalFile(backupPath);

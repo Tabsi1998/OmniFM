@@ -13,8 +13,8 @@ Useful commands:
 ```bash
 npm run release:preflight
 node scripts/release-gate.mjs --preflight --dry-run
-node scripts/release-gate.mjs --post-deploy --base-url https://omnifm.xyz --admin-token "$API_ADMIN_TOKEN"
-node scripts/release-gate.mjs --all --base-url https://omnifm.xyz --admin-token "$API_ADMIN_TOKEN"
+OMNIFM_LIVE_ADMIN_TOKEN="$API_ADMIN_TOKEN" node scripts/release-gate.mjs --post-deploy --base-url https://omnifm.xyz
+OMNIFM_LIVE_ADMIN_TOKEN="$API_ADMIN_TOKEN" node scripts/release-gate.mjs --all --base-url https://omnifm.xyz
 npm run release:rollback-plan
 ```
 
@@ -54,7 +54,7 @@ git fetch origin
 git log --oneline -5
 npm run release:preflight
 ./update.sh --update
-node scripts/release-gate.mjs --post-deploy --base-url https://omnifm.xyz --admin-token "$API_ADMIN_TOKEN"
+OMNIFM_LIVE_ADMIN_TOKEN="$API_ADMIN_TOKEN" node scripts/release-gate.mjs --post-deploy --base-url https://omnifm.xyz
 ```
 
 Split deployments can use rolling worker restarts when the change is compatible:
@@ -89,6 +89,9 @@ The post-deploy gate calls `scripts/phase6-live-check.mjs` and verifies:
 GitHub Actions also provides the `live-smoke` workflow for scheduled and manual
 checks. Configure repository secret `OMNIFM_LIVE_ADMIN_TOKEN` for the full
 authenticated run.
+
+The live admin token is read from the environment only. Do not put it into a
+command-line argument, because shell history and process listings can expose it.
 
 ## Owner Visibility
 

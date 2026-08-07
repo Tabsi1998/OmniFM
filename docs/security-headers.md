@@ -58,7 +58,7 @@ node --test test/security-headers.test.js test/legal-pages-routing.test.js
 Production/live checks:
 
 ```bash
-node scripts/phase6-live-check.mjs --base-url https://omnifm.xyz --admin-token "$API_ADMIN_TOKEN" --skip-logs
+OMNIFM_LIVE_ADMIN_TOKEN="$API_ADMIN_TOKEN" node scripts/phase6-live-check.mjs --base-url https://omnifm.xyz --skip-logs
 ```
 
 The live check verifies the important headers on the home page, a public API

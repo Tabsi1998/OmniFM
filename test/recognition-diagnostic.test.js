@@ -31,8 +31,8 @@ test("recognition diagnostic rejects an unsafe target before any stream work sta
 
 test("recognition diagnostic only hands the DNS-validated URL to safe runtime services", async () => {
   const calls = [];
-  const report = await runRecognitionDiagnostic("https://radio.example/start", {
-    validateUrl: async () => ({ ok: true, url: "https://radio.example/final" }),
+  const report = await runRecognitionDiagnostic("https://radio.example/start?token=must-not-leak", {
+    validateUrl: async () => ({ ok: true, url: "https://radio.example/final?access_token=must-not-leak" }),
     fetchSnapshot: async (url, options) => {
       calls.push({ kind: "snapshot", url, options });
       return {
@@ -52,19 +52,20 @@ test("recognition diagnostic only hands the DNS-validated URL to safe runtime se
 
   assert.equal(report.ok, true);
   assert.equal(report.error, null);
-  assert.equal(report.url, "https://radio.example/final");
+  assert.equal(report.url, "https://radio.example/final?...");
+  assert.doesNotMatch(JSON.stringify(report), /must-not-leak/);
   assert.equal(report.stream.displayTitle, "Artist - Track");
   assert.equal(report.recognition.attempted, true);
   assert.deepEqual(report.recognition.result, { artist: "Artist", title: "Track" });
   assert.deepEqual(calls, [
     {
       kind: "snapshot",
-      url: "https://radio.example/final",
+      url: "https://radio.example/final?access_token=must-not-leak",
       options: { includeCover: false, allowRecognition: false },
     },
     {
       kind: "recognition",
-      url: "https://radio.example/final",
+      url: "https://radio.example/final?access_token=must-not-leak",
       options: { existingTrack: null },
     },
   ]);

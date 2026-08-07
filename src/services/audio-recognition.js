@@ -6,6 +6,7 @@ import { Readable } from "node:stream";
 
 import { log } from "../lib/logging.js";
 import { clipText, parseEnvInt, waitMs } from "../lib/helpers.js";
+import { sanitizeUrlForLog } from "../lib/redact-sensitive.js";
 import { safeFetch } from "../lib/safe-outbound-http.js";
 
 const RECOGNITION_ENABLED = String(process.env.NOW_PLAYING_RECOGNITION_ENABLED ?? "0").trim() !== "0";
@@ -705,7 +706,7 @@ async function recognizeTrackFromStream(url, { existingTrack = null } = {}) {
       const acoustIdCandidate = await lookupAcoustIdFingerprint(sample.fingerprint, sample.duration);
       if (!acoustIdCandidate) {
         if (shouldLogRecognitionFailure(streamKey || cacheKey, new Error("AcoustID returned no matches"), "acoustid-no-match")) {
-          log("INFO", `[NowPlaying] Audio recognition found no AcoustID matches for ${clipText(String(url || ""), 120)}`);
+          log("INFO", `[NowPlaying] Audio recognition found no AcoustID matches for ${sanitizeUrlForLog(url)}`);
         }
         recognitionCache.set(cacheKey, { value: null, expiresAt: Date.now() + RECOGNITION_FAILURE_TTL_MS });
         return null;
