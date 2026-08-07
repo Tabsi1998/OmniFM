@@ -1692,6 +1692,29 @@ run_system_doctor() {
     doctor_warn "Dashboard OAuth unvollstaendig (Client ID/Secret/Redirect)."
   fi
 
+  # 3b) SMTP TLS policy
+  local smtp_host smtp_tls_mode smtp_tls_verify
+  smtp_host="$(read_env "SMTP_HOST" "")"
+  smtp_tls_mode="$(read_env "SMTP_TLS_MODE" "auto")"
+  smtp_tls_verify="$(read_env "SMTP_TLS_REJECT_UNAUTHORIZED" "1")"
+  if [[ -n "$smtp_host" ]]; then
+    case "${smtp_tls_mode,,}" in
+      plain)
+        doctor_warn "SMTP: TLS ist explizit deaktiviert (SMTP_TLS_MODE=plain)."
+        ;;
+      *)
+        case "${smtp_tls_verify,,}" in
+          0|false|no|off)
+            doctor_warn "SMTP: Zertifikatspruefung ist explizit deaktiviert (SMTP_TLS_REJECT_UNAUTHORIZED=${smtp_tls_verify})."
+            ;;
+          *)
+            doctor_ok "SMTP: TLS-Zertifikatspruefung aktiviert."
+            ;;
+        esac
+        ;;
+    esac
+  fi
+
   # 4) JSON Files
   repair_runtime_json_mount_dirs
   ensure_all_json_files
@@ -2474,8 +2497,9 @@ if [[ "$MODE" == "--email" ]]; then
         const mode =
           ['plain', 'starttls', 'smtps'].includes(modeRaw)
             ? modeRaw
-            : (port === 465 ? 'smtps' : (port === 25 ? 'plain' : 'starttls'));
-        const rejectUnauthorized = String(process.env.SMTP_TLS_REJECT_UNAUTHORIZED || '1') === '1';
+            : (port === 465 ? 'smtps' : 'starttls');
+        const tlsVerifyRaw = String(process.env.SMTP_TLS_REJECT_UNAUTHORIZED ?? '').trim().toLowerCase();
+        const rejectUnauthorized = !['0', 'false', 'no', 'off'].includes(tlsVerifyRaw);
         const opts = {
           host: process.env.SMTP_HOST,
           port,

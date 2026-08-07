@@ -116,7 +116,7 @@ const GROUPS = [
       { key: "SMTP_FROM", label: "SMTP Absender", type: "email" },
       { key: "ADMIN_EMAIL", label: "Admin E-Mail", type: "email" },
       { key: "SMTP_TLS_MODE", label: "SMTP TLS Modus", type: "enum", values: ["auto", "plain", "starttls", "smtps"], example: "auto" },
-      { key: "SMTP_TLS_REJECT_UNAUTHORIZED", label: "SMTP TLS Zertifikat pruefen", type: "boolean", example: "1" },
+      { key: "SMTP_TLS_REJECT_UNAUTHORIZED", label: "SMTP TLS Zertifikat pruefen (Standard: an)", type: "boolean", example: "1" },
       { key: "DISCORDBOTLIST_ENABLED", label: "DiscordBotList aktiv", type: "boolean", example: "1" },
       { key: "DISCORDBOTLIST_BOT_ID", label: "DiscordBotList Bot ID", type: "snowflake" },
       { key: "DISCORDBOTLIST_SLUG", label: "DiscordBotList Slug", type: "slug", example: "omnifm-dj" },

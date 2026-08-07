@@ -1,4 +1,9 @@
-import { getSmtpConfig, isConfigured as isEmailConfigured, sendMail } from "../email.js";
+import {
+  getSmtpConfig,
+  isConfigured as isEmailConfigured,
+  resolveTlsRejectUnauthorized,
+  sendMail,
+} from "../email.js";
 
 const TEST_CONFIRMATION_VALUE = "send-test-email";
 
@@ -42,7 +47,9 @@ function getOwnerMailStatus() {
     defaultRecipient,
     defaultRecipientMasked: maskEmail(defaultRecipient),
     tlsMode: cfg?.tlsMode || String(process.env.SMTP_TLS_MODE || "auto").trim().toLowerCase() || "auto",
-    rejectUnauthorized: cfg ? Boolean(cfg.rejectUnauthorized) : String(process.env.SMTP_TLS_REJECT_UNAUTHORIZED ?? "0") !== "0",
+    rejectUnauthorized: cfg
+      ? Boolean(cfg.rejectUnauthorized)
+      : resolveTlsRejectUnauthorized(process.env.SMTP_TLS_REJECT_UNAUTHORIZED),
     passwordConfigured: passConfigured,
     missing,
     confirmationValue: TEST_CONFIRMATION_VALUE,

@@ -7,8 +7,12 @@ function resolveTlsMode(port, rawMode) {
   const mode = String(rawMode || "auto").trim().toLowerCase();
   if (["plain", "starttls", "smtps"].includes(mode)) return mode;
   if (port === 465) return "smtps";
-  if (port === 25) return "plain";
   return "starttls";
+}
+
+function resolveTlsRejectUnauthorized(rawValue) {
+  const value = String(rawValue ?? "").trim().toLowerCase();
+  return !["0", "false", "no", "off"].includes(value);
 }
 
 function getSmtpConfig() {
@@ -19,7 +23,7 @@ function getSmtpConfig() {
   const from = process.env.SMTP_FROM || user;
   const adminEmail = process.env.ADMIN_EMAIL || "";
   const tlsMode = resolveTlsMode(port, process.env.SMTP_TLS_MODE);
-  const rejectUnauthorized = String(process.env.SMTP_TLS_REJECT_UNAUTHORIZED ?? "0") !== "0";
+  const rejectUnauthorized = resolveTlsRejectUnauthorized(process.env.SMTP_TLS_REJECT_UNAUTHORIZED);
   const tlsServername = String(process.env.SMTP_TLS_SERVERNAME || "").trim() || null;
   const tlsCaPath = String(process.env.SMTP_TLS_CA_PATH || "").trim() || null;
 
@@ -539,7 +543,7 @@ function buildExpiryEmail(data) {
 }
 
 export {
-  isConfigured, sendMail, getSmtpConfig,
+  isConfigured, sendMail, getSmtpConfig, resolveTlsRejectUnauthorized,
   buildPurchaseEmail, buildAdminNotification,
   buildInvoiceEmail,
   buildExpiryWarningEmail, buildExpiryEmail,
