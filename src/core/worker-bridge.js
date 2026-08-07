@@ -8,6 +8,8 @@ const WORKER_COMMAND_COLLECTION = "worker_bridge_commands";
 const WORKER_STATUS_TTL_MS = Math.max(30_000, Number.parseInt(String(process.env.REMOTE_WORKER_STATUS_STALE_MS || "45000"), 10) || 45_000);
 const WORKER_COMMAND_TTL_MS = Math.max(60_000, Number.parseInt(String(process.env.REMOTE_WORKER_COMMAND_TTL_MS || "300000"), 10) || 300_000);
 const WORKER_COMMAND_WAIT_POLL_MS = Math.max(100, Number.parseInt(String(process.env.REMOTE_WORKER_COMMAND_POLL_MS || "500"), 10) || 500);
+const WORKER_COMMAND_MIN_DEADLINE_MS = 5_000;
+const WORKER_COMMAND_MIN_WAIT_MS = 2_000;
 
 let bridgeIndexesPromise = null;
 
@@ -25,6 +27,29 @@ function getHeartbeatExpiryDate(baseTime = Date.now()) {
 
 function getCommandExpiryDate(baseTime = Date.now(), ttlMs = WORKER_COMMAND_TTL_MS) {
   return new Date(Number(baseTime) + Math.max(60_000, Number(ttlMs) || WORKER_COMMAND_TTL_MS));
+}
+
+function getCommandDeadlineDate(baseTime = Date.now(), timeoutMs = WORKER_COMMAND_TTL_MS) {
+  return new Date(Number(baseTime) + Math.max(WORKER_COMMAND_MIN_DEADLINE_MS, Number(timeoutMs) || WORKER_COMMAND_TTL_MS));
+}
+
+function getCommandDeadlineMs(value, fallbackMs = WORKER_COMMAND_TTL_MS) {
+  const parsed = Number(value);
+  return Math.max(
+    WORKER_COMMAND_MIN_DEADLINE_MS,
+    Number.isFinite(parsed) && parsed > 0 ? parsed : fallbackMs
+  );
+}
+
+function getPendingCommandDeadlineFilter(now) {
+  // Old commands created before deadlineAt existed remain executable until their
+  // existing TTL, while every newly queued command gets a caller-bound deadline.
+  return {
+    $or: [
+      { deadlineAt: { $gt: now } },
+      { deadlineAt: { $exists: false } },
+    ],
+  };
 }
 
 async function ensureWorkerBridgeCollections() {
@@ -59,6 +84,7 @@ async function ensureWorkerBridgeCollections() {
     await db.collection(WORKER_COMMAND_COLLECTION).createIndexes([
       { key: { commandId: 1 }, name: "command_unique", unique: true },
       { key: { workerId: 1, status: 1, createdAt: 1 }, name: "worker_status_created" },
+      { key: { workerId: 1, status: 1, deadlineAt: 1, createdAt: 1 }, name: "worker_status_deadline_created" },
       { key: { expiresAt: 1 }, name: "ttl", expireAfterSeconds: 0 },
     ]).catch(() => null);
 
@@ -140,7 +166,7 @@ async function createWorkerCommand(workerId, type, payload = {}, options = {}) {
   const db = await getWorkerBridgeDb();
   const now = new Date();
   const commandId = crypto.randomUUID();
-  const timeoutMs = Math.max(5_000, Number(options?.timeoutMs || 0) || 0);
+  const timeoutMs = getCommandDeadlineMs(options?.timeoutMs);
   const doc = {
     commandId,
     workerId: normalizedWorkerId,
@@ -149,8 +175,13 @@ async function createWorkerCommand(workerId, type, payload = {}, options = {}) {
     status: "pending",
     createdAt: now,
     updatedAt: now,
-    expiresAt: getCommandExpiryDate(now.getTime(), timeoutMs || WORKER_COMMAND_TTL_MS),
+    // expiresAt controls document retention. deadlineAt controls whether a
+    // pending command may still start, so a visible caller timeout cannot turn
+    // into a delayed action after the caller was told that it timed out.
+    expiresAt: getCommandExpiryDate(now.getTime()),
+    deadlineAt: getCommandDeadlineDate(now.getTime(), timeoutMs),
     claimedAt: null,
+    cancelledAt: null,
     completedAt: null,
     error: null,
     result: null,
@@ -172,6 +203,7 @@ async function claimNextWorkerCommand(workerId) {
       workerId: normalizedWorkerId,
       status: "pending",
       expiresAt: { $gt: now },
+      ...getPendingCommandDeadlineFilter(now),
     },
     {
       sort: { createdAt: 1 },
@@ -181,7 +213,12 @@ async function claimNextWorkerCommand(workerId) {
   if (!doc) return null;
 
   const update = await commands.updateOne(
-    { commandId: doc.commandId, status: "pending" },
+    {
+      commandId: doc.commandId,
+      status: "pending",
+      expiresAt: { $gt: now },
+      ...getPendingCommandDeadlineFilter(now),
+    },
     {
       $set: {
         status: "running",
@@ -209,7 +246,7 @@ async function completeWorkerCommand(commandId, result = {}) {
   const db = await getWorkerBridgeDb();
   const now = new Date();
   await db.collection(WORKER_COMMAND_COLLECTION).updateOne(
-    { commandId: normalizedCommandId },
+    { commandId: normalizedCommandId, status: "running" },
     {
       $set: {
         status: "completed",
@@ -232,7 +269,7 @@ async function failWorkerCommand(commandId, error) {
     : String(error || "unknown error");
 
   await db.collection(WORKER_COMMAND_COLLECTION).updateOne(
-    { commandId: normalizedCommandId },
+    { commandId: normalizedCommandId, status: "running" },
     {
       $set: {
         status: "failed",
@@ -242,6 +279,25 @@ async function failWorkerCommand(commandId, error) {
       },
     }
   );
+}
+
+async function cancelWorkerCommand(commandId, reason = "Worker-Command Timeout.") {
+  const normalizedCommandId = String(commandId || "").trim();
+  if (!normalizedCommandId) return false;
+  const db = await getWorkerBridgeDb();
+  const now = new Date();
+  const update = await db.collection(WORKER_COMMAND_COLLECTION).updateOne(
+    { commandId: normalizedCommandId, status: "pending" },
+    {
+      $set: {
+        status: "cancelled",
+        error: String(reason || "Worker-Command abgebrochen."),
+        updatedAt: now,
+        cancelledAt: now,
+      },
+    }
+  );
+  return update.modifiedCount > 0;
 }
 
 async function getWorkerCommand(commandId) {
@@ -257,7 +313,10 @@ async function waitForWorkerCommandResult(commandId, options = {}) {
     throw new Error("Command-ID fehlt.");
   }
 
-  const timeoutMs = Math.max(2_000, Number(options?.timeoutMs || 0) || 0);
+  const timeoutMs = Math.max(
+    WORKER_COMMAND_MIN_WAIT_MS,
+    Number(options?.timeoutMs || 0) || WORKER_COMMAND_TTL_MS
+  );
   const pollMs = Math.max(100, Number(options?.pollMs || 0) || WORKER_COMMAND_WAIT_POLL_MS);
   const deadline = Date.now() + timeoutMs;
 
@@ -276,16 +335,38 @@ async function waitForWorkerCommandResult(commandId, options = {}) {
     if (doc.status === "failed") {
       throw new Error(String(doc.error || "Worker-Command fehlgeschlagen."));
     }
+    if (doc.status === "cancelled") {
+      throw new Error(String(doc.error || "Worker-Command abgebrochen."));
+    }
     await new Promise((resolve) => {
       setTimeout(resolve, pollMs);
     });
   }
 
-  throw new Error("Worker-Command Timeout.");
+  const timeoutError = "Worker-Command Timeout.";
+  const cancelled = await cancelWorkerCommand(normalizedCommandId, timeoutError).catch(() => false);
+  if (!cancelled) {
+    // If a worker claimed the command before its deadline, it is intentionally
+    // not interrupted: playback operations are not safely reversible midway.
+    // A late completion is still reported accurately when it won the race.
+    const finalDoc = await getWorkerCommand(normalizedCommandId).catch(() => null);
+    if (finalDoc?.status === "completed") {
+      return {
+        ok: true,
+        result: finalDoc.result || {},
+        command: finalDoc,
+      };
+    }
+    if (finalDoc?.status === "failed" || finalDoc?.status === "cancelled") {
+      throw new Error(String(finalDoc.error || timeoutError));
+    }
+  }
+
+  throw new Error(timeoutError);
 }
 
 async function sendWorkerCommandAndWait(workerId, type, payload = {}, options = {}) {
-  const timeoutMs = Math.max(5_000, Number(options?.timeoutMs || 0) || 0);
+  const timeoutMs = getCommandDeadlineMs(options?.timeoutMs);
   const pollMs = Math.max(100, Number(options?.pollMs || 0) || WORKER_COMMAND_WAIT_POLL_MS);
   const command = await createWorkerCommand(workerId, type, payload, { timeoutMs });
   return waitForWorkerCommandResult(command.commandId, { timeoutMs, pollMs });
@@ -303,6 +384,7 @@ export {
   claimNextWorkerCommand,
   completeWorkerCommand,
   failWorkerCommand,
+  cancelWorkerCommand,
   getWorkerCommand,
   waitForWorkerCommandResult,
   sendWorkerCommandAndWait,
