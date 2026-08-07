@@ -39,6 +39,17 @@ test("runtime data backup restores a staged archive and leaves no staging direct
   const archives = (await fs.readdir(backupDir)).filter((name) => name.endsWith(".tar.gz"));
   assert.equal(archives.length, 1);
 
+  if (process.platform !== "win32") {
+    assert.equal((await fs.stat(backupDir)).mode & 0o777, 0o700, "backup directory must be private");
+    assert.equal((await fs.stat(path.join(backupDir, archives[0]))).mode & 0o777, 0o600, "backup archive must be private");
+    const checksumPath = path.join(backupDir, `${archives[0]}.sha256`);
+    try {
+      assert.equal((await fs.stat(checksumPath)).mode & 0o777, 0o600, "backup checksum must be private");
+    } catch (err) {
+      if (err?.code !== "ENOENT") throw err;
+    }
+  }
+
   await fs.writeFile(ownerAuditPath, '{"version":1,"events":[{"action":"after"}]}\n', "utf8");
   const archiveArg = path.join(".update-backups", "runtime-data", archives[0]).split(path.sep).join("/");
   await execFile(bash, [scriptPath, "restore", archiveArg, "--force"], { cwd: sandbox });

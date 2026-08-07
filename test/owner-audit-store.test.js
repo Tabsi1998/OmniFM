@@ -94,3 +94,34 @@ test("owner audit defaults to the persistent runtime data directory", async (t) 
   recordOwnerAudit({ action: "owner.runtime.persist", status: "success" });
   assert.equal((await fs.stat(path.join(dir, "owner-audit.json"))).isFile(), true);
 });
+
+test("owner audit quarantines corrupt history instead of silently overwriting it", async (t) => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omnifm-owner-audit-corrupt-"));
+  const auditFile = path.join(dir, "owner-audit.json");
+  const previousAuditFile = process.env.OMNIFM_OWNER_AUDIT_FILE;
+  process.env.OMNIFM_OWNER_AUDIT_FILE = auditFile;
+  await fs.writeFile(auditFile, "{not valid JSON", "utf8");
+
+  t.after(async () => {
+    if (previousAuditFile == null) delete process.env.OMNIFM_OWNER_AUDIT_FILE;
+    else process.env.OMNIFM_OWNER_AUDIT_FILE = previousAuditFile;
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  const unavailable = getOwnerAuditSnapshot();
+  assert.equal(unavailable.total, 0);
+  assert.equal(unavailable.integrity?.status, "corrupt");
+  assert.equal(await fs.readFile(auditFile, "utf8"), "{not valid JSON");
+
+  recordOwnerAudit({ action: "owner.recovery.test", status: "success" });
+
+  const entries = await fs.readdir(dir);
+  const quarantined = entries.find((entry) => entry.startsWith("owner-audit.json.corrupt-"));
+  assert.ok(quarantined, "the original corrupt audit history must be retained");
+  assert.equal(await fs.readFile(path.join(dir, quarantined), "utf8"), "{not valid JSON");
+
+  const recovered = getOwnerAuditSnapshot();
+  assert.equal(recovered.total, 2);
+  assert.equal(recovered.events[0].action, "owner.recovery.test");
+  assert.equal(recovered.events[1].action, "owner.audit.integrity.recovered");
+});
