@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 
 import {
   normalizeDashboardExportsWebhookConfig,
+  toPublicDashboardExportsWebhookConfig,
+  mergeDashboardExportsWebhookConfigWithStoredSecret,
   validateDashboardExportsWebhookConfig,
   shouldDeliverDashboardWebhook,
   buildDashboardWebhookPayload,
@@ -29,6 +31,47 @@ test("dashboard webhook helpers normalize config and gate delivery", () => {
   assert.equal(shouldDeliverDashboardWebhook(config, "stream_healthcheck_stalled"), false);
   assert.equal(shouldDeliverDashboardWebhook(config, "stream_recovered"), true);
   assert.equal(shouldDeliverDashboardWebhook(config, "missing"), false);
+});
+
+test("dashboard webhook public config is write-only for secrets and update merges preserve them", () => {
+  const sentinel = "dashboard-webhook-secret-sentinel";
+  const storedConfig = {
+    enabled: true,
+    url: "https://example.com/hook",
+    secret: sentinel,
+    events: ["stats_exported"],
+  };
+
+  const publicConfig = toPublicDashboardExportsWebhookConfig(storedConfig);
+  assert.deepEqual(publicConfig, {
+    enabled: true,
+    url: "https://example.com/hook",
+    events: ["stats_exported"],
+    secretConfigured: true,
+  });
+  assert.equal(Object.prototype.hasOwnProperty.call(publicConfig, "secret"), false);
+  assert.equal(JSON.stringify(publicConfig).includes(sentinel), false);
+
+  const updateWithoutSecret = mergeDashboardExportsWebhookConfigWithStoredSecret(
+    {
+      enabled: false,
+      url: "https://example.com/new-hook",
+      events: ["custom_stations_exported"],
+    },
+    storedConfig
+  );
+  assert.equal(updateWithoutSecret.secret, sentinel);
+
+  const explicitSecretRemoval = mergeDashboardExportsWebhookConfigWithStoredSecret(
+    {
+      enabled: false,
+      url: "https://example.com/new-hook",
+      secret: "",
+      events: ["custom_stations_exported"],
+    },
+    storedConfig
+  );
+  assert.equal(explicitSecretRemoval.secret, "");
 });
 
 test("dashboard webhook validation rejects local URLs and accepts a DNS-verified HTTPS target", async () => {

@@ -36,6 +36,7 @@ const ROLE_DJ_ID = "223456789012345678";
 const ROLE_ADMIN_ID = "323456789012345678";
 const VOICE_CHANNEL_ID = "423456789012345678";
 const TEXT_CHANNEL_ID = "523456789012345678";
+const DASHBOARD_WEBHOOK_SECRET_SENTINEL = "dashboard-webhook-secret-sentinel";
 
 async function snapshotFile(filePath) {
   try {
@@ -1404,6 +1405,8 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
   assert.equal(settingsResponse.payload.exportsWebhook.enabled, false);
   assert.equal(settingsResponse.payload.exportsWebhook.url, "");
   assert.deepEqual(settingsResponse.payload.exportsWebhook.events, []);
+  assert.equal(settingsResponse.payload.exportsWebhook.secretConfigured, false);
+  assert.equal(Object.prototype.hasOwnProperty.call(settingsResponse.payload.exportsWebhook, "secret"), false);
   assert.equal(settingsResponse.payload.capabilities.voiceGuard, true);
   assert.equal(settingsResponse.payload.voiceGuard.policy, "default");
   assert.equal(settingsResponse.payload.voiceGuard.available, true);
@@ -1433,7 +1436,7 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
           exportsWebhook: {
             enabled: true,
             url: " https://example.com/hook ",
-            secret: "x".repeat(200),
+            secret: `${DASHBOARD_WEBHOOK_SECRET_SENTINEL}${"x".repeat(200)}`,
             events: ["stats_exported", "stream_recovered", "stream_failover_activated"],
           },
           voiceGuard: {
@@ -1468,6 +1471,9 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
     });
     assert.equal(normalizedSettingsResponse.payload.exportsWebhook.url, "https://example.com/hook");
     assert.deepEqual(normalizedSettingsResponse.payload.exportsWebhook.events, ["stats_exported", "stream_recovered", "stream_failover_activated"]);
+    assert.equal(normalizedSettingsResponse.payload.exportsWebhook.secretConfigured, true);
+    assert.equal(Object.prototype.hasOwnProperty.call(normalizedSettingsResponse.payload.exportsWebhook, "secret"), false);
+    assert.equal(JSON.stringify(normalizedSettingsResponse.payload).includes(DASHBOARD_WEBHOOK_SECRET_SENTINEL), false);
     assert.equal(normalizedSettingsResponse.payload.voiceGuard.policy, "default");
     assert.equal(normalizedSettingsResponse.payload.voiceGuard.effectivePolicy, "return");
 
@@ -1480,6 +1486,7 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
     assert.equal(repairedSettings.weeklyDigest.dayOfWeek, 6);
     assert.equal(repairedSettings.weeklyDigest.hour, 0);
     assert.equal(repairedSettings.exportsWebhook.secret.length, 120);
+    assert.equal(repairedSettings.exportsWebhook.secret.startsWith(DASHBOARD_WEBHOOK_SECRET_SENTINEL), true);
     assert.equal(Object.prototype.hasOwnProperty.call(repairedSettings, "weeklyDigestLastSent"), false);
   }
 
@@ -1840,7 +1847,7 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
         exportsWebhook: {
           enabled: true,
           url: webhookUrl,
-          secret: "test-secret",
+          secret: DASHBOARD_WEBHOOK_SECRET_SENTINEL,
           events: ["stats_exported", "custom_stations_exported", "stream_healthcheck_stalled", "stream_recovered"],
         },
       }),
@@ -1854,6 +1861,39 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
     assert.equal(exportSettingsResponse.payload.exportsWebhook.enabled, true);
     assert.equal(exportSettingsResponse.payload.exportsWebhook.url, webhookUrl);
     assert.deepEqual(exportSettingsResponse.payload.exportsWebhook.events, ["stats_exported", "custom_stations_exported", "stream_healthcheck_stalled", "stream_recovered"]);
+    assert.equal(exportSettingsResponse.payload.exportsWebhook.secretConfigured, true);
+    assert.equal(Object.prototype.hasOwnProperty.call(exportSettingsResponse.payload.exportsWebhook, "secret"), false);
+    assert.equal(JSON.stringify(exportSettingsResponse.payload).includes(DASHBOARD_WEBHOOK_SECRET_SENTINEL), false);
+  }
+
+  const webhookSettingsWithoutSecretResponse = await requestJson(
+    baseUrl,
+    `/api/dashboard/settings?serverId=${GUILD_ID}`,
+    {
+      method: "PUT",
+      headers: {
+        ...authHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        exportsWebhook: {
+          enabled: true,
+          url: webhookUrl,
+          events: ["stats_exported", "custom_stations_exported", "stream_healthcheck_stalled", "stream_recovered"],
+        },
+      }),
+    }
+  );
+  assert.equal(webhookSettingsWithoutSecretResponse.status, mongoAvailable ? 200 : 503);
+  if (mongoAvailable && getDb()) {
+    assert.equal(webhookSettingsWithoutSecretResponse.payload.exportsWebhook.secretConfigured, true);
+    assert.equal(Object.prototype.hasOwnProperty.call(webhookSettingsWithoutSecretResponse.payload.exportsWebhook, "secret"), false);
+    assert.equal(JSON.stringify(webhookSettingsWithoutSecretResponse.payload).includes(DASHBOARD_WEBHOOK_SECRET_SENTINEL), false);
+    const storedWebhookSettings = await getDb().collection("guild_settings").findOne(
+      { guildId: GUILD_ID },
+      { projection: { _id: 0, exportsWebhook: 1 } }
+    );
+    assert.equal(storedWebhookSettings.exportsWebhook.secret, DASHBOARD_WEBHOOK_SECRET_SENTINEL);
   }
 
   const stationsResponse = await requestJson(
@@ -1878,6 +1918,7 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
     assert.equal(statsExportResponse.payload.webhookDelivery.delivered, true);
     assert.equal(webhookRequests.length, 2);
     assert.equal(webhookRequests[1].payload.event, "stats_exported");
+    assert.equal(webhookRequests[1].headers["x-omnifm-webhook-secret"], DASHBOARD_WEBHOOK_SECRET_SENTINEL);
   }
 
   const stationsExportResponse = await requestJson(
@@ -1892,6 +1933,37 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
     assert.equal(stationsExportResponse.payload.webhookDelivery.delivered, true);
     assert.equal(webhookRequests.length, 3);
     assert.equal(webhookRequests[2].payload.event, "custom_stations_exported");
+    assert.equal(webhookRequests[2].headers["x-omnifm-webhook-secret"], DASHBOARD_WEBHOOK_SECRET_SENTINEL);
+  }
+
+  const clearWebhookSecretResponse = await requestJson(
+    baseUrl,
+    `/api/dashboard/settings?serverId=${GUILD_ID}`,
+    {
+      method: "PUT",
+      headers: {
+        ...authHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        exportsWebhook: {
+          enabled: true,
+          url: webhookUrl,
+          secret: "",
+          events: ["stats_exported", "custom_stations_exported", "stream_healthcheck_stalled", "stream_recovered"],
+        },
+      }),
+    }
+  );
+  assert.equal(clearWebhookSecretResponse.status, mongoAvailable ? 200 : 503);
+  if (mongoAvailable && getDb()) {
+    assert.equal(clearWebhookSecretResponse.payload.exportsWebhook.secretConfigured, false);
+    assert.equal(Object.prototype.hasOwnProperty.call(clearWebhookSecretResponse.payload.exportsWebhook, "secret"), false);
+    const clearedWebhookSettings = await getDb().collection("guild_settings").findOne(
+      { guildId: GUILD_ID },
+      { projection: { _id: 0, exportsWebhook: 1 } }
+    );
+    assert.equal(clearedWebhookSettings.exportsWebhook.secret, "");
   }
 
   const availableFailoverStations = [

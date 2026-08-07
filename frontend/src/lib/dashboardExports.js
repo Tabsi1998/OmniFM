@@ -10,12 +10,14 @@ export const DASHBOARD_EXPORT_WEBHOOK_EVENTS = Object.freeze([
 export const DASHBOARD_EXPORTS_WEBHOOK_DEFAULTS = Object.freeze({
   enabled: false,
   url: '',
-  secret: '',
+  secretConfigured: false,
   events: [],
 });
 
 export function normalizeDashboardExportsWebhookConfig(rawConfig) {
   const config = rawConfig && typeof rawConfig === 'object' ? rawConfig : {};
+  const hasSecret = Object.prototype.hasOwnProperty.call(config, 'secret');
+  const secret = hasSecret ? String(config.secret || '').trim() : '';
   const events = [];
   const seen = new Set();
 
@@ -27,12 +29,18 @@ export function normalizeDashboardExportsWebhookConfig(rawConfig) {
     events.push(key);
   }
 
-  return {
+  const normalized = {
     enabled: config.enabled === true,
     url: String(config.url || '').trim(),
-    secret: String(config.secret || '').trim(),
+    secretConfigured: hasSecret ? Boolean(secret) : config.secretConfigured === true,
     events,
   };
+
+  if (hasSecret) {
+    normalized.secret = secret;
+  }
+
+  return normalized;
 }
 
 export function getDashboardExportWebhookEventLabel(eventKey, t) {
