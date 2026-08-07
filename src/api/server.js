@@ -149,6 +149,8 @@ import {
   linkServerToLicense,
   unlinkServerFromLicense,
   listLicensesByContactEmail,
+  listLicenses,
+  patchLicenseById,
   listProcessedSessionsByEmail,
   updateLicenseContactEmail,
   isSessionProcessed,
@@ -232,7 +234,6 @@ import {
   syncTopGGVotes,
 } from "../services/topgg.js";
 import { getVoteEventsState } from "../vote-events-store.js";
-import { listLicenses, patchLicenseById } from "../premium-store.js";
 import { getStationHealthReport } from "../services/station-health.js";
 import { getRecentOperatorIncidents } from "../operator-incidents-store.js";
 

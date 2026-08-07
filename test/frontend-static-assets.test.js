@@ -35,6 +35,16 @@ test("React public folder does not ship legacy standalone frontend assets", () =
   );
 });
 
+test("legacy fallback refresh has one complete implementation", () => {
+  const legacyApp = fs.readFileSync(path.join(repoRoot, "web", "app.js"), "utf8");
+  const refreshDeclarations = legacyApp.match(/async function refresh\(\)/g) || [];
+
+  assert.equal(refreshDeclarations.length, 1, "legacy refresh must have one implementation");
+  assert.doesNotMatch(legacyApp, /\brefresh\s*=\s*async function/);
+  assert.match(legacyApp, /setInterval\(refresh,\s*15000\)/);
+  assert.match(legacyApp, /if \(!_countUpDone\)/);
+});
+
 test("React public index references only the React mount and no legacy root assets", () => {
   const indexHtml = fs.readFileSync(
     path.join(repoRoot, "frontend", "public", "index.html"),
