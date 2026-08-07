@@ -17,6 +17,7 @@ export function createDashboardSettingsRouteHandler(deps) {
     getDashboardSession,
     getPrimaryFailoverStation,
     languagePick,
+    mergeDashboardExportsWebhookConfigWithStoredSecret,
     methodNotAllowed,
     normalizeFailoverChain,
     normalizeWeeklyDigestConfig,
@@ -87,6 +88,13 @@ export function createDashboardSettingsRouteHandler(deps) {
       try {
         const body = await readJsonBody();
         const updates = { guildId: guildInfo.id };
+        let currentSettings = null;
+        const getCurrentSettings = async () => {
+          if (currentSettings === null) {
+            currentSettings = await loadDashboardGuildSettings(guildInfo.id);
+          }
+          return currentSettings;
+        };
 
         if (body?.weeklyDigest && typeof body.weeklyDigest === "object") {
           if (!serverHasCapability(guildInfo.id, "weekly_digest")) {
@@ -138,7 +146,11 @@ export function createDashboardSettingsRouteHandler(deps) {
             sendLocalizedError(res, 403, language, "Exporte und Webhooks sind nur fuer Ultimate verfuegbar.", "Exports and webhooks are only available for Ultimate.");
             return true;
           }
-          const validatedWebhook = await validateDashboardExportsWebhookConfig(body.exportsWebhook);
+          const candidateWebhook = mergeDashboardExportsWebhookConfigWithStoredSecret(
+            body.exportsWebhook,
+            (await getCurrentSettings()).exportsWebhook || {}
+          );
+          const validatedWebhook = await validateDashboardExportsWebhookConfig(candidateWebhook);
           if (!validatedWebhook.ok) {
             sendJson(res, 400, { error: validatedWebhook.error });
             return true;
@@ -203,7 +215,7 @@ export function createDashboardSettingsRouteHandler(deps) {
           return true;
         }
 
-        const currentSettings = await loadDashboardGuildSettings(guildInfo.id);
+        const savedSettings = await getCurrentSettings();
         await getDb().collection("guild_settings").updateOne(
           { guildId: guildInfo.id },
           { $set: updates },
@@ -218,24 +230,24 @@ export function createDashboardSettingsRouteHandler(deps) {
         }
 
         const weeklyDigest = updates.weeklyDigest
-          || normalizeWeeklyDigestConfig(currentSettings.weeklyDigest || {}, language);
+          || normalizeWeeklyDigestConfig(savedSettings.weeklyDigest || {}, language);
         const failoverChain = Object.prototype.hasOwnProperty.call(updates, "failoverChain")
           ? normalizeFailoverChain(updates.failoverChain || [])
-          : resolveDashboardFailoverChain(currentSettings);
+          : resolveDashboardFailoverChain(savedSettings);
         const fallbackStation = Object.prototype.hasOwnProperty.call(updates, "fallbackStation")
           ? String(updates.fallbackStation || "").trim().toLowerCase()
-          : getPrimaryFailoverStation(failoverChain, currentSettings.fallbackStation || "");
+          : getPrimaryFailoverStation(failoverChain, savedSettings.fallbackStation || "");
         const incidentAlerts = Object.prototype.hasOwnProperty.call(updates, "incidentAlerts")
           ? buildDashboardIncidentAlertsResponse(updates.incidentAlerts)
-          : buildDashboardIncidentAlertsResponse(currentSettings.incidentAlerts || {});
+          : buildDashboardIncidentAlertsResponse(savedSettings.incidentAlerts || {});
         const exportsWebhook = Object.prototype.hasOwnProperty.call(updates, "exportsWebhook")
           ? buildDashboardExportsWebhookResponse(updates.exportsWebhook)
-          : buildDashboardExportsWebhookResponse(currentSettings.exportsWebhook || {});
+          : buildDashboardExportsWebhookResponse(savedSettings.exportsWebhook || {});
         const voiceGuard = Object.prototype.hasOwnProperty.call(updates, "voiceGuard")
           ? buildResolvedVoiceGuardConfig(updates.voiceGuard, {
             featureEnabled: serverHasCapability(guildInfo.id, "voice_guard"),
           })
-          : buildResolvedVoiceGuardConfig(currentSettings.voiceGuard || {}, {
+          : buildResolvedVoiceGuardConfig(savedSettings.voiceGuard || {}, {
             featureEnabled: serverHasCapability(guildInfo.id, "voice_guard"),
           });
 
@@ -246,7 +258,7 @@ export function createDashboardSettingsRouteHandler(deps) {
           capabilities: buildServerCapabilityPayload(guildInfo.id).capabilities,
           weeklyDigest,
           weeklyDigestMeta: buildWeeklyDigestMeta(weeklyDigest, {
-            lastSentAt: currentSettings.weeklyDigestLastSent || null,
+            lastSentAt: savedSettings.weeklyDigestLastSent || null,
           }),
           failoverChain,
           failoverChainPreview: buildDashboardFailoverChainPreview(guildInfo.id, failoverChain, fallbackStation),

@@ -105,8 +105,8 @@ import {
   normalizeWeeklyDigestConfig,
 } from "../lib/weekly-digest.js";
 import {
-  DEFAULT_DASHBOARD_EXPORTS_WEBHOOK_CONFIG,
-  normalizeDashboardExportsWebhookConfig,
+  toPublicDashboardExportsWebhookConfig,
+  mergeDashboardExportsWebhookConfigWithStoredSecret,
   validateDashboardExportsWebhookConfig,
   shouldDeliverDashboardWebhook,
   buildDashboardWebhookPayload,
@@ -553,11 +553,7 @@ function mapDashboardCustomStation(key, station) {
 }
 
 function buildDashboardExportsWebhookResponse(rawConfig) {
-  return normalizeDashboardExportsWebhookConfig(
-    rawConfig && typeof rawConfig === "object"
-      ? rawConfig
-      : DEFAULT_DASHBOARD_EXPORTS_WEBHOOK_CONFIG
-  );
+  return toPublicDashboardExportsWebhookConfig(rawConfig);
 }
 
 function buildDashboardIncidentAlertsResponse(rawConfig) {
@@ -827,6 +823,7 @@ const handleDashboardSettingsRoute = createDashboardSettingsRouteHandler({
   getPrimaryFailoverStation,
   languagePick,
   methodNotAllowed,
+  mergeDashboardExportsWebhookConfigWithStoredSecret,
   normalizeFailoverChain,
   normalizeWeeklyDigestConfig,
   resolveDashboardFailoverChain,
@@ -969,7 +966,6 @@ const handleDashboardSettingsDigestRoute = createDashboardSettingsDigestRouteHan
 
 const handleDashboardExportsRoute = createDashboardExportsRouteHandler({
   buildDashboardDetailStatsPayload,
-  buildDashboardExportsWebhookResponse,
   buildDashboardStatsForGuild,
   buildDashboardWebhookPayload,
   deliverDashboardWebhook,
@@ -981,6 +977,7 @@ const handleDashboardExportsRoute = createDashboardExportsRouteHandler({
   log,
   mapDashboardCustomStation,
   methodNotAllowed,
+  mergeDashboardExportsWebhookConfigWithStoredSecret,
   resolveDashboardGuildForSession,
   sendJson,
   sendLocalizedError,

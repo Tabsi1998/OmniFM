@@ -11,7 +11,6 @@ function sortCustomStations(stations) {
 export function createDashboardExportsRouteHandler(deps) {
   const {
     buildDashboardDetailStatsPayload,
-    buildDashboardExportsWebhookResponse,
     buildDashboardStatsForGuild,
     buildDashboardWebhookPayload,
     deliverDashboardWebhook,
@@ -23,6 +22,7 @@ export function createDashboardExportsRouteHandler(deps) {
     log,
     mapDashboardCustomStation,
     methodNotAllowed,
+    mergeDashboardExportsWebhookConfigWithStoredSecret,
     resolveDashboardGuildForSession,
     sendJson,
     sendLocalizedError,
@@ -61,7 +61,10 @@ export function createDashboardExportsRouteHandler(deps) {
         const body = await readJsonBody();
         const currentSettings = await loadDashboardGuildSettings(guildInfo.id);
         const candidateConfig = body?.exportsWebhook && typeof body.exportsWebhook === "object"
-          ? body.exportsWebhook
+          ? mergeDashboardExportsWebhookConfigWithStoredSecret(
+            body.exportsWebhook,
+            currentSettings.exportsWebhook || {}
+          )
           : currentSettings.exportsWebhook || {};
         const validatedWebhook = await validateDashboardExportsWebhookConfig(candidateConfig);
         if (!validatedWebhook.ok) {
@@ -166,7 +169,7 @@ export function createDashboardExportsRouteHandler(deps) {
 
         let webhookDelivery = null;
         const settings = await loadDashboardGuildSettings(guild.id);
-        const webhookConfig = buildDashboardExportsWebhookResponse(settings.exportsWebhook || {});
+        const webhookConfig = settings.exportsWebhook || {};
         if (shouldDeliverDashboardWebhook(webhookConfig, "stats_exported")) {
           webhookDelivery = await deliverDashboardWebhook(
             webhookConfig,
@@ -233,7 +236,7 @@ export function createDashboardExportsRouteHandler(deps) {
     let webhookDelivery = null;
     try {
       const settings = await loadDashboardGuildSettings(guild.id);
-      const webhookConfig = buildDashboardExportsWebhookResponse(settings.exportsWebhook || {});
+      const webhookConfig = settings.exportsWebhook || {};
       if (shouldDeliverDashboardWebhook(webhookConfig, "custom_stations_exported")) {
         const folderCount = new Set(stations.map((station) => station.folder).filter(Boolean)).size;
         webhookDelivery = await deliverDashboardWebhook(
