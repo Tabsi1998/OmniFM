@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 
 import { rootDir } from "./logging.js";
+import { redactSensitiveText } from "./redact-sensitive.js";
 import { validateOutboundUrl } from "./safe-outbound-http.js";
 
 const MAX_OUTPUT_CHARS = 120_000;
@@ -213,14 +214,18 @@ function stripAnsi(value) {
   return String(value || "").replace(/\u001b\[[0-9;]*[A-Za-z]/g, "");
 }
 
+function redactOwnerJobOutput(value) {
+  return redactSensitiveText(stripAnsi(value));
+}
+
 function appendOutput(job, chunk) {
-  const next = `${job.output}${stripAnsi(chunk)}`;
+  const next = redactOwnerJobOutput(`${job.output}${stripAnsi(chunk)}`);
   job.output = next.length > MAX_OUTPUT_CHARS ? next.slice(-MAX_OUTPUT_CHARS) : next;
   job.outputTruncated = next.length > MAX_OUTPUT_CHARS;
 }
 
 function buildOutputSummary(output, { truncated = false } = {}) {
-  const lines = stripAnsi(output)
+  const lines = redactOwnerJobOutput(output)
     .replace(/\r/g, "")
     .split("\n")
     .map((line) => line.trim())
@@ -260,10 +265,10 @@ function publicJob(job) {
     exitCode: job.exitCode,
     signal: job.signal,
     timedOut: Boolean(job.timedOut),
-    output: job.output,
+    output: redactOwnerJobOutput(job.output),
     outputTruncated: Boolean(job.outputTruncated),
     outputSummary: buildOutputSummary(job.output, { truncated: job.outputTruncated }),
-    error: job.error || null,
+    error: job.error ? redactSensitiveText(job.error) : null,
   };
 }
 
@@ -414,7 +419,7 @@ function startOwnerJob(actionId, { actor = "owner", onFinish = null, input = {} 
     appendOutput(job, `\n[OwnerJob] Start fehlgeschlagen: ${error?.message || String(error)}\n`);
     finishJob(job, {
       status: "failed",
-      error: error?.message || String(error),
+      error: redactSensitiveText(error?.message || String(error)),
     });
   });
   child.on("close", (exitCode, signal) => {
@@ -438,6 +443,7 @@ export {
   getOwnerJob,
   getOwnerJobActions,
   getOwnerJobsSnapshot,
+  redactOwnerJobOutput,
   resetOwnerJobsForTests,
   startOwnerJob,
 };

@@ -2,6 +2,7 @@
 // OmniFM: General Utility/Helper Functions
 // ============================================================
 import { BRAND, PLANS } from "../config/plans.js";
+import { sanitizeUrlForLog } from "./redact-sensitive.js";
 
 // ---- Constants ----
 const YEARLY_DISCOUNT_MONTHS = 10;
@@ -215,21 +216,6 @@ function applyVolumeTransformerLevel(transformer, value) {
     return true;
   }
   return false;
-}
-
-function sanitizeUrlForLog(rawUrl) {
-  const text = String(rawUrl || "").trim();
-  if (!text) return "-";
-  try {
-    const parsed = new URL(text);
-    if (parsed.username) parsed.username = "***";
-    if (parsed.password) parsed.password = "***";
-    if (parsed.search) parsed.search = "?...";
-    if (parsed.hash) parsed.hash = "";
-    return parsed.toString();
-  } catch {
-    return clipText(text, 180);
-  }
 }
 
 function splitTextForDiscord(content, maxLength = 1900) {

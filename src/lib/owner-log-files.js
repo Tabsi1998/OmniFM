@@ -2,13 +2,13 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { logsDir, rootDir } from "./logging.js";
+import { redactSensitiveText } from "./redact-sensitive.js";
 
 const DEFAULT_TAIL_BYTES = 80_000;
 const MAX_TAIL_BYTES = 300_000;
 const DEFAULT_MAX_LINES = 300;
 const MAX_LINES = 1000;
 const LOG_FILE_RE = /^(bot|error)(?:-[0-9T.-]+Z?)?\.log$/i;
-const SENSITIVE_KEY_RE = /(token|secret|password|pass|api[_-]?key|authorization|cookie)/i;
 
 function resolveOwnerLogsDir() {
   const explicit = String(process.env.OMNIFM_OWNER_LOGS_DIR || process.env.LOGS_DIR || "").trim();
@@ -22,10 +22,7 @@ function isAllowedLogFileName(fileName) {
 }
 
 function redactLogLine(line) {
-  return String(line || "")
-    .replace(/\b(Bearer|Bot)\s+[A-Za-z0-9._~+/=-]{12,}/gi, "$1 [redacted]")
-    .replace(/\b([A-Za-z0-9_.-]*(?:token|secret|password|pass|api[_-]?key|authorization|cookie)[A-Za-z0-9_.-]*)=("[^"]*"|'[^']*'|[^\s,;]+)/gi, "$1=[redacted]")
-    .replace(/\b([A-Za-z0-9_.-]*(?:token|secret|password|pass|api[_-]?key)[A-Za-z0-9_.-]*):("[^"]*"|'[^']*'|[^\s,;]+)/gi, "$1:[redacted]");
+  return redactSensitiveText(line);
 }
 
 function parseLogLine(line) {

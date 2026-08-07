@@ -1,6 +1,7 @@
 import { fetchStreamSnapshot, hasUsableStreamTrack } from "../src/services/now-playing.js";
 import { recognizeTrackFromStream } from "../src/services/audio-recognition.js";
 import { validateOutboundUrlWithDns } from "../src/lib/safe-outbound-http.js";
+import { redactSensitiveData, redactSensitiveText, sanitizeUrlForLog } from "../src/lib/redact-sensitive.js";
 import { pathToFileURL } from "node:url";
 
 function getRecognitionEnvironment(env = process.env) {
@@ -16,7 +17,7 @@ function getRecognitionEnvironment(env = process.env) {
 function buildRecognitionReport(url, env) {
   return {
     ok: false,
-    url: String(url || "").trim(),
+    url: sanitizeUrlForLog(url),
     env: getRecognitionEnvironment(env),
     stream: {
       metadataSource: null,
@@ -47,11 +48,11 @@ async function runRecognitionDiagnostic(rawUrl, {
   });
 
   if (!validation?.ok) {
-    report.error = validation?.error || "Stream-URL konnte nicht sicher erreicht werden.";
+    report.error = redactSensitiveText(validation?.error || "Stream-URL konnte nicht sicher erreicht werden.");
     return report;
   }
 
-  report.url = validation.url;
+  report.url = sanitizeUrlForLog(validation.url);
   try {
     // Both services use safeFetch internally. In particular, the recognition
     // service feeds its already DNS-pinned response to FFmpeg via pipe:0,
@@ -60,19 +61,21 @@ async function runRecognitionDiagnostic(rawUrl, {
       includeCover: false,
       allowRecognition: false,
     });
-    report.stream.metadataSource = streamSnapshot?.metadataSource || null;
-    report.stream.metadataStatus = streamSnapshot?.metadataStatus || null;
-    report.stream.displayTitle = streamSnapshot?.displayTitle || null;
-    report.stream.artist = streamSnapshot?.artist || null;
-    report.stream.title = streamSnapshot?.title || null;
-    report.stream.album = streamSnapshot?.album || null;
+    report.stream.metadataSource = redactSensitiveText(streamSnapshot?.metadataSource || "") || null;
+    report.stream.metadataStatus = redactSensitiveText(streamSnapshot?.metadataStatus || "") || null;
+    report.stream.displayTitle = redactSensitiveText(streamSnapshot?.displayTitle || "") || null;
+    report.stream.artist = redactSensitiveText(streamSnapshot?.artist || "") || null;
+    report.stream.title = redactSensitiveText(streamSnapshot?.title || "") || null;
+    report.stream.album = redactSensitiveText(streamSnapshot?.album || "") || null;
     report.stream.willSkipRecognition = hasUsableStreamTrack(streamSnapshot);
 
     report.recognition.attempted = true;
-    report.recognition.result = await recognizeTrack(validation.url, { existingTrack: null }) || null;
+    report.recognition.result = redactSensitiveData(
+      await recognizeTrack(validation.url, { existingTrack: null }) || null
+    );
     report.ok = true;
   } catch (error) {
-    report.error = String(error?.message || error);
+    report.error = redactSensitiveText(error?.message || error);
   }
 
   return report;

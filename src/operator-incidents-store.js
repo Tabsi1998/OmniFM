@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { getDb, isConnected } from "./lib/db.js";
 import { log, onLoggedError } from "./lib/logging.js";
+import { redactSensitiveData, redactSensitiveText } from "./lib/redact-sensitive.js";
 import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 
 const STORE_FILE = resolveRuntimeDataPath("operator-incidents.json");
@@ -29,7 +30,7 @@ function deepClone(value) {
 }
 
 function sanitizeText(value, maxLen = 240) {
-  const text = String(value ?? "").trim();
+  const text = redactSensitiveText(value).trim();
   if (!text) return "";
   return text.slice(0, maxLen);
 }
@@ -47,7 +48,7 @@ function normalizeLevel(value) {
 }
 
 function normalizeContext(value) {
-  const input = isObject(value) ? value : {};
+  const input = redactSensitiveData(isObject(value) ? value : {});
   const entries = Object.entries(input)
     .map(([key, entryValue]) => [sanitizeText(key, 60), sanitizeText(entryValue, 240)])
     .filter(([key, entryValue]) => key && entryValue);

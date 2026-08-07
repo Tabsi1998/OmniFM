@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveRuntimeDataPath } from "./runtime-data-path.js";
+import { redactSensitiveData, redactSensitiveText } from "./redact-sensitive.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..", "..");
@@ -139,47 +140,45 @@ async function pruneRotatedLogsIfNeeded(rotatedPrefix) {
 }
 
 function normalizeLogLines(ts, level, message) {
-  const rawLines = String(message ?? "").replace(/\r\n/g, "\n").split("\n");
+  const rawLines = redactSensitiveText(message).replace(/\r\n/g, "\n").split("\n");
   const lines = rawLines.length > 0 ? rawLines : [""];
   return lines.map((line) => `[${ts}] [${level}] ${line}`);
 }
 
 function clipLogText(value, maxLength = 400) {
-  const text = String(value ?? "").replace(/\s+/g, " ").trim();
+  const text = redactSensitiveText(value).replace(/\s+/g, " ").trim();
   if (!text) return "";
   if (text.length <= maxLength) return text;
   return `${text.slice(0, Math.max(1, maxLength - 3))}...`;
 }
 
 function formatLogValue(value, { maxLength = 240 } = {}) {
-  if (value === undefined || value === null) return "";
-  if (typeof value === "string") {
-    const text = clipLogText(value, maxLength);
+  const safeValue = redactSensitiveData(value);
+  if (safeValue === undefined || safeValue === null) return "";
+  if (typeof safeValue === "string") {
+    const text = clipLogText(safeValue, maxLength);
     if (!text) return "";
     return /^[A-Za-z0-9_./:@%+,\-=]+$/.test(text) ? text : JSON.stringify(text);
   }
-  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
-    return String(value);
+  if (typeof safeValue === "number" || typeof safeValue === "boolean" || typeof safeValue === "bigint") {
+    return String(safeValue);
   }
-  if (value instanceof Date) {
-    return value.toISOString();
+  if (safeValue instanceof Date) {
+    return safeValue.toISOString();
   }
-  if (Array.isArray(value)) {
+  if (Array.isArray(safeValue)) {
     return formatLogValue(
-      value
+      safeValue
         .map((entry) => formatLogValue(entry, { maxLength: Math.max(40, Math.floor(maxLength / 3)) }))
         .filter(Boolean)
         .join(","),
       { maxLength }
     );
   }
-  if (value instanceof Error) {
-    return clipLogText(`${value.name || "Error"}: ${value.message || String(value)}`, maxLength);
-  }
   try {
-    return formatLogValue(JSON.stringify(value), { maxLength });
+    return formatLogValue(JSON.stringify(safeValue), { maxLength });
   } catch {
-    return clipLogText(String(value), maxLength);
+    return clipLogText(String(safeValue), maxLength);
   }
 }
 
@@ -196,7 +195,7 @@ function formatLogContext(context = {}) {
 }
 
 function splitStackLines(stack) {
-  return String(stack ?? "")
+  return redactSensitiveText(stack)
     .replace(/\r\n/g, "\n")
     .split("\n")
     .map((line) => line.trimEnd())
@@ -251,7 +250,7 @@ function getErrorMetadataEntries(err) {
 
 function normalizeErrorLike(err) {
   if (err instanceof Error) {
-    const summary = `${err.name || "Error"}: ${err.message || String(err)}`;
+    const summary = redactSensitiveText(`${err.name || "Error"}: ${err.message || String(err)}`);
     const stackLines = splitStackLines(err.stack);
     if (stackLines.length > 0 && stackLines[0].trim() === summary.trim()) {
       stackLines.shift();
@@ -266,7 +265,7 @@ function normalizeErrorLike(err) {
 
   if (err && typeof err === "object") {
     const name = clipLogText(err.name || err.constructor?.name || "Error", 80) || "Error";
-    const message = clipLogText(err.message || JSON.stringify(err), 500) || "unknown";
+    const message = clipLogText(err.message || JSON.stringify(redactSensitiveData(err)), 500) || "unknown";
     const summary = `${name}: ${message}`;
     const stackLines = splitStackLines(err.stack);
     if (stackLines.length > 0 && stackLines[0].trim() === summary.trim()) {
@@ -339,7 +338,7 @@ function buildErrorLogMessage(summary, err, {
     currentCause = normalizedCause.cause;
   }
 
-  return lines.join("\n");
+  return redactSensitiveText(lines.join("\n"));
 }
 
 function queueLogWrite(lines, { includeErrorLog = false } = {}) {
@@ -365,7 +364,7 @@ function queueLogWrite(lines, { includeErrorLog = false } = {}) {
 
 function log(level, message) {
   const ts = new Date().toISOString();
-  const lines = normalizeLogLines(ts, level, message);
+  const lines = normalizeLogLines(ts, level, redactSensitiveText(message));
   for (const line of lines) {
     if (level === "ERROR") {
       console.error(line);
@@ -378,13 +377,16 @@ function log(level, message) {
 }
 
 function logError(summary, err, { context = null, level = "ERROR", includeStack = true } = {}) {
-  const message = buildErrorLogMessage(summary, err, { context, includeStack });
+  const safeSummary = redactSensitiveText(summary);
+  const safeErr = redactSensitiveData(err);
+  const safeContext = context && typeof context === "object" ? redactSensitiveData(context) : null;
+  const message = buildErrorLogMessage(safeSummary, safeErr, { context: safeContext, includeStack });
   log(level, message);
   const event = {
     timestamp: new Date().toISOString(),
-    summary: String(summary || "").trim() || "Error",
-    err,
-    context: context && typeof context === "object" ? { ...context } : null,
+    summary: String(safeSummary || "").trim() || "Error",
+    err: safeErr,
+    context: safeContext,
     level: String(level || "ERROR").trim().toUpperCase() || "ERROR",
     includeStack: includeStack !== false,
     message,
@@ -400,8 +402,8 @@ function logError(summary, err, { context = null, level = "ERROR", includeStack 
 }
 
 function logWithCooldown(level, key, message, cooldownMs = repeatedLogCooldownMs) {
-  const normalizedMessage = String(message ?? "");
-  const normalizedKey = String(key || "").trim();
+  const normalizedMessage = redactSensitiveText(message);
+  const normalizedKey = redactSensitiveText(key).trim();
   if (!normalizedKey || cooldownMs <= 0) {
     log(level, normalizedMessage);
     return true;

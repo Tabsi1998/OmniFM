@@ -1,17 +1,24 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
+import { redactSensitiveText, sanitizeUrlForLog } from "../src/lib/redact-sensitive.js";
 
 function parseArgs(argv) {
   const args = {
     "skip-api": false,
     "skip-logs": false,
+    "unsafe-token-argument": false,
     help: false,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
     const current = String(argv[index] || "");
     if (!current.startsWith("--")) continue;
+    if (current === "--admin-token" || current.startsWith("--admin-token=")) {
+      args["unsafe-token-argument"] = true;
+      if (current === "--admin-token" && !String(argv[index + 1] || "").startsWith("--")) index += 1;
+      continue;
+    }
     const key = current.slice(2);
     if (["skip-api", "skip-logs", "help"].includes(key)) {
       args[key] = true;
@@ -34,9 +41,9 @@ function normalizeBaseUrl(rawValue) {
   return value.replace(/\/+$/, "");
 }
 
-function resolveAdminToken(args) {
+function resolveAdminToken() {
   return String(
-    args["admin-token"]
+    process.env.OMNIFM_LIVE_ADMIN_TOKEN
     || process.env.OMNIFM_ADMIN_TOKEN
     || process.env.API_ADMIN_TOKEN
     || process.env.ADMIN_API_TOKEN
@@ -46,11 +53,11 @@ function resolveAdminToken(args) {
 
 function printUsage() {
   console.log("Usage:");
-  console.log("  node scripts/phase6-live-check.mjs --base-url https://omnifm.xyz --admin-token <token> [--docker-service omnifm] [--log-since 30m]");
+  console.log("  OMNIFM_LIVE_ADMIN_TOKEN=... node scripts/phase6-live-check.mjs --base-url https://omnifm.xyz [--docker-service omnifm] [--log-since 30m]");
   console.log("");
   console.log("Options:");
   console.log("  --base-url        API base URL, default: OMNIFM_BASE_URL, PUBLIC_WEB_URL, or http://localhost:8081");
-  console.log("  --admin-token     Admin API token, default: OMNIFM_ADMIN_TOKEN, API_ADMIN_TOKEN, or ADMIN_API_TOKEN");
+  console.log("  OMNIFM_LIVE_ADMIN_TOKEN  Admin API token (legacy environment aliases remain supported)");
   console.log("  --docker-service  Docker Compose service name, default: OMNIFM_DOCKER_SERVICE or omnifm");
   console.log("  --log-since       docker logs lookback window, default: OMNIFM_LOG_SINCE or 30m");
   console.log("  --skip-api        Skip authenticated API checks");
@@ -58,7 +65,7 @@ function printUsage() {
 }
 
 function logLine(level, message) {
-  console.log(`[${level}] ${message}`);
+  console.log(`[${level}] ${redactSensitiveText(message)}`);
 }
 
 function summarizeSync(entry) {
@@ -68,7 +75,7 @@ function summarizeSync(entry) {
 }
 
 function clipLine(value, maxLength = 180) {
-  const text = String(value || "").replace(/\s+/g, " ").trim();
+  const text = redactSensitiveText(value).replace(/\s+/g, " ").trim();
   if (text.length <= maxLength) return text;
   return `${text.slice(0, Math.max(0, maxLength - 3))}...`;
 }
@@ -545,13 +552,18 @@ function inspectLogs(dockerService, logSince) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  if (args["unsafe-token-argument"]) {
+    logLine("FAIL", "--admin-token is not accepted because command-line arguments can expose credentials. Set OMNIFM_LIVE_ADMIN_TOKEN instead.");
+    process.exitCode = 1;
+    return;
+  }
   if (args.help) {
     printUsage();
     return;
   }
 
   const baseUrl = normalizeBaseUrl(args["base-url"] || process.env.OMNIFM_BASE_URL || process.env.PUBLIC_WEB_URL);
-  const adminToken = resolveAdminToken(args);
+  const adminToken = resolveAdminToken();
   const dockerService = String(args["docker-service"] || process.env.OMNIFM_DOCKER_SERVICE || "omnifm").trim() || "omnifm";
   const logSince = String(args["log-since"] || process.env.OMNIFM_LOG_SINCE || "30m").trim() || "30m";
   const skipApi = args["skip-api"] === true;
@@ -559,7 +571,7 @@ async function main() {
 
   let hadFailure = false;
 
-  logLine("INFO", `baseUrl=${baseUrl}`);
+  logLine("INFO", `baseUrl=${sanitizeUrlForLog(baseUrl)}`);
   logLine("INFO", `dockerService=${dockerService}, logSince=${logSince}`);
 
   const coreResult = await inspectCoreRoutes(baseUrl);
@@ -576,7 +588,7 @@ async function main() {
 
   if (!skipApi) {
     if (!adminToken) {
-      logLine("FAIL", "Admin token missing. Set --admin-token, OMNIFM_ADMIN_TOKEN, API_ADMIN_TOKEN, or ADMIN_API_TOKEN.");
+      logLine("FAIL", "Admin token missing. Set OMNIFM_LIVE_ADMIN_TOKEN (or a supported legacy environment alias).");
       hadFailure = true;
     } else {
       const requests = [

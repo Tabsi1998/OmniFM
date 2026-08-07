@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
+import { redactSensitiveText } from "../src/lib/redact-sensitive.js";
 
 function parseArgs(argv) {
   const args = {
@@ -16,12 +17,18 @@ function parseArgs(argv) {
     "skip-doctor": false,
     "skip-live": false,
     "skip-logs": false,
+    "unsafe-token-argument": false,
     help: false,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
     const current = String(argv[index] || "");
     if (!current.startsWith("--")) continue;
+    if (current === "--admin-token" || current.startsWith("--admin-token=")) {
+      args["unsafe-token-argument"] = true;
+      if (current === "--admin-token" && !String(argv[index + 1] || "").startsWith("--")) index += 1;
+      continue;
+    }
     const key = current.slice(2);
     if (Object.prototype.hasOwnProperty.call(args, key)) {
       args[key] = true;
@@ -45,8 +52,8 @@ function parseArgs(argv) {
 function printUsage() {
   console.log("Usage:");
   console.log("  node scripts/release-gate.mjs --preflight [--dry-run] [--allow-dirty]");
-  console.log("  node scripts/release-gate.mjs --post-deploy --base-url https://omnifm.xyz --admin-token <token>");
-  console.log("  node scripts/release-gate.mjs --all --base-url https://omnifm.xyz --admin-token <token>");
+  console.log("  OMNIFM_LIVE_ADMIN_TOKEN=... node scripts/release-gate.mjs --post-deploy --base-url https://omnifm.xyz");
+  console.log("  OMNIFM_LIVE_ADMIN_TOKEN=... node scripts/release-gate.mjs --all --base-url https://omnifm.xyz");
   console.log("  node scripts/release-gate.mjs --rollback-plan");
   console.log("");
   console.log("Preflight checks: clean worktree, npm test, frontend build, npm audit, update.sh doctor.");
@@ -54,11 +61,11 @@ function printUsage() {
 }
 
 function log(level, message) {
-  console.log(`[${level}] ${message}`);
+  console.log(`[${level}] ${redactSensitiveText(message)}`);
 }
 
 function runStep(label, command, args, { dryRun = false, allowFailure = false, env = {} } = {}) {
-  const printable = [command, ...args].join(" ");
+  const printable = redactSensitiveText([command, ...args].join(" "));
   if (dryRun) {
     log("DRY", `${label}: ${printable}`);
     return true;
@@ -120,13 +127,12 @@ function checkCleanWorktree({ allowDirty = false, dryRun = false } = {}) {
   return false;
 }
 
-function resolveAdminToken(args) {
+function resolveAdminToken() {
   return String(
-    args["admin-token"]
+    process.env.OMNIFM_LIVE_ADMIN_TOKEN
     || process.env.OMNIFM_ADMIN_TOKEN
     || process.env.API_ADMIN_TOKEN
     || process.env.ADMIN_API_TOKEN
-    || process.env.OMNIFM_LIVE_ADMIN_TOKEN
     || ""
   ).trim();
 }
@@ -182,11 +188,9 @@ function runPostDeploy(args) {
   }
 
   const baseUrl = normalizeBaseUrl(args);
-  const adminToken = resolveAdminToken(args);
+  const adminToken = resolveAdminToken();
   const liveArgs = ["scripts/phase6-live-check.mjs", "--base-url", baseUrl];
-  if (adminToken) {
-    liveArgs.push("--admin-token", adminToken);
-  } else {
+  if (!adminToken) {
     liveArgs.push("--skip-api");
     log("WARN", "admin token missing; post-deploy falls back to public-only live smoke.");
   }
@@ -196,6 +200,7 @@ function runPostDeploy(args) {
 
   return runStep("post-deploy live smoke", "node", liveArgs, {
     dryRun: args["dry-run"],
+    env: adminToken ? { OMNIFM_LIVE_ADMIN_TOKEN: adminToken } : {},
   });
 }
 
@@ -222,13 +227,18 @@ Rollback plan:
    - If a backup restore is required, stop OmniFM containers first, restore Mongo, then start commander before workers.
 
 5. Verification.
-   - node scripts/release-gate.mjs --post-deploy --base-url https://omnifm.xyz --admin-token "$API_ADMIN_TOKEN"
+   - OMNIFM_LIVE_ADMIN_TOKEN="$API_ADMIN_TOKEN" node scripts/release-gate.mjs --post-deploy --base-url https://omnifm.xyz
    - Check /admin release card, /api/health/detail, live-smoke workflow, and Docker logs.
 `);
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  if (args["unsafe-token-argument"]) {
+    log("FAIL", "--admin-token is not accepted because command-line arguments can expose credentials. Set OMNIFM_LIVE_ADMIN_TOKEN instead.");
+    process.exitCode = 1;
+    return;
+  }
   if (args.help) {
     printUsage();
     return;
