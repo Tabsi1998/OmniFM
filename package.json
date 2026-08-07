@@ -36,7 +36,7 @@
     "@snazzah/davey": "^0.1.12",
     "discord.js": "^14.27.0",
     "dotenv": "^17.4.2",
-    "ipaddr.js": "^2.3.0",
+    "ipaddr.js": "^2.5.0",
     "libsodium-wrappers": "^0.8.4",
     "mongodb": "^7.5.0",
     "nodemailer": "^9.0.5",
