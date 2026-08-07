@@ -101,7 +101,7 @@ Common modes:
 | `./update.sh --status live` | Live Docker logs |
 | `./update.sh --status local-live` | Live local log tail |
 | `./update.sh --doctor` | System/runtime diagnostics |
-| `./update.sh --recognition-test <URL>` | Direct audio-recognition test |
+| `./update.sh --recognition-test <URL>` | Direct audio-recognition test; the stream is DNS-pinned and passed to FFmpeg through stdin |
 | `./update.sh --cleanup` | Cleanup logs, backups, Docker cache |
 
 Release gate wrappers:

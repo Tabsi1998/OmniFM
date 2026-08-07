@@ -12,6 +12,16 @@ const DEFAULT_MAX_REDIRECTS = 3;
 const REDIRECT_STATUS_CODES = new Set([301, 302, 303, 307, 308]);
 const BODYLESS_RESPONSE_STATUS_CODES = new Set([204, 205, 304]);
 const PRIVATE_HOST_SUFFIXES = Object.freeze([".local", ".internal", ".lan", ".home", ".nip.io", ".sslip.io"]);
+const SENSITIVE_REDIRECT_HEADER_NAMES = new Set([
+  "authorization",
+  "proxy-authorization",
+  "cookie",
+  "cookie2",
+  "host",
+  "x-api-key",
+  "x-auth-token",
+  "x-access-token",
+]);
 
 class SafeOutboundError extends Error {
   constructor(code, message, cause = null) {
@@ -322,6 +332,16 @@ function drainIncomingResponse(incoming) {
   }
 }
 
+function stripSensitiveRedirectHeaders(headers) {
+  const next = {};
+  for (const [name, value] of Object.entries(headers || {})) {
+    if (!SENSITIVE_REDIRECT_HEADER_NAMES.has(String(name).toLowerCase())) {
+      next[name] = value;
+    }
+  }
+  return next;
+}
+
 async function safeFetch(rawUrl, {
   method = "GET",
   headers = {},
@@ -339,6 +359,7 @@ async function safeFetch(rawUrl, {
     ? Math.max(0, Math.min(5, parsedRedirectLimit))
     : DEFAULT_MAX_REDIRECTS;
   let currentUrl = String(rawUrl || "").trim();
+  let requestHeaders = headers;
 
   for (let redirectCount = 0; ; redirectCount += 1) {
     const target = await resolveSafeOutboundTarget(currentUrl, policyOptions);
@@ -346,7 +367,7 @@ async function safeFetch(rawUrl, {
     try {
       incoming = await requestImpl(target, {
         method: normalizedMethod,
-        headers,
+        headers: requestHeaders,
         body,
         signal,
         timeoutMs,
@@ -377,7 +398,11 @@ async function safeFetch(rawUrl, {
     }
 
     try {
-      currentUrl = new URL(location, target.url).toString();
+      const nextUrl = new URL(location, target.url);
+      if (nextUrl.origin !== target.url.origin) {
+        requestHeaders = stripSensitiveRedirectHeaders(requestHeaders);
+      }
+      currentUrl = nextUrl.toString();
     } catch (error) {
       throw createSafeOutboundError("OUTBOUND_REDIRECT_INVALID", "Weiterleitung zu einem nicht erlaubten Ziel.", error);
     }
