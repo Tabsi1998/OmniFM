@@ -308,7 +308,9 @@ bash ./scripts/compose.sh up -d
 ```
 
 Backups may contain user, license, session, and audit data. Store them with the
-same access controls as `.env` and do not upload them to source control.
+same access controls as `.env` and do not upload them to source control. On
+Linux, the backup script enforces `0700` on its backup directory and `0600` on
+archives and checksum sidecars.
 
 ### Container hardening
 

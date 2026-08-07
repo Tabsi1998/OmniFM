@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 
-import { rootDir } from "./logging.js";
+import { log, rootDir } from "./logging.js";
 import { withFileStoreLock } from "./file-store-lock.js";
 import { resolveRuntimeDataPath } from "./runtime-data-path.js";
 
@@ -10,6 +10,15 @@ const MAX_AUDIT_EVENTS = 500;
 const DEFAULT_AUDIT_LIMIT = 100;
 const MAX_TEXT_LENGTH = 500;
 const SENSITIVE_KEY_RE = /(token|secret|password|pass|api[_-]?key|authorization|cookie)/i;
+
+class OwnerAuditCorruptionError extends Error {
+  constructor(filePath, cause) {
+    super(`Owner audit file is corrupt: ${filePath}`);
+    this.name = "OwnerAuditCorruptionError";
+    this.filePath = filePath;
+    this.cause = cause;
+  }
+}
 
 function resolveOwnerAuditFilePath() {
   const explicit = String(process.env.OMNIFM_OWNER_AUDIT_FILE || "").trim();
@@ -63,19 +72,37 @@ function normalizeAuditEvent(rawEvent) {
 }
 
 function readAuditState(filePath = resolveOwnerAuditFilePath()) {
+  if (!fs.existsSync(filePath)) return emptyAuditState();
+  const raw = fs.readFileSync(filePath, "utf8").trim();
+  if (!raw) {
+    throw new OwnerAuditCorruptionError(filePath, new Error("file is empty"));
+  }
+
   try {
-    if (!fs.existsSync(filePath)) return emptyAuditState();
-    const raw = fs.readFileSync(filePath, "utf8").trim();
-    if (!raw) return emptyAuditState();
     const parsed = JSON.parse(raw);
-    const events = Array.isArray(parsed?.events) ? parsed.events : [];
+    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.events)) {
+      throw new Error("expected an object with an events array");
+    }
+    const events = parsed.events;
     return {
       version: 1,
       events: events.map((event) => normalizeAuditEvent(event)).slice(-MAX_AUDIT_EVENTS),
     };
-  } catch {
-    return emptyAuditState();
+  } catch (err) {
+    throw new OwnerAuditCorruptionError(filePath, err);
   }
+}
+
+function quarantineCorruptAuditFile(filePath, cause) {
+  const quarantinedPath = `${filePath}.corrupt-${Date.now()}-${randomUUID()}`;
+  fs.renameSync(filePath, quarantinedPath);
+  try {
+    fs.chmodSync(quarantinedPath, 0o600);
+  } catch {
+    // Best effort only: the original file mode is preserved if chmod is unavailable.
+  }
+  log("ERROR", `[owner-audit] Corrupt audit file quarantined as ${path.basename(quarantinedPath)}: ${cause?.message || "invalid JSON"}`);
+  return quarantinedPath;
 }
 
 function writeAuditState(filePath, state) {
@@ -90,7 +117,20 @@ function writeAuditState(filePath, state) {
 function recordOwnerAudit(event) {
   const filePath = resolveOwnerAuditFilePath();
   return withFileStoreLock(filePath, () => {
-    const state = readAuditState(filePath);
+    let state;
+    try {
+      state = readAuditState(filePath);
+    } catch (err) {
+      if (!(err instanceof OwnerAuditCorruptionError)) throw err;
+      const quarantinedPath = quarantineCorruptAuditFile(filePath, err.cause);
+      state = emptyAuditState();
+      state.events.push(normalizeAuditEvent({
+        action: "owner.audit.integrity.recovered",
+        status: "failed",
+        summary: "Corrupt owner audit file was quarantined before recording a new event.",
+        metadata: { quarantinedFile: path.basename(quarantinedPath) },
+      }));
+    }
     const normalized = normalizeAuditEvent(event);
     state.events.push(normalized);
     writeAuditState(filePath, state);
@@ -100,13 +140,26 @@ function recordOwnerAudit(event) {
 
 function getOwnerAuditSnapshot({ limit = DEFAULT_AUDIT_LIMIT } = {}) {
   const filePath = resolveOwnerAuditFilePath();
-  const state = readAuditState(filePath);
   const safeLimit = Math.min(500, Math.max(1, Number.parseInt(String(limit || DEFAULT_AUDIT_LIMIT), 10) || DEFAULT_AUDIT_LIMIT));
+  let state;
+  let integrity = null;
+  try {
+    state = readAuditState(filePath);
+  } catch (err) {
+    if (!(err instanceof OwnerAuditCorruptionError)) throw err;
+    log("ERROR", `[owner-audit] Audit history is unavailable until it is recovered: ${err.cause?.message || "invalid JSON"}`);
+    state = emptyAuditState();
+    integrity = {
+      status: "corrupt",
+      message: "The audit history is corrupt and will be quarantined before the next audit write.",
+    };
+  }
   return {
     generatedAt: new Date().toISOString(),
     file: filePath,
     total: state.events.length,
     events: state.events.slice().reverse().slice(0, safeLimit),
+    ...(integrity ? { integrity } : {}),
   };
 }
 

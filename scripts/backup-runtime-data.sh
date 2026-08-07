@@ -4,6 +4,7 @@
 # directory. The restore path intentionally requires stopped OmniFM containers
 # and an explicit --force because it replaces live state.
 set -euo pipefail
+umask 077
 
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNTIME_DIR="${OMNIFM_HOST_RUNTIME_DATA_DIR:-$APP_DIR/runtime-data}"
@@ -55,15 +56,19 @@ create_backup() {
   [[ -d "$RUNTIME_DIR" ]] || fatal "Runtime data directory is missing: $RUNTIME_DIR. Run bash ./init-data.sh first."
 
   mkdir -p "$BACKUP_DIR"
+  chmod 700 "$BACKUP_DIR"
   archive="$BACKUP_DIR/$(archive_name)"
   temp_archive="${archive}.tmp-$$"
   tar -C "$(dirname "$RUNTIME_DIR")" -czf "$temp_archive" "$(basename "$RUNTIME_DIR")"
+  chmod 600 "$temp_archive"
   validate_archive_layout "$temp_archive"
   mv "$temp_archive" "$archive"
+  chmod 600 "$archive"
 
   if command -v sha256sum >/dev/null 2>&1; then
     checksum_file="${archive}.sha256"
     sha256sum "$archive" > "$checksum_file"
+    chmod 600 "$checksum_file"
   fi
 
   echo "[OK] Runtime-data backup created: $archive"
