@@ -217,6 +217,15 @@ FFmpeg tuning variables read by code:
 - `FFMPEG_OUTPUT_FLUSH_PACKETS`
 - `FFMPEG_STDERR_VERBOSITY`
 
+## Outbound URL Safety
+
+User-configured stream URLs (including custom stations, owner checks, stream metadata, health checks, and recognition) use one outbound network policy. Dashboard export webhooks use the same policy and additionally require HTTPS.
+
+- Credentials in URLs, localhost, private/link-local/loopback IPv4 and IPv6 addresses, and private host suffixes are rejected.
+- Each outbound connection performs a fresh DNS check; every DNS answer must be public and the selected, verified address is pinned to that connection.
+- Redirects are followed only for `GET`/`HEAD`, are limited to three hops, and each destination is checked again. Export webhooks reject redirects.
+- There is deliberately no environment-variable bypass for local webhook targets. Tests inject their own transport instead of weakening production validation.
+
 ## Audio Recognition
 
 | Variable | Purpose | Notes |
@@ -422,7 +431,6 @@ These are not usually needed for normal operation but currently exist in the run
 
 - `API_RATE_STATE_MAX_ENTRIES`
 - `NODE_TEST_CONTEXT`
-- `OMNIFM_ALLOW_LOCAL_WEBHOOKS`
 - `OMNIFM_BASE_URL`
 - `OMNIFM_COMMAND_PERMISSIONS_FILE`
 - `OMNIFM_CUSTOM_STATIONS_FILE`

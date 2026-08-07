@@ -1,4 +1,4 @@
-import { validateCustomStationUrlWithDns } from "../custom-stations.js";
+import { SafeOutboundError, safeFetch, validateOutboundUrlWithDns } from "./safe-outbound-http.js";
 
 const DASHBOARD_EXPORT_WEBHOOK_EVENT_KEYS = Object.freeze([
   "stats_exported",
@@ -15,6 +15,13 @@ const DEFAULT_DASHBOARD_EXPORTS_WEBHOOK_CONFIG = Object.freeze({
   secret: "",
   events: [],
 });
+
+let dashboardWebhookFetchForTests = null;
+
+function isNodeTestRun() {
+  return String(process.env.NODE_TEST_CONTEXT || "").toLowerCase() === "child"
+    || process.argv.some((arg) => /\.test\.[cm]?js$/i.test(String(arg || "")));
+}
 
 function normalizeWebhookEventList(rawEvents) {
   const values = Array.isArray(rawEvents)
@@ -45,41 +52,17 @@ function normalizeDashboardExportsWebhookConfig(rawConfig) {
   };
 }
 
-function isLoopbackWebhookUrl(parsedUrl) {
-  const hostname = String(parsedUrl?.hostname || "").trim().toLowerCase();
-  return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1";
-}
-
-async function validateDashboardExportsWebhookConfig(rawConfig) {
+async function validateDashboardExportsWebhookConfig(rawConfig, options = {}) {
   const config = normalizeDashboardExportsWebhookConfig(rawConfig);
   if (!config.url) {
     return { ok: true, config };
   }
 
-  let parsedUrl;
-  try {
-    parsedUrl = new URL(config.url);
-  } catch {
-    return { ok: false, error: "Webhook-URL ist ungueltig." };
-  }
-
-  if (parsedUrl.username || parsedUrl.password) {
-    return { ok: false, error: "Webhook-URLs mit Benutzername oder Passwort sind nicht erlaubt." };
-  }
-
-  const allowLocalHttp = process.env.OMNIFM_ALLOW_LOCAL_WEBHOOKS === "1" && isLoopbackWebhookUrl(parsedUrl);
-  if (allowLocalHttp) {
-    if (!/^https?:$/i.test(parsedUrl.protocol)) {
-      return { ok: false, error: "Lokale Test-Webhooks muessen mit http:// oder https:// beginnen." };
-    }
-    return { ok: true, config: { ...config, url: parsedUrl.toString() } };
-  }
-
-  if (String(parsedUrl.protocol || "").toLowerCase() !== "https:") {
-    return { ok: false, error: "Webhook-URLs muessen HTTPS verwenden." };
-  }
-
-  const validation = await validateCustomStationUrlWithDns(parsedUrl.toString());
+  const validation = await validateOutboundUrlWithDns(config.url, {
+    ...options,
+    allowedProtocols: ["https:"],
+    requireHttps: true,
+  });
   if (!validation.ok) {
     return { ok: false, error: validation.error };
   }
@@ -173,7 +156,8 @@ async function deliverDashboardWebhook(rawConfig, eventKey, payload) {
   const timeout = setTimeout(() => controller.abort(), 5000);
 
   try {
-    const response = await fetch(config.url, {
+    const fetchImpl = dashboardWebhookFetchForTests || safeFetch;
+    const response = await fetchImpl(config.url, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -182,13 +166,14 @@ async function deliverDashboardWebhook(rawConfig, eventKey, payload) {
       },
       body: JSON.stringify(payload),
       signal: controller.signal,
+      timeoutMs: 5000,
+      redirect: "error",
     });
 
-    let responseText = "";
     try {
-      responseText = String(await response.text()).slice(0, 300);
+      await response.body?.cancel?.();
     } catch {
-      responseText = "";
+      // ignore
     }
 
     if (!response.ok) {
@@ -196,7 +181,7 @@ async function deliverDashboardWebhook(rawConfig, eventKey, payload) {
         attempted: true,
         delivered: false,
         status: response.status,
-        error: responseText || `Webhook antwortete mit Status ${response.status}.`,
+        error: `Webhook antwortete mit Status ${response.status}.`,
       };
     }
 
@@ -204,7 +189,6 @@ async function deliverDashboardWebhook(rawConfig, eventKey, payload) {
       attempted: true,
       delivered: true,
       status: response.status,
-      responseText,
     };
   } catch (err) {
     return {
@@ -212,11 +196,23 @@ async function deliverDashboardWebhook(rawConfig, eventKey, payload) {
       delivered: false,
       error: err?.name === "AbortError"
         ? "Webhook-Zeitlimit ueberschritten."
-        : (err?.message || String(err)),
+        : (err instanceof SafeOutboundError
+          ? err.message
+          : "Webhook konnte nicht zugestellt werden."),
     };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function setDashboardWebhookFetchForTests(fetchImpl = null) {
+  if (!isNodeTestRun()) {
+    throw new Error("Dashboard webhook test transport is only available during node:test runs.");
+  }
+  if (fetchImpl !== null && typeof fetchImpl !== "function") {
+    throw new TypeError("Webhook test transport must be a function or null.");
+  }
+  dashboardWebhookFetchForTests = fetchImpl;
 }
 
 export {
@@ -227,4 +223,5 @@ export {
   shouldDeliverDashboardWebhook,
   buildDashboardWebhookPayload,
   deliverDashboardWebhook,
+  setDashboardWebhookFetchForTests,
 };

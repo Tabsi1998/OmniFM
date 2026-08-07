@@ -28,7 +28,7 @@ test("owner station stream test reports successful configured station URL", asyn
       key: "localtest",
       name: "Local Test",
       url: `${baseUrl}/stream.mp3`,
-    });
+    }, { fetchImpl: globalThis.fetch });
 
     assert.equal(result.ok, true);
     assert.equal(result.status, "up");
@@ -56,7 +56,7 @@ test("owner station stream test falls back to ranged GET when HEAD fails", async
       key: "fallback",
       name: "Fallback",
       url: `${baseUrl}/stream.mp3`,
-    });
+    }, { fetchImpl: globalThis.fetch });
 
     assert.equal(result.ok, true);
     assert.equal(result.status, "up");
@@ -81,7 +81,7 @@ test("owner station stream test falls back to ranged GET when HEAD is not allowe
       key: "head405",
       name: "Head 405",
       url: `${baseUrl}/stream.mp3`,
-    });
+    }, { fetchImpl: globalThis.fetch });
 
     assert.equal(result.ok, true);
     assert.equal(result.status, "up");

@@ -86,8 +86,8 @@ test("custom station validation retries transient DNS failures before succeeding
   assert.equal(result.url, "https://radio.example/live");
 });
 
-test("custom station validation uses a recent cached DNS result during transient resolver failures", async () => {
-  const moduleUrl = new URL(`../src/custom-stations.js?dns-cache-test=${Date.now()}`, import.meta.url);
+test("custom station validation never falls back to stale DNS data", async () => {
+  const moduleUrl = new URL(`../src/custom-stations.js?dns-no-cache-test=${Date.now()}`, import.meta.url);
   const customStations = await import(moduleUrl.href);
 
   const success = await customStations.validateCustomStationUrlWithDns(
@@ -101,7 +101,7 @@ test("custom station validation uses a recent cached DNS result during transient
 
   assert.equal(success.ok, true);
 
-  const fallback = await customStations.validateCustomStationUrlWithDns(
+  const failedLookup = await customStations.validateCustomStationUrlWithDns(
     "https://cache.example/live",
     {
       retryCount: 2,
@@ -114,8 +114,10 @@ test("custom station validation uses a recent cached DNS result during transient
     }
   );
 
-  assert.equal(fallback.ok, true);
-  assert.equal(fallback.url, "https://cache.example/live");
+  assert.deepEqual(failedLookup, {
+    ok: false,
+    error: "Host konnte nicht aufgelöst werden.",
+  });
 });
 
 test("custom station helpers normalize folder and tags safely", async () => {

@@ -17,15 +17,23 @@ import {
   isLikelyNetworkFailureLine,
 } from "../lib/helpers.js";
 import { networkRecoveryCoordinator } from "../core/network-recovery.js";
-import { validateCustomStationUrlWithDns } from "../custom-stations.js";
+import { safeFetch } from "../lib/safe-outbound-http.js";
 
 async function createResource(url, volume, qualityPreset, botName, bitrateOverride, networkScope = null) {
-  const urlValidation = await validateCustomStationUrlWithDns(url);
-  if (!urlValidation.ok) {
-    throw new Error(urlValidation.error);
+  const streamResponse = await safeFetch(url, {
+    method: "GET",
+    redirect: "follow",
+    headers: { "User-Agent": "OmniFM/3.0" },
+    timeoutMs: 10_000,
+  });
+  if (!streamResponse.ok || !streamResponse.body) {
+    try {
+      await streamResponse.body?.cancel?.();
+    } catch {
+      // ignore
+    }
+    throw new Error(`Stream konnte nicht geladen werden: ${streamResponse.status}`);
   }
-
-  const safeUrl = urlValidation.url;
   const recoveryOptions = networkScope ? { scope: networkScope } : undefined;
   const preset = qualityPreset || "custom";
   const presetBitrate =
@@ -43,15 +51,7 @@ async function createResource(url, volume, qualityPreset, botName, bitrateOverri
       "-thread_queue_size", profile.threadQueueSize,
       "-rtbufsize", profile.rtbufsize,
       "-max_delay", profile.maxDelayUs,
-      "-reconnect", "1",
-      "-reconnect_streamed", "1",
-      "-reconnect_at_eof", "1",
-      "-reconnect_delay_max", "5",
-      "-reconnect_on_network_error", "1",
-      "-reconnect_on_http_error", "4xx,5xx",
-      "-rw_timeout", profile.rwTimeoutUs,
-      "-timeout", profile.ioTimeoutUs,
-      "-i", safeUrl,
+      "-i", "pipe:0",
       "-ar", "48000",
       "-ac", "2",
       "-vn",
@@ -96,9 +96,20 @@ async function createResource(url, volume, qualityPreset, botName, bitrateOverri
     });
     log("INFO", `[${botName}] ffmpeg ${loggedArgs.join(" ")}`);
     const ffmpeg = spawn("ffmpeg", args, {
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env, AV_LOG_FORCE_NOCOLOR: "1" }
     });
+    const source = Readable.fromWeb(streamResponse.body);
+    source.once("error", (error) => {
+      try {
+        ffmpeg.stdin.destroy(error);
+      } catch {
+        // ignore
+      }
+    });
+    ffmpeg.stdin.once("error", () => source.destroy());
+    ffmpeg.once("close", () => source.destroy());
+    source.pipe(ffmpeg.stdin);
 
     let stderrBuffer = "";
     ffmpeg.stderr.on("data", (chunk) => {
@@ -120,6 +131,7 @@ async function createResource(url, volume, qualityPreset, botName, bitrateOverri
     });
 
     ffmpeg.on("error", (err) => {
+      source.destroy(err);
       log("ERROR", `[${botName}] ffmpeg process error: ${err?.message || err}`);
     });
 
@@ -132,16 +144,7 @@ async function createResource(url, volume, qualityPreset, botName, bitrateOverri
     return { resource, process: ffmpeg };
   }
 
-  const res = await fetch(safeUrl, {
-    redirect: "follow",
-    headers: { "User-Agent": "OmniFM/3.0" },
-    signal: AbortSignal.timeout(10_000)
-  });
-  if (!res.ok || !res.body) {
-    throw new Error(`Stream konnte nicht geladen werden: ${res.status}`);
-  }
-
-  const stream = Readable.fromWeb(res.body);
+  const stream = Readable.fromWeb(streamResponse.body);
   networkRecoveryCoordinator.noteSuccess(`${botName} fetch-stream`, recoveryOptions);
 
   // ---- Fix: demuxProbe() kann bei kaputten Streams ewig haengen ----
