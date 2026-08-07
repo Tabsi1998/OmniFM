@@ -981,6 +981,53 @@ test("scheduleReconnect keeps the attempt counter stable when reconnect work was
   }
 });
 
+test("connectToVoice forwards the interaction language to voice access validation", async () => {
+  let receivedLanguage = null;
+  const state = {
+    connection: { joinConfig: { channelId: "voice-1" } },
+    reconnectAttempts: 3,
+  };
+  const channel = {
+    id: "voice-1",
+    guildId: "guild-1",
+    type: ChannelType.GuildVoice,
+    isVoiceBased() {
+      return true;
+    },
+  };
+  const runtime = {
+    createInteractionTranslator() {
+      return {
+        language: "en",
+        t: (de, en) => en || de,
+      };
+    },
+    async validateVoiceChannelAccess(_guild, _channel, { language }) {
+      receivedLanguage = language;
+      return { ok: true };
+    },
+    async refreshVoiceGuardSettings() {},
+    getState() {
+      return state;
+    },
+    clearReconnectTimer() {},
+    queueVoiceStateReconcile() {},
+  };
+  const interaction = {
+    guildId: "guild-1",
+    guild: { id: "guild-1" },
+    member: { voice: { channel } },
+  };
+
+  const result = await BotRuntime.prototype.connectToVoice.call(runtime, interaction);
+
+  assert.equal(receivedLanguage, "en");
+  assert.equal(result.connection, state.connection);
+  assert.equal(result.error, null);
+  assert.equal(state.lastChannelId, "voice-1");
+  assert.equal(state.reconnectAttempts, 0);
+});
+
 test("syncVoiceChannelStatus reapplies the status after reconnect invalidation", async () => {
   let putCalls = 0;
   const runtime = Object.create(BotRuntime.prototype);

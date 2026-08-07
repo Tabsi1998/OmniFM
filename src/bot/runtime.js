@@ -3727,7 +3727,7 @@ class BotRuntime {
   }
 
   async connectToVoice(interaction, targetChannel = null, { silent = false } = {}) {
-    const { t } = this.createInteractionTranslator(interaction);
+    const { t, language } = this.createInteractionTranslator(interaction);
     const sendError = async (message) => {
       if (!silent) {
         await this.respondInteraction(interaction, { content: message, flags: MessageFlags.Ephemeral });
