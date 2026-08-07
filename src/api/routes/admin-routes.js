@@ -42,6 +42,82 @@ import { getOwnerAuditSnapshot, recordOwnerAudit } from "../../lib/owner-audit-s
 import { getOwnerLogFileSnapshot, getOwnerLogFilesSnapshot } from "../../lib/owner-log-files.js";
 import { TEST_CONFIRMATION_VALUE, getOwnerMailStatus, sendOwnerTestMail } from "../../lib/owner-mail-test.js";
 import { testOwnerStationStream } from "../../lib/owner-station-test.js";
+import { getClientIp, getTrustedForwardedProto } from "../../lib/api-helpers.js";
+
+export function readRequestBody(req, limitBytes = 4096) {
+  const maxBytes = Math.max(1, Math.floor(Number(limitBytes) || 4096));
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let size = 0;
+    const chunks = [];
+    let onData = null;
+    let onEnd = null;
+    let onError = null;
+
+    const cleanup = () => {
+      if (onData) req.removeListener?.("data", onData);
+      if (onEnd) req.removeListener?.("end", onEnd);
+      if (onError) req.removeListener?.("error", onError);
+    };
+
+    const fail = (message, statusCode = 413) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+
+      chunks.length = 0;
+
+      // Stop retaining request data immediately, but drain the stream so the
+      // route can still return a meaningful 413 response on a keep-alive
+      // connection instead of tearing down the entire socket.
+      try {
+        req.resume?.();
+      } catch {
+        // The route handler still returns the bounded-request error below.
+      }
+
+      const error = new Error(message);
+      error.statusCode = statusCode;
+      reject(error);
+    };
+
+    const declaredLength = Number.parseInt(String(req.headers?.["content-length"] || ""), 10);
+    if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+      fail("Request body too large");
+      return;
+    }
+
+    onData = (chunk) => {
+      if (settled) return;
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      size += buffer.length;
+      if (size > maxBytes) {
+        fail("Request body too large");
+        return;
+      }
+      chunks.push(buffer);
+    };
+
+    onEnd = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(Buffer.concat(chunks).toString("utf8"));
+    };
+
+    onError = (error) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(error);
+    };
+
+    req.on("data", onData);
+    req.on("end", onEnd);
+    req.on("error", onError);
+  });
+}
 
 export function createAdminRoutesHandler(deps) {
   const {
@@ -689,9 +765,8 @@ export function createAdminRoutesHandler(deps) {
   }
 
   function shouldUseSecureAdminCookie(req) {
-    const forwardedProto = String(req.headers?.["x-forwarded-proto"] || "").toLowerCase();
     const publicUrl = String(process.env.PUBLIC_WEB_URL || "").toLowerCase();
-    return forwardedProto.split(",")[0].trim() === "https" || publicUrl.startsWith("https://");
+    return getTrustedForwardedProto(req) === "https" || publicUrl.startsWith("https://");
   }
 
   function buildAdminCookie(token, req) {
@@ -725,9 +800,8 @@ export function createAdminRoutesHandler(deps) {
   }
 
   function getRequestAuditMeta(req) {
-    const forwardedFor = String(req.headers?.["x-forwarded-for"] || "").split(",")[0].trim();
     return {
-      ip: forwardedFor || req.socket?.remoteAddress || "",
+      ip: getClientIp(req),
       userAgent: String(req.headers?.["user-agent"] || "").slice(0, 200),
       origin: String(req.headers?.origin || "").slice(0, 200),
     };
@@ -747,18 +821,6 @@ export function createAdminRoutesHandler(deps) {
       log?.("WARN", `[Owner] Audit konnte nicht geschrieben werden: ${err?.message || String(err)}`);
       return null;
     }
-  }
-
-  function readRequestBody(req, limitBytes = 4096) {
-    return new Promise((resolve, reject) => {
-      let body = "";
-      req.on("data", (chunk) => {
-        body += chunk;
-        if (body.length > limitBytes) reject(new Error("Request body too large"));
-      });
-      req.on("end", () => resolve(body));
-      req.on("error", reject);
-    });
   }
 
   function parseSessionPayload(rawBody, contentType) {
@@ -863,7 +925,8 @@ export function createAdminRoutesHandler(deps) {
         }
         return true;
       } catch (err) {
-        sendAdminJson(res, 400, { ok: false, error: err?.message || "Invalid login request" });
+        const statusCode = Number(err?.statusCode) === 413 ? 413 : 400;
+        sendAdminJson(res, statusCode, { ok: false, error: err?.message || "Invalid login request" });
         return true;
       }
     }
@@ -1445,7 +1508,7 @@ export function createAdminRoutesHandler(deps) {
           target: licenseId,
           summary: err?.message || "Ungueltiger Body",
         });
-        sendJson(res, 400, { ok: false, error: err?.message || "Ungültiger Body" });
+        sendJson(res, err?.statusCode || 400, { ok: false, error: err?.message || "Ungültiger Body" });
       }
       return true;
     }

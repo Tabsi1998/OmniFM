@@ -324,6 +324,7 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
     WEB_INTERNAL_PORT: "0",
     WEB_PORT: "0",
     WEB_BIND: "127.0.0.1",
+    CORS_ALLOWED_ORIGINS: "https://dashboard.example.test",
     API_ADMIN_TOKEN: "test-admin-token",
     API_RATE_LIMIT_MAX: "200",
     API_RATE_LIMIT_PREMIUM_MAX: "50",
@@ -560,12 +561,13 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
   const dashboardCorsPreflightResponse = await requestJson(baseUrl, "/api/dashboard/settings", {
     method: "OPTIONS",
     headers: {
-      Origin: baseUrl,
+      Origin: "https://dashboard.example.test",
       "Access-Control-Request-Method": "PUT",
       "Access-Control-Request-Headers": "Content-Type, X-OmniFM-CSRF",
     },
   });
   assert.equal(dashboardCorsPreflightResponse.status, 204);
+  assert.equal(dashboardCorsPreflightResponse.headers.get("access-control-allow-origin"), "https://dashboard.example.test");
   assert.match(
     dashboardCorsPreflightResponse.headers.get("access-control-allow-headers") || "",
     /X-OmniFM-CSRF/i

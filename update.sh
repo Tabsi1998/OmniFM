@@ -190,8 +190,8 @@ build_default_origin_candidates() {
 }
 
 auto_fix_web_env() {
-  local web_port domain public_url origin defaults_csv effective_public_url
-  local current_cors current_returns new_cors new_returns changed=0
+  local web_port domain public_url origin defaults_csv cors_origin effective_public_url
+  local current_cors current_returns new_cors new_returns proxy_trust proxy_ips changed=0
 
   web_port="$(read_env "WEB_PORT" "8081")"
   domain="$(read_env "WEB_DOMAIN" "")"
@@ -212,11 +212,18 @@ auto_fix_web_env() {
 
   effective_public_url="${public_url:-http://localhost:${web_port}}"
   defaults_csv="$(build_default_origin_candidates "$effective_public_url" "$web_port")"
+  cors_origin="$(extract_origin "$effective_public_url" || true)"
   current_cors="$(read_env "CORS_ALLOWED_ORIGINS" "")"
   current_returns="$(read_env "CHECKOUT_RETURN_ORIGINS" "")"
   IFS=',' read -r -a default_items <<< "$defaults_csv"
 
-  new_cors="$(merge_csv_values "$current_cors" "${default_items[@]}")"
+  # CORS is a credentialed browser trust boundary. Keep existing operator
+  # entries, but only add the canonical public origin automatically. Aliases
+  # and local development origins must be added deliberately to the CSV.
+  new_cors="$current_cors"
+  if [[ -n "$cors_origin" ]]; then
+    new_cors="$(merge_csv_values "$current_cors" "$cors_origin")"
+  fi
   new_returns="$(merge_csv_values "$current_returns" "${default_items[@]}")"
 
   if [[ "$new_cors" != "$current_cors" ]]; then
@@ -230,10 +237,14 @@ auto_fix_web_env() {
     info "CHECKOUT_RETURN_ORIGINS aktualisiert."
   fi
 
-  if [[ "$(read_env "TRUST_PROXY_HEADERS" "")" == "" ]]; then
-    write_env_line "TRUST_PROXY_HEADERS" "1"
+  proxy_trust="$(read_env "TRUST_PROXY_HEADERS" "")"
+  proxy_ips="$(read_env "TRUSTED_PROXY_IPS" "")"
+  if [[ -z "$proxy_trust" ]]; then
+    write_env_line "TRUST_PROXY_HEADERS" "0"
     changed=1
-    info "TRUST_PROXY_HEADERS=1 gesetzt."
+    info "TRUST_PROXY_HEADERS=0 gesetzt."
+  elif [[ "$proxy_trust" == "1" && -z "$proxy_ips" ]]; then
+    warn "TRUST_PROXY_HEADERS=1 ohne TRUSTED_PROXY_IPS: Proxy-Header werden aus Sicherheitsgruenden ignoriert."
   fi
 
   if (( changed == 0 )); then
@@ -2207,7 +2218,8 @@ ensure_env_default "LISTENER_STATS_POLL_MS" "30000"
 ensure_env_default "PREMIUM_GUILD_ACCESS_MODE" "restrict"
 ensure_env_default "TRANSCODE" "0"
 ensure_env_default "TRANSCODE_MODE" "opus"
-ensure_env_default "TRUST_PROXY_HEADERS" "1"
+ensure_env_default "TRUST_PROXY_HEADERS" "0"
+ensure_env_default "TRUSTED_PROXY_IPS" ""
 ensure_env_default "PUBLIC_WEB_URL" ""
 ensure_env_default "WEB_PORT" "8081"
 ensure_env_default "WEB_INTERNAL_PORT" "8080"

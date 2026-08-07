@@ -276,6 +276,15 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     });
     assert.equal(invalidAdminSessionResponse.status, 401);
 
+    const oversizedAdminSessionResponse = await fetch(`http://127.0.0.1:${port}/api/admin/session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `token=${"x".repeat(4_100)}`,
+      redirect: "manual",
+    });
+    assert.equal(oversizedAdminSessionResponse.status, 413);
+    assert.match((await oversizedAdminSessionResponse.json()).error, /body too large/i);
+
     const adminSessionResponse = await fetch(`http://127.0.0.1:${port}/api/admin/session`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },

@@ -96,6 +96,7 @@ import {
   toOrigin,
   enforceApiRateLimit,
   getClientIp,
+  getTrustedForwardedProto,
 } from "../lib/api-helpers.js";
 import {
   buildWeeklyDigestEmbedData,
@@ -1480,8 +1481,7 @@ function getFrontendBaseOrigin(req, publicUrl, preferredOrigin = "") {
 function isSecureCookieRequest(req, targetOrigin = "") {
   if (String(targetOrigin || "").startsWith("https://")) return true;
   if (String(req.socket?.encrypted || false) === "true") return true;
-  const forwardedProto = String(req.headers["x-forwarded-proto"] || "").trim().toLowerCase().split(",")[0].trim();
-  return forwardedProto === "https";
+  return getTrustedForwardedProto(req) === "https";
 }
 
 function buildDashboardSessionCookie(token, req, targetOrigin) {
@@ -3117,7 +3117,11 @@ function startWebServer(runtimes) {
 
     // Owner/admin routes use their own token/cookie auth and must not be
     // blocked by generic frontend CORS when a reverse proxy rewrites Host.
+    // They are still rate-limited before parsing any potentially large body.
     if (requestUrl.pathname === "/admin" || requestUrl.pathname === "/admin/" || requestUrl.pathname.startsWith("/api/admin/")) {
+      if (!enforceApiRateLimit(req, res, requestUrl.pathname)) {
+        return;
+      }
       if (await handleAdminRoutes({ req, res, requestUrl })) {
         return;
       }

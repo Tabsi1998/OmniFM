@@ -3,6 +3,7 @@
 // ============================================================
 import fs from "node:fs";
 import path from "node:path";
+import net from "node:net";
 import { timingSafeEqual } from "node:crypto";
 import { log, webDir } from "./logging.js";
 import {
@@ -263,39 +264,6 @@ function sendStaticFile(res, filePath, { headOnly = false, notFoundPath = "" } =
 }
 
 // ---- CORS ----
-function sanitizeHostHeader(rawHost) {
-  const host = String(rawHost || "").trim();
-  if (!host) return "";
-  if (/[\s/\\]/.test(host)) return "";
-  return host;
-}
-
-function getRequestOrigin(req) {
-  const host = sanitizeHostHeader(req.headers.host);
-  if (!host) return null;
-  const forwardedProto = TRUST_PROXY_HEADERS
-    ? String(req.headers["x-forwarded-proto"] || "").trim().toLowerCase().split(",")[0].trim()
-    : "";
-  const socketProto = req.socket?.encrypted ? "https" : "http";
-  const proto = forwardedProto === "https" || forwardedProto === "http" ? forwardedProto : socketProto;
-  return `${proto}://${host}`;
-}
-
-function getRequestHostOriginCandidates(req) {
-  const host = sanitizeHostHeader(req.headers.host);
-  if (!host) return [];
-  const candidates = new Set();
-  const requestOrigin = getRequestOrigin(req);
-  if (requestOrigin) candidates.add(requestOrigin);
-
-  // Behind TLS-terminating reverse proxies Node can see an HTTP socket while
-  // the browser correctly sends Origin: https://host. Keep the host strict,
-  // but allow both schemes for the same Host header.
-  candidates.add(`https://${host}`);
-  candidates.add(`http://${host}`);
-  return [...candidates];
-}
-
 function toOrigin(rawUrl) {
   try {
     const parsed = new URL(String(rawUrl || "").trim());
@@ -311,6 +279,63 @@ function parseCsvEnv(rawValue) {
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
+}
+
+function normalizeIpAddress(rawValue) {
+  let value = String(rawValue || "").trim().toLowerCase();
+  if (value.startsWith("[") && value.endsWith("]")) {
+    value = value.slice(1, -1);
+  }
+  if (value.startsWith("::ffff:")) {
+    const mappedIpv4 = value.slice("::ffff:".length);
+    if (net.isIP(mappedIpv4) === 4) return mappedIpv4;
+  }
+  return net.isIP(value) ? value : "";
+}
+
+function parseTrustedProxyIps(rawValue = process.env.TRUSTED_PROXY_IPS || "") {
+  return new Set(
+    parseCsvEnv(rawValue)
+      .map((value) => normalizeIpAddress(value))
+      .filter(Boolean)
+  );
+}
+
+const TRUSTED_PROXY_IPS = parseTrustedProxyIps();
+
+function toTrustedProxyIpSet(rawValue) {
+  if (rawValue instanceof Set) {
+    return new Set([...rawValue].map((value) => normalizeIpAddress(value)).filter(Boolean));
+  }
+  return parseTrustedProxyIps(Array.isArray(rawValue) ? rawValue.join(",") : rawValue);
+}
+
+function isTrustedProxyAddress(rawAddress, trustedProxyIps = TRUSTED_PROXY_IPS) {
+  const address = normalizeIpAddress(rawAddress);
+  if (!address) return false;
+
+  const trusted = toTrustedProxyIpSet(trustedProxyIps);
+  return trusted.has(address);
+}
+
+function shouldTrustProxyHeaders(req, {
+  enabled = TRUST_PROXY_HEADERS,
+  trustedProxyIps = TRUSTED_PROXY_IPS,
+} = {}) {
+  if (!enabled) return false;
+  return isTrustedProxyAddress(req?.socket?.remoteAddress, trustedProxyIps);
+}
+
+function getTrustedForwardedProto(req, proxyOptions = undefined) {
+  if (!shouldTrustProxyHeaders(req, proxyOptions)) return "";
+
+  const rawHeader = req?.headers?.["x-forwarded-proto"];
+  const values = (Array.isArray(rawHeader) ? rawHeader : [rawHeader])
+    .flatMap((value) => String(value || "").split(","))
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  const nearestProtocol = values.at(-1);
+  return nearestProtocol === "https" || nearestProtocol === "http" ? nearestProtocol : "";
 }
 
 function buildWebDomainOriginCandidates() {
@@ -454,24 +479,11 @@ function resolveCheckoutReturnBase(returnUrl, publicUrl, req) {
   return `${parsed.origin}${safePath}`;
 }
 
-function buildAllowedApiOrigins(publicUrl, req) {
+function buildAllowedApiOrigins(publicUrl) {
   const configured = parseCsvEnv(process.env.CORS_ALLOWED_ORIGINS || process.env.CORS_ORIGINS || "");
-
-  const candidates = [
-    ...configured,
-    publicUrl,
-    ...buildWebDomainOriginCandidates(),
-    ...getRequestHostOriginCandidates(req),
-  ];
-
-  if (shouldIncludeDefaultLocalOrigins(publicUrl, configured)) {
-    candidates.push(
-      "http://localhost",
-      "http://127.0.0.1",
-      "http://localhost:3000",
-      "http://127.0.0.1:3000"
-    );
-  }
+  // Credentialed API CORS must be entirely operator-configured. Do not infer
+  // aliases or development origins from WEB_DOMAIN, Host, or the runtime.
+  const candidates = [...configured, publicUrl];
 
   const allowed = new Set();
   for (const candidate of candidates) {
@@ -489,7 +501,7 @@ function isAllowedFrontendOrigin(rawOrigin, publicUrl) {
 
 function applyCors(req, res, publicUrl) {
   const originHeader = String(req.headers.origin || "").trim();
-  const allowedOrigins = buildAllowedApiOrigins(publicUrl, req);
+  const allowedOrigins = buildAllowedApiOrigins(publicUrl);
   const normalizedOrigin = toOrigin(originHeader);
   const hasOriginHeader = originHeader.length > 0;
 
@@ -750,21 +762,31 @@ const MAX_API_RATE_STATE_ENTRIES = Math.max(
   Number.parseInt(String(process.env.API_RATE_STATE_MAX_ENTRIES || "50000"), 10) || 50_000
 );
 
-function firstHeaderValue(rawHeader) {
-  if (!rawHeader) return "";
-  if (typeof rawHeader === "string") return rawHeader.split(",")[0].trim();
-  if (Array.isArray(rawHeader)) return String(rawHeader[0] || "").trim();
+function getForwardedClientIp(rawHeader, trustedProxyIps) {
+  const rawValues = Array.isArray(rawHeader) ? rawHeader : [rawHeader];
+  const chain = rawValues
+    .flatMap((value) => String(value || "").split(","))
+    .map((value) => normalizeIpAddress(value))
+    .filter(Boolean);
+
+  // Standard reverse proxies append their immediate peer to X-Forwarded-For.
+  // Working backwards prevents an attacker-controlled value at the beginning
+  // of the chain from becoming the rate-limit identity.
+  for (let index = chain.length - 1; index >= 0; index -= 1) {
+    if (!isTrustedProxyAddress(chain[index], trustedProxyIps)) return chain[index];
+  }
   return "";
 }
 
-function getClientIp(req) {
-  if (TRUST_PROXY_HEADERS) {
-    const forwarded = firstHeaderValue(req.headers["x-forwarded-for"]);
-    if (forwarded) return forwarded;
-    const realIp = firstHeaderValue(req.headers["x-real-ip"]);
-    if (realIp) return realIp;
+function getClientIp(req, proxyOptions = undefined) {
+  const peerIp = normalizeIpAddress(req?.socket?.remoteAddress);
+  if (!shouldTrustProxyHeaders(req, proxyOptions)) {
+    return peerIp || req?.socket?.remoteAddress || "unknown";
   }
-  return req.socket?.remoteAddress || "unknown";
+
+  const trustedProxyIps = proxyOptions?.trustedProxyIps ?? TRUSTED_PROXY_IPS;
+  const forwarded = getForwardedClientIp(req?.headers?.["x-forwarded-for"], trustedProxyIps);
+  return forwarded || peerIp || req?.socket?.remoteAddress || "unknown";
 }
 
 function getApiRateLimitSpec(pathname) {
@@ -861,4 +883,9 @@ export {
   toOrigin,
   enforceApiRateLimit,
   getClientIp,
+  normalizeIpAddress,
+  parseTrustedProxyIps,
+  isTrustedProxyAddress,
+  shouldTrustProxyHeaders,
+  getTrustedForwardedProto,
 };

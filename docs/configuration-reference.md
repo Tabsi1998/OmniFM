@@ -48,7 +48,8 @@ Those are only used when no numbered `BOT_N_*` configuration exists.
 | `CORS_ALLOWED_ORIGINS` | Allowed browser origins | CSV |
 | `CORS_ORIGINS` | Legacy alias | CSV |
 | `CHECKOUT_RETURN_ORIGINS` | Allowed checkout return origins | CSV |
-| `TRUST_PROXY_HEADERS` | Trust `x-forwarded-*` style proxy headers | Useful behind reverse proxies |
+| `TRUST_PROXY_HEADERS` | Trust `x-forwarded-*` style proxy headers | Default `0`; enable only behind a trusted reverse proxy |
+| `TRUSTED_PROXY_IPS` | Exact proxy source IP addresses | Empty by default; CSV required when `TRUST_PROXY_HEADERS=1` |
 | `SECURITY_HSTS_ENABLED` | Force HSTS on/off | `1` or `0`; auto-detected from HTTPS public URL by default |
 | `HSTS_ENABLED` | Legacy HSTS override alias | `1` or `0` |
 | `SECURITY_HSTS_PRELOAD` | Add HSTS `preload` directive | Only after domain/subdomains are HTTPS-ready |
@@ -64,9 +65,19 @@ Dashboard browser mutations use the HttpOnly dashboard session cookie and must
 send `X-OmniFM-CSRF: dashboard-intent` for `POST`, `PUT`, `PATCH`, and `DELETE`
 requests under `/api/dashboard/*` plus `POST /api/auth/logout`. Keep the
 frontend origin in `PUBLIC_WEB_URL` or `CORS_ALLOWED_ORIGINS` exact enough that
-credentialed CORS remains limited to the real site. Behind a reverse proxy,
+credentialed CORS remains limited to the real site. API CORS never derives an
+allowed origin from the request host, `WEB_DOMAIN`, or implicit localhost/www
+aliases; add every required origin explicitly. Behind a reverse proxy,
 ensure HTTPS is visible to the app so production cookies are emitted with the
 secure cross-site attributes.
+
+`TRUST_PROXY_HEADERS` is disabled by default. Only enable it when the app is
+reachable exclusively through a reverse proxy and set `TRUSTED_PROXY_IPS` to
+the proxy's exact source IP addresses. If the Node port is publicly reachable,
+untrusted clients can forge `X-Forwarded-For` and `X-Forwarded-Proto` headers;
+do not enable proxy-header trust in that topology. The reverse proxy must
+append the client address to `X-Forwarded-For` (the usual proxy behavior); all
+intermediate proxy IPs in that chain also need to be listed exactly.
 
 ## Release Metadata
 
