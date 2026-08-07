@@ -11,6 +11,7 @@
 // ============================================================
 
 import { log } from "../lib/logging.js";
+import { safeFetch } from "../lib/safe-outbound-http.js";
 
 const STATION_HEALTH_ENABLED = String(process.env.STATION_HEALTH_ENABLED || "0") === "1";
 const STATION_HEALTH_INTERVAL_MS = Math.max(
@@ -26,6 +27,7 @@ const STATION_HEALTH_CONCURRENCY = Math.max(
   1,
   Math.min(20, Number.parseInt(String(process.env.STATION_HEALTH_CONCURRENCY || "5"), 10) || 5)
 );
+const HEAD_FALLBACK_STATUS_CODES = new Set([403, 405, 501]);
 
 /** @type {Map<string, StationHealthEntry>} */
 const healthReport = new Map();
@@ -70,30 +72,39 @@ async function checkStation(key, name, url) {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), STATION_HEALTH_TIMEOUT_MS);
+    const fetchRangedGet = () => safeFetch(url, {
+      method: "GET",
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "OmniFM-HealthCheck/1.0",
+        "Range": "bytes=0-0",
+      },
+      redirect: "follow",
+      timeoutMs: STATION_HEALTH_TIMEOUT_MS,
+    });
 
     let response;
     try {
       // HEAD-Request zuerst – spart Bandbreite
-      response = await fetch(url, {
+      response = await safeFetch(url, {
         method: "HEAD",
         signal: controller.signal,
         headers: { "User-Agent": "OmniFM-HealthCheck/1.0" },
         redirect: "follow",
+        timeoutMs: STATION_HEALTH_TIMEOUT_MS,
       });
+      if (HEAD_FALLBACK_STATUS_CODES.has(Number(response?.status || 0))) {
+        try {
+          await response.body?.cancel?.();
+        } catch {
+          // ignore
+        }
+        response = await fetchRangedGet();
+      }
     } catch (headErr) {
-      // Manche Streams unterstützen kein HEAD → GET mit sofortigem Abbruch
+      // Some streams reject HEAD, so use a small ranged GET instead.
       if (!controller.signal.aborted) {
-        response = await fetch(url, {
-          method: "GET",
-          signal: controller.signal,
-          headers: {
-            "User-Agent": "OmniFM-HealthCheck/1.0",
-            "Range": "bytes=0-0",
-          },
-          redirect: "follow",
-        });
-        // Sofort abbrechen – wir wollen nur den Status-Code
-        controller.abort();
+        response = await fetchRangedGet();
       } else {
         throw headErr;
       }
@@ -105,6 +116,11 @@ async function checkStation(key, name, url) {
     // HTTP 200, 206 (Partial Content), 301/302 (Redirect) = OK
     // 4xx/5xx = down
     const ok = response.status < 400 || response.status === 401; // 401 = Auth required aber Server läuft
+    try {
+      await response.body?.cancel?.();
+    } catch {
+      // ignore
+    }
 
     const entry = {
       key,

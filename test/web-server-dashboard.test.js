@@ -25,6 +25,7 @@ import {
 } from "../src/dashboard-store.js";
 import { createScheduledEvent } from "../src/scheduled-events-store.js";
 import { recordRuntimeIncident } from "../src/runtime-incidents-store.js";
+import { setDashboardWebhookFetchForTests } from "../src/lib/dashboard-webhooks.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -329,7 +330,6 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
     API_RATE_LIMIT_MAX: "200",
     API_RATE_LIMIT_PREMIUM_MAX: "50",
     API_RATE_LIMIT_WEBHOOK_MAX: "200",
-    OMNIFM_ALLOW_LOCAL_WEBHOOKS: "1",
     DISCORDBOTLIST_ENABLED: "1",
     DISCORDBOTLIST_TOKEN: "test-discordbotlist-token",
     DISCORDBOTLIST_BOT_ID: "923456789012345678",
@@ -533,13 +533,19 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
   webhookServer.listen(0, "127.0.0.1");
   await once(webhookServer, "listening");
   const webhookAddress = webhookServer.address();
-  const webhookUrl = `http://127.0.0.1:${webhookAddress.port}/exports`;
+  const localWebhookUrl = `http://127.0.0.1:${webhookAddress.port}/exports`;
+  const webhookUrl = "https://1.1.1.1/exports";
+  setDashboardWebhookFetchForTests(async (targetUrl, options) => {
+    assert.equal(targetUrl, webhookUrl);
+    return await fetch(localWebhookUrl, options);
+  });
   const server = startWebServer([runtimeStub]);
   await once(server, "listening");
   const address = server.address();
   const baseUrl = `http://127.0.0.1:${address.port}`;
 
   t.after(async () => {
+    setDashboardWebhookFetchForTests(null);
     await new Promise((resolve) => server.close(resolve));
     await new Promise((resolve) => webhookServer.close(resolve));
     deleteDashboardAuthSession(sessionToken);

@@ -1,3 +1,5 @@
+import { safeFetch } from "./safe-outbound-http.js";
+
 const DEFAULT_TIMEOUT_MS = 8_000;
 const HEAD_FALLBACK_STATUS_CODES = new Set([403, 405, 501]);
 
@@ -47,7 +49,7 @@ function buildFailureResult(station, { url, startedAtMs, method, error, timeoutM
   };
 }
 
-async function testOwnerStationStream(station, { timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl = globalThis.fetch } = {}) {
+async function testOwnerStationStream(station, { timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl = safeFetch } = {}) {
   if (!station || typeof station !== "object") {
     const error = new Error("Station fehlt.");
     error.statusCode = 400;
@@ -76,8 +78,14 @@ async function testOwnerStationStream(station, { timeoutMs = DEFAULT_TIMEOUT_MS,
         redirect: "follow",
         signal: controller.signal,
         headers: { "User-Agent": "OmniFM-OwnerStationTest/1.0" },
+        timeoutMs: safeTimeoutMs,
       });
       if (HEAD_FALLBACK_STATUS_CODES.has(Number(response?.status || 0))) {
+        try {
+          await response?.body?.cancel?.();
+        } catch {
+          // ignore
+        }
         method = "GET";
         response = await fetchImpl(url, {
           method,
@@ -87,6 +95,7 @@ async function testOwnerStationStream(station, { timeoutMs = DEFAULT_TIMEOUT_MS,
             "User-Agent": "OmniFM-OwnerStationTest/1.0",
             "Range": "bytes=0-0",
           },
+          timeoutMs: safeTimeoutMs,
         });
       }
     } catch (headError) {
@@ -100,11 +109,17 @@ async function testOwnerStationStream(station, { timeoutMs = DEFAULT_TIMEOUT_MS,
           "User-Agent": "OmniFM-OwnerStationTest/1.0",
           "Range": "bytes=0-0",
         },
+        timeoutMs: safeTimeoutMs,
       });
     }
 
     const httpStatus = Number(response?.status || 0) || null;
     const ok = httpStatus != null && (httpStatus < 400 || httpStatus === 401);
+    try {
+      await response?.body?.cancel?.();
+    } catch {
+      // ignore
+    }
     return {
       ok,
       key,

@@ -2,9 +2,11 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import { Readable } from "node:stream";
 
 import { log } from "../lib/logging.js";
 import { clipText, parseEnvInt, waitMs } from "../lib/helpers.js";
+import { safeFetch } from "../lib/safe-outbound-http.js";
 
 const RECOGNITION_ENABLED = String(process.env.NOW_PLAYING_RECOGNITION_ENABLED ?? "0").trim() !== "0";
 const ACOUSTID_API_KEY = String(process.env.ACOUSTID_API_KEY || "").trim();
@@ -100,10 +102,11 @@ async function waitForProviderWindow(provider, minDelayMs) {
   }
 }
 
-function runProcess(command, args, { timeoutMs = 15_000 } = {}) {
+function runProcess(command, args, { timeoutMs = 15_000, input = null } = {}) {
   return new Promise((resolve, reject) => {
+    const hasInput = Boolean(input && typeof input.pipe === "function");
     const child = spawn(command, args, {
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: [hasInput ? "pipe" : "ignore", "pipe", "pipe"],
       windowsHide: true,
       env: { ...process.env, AV_LOG_FORCE_NOCOLOR: "1" },
     });
@@ -111,15 +114,47 @@ function runProcess(command, args, { timeoutMs = 15_000 } = {}) {
     let stdout = "";
     let stderr = "";
     let settled = false;
-    const timeout = setTimeout(() => {
-      if (settled) return;
-      settled = true;
+    let timeout = null;
+    let onInputError = null;
+
+    const stopInput = () => {
+      if (!hasInput) return;
       try {
-        child.kill("SIGKILL");
+        input.unpipe?.(child.stdin);
       } catch {
         // ignore
       }
-      reject(new Error(`${command} timed out after ${timeoutMs}ms`));
+      if (!input.destroyed) {
+        try {
+          input.destroy?.();
+        } catch {
+          // ignore
+        }
+      }
+    };
+
+    const cleanup = () => {
+      if (timeout) clearTimeout(timeout);
+      if (hasInput && onInputError) input.off?.("error", onInputError);
+      stopInput();
+    };
+
+    const fail = (error, { kill = false } = {}) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (kill) {
+        try {
+          child.kill("SIGKILL");
+        } catch {
+          // ignore
+        }
+      }
+      reject(error);
+    };
+
+    timeout = setTimeout(() => {
+      fail(new Error(`${command} timed out after ${timeoutMs}ms`), { kill: true });
     }, Math.max(1000, timeoutMs));
 
     child.stdout.on("data", (chunk) => {
@@ -131,16 +166,13 @@ function runProcess(command, args, { timeoutMs = 15_000 } = {}) {
     });
 
     child.on("error", (error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-      reject(error);
+      fail(error);
     });
 
     child.on("close", (code) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timeout);
+      cleanup();
       if (code === 0) {
         resolve({ stdout, stderr });
         return;
@@ -152,6 +184,22 @@ function runProcess(command, args, { timeoutMs = 15_000 } = {}) {
       error.command = command;
       reject(error);
     });
+
+    if (hasInput) {
+      onInputError = (error) => fail(error, { kill: true });
+      input.once("error", onInputError);
+      child.stdin.on("error", () => {
+        // ffmpeg may stop after the requested sample while the source stream
+        // is still open. End the source without turning that normal EPIPE
+        // into a failed recognition attempt.
+        stopInput();
+      });
+      try {
+        input.pipe(child.stdin);
+      } catch (error) {
+        fail(error, { kill: true });
+      }
+    }
   });
 }
 
@@ -337,31 +385,50 @@ async function fingerprintCapturedSample(samplePath, tempDir, preferredFingerpri
   }
 }
 
+function buildCaptureFfmpegArgs(samplePath) {
+  return [
+    "-hide_banner",
+    "-loglevel", "error",
+    "-nostdin",
+    "-y",
+    "-t", String(RECOGNITION_SAMPLE_SECONDS),
+    "-i", "pipe:0",
+    "-vn",
+    "-ac", String(RECOGNITION_CAPTURE_CHANNELS),
+    "-ar", String(RECOGNITION_CAPTURE_SAMPLE_RATE),
+    "-c:a", "pcm_s16le",
+    "-f", "wav",
+    samplePath,
+  ];
+}
+
 async function captureFingerprintAttempt(url) {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omnifm-fingerprint-"));
   const samplePath = path.join(tempDir, "sample.wav");
+  let source = null;
 
   try {
-    await runProcess("ffmpeg", [
-      "-hide_banner",
-      "-loglevel", "error",
-      "-nostdin",
-      "-y",
-      "-reconnect", "1",
-      "-reconnect_streamed", "1",
-      "-reconnect_at_eof", "1",
-      "-reconnect_delay_max", "3",
-      "-rw_timeout", "15000000",
-      "-timeout", "15000000",
-      "-t", String(RECOGNITION_SAMPLE_SECONDS),
-      "-i", String(url || ""),
-      "-vn",
-      "-ac", String(RECOGNITION_CAPTURE_CHANNELS),
-      "-ar", String(RECOGNITION_CAPTURE_SAMPLE_RATE),
-      "-c:a", "pcm_s16le",
-      "-f", "wav",
-      samplePath,
-    ], { timeoutMs: RECOGNITION_TIMEOUT_MS });
+    const response = await safeFetch(url, {
+      method: "GET",
+      redirect: "follow",
+      headers: { "User-Agent": USER_AGENT },
+      timeoutMs: Math.min(RECOGNITION_TIMEOUT_MS, 15_000),
+    });
+    if (!response.ok || !response.body) {
+      try {
+        await response.body?.cancel?.();
+      } catch {
+        // ignore
+      }
+      throw new Error(`stream request failed with status ${response.status}`);
+    }
+    source = Readable.fromWeb(response.body);
+
+    await runProcess(
+      "ffmpeg",
+      buildCaptureFfmpegArgs(samplePath),
+      { timeoutMs: RECOGNITION_TIMEOUT_MS, input: source }
+    );
 
     const sampleStat = await fs.stat(samplePath).catch(() => null);
     if (!sampleStat || sampleStat.size <= 44) {
@@ -394,6 +461,7 @@ async function captureFingerprintAttempt(url) {
     const preferredFingerprintSeconds = Math.min(RECOGNITION_SAMPLE_SECONDS, Math.max(1, Math.floor(capturedSeconds)));
     return await fingerprintCapturedSample(samplePath, tempDir, preferredFingerprintSeconds);
   } finally {
+    source?.destroy?.();
     await fs.rm(tempDir, { recursive: true, force: true }).catch(() => null);
   }
 }
@@ -687,6 +755,7 @@ async function recognizeTrackFromStream(url, { existingTrack = null } = {}) {
 }
 
 export {
+  buildCaptureFfmpegArgs,
   estimatePcmWavDurationSeconds,
   extractAcoustIdCandidate,
   extractFpcalcResultFromError,
