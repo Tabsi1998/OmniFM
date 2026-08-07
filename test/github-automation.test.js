@@ -40,6 +40,7 @@ test("github automation files and docs stay in sync", async () => {
     ".github/ISSUE_TEMPLATE/bug_report.yml",
     ".github/ISSUE_TEMPLATE/feature_request.yml",
     ".github/ISSUE_TEMPLATE/config.yml",
+    ".npmrc",
   ];
 
   for (const file of requiredFiles) {
@@ -49,7 +50,7 @@ test("github automation files and docs stay in sync", async () => {
   const ci = await readText(".github/workflows/ci.yml");
   expectIncludes(ci, "concurrency:", "ci concurrency missing");
   expectIncludes(ci, "workflow_dispatch:", "ci workflow_dispatch missing");
-  expectIncludes(ci, "node-version: [22, 24]", "ci matrix missing Node 22/24");
+  expectIncludes(ci, "node-version: [22]", "ci matrix must use the supported Node 22 runtime");
   expectMatches(ci, /actions\/upload-artifact@v\d+/, "ci artifact upload missing");
   expectIncludes(ci, "mongo-smoke:", "ci mongo smoke job missing");
   expectIncludes(ci, "frontend-build:", "ci frontend job missing");
@@ -60,7 +61,7 @@ test("github automation files and docs stay in sync", async () => {
   const nightly = await readText(".github/workflows/nightly.yml");
   expectIncludes(nightly, "schedule:", "nightly schedule missing");
   expectIncludes(nightly, "workflow_dispatch:", "nightly dispatch missing");
-  expectIncludes(nightly, "node-version: [22, 24]", "nightly matrix missing Node 22/24");
+  expectIncludes(nightly, "node-version: [22]", "nightly matrix must use the supported Node 22 runtime");
   expectMatches(nightly, /actions\/upload-artifact@v\d+/, "nightly artifact upload missing");
   expectIncludes(nightly, "recovery-focus:", "nightly recovery job missing");
 
@@ -72,6 +73,7 @@ test("github automation files and docs stay in sync", async () => {
   expectIncludes(liveSmoke, "scripts/phase6-live-check.mjs", "live smoke script missing");
   expectIncludes(liveSmoke, "--skip-logs", "live smoke should skip local Docker log scan in GitHub Actions");
   expectIncludes(liveSmoke, "skip_authenticated_api", "live smoke public-only diagnostic input missing");
+  expectIncludes(liveSmoke, "node-version: 22", "live smoke must use the supported Node 22 runtime");
   expectMatches(liveSmoke, /actions\/upload-artifact@v\d+/, "live smoke artifact upload missing");
 
   const liveCheck = await readText("scripts/phase6-live-check.mjs");
@@ -96,13 +98,16 @@ test("github automation files and docs stay in sync", async () => {
   expectIncludes(releaseProcess, "OMNIFM_LAST_LIVE_SMOKE_STATUS", "release process live smoke metadata missing");
 
   const packageJson = await readText("package.json");
-  expectIncludes(packageJson, "\"node\": \">=22 <25\"", "root package Node engine range missing");
+  expectIncludes(packageJson, "\"node\": \">=22 <23\"", "root package Node 22 engine range missing");
   expectIncludes(packageJson, "release:preflight", "package release preflight script missing");
   expectIncludes(packageJson, "release:postdeploy", "package release postdeploy script missing");
   expectIncludes(packageJson, "release:rollback-plan", "package release rollback script missing");
 
+  const npmrc = await readText(".npmrc");
+  expectIncludes(npmrc, "engine-strict=true", "npm must enforce the supported Node runtime");
+
   const frontendPackageJson = await readText("frontend/package.json");
-  expectIncludes(frontendPackageJson, "\"node\": \">=22 <25\"", "frontend package Node engine range missing");
+  expectIncludes(frontendPackageJson, "\"node\": \">=22 <23\"", "frontend package Node 22 engine range missing");
   expectIncludes(frontendPackageJson, "\"type\": \"module\"", "frontend package should declare ESM type");
 
   const dockerfile = await readText("Dockerfile");
@@ -112,6 +117,8 @@ test("github automation files and docs stay in sync", async () => {
   const toolchainDocs = await readText("docs/toolchain.md");
   expectIncludes(toolchainDocs, "Frontend production builds use Node.js 22", "toolchain frontend Node contract missing");
   expectIncludes(toolchainDocs, "DEP0176", "toolchain CRA warning note missing");
+  expectIncludes(toolchainDocs, "Node 24 And Native Audio Dependencies", "toolchain native Node 24 limitation missing");
+  expectIncludes(toolchainDocs, "engine-strict=true", "toolchain engine-strict contract missing");
   expectIncludes(toolchainDocs, "react-scripts 5.0.1", "toolchain CRA dependency note missing");
   expectIncludes(toolchainDocs, "frontend package both run as ES module packages", "toolchain ESM package note missing");
 
@@ -122,6 +129,7 @@ test("github automation files and docs stay in sync", async () => {
   expectIncludes(codeql, "Code scanning unavailable", "codeql skip notice missing");
   expectIncludes(codeql, "github/codeql-action/init@v4", "codeql init missing");
   expectIncludes(codeql, "github/codeql-action/analyze@v4", "codeql analyze missing");
+  expectIncludes(codeql, "node-version: 22", "codeql must use the supported Node 22 runtime");
 
   const dependencyReview = await readText(".github/workflows/dependency-review.yml");
   expectIncludes(dependencyReview, "Dependency review disabled", "dependency review disabled notice missing");

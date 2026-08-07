@@ -7,7 +7,7 @@ Run the canonical Node.js bot, API, and website locally and test real Discord fl
 ## Prerequisites
 
 - Node.js 22.x for the production-matching runtime and frontend build path
-- Node.js 24.x is kept as a CI compatibility gate for the backend/runtime tests
+- Node.js 24.x is not a supported local runtime; use Node 22.x, especially on Windows where the native audio dependency has no Node-24 prebuild
 - npm
 - At least one Discord bot token and client ID
 - `ffmpeg` recommended for real playback tests
