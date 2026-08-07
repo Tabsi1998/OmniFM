@@ -54,6 +54,9 @@ test("github automation files and docs stay in sync", async () => {
   expectIncludes(ci, "node-version: [22]", "ci matrix must use the supported Node 22 runtime");
   expectMatches(ci, /actions\/upload-artifact@v\d+/, "ci artifact upload missing");
   expectIncludes(ci, "mongo-smoke:", "ci mongo smoke job missing");
+  expectIncludes(ci, "voice-codec:", "ci native voice codec job missing");
+  expectIncludes(ci, "windows-latest", "ci must smoke-test the native codec on Windows");
+  expectIncludes(ci, "docker-audio-smoke.log", "ci Docker native audio smoke log missing");
   expectIncludes(ci, "frontend-build:", "ci frontend job missing");
   expectIncludes(ci, "docker-build:", "ci docker job missing");
   expectIncludes(ci, "npm run test:repo-hygiene", "ci repo hygiene check missing");
@@ -103,6 +106,8 @@ test("github automation files and docs stay in sync", async () => {
   expectIncludes(packageJson, "release:preflight", "package release preflight script missing");
   expectIncludes(packageJson, "release:postdeploy", "package release postdeploy script missing");
   expectIncludes(packageJson, "release:rollback-plan", "package release rollback script missing");
+  expectIncludes(packageJson, "test:voice-codec", "package native voice codec smoke missing");
+  expectIncludes(packageJson, "\"tar\": \"7.5.22\"", "package tar security override missing");
 
   const npmrc = await readText(".npmrc");
   expectIncludes(npmrc, "engine-strict=true", "npm must enforce the supported Node runtime");
@@ -118,6 +123,7 @@ test("github automation files and docs stay in sync", async () => {
   expectIncludes(dependencyDocs, "npm audit --omit=dev --audit-level=high", "dependency docs production audit command missing");
   expectIncludes(dependencyDocs, "Do not use `npm audit fix --force`", "dependency docs unsafe audit fix warning missing");
   expectIncludes(dependencyDocs, "#132", "dependency docs native audio audit issue missing");
+  expectIncludes(dependencyDocs, "tar@7.5.22", "dependency docs tar mitigation missing");
 
   const dockerfile = await readText("Dockerfile");
   expectIncludes(dockerfile, "ARG NODE_IMAGE=node:22.23.1-bookworm-slim", "Docker image must stay on a fixed Node 22 release");
@@ -128,6 +134,8 @@ test("github automation files and docs stay in sync", async () => {
   expectIncludes(toolchainDocs, "Frontend production builds use Node.js 22", "toolchain frontend Node contract missing");
   expectIncludes(toolchainDocs, "DEP0176", "toolchain CRA warning note missing");
   expectIncludes(toolchainDocs, "Node 24 And Native Audio Dependencies", "toolchain native Node 24 limitation missing");
+  expectIncludes(toolchainDocs, "Native Opus Security And Runtime Check", "toolchain native Opus audit documentation missing");
+  expectIncludes(toolchainDocs, "npm run test:voice-codec", "toolchain native Opus smoke command missing");
   expectIncludes(toolchainDocs, "engine-strict=true", "toolchain engine-strict contract missing");
   expectIncludes(toolchainDocs, "react-scripts 5.0.1", "toolchain CRA dependency note missing");
   expectIncludes(toolchainDocs, "frontend package both run as ES module packages", "toolchain ESM package note missing");

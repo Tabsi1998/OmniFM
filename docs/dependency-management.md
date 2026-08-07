@@ -42,10 +42,15 @@ the legacy CRA build chain. Do not use `npm audit fix --force`: it can replace
   The remaining build-tool advisories are confined to the legacy
   `react-scripts`/CRA chain and are tracked by #83; the frontend migration must
   remove that chain instead of papering it over with unsafe overrides.
-- The root production audit still contains the `@discordjs/opus` native
-  `node-pre-gyp`/`tar` chain. It has no safe automatic remediation and is
-  explicitly tracked by #132. No release should claim a clean production audit
-  until that issue is resolved.
+- The root production audit is clean. OmniFM deliberately keeps the native
+  `@discordjs/opus` implementation and constrains its unmaintained
+  `@discordjs/node-pre-gyp` transitive `tar` dependency with the root npm
+  override `tar@7.5.22`. This is a targeted compatibility override, not an
+  `npm audit fix --force`: Node 22 installs it cleanly and the native
+  encode/decode smoke covers the actual codec binding on Linux and Windows.
+  Re-evaluate and remove the override when the upstream native package ships a
+  maintained dependency range. This decision and its regression coverage close
+  #132.
 
 ## Review Cadence
 

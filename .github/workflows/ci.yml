@@ -111,6 +111,29 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  voice-codec:
+    name: native voice codec (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Run native Opus encode/decode smoke
+        run: npm run test:voice-codec
+
   mongo-smoke:
     name: mongo smoke
     runs-on: ubuntu-latest
@@ -220,6 +243,26 @@ jobs:
           set -o pipefail
           docker run --rm omnifm-ci node -e "const fs = require('fs'); if (process.getuid() === 0) throw new Error('runtime must not run as root'); for (const file of ['stations.json', 'owner-audit.json']) { if (!fs.statSync('/app/runtime-data/' + file).isFile()) throw new Error('missing initialized runtime file: ' + file); } console.log('entrypoint runtime-data smoke passed');" 2>&1 | tee test_reports/ci/docker-entrypoint-smoke.log
 
+      - name: Smoke native audio and FFmpeg in the runtime image
+        shell: bash
+        run: |
+          set -o pipefail
+          docker run --rm -i --entrypoint node omnifm-ci - <<'NODE' 2>&1 | tee test_reports/ci/docker-audio-smoke.log
+          const { spawnSync } = require('node:child_process');
+          const { OpusEncoder } = require('@discordjs/opus');
+          const pcm = Buffer.alloc(960 * 2 * 2);
+          const encoder = new OpusEncoder(48_000, 2);
+          try {
+            const packet = encoder.encode(pcm);
+            if (!packet.length) throw new Error('native Opus encoder produced no packet');
+          } finally {
+            encoder.delete?.();
+          }
+          const ffmpeg = spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 's16le', '-ar', '48000', '-ac', '2', '-i', 'pipe:0', '-f', 'null', '-'], { input: pcm });
+          if (ffmpeg.status !== 0) throw new Error(ffmpeg.stderr.toString() || 'FFmpeg PCM smoke failed');
+          console.log('runtime native Opus and FFmpeg smoke passed');
+          NODE
+
       - name: Upload docker build log
         if: always()
         uses: actions/upload-artifact@v7
@@ -228,5 +271,6 @@ jobs:
           path: |
             test_reports/ci/docker-build.log
             test_reports/ci/docker-entrypoint-smoke.log
+            test_reports/ci/docker-audio-smoke.log
           if-no-files-found: error
           retention-days: 14

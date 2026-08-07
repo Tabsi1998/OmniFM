@@ -46,6 +46,32 @@ install Node.js 22.x instead.
 Do not re-enable Node 24 in the engine range or CI matrix until the native audio
 dependencies ship tested Node-24 Windows prebuilds and `npm ci` succeeds there.
 
+## Native Opus Security And Runtime Check
+
+OmniFM keeps `@discordjs/opus@0.10.0` as the codec implementation because it
+is the native Discord voice integration and avoids the performance compromise
+of switching the production radio path to a JavaScript fallback. Its package is
+MIT licensed. The package currently brings in the unmaintained
+`@discordjs/node-pre-gyp` installer, so the root npm `overrides` block pins only
+its `tar` dependency to `7.5.22` (BlueOak-1.0.0, Node 18+). This removes the
+production audit finding without replacing the codec or weakening the Node 22
+runtime contract.
+
+Run the native binding smoke after every dependency or image update:
+
+```bash
+npm ci --no-audit --no-fund
+npm run test:voice-codec
+npm audit --omit=dev --audit-level=high
+```
+
+CI runs the encode/decode smoke on both `ubuntu-latest` and `windows-latest`
+with Node 22. The Docker CI job also runs it inside the final Linux runtime
+image and verifies that FFmpeg accepts a 48 kHz stereo PCM frame. These checks
+prove the codec binding and transcode hand-off; a real Discord guild playback
+and reconnect rehearsal remains a release-operations check because it requires
+an authorized live voice channel.
+
 ## CRA Build Warning
 
 The frontend still uses `react-scripts 5.0.1`. On unsupported Node.js 24, this toolchain can
