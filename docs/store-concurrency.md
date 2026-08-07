@@ -24,6 +24,7 @@ File-backed JSON stores remain useful for local development, migration, diagnost
 | Coupons/offers | `coupons.json` | Global billing/offers | Commander/API or CLI maintenance | Checkout/admin mutations belong to commander path |
 | Provider directories | `discordbotlist.json`, `botsgg.json`, `topgg.json`, `vote-events.json` | Global provider sync | Commander sync process | Provider sync loops run in commander |
 | Incidents | `operator-incidents.json`, `runtime-incidents.json`, Mongo where available | Diagnostics | MongoDB where available, otherwise process fallback | Runtime incidents prefer MongoDB; operator incidents are diagnostic fallback data |
+| Owner audit trail | `owner-audit.json` | Global operator audit | Commander/API owner actions | Inter-process file lock; persistent `runtime-data/` file retains the newest 500 sanitized events during Mongo outages |
 | Guild languages | `guild-languages.json` | Global legacy language fallback | Commander/command process | Legacy fallback; language resolution is normalized at runtime |
 
 The same classification is mirrored in `src/lib/store-concurrency.js` and covered by tests.
@@ -35,6 +36,7 @@ The same classification is mirrored in `src/lib/store-concurrency.js` and covere
 - Treat shared JSON files in split mode as fallback, migration, or commander-owned data, not as a safe general-purpose multi-writer database.
 - If a new store is added, document its scope, owner, split safety, and protection in this document and in `STORE_CONCURRENCY_REGISTRY`.
 - If a global store needs worker-side writes, use MongoDB, an inter-process file lock around the complete read/modify/write transaction, or a versioned compare-and-retry strategy.
+- In Docker, all listed JSON files and split-state directories live under the single persistent `runtime-data/` bind mount. See [operations.md](operations.md#persisted-runtime-data) for initialization, backup, and restore.
 
 ## Current Lock Coverage
 

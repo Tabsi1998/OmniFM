@@ -1,11 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { buildCustomStationReference, parseCustomStationReference } from "./custom-stations.js";
 import { log } from "./lib/logging.js";
+import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const EVENTS_FILE = path.resolve(__dirname, "..", "scheduled-events.json");
+const EVENTS_FILE = resolveRuntimeDataPath("scheduled-events.json");
 const SUPPORTED_REPEAT = new Set([
   "none",
   "daily",

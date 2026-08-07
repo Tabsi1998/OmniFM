@@ -1,11 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { log, logStoreLoadError } from "./lib/logging.js";
 import { validateOutboundUrl, validateOutboundUrlWithDns } from "./lib/safe-outbound-http.js";
+import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_CUSTOM_FILE = path.resolve(__dirname, "..", "custom-stations.json");
+const DEFAULT_CUSTOM_FILE = resolveRuntimeDataPath("custom-stations.json");
 const CUSTOM_FILE = path.resolve(process.env.OMNIFM_CUSTOM_STATIONS_FILE || DEFAULT_CUSTOM_FILE);
 const CUSTOM_BACKUP_FILE = `${CUSTOM_FILE}.bak`;
 const MAX_STATIONS_PER_GUILD = 50;

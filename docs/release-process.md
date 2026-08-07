@@ -135,9 +135,10 @@ bash ./scripts/compose.sh up -d --build
 
 4. In split mode, restart commander first when API/dashboard/commands are
    affected. Restart workers first only for worker-only playback incidents.
-5. Restore runtime JSON files only for data-related incidents and only from a
-   verified backup. Keep `stations.json` under Git ownership unless the station
-   catalog itself is the rollback target.
+5. Restore `runtime-data/` only for data-related incidents and only from a
+   verified archive using `scripts/backup-runtime-data.sh`. The root
+   `stations.json` is only the versioned seed catalog; the active mutable
+   catalog is `runtime-data/stations.json`.
 6. For MongoDB incidents, stop OmniFM containers before restoring a database
    backup. Prefer forward fixes for already-applied schema/data migrations.
 7. Run the post-deploy gate again and inspect `/admin`, `/api/health/detail`,

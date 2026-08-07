@@ -1,10 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { withFileStoreLock } from "./lib/file-store-lock.js";
+import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const STORE_FILE = path.resolve(process.env.OMNIFM_DASHBOARD_FILE || path.resolve(__dirname, "..", "dashboard.json"));
+const STORE_FILE = path.resolve(process.env.OMNIFM_DASHBOARD_FILE || resolveRuntimeDataPath("dashboard.json"));
 const BACKUP_FILE = `${STORE_FILE}.bak`;
 
 function emptyState() {

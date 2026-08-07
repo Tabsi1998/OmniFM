@@ -171,11 +171,12 @@ Current billing defaults in code:
 | `MONGO_ENABLED` | Enable Mongo-backed runtime features | `1` or `0` |
 | `MONGO_URL` | MongoDB connection string | Enables Mongo automatically when set |
 | `DB_NAME` | Database name | Used by Mongo connection |
-| `LOGS_DIR` | Override log directory | Default is `logs` |
+| `OMNIFM_RUNTIME_DATA_DIR` | Base directory for mutable file stores | Docker sets `/app/runtime-data`; local default is the repository root for backward compatibility |
+| `LOGS_DIR` | Override log directory | Default is `runtime-data/logs` in Docker-oriented configuration |
 | `LOG_MAX_MB` | Rotate log files at size threshold | Default written by management scripts |
 | `LOG_MAX_FILES` | Max rotated files retained |  |
 | `LOG_MAX_DAYS` | Max age for rotated logs |  |
-| `BOT_STATE_SPLIT_DIR` | Split-mode bot state directory | Default is `bot-state` |
+| `BOT_STATE_SPLIT_DIR` | Split-mode bot state directory | Default is `runtime-data/bot-state` in Docker-oriented configuration |
 
 Additional log/runtime housekeeping knobs:
 

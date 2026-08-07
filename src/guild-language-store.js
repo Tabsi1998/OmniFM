@@ -1,11 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { getDefaultLanguage, normalizeLanguage } from "./i18n.js";
 import { log, logStoreLoadError } from "./lib/logging.js";
+import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const STORE_FILE = path.resolve(__dirname, "..", "guild-languages.json");
+const STORE_FILE = resolveRuntimeDataPath("guild-languages.json");
 const BACKUP_FILE = `${STORE_FILE}.bak`;
 
 function emptyState() {

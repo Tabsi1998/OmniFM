@@ -120,8 +120,9 @@ test("github automation files and docs stay in sync", async () => {
   expectIncludes(dependencyDocs, "#132", "dependency docs native audio audit issue missing");
 
   const dockerfile = await readText("Dockerfile");
-  expectIncludes(dockerfile, "FROM node:22-slim AS frontend-builder", "Docker frontend builder must stay on Node 22");
-  expectIncludes(dockerfile, "FROM node:22-slim", "Docker runtime image missing");
+  expectIncludes(dockerfile, "ARG NODE_IMAGE=node:22.23.1-bookworm-slim", "Docker image must stay on a fixed Node 22 release");
+  expectIncludes(dockerfile, "FROM ${NODE_IMAGE} AS frontend-builder", "Docker frontend builder must stay on Node 22");
+  expectIncludes(dockerfile, "FROM ${NODE_IMAGE} AS runtime", "Docker runtime image missing");
 
   const toolchainDocs = await readText("docs/toolchain.md");
   expectIncludes(toolchainDocs, "Frontend production builds use Node.js 22", "toolchain frontend Node contract missing");

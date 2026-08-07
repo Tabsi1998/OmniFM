@@ -1,15 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import {
   COMMAND_PERMISSION_COMMANDS,
   isPermissionManagedCommand,
   normalizePermissionCommandName,
 } from "./config/command-permissions.js";
 import { log, logStoreLoadError } from "./lib/logging.js";
+import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_STORE_FILE = path.resolve(__dirname, "..", "command-permissions.json");
+const DEFAULT_STORE_FILE = resolveRuntimeDataPath("command-permissions.json");
 const STORE_FILE = path.resolve(process.env.OMNIFM_COMMAND_PERMISSIONS_FILE || DEFAULT_STORE_FILE);
 const STORE_BACKUP_FILE = STORE_FILE + ".bak";
 

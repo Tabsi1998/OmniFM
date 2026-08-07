@@ -73,3 +73,24 @@ test("owner audit snapshot returns newest events first and honors limits", async
   assert.equal(snapshot.events[0].action, "owner.second");
   assert.equal(snapshot.events[0].status, "failed");
 });
+
+test("owner audit defaults to the persistent runtime data directory", async (t) => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omnifm-owner-audit-runtime-"));
+  const previousRuntimeDir = process.env.OMNIFM_RUNTIME_DATA_DIR;
+  const previousAuditFile = process.env.OMNIFM_OWNER_AUDIT_FILE;
+  process.env.OMNIFM_RUNTIME_DATA_DIR = dir;
+  delete process.env.OMNIFM_OWNER_AUDIT_FILE;
+  resetOwnerAuditForTests();
+
+  t.after(async () => {
+    if (previousRuntimeDir == null) delete process.env.OMNIFM_RUNTIME_DATA_DIR;
+    else process.env.OMNIFM_RUNTIME_DATA_DIR = previousRuntimeDir;
+    if (previousAuditFile == null) delete process.env.OMNIFM_OWNER_AUDIT_FILE;
+    else process.env.OMNIFM_OWNER_AUDIT_FILE = previousAuditFile;
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  assert.equal(resolveOwnerAuditFilePath(), path.join(dir, "owner-audit.json"));
+  recordOwnerAudit({ action: "owner.runtime.persist", status: "success" });
+  assert.equal((await fs.stat(path.join(dir, "owner-audit.json"))).isFile(), true);
+});

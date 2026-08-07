@@ -249,41 +249,80 @@ bash ./scripts/compose.sh logs -f omnifm
 
 ## Persisted Runtime Data
 
-The compose files bind-mount these state files from the repository root. Except
-for the versioned station catalog `stations.json`, these files are local runtime
-state and must remain ignored by Git.
+Both Compose files bind-mount exactly one host directory:
 
-- `stations.json`
-- `premium.json`
-- `bot-state.json`
-- `custom-stations.json`
-- `command-permissions.json`
-- `guild-languages.json`
-- `song-history.json`
-- `dashboard.json`
-- `listening-stats.json`
-- `scheduled-events.json`
-- `coupons.json`
-- `discordbotlist.json`
-- `botsgg.json`
-- `topgg.json`
-- `vote-events.json`
-- `logs/`
+```text
+./runtime-data:/app/runtime-data
+```
 
-Split mode additionally mounts:
+It contains all mutable JSON stores, logs, split-state directories, incident
+fallbacks, and `owner-audit.json`. `owner-audit.json` is the persistent
+file-backed source of truth for owner actions (retention: the newest 500
+sanitized events); it remains available during a controlled MongoDB outage.
+The owner UI/API is the supported access path for audit events.
 
-- `bot-state/`
-- `song-history/`
+Run the initializer before a direct Compose command:
 
-Before repository maintenance commits, run:
+```bash
+bash ./init-data.sh
+```
+
+`scripts/compose.sh`, `install.sh`, `update.sh`, and the PowerShell split
+starter invoke it automatically for starts. On its first run it copies existing
+root-level runtime files into `runtime-data/` without deleting the old files.
+It creates missing files with safe defaults and refuses directory or symlink
+mistakes instead of allowing an in-memory fallback. The container validates the
+JSON again before it starts an application role.
+
+The versioned root `stations.json` remains the seed catalog. It is copied into
+`runtime-data/stations.json` only when that mutable runtime catalog does not
+exist yet. Never delete `runtime-data/` to update the catalog; use the station
+management workflow instead.
+
+All runtime data is ignored by Git, including lock, temporary, corrupt-file,
+and pre-restore artifacts. Before maintenance commits, run:
 
 ```bash
 npm run test:repo-hygiene
 ```
 
-The check fails when local runtime state, backups, locks, logs, or report
-artifacts are accidentally tracked. The canonical Git remote is
-`https://github.com/Tabsi1998/OmniFM.git`.
+### Backup and restore
+
+Create an archive before a manual maintenance window:
+
+```bash
+bash ./scripts/backup-runtime-data.sh create
+bash ./scripts/backup-runtime-data.sh list
+```
+
+Archives and optional SHA-256 sidecars live under
+`.update-backups/runtime-data/`; `update.sh` creates one automatically unless
+`OMNIFM_SKIP_RUNTIME_BACKUP=1` is deliberately set. To restore, stop all
+OmniFM containers first. Restore requires an explicit force flag and retains
+the previous directory as `runtime-data.pre-restore-<timestamp>/` for rollback:
+
+```bash
+bash ./scripts/compose.sh down
+bash ./scripts/backup-runtime-data.sh restore .update-backups/runtime-data/<archive>.tar.gz --force
+bash ./scripts/compose.sh up -d
+```
+
+Backups may contain user, license, session, and audit data. Store them with the
+same access controls as `.env` and do not upload them to source control.
+
+### Container hardening
+
+The Docker build context is an allowlist, the application image runs as the
+unprivileged `node` user, and Compose drops application capabilities and sets
+`no-new-privileges`. The launcher maps that user to the invoking Linux host UID
+and GID so bind-mounted runtime data does not become root-owned. MongoDB keeps
+its image defaults because its upstream entrypoint must initialize its database
+volume; the application services receive the stricter capability policy.
+
+Node and Mongo images use fixed release tags. Review and update them together
+with the Docker build/start CI job; do not replace them with broad major tags.
+
+The canonical Git remote is `https://github.com/Tabsi1998/OmniFM.git`.
 
 ## Common Tasks
 

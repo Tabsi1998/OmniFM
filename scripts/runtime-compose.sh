@@ -123,6 +123,13 @@ refresh_omnifm_compose_env() {
   local mode profiles_csv
 
   export OMNIFM_COMPOSE_APP_DIR="$app_dir"
+  if command -v id >/dev/null 2>&1; then
+    export OMNIFM_CONTAINER_UID="${OMNIFM_CONTAINER_UID:-$(id -u)}"
+    export OMNIFM_CONTAINER_GID="${OMNIFM_CONTAINER_GID:-$(id -g)}"
+  else
+    export OMNIFM_CONTAINER_UID="${OMNIFM_CONTAINER_UID:-1000}"
+    export OMNIFM_CONTAINER_GID="${OMNIFM_CONTAINER_GID:-1000}"
+  fi
   mode="$(compose_determine_mode "$app_dir")"
   export OMNIFM_DEPLOYMENT_ACTIVE="$mode"
 
@@ -170,6 +177,11 @@ compose_worker_services() {
     [[ -n "$idx" ]] || continue
     printf "%s\n" "omnifm-worker-${idx}"
   done < <(compose_worker_indexes "$app_dir")
+}
+
+prepare_omnifm_runtime_data() {
+  local app_dir="${1:-${OMNIFM_COMPOSE_APP_DIR:-$(pwd)}}"
+  bash "${app_dir}/init-data.sh"
 }
 
 compose_deployment_summary() {

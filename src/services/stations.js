@@ -8,10 +8,11 @@ import net from "node:net";
 import { fileURLToPath } from "node:url";
 import { getServerPlan, planAtLeast, requireFeature } from "../core/entitlements.js";
 import { log } from "../lib/logging.js";
+import { resolveRuntimeDataPath } from "../lib/runtime-data-path.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.resolve(__dirname, "..", "..", "data");
-const customFile = path.resolve(__dirname, "..", "..", "custom-stations.json");
+const customFile = resolveRuntimeDataPath("custom-stations.json");
 
 const MAX_CUSTOM_PER_SERVER = 50;
 

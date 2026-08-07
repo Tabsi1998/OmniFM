@@ -44,7 +44,14 @@ topgg.json
 vote-events.json
 operator-incidents.json
 runtime-incidents.json
+owner-audit.json
+runtime-data/
+runtime-data.pre-restore-*/
+.runtime-data-restore.*/
 *.json.bak
+*.json.tmp-*
+*.json.corrupt-*
+*.tmp
 *.lock
 
 # Local-only helper artifacts

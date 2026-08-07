@@ -96,6 +96,14 @@ export const STORE_CONCURRENCY_REGISTRY = [
     protection: "runtime incidents prefer MongoDB; operator incidents are diagnostic fallback data",
   },
   {
+    store: "owner-audit",
+    files: ["owner-audit.json"],
+    scope: "global operator audit trail",
+    runtimeOwner: "commander/API owner actions",
+    splitSafety: "locked-file",
+    protection: "inter-process lock and persistent runtime-data volume retain the audited owner action history",
+  },
+  {
     store: "guild-languages",
     files: ["guild-languages.json"],
     scope: "global legacy language fallback",

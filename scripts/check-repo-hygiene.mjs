@@ -23,12 +23,16 @@ const forbiddenTrackedFiles = new Set([
   "vote-events.json",
   "operator-incidents.json",
   "runtime-incidents.json",
+  "owner-audit.json",
 ]);
 
 const forbiddenTrackedPrefixes = [
   "bot-state/",
   "song-history/",
   "logs/",
+  "runtime-data/",
+  "runtime-data.pre-restore-",
+  ".runtime-data-restore.",
   "test_reports/",
   ".update-backups/",
   "memory/",
@@ -65,7 +69,13 @@ function assertCleanGitignore() {
 
 function isForbiddenTrackedRuntimePath(filePath) {
   if (forbiddenTrackedFiles.has(filePath)) return true;
-  if (filePath.endsWith(".json.bak") || filePath.endsWith(".lock") || filePath.endsWith(".log")) return true;
+  if (
+    filePath.endsWith(".json.bak")
+    || filePath.endsWith(".lock")
+    || filePath.endsWith(".log")
+    || /\.json\.(?:tmp-|corrupt-)/.test(filePath)
+    || filePath.endsWith(".tmp")
+  ) return true;
   return forbiddenTrackedPrefixes.some((prefix) => filePath.startsWith(prefix));
 }
 

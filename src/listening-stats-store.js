@@ -3,12 +3,11 @@
 // ============================================================
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { getDb, isConnected } from "./lib/db.js";
 import { log } from "./lib/logging.js";
+import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const STORE_FILE = path.resolve(__dirname, "..", "listening-stats.json");
+const STORE_FILE = resolveRuntimeDataPath("listening-stats.json");
 const BACKUP_FILE = `${STORE_FILE}.bak`;
 const MAX_FALLBACK_DAILY_STATS = 400;
 const MAX_FALLBACK_SESSION_HISTORY = 120;

@@ -45,6 +45,7 @@ report_runtime_tools_status() {
 
 compose_up_with_build() {
   refresh_omnifm_compose_env "$APP_DIR"
+  prepare_omnifm_runtime_data "$APP_DIR"
   info "$(compose_deployment_summary "$APP_DIR")"
   if docker compose up -d --build --remove-orphans; then
     report_runtime_tools_status
@@ -380,7 +381,7 @@ write_env_line "REMOTE_WORKER_COMMAND_POLL_MS" "$(compose_read_env_value "$APP_D
 write_env_line "REMOTE_WORKER_COMMAND_TTL_MS" "$(compose_read_env_value "$APP_DIR" "REMOTE_WORKER_COMMAND_TTL_MS" "300000")"
 write_env_line "REMOTE_WORKER_STATUS_POLL_MS" "$(compose_read_env_value "$APP_DIR" "REMOTE_WORKER_STATUS_POLL_MS" "2000")"
 write_env_line "REMOTE_WORKER_STATUS_STALE_MS" "$(compose_read_env_value "$APP_DIR" "REMOTE_WORKER_STATUS_STALE_MS" "45000")"
-write_env_line "BOT_STATE_SPLIT_DIR" "$(compose_read_env_value "$APP_DIR" "BOT_STATE_SPLIT_DIR" "bot-state")"
+write_env_line "BOT_STATE_SPLIT_DIR" "$(compose_read_env_value "$APP_DIR" "BOT_STATE_SPLIT_DIR" "runtime-data/bot-state")"
 
 refresh_omnifm_compose_env "$APP_DIR"
 ok "$(compose_deployment_summary "$APP_DIR")"
