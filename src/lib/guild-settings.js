@@ -66,7 +66,10 @@ export async function loadGuildSettings(guildId) {
 
     if (hasStoredSettings && JSON.stringify(settings || {}) !== JSON.stringify(normalized)) {
       const removedKeys = Object.keys(settings).filter((key) => !Object.prototype.hasOwnProperty.call(normalized, key));
-      void getDb().collection("guild_settings").updateOne(
+      // A caller that awaits this load expects repaired settings to be durable
+      // before it can perform a following read or write. Leaving the repair in
+      // the background made that guarantee timing-dependent (especially in CI).
+      await getDb().collection("guild_settings").updateOne(
         { guildId: normalizedGuildId },
         {
           $set: normalized,
