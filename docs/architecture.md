@@ -20,6 +20,12 @@ OmniFM supports two runtime topologies.
 
 Both modes use the same stores, Discord command definitions, API handlers, and frontend build.
 
+### Remote Worker Command Deadlines
+
+Every remote command has two independent timestamps: a queue deadline and a retention TTL. The command's visible caller timeout is its queue deadline. If that deadline passes while the command is still pending, the commander atomically marks it as cancelled and a worker must not claim or execute it later.
+
+Commands already claimed by a worker are deliberately not force-cancelled: playback and voice operations are not safely reversible midway. In that case the caller receives a timeout unless the completed result wins the final race; operators should issue the next desired state explicitly. Command records remain available until their configured TTL for diagnosis.
+
 ## Commander / Worker Model
 
 The commander is the control plane:
