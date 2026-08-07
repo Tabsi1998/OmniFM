@@ -5,7 +5,13 @@ import {
   applyCors,
   buildContentSecurityPolicy,
   buildPermissionsPolicy,
+  getClientIp,
   getCommonSecurityHeaders,
+  getTrustedForwardedProto,
+  isTrustedProxyAddress,
+  normalizeIpAddress,
+  parseTrustedProxyIps,
+  shouldTrustProxyHeaders,
   shouldSendStrictTransportSecurity,
 } from "../src/lib/api-helpers.js";
 
@@ -98,10 +104,10 @@ test("policy builders return compact header strings", () => {
   assert.doesNotMatch(buildPermissionsPolicy(), /\n/);
 });
 
-test("CORS accepts HTTPS browser origin for the same reverse-proxied host", () => {
+test("CORS requires an explicit configured origin instead of trusting Host or WEB_DOMAIN", () => {
   const restoreEnv = setEnv({
     PUBLIC_WEB_URL: "",
-    WEB_DOMAIN: "",
+    WEB_DOMAIN: "omnifm.xyz",
     CORS_ALLOWED_ORIGINS: "",
     CORS_ORIGINS: "",
   });
@@ -121,26 +127,74 @@ test("CORS accepts HTTPS browser origin for the same reverse-proxied host", () =
       socket: { encrypted: false },
     };
 
-    assert.equal(applyCors(req, res, ""), true);
-    assert.equal(headers.get("access-control-allow-origin"), "https://omnifm.xyz");
+    assert.equal(applyCors(req, res, ""), false);
+    assert.equal(headers.get("access-control-allow-origin"), undefined);
 
-    const blockedHeaders = new Map();
-    const blockedRes = {
+    process.env.PUBLIC_WEB_URL = "https://app.omnifm.xyz";
+    process.env.CORS_ALLOWED_ORIGINS = "http://localhost:3000";
+    const configuredHeaders = new Map();
+    const configuredRes = {
       setHeader(name, value) {
-        blockedHeaders.set(String(name).toLowerCase(), value);
+        configuredHeaders.set(String(name).toLowerCase(), value);
       },
     };
-    const blockedReq = {
+    const configuredReq = {
       headers: {
-        host: "omnifm.xyz",
-        origin: "https://evil.example",
+        host: "internal-proxy.local",
+        origin: "https://app.omnifm.xyz",
       },
       socket: { encrypted: false },
     };
 
-    assert.equal(applyCors(blockedReq, blockedRes, ""), false);
-    assert.equal(blockedHeaders.get("access-control-allow-origin"), undefined);
+    assert.equal(applyCors(configuredReq, configuredRes, process.env.PUBLIC_WEB_URL), true);
+    assert.equal(configuredHeaders.get("access-control-allow-origin"), "https://app.omnifm.xyz");
+    assert.equal(configuredHeaders.get("access-control-allow-credentials"), "true");
+
+    const localHeaders = new Map();
+    const localRes = {
+      setHeader(name, value) {
+        localHeaders.set(String(name).toLowerCase(), value);
+      },
+    };
+    assert.equal(applyCors({
+      headers: { origin: "http://localhost:3000" },
+      socket: { encrypted: false },
+    }, localRes, process.env.PUBLIC_WEB_URL), true);
+    assert.equal(localHeaders.get("access-control-allow-origin"), "http://localhost:3000");
   } finally {
     restoreEnv();
   }
+});
+
+test("proxy headers require a trusted direct peer and preserve the real client from XFF", () => {
+  const trustedProxyIps = parseTrustedProxyIps("192.0.2.10, 192.0.2.11");
+  const proxyOptions = { enabled: true, trustedProxyIps };
+
+  assert.deepEqual([...trustedProxyIps].sort(), ["192.0.2.10", "192.0.2.11"]);
+  assert.equal(normalizeIpAddress("::ffff:192.0.2.10"), "192.0.2.10");
+  assert.equal(isTrustedProxyAddress("::ffff:192.0.2.10", trustedProxyIps), true);
+
+  const directRequest = {
+    headers: {
+      "x-forwarded-for": "198.51.100.1",
+      "x-forwarded-proto": "https",
+    },
+    socket: { remoteAddress: "203.0.113.9" },
+  };
+  assert.equal(shouldTrustProxyHeaders(directRequest, proxyOptions), false);
+  assert.equal(getClientIp(directRequest, proxyOptions), "203.0.113.9");
+  assert.equal(getTrustedForwardedProto(directRequest, proxyOptions), "");
+
+  const proxiedRequest = {
+    headers: {
+      // A client-controlled value is leftmost, then the real client and an
+      // upstream proxy are appended by standard reverse proxies.
+      "x-forwarded-for": "203.0.113.250, 198.51.100.42, 192.0.2.11",
+      "x-forwarded-proto": "https",
+    },
+    socket: { remoteAddress: "::ffff:192.0.2.10" },
+  };
+  assert.equal(shouldTrustProxyHeaders(proxiedRequest, proxyOptions), true);
+  assert.equal(getClientIp(proxiedRequest, proxyOptions), "198.51.100.42");
+  assert.equal(getTrustedForwardedProto(proxiedRequest, proxyOptions), "https");
 });
