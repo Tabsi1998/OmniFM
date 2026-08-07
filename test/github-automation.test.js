@@ -41,6 +41,7 @@ test("github automation files and docs stay in sync", async () => {
     ".github/ISSUE_TEMPLATE/feature_request.yml",
     ".github/ISSUE_TEMPLATE/config.yml",
     ".npmrc",
+    "docs/dependency-management.md",
   ];
 
   for (const file of requiredFiles) {
@@ -109,6 +110,14 @@ test("github automation files and docs stay in sync", async () => {
   const frontendPackageJson = await readText("frontend/package.json");
   expectIncludes(frontendPackageJson, "\"node\": \">=22 <23\"", "frontend package Node 22 engine range missing");
   expectIncludes(frontendPackageJson, "\"type\": \"module\"", "frontend package should declare ESM type");
+  expectIncludes(frontendPackageJson, "\"devDependencies\"", "frontend build dependencies section missing");
+  expectIncludes(frontendPackageJson, "\"react-scripts\": \"5.0.1\"", "frontend build toolchain dependency missing");
+
+  const dependencyDocs = await readText("docs/dependency-management.md");
+  expectIncludes(dependencyDocs, "npm ci --no-audit --no-fund", "dependency docs clean-install command missing");
+  expectIncludes(dependencyDocs, "npm audit --omit=dev --audit-level=high", "dependency docs production audit command missing");
+  expectIncludes(dependencyDocs, "Do not use `npm audit fix --force`", "dependency docs unsafe audit fix warning missing");
+  expectIncludes(dependencyDocs, "#132", "dependency docs native audio audit issue missing");
 
   const dockerfile = await readText("Dockerfile");
   expectIncludes(dockerfile, "FROM node:22-slim AS frontend-builder", "Docker frontend builder must stay on Node 22");
@@ -171,6 +180,7 @@ test("github automation files and docs stay in sync", async () => {
   expectIncludes(readme, "OMNIFM_RUN_LEGACY_BACKEND_TESTS=1", "README legacy Python opt-in missing");
   expectIncludes(readme, "VOICE_CHANNEL_STATUS_REFRESH_MS", "README voice channel refresh setting missing");
   expectIncludes(readme, "Release, Update, and Rollback Process", "README release process docs link missing");
+  expectIncludes(readme, "Dependency Management", "README dependency management docs link missing");
 
   const backendReadme = await readText("backend/README.md");
   expectIncludes(backendReadme, "archived as a legacy/reference implementation", "backend README legacy status missing");
