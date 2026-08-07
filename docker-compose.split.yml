@@ -1,46 +1,39 @@
 x-omnifm-volumes: &omnifm_volumes
-  - ./stations.json:/app/stations.json
-  - ./premium.json:/app/premium.json
-  - ./bot-state.json:/app/bot-state.json
-  - ./custom-stations.json:/app/custom-stations.json
-  - ./command-permissions.json:/app/command-permissions.json
-  - ./guild-languages.json:/app/guild-languages.json
-  - ./song-history.json:/app/song-history.json
-  - ./dashboard.json:/app/dashboard.json
-  - ./listening-stats.json:/app/listening-stats.json
-  - ./scheduled-events.json:/app/scheduled-events.json
-  - ./coupons.json:/app/coupons.json
-  - ./discordbotlist.json:/app/discordbotlist.json
-  - ./botsgg.json:/app/botsgg.json
-  - ./topgg.json:/app/topgg.json
-  - ./vote-events.json:/app/vote-events.json
-  - ./logs:/app/logs
-  - ./bot-state:/app/bot-state
-  - ./song-history:/app/song-history
+  - ./runtime-data:/app/runtime-data
+
+x-omnifm-worker-environment: &omnifm_worker_environment
+  MONGO_URL: mongodb://mongodb:27017
+  DB_NAME: radio_bot
+  BOT_PROCESS_ROLE: worker
+  OMNIFM_RUNTIME_DATA_DIR: /app/runtime-data
 
 x-omnifm-worker-base: &omnifm_worker_base
   build: .
   init: true
+  user: "${OMNIFM_CONTAINER_UID:-1000}:${OMNIFM_CONTAINER_GID:-1000}"
   env_file:
     - .env
   command: ["node", "src/entrypoints/worker.js"]
-  environment:
-    - MONGO_URL=mongodb://mongodb:27017
-    - DB_NAME=radio_bot
-    - BOT_PROCESS_ROLE=worker
+  environment: *omnifm_worker_environment
   volumes: *omnifm_volumes
   restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
   depends_on:
     mongodb:
       condition: service_healthy
 
 services:
   mongodb:
-    image: mongo:7
+    image: mongo:7.0.39-jammy
     container_name: omnifm-mongodb
     volumes:
       - mongodb_data:/data/db
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
@@ -54,6 +47,7 @@ services:
     build: .
     container_name: omnifm
     init: true
+    user: "${OMNIFM_CONTAINER_UID:-1000}:${OMNIFM_CONTAINER_GID:-1000}"
     env_file:
       - .env
     command: ["node", "src/entrypoints/commander.js"]
@@ -61,10 +55,15 @@ services:
       - MONGO_URL=mongodb://mongodb:27017
       - DB_NAME=radio_bot
       - BOT_PROCESS_ROLE=commander
+      - OMNIFM_RUNTIME_DATA_DIR=/app/runtime-data
     ports:
       - "${WEB_PORT:-8081}:${WEB_INTERNAL_PORT:-8080}"
     volumes: *omnifm_volumes
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     healthcheck:
       test:
         [
@@ -86,200 +85,160 @@ services:
     profiles: ["worker-1"]
     container_name: omnifm-worker-1
     environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=radio_bot
-      - BOT_PROCESS_ROLE=worker
-      - BOT_PROCESS_INDEX=1
+      <<: *omnifm_worker_environment
+      BOT_PROCESS_INDEX: "1"
 
   omnifm-worker-2:
     <<: *omnifm_worker_base
     profiles: ["worker-2"]
     container_name: omnifm-worker-2
     environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=radio_bot
-      - BOT_PROCESS_ROLE=worker
-      - BOT_PROCESS_INDEX=2
+      <<: *omnifm_worker_environment
+      BOT_PROCESS_INDEX: "2"
 
   omnifm-worker-3:
     <<: *omnifm_worker_base
     profiles: ["worker-3"]
     container_name: omnifm-worker-3
     environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=radio_bot
-      - BOT_PROCESS_ROLE=worker
-      - BOT_PROCESS_INDEX=3
+      <<: *omnifm_worker_environment
+      BOT_PROCESS_INDEX: "3"
 
   omnifm-worker-4:
     <<: *omnifm_worker_base
     profiles: ["worker-4"]
     container_name: omnifm-worker-4
     environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=radio_bot
-      - BOT_PROCESS_ROLE=worker
-      - BOT_PROCESS_INDEX=4
+      <<: *omnifm_worker_environment
+      BOT_PROCESS_INDEX: "4"
 
   omnifm-worker-5:
     <<: *omnifm_worker_base
     profiles: ["worker-5"]
     container_name: omnifm-worker-5
     environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=radio_bot
-      - BOT_PROCESS_ROLE=worker
-      - BOT_PROCESS_INDEX=5
+      <<: *omnifm_worker_environment
+      BOT_PROCESS_INDEX: "5"
 
   omnifm-worker-6:
     <<: *omnifm_worker_base
     profiles: ["worker-6"]
     container_name: omnifm-worker-6
     environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=radio_bot
-      - BOT_PROCESS_ROLE=worker
-      - BOT_PROCESS_INDEX=6
+      <<: *omnifm_worker_environment
+      BOT_PROCESS_INDEX: "6"
 
   omnifm-worker-7:
     <<: *omnifm_worker_base
     profiles: ["worker-7"]
     container_name: omnifm-worker-7
     environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=radio_bot
-      - BOT_PROCESS_ROLE=worker
-      - BOT_PROCESS_INDEX=7
+      <<: *omnifm_worker_environment
+      BOT_PROCESS_INDEX: "7"
 
   omnifm-worker-8:
     <<: *omnifm_worker_base
     profiles: ["worker-8"]
     container_name: omnifm-worker-8
     environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=radio_bot
-      - BOT_PROCESS_ROLE=worker
-      - BOT_PROCESS_INDEX=8
+      <<: *omnifm_worker_environment
+      BOT_PROCESS_INDEX: "8"
 
   omnifm-worker-9:
     <<: *omnifm_worker_base
     profiles: ["worker-9"]
     container_name: omnifm-worker-9
     environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=radio_bot
-      - BOT_PROCESS_ROLE=worker
-      - BOT_PROCESS_INDEX=9
+      <<: *omnifm_worker_environment
+      BOT_PROCESS_INDEX: "9"
 
   omnifm-worker-10:
     <<: *omnifm_worker_base
     profiles: ["worker-10"]
     container_name: omnifm-worker-10
     environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=radio_bot
-      - BOT_PROCESS_ROLE=worker
-      - BOT_PROCESS_INDEX=10
+      <<: *omnifm_worker_environment
+      BOT_PROCESS_INDEX: "10"
 
   omnifm-worker-11:
     <<: *omnifm_worker_base
     profiles: ["worker-11"]
     container_name: omnifm-worker-11
     environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=radio_bot
-      - BOT_PROCESS_ROLE=worker
-      - BOT_PROCESS_INDEX=11
+      <<: *omnifm_worker_environment
+      BOT_PROCESS_INDEX: "11"
 
   omnifm-worker-12:
     <<: *omnifm_worker_base
     profiles: ["worker-12"]
     container_name: omnifm-worker-12
     environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=radio_bot
-      - BOT_PROCESS_ROLE=worker
-      - BOT_PROCESS_INDEX=12
+      <<: *omnifm_worker_environment
+      BOT_PROCESS_INDEX: "12"
 
   omnifm-worker-13:
     <<: *omnifm_worker_base
     profiles: ["worker-13"]
     container_name: omnifm-worker-13
     environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=radio_bot
-      - BOT_PROCESS_ROLE=worker
-      - BOT_PROCESS_INDEX=13
+      <<: *omnifm_worker_environment
+      BOT_PROCESS_INDEX: "13"
 
   omnifm-worker-14:
     <<: *omnifm_worker_base
     profiles: ["worker-14"]
     container_name: omnifm-worker-14
     environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=radio_bot
-      - BOT_PROCESS_ROLE=worker
-      - BOT_PROCESS_INDEX=14
+      <<: *omnifm_worker_environment
+      BOT_PROCESS_INDEX: "14"
 
   omnifm-worker-15:
     <<: *omnifm_worker_base
     profiles: ["worker-15"]
     container_name: omnifm-worker-15
     environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=radio_bot
-      - BOT_PROCESS_ROLE=worker
-      - BOT_PROCESS_INDEX=15
+      <<: *omnifm_worker_environment
+      BOT_PROCESS_INDEX: "15"
 
   omnifm-worker-16:
     <<: *omnifm_worker_base
     profiles: ["worker-16"]
     container_name: omnifm-worker-16
     environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=radio_bot
-      - BOT_PROCESS_ROLE=worker
-      - BOT_PROCESS_INDEX=16
+      <<: *omnifm_worker_environment
+      BOT_PROCESS_INDEX: "16"
 
   omnifm-worker-17:
     <<: *omnifm_worker_base
     profiles: ["worker-17"]
     container_name: omnifm-worker-17
     environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=radio_bot
-      - BOT_PROCESS_ROLE=worker
-      - BOT_PROCESS_INDEX=17
+      <<: *omnifm_worker_environment
+      BOT_PROCESS_INDEX: "17"
 
   omnifm-worker-18:
     <<: *omnifm_worker_base
     profiles: ["worker-18"]
     container_name: omnifm-worker-18
     environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=radio_bot
-      - BOT_PROCESS_ROLE=worker
-      - BOT_PROCESS_INDEX=18
+      <<: *omnifm_worker_environment
+      BOT_PROCESS_INDEX: "18"
 
   omnifm-worker-19:
     <<: *omnifm_worker_base
     profiles: ["worker-19"]
     container_name: omnifm-worker-19
     environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=radio_bot
-      - BOT_PROCESS_ROLE=worker
-      - BOT_PROCESS_INDEX=19
+      <<: *omnifm_worker_environment
+      BOT_PROCESS_INDEX: "19"
 
   omnifm-worker-20:
     <<: *omnifm_worker_base
     profiles: ["worker-20"]
     container_name: omnifm-worker-20
     environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=radio_bot
-      - BOT_PROCESS_ROLE=worker
-      - BOT_PROCESS_INDEX=20
+      <<: *omnifm_worker_environment
+      BOT_PROCESS_INDEX: "20"
 
 volumes:
   mongodb_data:

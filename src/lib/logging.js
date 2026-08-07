@@ -4,6 +4,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveRuntimeDataPath } from "./runtime-data-path.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..", "..");
@@ -46,9 +47,9 @@ function resolveLogsDir() {
     return path.isAbsolute(explicit) ? explicit : path.resolve(rootDir, explicit);
   }
   if (isTestRun()) {
-    return path.join(rootDir, "logs", "test");
+    return resolveRuntimeDataPath("logs/test");
   }
-  return path.join(rootDir, "logs");
+  return resolveRuntimeDataPath("logs");
 }
 
 const logsDir = resolveLogsDir();

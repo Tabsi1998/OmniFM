@@ -1,9 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const STATE_FILE = path.resolve(__dirname, "..", "vote-events.json");
+const STATE_FILE = resolveRuntimeDataPath("vote-events.json");
 const MAX_STORED_VOTE_EVENTS = 1000;
 const SUPPORTED_PROVIDERS = new Set(["discordbotlist", "topgg"]);
 

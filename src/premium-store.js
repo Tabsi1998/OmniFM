@@ -4,13 +4,12 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { PLANS } from "./config/plans.js";
 import { getDefaultLanguage, normalizeLanguage } from "./i18n.js";
 import { log, logStoreLoadError } from "./lib/logging.js";
+import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const premiumFile = path.resolve(__dirname, "..", "premium.json");
+const premiumFile = resolveRuntimeDataPath("premium.json");
 const premiumBackupFile = premiumFile + ".bak";
 
 const MAX_PROCESSED_ENTRIES = 5000;

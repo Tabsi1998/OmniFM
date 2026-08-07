@@ -69,7 +69,7 @@ jobs:
         node-version: [22]
     services:
       mongo:
-        image: mongo:7
+        image: mongo:7.0.39-jammy
         ports:
           - 27017:27017
         options: >-
@@ -117,7 +117,7 @@ jobs:
     timeout-minutes: 15
     services:
       mongo:
-        image: mongo:7
+        image: mongo:7.0.39-jammy
         ports:
           - 27017:27017
         options: >-
@@ -192,11 +192,20 @@ jobs:
           retention-days: 14
 
   docker-build:
-    name: docker build
+    name: docker build and entrypoint smoke
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
+
+      - name: Validate Compose manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .env.example .env
+          trap 'rm -f .env' EXIT
+          docker compose -f docker-compose.yml config --quiet
+          docker compose -f docker-compose.split.yml --profile worker-1 config --quiet
 
       - name: Build container
         shell: bash
@@ -205,11 +214,19 @@ jobs:
           mkdir -p test_reports/ci
           docker build -t omnifm-ci . 2>&1 | tee test_reports/ci/docker-build.log
 
+      - name: Start entrypoint as the unprivileged runtime user
+        shell: bash
+        run: |
+          set -o pipefail
+          docker run --rm omnifm-ci node -e "const fs = require('fs'); if (process.getuid() === 0) throw new Error('runtime must not run as root'); for (const file of ['stations.json', 'owner-audit.json']) { if (!fs.statSync('/app/runtime-data/' + file).isFile()) throw new Error('missing initialized runtime file: ' + file); } console.log('entrypoint runtime-data smoke passed');" 2>&1 | tee test_reports/ci/docker-entrypoint-smoke.log
+
       - name: Upload docker build log
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: docker-build-log
-          path: test_reports/ci/docker-build.log
+          path: |
+            test_reports/ci/docker-build.log
+            test_reports/ci/docker-entrypoint-smoke.log
           if-no-files-found: error
           retention-days: 14

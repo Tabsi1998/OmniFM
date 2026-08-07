@@ -1,128 +1,129 @@
 #!/usr/bin/env sh
 
-# KEIN set -e hier! Wir behandeln Fehler selbst.
+set -u
+
 export LANG="${LANG:-C.UTF-8}"
 export LC_ALL="${LC_ALL:-C.UTF-8}"
+export OMNIFM_RUNTIME_DATA_DIR="${OMNIFM_RUNTIME_DATA_DIR:-/app/runtime-data}"
 
-init_runtime_dir() {
-  local dirpath="$1"
-
-  if [ -f "$dirpath" ]; then
-    echo "[WARN] $dirpath ist eine Datei statt ein Verzeichnis."
-    echo "[WARN] Bitte auf dem Host korrigieren und den Container neu starten."
-    return 0
-  fi
-
-  mkdir -p "$dirpath" 2>/dev/null || true
+fatal() {
+  echo "[ERROR] $*" >&2
+  exit 1
 }
 
-init_runtime_dir "/app/logs"
-init_runtime_dir "/app/bot-state"
-init_runtime_dir "/app/song-history"
+ensure_runtime_dir() {
+  dirpath="$1"
 
-# === JSON-Dateien sicherstellen ===
-# Docker bind-mount erstellt ein VERZEICHNIS wenn die Datei auf dem Host fehlt.
-# Ein Verzeichnis-Mount kann NICHT geloescht werden (Device or resource busy).
-# Loesung: Wenn es ein Verzeichnis ist, pruefen ob darin geschrieben werden kann,
-# ansonsten eine Warnung ausgeben und trotzdem starten.
+  if [ -e "$dirpath" ] && [ ! -d "$dirpath" ]; then
+    fatal "$dirpath must be a writable directory. Run bash ./init-data.sh on the host before starting Compose."
+  fi
+
+  mkdir -p "$dirpath" || fatal "Could not create runtime directory $dirpath."
+  [ -w "$dirpath" ] || fatal "$dirpath is not writable by the unprivileged container user. Run bash ./init-data.sh on the host."
+}
 
 init_json_file() {
-  local filepath="$1"
-  local filename=$(basename "$filepath")
+  filepath="$1"
+  default_file="${2:-}"
+  filename=$(basename "$filepath")
 
   if [ -d "$filepath" ]; then
-    # Es ist ein Verzeichnis (Docker hat es erstellt weil die Datei fehlte)
-    echo "[WARN] $filepath ist ein Verzeichnis statt einer Datei!"
-    echo "[WARN] Erstelle $filename auf dem Host und starte neu:"
-    echo "[WARN]   echo '{}' > ./$filename"
-    echo "[WARN]   docker compose up -d"
-    # Versuche NICHT zu loeschen - das schlaegt fehl bei Docker-Mounts
-    # Statt dessen starten wir trotzdem - der Code nutzt In-Memory-Fallback
-    return 0
+    fatal "$filepath is a directory, not a JSON file. Fix the runtime-data mount on the host; refusing an in-memory fallback."
   fi
 
-  if [ ! -f "$filepath" ]; then
-    echo '{}' > "$filepath" 2>/dev/null || true
-  fi
-
-  # Leere Datei? Initialisieren
-  if [ -f "$filepath" ] && [ ! -s "$filepath" ]; then
-    echo '{}' > "$filepath" 2>/dev/null || true
-  fi
-
-  # Validate JSON content
-  if [ -f "$filepath" ] && [ -s "$filepath" ]; then
-    if ! node -e "JSON.parse(require('fs').readFileSync('$filepath','utf8'))" 2>/dev/null; then
-      echo "[WARN] $filename enthaelt ungueltiges JSON. Erstelle Backup und initialisiere neu."
-      cp "$filepath" "${filepath}.corrupt-$(date +%s)" 2>/dev/null || true
-      echo '{}' > "$filepath" 2>/dev/null || true
+  if [ ! -e "$filepath" ]; then
+    if [ -n "$default_file" ] && [ -f "$default_file" ]; then
+      cp "$default_file" "$filepath" || fatal "Could not seed $filename from $default_file."
+    else
+      printf '{}\n' > "$filepath" || fatal "Could not initialize $filename."
     fi
+  fi
+
+  if [ ! -s "$filepath" ]; then
+    printf '{}\n' > "$filepath" || fatal "Could not initialize empty $filename."
+  fi
+
+  if ! node -e "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'))" "$filepath" 2>/dev/null; then
+    backup="${filepath}.corrupt-$(date +%s)"
+    cp "$filepath" "$backup" 2>/dev/null || true
+    fatal "$filename contains invalid JSON. A best-effort backup was written to $backup; repair the file before restarting."
   fi
 }
 
-init_json_file "/app/bot-state.json"
-init_json_file "/app/custom-stations.json"
-init_json_file "/app/command-permissions.json"
-init_json_file "/app/guild-languages.json"
-init_json_file "/app/song-history.json"
-init_json_file "/app/listening-stats.json"
-init_json_file "/app/dashboard.json"
-init_json_file "/app/scheduled-events.json"
-init_json_file "/app/coupons.json"
-init_json_file "/app/premium.json"
-init_json_file "/app/stations.json"
-# Fix: Fehlende JSON-Dateien ergaenzt (wurden vorher nicht initialisiert)
-init_json_file "/app/discordbotlist.json"
-init_json_file "/app/botsgg.json"
-init_json_file "/app/topgg.json"
-init_json_file "/app/vote-events.json"
+ensure_runtime_dir "$OMNIFM_RUNTIME_DATA_DIR"
+ensure_runtime_dir "$OMNIFM_RUNTIME_DATA_DIR/logs"
+ensure_runtime_dir "$OMNIFM_RUNTIME_DATA_DIR/bot-state"
+ensure_runtime_dir "$OMNIFM_RUNTIME_DATA_DIR/song-history"
+
+init_json_file "$OMNIFM_RUNTIME_DATA_DIR/stations.json" "/app/defaults/stations.json"
+init_json_file "$OMNIFM_RUNTIME_DATA_DIR/bot-state.json"
+init_json_file "$OMNIFM_RUNTIME_DATA_DIR/custom-stations.json"
+init_json_file "$OMNIFM_RUNTIME_DATA_DIR/command-permissions.json"
+init_json_file "$OMNIFM_RUNTIME_DATA_DIR/guild-languages.json"
+init_json_file "$OMNIFM_RUNTIME_DATA_DIR/song-history.json"
+init_json_file "$OMNIFM_RUNTIME_DATA_DIR/listening-stats.json"
+init_json_file "$OMNIFM_RUNTIME_DATA_DIR/dashboard.json"
+init_json_file "$OMNIFM_RUNTIME_DATA_DIR/scheduled-events.json"
+init_json_file "$OMNIFM_RUNTIME_DATA_DIR/coupons.json"
+init_json_file "$OMNIFM_RUNTIME_DATA_DIR/premium.json"
+init_json_file "$OMNIFM_RUNTIME_DATA_DIR/discordbotlist.json"
+init_json_file "$OMNIFM_RUNTIME_DATA_DIR/botsgg.json"
+init_json_file "$OMNIFM_RUNTIME_DATA_DIR/topgg.json"
+init_json_file "$OMNIFM_RUNTIME_DATA_DIR/vote-events.json"
+init_json_file "$OMNIFM_RUNTIME_DATA_DIR/operator-incidents.json"
+init_json_file "$OMNIFM_RUNTIME_DATA_DIR/runtime-incidents.json"
+init_json_file "$OMNIFM_RUNTIME_DATA_DIR/owner-audit.json"
 
 if command -v ffmpeg >/dev/null 2>&1; then
-  echo "[INFO] ffmpeg verfuegbar: $(ffmpeg -version | head -n 1)"
+  echo "[INFO] ffmpeg available: $(ffmpeg -version | head -n 1)"
 else
-  echo "[WARN] ffmpeg fehlt im Container."
+  fatal "ffmpeg is missing from the runtime image."
 fi
 
 if [ "${NOW_PLAYING_RECOGNITION_ENABLED:-0}" != "0" ]; then
   if command -v fpcalc >/dev/null 2>&1; then
-    echo "[INFO] Audio-Erkennung bereit: $(fpcalc -version 2>/dev/null | head -n 1)"
+    echo "[INFO] Audio recognition ready: $(fpcalc -version 2>/dev/null | head -n 1)"
   else
-    echo "[WARN] Audio-Erkennung ist aktiviert, aber fpcalc/Chromaprint fehlt im Container."
-    echo "[WARN] Bitte Docker-Image neu bauen oder die Build-Logs auf Paketfehler pruefen."
+    fatal "Audio recognition is enabled but fpcalc/Chromaprint is missing."
   fi
 fi
 
-# === Commands registrieren ===
-if [ "$#" -gt 0 ]; then
+is_default_app_command() {
+  [ "$#" -eq 2 ] && [ "$1" = "node" ] && [ "$2" = "/app/src/index.js" ]
+}
+
+# Docker Compose uses `command` for the commander and worker roles. With an
+# ENTRYPOINT those commands still get the data-dir validation above, but should
+# not perform the monolith-only command registration below.
+if [ "$#" -gt 0 ] && ! is_default_app_command "$@"; then
   exec "$@"
 fi
 
-# === MongoDB-Verfuegbarkeit pruefen ===
-if [ -n "$MONGO_URL" ]; then
+if [ -n "${MONGO_URL:-}" ]; then
   MONGO_WAIT_SECONDS="${MONGO_WAIT_SECONDS:-30}"
-  echo "[INFO] Warte auf MongoDB ($MONGO_URL) fuer maximal ${MONGO_WAIT_SECONDS}s..."
-  WAITED=0
-  while [ "$WAITED" -lt "$MONGO_WAIT_SECONDS" ]; do
+  echo "[INFO] Waiting for MongoDB for up to ${MONGO_WAIT_SECONDS}s..."
+  waited=0
+  while [ "$waited" -lt "$MONGO_WAIT_SECONDS" ]; do
     if node -e "
       const { MongoClient } = require('mongodb');
-      const c = new MongoClient('$MONGO_URL', { serverSelectionTimeoutMS: 2000, connectTimeoutMS: 2000 });
-      c.connect().then(() => { c.close(); process.exit(0); }).catch(() => process.exit(1));
+      const client = new MongoClient(process.env.MONGO_URL, { serverSelectionTimeoutMS: 2000, connectTimeoutMS: 2000 });
+      client.connect().then(() => client.close()).then(() => process.exit(0)).catch(() => process.exit(1));
     " 2>/dev/null; then
-      echo "[INFO] MongoDB ist erreichbar."
+      echo "[INFO] MongoDB is reachable."
       break
     fi
-    WAITED=$((WAITED + 2))
+    waited=$((waited + 2))
     sleep 2
   done
-  if [ "$WAITED" -ge "$MONGO_WAIT_SECONDS" ]; then
-    echo "[WARN] MongoDB nicht erreichbar nach ${MONGO_WAIT_SECONDS}s. Starte trotzdem mit Datei-basierten Stores."
+  if [ "$waited" -ge "$MONGO_WAIT_SECONDS" ]; then
+    echo "[WARN] MongoDB was not reachable after ${MONGO_WAIT_SECONDS}s; starting with the configured runtime policy."
   fi
 fi
 
 if [ "${REGISTER_COMMANDS_ON_BOOT:-1}" = "1" ]; then
-  echo "[INFO] Registriere Discord-Commands..."
-  node /app/src/deploy-commands.js || echo "[WARN] Command-Registrierung fehlgeschlagen (ueberspringe)"
+  echo "[INFO] Registering Discord commands..."
+  node /app/src/deploy-commands.js || echo "[WARN] Command registration failed; continuing startup."
 fi
 
-echo "[INFO] Starte OmniFM..."
+echo "[INFO] Starting OmniFM..."
 exec node /app/src/index.js

@@ -1,6 +1,6 @@
 import fs from "node:fs";
-import path from "node:path";
 import { getDb, isConnected } from "../../lib/db.js";
+import { resolveRuntimeDataPath } from "../../lib/runtime-data-path.js";
 
 function buildPublicBotTotals(bots) {
   return bots.reduce(
@@ -62,7 +62,6 @@ export function createPublicRoutesHandler(deps) {
     loadStations,
     log,
     methodNotAllowed,
-    rootDir,
     sendJson,
     sendLocalizedError,
     webRootSource,
@@ -262,19 +261,19 @@ export function createPublicRoutesHandler(deps) {
         stores: {
           dashboardSessions: {
             backend: "json-file",
-            filePresent: fs.existsSync(path.join(rootDir, "dashboard.json")),
+            filePresent: fs.existsSync(resolveRuntimeDataPath("dashboard.json")),
           },
           premiumLicenses: {
             backend: "json-file",
-            filePresent: fs.existsSync(path.join(rootDir, "premium.json")),
+            filePresent: fs.existsSync(resolveRuntimeDataPath("premium.json")),
           },
           commandPermissions: {
             backend: "json-file",
-            filePresent: fs.existsSync(path.join(rootDir, "command-permissions.json")),
+            filePresent: fs.existsSync(resolveRuntimeDataPath("command-permissions.json")),
           },
           customStations: {
             backend: "json-file",
-            filePresent: fs.existsSync(path.join(rootDir, "custom-stations.json")),
+            filePresent: fs.existsSync(resolveRuntimeDataPath("custom-stations.json")),
           },
           listeningStats: {
             backend: isConnected() ? "mongodb+json-fallback" : "json-fallback",

@@ -13,4 +13,13 @@ if [[ $# -eq 0 ]]; then
   exit 0
 fi
 
+for arg in "$@"; do
+  case "$arg" in
+    up|create|start|run)
+      bash "$APP_DIR/init-data.sh"
+      break
+      ;;
+  esac
+done
+
 exec docker compose "$@"

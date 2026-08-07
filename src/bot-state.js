@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { log, logStoreLoadError } from "./lib/logging.js";
+import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
@@ -12,11 +13,11 @@ function resolveStatePath(value, fallbackPath) {
   return path.isAbsolute(raw) ? raw : path.resolve(rootDir, raw);
 }
 
-const STATE_FILE = resolveStatePath(process.env.OMNIFM_BOT_STATE_FILE, path.join(rootDir, "bot-state.json"));
+const STATE_FILE = resolveStatePath(process.env.OMNIFM_BOT_STATE_FILE, resolveRuntimeDataPath("bot-state.json"));
 const STATE_BACKUP_FILE = `${STATE_FILE}.bak`;
 const SPLIT_PROCESS_ROLE = String(process.env.BOT_PROCESS_ROLE || "").trim().toLowerCase();
 const SPLIT_STATE_STORAGE_ENABLED = SPLIT_PROCESS_ROLE === "commander" || SPLIT_PROCESS_ROLE === "worker";
-const SPLIT_STATE_DIR = resolveStatePath(process.env.BOT_STATE_SPLIT_DIR, path.join(rootDir, "bot-state"));
+const SPLIT_STATE_DIR = resolveStatePath(process.env.BOT_STATE_SPLIT_DIR, resolveRuntimeDataPath("bot-state"));
 
 function hasStateEntries(value) {
   return Boolean(value && typeof value === "object" && Object.keys(value).length > 0);
@@ -206,7 +207,7 @@ function saveState(state) {
     // (schlaegt fehl mit "Device or resource busy")
     if (fs.existsSync(STATE_FILE) && fs.statSync(STATE_FILE).isDirectory()) {
       log("WARN", `[bot-state] ${STATE_FILE} ist ein Verzeichnis - State wird nur im Speicher gehalten.`);
-      log("WARN", `[bot-state] Fix: echo '{}' > ./bot-state.json && docker compose up -d`);
+      log("WARN", "[bot-state] Fix: bash ./init-data.sh && bash ./scripts/compose.sh up -d");
       return;
     }
 

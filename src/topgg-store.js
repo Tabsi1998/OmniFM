@@ -1,9 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const STATE_FILE = path.resolve(__dirname, "..", "topgg.json");
+const STATE_FILE = resolveRuntimeDataPath("topgg.json");
 
 function emptyState() {
   return {

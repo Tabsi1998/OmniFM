@@ -1,10 +1,12 @@
 services:
   mongodb:
-    image: mongo:7
+    image: mongo:7.0.39-jammy
     container_name: omnifm-mongodb
     volumes:
       - mongodb_data:/data/db
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
@@ -12,41 +14,29 @@ services:
       retries: 5
       start_period: 10s
     environment:
-      - MONGO_INITDB_DATABASE=radio_bot
+      MONGO_INITDB_DATABASE: radio_bot
 
   omnifm:
     build: .
     container_name: omnifm
     init: true
+    user: "${OMNIFM_CONTAINER_UID:-1000}:${OMNIFM_CONTAINER_GID:-1000}"
     env_file:
       - .env
     environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=radio_bot
+      MONGO_URL: mongodb://mongodb:27017
+      DB_NAME: radio_bot
+      OMNIFM_RUNTIME_DATA_DIR: /app/runtime-data
     ports:
       - "${WEB_PORT:-8081}:${WEB_INTERNAL_PORT:-8080}"
     volumes:
-      - ./.env:/app/.env
-      - ./stations.json:/app/stations.json
-      - ./premium.json:/app/premium.json
-      - ./bot-state.json:/app/bot-state.json
-      - ./custom-stations.json:/app/custom-stations.json
-      - ./command-permissions.json:/app/command-permissions.json
-      - ./guild-languages.json:/app/guild-languages.json
-      - ./song-history.json:/app/song-history.json
-      - ./dashboard.json:/app/dashboard.json
-      - ./listening-stats.json:/app/listening-stats.json
-      - ./scheduled-events.json:/app/scheduled-events.json
-      - ./coupons.json:/app/coupons.json
-      - ./discordbotlist.json:/app/discordbotlist.json
-      - ./botsgg.json:/app/botsgg.json
-      - ./topgg.json:/app/topgg.json
-      - ./vote-events.json:/app/vote-events.json
-      - ./logs:/app/logs
+      - ./runtime-data:/app/runtime-data
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     healthcheck:
-      # Fix: curl statt node als Health-Check-Binary (schneller, kein ~200ms Node-Startup)
-      # curl wird jetzt explizit im Dockerfile installiert
       test:
         [
           "CMD",

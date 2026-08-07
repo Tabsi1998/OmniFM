@@ -1,13 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const STORE_FILE = path.resolve(__dirname, "..", "song-history.json");
+const STORE_FILE = resolveRuntimeDataPath("song-history.json");
 const BACKUP_FILE = `${STORE_FILE}.bak`;
 const SPLIT_PROCESS_ROLE = String(process.env.BOT_PROCESS_ROLE || "").trim().toLowerCase();
 const SPLIT_HISTORY_STORAGE_ENABLED = SPLIT_PROCESS_ROLE === "commander" || SPLIT_PROCESS_ROLE === "worker";
-const SPLIT_HISTORY_DIR = path.resolve(__dirname, "..", "song-history");
+const SPLIT_HISTORY_DIR = resolveRuntimeDataPath("song-history");
 const DEFAULT_MAX_PER_GUILD = 120;
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 30;
@@ -270,4 +269,3 @@ export function clearSongHistory(guildId) {
 export const addSongEntry = appendSongHistory;
 export const getHistory = getSongHistory;
 export const getGuildSongHistory = getSongHistory;
-

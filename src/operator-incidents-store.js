@@ -1,11 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { getDb, isConnected } from "./lib/db.js";
 import { log, onLoggedError } from "./lib/logging.js";
+import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const STORE_FILE = path.resolve(__dirname, "..", "operator-incidents.json");
+const STORE_FILE = resolveRuntimeDataPath("operator-incidents.json");
 const BACKUP_FILE = `${STORE_FILE}.bak`;
 const MAX_FALLBACK_INCIDENTS = 500;
 const OPERATOR_INCIDENT_REPEAT_COOLDOWN_MS = Math.max(

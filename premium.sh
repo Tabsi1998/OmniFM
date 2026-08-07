@@ -13,6 +13,7 @@ if command -v docker >/dev/null 2>&1 && docker compose ps --services --status ru
 fi
 
 if command -v docker >/dev/null 2>&1; then
+  bash "$APP_DIR/init-data.sh"
   exec docker compose run --rm --no-deps --build omnifm node /app/src/premium-cli.js "$@"
 fi
 

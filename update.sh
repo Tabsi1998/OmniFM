@@ -41,6 +41,11 @@ fail()  { echo -e "  ${RED}[FAIL]${NC} $*"; }
 
 APP_DIR="${APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 cd "$APP_DIR"
+RUNTIME_DATA_DIR="${OMNIFM_HOST_RUNTIME_DATA_DIR:-$APP_DIR/runtime-data}"
+
+runtime_data_file() {
+  printf "%s/%s" "$RUNTIME_DATA_DIR" "$1"
+}
 
 # shellcheck source=/dev/null
 source "$APP_DIR/scripts/runtime-compose.sh"
@@ -313,8 +318,8 @@ read_env() {
 
 get_logs_dir() {
   local logs_dir
-  logs_dir="$(echo "$(read_env "LOGS_DIR" "logs")" | xargs)"
-  [[ -z "$logs_dir" ]] && logs_dir="logs"
+  logs_dir="$(echo "$(read_env "LOGS_DIR" "runtime-data/logs")" | xargs)"
+  [[ -z "$logs_dir" ]] && logs_dir="runtime-data/logs"
 
   if [[ "$logs_dir" == /* || "$logs_dir" =~ ^[A-Za-z]:[\\/].* ]]; then
     printf "%s" "$logs_dir"
@@ -1211,7 +1216,7 @@ json_validation_available_local() {
 
 json_file_can_use_container_validation() {
   local fp="$1"
-  [[ "$fp" =~ ^[A-Za-z0-9._-]+\.json$ ]] || return 1
+  [[ "$(basename "$fp")" =~ ^[A-Za-z0-9._-]+\.json$ ]] || return 1
   refresh_compose_environment
   docker compose ps --services --filter status=running 2>/dev/null | grep -q '^omnifm$'
 }
@@ -1260,10 +1265,11 @@ PY
 }
 
 json_file_is_valid_in_omnifm() {
-  local fp="$1"
+  local fp="$1" container_file
   json_file_can_use_container_validation "$fp" || return 1
   refresh_compose_environment
-  docker compose exec -T omnifm node -e "const fs=require('fs'); const p=process.argv[1]; if(!fs.statSync(p).isFile()) process.exit(2); JSON.parse(fs.readFileSync(p, 'utf8'));" "/app/${fp}" >/dev/null 2>&1
+  container_file="/app/runtime-data/$(basename "$fp")"
+  docker compose exec -T omnifm node -e "const fs=require('fs'); const p=process.argv[1]; if(!fs.statSync(p).isFile()) process.exit(2); JSON.parse(fs.readFileSync(p, 'utf8'));" "$container_file" >/dev/null 2>&1
 }
 
 runtime_json_default_content() {
@@ -1278,11 +1284,12 @@ runtime_json_default_content() {
 
 repair_json_file() {
   local fp="$1" content="${2:-{}}"
-  local stamp corrupt_copy latest_backup backup_file
+  local stamp corrupt_copy latest_backup backup_file backup_name
 
   mkdir -p .update-backups
   stamp="$(date +%Y%m%d%H%M%S)"
-  corrupt_copy=".update-backups/${fp}.corrupt.${stamp}"
+  backup_name="$(basename "$fp")"
+  corrupt_copy=".update-backups/${backup_name}.corrupt.${stamp}"
   cp "$fp" "$corrupt_copy" 2>/dev/null || true
 
   backup_file="${fp}.bak"
@@ -1294,7 +1301,7 @@ repair_json_file() {
     fi
   fi
 
-  latest_backup="$(ls -t ".update-backups/${fp}."* 2>/dev/null | head -1 || true)"
+  latest_backup="$(ls -t ".update-backups/${backup_name}."* 2>/dev/null | head -1 || true)"
   if [[ -n "$latest_backup" ]] && [[ -s "$latest_backup" ]] && json_file_is_valid "$latest_backup"; then
     cp "$latest_backup" "$fp"
     if json_file_is_valid "$fp"; then
@@ -1308,57 +1315,60 @@ repair_json_file() {
 }
 
 ensure_all_json_files() {
-  ensure_json_file "premium.json"         '{"licenses":{}}'
-  ensure_json_file "bot-state.json"       '{}'
-  ensure_json_file "custom-stations.json" '{}'
-  ensure_json_file "command-permissions.json" '{"guilds":{}}'
-  ensure_json_file "guild-languages.json" '{"version":1,"guilds":{}}'
-  ensure_json_file "song-history.json" '{"guilds":{}}'
-  ensure_json_file "listening-stats.json" '{"version":1,"guilds":{}}'
-  ensure_json_file "scheduled-events.json" '{"version":1,"events":[]}'
-  ensure_json_file "coupons.json" '{"offers":{},"redemptions":{}}'
-  ensure_json_file "dashboard.json" '{"version":1,"events":{},"perms":{},"telemetry":{},"authSessions":{},"oauthStates":{}}'
-  ensure_json_file "discordbotlist.json" '{"version":1,"totalVotes":0,"votes":[],"lastWebhookVoteAt":null,"lastCommandsSync":null,"lastStatsSync":null,"lastVoteSync":null}'
-  ensure_json_file "botsgg.json" '{"version":1,"lastStatsSync":null}'
-  ensure_json_file "topgg.json" '{"version":1,"project":null,"lastProjectSync":null,"lastCommandsSync":null,"lastStatsSync":null,"lastVoteSync":null,"lastWebhookVoteAt":null,"lastWebhookTestAt":null}'
-  ensure_json_file "vote-events.json" '{"version":1,"totalVotes":0,"votes":[],"providers":{"discordbotlist":{"totalVotes":0,"lastVoteAt":null,"lastReceivedAt":null},"topgg":{"totalVotes":0,"lastVoteAt":null,"lastReceivedAt":null}}}'
-  # stations.json nur erstellen wenn komplett fehlend
-  if [[ -d "stations.json" ]]; then
-    rm -rf "stations.json" 2>/dev/null || true
-  fi
-  if [[ ! -f "stations.json" ]]; then
-    echo '{"defaultStationKey":null,"stations":{},"qualityPreset":"custom"}' > stations.json
-  fi
+  prepare_omnifm_runtime_data "$APP_DIR"
+  ensure_json_file "$(runtime_data_file "premium.json")"         '{"licenses":{}}'
+  ensure_json_file "$(runtime_data_file "bot-state.json")"       '{}'
+  ensure_json_file "$(runtime_data_file "custom-stations.json")" '{}'
+  ensure_json_file "$(runtime_data_file "command-permissions.json")" '{"guilds":{}}'
+  ensure_json_file "$(runtime_data_file "guild-languages.json")" '{"version":1,"guilds":{}}'
+  ensure_json_file "$(runtime_data_file "song-history.json")" '{"guilds":{}}'
+  ensure_json_file "$(runtime_data_file "listening-stats.json")" '{"version":1,"guilds":{}}'
+  ensure_json_file "$(runtime_data_file "scheduled-events.json")" '{"version":1,"events":[]}'
+  ensure_json_file "$(runtime_data_file "coupons.json")" '{"offers":{},"redemptions":{}}'
+  ensure_json_file "$(runtime_data_file "dashboard.json")" '{"version":1,"events":{},"perms":{},"telemetry":{},"authSessions":{},"oauthStates":{}}'
+  ensure_json_file "$(runtime_data_file "discordbotlist.json")" '{"version":1,"totalVotes":0,"votes":[],"lastWebhookVoteAt":null,"lastCommandsSync":null,"lastStatsSync":null,"lastVoteSync":null}'
+  ensure_json_file "$(runtime_data_file "botsgg.json")" '{"version":1,"lastStatsSync":null}'
+  ensure_json_file "$(runtime_data_file "topgg.json")" '{"version":1,"project":null,"lastProjectSync":null,"lastCommandsSync":null,"lastStatsSync":null,"lastVoteSync":null,"lastWebhookVoteAt":null,"lastWebhookTestAt":null}'
+  ensure_json_file "$(runtime_data_file "vote-events.json")" '{"version":1,"totalVotes":0,"votes":[],"providers":{"discordbotlist":{"totalVotes":0,"lastVoteAt":null,"lastReceivedAt":null},"topgg":{"totalVotes":0,"lastVoteAt":null,"lastReceivedAt":null}}}'
+  ensure_json_file "$(runtime_data_file "operator-incidents.json")" '{}'
+  ensure_json_file "$(runtime_data_file "runtime-incidents.json")" '{}'
+  ensure_json_file "$(runtime_data_file "owner-audit.json")" '{"version":1,"events":[]}'
+  ensure_json_file "$(runtime_data_file "stations.json")" '{"defaultStationKey":null,"stations":{},"qualityPreset":"custom"}'
 }
 
 ensure_split_state_dirs() {
-  if [[ -f "bot-state" ]]; then
-    warn "bot-state war eine Datei statt ein Verzeichnis - korrigiere auf Verzeichnis."
-    rm -f "bot-state" 2>/dev/null || true
+  local bot_state_dir song_history_dir logs_dir
+  bot_state_dir="$(runtime_data_file "bot-state")"
+  song_history_dir="$(runtime_data_file "song-history")"
+  logs_dir="$(runtime_data_file "logs")"
+  if [[ -f "$bot_state_dir" ]]; then
+    warn "runtime-data/bot-state war eine Datei statt ein Verzeichnis - korrigiere auf Verzeichnis."
+    rm -f "$bot_state_dir" 2>/dev/null || true
   fi
-  if [[ -f "song-history" ]]; then
-    warn "song-history war eine Datei statt ein Verzeichnis - korrigiere auf Verzeichnis."
-    rm -f "song-history" 2>/dev/null || true
+  if [[ -f "$song_history_dir" ]]; then
+    warn "runtime-data/song-history war eine Datei statt ein Verzeichnis - korrigiere auf Verzeichnis."
+    rm -f "$song_history_dir" 2>/dev/null || true
   fi
-  mkdir -p logs bot-state song-history
+  mkdir -p "$logs_dir" "$bot_state_dir" "$song_history_dir"
 }
 
 repair_runtime_json_mount_dirs() {
-  local json_file host_repair_needed=0 restart_needed=0 was_running=0 default_content=""
+  local json_file json_path host_repair_needed=0 restart_needed=0 was_running=0 default_content=""
   local -a runtime_services=()
 
   for json_file in discordbotlist.json botsgg.json topgg.json vote-events.json; do
-    if [[ -d "$json_file" || ! -f "$json_file" ]]; then
+    json_path="$(runtime_data_file "$json_file")"
+    if [[ -d "$json_path" || ! -f "$json_path" ]]; then
       host_repair_needed=1
       restart_needed=1
       continue
     fi
-    if json_validation_available_local && ! json_file_is_valid "$json_file"; then
+    if json_validation_available_local && ! json_file_is_valid "$json_path"; then
       host_repair_needed=1
       restart_needed=1
       continue
     fi
-    if json_file_can_use_container_validation "$json_file" && ! json_file_is_valid_in_omnifm "$json_file"; then
+    if json_file_can_use_container_validation "$json_path" && ! json_file_is_valid_in_omnifm "$json_path"; then
       restart_needed=1
     fi
   done
@@ -1374,18 +1384,19 @@ repair_runtime_json_mount_dirs() {
 
   if (( host_repair_needed )); then
     for json_file in discordbotlist.json botsgg.json topgg.json vote-events.json; do
+      json_path="$(runtime_data_file "$json_file")"
       default_content="$(runtime_json_default_content "$json_file")"
-      if [[ -d "$json_file" ]]; then
-        info "Korrigiere $json_file (war Verzeichnis statt Datei)..."
-        rm -rf "$json_file" 2>/dev/null || true
+      if [[ -d "$json_path" ]]; then
+        info "Korrigiere runtime-data/$json_file (war Verzeichnis statt Datei)..."
+        rm -rf "$json_path" 2>/dev/null || true
       fi
-      if [[ ! -f "$json_file" ]]; then
-        write_json_file "$json_file" "$default_content"
-      elif json_validation_available_local && ! json_file_is_valid "$json_file"; then
-        repair_json_file "$json_file" "$default_content"
+      if [[ ! -f "$json_path" ]]; then
+        write_json_file "$json_path" "$default_content"
+      elif json_validation_available_local && ! json_file_is_valid "$json_path"; then
+        repair_json_file "$json_path" "$default_content"
       fi
-      if [[ ! -f "$json_file" ]]; then
-        write_json_file "$json_file" "$default_content"
+      if [[ ! -f "$json_path" ]]; then
+        write_json_file "$json_path" "$default_content"
       fi
     done
   fi
@@ -1684,44 +1695,45 @@ run_system_doctor() {
   # 4) JSON Files
   repair_runtime_json_mount_dirs
   ensure_all_json_files
-  local json_file
-  for json_file in premium.json bot-state.json custom-stations.json command-permissions.json guild-languages.json song-history.json listening-stats.json scheduled-events.json coupons.json dashboard.json discordbotlist.json botsgg.json topgg.json vote-events.json stations.json; do
-    if [[ ! -f "$json_file" ]]; then
-      if [[ -d "$json_file" ]]; then
-        doctor_fail "Pfad ist noch ein Verzeichnis: ${json_file}"
+  local json_file json_path
+  for json_file in premium.json bot-state.json custom-stations.json command-permissions.json guild-languages.json song-history.json listening-stats.json scheduled-events.json coupons.json dashboard.json discordbotlist.json botsgg.json topgg.json vote-events.json operator-incidents.json runtime-incidents.json owner-audit.json stations.json; do
+    json_path="$(runtime_data_file "$json_file")"
+    if [[ ! -f "$json_path" ]]; then
+      if [[ -d "$json_path" ]]; then
+        doctor_fail "Pfad ist noch ein Verzeichnis: runtime-data/${json_file}"
       else
-        doctor_fail "Datei fehlt: ${json_file}"
+        doctor_fail "Datei fehlt: runtime-data/${json_file}"
       fi
       continue
     fi
     if [[ "$json_file" =~ ^(discordbotlist|botsgg|topgg|vote-events)\.json$ ]]; then
-      if json_validation_available_local && ! json_file_is_valid "$json_file"; then
-        doctor_fail "JSON fehlerhaft auf Host: ${json_file}"
+      if json_validation_available_local && ! json_file_is_valid "$json_path"; then
+        doctor_fail "JSON fehlerhaft auf Host: runtime-data/${json_file}"
         continue
       fi
-      if json_file_can_use_container_validation "$json_file"; then
-        if json_file_is_valid_in_omnifm "$json_file"; then
-          doctor_ok "JSON ok: ${json_file}"
+      if json_file_can_use_container_validation "$json_path"; then
+        if json_file_is_valid_in_omnifm "$json_path"; then
+          doctor_ok "JSON ok: runtime-data/${json_file}"
         else
-          doctor_fail "JSON/Bind-Mount im Container fehlerhaft: ${json_file}"
+          doctor_fail "JSON/Bind-Mount im Container fehlerhaft: runtime-data/${json_file}"
         fi
         continue
       fi
       if json_validation_available_local; then
-        doctor_ok "JSON ok: ${json_file}"
+        doctor_ok "JSON ok: runtime-data/${json_file}"
       else
-        doctor_warn "JSON-Syntax nicht geprueft: ${json_file} (kein lokaler Parser, omnifm nicht aktiv)"
+        doctor_warn "JSON-Syntax nicht geprueft: runtime-data/${json_file} (kein lokaler Parser, omnifm nicht aktiv)"
       fi
       continue
     fi
     if ! json_validation_available_local; then
-      doctor_warn "JSON-Syntax nicht geprueft: ${json_file} (kein lokaler Parser)"
+      doctor_warn "JSON-Syntax nicht geprueft: runtime-data/${json_file} (kein lokaler Parser)"
       continue
     fi
-    if json_file_is_valid "$json_file"; then
-      doctor_ok "JSON ok: ${json_file}"
+    if json_file_is_valid "$json_path"; then
+      doctor_ok "JSON ok: runtime-data/${json_file}"
     else
-      doctor_fail "JSON fehlerhaft: ${json_file}"
+      doctor_fail "JSON fehlerhaft: runtime-data/${json_file}"
     fi
   done
 
@@ -1951,6 +1963,7 @@ compose_build() {
 
 compose_up() {
   refresh_compose_environment
+  prepare_omnifm_runtime_data "$APP_DIR"
   if docker compose up -d --remove-orphans; then
     return 0
   fi
@@ -1960,6 +1973,7 @@ compose_up() {
 
 compose_up_no_deps() {
   refresh_compose_environment
+  prepare_omnifm_runtime_data "$APP_DIR"
   if docker compose up -d --no-deps "$@"; then
     return 0
   fi
@@ -1996,6 +2010,7 @@ wait_for_compose_service_running() {
 
 compose_up_with_build() {
   refresh_compose_environment
+  prepare_omnifm_runtime_data "$APP_DIR"
   info "$(compose_deployment_summary "$APP_DIR")"
   if docker compose up -d --build --remove-orphans; then
     report_runtime_tools_status
@@ -2179,7 +2194,7 @@ ensure_env_default "WORKER_AUTOHEAL_ENABLED" "1"
 ensure_env_default "WORKER_AUTOHEAL_CHECK_MS" "30000"
 ensure_env_default "WORKER_AUTOHEAL_GRACE_MS" "600000"
 ensure_env_default "WORKER_AUTOHEAL_RECOVERING_MS" "1200000"
-ensure_env_default "BOT_STATE_SPLIT_DIR" "bot-state"
+ensure_env_default "BOT_STATE_SPLIT_DIR" "runtime-data/bot-state"
 ensure_env_default "DISCORD_OAUTH_SCOPES" "identify guilds"
 ensure_env_default "DASHBOARD_SESSION_COOKIE" "omnifm_session"
 ensure_env_default "DASHBOARD_SESSION_TTL_SECONDS" "86400"
@@ -2225,9 +2240,21 @@ ensure_env_default "WEB_PORT" "8081"
 ensure_env_default "WEB_INTERNAL_PORT" "8080"
 ensure_env_default "WEB_BIND" "0.0.0.0"
 ensure_env_default "WEB_DOMAIN" ""
-ensure_env_default "LOGS_DIR" "logs"
+ensure_env_default "LOGS_DIR" "runtime-data/logs"
 write_env_line "BOT_COUNT" "$(count_bots)"
 write_env_line "COMMANDER_BOT_INDEX" "$(compose_resolve_commander_index "$APP_DIR")"
+refresh_compose_environment
+
+# Legacy Docker defaults wrote outside the only persistent runtime-data mount.
+# Migrate only the known old defaults; custom operator paths remain untouched.
+if [[ "$(read_env "BOT_STATE_SPLIT_DIR" "")" == "bot-state" ]]; then
+  warn "Migration: BOT_STATE_SPLIT_DIR wird nach runtime-data/bot-state verschoben."
+  write_env_line "BOT_STATE_SPLIT_DIR" "runtime-data/bot-state"
+fi
+if [[ "$(read_env "LOGS_DIR" "")" == "logs" ]]; then
+  warn "Migration: LOGS_DIR wird nach runtime-data/logs verschoben."
+  write_env_line "LOGS_DIR" "runtime-data/logs"
+fi
 refresh_compose_environment
 
 # Einmalige Migration: fruehere Defaults hatten CLEAN_GUILD_COMMANDS_ON_BOOT=1.
@@ -3977,17 +4004,28 @@ if [[ -f .env ]]; then
   cp .env ".update-backups/.env.$(date +%Y%m%d%H%M%S)"
 fi
 
+# Runtime data is outside Git and must be archived before a code update. The
+# initializer also performs the one-time migration from legacy root JSON files.
+prepare_omnifm_runtime_data "$APP_DIR"
+if [[ "${OMNIFM_SKIP_RUNTIME_BACKUP:-0}" == "1" ]]; then
+  warn "Runtime-data backup was explicitly skipped (OMNIFM_SKIP_RUNTIME_BACKUP=1)."
+elif ! bash "$APP_DIR/scripts/backup-runtime-data.sh" create; then
+  fail "Runtime-data backup failed; refusing to continue with the update."
+  exit 1
+fi
+
 # Pull latest code
 info "Hole neuesten Code von ${REMOTE}/${BRANCH}..."
 update_stamp="$(date +%Y%m%d%H%M%S)"
-licenses_before_update="$(count_license_entries premium.json)"
+licenses_before_update="$(count_license_entries "$(runtime_data_file "premium.json")")"
 update_strategy="$(select_update_strategy "${MODE_ARG:-}")"
 info "Update-Strategie: ${update_strategy}"
 
 # WICHTIG: Premium-Daten IMMER sichern vor Update!
-for pf in premium.json bot-state.json custom-stations.json command-permissions.json guild-languages.json song-history.json listening-stats.json scheduled-events.json coupons.json dashboard.json discordbotlist.json botsgg.json topgg.json vote-events.json; do
-  if [[ -f "$pf" ]]; then
-    cp "$pf" ".update-backups/${pf}.${update_stamp}" 2>/dev/null || true
+for pf in premium.json bot-state.json custom-stations.json command-permissions.json guild-languages.json song-history.json listening-stats.json scheduled-events.json coupons.json dashboard.json discordbotlist.json botsgg.json topgg.json vote-events.json operator-incidents.json runtime-incidents.json owner-audit.json; do
+  runtime_pf="$(runtime_data_file "$pf")"
+  if [[ -f "$runtime_pf" ]]; then
+    cp "$runtime_pf" ".update-backups/${pf}.${update_stamp}" 2>/dev/null || true
   fi
 done
 prune_update_backups
@@ -4007,6 +4045,7 @@ old_head="$(git rev-parse HEAD 2>/dev/null || echo "unknown")"
 git reset --hard "$REMOTE/$BRANCH"
 new_head="$(git rev-parse HEAD 2>/dev/null || echo "unknown")"
 git clean -fd \
+  -e runtime-data \
   -e logs \
   -e bot-state \
   -e song-history \
@@ -4031,38 +4070,41 @@ git clean -fd \
 
 # Laufzeitdaten immer aus dem VOR-Update Snapshot wiederherstellen,
 # damit git reset keine produktiven JSON-Daten ueberschreibt.
-for pf in premium.json bot-state.json custom-stations.json command-permissions.json guild-languages.json song-history.json listening-stats.json scheduled-events.json coupons.json dashboard.json discordbotlist.json botsgg.json topgg.json vote-events.json; do
+for pf in premium.json bot-state.json custom-stations.json command-permissions.json guild-languages.json song-history.json listening-stats.json scheduled-events.json coupons.json dashboard.json discordbotlist.json botsgg.json topgg.json vote-events.json operator-incidents.json runtime-incidents.json owner-audit.json; do
+  runtime_pf="$(runtime_data_file "$pf")"
   snapshot=".update-backups/${pf}.${update_stamp}"
   if [[ -s "$snapshot" ]]; then
-    if ! cmp -s "$snapshot" "$pf" 2>/dev/null; then
-      cp "$snapshot" "$pf"
-      info "${pf} aus Pre-Update Snapshot wiederhergestellt."
+    if ! cmp -s "$snapshot" "$runtime_pf" 2>/dev/null; then
+      mkdir -p "$(dirname "$runtime_pf")"
+      cp "$snapshot" "$runtime_pf"
+      info "runtime-data/${pf} aus Pre-Update Snapshot wiederhergestellt."
     fi
   fi
 done
 
 # Sicherheitscheck: Premium-Daten duerfen NICHT leer sein nach Update
-for pf in premium.json bot-state.json custom-stations.json command-permissions.json guild-languages.json song-history.json listening-stats.json scheduled-events.json coupons.json dashboard.json discordbotlist.json botsgg.json topgg.json vote-events.json; do
-  if [[ -f "$pf" ]] && [[ ! -s "$pf" ]]; then
+for pf in premium.json bot-state.json custom-stations.json command-permissions.json guild-languages.json song-history.json listening-stats.json scheduled-events.json coupons.json dashboard.json discordbotlist.json botsgg.json topgg.json vote-events.json operator-incidents.json runtime-incidents.json owner-audit.json; do
+  runtime_pf="$(runtime_data_file "$pf")"
+  if [[ -f "$runtime_pf" ]] && [[ ! -s "$runtime_pf" ]]; then
     latest_backup=$(ls -t ".update-backups/${pf}."* 2>/dev/null | head -1)
     if [[ -n "$latest_backup" ]] && [[ -s "$latest_backup" ]]; then
-      warn "${pf} ist leer nach Update - stelle Backup wieder her..."
-      cp "$latest_backup" "$pf"
-      ok "${pf} aus Backup wiederhergestellt."
+      warn "runtime-data/${pf} ist leer nach Update - stelle Backup wieder her..."
+      cp "$latest_backup" "$runtime_pf"
+      ok "runtime-data/${pf} aus Backup wiederhergestellt."
     fi
   fi
 done
 
 # Zusätzlicher Guard: Wenn vor dem Update Lizenzen da waren, nach dem Update aber nicht mehr,
 # stelle sofort das letzte Backup wieder her.
-licenses_after_update="$(count_license_entries premium.json)"
+licenses_after_update="$(count_license_entries "$(runtime_data_file "premium.json")")"
 if [[ "${licenses_before_update:-0}" -gt 0 && "${licenses_after_update:-0}" -lt "${licenses_before_update:-0}" ]]; then
   latest_premium_backup="$(ls -t .update-backups/premium.json.* 2>/dev/null | head -1)"
   if [[ -n "$latest_premium_backup" && -s "$latest_premium_backup" ]]; then
-    warn "Lizenzanzahl kleiner nach Update (${licenses_before_update} -> ${licenses_after_update}) - stelle premium.json aus Backup wieder her..."
-    cp "$latest_premium_backup" premium.json
-    licenses_after_update="$(count_license_entries premium.json)"
-    ok "premium.json wiederhergestellt (Lizenzen: ${licenses_after_update})."
+    warn "Lizenzanzahl kleiner nach Update (${licenses_before_update} -> ${licenses_after_update}) - stelle runtime-data/premium.json aus Backup wieder her..."
+    cp "$latest_premium_backup" "$(runtime_data_file "premium.json")"
+    licenses_after_update="$(count_license_entries "$(runtime_data_file "premium.json")")"
+    ok "runtime-data/premium.json wiederhergestellt (Lizenzen: ${licenses_after_update})."
   fi
 fi
 

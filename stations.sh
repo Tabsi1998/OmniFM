@@ -22,5 +22,6 @@ running_services="$(docker compose ps --services --status running 2>/dev/null ||
 if printf "%s\n" "$running_services" | grep -q "^omnifm$"; then
   docker compose exec -T omnifm node /app/src/stations-cli.js "$@"
 else
+  bash "$APP_DIR/init-data.sh"
   docker compose run --rm --no-deps --build omnifm node /app/src/stations-cli.js "$@"
 fi

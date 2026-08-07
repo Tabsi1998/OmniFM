@@ -1,9 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const STORE_FILE = path.resolve(__dirname, "..", "coupons.json");
+const STORE_FILE = resolveRuntimeDataPath("coupons.json");
 const BACKUP_FILE = `${STORE_FILE}.bak`;
 const OFFER_KINDS = new Set(["coupon", "referral"]);
 const OFFER_FULFILLMENT_MODES = new Set(["discount", "direct_grant"]);

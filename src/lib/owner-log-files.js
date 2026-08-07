@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { rootDir } from "./logging.js";
+import { logsDir, rootDir } from "./logging.js";
 
 const DEFAULT_TAIL_BYTES = 80_000;
 const MAX_TAIL_BYTES = 300_000;
@@ -13,7 +13,7 @@ const SENSITIVE_KEY_RE = /(token|secret|password|pass|api[_-]?key|authorization|
 function resolveOwnerLogsDir() {
   const explicit = String(process.env.OMNIFM_OWNER_LOGS_DIR || process.env.LOGS_DIR || "").trim();
   if (explicit) return path.isAbsolute(explicit) ? explicit : path.resolve(rootDir, explicit);
-  return path.join(rootDir, "logs");
+  return logsDir;
 }
 
 function isAllowedLogFileName(fileName) {

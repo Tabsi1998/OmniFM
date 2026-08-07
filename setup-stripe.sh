@@ -58,6 +58,7 @@ info "Starte Container neu damit der Key aktiv wird..."
 
 if command -v docker >/dev/null 2>&1; then
   # WICHTIG: up -d statt restart - restart liest .env NICHT neu ein!
+  bash "$APP_DIR/init-data.sh"
   docker compose up -d --build --remove-orphans 2>/dev/null || {
     warn "Build fehlgeschlagen, versuche ohne --build..."
     docker compose up -d --remove-orphans 2>/dev/null || true

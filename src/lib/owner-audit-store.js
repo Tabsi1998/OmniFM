@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import { rootDir } from "./logging.js";
 import { withFileStoreLock } from "./file-store-lock.js";
+import { resolveRuntimeDataPath } from "./runtime-data-path.js";
 
 const MAX_AUDIT_EVENTS = 500;
 const DEFAULT_AUDIT_LIMIT = 100;
@@ -13,7 +14,7 @@ const SENSITIVE_KEY_RE = /(token|secret|password|pass|api[_-]?key|authorization|
 function resolveOwnerAuditFilePath() {
   const explicit = String(process.env.OMNIFM_OWNER_AUDIT_FILE || "").trim();
   if (explicit) return path.isAbsolute(explicit) ? explicit : path.resolve(rootDir, explicit);
-  return path.join(rootDir, "owner-audit.json");
+  return resolveRuntimeDataPath("owner-audit.json");
 }
 
 function emptyAuditState() {

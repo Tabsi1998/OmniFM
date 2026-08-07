@@ -3,12 +3,11 @@
 // ============================================================
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { getDb } from "./lib/db.js";
 import { log, logStoreLoadError } from "./lib/logging.js";
+import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const stationsPath = path.resolve(__dirname, "..", "stations.json");
+const stationsPath = resolveRuntimeDataPath("stations.json");
 
 const QUALITY_PRESETS = new Set(["low", "medium", "high", "custom"]);
 const COLLECTION = "stations";
