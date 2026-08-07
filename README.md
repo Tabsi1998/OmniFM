@@ -39,9 +39,10 @@ It is not the production backend and is not part of the CI release gate.
 
 ## Quick Start
 
-1. Copy `.env.example` to `.env`.
-2. Fill at least `BOT_1_TOKEN` and `BOT_1_CLIENT_ID`.
-3. Run the installer or start directly with Docker:
+1. For a local Node installation, use Node.js 22.x. Node 24 is not supported because the native audio dependency does not provide a Windows prebuild for it.
+2. Copy `.env.example` to `.env`.
+3. Fill at least `BOT_1_TOKEN` and `BOT_1_CLIENT_ID`.
+4. Run the installer or start directly with Docker:
 
 ```bash
 ./install.sh
@@ -49,7 +50,7 @@ bash ./scripts/compose.sh up -d --build
 bash ./scripts/compose.sh logs -f omnifm
 ```
 
-4. Check the backend:
+5. Check the backend:
 
 ```bash
 curl http://localhost:8081/api/health
