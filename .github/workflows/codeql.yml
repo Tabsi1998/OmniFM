@@ -64,7 +64,7 @@ jobs:
         run: |
           echo "::notice title=CodeQL skipped::GitHub code scanning is not available for this repository (HTTP ${{ steps.support.outputs.http_status }}). Enable code scanning or GitHub Advanced Security if you want this check enforced."
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: steps.support.outputs.supported == 'true'
         with:
           node-version: 22
