@@ -20,3 +20,27 @@
 # artifact even though the frontend source itself is allowlisted above.
 frontend/node_modules
 frontend/build
+
+# Re-included source trees must not make local credentials part of a build
+# context. Keep these rules after the allowlist so they also apply below src/,
+# frontend/, data/, and web/. Character classes make the policy case-robust on
+# hosts whose filesystems preserve mixed-case filenames.
+**/.[Ee][Nn][Vv]
+**/.[Ee][Nn][Vv].*
+**/.[Ee][Nn][Vv][Rr][Cc]
+**/.[Nn][Pp][Mm][Rr][Cc]
+**/.[Nn][Ee][Tt][Rr][Cc]
+**/[Cc][Rr][Ee][Dd][Ee][Nn][Tt][Ii][Aa][Ll][Ss]/**
+**/[Ss][Ee][Cc][Rr][Ee][Tt][Ss]/**
+**/*[Cc][Rr][Ee][Dd][Ee][Nn][Tt][Ii][Aa][Ll]*
+**/*[Ss][Ee][Cc][Rr][Ee][Tt]*
+**/*[Tt][Oo][Kk][Ee][Nn]*
+**/*[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]*
+**/*.[Kk][Ee][Yy]
+**/*.[Pp][Ee][Mm]
+**/*.[Pp]12
+**/*.[Pp][Ff][Xx]
+**/*.[Pp]8
+**/*.[Kk][Dd][Bb][Xx]
+**/[Ii][Dd]_[Rr][Ss][Aa]
+**/[Ii][Dd]_[Ee][Dd]25519
