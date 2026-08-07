@@ -33,9 +33,9 @@ jobs:
       SKIP_AUTHENTICATED_API: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_authenticated_api || false }}
       OMNIFM_ADMIN_TOKEN: ${{ secrets.OMNIFM_LIVE_ADMIN_TOKEN }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
