@@ -152,6 +152,8 @@ test("github automation files and docs stay in sync", async () => {
   const dependabot = await readText(".github/dependabot.yml");
   expectIncludes(dependabot, "package-ecosystem: github-actions", "dependabot actions config missing");
   expectIncludes(dependabot, "directory: /frontend", "dependabot frontend config missing");
+  expectIncludes(dependabot, "package-ecosystem: pip", "dependabot Python config missing");
+  expectIncludes(dependabot, "directory: /backend", "dependabot backend directory missing");
   expectIncludes(dependabot, "dependency-name: \"react\"", "dependabot React major ignore missing");
   expectIncludes(dependabot, "dependency-name: \"react-dom\"", "dependabot ReactDOM major ignore missing");
   expectIncludes(dependabot, "version-update:semver-major", "dependabot major-version ignore policy missing");
@@ -187,12 +189,19 @@ test("github automation files and docs stay in sync", async () => {
   expectIncludes(backendReadme, "archived as a legacy/reference implementation", "backend README legacy status missing");
   expectIncludes(backendReadme, "not part of the CI release gate", "backend README CI status missing");
   expectIncludes(backendReadme, "OMNIFM_RUN_LEGACY_BACKEND_TESTS=1", "backend README opt-in missing");
+  expectIncludes(backendReadme, "pip-audit -r backend/requirements.txt", "backend README audit command missing");
 
   const backendRequirements = await readText("backend/requirements.txt");
   expectIncludes(backendRequirements, "Legacy/reference backend only", "backend requirements legacy note missing");
   for (const packageName of ["fastapi", "uvicorn", "python-dotenv", "pymongo", "requests", "pytest"]) {
     expectMatches(backendRequirements, new RegExp(`^${packageName}==`, "m"), `backend requirements missing ${packageName}`);
   }
+  expectIncludes(backendRequirements, "python-dotenv==1.2.2", "backend dotenv security pin missing");
+  expectIncludes(backendRequirements, "fastapi==0.141.1", "backend FastAPI security pin missing");
+  expectIncludes(backendRequirements, "uvicorn==0.52.1", "backend Uvicorn security pin missing");
+  expectIncludes(backendRequirements, "pymongo==4.17.0", "backend pymongo security pin missing");
+  expectIncludes(backendRequirements, "requests==2.34.2", "backend requests security pin missing");
+  expectIncludes(backendRequirements, "pytest==9.1.1", "backend pytest security pin missing");
   assert.equal(
     backendRequirements.split(/\r?\n/).filter((line) => line.trim() && !line.trim().startsWith("#")).length,
     6,
