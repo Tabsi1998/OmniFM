@@ -206,7 +206,7 @@ test("github automation files and docs stay in sync", async () => {
   }
   expectIncludes(backendRequirements, "python-dotenv==1.2.2", "backend dotenv security pin missing");
   expectIncludes(backendRequirements, "fastapi==0.141.1", "backend FastAPI security pin missing");
-  expectIncludes(backendRequirements, "uvicorn==0.52.1", "backend Uvicorn security pin missing");
+  expectIncludes(backendRequirements, "uvicorn==0.52.3", "backend Uvicorn security pin missing");
   expectIncludes(backendRequirements, "pymongo==4.17.0", "backend pymongo security pin missing");
   expectIncludes(backendRequirements, "requests==2.34.2", "backend requests security pin missing");
   expectIncludes(backendRequirements, "pytest==9.1.1", "backend pytest security pin missing");
