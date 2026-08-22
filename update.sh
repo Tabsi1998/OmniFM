@@ -646,7 +646,7 @@ show_admin_runtime_summary() {
   local log_mb log_files log_days auto_prune prune_until logs_dir
   local stripe dbl_token dbl_enabled dbl_status botsgg_token botsgg_enabled botsgg_status
   local topgg_token topgg_enabled topgg_status dash_status mongo_status container_status
-  local mode expected_workers running_workers
+  local mode expected_workers running_workers unexpected_workers unexpected_workers_check_failed=0
 
   bot_count="$(count_bots)"
   commander_idx="$(read_env "COMMANDER_BOT_INDEX" "1")"
@@ -676,6 +676,12 @@ show_admin_runtime_summary() {
   mode="$(deployment_mode)"
   expected_workers="$(runtime_worker_count_expected)"
   running_workers="$(runtime_worker_count_running)"
+  if ! unexpected_workers="$(runtime_unexpected_worker_services 2>/dev/null)"; then
+    unexpected_workers=""
+    unexpected_workers_check_failed=1
+  fi
+  unexpected_workers="${unexpected_workers//$'\n'/, }"
+  unexpected_workers="${unexpected_workers%, }"
 
   if docker compose ps --services --filter status=running 2>/dev/null | grep -q "^omnifm$"; then
     if [[ "$mode" == "split" ]]; then
@@ -689,6 +695,11 @@ show_admin_runtime_summary() {
     else
       container_status="${YELLOW}gestoppt${NC}"
     fi
+  fi
+  if (( unexpected_workers_check_failed == 1 )); then
+    container_status+=" / ${YELLOW}verwaiste Worker nicht pruefbar${NC}"
+  elif [[ -n "$unexpected_workers" ]]; then
+    container_status+=" / ${RED}verwaist: ${unexpected_workers}${NC}"
   fi
   if docker compose ps --services --filter status=running 2>/dev/null | grep -q "^mongodb$"; then
     mongo_status="${GREEN}MongoDB${NC}"
@@ -913,6 +924,21 @@ runtime_worker_count_running() {
   printf "%s" "$count"
 }
 
+runtime_unexpected_worker_services() {
+  refresh_compose_environment
+  compose_list_unexpected_split_workers "$APP_DIR"
+}
+
+reconcile_split_workers_before_start() {
+  refresh_compose_environment
+  if compose_prepare_split_topology_before_start "$APP_DIR"; then
+    return 0
+  fi
+
+  fail "Split-Topologie konnte vor dem Start nicht sicher vorbereitet werden."
+  return 1
+}
+
 populate_runtime_services_array() {
   local __target_var="$1"
   local -a services=()
@@ -945,16 +971,6 @@ stop_runtime_containers_for_update() {
 
   if [[ -n "$__target_var" ]]; then
     printf -v "$__target_var" '%s' "$was_running"
-  fi
-}
-
-stop_commander_container_for_update() {
-  refresh_compose_environment
-
-  if docker compose ps --services --filter status=running 2>/dev/null | grep -q '^omnifm$'; then
-    info "Stoppe Commander fuer Update, Worker bleiben aktiv..."
-    docker compose stop -t 20 omnifm >/dev/null 2>&1 \
-      || warn "Commander konnte vor dem Update nicht sauber gestoppt werden."
   fi
 }
 
@@ -1049,7 +1065,7 @@ select_update_strategy() {
 
 run_update_deploy_strategy() {
   local strategy="${1:-full}"
-  local build_no_cache current_mode delay_ms timeout_ms sleep_seconds
+  local build_no_cache current_mode delay_ms timeout_ms sleep_seconds topology_check_status
   local -a build_args=()
   local -a runtime_services=()
   local -a worker_services=()
@@ -1068,6 +1084,29 @@ run_update_deploy_strategy() {
         warn "Commander-only ist nur im Split-Modus sinnvoll. Nutze Voll-Update."
         run_update_deploy_strategy "full"
         return $?
+      fi
+      refresh_compose_environment
+      if compose_running_commander_requires_stop_before_split_start "$APP_DIR"; then
+        warn "Commander-only ist bei einem Commander-Wechsel nicht sicher. Nutze Rolling-Update."
+        run_update_deploy_strategy "rolling"
+        return $?
+      else
+        topology_check_status=$?
+      fi
+      if (( topology_check_status != 1 )); then
+        fail "Commander-Topologie konnte vor dem gezielten Update nicht sicher geprueft werden."
+        return 1
+      fi
+      if compose_stopped_commander_requires_recreate_before_split_start "$APP_DIR"; then
+        warn "Commander-only ist bei einer geaenderten gestoppten Commander-Topologie nicht sicher. Nutze Rolling-Update."
+        run_update_deploy_strategy "rolling"
+        return $?
+      else
+        topology_check_status=$?
+      fi
+      if (( topology_check_status != 1 )); then
+        fail "Gestoppte Commander-Topologie konnte vor dem gezielten Update nicht sicher geprueft werden."
+        return 1
       fi
       info "Baue nur den Commander neu..."
       compose_build "${build_args[@]}" omnifm || return 1
@@ -1096,10 +1135,14 @@ run_update_deploy_strategy() {
       info "Baue Runtime-Images fuer Rolling Update..."
       compose_build "${build_args[@]}" "${runtime_services[@]}" || return 1
 
+      if ! reconcile_split_workers_before_start; then
+        return 1
+      fi
+
       for idx in "${!worker_services[@]}"; do
         service="${worker_services[$idx]}"
         info "Rolling Update fuer ${service}..."
-        compose_up_no_deps "$service" || return 1
+        compose_up_no_deps --skip-worker-reconciliation "$service" || return 1
         if ! wait_for_compose_service_running "$service" "$timeout_ms"; then
           fail "${service} wurde nach dem Rolling Update nicht rechtzeitig aktiv."
           return 1
@@ -1111,7 +1154,7 @@ run_update_deploy_strategy() {
       done
 
       info "Aktualisiere Commander zuletzt..."
-      compose_up_no_deps omnifm || return 1
+      compose_up_no_deps --skip-worker-reconciliation omnifm || return 1
       if ! wait_for_compose_service_running "omnifm" "$timeout_ms"; then
         fail "Commander wurde nach dem Rolling Update nicht rechtzeitig aktiv."
         return 1
@@ -1403,7 +1446,16 @@ repair_runtime_json_mount_dirs() {
 
   if (( was_running )); then
     info "Starte Runtime-Container nach JSON-Reparatur wieder..."
-    docker compose start "${runtime_services[@]}" >/dev/null 2>&1 || warn "Runtime-Container konnten nach JSON-Reparatur nicht gestartet werden."
+    # `start` reuses the old container environment. It is safe only when the
+    # split/monolith topology is unchanged; otherwise recreate with `up` so a
+    # former commander cannot come back with an old Discord identity.
+    if compose_prepare_split_topology_before_start "$APP_DIR" "start"; then
+      populate_runtime_services_array runtime_services
+      docker compose start "${runtime_services[@]}" >/dev/null 2>&1 || warn "Runtime-Container konnten nach JSON-Reparatur nicht gestartet werden."
+    else
+      warn "Runtime-Topologie hat sich geaendert oder ist nicht sicher pruefbar; starte Container mit sicherem Recreate neu."
+      compose_up || warn "Runtime-Container konnten nach JSON-Reparatur nicht sicher neu erstellt werden."
+    fi
     sleep 2
   fi
 }
@@ -1761,7 +1813,7 @@ run_system_doctor() {
   done
 
   # 5) Runtime status
-  local current_mode expected_workers running_workers
+  local current_mode expected_workers running_workers unexpected_workers
   current_mode="$(deployment_mode)"
   expected_workers="$(runtime_worker_count_expected)"
   running_workers="$(runtime_worker_count_running)"
@@ -1777,6 +1829,17 @@ run_system_doctor() {
     else
       doctor_warn "Worker-Container aktiv: ${running_workers}/${expected_workers}"
     fi
+  fi
+  if unexpected_workers="$(runtime_unexpected_worker_services 2>/dev/null)"; then
+    if [[ -n "$unexpected_workers" ]]; then
+      unexpected_workers="${unexpected_workers//$'\n'/, }"
+      unexpected_workers="${unexpected_workers%, }"
+      doctor_warn "Verwaiste Split-Worker erkannt: ${unexpected_workers}. Ein Start/Update bereinigt sie vor dem Deploy."
+    else
+      doctor_ok "Keine verwaisten Split-Worker erkannt."
+    fi
+  else
+    doctor_warn "Verwaiste Split-Worker konnten nicht sicher geprueft werden."
   fi
 
   # 6) MongoDB status
@@ -1844,6 +1907,7 @@ compose_build() {
 
 compose_up() {
   refresh_compose_environment
+  reconcile_split_workers_before_start || return 1
   prepare_omnifm_runtime_data "$APP_DIR"
   if docker compose up -d --remove-orphans; then
     return 0
@@ -1853,7 +1917,16 @@ compose_up() {
 }
 
 compose_up_no_deps() {
+  local skip_worker_reconciliation=0
+  if [[ "${1:-}" == "--skip-worker-reconciliation" ]]; then
+    skip_worker_reconciliation=1
+    shift
+  fi
+
   refresh_compose_environment
+  if (( skip_worker_reconciliation == 0 )); then
+    reconcile_split_workers_before_start || return 1
+  fi
   prepare_omnifm_runtime_data "$APP_DIR"
   if docker compose up -d --no-deps "$@"; then
     return 0
@@ -1891,6 +1964,7 @@ wait_for_compose_service_running() {
 
 compose_up_with_build() {
   refresh_compose_environment
+  reconcile_split_workers_before_start || return 1
   prepare_omnifm_runtime_data "$APP_DIR"
   info "$(compose_deployment_summary "$APP_DIR")"
   if docker compose up -d --build --remove-orphans; then

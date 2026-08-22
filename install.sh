@@ -45,6 +45,10 @@ report_runtime_tools_status() {
 
 compose_up_with_build() {
   refresh_omnifm_compose_env "$APP_DIR"
+  if ! compose_prepare_split_topology_before_start "$APP_DIR"; then
+    fail "Split-Topologie konnte vor dem Start nicht sicher vorbereitet werden."
+    return 1
+  fi
   prepare_omnifm_runtime_data "$APP_DIR"
   info "$(compose_deployment_summary "$APP_DIR")"
   if docker compose up -d --build --remove-orphans; then
