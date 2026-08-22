@@ -180,7 +180,7 @@ test("compose wrapper stops a changed commander before starting split workers", 
     runningCommanderIndex: "1",
   });
 
-  await runBash(sandbox, shellEnv, "./scripts/compose.sh up -d");
+  await runBash(sandbox, shellEnv, "bash ./scripts/compose.sh up -d");
 
   const calls = (await fs.readFile(path.join(sandbox, "docker.log"), "utf8"))
     .trim()
@@ -226,7 +226,7 @@ test("compose start refuses to revive a stopped commander from a different topol
   });
 
   await assert.rejects(
-    runBash(sandbox, shellEnv, "./scripts/compose.sh start"),
+    runBash(sandbox, shellEnv, "bash ./scripts/compose.sh start"),
     (error) => {
       assert.equal(error.code, 1);
       assert.match(error.stderr, /compose start ist nicht sicher/i);
@@ -254,7 +254,7 @@ test("compose wrapper refuses an inactive worker profile before it can recreate 
   });
 
   await assert.rejects(
-    runBash(sandbox, shellEnv, "./scripts/compose.sh --profile worker-17 up -d"),
+    runBash(sandbox, shellEnv, "bash ./scripts/compose.sh --profile worker-17 up -d"),
     (error) => {
       assert.equal(error.code, 2);
       assert.match(error.stderr, /Profil worker-17 .* nicht aktiv/i);
@@ -279,7 +279,7 @@ test("compose wrapper stops before up when stale-worker removal fails", async (t
   });
 
   await assert.rejects(
-    runBash(sandbox, shellEnv, "./scripts/compose.sh up -d"),
+    runBash(sandbox, shellEnv, "bash ./scripts/compose.sh up -d"),
     (error) => {
       assert.equal(error.code, 1);
       assert.match(error.stderr, /nicht sicher entfernt werden|nicht sicher vorbereitet werden/i);
@@ -304,7 +304,7 @@ test("compose wrapper rejects an invalid commander before it can reconcile worke
   });
 
   await assert.rejects(
-    runBash(sandbox, shellEnv, "./scripts/compose.sh up -d"),
+    runBash(sandbox, shellEnv, "bash ./scripts/compose.sh up -d"),
     (error) => {
       assert.equal(error.code, 1);
       assert.match(error.stderr, /COMMANDER_BOT_INDEX=17/i);
@@ -328,7 +328,7 @@ test("compose wrapper rejects incomplete numbered bot configuration before clean
   });
 
   await assert.rejects(
-    runBash(sandbox, shellEnv, "./scripts/compose.sh up -d"),
+    runBash(sandbox, shellEnv, "bash ./scripts/compose.sh up -d"),
     (error) => {
       assert.equal(error.code, 1);
       assert.match(error.stderr, /BOT_1_CLIENT_ID/i);
@@ -355,7 +355,7 @@ test("compose wrapper rejects duplicate bot identities before cleanup", async (t
   });
 
   await assert.rejects(
-    runBash(sandbox, shellEnv, "./scripts/compose.sh up -d"),
+    runBash(sandbox, shellEnv, "bash ./scripts/compose.sh up -d"),
     (error) => {
       assert.equal(error.code, 1);
       assert.match(error.stderr, /Tokens duerfen nicht doppelt/i);
@@ -381,7 +381,7 @@ test("compose wrapper rejects non-contiguous numbered bots before auto-mode clea
   });
 
   await assert.rejects(
-    runBash(sandbox, shellEnv, "./scripts/compose.sh up -d"),
+    runBash(sandbox, shellEnv, "bash ./scripts/compose.sh up -d"),
     (error) => {
       assert.equal(error.code, 1);
       assert.match(error.stderr, /ohne Luecke/i);
@@ -406,7 +406,7 @@ test("compose wrapper rejects a numbered bot sequence that does not start at BOT
   });
 
   await assert.rejects(
-    runBash(sandbox, shellEnv, "./scripts/compose.sh up -d"),
+    runBash(sandbox, shellEnv, "bash ./scripts/compose.sh up -d"),
     (error) => {
       assert.equal(error.code, 1);
       assert.match(error.stderr, /ohne Luecke/i);
@@ -432,7 +432,7 @@ test("compose wrapper accepts quoted CRLF values and honors the quoted commander
     runningCommanderIndex: "1",
   });
 
-  await runBash(sandbox, shellEnv, "./scripts/compose.sh up -d");
+  await runBash(sandbox, shellEnv, "bash ./scripts/compose.sh up -d");
 
   const calls = (await fs.readFile(path.join(sandbox, "docker.log"), "utf8"))
     .trim()
@@ -457,7 +457,7 @@ test("compose wrapper rejects up --no-recreate before a commander switch can rev
   });
 
   await assert.rejects(
-    runBash(sandbox, shellEnv, "./scripts/compose.sh up -d --no-recreate"),
+    runBash(sandbox, shellEnv, "bash ./scripts/compose.sh up -d --no-recreate"),
     (error) => {
       assert.equal(error.code, 2);
       assert.match(error.stderr, /--no-recreate/i);
@@ -480,7 +480,7 @@ test("compose wrapper fails closed when start would revive a stopped split comma
   });
 
   await assert.rejects(
-    runBash(sandbox, shellEnv, "./scripts/compose.sh start"),
+    runBash(sandbox, shellEnv, "bash ./scripts/compose.sh start"),
     (error) => {
       assert.equal(error.code, 1);
       assert.match(error.stderr, /Topologie-Wechsel|alte Split-Topologie/i);
@@ -506,7 +506,7 @@ test("compose wrapper refuses restart when a running commander belongs to anothe
   });
 
   await assert.rejects(
-    runBash(sandbox, shellEnv, "./scripts/compose.sh restart"),
+    runBash(sandbox, shellEnv, "bash ./scripts/compose.sh restart"),
     (error) => {
       assert.equal(error.code, 1);
       assert.match(error.stderr, /Topologie-Wechsel/i);
@@ -529,7 +529,7 @@ test("compose wrapper stops a running split commander before split-to-monolith u
     runningCommanderIndex: "1",
   });
 
-  await runBash(sandbox, shellEnv, "./scripts/compose.sh up -d");
+  await runBash(sandbox, shellEnv, "bash ./scripts/compose.sh up -d");
 
   const calls = (await fs.readFile(path.join(sandbox, "docker.log"), "utf8"))
     .trim()
@@ -555,7 +555,7 @@ test("compose wrapper does not mutate topology for a dry-run", async (t) => {
     runningCommanderIndex: "1",
   });
 
-  await runBash(sandbox, shellEnv, "./scripts/compose.sh --dry-run up -d");
+  await runBash(sandbox, shellEnv, "bash ./scripts/compose.sh --dry-run up -d");
 
   const calls = await fs.readFile(path.join(sandbox, "docker.log"), "utf8");
   assert.match(calls, /--dry-run up -d/);
@@ -576,7 +576,7 @@ test("compose wrapper determines the actual subcommand instead of matching CLI p
     runningCommanderIndex: "1",
   });
 
-  await runBash(sandbox, shellEnv, "./scripts/compose.sh exec omnifm sh -lc 'echo up'");
+  await runBash(sandbox, shellEnv, "bash ./scripts/compose.sh exec omnifm sh -lc 'echo up'");
 
   const calls = await fs.readFile(path.join(sandbox, "docker.log"), "utf8");
   assert.match(calls, /exec omnifm sh -lc echo up/);
@@ -598,7 +598,7 @@ test("compose wrapper rejects one-off runtime containers before Docker can dupli
 
   for (const service of ["omnifm", "omnifm-worker-2"]) {
     await assert.rejects(
-      runBash(sandbox, shellEnv, `./scripts/compose.sh run ${service}`),
+      runBash(sandbox, shellEnv, `bash ./scripts/compose.sh run ${service}`),
       (error) => {
         assert.equal(error.code, 2);
         assert.match(error.stderr, /docker compose run.*gesperrt/i);
