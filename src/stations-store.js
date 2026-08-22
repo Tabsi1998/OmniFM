@@ -4,6 +4,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { getDb } from "./lib/db.js";
+import { withFileStoreLock } from "./lib/file-store-lock.js";
 import { log, logStoreLoadError } from "./lib/logging.js";
 import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 
@@ -12,9 +13,138 @@ const stationsPath = resolveRuntimeDataPath("stations.json");
 const QUALITY_PRESETS = new Set(["low", "medium", "high", "custom"]);
 const COLLECTION = "stations";
 const CONFIG_COLLECTION = "stations_config";
+const CATALOG_MIGRATIONS_COLLECTION = "stations_catalog_migrations";
+
+const TOMORROWLAND_ANTHEMS_LEGACY_URL = "https://playerservices.streamtheworld.com/api/livestream-redirect/OWR_DAB.mp3";
+const TOMORROWLAND_ANTHEMS_URL = "https://playerservices.streamtheworld.com/api/livestream-redirect/OWR_ANTHEMS.mp3";
+
+export const STATION_CATALOG_MIGRATIONS = Object.freeze([
+  Object.freeze({
+    id: "2026-08-22-tomorrowland-anthems-url",
+    key: "protml03",
+    keys: Object.freeze(["protml03", "pro_tml_03"]),
+    fromUrl: TOMORROWLAND_ANTHEMS_LEGACY_URL,
+    toUrl: TOMORROWLAND_ANTHEMS_URL,
+  }),
+]);
 
 function col() { const db = getDb(); return db ? db.collection(COLLECTION) : null; }
 function configCol() { const db = getDb(); return db ? db.collection(CONFIG_COLLECTION) : null; }
+function catalogMigrationsCol() { const db = getDb(); return db ? db.collection(CATALOG_MIGRATIONS_COLLECTION) : null; }
+
+function isDuplicateKeyError(err) {
+  return Number(err?.code) === 11000 || /E11000\s+duplicate\s+key/i.test(String(err?.message || ""));
+}
+
+/**
+ * Applies narrowly-scoped built-in catalog migrations before the catalog is read.
+ *
+ * Each station write has an exact legacy URL filter and only known catalog-key
+ * representations, so a dashboard or operator override is never replaced. The
+ * completion marker is inserted only after the catalog write succeeds. Multiple
+ * split workers can safely race this: their exact writes are idempotent and a
+ * duplicate marker means another process already completed the same migration.
+ */
+export async function applyStationCatalogMigrations(stationsCollection, migrationsCollection) {
+  if (!stationsCollection || !migrationsCollection) return { applied: [], skipped: [] };
+
+  const applied = [];
+  const skipped = [];
+
+  for (const migration of STATION_CATALOG_MIGRATIONS) {
+    const marker = await migrationsCollection.findOne(
+      { _id: migration.id },
+      { projection: { _id: 1 } }
+    );
+    if (marker) {
+      skipped.push({ id: migration.id, reason: "already-applied" });
+      continue;
+    }
+
+    const updateResult = await stationsCollection.updateMany(
+      { key: { $in: migration.keys }, url: migration.fromUrl },
+      { $set: { url: migration.toUrl } }
+    );
+    if (updateResult?.acknowledged === false) {
+      throw new Error(`Katalogmigration ${migration.id} wurde von MongoDB nicht bestaetigt.`);
+    }
+
+    const markerDocument = {
+      _id: migration.id,
+      appliedAt: new Date(),
+      key: migration.key,
+      keys: migration.keys,
+      fromUrl: migration.fromUrl,
+      toUrl: migration.toUrl,
+      matchedCount: Number(updateResult?.matchedCount || 0),
+      modifiedCount: Number(updateResult?.modifiedCount || 0),
+    };
+
+    try {
+      const markerResult = await migrationsCollection.insertOne(markerDocument);
+      if (markerResult?.acknowledged === false) {
+        throw new Error(`Katalogmigration ${migration.id} konnte nicht als abgeschlossen markiert werden.`);
+      }
+      applied.push({ id: migration.id, ...markerDocument, markerWritten: true });
+    } catch (err) {
+      if (!isDuplicateKeyError(err)) throw err;
+      applied.push({ id: migration.id, ...markerDocument, markerWritten: false });
+    }
+  }
+
+  return { applied, skipped };
+}
+
+function isRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function writeStationsFileAtomically(filePath, data) {
+  const tempPath = `${filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const serialized = `${JSON.stringify(data, null, 2)}\n`;
+
+  try {
+    fs.writeFileSync(tempPath, serialized, "utf8");
+    fs.renameSync(tempPath, filePath);
+  } finally {
+    try { fs.unlinkSync(tempPath); } catch {}
+  }
+}
+
+/**
+ * Migrates the mutable runtime-data catalog when MongoDB is unavailable.
+ * Only the sanitized key protml03 with the exact retired URL is changed; all
+ * other catalog fields and operator overrides are preserved unchanged.
+ */
+export function migrateStationsFileCatalog(filePath = stationsPath) {
+  if (!fs.existsSync(filePath)) return { changed: false, reason: "missing-file" };
+  if (!fs.statSync(filePath).isFile()) return { changed: false, reason: "not-a-file" };
+
+  return withFileStoreLock(filePath, () => {
+    // The file may have changed while this process waited for another worker.
+    if (!fs.existsSync(filePath)) return { changed: false, reason: "missing-file" };
+    if (!fs.statSync(filePath).isFile()) return { changed: false, reason: "not-a-file" };
+
+    const data = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    if (!isRecord(data) || !isRecord(data.stations)) {
+      return { changed: false, reason: "invalid-catalog" };
+    }
+
+    let matchedCount = 0;
+    for (const [rawKey, station] of Object.entries(data.stations)) {
+      if (!isRecord(station)) continue;
+      if (sanitizeKey(rawKey) !== "protml03") continue;
+      if (station.url !== TOMORROWLAND_ANTHEMS_LEGACY_URL) continue;
+      station.url = TOMORROWLAND_ANTHEMS_URL;
+      matchedCount += 1;
+    }
+
+    if (matchedCount === 0) return { changed: false, matchedCount: 0 };
+
+    writeStationsFileAtomically(filePath, data);
+    return { changed: true, matchedCount };
+  });
+}
 
 function emptyStationsData() {
   return { defaultStationKey: null, stations: {}, locked: false, qualityPreset: "custom", fallbackKeys: [] };
@@ -65,6 +195,16 @@ export function normalizeStationsData(input) {
 }
 
 function loadStationsFromFile() {
+  try {
+    const migration = migrateStationsFileCatalog();
+    if (migration.changed) {
+      log("INFO", `Stations-Dateikatalogmigration abgeschlossen: ${migration.matchedCount} Tomorrowland-Anthems-URL(s) aktualisiert`);
+    }
+  } catch (err) {
+    // Keep the existing file fallback available; a failed migration never overwrites it.
+    log("WARN", `Stations-Dateikatalogmigration fehlgeschlagen: ${err?.message || err}`);
+  }
+
   if (!fs.existsSync(stationsPath)) return emptyStationsData();
   try {
     if (fs.statSync(stationsPath).isDirectory()) return emptyStationsData();
@@ -95,6 +235,21 @@ export async function initStationsStore() {
   }
 
   try {
+    const migrationsCollection = catalogMigrationsCol();
+    if (migrationsCollection) {
+      try {
+        const migrationResult = await applyStationCatalogMigrations(c, migrationsCollection);
+        const writtenMarkers = migrationResult.applied.filter((entry) => entry.markerWritten);
+        if (writtenMarkers.length > 0) {
+          log("INFO", `Stations-Katalogmigration abgeschlossen: ${writtenMarkers.map((entry) => entry.id).join(", ")}`);
+        }
+      } catch (err) {
+        // Do not hide an otherwise readable catalog when only its migration metadata fails.
+        // No completion marker is written in this case, so a later startup retries safely.
+        log("WARN", `Stations-Katalogmigration fehlgeschlagen: ${err?.message || err}`);
+      }
+    }
+
     const docs = await c.find({}, { projection: { _id: 0 } }).toArray();
     if (docs.length === 0) {
       // Seed from file

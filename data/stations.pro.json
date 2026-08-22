@@ -58,8 +58,8 @@
   },
   {
     "id": "pro_tml_03",
-    "name": "Tomorrowland - DAB",
-    "streamURL": "https://playerservices.streamtheworld.com/api/livestream-redirect/OWR_DAB.mp3",
+    "name": "Tomorrowland - Anthems",
+    "streamURL": "https://playerservices.streamtheworld.com/api/livestream-redirect/OWR_ANTHEMS.mp3",
     "requiredPlan": "pro",
     "bitrate": 192,
     "tags": [
