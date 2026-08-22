@@ -193,6 +193,9 @@ export default function DashboardSettings({
   const wd = settings?.weeklyDigest || { enabled: false, channelId: '', dayOfWeek: 1, hour: 9, language: 'de' };
   const incidentAlerts = normalizeDashboardIncidentAlertsConfig(settings?.incidentAlerts);
   const exportsWebhook = normalizeDashboardExportsWebhookConfig(settings?.exportsWebhook);
+  const webhookSecretInput = Object.prototype.hasOwnProperty.call(exportsWebhook, 'secret')
+    ? exportsWebhook.secret
+    : '';
   const voiceGuard = normalizeDashboardVoiceGuardConfig(settings?.voiceGuard);
   const voiceGuardSummary = buildDashboardVoiceGuardSummary(voiceGuard, t);
   const canManageWeeklyDigest = capabilities.weeklyDigest === true;
@@ -918,7 +921,7 @@ export default function DashboardSettings({
               {exportsWebhook.events.length} / {DASHBOARD_EXPORT_WEBHOOK_EVENTS.length}
             </div>
             <div style={{ marginTop: 6, fontSize: 12, color: '#71717A' }}>
-              {exportsWebhook.secret ? t('Secret gesetzt', 'Secret configured') : t('Ohne Secret', 'No secret')}
+              {exportsWebhook.secretConfigured ? t('Secret gesetzt', 'Secret configured') : t('Ohne Secret', 'No secret')}
             </div>
           </div>
         </div>
@@ -952,11 +955,24 @@ export default function DashboardSettings({
             <input
               data-testid="exports-webhook-secret-input"
               disabled={!canManageExports}
-              value={exportsWebhook.secret}
+              value={webhookSecretInput}
               onChange={(e) => updateExportsWebhook({ secret: e.target.value })}
-              placeholder={t('Optional', 'Optional')}
+              placeholder={exportsWebhook.secretConfigured
+                ? t('Gespeichert – zum Ersetzen eingeben', 'Configured – enter to replace')
+                : t('Optional', 'Optional')}
               style={{ width: '100%', height: 40, padding: '0 10px', border: '1px solid #1A1A2E', background: '#050505', color: '#fff', boxSizing: 'border-box', fontSize: 13 }}
             />
+            {exportsWebhook.secretConfigured && (
+              <button
+                type="button"
+                data-testid="exports-webhook-secret-clear"
+                disabled={!canManageExports}
+                onClick={() => updateExportsWebhook({ secret: '' })}
+                style={{ marginTop: 7, border: 0, padding: 0, background: 'transparent', color: canManageExports ? '#FCA5A5' : '#52525B', cursor: canManageExports ? 'pointer' : 'not-allowed', fontSize: 12 }}
+              >
+                {t('Secret beim Speichern entfernen', 'Remove secret when saving')}
+              </button>
+            )}
           </div>
         </div>
 

@@ -21,12 +21,25 @@ test("dashboard exports helpers normalize config and labels", () => {
     enabled: true,
     url: "https://example.com/webhook",
     secret: "demo",
+    secretConfigured: true,
     events: ["stats_exported", "custom_stations_exported"],
   });
   assert.equal(
     getDashboardExportWebhookEventLabel(DASHBOARD_EXPORT_WEBHOOK_EVENTS[0].key, (_de, en) => en),
     "Stats exports"
   );
+});
+
+test("dashboard exports config keeps a stored-secret indicator without rehydrating the secret", () => {
+  const config = normalizeDashboardExportsWebhookConfig({
+    enabled: true,
+    url: "https://example.com/webhook",
+    secretConfigured: true,
+    events: ["stats_exported"],
+  });
+
+  assert.equal(config.secretConfigured, true);
+  assert.equal(Object.prototype.hasOwnProperty.call(config, "secret"), false);
 });
 
 test("dashboard exports helpers expose useful summary states and filenames", () => {

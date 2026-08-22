@@ -52,6 +52,28 @@ function normalizeDashboardExportsWebhookConfig(rawConfig) {
   };
 }
 
+function toPublicDashboardExportsWebhookConfig(rawConfig) {
+  const config = normalizeDashboardExportsWebhookConfig(rawConfig);
+  return {
+    enabled: config.enabled,
+    url: config.url,
+    events: config.events,
+    secretConfigured: Boolean(config.secret),
+  };
+}
+
+function mergeDashboardExportsWebhookConfigWithStoredSecret(rawConfig, storedConfig) {
+  const input = rawConfig && typeof rawConfig === "object" ? rawConfig : {};
+  if (Object.prototype.hasOwnProperty.call(input, "secret")) {
+    return input;
+  }
+
+  return {
+    ...input,
+    secret: normalizeDashboardExportsWebhookConfig(storedConfig).secret,
+  };
+}
+
 async function validateDashboardExportsWebhookConfig(rawConfig, options = {}) {
   const config = normalizeDashboardExportsWebhookConfig(rawConfig);
   if (!config.url) {
@@ -219,6 +241,8 @@ export {
   DASHBOARD_EXPORT_WEBHOOK_EVENT_KEYS,
   DEFAULT_DASHBOARD_EXPORTS_WEBHOOK_CONFIG,
   normalizeDashboardExportsWebhookConfig,
+  toPublicDashboardExportsWebhookConfig,
+  mergeDashboardExportsWebhookConfigWithStoredSecret,
   validateDashboardExportsWebhookConfig,
   shouldDeliverDashboardWebhook,
   buildDashboardWebhookPayload,
