@@ -1,7 +1,7 @@
 # Legacy/reference backend only.
 # Production and CI use the canonical Node.js runtime in ../src.
 fastapi==0.141.1
-uvicorn==0.52.1
+uvicorn==0.52.3
 python-dotenv==1.2.2
 pymongo==4.17.0
 requests==2.34.2
