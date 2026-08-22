@@ -12,6 +12,10 @@ import {
   isWithinWorkerPlanLimit,
   applyVolumeTransformerLevel,
   isLikelyNetworkFailureLine,
+  STREAM_RESTART_BASE_MS,
+  STREAM_RESTART_MAX_MS,
+  STREAM_ERROR_COOLDOWN_THRESHOLD,
+  STREAM_ERROR_COOLDOWN_MS,
 } from "../src/lib/helpers.js";
 import { buildCommandsJson } from "../src/commands.js";
 import { networkRecoveryCoordinator } from "../src/core/network-recovery.js";
@@ -38,6 +42,7 @@ import {
 import {
   armRuntimePlaybackRecovery,
   evaluateRuntimeStreamHealth,
+  handleRuntimeStreamEnd,
   restartRuntimeCurrentStation,
   scheduleRuntimeStreamRestart,
 } from "../src/bot/runtime-streams.js";
@@ -1658,6 +1663,10 @@ test("armPlaybackRecovery keeps the worker connected and schedules a stream retr
     scheduleReconnect() {
       scheduledReconnect += 1;
     },
+    getNetworkRecoveryDelayMs() {
+      return 0;
+    },
+    noteNetworkRecoveryFailure() {},
   };
 
   const recovery = armRuntimePlaybackRecovery(
@@ -1676,12 +1685,89 @@ test("armPlaybackRecovery keeps the worker connected and schedules a stream retr
   assert.equal(state.currentStationName, "Rock Radio");
   assert.equal(state.currentMeta, null);
   assert.equal(state.nowPlayingSignature, null);
+  assert.equal(state.streamErrorCount, 1);
+  assert.equal(state.lastStreamEndReason, "play-start-failed");
   assert.equal(persistCount, 1);
   assert.equal(presenceCount, 1);
   assert.equal(scheduledReconnect, 0);
   assert.equal(scheduledRestart.guildId, "guild-1");
   assert.equal(scheduledRestart.passedState, state);
   assert.equal(scheduledRestart.reason, "play-start-failed");
+  assert.equal(scheduledRestart.delayMs, STREAM_RESTART_BASE_MS);
+});
+
+test("armPlaybackRecovery does not schedule a retry for a permanent stream error", () => {
+  let scheduledRestart = 0;
+  const state = {
+    connection: { joinConfig: { channelId: "voice-1" } },
+    currentStationKey: "protml03",
+    currentStationName: "Tomorrowland Anthems",
+    shouldReconnect: true,
+  };
+  const runtime = {
+    config: { name: "OmniFM Test" },
+    clearCurrentProcess() {},
+    clearNowPlayingTimer() {},
+    updatePresence() {},
+    persistState() {},
+    scheduleStreamRestart() {
+      scheduledRestart += 1;
+    },
+  };
+
+  const recovery = armRuntimePlaybackRecovery(
+    runtime,
+    "guild-1",
+    state,
+    { stations: { protml03: { name: "Tomorrowland Anthems" } } },
+    "protml03",
+    new Error("Stream konnte nicht geladen werden: 404"),
+    { reason: "play-start-failed" }
+  );
+
+  assert.equal(recovery.scheduled, false);
+  assert.equal(recovery.permanent, true);
+  assert.equal(scheduledRestart, 0);
+  assert.equal(state.shouldReconnect, false);
+  assert.equal(state.streamErrorCount, 1);
+});
+
+test("armPlaybackRecovery treats outbound policy rejections as permanent", () => {
+  let scheduledRestart = 0;
+  const state = {
+    connection: { joinConfig: { channelId: "voice-1" } },
+    currentStationKey: "custom:blocked",
+    currentStationName: "Blocked Radio",
+    shouldReconnect: true,
+  };
+  const runtime = {
+    config: { name: "OmniFM Test" },
+    clearCurrentProcess() {},
+    clearNowPlayingTimer() {},
+    updatePresence() {},
+    persistState() {},
+    scheduleStreamRestart() {
+      scheduledRestart += 1;
+    },
+  };
+  const policyError = Object.assign(new Error("Lokale/private Hosts sind nicht erlaubt."), {
+    code: "OUTBOUND_HOST_NOT_ALLOWED",
+  });
+
+  const recovery = armRuntimePlaybackRecovery(
+    runtime,
+    "guild-1",
+    state,
+    { stations: { "custom:blocked": { name: "Blocked Radio" } } },
+    "custom:blocked",
+    policyError,
+    { reason: "play-start-failed" }
+  );
+
+  assert.equal(recovery.scheduled, false);
+  assert.equal(recovery.permanent, true);
+  assert.equal(scheduledRestart, 0);
+  assert.equal(state.shouldReconnect, false);
 });
 
 test("playInGuild returns recovering instead of leaving when initial stream start fails", async () => {
@@ -3992,14 +4078,10 @@ test("restartCurrentStation retries after transient restart failures", async () 
   const originalNoteFailure = networkRecoveryCoordinator.noteFailure;
   const originalGetRecoveryDelayMs = networkRecoveryCoordinator.getRecoveryDelayMs;
   const notedFailures = [];
-  let recoveryDelayCalls = 0;
   networkRecoveryCoordinator.noteFailure = (source, detail) => {
     notedFailures.push({ source, detail });
   };
-  networkRecoveryCoordinator.getRecoveryDelayMs = () => {
-    recoveryDelayCalls += 1;
-    return recoveryDelayCalls === 1 ? 0 : 12_345;
-  };
+  networkRecoveryCoordinator.getRecoveryDelayMs = () => 12_345;
 
   try {
     let scheduled = null;
@@ -4045,6 +4127,8 @@ test("restartCurrentStation retries after transient restart failures", async () 
     await restartRuntimeCurrentStation(runtime, state, "guild-1");
 
     assert.equal(notedFailures.length, 1);
+    assert.equal(state.streamErrorCount, 1);
+    assert.equal(state.lastStreamEndReason, "restart-error");
     assert.deepEqual(scheduled, {
       guildId: "guild-1",
       passedState: state,
@@ -4055,6 +4139,249 @@ test("restartCurrentStation retries after transient restart failures", async () 
     networkRecoveryCoordinator.noteFailure = originalNoteFailure;
     networkRecoveryCoordinator.getRecoveryDelayMs = originalGetRecoveryDelayMs;
   }
+});
+
+test("restartCurrentStation backs off every failed outbound stream start", async () => {
+  const scheduled = [];
+  const notedFailures = [];
+  const state = {
+    shouldReconnect: true,
+    currentStationKey: "custom:unreachable",
+    currentStationName: "Unreachable Radio",
+    connection: { joinConfig: { channelId: "voice-1" } },
+    lastChannelId: "voice-1",
+    activeScheduledEventStopAtMs: 0,
+  };
+  const outboundError = Object.assign(new Error("Ziel-URL konnte nicht erreicht werden."), {
+    code: "OUTBOUND_REQUEST_FAILED",
+  });
+  const runtime = {
+    config: { name: "OmniFM Test" },
+    isScheduledEventStopDue() {
+      return false;
+    },
+    getResolvedCurrentStation() {
+      return {
+        key: "custom:unreachable",
+        station: { name: "Unreachable Radio" },
+        stations: { stations: { "custom:unreachable": { name: "Unreachable Radio" } } },
+      };
+    },
+    clearCurrentProcess() {},
+    playStation() {
+      throw outboundError;
+    },
+    normalizeStationReference() {
+      return { isCustom: true };
+    },
+    resolveStationForGuild() {
+      return null;
+    },
+    getNetworkRecoveryDelayMs() {
+      return 0;
+    },
+    noteNetworkRecoveryFailure(_guildId, source, detail) {
+      notedFailures.push({ source, detail });
+    },
+    scheduleStreamRestart(guildId, passedState, delayMs, reason) {
+      scheduled.push({ guildId, passedState, delayMs, reason });
+    },
+    persistState() {},
+  };
+
+  for (let attempt = 1; attempt <= STREAM_ERROR_COOLDOWN_THRESHOLD; attempt += 1) {
+    await restartRuntimeCurrentStation(runtime, state, "guild-1");
+    const expectedBackoff = Math.min(
+      STREAM_RESTART_MAX_MS,
+      STREAM_RESTART_BASE_MS * Math.pow(2, Math.min(attempt - 1, 8))
+    );
+    const expectedDelay = attempt >= STREAM_ERROR_COOLDOWN_THRESHOLD
+      ? Math.max(expectedBackoff, STREAM_ERROR_COOLDOWN_MS)
+      : expectedBackoff;
+    assert.equal(state.streamErrorCount, attempt);
+    assert.equal(scheduled.at(-1).delayMs, expectedDelay);
+  }
+
+  assert.equal(notedFailures.length, STREAM_ERROR_COOLDOWN_THRESHOLD);
+  assert.equal(scheduled.length, STREAM_ERROR_COOLDOWN_THRESHOLD);
+  assert.equal(scheduled.at(-1).reason, "restart-error");
+  assert.ok(scheduled.at(-1).delayMs >= STREAM_ERROR_COOLDOWN_MS);
+});
+
+test("restartCurrentStation performs the next attempt after a network penalty", async () => {
+  let playCalls = 0;
+  const scheduled = [];
+  const state = {
+    shouldReconnect: true,
+    currentStationKey: "custom:unreachable",
+    currentStationName: "Unreachable Radio",
+    connection: { joinConfig: { channelId: "voice-1" } },
+    activeScheduledEventStopAtMs: 0,
+  };
+  const outboundError = Object.assign(new Error("Ziel-URL konnte nicht erreicht werden."), {
+    code: "OUTBOUND_REQUEST_FAILED",
+  });
+  const runtime = {
+    config: { name: "OmniFM Test" },
+    isScheduledEventStopDue() {
+      return false;
+    },
+    getResolvedCurrentStation() {
+      return {
+        key: "custom:unreachable",
+        station: { name: "Unreachable Radio" },
+        stations: { stations: { "custom:unreachable": { name: "Unreachable Radio" } } },
+      };
+    },
+    clearCurrentProcess() {},
+    playStation() {
+      playCalls += 1;
+      if (playCalls === 1) throw outboundError;
+    },
+    normalizeStationReference() {
+      return { isCustom: true };
+    },
+    getNetworkRecoveryDelayMs() {
+      return 12_345;
+    },
+    noteNetworkRecoveryFailure() {},
+    getCurrentListenerCount() {
+      return 0;
+    },
+    scheduleStreamRestart(guildId, passedState, delayMs, reason) {
+      scheduled.push({ guildId, passedState, delayMs, reason });
+    },
+    persistState() {},
+  };
+
+  await restartRuntimeCurrentStation(runtime, state, "guild-1");
+  await restartRuntimeCurrentStation(runtime, state, "guild-1");
+
+  assert.equal(playCalls, 2);
+  assert.equal(scheduled.length, 1);
+  assert.equal(scheduled[0].delayMs, 12_345);
+  assert.equal(state.streamErrorCount, 1);
+});
+
+test("permanent stream start errors stop playback instead of retrying forever", async () => {
+  let scheduled = 0;
+  let stopped = 0;
+  const state = {
+    shouldReconnect: true,
+    currentStationKey: "protml03",
+    currentStationName: "Tomorrowland Anthems",
+    connection: { joinConfig: { channelId: "voice-1" } },
+    lastChannelId: "voice-1",
+    activeScheduledEventStopAtMs: 0,
+  };
+  const runtime = {
+    config: { name: "OmniFM Test" },
+    isScheduledEventStopDue() {
+      return false;
+    },
+    getResolvedCurrentStation() {
+      return {
+        key: "protml03",
+        station: { name: "Tomorrowland Anthems" },
+        stations: { stations: { protml03: { name: "Tomorrowland Anthems" } } },
+      };
+    },
+    clearCurrentProcess() {},
+    playStation() {
+      throw new Error("Stream konnte nicht geladen werden: 404");
+    },
+    normalizeStationReference() {
+      return { isCustom: true };
+    },
+    resolveStationForGuild() {
+      return null;
+    },
+    getNetworkRecoveryDelayMs() {
+      return 0;
+    },
+    scheduleStreamRestart() {
+      scheduled += 1;
+    },
+    async stopInGuild() {
+      stopped += 1;
+      state.shouldReconnect = false;
+      state.currentStationKey = null;
+      state.currentStationName = null;
+      return { ok: true };
+    },
+    persistState() {},
+  };
+
+  await restartRuntimeCurrentStation(runtime, state, "guild-1");
+
+  assert.equal(state.streamErrorCount, 1);
+  assert.equal(scheduled, 0);
+  assert.equal(stopped, 1);
+  assert.equal(state.shouldReconnect, false);
+  assert.equal(state.currentStationKey, null);
+});
+
+test("restartCurrentStation allows only one simultaneous start attempt per guild", async () => {
+  let playCalls = 0;
+  let releasePlay = null;
+  const state = {
+    shouldReconnect: true,
+    currentStationKey: "station-a",
+    currentStationName: "Station A",
+    connection: { joinConfig: { channelId: "voice-1" } },
+    activeScheduledEventStopAtMs: 0,
+  };
+  const runtime = {
+    config: { name: "OmniFM Test" },
+    isScheduledEventStopDue() {
+      return false;
+    },
+    getResolvedCurrentStation() {
+      return {
+        key: "station-a",
+        station: { name: "Station A" },
+        stations: { stations: { "station-a": { name: "Station A" } } },
+      };
+    },
+    clearCurrentProcess() {},
+    playStation() {
+      playCalls += 1;
+      return new Promise((resolve) => {
+        releasePlay = resolve;
+      });
+    },
+  };
+
+  const first = restartRuntimeCurrentStation(runtime, state, "guild-1");
+  await new Promise((resolve) => setImmediate(resolve));
+  const second = restartRuntimeCurrentStation(runtime, state, "guild-1");
+
+  assert.equal(playCalls, 1);
+  assert.equal(state.streamRestartInFlight, true);
+  releasePlay();
+  await Promise.all([first, second]);
+  assert.equal(state.streamRestartInFlight, false);
+});
+
+test("stream end ignores audio events while a stream restart is in flight", async () => {
+  let scheduled = 0;
+  const state = {
+    shouldReconnect: true,
+    currentStationKey: "station-a",
+    streamRestartInFlight: true,
+    streamErrorCount: 0,
+  };
+  const runtime = {
+    config: { name: "OmniFM Test" },
+    scheduleStreamRestart() {
+      scheduled += 1;
+    },
+  };
+
+  await handleRuntimeStreamEnd(runtime, "guild-1", state, "error");
+
+  assert.equal(scheduled, 0);
+  assert.equal(state.streamErrorCount, 0);
 });
 
 test("stream healthcheck forces an early restart when audio stalls", async () => {

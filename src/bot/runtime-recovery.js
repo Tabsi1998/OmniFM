@@ -291,6 +291,7 @@ function buildRuntimeLogContext(runtime, guildId, state = null, extra = {}) {
     reconnectInFlight: state?.reconnectInFlight === true,
     voiceConnectInFlight: state?.voiceConnectInFlight === true,
     streamRestartPending: Boolean(state?.streamRestartTimer),
+    streamRestartInFlight: state?.streamRestartInFlight === true,
     restoreBlockCount: Number(state?.restoreBlockCount || 0) || 0,
     restoreBlockReason: state?.restoreBlockReason || null,
     ...extra,
@@ -323,6 +324,7 @@ function buildRuntimeRecoverySnapshot(runtime, guildId, state = null, extra = {}
   if (state?.reconnectInFlight === true) detail.push("reconnect=1");
   if (state?.voiceConnectInFlight === true) detail.push("voice=1");
   if (state?.streamRestartTimer) detail.push("stream=1");
+  if (state?.streamRestartInFlight === true) detail.push("streamFlight=1");
   const restoreBlockedUntil = Number(state?.restoreBlockedUntil || 0) || 0;
   if (restoreBlockedUntil > Date.now()) {
     detail.push(`restoreBlockedFor=${Math.round((restoreBlockedUntil - Date.now()) / 1000)}s`);
@@ -1088,7 +1090,13 @@ export async function reconcileRuntimeGuildVoiceState(runtime, guildId, { reason
     return;
   }
 
-  if (state.currentStationKey && state.player.state.status === AudioPlayerStatus.Idle && !state.streamRestartTimer && !state.reconnectTimer) {
+  if (
+    state.currentStationKey
+    && state.player.state.status === AudioPlayerStatus.Idle
+    && !state.streamRestartTimer
+    && !state.streamRestartInFlight
+    && !state.reconnectTimer
+  ) {
     runtime.scheduleStreamRestart(guildId, state, 750, `voice-health-${reason}`);
   }
   if (state.currentStationKey) {
@@ -1500,7 +1508,7 @@ export function handleRuntimeNetworkRecovered(runtime, recoveryEvent = null) {
       continue;
     }
 
-    if (state.player.state.status === AudioPlayerStatus.Idle && !state.streamRestartTimer) {
+    if (state.player.state.status === AudioPlayerStatus.Idle && !state.streamRestartTimer && !state.streamRestartInFlight) {
       runtime.scheduleStreamRestart(guildId, state, 750, "network-recovered");
     }
   }

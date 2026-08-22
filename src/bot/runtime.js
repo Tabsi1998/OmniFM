@@ -478,6 +478,7 @@ class BotRuntime {
         reconnectScheduledReason: null,
         reconnectScheduledDelayMs: 0,
         streamRestartTimer: null,
+        streamRestartInFlight: false,
         streamRestartScheduledAt: 0,
         streamRestartScheduledReason: null,
         streamRestartScheduledDelayMs: 0,
@@ -4213,6 +4214,7 @@ class BotRuntime {
             !playing
             || state.reconnectTimer
             || state.streamRestartTimer
+            || state.streamRestartInFlight
             || (Number(state.reconnectAttempts || 0) || 0) > 0
           )
         ),
@@ -4229,6 +4231,7 @@ class BotRuntime {
       if (state.reconnectTimer) detail.reconnectPending = true;
       if (state.reconnectInFlight === true) detail.reconnectInFlight = true;
       if (state.streamRestartTimer) detail.streamRestartPending = true;
+      if (state.streamRestartInFlight === true) detail.streamRestartInFlight = true;
       if (state.voiceConnectInFlight === true) detail.voiceConnectInFlight = true;
       if (state.lastStreamErrorAt) detail.lastStreamErrorAt = state.lastStreamErrorAt;
       if (state.lastHealthcheckFailureAt) detail.lastHealthcheckFailureAt = state.lastHealthcheckFailureAt;
