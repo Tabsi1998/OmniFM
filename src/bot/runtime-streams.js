@@ -139,6 +139,7 @@ function getRuntimeStreamSnapshot(runtime, guildId, state = null, extra = {}) {
     `errors=${Number(state?.streamErrorCount || 0) || 0}`,
   ];
   if (state?.streamRestartTimer) detail.push("stream=1");
+  if (state?.streamRestartInFlight === true) detail.push("streamFlight=1");
   if (state?.reconnectTimer) detail.push("reconnect=1");
   if (state?.reconnectInFlight === true) detail.push("reconnectFlight=1");
   if (state?.voiceConnectInFlight === true) detail.push("voiceFlight=1");
@@ -195,9 +196,69 @@ function getStreamRestartErrorMessage(err) {
 }
 
 function isRecoverableStreamRestartError(err) {
+  const code = String(err?.code || "").trim().toUpperCase();
+  if (code === "OUTBOUND_REQUEST_FAILED" || code === "OUTBOUND_TIMEOUT") return true;
+
   const text = getStreamRestartErrorMessage(err).toLowerCase();
   if (isLikelyNetworkFailureLine(text)) return true;
-  return /stream konnte nicht geladen werden:\s*(408|425|429|5\d\d)\b/i.test(text);
+  return /stream konnte nicht geladen werden:\s*(408|425|429|5\d\d)\b|ziel-url konnte nicht erreicht werden\.|ausgehende anfrage hat das zeitlimit/i.test(text);
+}
+
+function isPermanentStreamRestartError(err) {
+  const code = String(err?.code || "").trim().toUpperCase();
+  if ([
+    "OUTBOUND_URL_INVALID",
+    "OUTBOUND_URL_TOO_LONG",
+    "OUTBOUND_HTTPS_REQUIRED",
+    "OUTBOUND_PROTOCOL_NOT_ALLOWED",
+    "OUTBOUND_CREDENTIALS_NOT_ALLOWED",
+    "OUTBOUND_HOST_INVALID",
+    "OUTBOUND_ADDRESS_NOT_ALLOWED",
+    "OUTBOUND_HOST_NOT_ALLOWED",
+    "OUTBOUND_REDIRECT_NOT_ALLOWED",
+    "OUTBOUND_REDIRECT_INVALID",
+    "OUTBOUND_BODY_UNSUPPORTED",
+  ].includes(code)) {
+    return true;
+  }
+
+  const match = getStreamRestartErrorMessage(err).match(/stream konnte nicht geladen werden:\s*(\d{3})\b/i);
+  if (!match) return false;
+  const status = Number(match[1]);
+  // 401/403 can be temporary provider-side authorization challenges. A missing
+  // or explicitly retired stream, however, cannot recover without a new URL.
+  return status === 404 || status === 410;
+}
+
+function recordRuntimeStreamStartFailure(state, reason = "restart-error") {
+  const previousErrorCount = Math.max(0, Number(state?.streamErrorCount || 0) || 0);
+  const errorCount = Math.min(10_000, previousErrorCount + 1);
+  state.streamErrorCount = errorCount;
+  state.lastStreamErrorAt = new Date().toISOString();
+  state.lastStreamEndReason = String(reason || "restart-error");
+  state.idleRestartStreak = 0;
+  state.lastIdleRestartAt = 0;
+  return errorCount;
+}
+
+function getRuntimeStreamStartFailureRetry(runtime, guildId, state) {
+  const errorCount = Math.max(1, Number(state?.streamErrorCount || 0) || 0);
+  const exponent = Math.min(Math.max(errorCount - 1, 0), 8);
+  let delayMs = Math.min(STREAM_RESTART_MAX_MS, STREAM_RESTART_BASE_MS * Math.pow(2, exponent));
+  const cooldownActive = errorCount >= STREAM_ERROR_COOLDOWN_THRESHOLD;
+  if (cooldownActive) {
+    delayMs = Math.max(delayMs, STREAM_ERROR_COOLDOWN_MS);
+  }
+
+  const networkCooldownMs = Math.max(0, Number(getRuntimeRecoveryDelayMs(runtime, guildId)) || 0);
+  delayMs = Math.max(delayMs, networkCooldownMs);
+
+  return {
+    errorCount,
+    delayMs,
+    cooldownActive,
+    networkCooldownMs,
+  };
 }
 
 function clearRuntimeStreamHealthTimer(state) {
@@ -514,6 +575,7 @@ export function scheduleRuntimeStreamRestart(runtime, guildId, state, delayMs, r
 
 export async function handleRuntimeStreamEnd(runtime, guildId, state, reason) {
   if (!state.shouldReconnect || !state.currentStationKey) return;
+  if (state.streamRestartInFlight) return;
   if (!isRuntimeVoiceConnected(runtime, guildId, state, { includeObserved: true })) return;
 
   const now = Date.now();
@@ -617,8 +679,10 @@ export function armRuntimePlaybackRecovery(
 ) {
   const stationName = stations?.stations?.[key]?.name || state.currentStationName || key;
   const errorMessage = err?.message || String(err || "unknown");
+  const recoverableStartError = isRecoverableStreamRestartError(err);
+  const permanentStartError = isPermanentStreamRestartError(err);
 
-  state.lastStreamErrorAt = new Date().toISOString();
+  const errorCount = recordRuntimeStreamStartFailure(state, reason);
   state.shouldReconnect = true;
   state.currentStationKey = key;
   state.currentStationName = stationName;
@@ -629,14 +693,43 @@ export function armRuntimePlaybackRecovery(
   runtime.updatePresence();
   runtime.persistState();
 
-  const networkCooldownMs = getRuntimeRecoveryDelayMs(runtime, guildId);
-  const delay = Math.max(1_000, networkCooldownMs || STREAM_RESTART_BASE_MS);
+  if (recoverableStartError) {
+    noteRuntimeRecoveryFailure(
+      runtime,
+      guildId,
+      `${runtime.config.name} initial-stream-start`,
+      `guild=${guildId} station=${key}: ${errorMessage}`
+    );
+  }
+
+  if (permanentStartError) {
+    state.shouldReconnect = false;
+    log(
+      "ERROR",
+      `[${runtime.config.name}] Permanenter Stream-Startfehler fuer ${key}; automatische Wiederherstellung wird beendet: ${errorMessage}`
+    );
+    runtime.persistState();
+    return {
+      scheduled: false,
+      delayMs: 0,
+      message: errorMessage,
+      stationName,
+      permanent: true,
+    };
+  }
+
+  const retry = getRuntimeStreamStartFailureRetry(runtime, guildId, state);
+  const delay = retry.delayMs;
 
   if (isRuntimeVoiceConnected(runtime, guildId, state, { includeObserved: true })) {
     log(
       "WARN",
       `[${runtime.config.name}] Stream-Start fehlgeschlagen: ${errorMessage}. ` +
-      `${getRuntimeStreamSnapshot(runtime, guildId, state, { reason, delayMs: delay })}`
+      `${getRuntimeStreamSnapshot(runtime, guildId, state, {
+        reason,
+        delayMs: delay,
+        detail: `errorStreak=${errorCount}${retry.cooldownActive ? ":cooldown" : ""}`,
+      })}`
     );
     runtime.scheduleStreamRestart(guildId, state, delay, reason);
     return { scheduled: true, delayMs: delay, message: errorMessage, stationName };
@@ -748,7 +841,7 @@ export async function playRuntimeStation(runtime, state, stations, key, guildId,
     });
 }
 
-export async function restartRuntimeCurrentStation(runtime, state, guildId) {
+async function restartRuntimeCurrentStationAttempt(runtime, state, guildId) {
   if (!state.shouldReconnect || !state.currentStationKey) return;
   if (runtime.isScheduledEventStopDue(state.activeScheduledEventStopAtMs)) {
     await runtime.stopInGuild(guildId);
@@ -773,15 +866,10 @@ export async function restartRuntimeCurrentStation(runtime, state, guildId) {
     return;
   }
 
-  const networkCooldownMs = getRuntimeRecoveryDelayMs(runtime, guildId);
-  if (networkCooldownMs > 0) {
-    log("INFO", `[${runtime.config.name}] Stream-Restart wegen Netz-Cooldown verschoben ${getRuntimeStreamSnapshot(runtime, guildId, state, {
-      reason: "network-cooldown",
-      delayMs: Math.max(1_000, networkCooldownMs),
-    })}`);
-    runtime.scheduleStreamRestart(guildId, state, Math.max(1_000, networkCooldownMs), "network-cooldown");
-    return;
-  }
+  // NetworkRecovery exposes a penalty duration, not an absolute cooldown-until
+  // timestamp. The failed-start retry plan incorporates that penalty below. Do
+  // not defer here: a deferred retry would never perform a request that can
+  // produce the success signal needed to clear the recovery scope.
 
   try {
     runtime.clearCurrentProcess(state);
@@ -813,8 +901,8 @@ export async function restartRuntimeCurrentStation(runtime, state, guildId) {
     }
   } catch (err) {
     const errorMessage = getStreamRestartErrorMessage(err);
-    const recoverableRestartError = isRecoverableStreamRestartError(errorMessage);
-    state.lastStreamErrorAt = new Date().toISOString();
+    const recoverableRestartError = isRecoverableStreamRestartError(err);
+    const errorCount = recordRuntimeStreamStartFailure(state, "restart-error");
     if (recoverableRestartError) {
       noteRuntimeRecoveryFailure(runtime, guildId, `${runtime.config.name} auto-restart`, `guild=${guildId} station=${key}: ${errorMessage}`);
     }
@@ -864,13 +952,13 @@ export async function restartRuntimeCurrentStation(runtime, state, guildId) {
           attemptedCandidates: fallbackCandidates,
           triggerError: errorMessage,
           recoverableRestartError,
-          streamErrorCount: previousErrorCount,
+          streamErrorCount: errorCount,
           listenerCount: runtime.getCurrentListenerCount(guildId, state),
         }).catch(() => null);
         return;
       } catch (fallbackErr) {
         const fallbackMessage = getStreamRestartErrorMessage(fallbackErr);
-        const recoverableFallbackError = isRecoverableStreamRestartError(fallbackMessage);
+        const recoverableFallbackError = isRecoverableStreamRestartError(fallbackErr);
         if (recoverableFallbackError) {
           noteRuntimeRecoveryFailure(
             runtime,
@@ -894,18 +982,46 @@ export async function restartRuntimeCurrentStation(runtime, state, guildId) {
         attemptedCandidates: fallbackCandidates,
         triggerError: errorMessage,
         recoverableRestartError,
-        streamErrorCount: previousErrorCount,
+        streamErrorCount: errorCount,
         lastStreamErrorAt: previousLastStreamErrorAt,
       }).catch(() => null);
     }
 
-    const retryDelay = Math.max(STREAM_RESTART_BASE_MS, getRuntimeRecoveryDelayMs(runtime, guildId));
+    if (isPermanentStreamRestartError(err)) {
+      log(
+        "ERROR",
+        `[${runtime.config.name}] Permanenter Stream-Restartfehler fuer ${resolvedStation.key}; Wiedergabe wird beendet: ${errorMessage}`
+      );
+      if (typeof runtime.stopInGuild === "function") {
+        try {
+          await runtime.stopInGuild(guildId);
+          return;
+        } catch (stopErr) {
+          log("WARN", `[${runtime.config.name}] Wiedergabe nach permanentem Streamfehler konnte nicht sauber beendet werden: ${getStreamRestartErrorMessage(stopErr)}`);
+        }
+      }
+      state.shouldReconnect = false;
+      state.currentStationKey = null;
+      state.currentStationName = null;
+      state.currentMeta = null;
+      state.nowPlayingSignature = null;
+      runtime.clearNowPlayingTimer?.(state);
+      runtime.clearScheduledEventPlayback?.(state);
+      runtime.updatePresence?.();
+      runtime.persistState?.();
+      return;
+    }
+
+    const retry = getRuntimeStreamStartFailureRetry(runtime, guildId, state);
+    const retryDelay = retry.delayMs;
     if (isRuntimeVoiceConnected(runtime, guildId, state, { includeObserved: true })) {
       log(
         "INFO",
-        `[${runtime.config.name}] Stream-Retry nach Restart-Fehler fuer ${resolvedStation.key} in ${Math.round(retryDelay)}ms`
+        `[${runtime.config.name}] Stream-Retry nach Restart-Fehler fuer ${resolvedStation.key} in ${Math.round(retryDelay)}ms ` +
+        `(Fehlerreihe ${retry.errorCount}${retry.cooldownActive ? ", Cooldown aktiv" : ""})`
       );
       runtime.scheduleStreamRestart(guildId, state, retryDelay, "restart-error");
+      runtime.persistState?.();
       return;
     }
 
@@ -919,5 +1035,21 @@ export async function restartRuntimeCurrentStation(runtime, state, guildId) {
         reason: "restart-error",
       });
     }
+    runtime.persistState?.();
+  }
+}
+
+export async function restartRuntimeCurrentStation(runtime, state, guildId) {
+  if (!state?.shouldReconnect || !state.currentStationKey) return;
+  if (state.streamRestartInFlight) {
+    log("INFO", `[${runtime.config.name}] Stream-Restart bereits aktiv ${getRuntimeStreamSnapshot(runtime, guildId, state, { reason: "restart-in-flight" })}`);
+    return;
+  }
+
+  state.streamRestartInFlight = true;
+  try {
+    return await restartRuntimeCurrentStationAttempt(runtime, state, guildId);
+  } finally {
+    state.streamRestartInFlight = false;
   }
 }
