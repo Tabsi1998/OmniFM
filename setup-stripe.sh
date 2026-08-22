@@ -10,6 +10,7 @@ NC='\033[0m'
 
 info()  { echo -e "${CYAN}[INFO]${NC} $*"; }
 ok()    { echo -e "${GREEN}[OK]${NC}   $*"; }
+warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
 fail()  { echo -e "${RED}[FAIL]${NC} $*"; }
 
 echo ""
@@ -57,15 +58,26 @@ echo ""
 info "Starte Container neu damit der Key aktiv wird..."
 
 if command -v docker >/dev/null 2>&1; then
+  # The legacy direct Compose call used its interpolation default (1000).
+  # Keep that ownership when this setup helper is invoked via sudo, while the
+  # wrapper adds topology reconciliation before every actual start.
+  export OMNIFM_CONTAINER_UID="${OMNIFM_CONTAINER_UID:-1000}"
+  export OMNIFM_CONTAINER_GID="${OMNIFM_CONTAINER_GID:-1000}"
+
   # WICHTIG: up -d statt restart - restart liest .env NICHT neu ein!
-  bash "$APP_DIR/init-data.sh"
-  docker compose up -d --build --remove-orphans 2>/dev/null || {
+  if bash "$APP_DIR/scripts/compose.sh" up -d --build --remove-orphans; then
+    ok "Container neugestartet."
+  else
     warn "Build fehlgeschlagen, versuche ohne --build..."
-    docker compose up -d --remove-orphans 2>/dev/null || true
-  }
-  ok "Container neugestartet."
+    if bash "$APP_DIR/scripts/compose.sh" up -d --remove-orphans; then
+      ok "Container neugestartet."
+    else
+      fail "Container konnten nach der Stripe-Aenderung nicht sicher gestartet werden."
+      exit 1
+    fi
+  fi
 else
-  echo -e "  ${YELLOW}Docker nicht gefunden. Bitte manuell neustarten: docker compose up -d --build${NC}"
+  echo -e "  ${YELLOW}Docker nicht gefunden. Bitte manuell neustarten: bash ./scripts/compose.sh up -d --build${NC}"
 fi
 
 echo ""
