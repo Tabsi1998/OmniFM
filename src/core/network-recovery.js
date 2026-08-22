@@ -24,9 +24,25 @@ function normalizeScope(rawScope) {
 }
 
 class NetworkRecoveryCoordinator {
-  constructor() {
+  constructor({ now = () => Date.now(), jitter = applyJitter } = {}) {
     this.scopes = new Map();
     this.listeners = new Set();
+    this.now = typeof now === "function" ? now : () => Date.now();
+    this.jitter = typeof jitter === "function" ? jitter : applyJitter;
+  }
+
+  getNowMs() {
+    const now = Number(this.now());
+    return Number.isFinite(now) ? now : Date.now();
+  }
+
+  getCooldownMs(failureCount) {
+    const backoff = NETWORK_COOLDOWN_BASE_MS * Math.pow(1.6, Math.min(Math.max(0, failureCount - 1), 10));
+    const jittered = Number(this.jitter(backoff, 0.25));
+    return Math.min(
+      NETWORK_COOLDOWN_MAX_MS,
+      Math.max(0, Number.isFinite(jittered) ? jittered : backoff)
+    );
   }
 
   getScopeState(scope = "global", { createIfMissing = true } = {}) {
@@ -36,7 +52,8 @@ class NetworkRecoveryCoordinator {
       this.scopes.set(key, {
         failureCount: 0,
         lastFailureAt: 0,
-        lastSuccessAt: Date.now(),
+        lastSuccessAt: this.getNowMs(),
+        cooldownUntil: 0,
       });
     }
     return this.scopes.get(key);
@@ -46,12 +63,17 @@ class NetworkRecoveryCoordinator {
     const { scope } = normalizeOptions(options);
     const scopeKey = normalizeScope(scope);
     const scopeState = this.getScopeState(scopeKey);
-    const now = Date.now();
-    if (now - scopeState.lastFailureAt > NETWORK_FAILURE_RESET_MS) {
+    const now = this.getNowMs();
+    const lastRecoveryActivityAt = Math.max(
+      Number(scopeState.lastFailureAt || 0) || 0,
+      Number(scopeState.cooldownUntil || 0) || 0
+    );
+    if (lastRecoveryActivityAt > 0 && (now - lastRecoveryActivityAt) > NETWORK_FAILURE_RESET_MS) {
       scopeState.failureCount = 0;
     }
     scopeState.failureCount += 1;
     scopeState.lastFailureAt = now;
+    scopeState.cooldownUntil = now + this.getCooldownMs(scopeState.failureCount);
     if (scopeState.failureCount <= 3) {
       log(
         "INFO",
@@ -65,10 +87,11 @@ class NetworkRecoveryCoordinator {
     const scopeKey = normalizeScope(scope);
     const scopeState = this.getScopeState(scopeKey, { createIfMissing: false });
     if (!scopeState) return;
-    const now = Date.now();
+    const now = this.getNowMs();
     const hadFailures = scopeState.failureCount > 0;
     scopeState.failureCount = 0;
     scopeState.lastSuccessAt = now;
+    scopeState.cooldownUntil = 0;
     if (hadFailures) {
       const event = {
         scope: scopeKey,
@@ -99,8 +122,24 @@ class NetworkRecoveryCoordinator {
     const scopeState = this.getScopeState(scopeKey, { createIfMissing: false });
     if (!scopeState) return 0;
     if (scopeState.failureCount <= 0) return 0;
-    const backoff = NETWORK_COOLDOWN_BASE_MS * Math.pow(1.6, Math.min(scopeState.failureCount - 1, 10));
-    return Math.min(NETWORK_COOLDOWN_MAX_MS, applyJitter(backoff, 0.25));
+    return Math.max(0, (Number(scopeState.cooldownUntil || 0) || 0) - this.getNowMs());
+  }
+
+  getRecoveryState(options = {}) {
+    const { scope } = normalizeOptions(options);
+    const scopeKey = normalizeScope(scope);
+    const scopeState = this.getScopeState(scopeKey, { createIfMissing: false });
+    if (!scopeState) return null;
+
+    const cooldownUntil = Number(scopeState.cooldownUntil || 0) || 0;
+    return {
+      scope: scopeKey,
+      failureCount: Number(scopeState.failureCount || 0) || 0,
+      lastFailureAt: Number(scopeState.lastFailureAt || 0) || 0,
+      lastSuccessAt: Number(scopeState.lastSuccessAt || 0) || 0,
+      cooldownUntil,
+      cooldownRemainingMs: Math.max(0, cooldownUntil - this.getNowMs()),
+    };
   }
 
   isNetworkHealthy(options = {}) {
