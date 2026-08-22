@@ -1532,47 +1532,6 @@ function retryRefresh() {
   refresh();
 }
 
-async function refresh() {
-  try {
-    var results = await Promise.all([
-      fetchJson('/api/bots', 8000),
-      fetchJson('/api/stations', 8000),
-    ]);
-
-    var botsRes = results[0];
-    var stationsRes = results[1];
-    var bots = botsRes.bots || [];
-    var totals = botsRes.totals || {};
-    var stations = stationsRes.stations || [];
-
-    _lastRefreshOk = true;
-    _apiErrorShown = false;
-
-    renderBots(bots);
-    renderStations(stations);
-    // Use allStations.length (filtered in renderStations) for accurate count
-    renderFooterStats({ ...totals, bots: bots.length, stations: allStations.length });
-
-    document.getElementById('statServers').textContent = fmtInt(totals.servers);
-    document.getElementById('statStations').textContent = fmtInt(allStations.length);
-    document.getElementById('statBots').textContent = fmtInt(bots.length);
-  } catch (e) {
-    console.error(tr('API Fehler:', 'API error:'), e);
-    if (!_lastRefreshOk) {
-      // Nur beim ersten Fehler (noch nie erfolgreich geladen) Fehlermeldung zeigen
-      showApiError();
-    }
-  }
-}
-
-// Erster Ladeversuch mit Timeout-Fallback: nach 6s Fehlermeldung wenn noch nichts geladen
-var _initialLoadTimer = setTimeout(function() {
-  if (!_lastRefreshOk) showApiError();
-}, 6000);
-
-refresh().then(function() { clearTimeout(_initialLoadTimer); });
-setInterval(refresh, 15000);
-
 // --- Count-Up Animation für Hero-Stats ---
 var _countUpDone = false;
 function animateCounter(el, target, duration) {
@@ -1594,18 +1553,13 @@ function animateCounter(el, target, duration) {
   requestAnimationFrame(step);
 }
 
-// Überschreibe fmtInt für Stats nach erstem Laden mit Animation
-var _origStatServers = document.getElementById('statServers');
-var _origStatStations = document.getElementById('statStations');
-var _origStatBots = document.getElementById('statBots');
-
-var _refreshOriginal = refresh;
-refresh = async function() {
+async function refresh() {
   try {
     var results = await Promise.all([
       fetchJson('/api/bots', 8000),
       fetchJson('/api/stations', 8000),
     ]);
+
     var botsRes = results[0];
     var stationsRes = results[1];
     var bots = botsRes.bots || [];
@@ -1635,9 +1589,20 @@ refresh = async function() {
     }
   } catch (e) {
     console.error(tr('API Fehler:', 'API error:'), e);
-    if (!_lastRefreshOk) showApiError();
+    if (!_lastRefreshOk) {
+      // Nur beim ersten Fehler (noch nie erfolgreich geladen) Fehlermeldung zeigen
+      showApiError();
+    }
   }
-};
+}
+
+// Erster Ladeversuch mit Timeout-Fallback: nach 6s Fehlermeldung wenn noch nichts geladen
+var _initialLoadTimer = setTimeout(function() {
+  if (!_lastRefreshOk) showApiError();
+}, 6000);
+
+refresh().then(function() { clearTimeout(_initialLoadTimer); });
+setInterval(refresh, 15000);
 
 // --- Scroll-Indicator ausblenden ---
 window.addEventListener('scroll', function() {
