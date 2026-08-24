@@ -4091,3 +4091,62 @@ async def admin_station_list(request: Request):
             rows = []
     return {"stations": rows, "count": len(rows)}
 
+
+
+# ------------------------------------------------------------
+# Cover art / track metadata (keyless via iTunes Search API).
+# Used to enrich "Now Playing" and station cards with real
+# artwork without requiring any API keys. Server-side + cached.
+# ------------------------------------------------------------
+_COVER_CACHE = {}
+_COVER_CACHE_MAX = 500
+
+
+@app.get("/api/cover")
+async def cover_lookup(request: Request, artist: str = "", title: str = "", term: str = ""):
+    rate_limited = enforce_api_rate_limit(request, "read")
+    if rate_limited is not None:
+        return rate_limited
+    query = (term or f"{artist} {title}").strip()
+    query = re.sub(r"\s+", " ", query)[:120]
+    if not query:
+        return {"ok": False, "error": "Kein Suchbegriff."}
+    ckey = query.lower()
+    if ckey in _COVER_CACHE:
+        return _COVER_CACHE[ckey]
+
+    result = {"ok": False, "query": query}
+    try:
+        resp = await run_in_threadpool(
+            lambda: requests.get(
+                "https://itunes.apple.com/search",
+                params={"term": query, "entity": "song", "limit": 1},
+                timeout=5,
+                headers={"User-Agent": "OmniFM/1.0"},
+            )
+        )
+        if resp.status_code < 400:
+            items = (resp.json() or {}).get("results", [])
+            if items:
+                it = items[0]
+                art = str(it.get("artworkUrl100") or "")
+                art_hi = art.replace("100x100bb", "600x600bb").replace("100x100", "600x600")
+                result = {
+                    "ok": True,
+                    "query": query,
+                    "artwork": art_hi or None,
+                    "artworkSmall": art or None,
+                    "artist": it.get("artistName"),
+                    "title": it.get("trackName"),
+                    "collection": it.get("collectionName"),
+                    "genre": it.get("primaryGenreName"),
+                    "previewUrl": it.get("previewUrl"),
+                }
+    except Exception:
+        result = {"ok": False, "query": query}
+
+    if len(_COVER_CACHE) >= _COVER_CACHE_MAX:
+        _COVER_CACHE.clear()
+    _COVER_CACHE[ckey] = result
+    return result
+

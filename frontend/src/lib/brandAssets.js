@@ -1,13 +1,14 @@
 // Shared OmniFM brand asset catalog (files live in /public/brand).
+// Primary brand is a true vector (SVG) with transparent PNG exports so
+// partners can place the mark on any background (dark or light).
 export const BRAND_ASSETS = [
-  { slug: 'omnifm-icon-universal', label: 'Universal Icon', desc: 'Primäres Symbol – funktioniert auf hell & dunkel.', file: '/brand/omnifm-icon-universal.jpg', bg: 'dark', use: 'App-Icon, Social Avatar' },
-  { slug: 'omnifm-bot-avatar', label: 'Discord Bot Avatar', desc: 'Rundes Profilbild für den Discord-Bot.', file: '/brand/omnifm-bot-avatar.jpg', bg: 'discord', use: 'Discord-Profil, Favicon' },
-  { slug: 'omnifm-wordmark-dark', label: 'Wortmarke (Dunkel)', desc: 'Logo + Schriftzug für dunkle Flächen.', file: '/brand/omnifm-wordmark-dark.jpg', bg: 'dark', use: 'Header, dunkle Webseiten' },
-  { slug: 'omnifm-wordmark-light', label: 'Wortmarke (Hell)', desc: 'Logo + Schriftzug für helle Flächen.', file: '/brand/omnifm-wordmark-light.jpg', bg: 'light', use: 'Helle Webseiten, Dokumente' },
-  { slug: 'omnifm-sponsor-badge', label: 'Sponsor-Badge', desc: '„Powered by OmniFM" zum Verlinken.', file: '/brand/omnifm-sponsor-badge.jpg', bg: 'dark', use: 'Sponsoren-Links, Footer' },
-  { slug: 'omnifm-banner', label: 'Marketing-Banner', desc: 'Breites Hero-Banner für Social & Web.', file: '/brand/omnifm-banner.jpg', bg: 'dark', use: 'Social Header, OG-Image' },
-  { slug: 'omnifm-print-logo', label: 'Druck-Logo', desc: 'Kontrastreiches Logo auf weißem Grund.', file: '/brand/omnifm-print-logo.jpg', bg: 'light', use: 'Print, Flyer, Sticker' },
-  { slug: 'omnifm-favicon-mark', label: 'Favicon-Mark', desc: 'Reduzierte Marke, lesbar ab 32px.', file: '/brand/omnifm-favicon-mark.jpg', bg: 'dark', use: 'Favicon, kleine Icons' },
+  { slug: 'omnifm-mark-svg', label: 'Vektor-Icon (SVG)', desc: 'Skalierbare Marke – Schallwelle + Unendlichkeit. Transparent.', file: '/brand/omnifm-mark.svg', bg: 'dark', use: 'Print, App, Vektor · beste Qualität' },
+  { slug: 'omnifm-mark-512', label: 'Icon PNG (transparent)', desc: 'Hauptsymbol als transparentes PNG.', file: '/brand/omnifm-mark-512.png', bg: 'dark', use: 'App-Icon, Social Avatar' },
+  { slug: 'omnifm-wordmark-dark', label: 'Wortmarke – Dunkel', desc: 'Logo + „omnifm" für dunkle Flächen. Transparent.', file: '/brand/omnifm-wordmark-dark.png', bg: 'dark', use: 'Header, dunkle Webseiten' },
+  { slug: 'omnifm-wordmark-light', label: 'Wortmarke – Hell', desc: 'Logo + „omnifm" für helle Flächen. Transparent.', file: '/brand/omnifm-wordmark-light.png', bg: 'light', use: 'Helle Seiten, Dokumente' },
+  { slug: 'omnifm-sponsor-badge', label: 'Sponsor-Badge', desc: '„Powered by omnifm" zum Verlinken. Transparent.', file: '/brand/omnifm-sponsor-badge.png', bg: 'dark', use: 'Sponsoren-Links, Footer' },
+  { slug: 'omnifm-banner', label: 'Marketing-Banner', desc: 'Breites Hero-Banner für Social & Web.', file: '/brand/omnifm-banner.png', bg: 'dark', use: 'Social Header, OG-Image' },
+  { slug: 'omnifm-favicon', label: 'Favicon', desc: 'Kompakte Marke, lesbar in kleinen Größen.', file: '/brand/omnifm-favicon.png', bg: 'dark', use: 'Favicon, kleine Icons' },
 ];
 
 export const BRAND_PALETTE = [
@@ -32,9 +33,9 @@ export function siteOrigin() {
 }
 
 export function sponsorEmbedHtml(origin = siteOrigin()) {
-  return `<a href="${origin}" target="_blank" rel="noopener">\n  <img src="${origin}/brand/omnifm-sponsor-badge.jpg" alt="Powered by OmniFM" height="44" />\n</a>`;
+  return `<a href="${origin}" target="_blank" rel="noopener">\n  <img src="${origin}/brand/omnifm-sponsor-badge.png" alt="Powered by OmniFM" height="44" />\n</a>`;
 }
 
 export function sponsorEmbedMarkdown(origin = siteOrigin()) {
-  return `[![Powered by OmniFM](${origin}/brand/omnifm-sponsor-badge.jpg)](${origin})`;
+  return `[![Powered by OmniFM](${origin}/brand/omnifm-sponsor-badge.png)](${origin})`;
 }

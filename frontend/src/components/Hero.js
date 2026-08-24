@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Headphones, Radio, Volume2, Play, SkipForward, Users } from 'lucide-react';
 import { useI18n } from '../i18n.js';
 import { resolvePrimaryInviteUrl } from '../lib/invite.js';
+import { buildApiUrl } from '../lib/api.js';
 
 const heroCss = `
 @keyframes eq-bounce { 0%,100% { transform: scaleY(0.28);} 50% { transform: scaleY(1);} }
@@ -39,11 +40,21 @@ function Equalizer({ bars = 14, height = 44, colorful = true }) {
 
 function NowPlayingConsole({ listeners }) {
   const [idx, setIdx] = useState(0);
+  const [cover, setCover] = useState(null);
   useEffect(() => {
     const t = setInterval(() => setIdx((v) => (v + 1) % LIVE_TRACKS.length), 4200);
     return () => clearInterval(t);
   }, []);
   const track = LIVE_TRACKS[idx];
+  useEffect(() => {
+    let stop = false;
+    const term = track.artist.replace('—', ' ');
+    setCover(null);
+    fetch(buildApiUrl(`/api/cover?term=${encodeURIComponent(term)}`))
+      .then((r) => r.json()).then((d) => { if (!stop && d && d.ok && d.artwork) setCover(d.artwork); })
+      .catch(() => {});
+    return () => { stop = true; };
+  }, [track.artist]);
 
   return (
     <div
@@ -83,7 +94,9 @@ function NowPlayingConsole({ listeners }) {
           background: 'linear-gradient(135deg, #ff6b00 0%, #ff2a5f 60%, #7a1030 100%)',
           display: 'grid', placeItems: 'center', boxShadow: '0 12px 30px rgba(255,107,0,0.35)',
         }}>
-          <Radio size={30} color="rgba(255,255,255,0.92)" />
+          {cover
+            ? <img src={cover} alt={track.station} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+            : <Radio size={30} color="rgba(255,255,255,0.92)" />}
           <div style={{ position: 'absolute', bottom: 8, left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
             <Equalizer bars={7} height={20} colorful={false} />
           </div>

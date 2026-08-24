@@ -56,7 +56,7 @@ function Navbar({ page = 'home' }) {
           color: '#fff',
         }}
       >
-        <Radio size={22} color="#ff6b00" />
+        <img src="/brand/omnifm-mark.svg" alt="OmniFM" width="28" height="28" style={{ display: 'block' }} />
         <span
           style={{
             fontFamily: "'Orbitron', sans-serif",

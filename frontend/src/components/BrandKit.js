@@ -82,7 +82,7 @@ export default function BrandKit({ embedded = false }) {
         <div className="oa-grid cols-2">
           <div className="oa-card" data-testid="brand-badge-preview">
             <div style={{ height: 120, borderRadius: 12, background: 'linear-gradient(135deg,#0e111a,#08090d)', display: 'grid', placeItems: 'center', border: '1px solid #1b2133', marginBottom: 14 }}>
-              <img src="/brand/omnifm-sponsor-badge.jpg" alt="Powered by OmniFM" style={{ maxWidth: '70%', maxHeight: '64%', objectFit: 'contain' }} />
+              <img src="/brand/omnifm-sponsor-badge.png" alt="Powered by OmniFM" style={{ maxWidth: '70%', maxHeight: '64%', objectFit: 'contain' }} />
             </div>
             <p style={{ color: '#94a3b8', fontSize: 13.5, lineHeight: 1.5 }}>So sieht der Badge aus, wenn du ihn auf deiner Seite oder in deinem Discord-Server als Sponsor einbindest.</p>
           </div>

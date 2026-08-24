@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Hash, Play, Pause, SkipForward, Square, Heart, ListMusic, Radio } from 'lucide-react';
+import { buildApiUrl } from '../lib/api.js';
 
 const STATIONS = [
   { name: 'Synthwave Nights', genre: 'Retrowave', bitrate: '320 kbps', listeners: 342, now: 'The Midnight — Vampires' },
@@ -34,8 +35,17 @@ function DiscordButton({ icon: Icon, label, primary }) {
 
 export default function DiscordShowcase() {
   const [i, setI] = useState(0);
+  const [cover, setCover] = useState(null);
   useEffect(() => { const t = setInterval(() => setI((v) => (v + 1) % STATIONS.length), 4000); return () => clearInterval(t); }, []);
   const s = STATIONS[i];
+  useEffect(() => {
+    let stop = false;
+    setCover(null);
+    fetch(buildApiUrl(`/api/cover?term=${encodeURIComponent(s.now.replace('—', ' '))}`))
+      .then((r) => r.json()).then((d) => { if (!stop && d && d.ok && d.artwork) setCover(d.artwork); })
+      .catch(() => {});
+    return () => { stop = true; };
+  }, [s.now]);
 
   return (
     <section id="in-discord" data-testid="discord-showcase" style={{ position: 'relative', padding: '90px 24px' }}>
@@ -97,8 +107,8 @@ export default function DiscordShowcase() {
                           <div><div style={{ color: '#b5bac1', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Hörer</div><div style={{ color: '#dbdee1', fontSize: 13, marginTop: 2 }}>{s.listeners}</div></div>
                         </div>
                       </div>
-                      <div style={{ width: 68, height: 68, borderRadius: 8, flexShrink: 0, background: 'linear-gradient(135deg,#ff6b00,#7a1030)', display: 'grid', placeItems: 'center' }}>
-                        <ListMusic size={26} color="rgba(255,255,255,0.9)" />
+                      <div style={{ width: 68, height: 68, borderRadius: 8, flexShrink: 0, overflow: 'hidden', background: 'linear-gradient(135deg,#ff6b00,#7a1030)', display: 'grid', placeItems: 'center' }}>
+                        {cover ? <img src={cover} alt={s.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <ListMusic size={26} color="rgba(255,255,255,0.9)" />}
                       </div>
                     </div>
                     <div style={{ marginTop: 12, height: 5, borderRadius: 999, background: '#1e1f22', overflow: 'hidden' }}>

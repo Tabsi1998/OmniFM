@@ -161,6 +161,36 @@ export default function GuildDashboard() {
   };
   const togglePerm = (cmd, roleId) => setPerms((p) => ({ ...p, [`${cmd}:${roleId}`]: !p[`${cmd}:${roleId}`] }));
 
+  // Real mode: seed permission matrix from the backend for the selected guild.
+  useEffect(() => {
+    if (demo || !session.authenticated || !guildId) return undefined;
+    let stop = false;
+    fetch(buildApiUrl(`/api/dashboard/perms?serverId=${encodeURIComponent(guildId)}`), { credentials: 'include', cache: 'no-store' })
+      .then((r) => r.json()).then((d) => {
+        if (stop || !d || !d.commandRoleMap) return;
+        const seed = {};
+        Object.entries(d.commandRoleMap).forEach(([cmd, roles]) => (Array.isArray(roles) ? roles : []).forEach((rid) => { seed[`${cmd}:${rid}`] = true; }));
+        setPerms(seed);
+      }).catch(() => {});
+    return () => { stop = true; };
+  }, [demo, session.authenticated, guildId]);
+
+  const savePerms = async () => {
+    if (demo) { setMsg({ ok: true, text: 'Berechtigungen gespeichert (Demo).' }); return; }
+    const commandRoleMap = {};
+    COMMANDS.forEach((c) => {
+      const roles = gdata.roles.filter((r) => perms[`${c.id}:${r.id}`]).map((r) => r.id);
+      if (roles.length) commandRoleMap[c.id] = roles;
+    });
+    try {
+      const res = await fetch(buildApiUrl(`/api/dashboard/perms?serverId=${encodeURIComponent(guildId)}`), {
+        method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ commandRoleMap }),
+      });
+      if (!res.ok) throw new Error('save failed');
+      setMsg({ ok: true, text: 'Berechtigungen gespeichert.' });
+    } catch { setMsg({ ok: false, text: 'Speichern fehlgeschlagen.' }); }
+  };
+
   useEffect(() => {
     if (!msg) return undefined;
     const t = setTimeout(() => setMsg(null), 2800);
@@ -234,6 +264,14 @@ export default function GuildDashboard() {
               {session.guilds.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </div>
+        </div>
+
+        <div className="oa-mobile-nav">
+          {NAV.map((n) => (
+            <button key={n.id} className={`oa-nav-btn ${section === n.id ? 'active' : ''}`} style={{ width: 'auto', whiteSpace: 'nowrap' }} onClick={() => { setSection(n.id); setMsg(null); }} data-testid={`guild-mobile-nav-${n.id}`}>
+              <n.icon size={16} /> {n.label}
+            </button>
+          ))}
         </div>
 
         {msg && <div className={`oa-pill ${msg.ok ? 'green' : 'red'}`} style={{ marginBottom: 16 }} data-testid="guild-message">{msg.ok ? <Check size={13} /> : null} {msg.text}</div>}
@@ -358,7 +396,7 @@ export default function GuildDashboard() {
                 </tbody>
               </table>
             </div>
-            <button className="oa-btn primary" style={{ marginTop: 16 }} onClick={() => setMsg({ ok: true, text: 'Berechtigungen gespeichert.' })} data-testid="guild-perms-save"><Check size={16} /> Speichern</button>
+            <button className="oa-btn primary" style={{ marginTop: 16 }} onClick={savePerms} data-testid="guild-perms-save"><Check size={16} /> Speichern</button>
           </>
         )}
 

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" fill="none" role="img" aria-label="OmniFM">
+  <defs>
+    <linearGradient id="omniGrad" x1="18" y1="44" x2="102" y2="76" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff6b00"/>
+      <stop offset="0.55" stop-color="#ff2a5f"/>
+      <stop offset="1" stop-color="#00e5ff"/>
+    </linearGradient>
+    <linearGradient id="omniBar" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#00e5ff"/>
+      <stop offset="1" stop-color="#ff6b00"/>
+    </linearGradient>
+  </defs>
+  <!-- Infinity (soundwave loop) -->
+  <path d="M60 60 C72 43 97 43 97 60 C97 77 72 77 60 60 C48 43 23 43 23 60 C23 77 48 77 60 60 Z"
+        stroke="url(#omniGrad)" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Equalizer / soundwave bars at the crossing -->
+  <g fill="url(#omniBar)">
+    <rect x="52.5" y="52" width="3.4" height="16" rx="1.7"/>
+    <rect x="58.3" y="46" width="3.4" height="28" rx="1.7"/>
+    <rect x="64.1" y="50" width="3.4" height="20" rx="1.7"/>
+  </g>
+</svg>
