@@ -31,7 +31,7 @@
 
 - **Frontend:** React (CRA), Design-System „Broadcast Studio" (Obsidian + Signal-Orange + Cyber-Cyan), `recharts`, `lucide-react`.
 - **Backend:** FastAPI, alle Endpunkte unter `/api`, MongoDB über `MONGO_URL`.
-- **Discord-Voice-Bot:** Node.js / `discord.js` (Commander/Worker-Split) – der eigentliche Streaming-Runtime. Läuft separat (Docker/systemd) und teilt sich die MongoDB.
+- **Discord-Voice-Bot:** Node.js / `discord.js` (Commander/Worker-Split) – der eigentliche Streaming-Runtime unter `src/`. **Wird von `start.sh` mitgestartet und liest Commander + Worker vollständig aus dem Owner-Menü (MongoDB `owner_config.discord`) – keine Token-Env-Variablen nötig.** Teilt sich dieselbe MongoDB wie das Backend.
 
 ## 🎨 Marke
 
@@ -55,20 +55,41 @@ cd frontend && yarn install && yarn start
 
 MongoDB muss erreichbar sein (siehe `.env`).
 
-## 🖥️ Deployment auf Ubuntu (Web-Stack)
+## 🖥️ Deployment auf Ubuntu (kompletter Stack inkl. Discord-Bot)
+
+**Voraussetzungen** (einmalig, für die nativen Voice-Abhängigkeiten des Bots):
+
+```bash
+sudo apt-get update && sudo apt-get install -y python3 python3-venv build-essential ffmpeg nodejs npm
+# Node 18+ (LTS 20/22 ok). ffmpeg wird vom Bot fürs Voice-Streaming benötigt.
+# MongoDB lokal oder MONGO_URL in backend/.env auf eine erreichbare DB
+```
 
 Klonen → einmalig `./start.sh` → ab dann Updates per `./update.sh`:
 
 ```bash
 git clone <repo> omnifm && cd omnifm
-./start.sh     # installiert alles, baut Frontend, startet Mongo + Backend + Frontend
+./start.sh     # installiert alles, baut Frontend, startet Mongo + Backend + Frontend + Discord-Bot
 ./stop.sh      # alles stoppen  (./stop.sh --all stoppt auch die von start.sh gestartete MongoDB)
-./update.sh    # git pull + Abhängigkeiten aktualisieren + Neustart
+./update.sh    # git pull + Abhängigkeiten aktualisieren + Neustart (inkl. Bot)
 ```
 
-`start.sh` ist idempotent: erstellt bei Bedarf ein Python-venv, installiert Backend- und
-Frontend-Abhängigkeiten, baut das Frontend und serviert es. Logs unter `logs/`, PIDs unter `run/`.
+`start.sh` ist idempotent: erstellt bei Bedarf ein Python-venv, installiert Backend-, Frontend- und
+Bot-Abhängigkeiten, baut das Frontend, serviert es und startet den Discord-Bot **aus der Owner-Config**.
+Ist noch kein Commander-Token im Owner-Menü hinterlegt, wird der Bot sauber übersprungen (der Rest läuft
+trotzdem). Logs unter `logs/` (`bot.log`, `backend.log`, `frontend.log`), PIDs unter `run/`.
 Ports via `BACKEND_PORT` / `FRONTEND_PORT` überschreibbar.
+
+### Discord-Bot einrichten (100 % über die Owner-Konsole)
+
+1. `./start.sh` starten → Website + Owner-Konsole laufen.
+2. `/admin` → **Discord & Bots**: Commander-Token + Client-ID eintragen, beliebig viele Worker
+   („+ Bot hinzufügen") mit Token/Client-ID/Tier anlegen. Speichern.
+3. `./update.sh` (oder `./start.sh`) erneut ausführen → der Bot bootet automatisch mit genau diesen
+   Bots. Commander nimmt Slash-Commands entgegen und verteilt Voice-Streams an die Worker.
+
+> Der Bot liest **ausschließlich** aus der MongoDB-Owner-Config (`src/entrypoints/from-owner-config.mjs`).
+> Änderungen an Bots/Tokens erfordern nur ein erneutes `./update.sh` – keine Datei- oder Env-Bearbeitung.
 
 ## ⚙️ Konfiguration
 

@@ -64,5 +64,24 @@ log "Serviere Frontend auf Port $FRONTEND_PORT..."
 ( cd "$ROOT/frontend" && nohup npx --yes serve -s build -l "$FRONTEND_PORT" \
   >"$LOG_DIR/frontend.log" 2>&1 & echo $! > "$RUN_DIR/frontend.pid" )
 
+# --- Discord bot (DB-driven, optional) --------------------------------------
+# Reads Commander + Workers straight from the Owner Console (MongoDB).
+# Skips gracefully if no bot token has been configured yet.
+if [ -f "$ROOT/package.json" ]; then
+  log "Installiere Bot-Abhängigkeiten (Node)..."
+  ( cd "$ROOT" && npm install --no-audit --no-fund --engine-strict=false --loglevel=error ) || warn "Bot-Abhängigkeiten konnten nicht installiert werden."
+  log "Starte Discord-Bot aus Owner-Menü-Konfiguration..."
+  ( cd "$ROOT" && nohup node src/entrypoints/from-owner-config.mjs >"$LOG_DIR/bot.log" 2>&1 & echo $! > "$RUN_DIR/bot.pid" )
+  sleep 3
+  BOT_PID="$(cat "$RUN_DIR/bot.pid" 2>/dev/null)"
+  if [ -n "$BOT_PID" ] && kill -0 "$BOT_PID" 2>/dev/null; then
+    log "Discord-Bot läuft (PID $BOT_PID)."
+  else
+    rm -f "$RUN_DIR/bot.pid"
+    warn "Discord-Bot nicht gestartet – vermutlich noch kein Commander-Token hinterlegt."
+    warn "Trage Tokens unter /admin → 'Discord & Bots' ein und führe ./update.sh (oder ./start.sh) erneut aus."
+  fi
+fi
+
 log "Fertig. Backend: http://localhost:$BACKEND_PORT  |  Frontend: http://localhost:$FRONTEND_PORT"
 log "Logs: $LOG_DIR   Stoppen mit: ./stop.sh"

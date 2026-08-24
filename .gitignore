@@ -14,6 +14,8 @@ yarn.lock
 # Logs, caches, reports, and local helper output
 *.log
 logs/
+run/
+.venv/
 test_reports/
 .update-backups/
 memory/

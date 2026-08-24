@@ -4310,9 +4310,9 @@ async def admin_discord_logs(request: Request):
     if not logs:
         logs = [x for x in _read_json_list(OWNER_AUDIT_FILE) if str(x.get("action", "")).startswith(("config", "discord", "station"))][:60]
     note = (
-        "Commander-Token gesetzt. Verbinde den Node-Commander auf deinem Server, um Live-Bot-Logs zu streamen."
+        "Commander-Token gesetzt. Der Node-Bot bootet beim n\u00e4chsten ./start.sh (oder ./update.sh) automatisch aus dieser Konfiguration \u2013 keine .env-Tokens n\u00f6tig."
         if connected else
-        "Noch kein Commander-Token gesetzt. Live-Bot-Logs erscheinen, sobald ein Token hinterlegt und der Node-Commander verbunden ist."
+        "Noch kein Commander-Token gesetzt. Trage Token + Client ID ein; der Bot startet dann automatisch \u00fcber ./start.sh aus dieser Owner-Konfiguration."
     )
     return {
         "connected": connected,

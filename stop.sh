@@ -30,6 +30,7 @@ kill_pid() {
 
 kill_pid frontend
 kill_pid backend
+kill_pid bot
 
 if [ "${1:-}" = "--all" ]; then
   kill_pid mongod
