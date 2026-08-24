@@ -1,44 +1,68 @@
 #!/usr/bin/env bash
-# ============================================================
-# OmniFM Web Stack — start (Ubuntu / self-hosted)
-# Starts the FastAPI management API and serves the built React
-# dashboard. Run ./stop.sh to stop, ./update.sh to update.
-#
-# Requirements: python3 (venv), node>=22, yarn, MongoDB reachable
-# via MONGO_URL in backend/.env.
-# ============================================================
+# ---------------------------------------------------------------------------
+# OmniFM — clean start script (Ubuntu / Debian)
+# Installs dependencies (first run) and starts MongoDB, the FastAPI backend
+# and the React frontend. Idempotent: safe to run multiple times.
+# Usage:  ./start.sh
+# ---------------------------------------------------------------------------
 set -euo pipefail
-cd "$(dirname "$0")"
 
-RUN_DIR=".run"
-mkdir -p "$RUN_DIR"
-
-BACKEND_HOST="${BACKEND_HOST:-0.0.0.0}"
-BACKEND_PORT="${BACKEND_PORT:-8001}"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RUN_DIR="$ROOT/run"
+LOG_DIR="$ROOT/logs"
+VENV="$ROOT/.venv"
 FRONTEND_PORT="${FRONTEND_PORT:-3000}"
+BACKEND_PORT="${BACKEND_PORT:-8001}"
 
-echo "==> OmniFM Web Stack starting"
+mkdir -p "$RUN_DIR" "$LOG_DIR"
 
-# --- Backend (FastAPI) ---
-if [ ! -d ".venv" ]; then
-  echo "==> Creating Python virtualenv (.venv)"
-  python3 -m venv .venv
+log()  { printf "\033[1;36m[OmniFM]\033[0m %s\n" "$*"; }
+warn() { printf "\033[1;33m[warn]\033[0m %s\n" "$*"; }
+die()  { printf "\033[1;31m[error]\033[0m %s\n" "$*" >&2; exit 1; }
+
+command -v python3 >/dev/null 2>&1 || die "python3 ist nicht installiert."
+command -v node    >/dev/null 2>&1 || die "node ist nicht installiert (Node 18+ empfohlen)."
+command -v yarn    >/dev/null 2>&1 || { warn "yarn fehlt – installiere via 'npm i -g yarn'"; command -v npm >/dev/null 2>&1 && npm i -g yarn || die "npm fehlt ebenfalls."; }
+
+# --- MongoDB -----------------------------------------------------------------
+if ! pgrep -x mongod >/dev/null 2>&1; then
+  if command -v mongod >/dev/null 2>&1; then
+    log "Starte MongoDB..."
+    mkdir -p "$ROOT/data/db"
+    nohup mongod --dbpath "$ROOT/data/db" --bind_ip_all >"$LOG_DIR/mongod.log" 2>&1 &
+    echo $! > "$RUN_DIR/mongod.pid"
+    sleep 3
+  else
+    warn "mongod nicht gefunden. Stelle sicher, dass MONGO_URL in backend/.env auf eine erreichbare MongoDB zeigt."
+  fi
+else
+  log "MongoDB läuft bereits."
 fi
-./.venv/bin/pip install -q -r backend/requirements.txt
 
-echo "==> Starting backend on ${BACKEND_HOST}:${BACKEND_PORT}"
-( cd backend && nohup ../.venv/bin/uvicorn server:app --host "$BACKEND_HOST" --port "$BACKEND_PORT" \
-    > "../$RUN_DIR/backend.log" 2>&1 & echo $! > "../$RUN_DIR/backend.pid" )
+# --- Backend (FastAPI) -------------------------------------------------------
+log "Richte Python-Umgebung ein..."
+[ -d "$VENV" ] || python3 -m venv "$VENV"
+# shellcheck disable=SC1091
+source "$VENV/bin/activate"
+pip install --quiet --upgrade pip
+pip install --quiet -r "$ROOT/backend/requirements.txt"
 
-# --- Frontend (build + static serve) ---
-echo "==> Building frontend"
-( cd frontend && yarn install --frozen-lockfile >/dev/null 2>&1 || yarn install; yarn build )
+[ -f "$ROOT/backend/.env" ] || warn "backend/.env fehlt – bitte MONGO_URL, DB_NAME und API_ADMIN_TOKEN setzen."
 
-echo "==> Serving frontend on :${FRONTEND_PORT}"
-nohup npx --yes serve -s frontend/build -l "$FRONTEND_PORT" \
-  > "$RUN_DIR/frontend.log" 2>&1 & echo $! > "$RUN_DIR/frontend.pid"
+log "Starte Backend auf Port $BACKEND_PORT..."
+( cd "$ROOT/backend" && nohup "$VENV/bin/uvicorn" server:app --host 0.0.0.0 --port "$BACKEND_PORT" --workers 1 \
+  >"$LOG_DIR/backend.log" 2>&1 & echo $! > "$RUN_DIR/backend.pid" )
 
-echo "==> OmniFM Web Stack is up."
-echo "    API:      http://localhost:${BACKEND_PORT}/api/health"
-echo "    Dashboard http://localhost:${FRONTEND_PORT}/"
-echo "    Owner:    http://localhost:${FRONTEND_PORT}/admin"
+# --- Frontend (React) --------------------------------------------------------
+log "Installiere Frontend-Abhängigkeiten..."
+( cd "$ROOT/frontend" && yarn install --frozen-lockfile 2>/dev/null || yarn install )
+
+log "Baue Frontend..."
+( cd "$ROOT/frontend" && yarn build )
+
+log "Serviere Frontend auf Port $FRONTEND_PORT..."
+( cd "$ROOT/frontend" && nohup npx --yes serve -s build -l "$FRONTEND_PORT" \
+  >"$LOG_DIR/frontend.log" 2>&1 & echo $! > "$RUN_DIR/frontend.pid" )
+
+log "Fertig. Backend: http://localhost:$BACKEND_PORT  |  Frontend: http://localhost:$FRONTEND_PORT"
+log "Logs: $LOG_DIR   Stoppen mit: ./stop.sh"

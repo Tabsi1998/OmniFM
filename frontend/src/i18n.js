@@ -832,7 +832,8 @@ const LOCALE_MESSAGES = {
       },
       defaultCountry: 'Österreich',
       notProvided: 'Nicht angegeben',
-      warningTitle: 'Pflichtfelder fehlen',
+      vatStatusLabel: 'Umsatzsteuer',
+      kleinunternehmerNote: 'Umsatzsteuerbefreit als Kleinunternehmer gemäß § 6 Abs. 1 Z 27 UStG (keine Umsatzsteuer, kein USt-Ausweis).',
       warningFallback: 'Pflichtangaben',
       warning: ({ fields }) => `Diese Angaben fehlen aktuell noch oder sind unvollständig: ${fields}. Für einen rechtssicheren Betrieb in Österreich solltest du das ergänzen.`,
       noteTitle: 'Rechtlicher Hinweis',
@@ -1805,6 +1806,8 @@ const LOCALE_MESSAGES = {
       },
       defaultCountry: 'Austria',
       notProvided: 'Not provided',
+      vatStatusLabel: 'VAT status',
+      kleinunternehmerNote: 'VAT-exempt small business under § 6 (1) 27 of the Austrian VAT Act (no VAT charged, no VAT shown).',
       warningTitle: 'Required fields are missing',
       warningFallback: 'required details',
       warning: ({ fields }) => `These details are still missing or incomplete: ${fields}. For an Austrian production website you should complete them before relying on this imprint.`,
@@ -2026,21 +2029,11 @@ function readQueryLocale() {
 
 function resolveInitialLocale() {
   if (typeof window === 'undefined') return DEFAULT_LOCALE;
-  const queryValue = readQueryLocale();
-  const queryLocale = normalizeLocale(queryValue);
-  if (queryValue) {
-    writeStoredLocale(queryLocale);
-    return queryLocale;
-  }
-
-  const storedValue = readStoredLocale();
-  const storedLocale = normalizeLocale(storedValue);
-  if (storedValue) return storedLocale;
-
-  const htmlValue = document?.documentElement?.lang || '';
-  if (htmlValue) return normalizeLocale(htmlValue);
-
-  return normalizeLocale(window.navigator?.language || DEFAULT_LOCALE);
+  // Language follows the browser automatically — no manual switch.
+  const nav = (window.navigator?.languages && window.navigator.languages[0])
+    || window.navigator?.language
+    || DEFAULT_LOCALE;
+  return normalizeLocale(nav);
 }
 
 export function I18nProvider({ children }) {

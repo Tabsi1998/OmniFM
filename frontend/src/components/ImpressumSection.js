@@ -159,6 +159,9 @@ function ImpressumSection({ legal }) {
     { label: copy.legal.fields.commercialRegisterNumber, value: legalInfo.commercialRegisterNumber },
     { label: copy.legal.fields.commercialRegisterCourt, value: legalInfo.commercialRegisterCourt },
     { label: copy.legal.fields.vatId, value: legalInfo.vatId },
+    ...(legalInfo.kleinunternehmer
+      ? [{ label: copy.legal.vatStatusLabel, value: copy.legal.kleinunternehmerNote, multiline: true }]
+      : []),
   ];
 
   const mediaRows = [

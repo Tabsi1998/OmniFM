@@ -14,8 +14,10 @@
 |---|---|---|
 | **Landing** | Marketing-Seite mit Live „Now Playing", Discord-Embed-Showcase, Sticky-Player | `/` |
 | **Server-Dashboard** | Für Server-Admins (Discord OAuth): My Stations, Rollen & Rechte, Statistiken, Abo | `/dashboard` |
-| **Owner-Konsole** | Passwortgeschützt (nur Betreiber): Stationen-Verwaltung, Stream-Test, Live-Monitoring, Lizenzen, Audit-Log | `/admin` |
+| **Owner-Konsole** | Passwortgeschützt (nur Betreiber) — **die komplette Konfigurationszentrale**: Unternehmen & Recht, Pläne & Preise, Discord & Bots, Zahlungen, Stationen, Monitoring, Lizenzen, Audit, Brand | `/admin` |
 | **Brand-Kit** | Öffentliche Logo-/Presse-Seite mit Downloads & Sponsor-Badge-Einbettcode | `/brand` |
+
+> **Sprache:** Die Website erkennt die Sprache automatisch am Browser (Deutsch/Englisch). Kein manueller Umschalter.
 
 ## 🧱 Architektur (dieser Stack)
 
@@ -55,14 +57,18 @@ MongoDB muss erreichbar sein (siehe `.env`).
 
 ## 🖥️ Deployment auf Ubuntu (Web-Stack)
 
+Klonen → einmalig `./start.sh` → ab dann Updates per `./update.sh`:
+
 ```bash
-./start.sh     # Backend (uvicorn) + Frontend-Build starten
-./stop.sh      # Alles stoppen
-./update.sh    # Code aktualisieren, Abhängigkeiten & Neustart
+git clone <repo> omnifm && cd omnifm
+./start.sh     # installiert alles, baut Frontend, startet Mongo + Backend + Frontend
+./stop.sh      # alles stoppen  (./stop.sh --all stoppt auch die von start.sh gestartete MongoDB)
+./update.sh    # git pull + Abhängigkeiten aktualisieren + Neustart
 ```
 
-`start.sh` erstellt bei Bedarf ein Python-venv, installiert Abhängigkeiten,
-baut das Frontend und serviert es. Ports via `BACKEND_PORT` / `FRONTEND_PORT` überschreibbar.
+`start.sh` ist idempotent: erstellt bei Bedarf ein Python-venv, installiert Backend- und
+Frontend-Abhängigkeiten, baut das Frontend und serviert es. Logs unter `logs/`, PIDs unter `run/`.
+Ports via `BACKEND_PORT` / `FRONTEND_PORT` überschreibbar.
 
 ## ⚙️ Konfiguration
 
@@ -82,24 +88,33 @@ REACT_APP_BACKEND_URL=https://deine-domain.tld
 Optional (aktivieren einzelne Features): `STRIPE_*`, `DISCORD_CLIENT_ID/SECRET` (OAuth),
 `SMTP_*`, `DISCORDBOTLIST_TOKEN`.
 
-## 🔑 Owner-Konsole
+## 🔑 Owner-Konsole — die zentrale Konfigurationsoberfläche
 
-`/admin` → mit `API_ADMIN_TOKEN` anmelden. Funktionen:
-- **Global Overview** (Lizenzen, MRR/ARR, Server, Stationen)
-- **Live-Monitoring** (Worker-Health, Incidents, Log-Stream)
-- **Radio-Katalog** vollständig verwalten (anlegen/bearbeiten/löschen) inkl. **Stream-Test**
-- **Lizenz-Manager**, **Integrationen**, **Audit-Log** (jede Änderung protokolliert)
-- **Brand-Kit** (Assets downloaden & Einbettcodes kopieren)
+`/admin` → mit `API_ADMIN_TOKEN` anmelden. **Alles wird in MongoDB gespeichert und
+überschreibt die `.env`-Defaults** — die komplette Plattform ist über die UI konfigurierbar:
+
+- **Unternehmen & Recht** — Firma, Adresse, UID, Kleinunternehmer-Status (Österreich) →
+  generiert **Impressum, Datenschutz & Nutzungsbedingungen automatisch**.
+- **Pläne & Preise** — Free/Pro/Ultimate: EUR-Preise, Bot-Anzahl, Stationen, Audio, Features →
+  wirkt sofort auf die Preis-Sektion der Website.
+- **Discord & Bots** — Commander-Token/Client-ID, Worker-Bots (**„+ Bot hinzufügen“**), Invite-Links, Bot-Logs.
+- **Zahlungen** — Stripe & PayPal (aktivierbar, Secrets maskiert), erweiterbar für weitere Anbieter.
+- **Global Overview** (Lizenzen, MRR/ARR, Server, Stationen), **Live-Monitoring** (Worker-Health, Incidents, Logs).
+- **Radio-Katalog** verwalten inkl. **Stream-Test**, **Lizenz-Manager**, **Audit-Log**, **Brand-Kit**.
 
 ## 📡 Wichtige API-Endpunkte
 
 ```
 GET  /api/health
 GET  /api/stats | /api/stations | /api/bots | /api/commands
-GET  /api/cover?artist=&title=              # keyless Cover-Art (iTunes)
+GET  /api/legal | /api/privacy | /api/terms      # aus Owner-Config generiert
+GET  /api/premium/tiers | /api/premium/pricing    # aus Owner-Config (Pläne)
+GET  /api/cover?term=                             # keyless Cover-Art (iTunes)
 # Owner (Header: X-Admin-Token)
 POST /api/admin/login
 GET  /api/admin/overview | /workers | /licenses | /stations | /monitoring | /audit | /integrations
+GET/PUT /api/admin/config            # Abschnitte: company, plans, discord, payments
+GET  /api/admin/discord/logs
 POST /api/admin/stations   DELETE /api/admin/stations/{key}   POST /api/admin/stations/test
 # Server-Dashboard (Discord OAuth Session)
 GET  /api/auth/session   GET/PUT /api/dashboard/perms   GET/POST/DELETE /api/dashboard/custom-stations

@@ -18,6 +18,7 @@ import GuildDashboard from './components/GuildDashboard.js';
 import OwnerAdmin from './components/OwnerAdmin.js';
 import BrandKit from './components/BrandKit.js';
 import DiscordShowcase from './components/DiscordShowcase.js';
+import HowToDiscord from './components/HowToDiscord.js';
 import NowPlayingBar from './components/NowPlayingBar.js';
 import FaqSection from './components/FaqSection.js';
 import CookieConsent from './components/CookieConsent.js';
@@ -259,6 +260,7 @@ function AppContent() {
       <Hero stats={stats} bots={bots} />
       <TrustBar stats={stats} />
       <DiscordShowcase />
+      <HowToDiscord />
       <Features />
       <WhyOmniFM />
       <StationBrowser stations={stations} loading={loading} />

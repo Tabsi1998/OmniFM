@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Globe, Menu, Radio, X } from 'lucide-react';
+import { Menu, Radio, X } from 'lucide-react';
 import { useI18n } from '../i18n.js';
 import { buildHomeHref, buildPageHref } from '../lib/pageRouting.js';
 
@@ -8,7 +8,7 @@ const DISCORD_URL = 'https://discord.gg/UeRkfGS43R';
 function Navbar({ page = 'home' }) {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
-  const { copy, locale, localeMeta, toggleLocale } = useI18n();
+  const { copy, locale } = useI18n();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -110,45 +110,23 @@ function Navbar({ page = 'home' }) {
             fontSize: 13,
             fontWeight: 700,
             letterSpacing: '0.04em',
-            border: '1px solid rgba(88, 101, 242, 0.45)',
-            background: 'rgba(88, 101, 242, 0.16)',
-            padding: '8px 12px',
+            borderRadius: 10,
+            border: '1px solid rgba(255,107,0,0.45)',
+            background: 'rgba(255,107,0,0.12)',
+            padding: '8px 14px',
+            transition: 'background 0.2s, border-color 0.2s',
+          }}
+          onMouseEnter={(event) => {
+            event.currentTarget.style.background = 'rgba(255,107,0,0.22)';
+            event.currentTarget.style.borderColor = 'rgba(255,107,0,0.7)';
+          }}
+          onMouseLeave={(event) => {
+            event.currentTarget.style.background = 'rgba(255,107,0,0.12)';
+            event.currentTarget.style.borderColor = 'rgba(255,107,0,0.45)';
           }}
         >
           DASHBOARD
         </a>
-
-        <button
-          type="button"
-          data-testid="nav-language-toggle"
-          onClick={toggleLocale}
-          title={localeMeta.switchTitle}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '8px 12px',
-            borderRadius: 999,
-            border: '1px solid rgba(255,255,255,0.12)',
-            background: 'rgba(255,255,255,0.04)',
-            color: '#fff',
-            fontSize: 12,
-            fontWeight: 700,
-            cursor: 'pointer',
-            transition: 'border-color 0.2s, background 0.2s',
-          }}
-          onMouseEnter={(event) => {
-            event.currentTarget.style.borderColor = 'rgba(255,107,0,0.4)';
-            event.currentTarget.style.background = 'rgba(255,107,0,0.08)';
-          }}
-          onMouseLeave={(event) => {
-            event.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)';
-            event.currentTarget.style.background = 'rgba(255,255,255,0.04)';
-          }}
-        >
-          <Globe size={14} color="#ff6b00" />
-          {localeMeta.label} / {localeMeta.switchLabel}
-        </button>
 
         <a
           href={DISCORD_URL}
@@ -239,37 +217,14 @@ function Navbar({ page = 'home' }) {
               textDecoration: 'none',
               fontSize: 16,
               fontWeight: 700,
-              border: '1px solid rgba(88, 101, 242, 0.45)',
-              background: 'rgba(88, 101, 242, 0.16)',
+              borderRadius: 10,
+              border: '1px solid rgba(255,107,0,0.45)',
+              background: 'rgba(255,107,0,0.12)',
               padding: '10px 12px',
             }}
           >
             Dashboard
           </a>
-
-          <button
-            type="button"
-            onClick={() => {
-              toggleLocale();
-              setOpen(false);
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              padding: 0,
-              border: 'none',
-              background: 'none',
-              color: '#fff',
-              textAlign: 'left',
-              fontSize: 16,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            <Globe size={16} color="#ff6b00" />
-            {copy.navbar.language}: {localeMeta.switchLabel}
-          </button>
 
           <a
             href={DISCORD_URL}

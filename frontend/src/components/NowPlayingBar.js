@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Radio, Play, Users, Headphones, X } from 'lucide-react';
 import { resolvePrimaryInviteUrl } from '../lib/invite.js';
+import { useI18n } from '../i18n.js';
 
 const TRACKS = [
   { s: 'Synthwave Nights', a: 'The Midnight — Vampires', g: '320 kbps' },
@@ -27,6 +28,8 @@ function Bars() {
 }
 
 export default function NowPlayingBar({ stats = {}, bots = [] }) {
+  const { locale, formatNumber } = useI18n();
+  const ctaLabel = locale === 'en' ? 'Start in Discord' : 'In Discord starten';
   const [idx, setIdx] = useState(0);
   const [closed, setClosed] = useState(() => (typeof window !== 'undefined' && window.sessionStorage.getItem('omnifm_npbar_closed') === '1'));
   const invite = resolvePrimaryInviteUrl(bots);
@@ -60,7 +63,7 @@ export default function NowPlayingBar({ stats = {}, bots = [] }) {
             <div className="npbar-hidemobile" style={{ color: '#94a3b8', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{track.a}</div>
           </div>
           <span className="npbar-hidemobile" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#94a3b8', fontSize: 12, fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 }}>
-            <Users size={13} color="#ff6b00" /> {Number(listeners).toLocaleString('de-DE')}
+            <Users size={13} color="#ff6b00" /> {formatNumber(Number(listeners))}
           </span>
           <span className="npbar-hidemobile" style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, fontWeight: 700, color: '#ffb27a', background: 'rgba(255,107,0,0.14)', border: '1px solid rgba(255,107,0,0.3)', borderRadius: 999, padding: '3px 9px', flexShrink: 0 }}>{track.g}</span>
           <Bars />
@@ -71,7 +74,7 @@ export default function NowPlayingBar({ stats = {}, bots = [] }) {
             data-testid="now-playing-bar-cta"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 11, background: 'linear-gradient(135deg,#ff6b00,#ff2a5f)', color: '#08090d', fontWeight: 800, fontSize: 13, flexShrink: 0 }}
           >
-            <Headphones size={15} /> <span className="npbar-hidemobile">In Discord starten</span><Play size={14} style={{ display: 'none' }} />
+            <Headphones size={15} /> <span className="npbar-hidemobile">{ctaLabel}</span><Play size={14} style={{ display: 'none' }} />
           </a>
           <button
             onClick={() => { setClosed(true); try { window.sessionStorage.setItem('omnifm_npbar_closed', '1'); } catch { /* noop */ } }}

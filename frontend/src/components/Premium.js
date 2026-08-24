@@ -57,7 +57,7 @@ function normalizeTier(rawTier, fallbackTier, fallbackFeatures) {
     name: String(tier.name || fallback.name || 'Plan'),
     pricePerMonth: Number.isFinite(Number(tier.pricePerMonth)) ? Number(tier.pricePerMonth) : Number(fallback.pricePerMonth || 0),
     startingAt: String(tier.startingAt || fallback.startingAt || '').trim(),
-    features: localizedFeatures.length > 0 ? localizedFeatures : apiFeatures,
+    features: apiFeatures.length > 0 ? apiFeatures : localizedFeatures,
     durationPricing: pick('durationPricing'),
     seatPricing: pick('seatPricing'),
   };

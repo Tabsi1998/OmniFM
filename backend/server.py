@@ -147,6 +147,164 @@ except Exception:
     MAX_API_RATE_STATE_ENTRIES = 50000
 
 
+# ------------------------------------------------------------------
+# Owner-configurable settings (stored in Mongo `owner_config`, and
+# they override env). This turns the Owner Console into the single
+# source of truth for company/legal, plans/pricing, Discord bots and
+# payment providers. Everything is editable from the UI.
+# ------------------------------------------------------------------
+OWNER_CONFIG_ID = "global"
+SECRET_MASK = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+SECRET_CONFIG_FIELDS = {"token", "secretKey", "webhookSecret", "secret"}
+
+DEFAULT_OWNER_CONFIG = {
+    "company": {
+        "providerName": "",
+        "legalForm": "Einzelunternehmen (Kleinunternehmer)",
+        "representative": "",
+        "streetAddress": "",
+        "postalCode": "",
+        "city": "",
+        "country": "\u00d6sterreich",
+        "email": "",
+        "phone": "",
+        "website": "",
+        "businessPurpose": "Betrieb eines Discord-Radio-/Musik-Dienstes",
+        "vatId": "",
+        "kleinunternehmer": True,
+        "commercialRegisterNumber": "",
+        "commercialRegisterCourt": "",
+        "supervisoryAuthority": "",
+        "chamber": "",
+        "profession": "",
+        "professionRules": "",
+        "editorialResponsible": "",
+        "mediaOwner": "",
+        "mediaLine": "",
+        "dpoName": "",
+        "dpoEmail": "",
+        "hostingProvider": "",
+        "hostingLocation": "",
+        "effectiveDate": "",
+        "governingLaw": "\u00d6sterreichisches Recht",
+    },
+    "plans": {
+        "free": {"name": "Free", "pricePerMonth": 0, "startingAt": "0", "maxBots": 2, "stations": "20 Free Stationen", "bitrate": "64k", "reconnectMs": 5000, "features": ["Bis zu 2 Bots", "20 Free Stationen", "Standard Audio (64k)", "Standard Reconnect"]},
+        "pro": {"name": "Pro", "pricePerMonth": 299, "startingAt": "2,99", "maxBots": 8, "stations": "120 Stationen (Free + Pro)", "bitrate": "128k", "reconnectMs": 1500, "features": ["Bis zu 8 Bots", "120 Stationen (Free + Pro)", "HQ Audio (128k Opus)", "Priority Reconnect", "Rollenbasierte Berechtigungen", "Event-Scheduler"]},
+        "ultimate": {"name": "Ultimate", "pricePerMonth": 499, "startingAt": "4,99", "maxBots": 16, "stations": "Alle Stationen + Custom URLs", "bitrate": "320k", "reconnectMs": 400, "features": ["Bis zu 16 Bots", "Alle Stationen + Custom URLs", "Ultra HQ Audio (320k)", "Instant Reconnect", "Rollenbasierte Berechtigungen"]},
+    },
+    "discord": {
+        "commander": {"name": "OmniFM Commander", "token": "", "clientId": "", "inviteUrl": ""},
+        "workers": [],
+    },
+    "payments": {
+        "stripe": {"enabled": False, "mode": "test", "publishableKey": "", "secretKey": "", "webhookSecret": ""},
+        "paypal": {"enabled": False, "mode": "sandbox", "clientId": "", "secret": ""},
+        "providers": [],
+    },
+}
+
+
+def _deep_merge(base, override):
+    for key, value in (override or {}).items():
+        if isinstance(value, dict) and isinstance(base.get(key), dict):
+            _deep_merge(base[key], value)
+        else:
+            base[key] = value
+    return base
+
+
+def load_owner_config_raw():
+    if db is not None:
+        try:
+            found = db.owner_config.find_one({"_id": OWNER_CONFIG_ID}) or {}
+            found.pop("_id", None)
+            return found
+        except Exception:
+            return {}
+    return {}
+
+
+def get_config_section(name):
+    default = DEFAULT_OWNER_CONFIG.get(name)
+    stored = load_owner_config_raw().get(name)
+    if isinstance(default, dict):
+        merged = json.loads(json.dumps(default))
+        if isinstance(stored, dict):
+            _deep_merge(merged, stored)
+        return merged
+    if stored is not None:
+        return stored
+    return json.loads(json.dumps(default)) if default is not None else {}
+
+
+def _merge_config_secrets(current, incoming):
+    """Keep existing secret values when the incoming value is blank or masked.
+    Lists of dicts (workers/providers) are matched by identity (clientId/name),
+    not index, so removing/reordering never leaks a secret onto another item."""
+    def _blank_new_secrets(item):
+        if isinstance(item, dict):
+            for k, v in list(item.items()):
+                if k in SECRET_CONFIG_FIELDS and (v in ("", None, SECRET_MASK) or (isinstance(v, str) and v.startswith("\u2022"))):
+                    item[k] = ""
+        return item
+
+    if isinstance(incoming, dict) and isinstance(current, dict):
+        for key, value in list(incoming.items()):
+            if key in SECRET_CONFIG_FIELDS and (value in ("", None, SECRET_MASK) or (isinstance(value, str) and value.startswith("\u2022"))):
+                incoming[key] = current.get(key, "")
+            elif isinstance(value, (dict, list)) and key in current:
+                incoming[key] = _merge_config_secrets(current[key], value)
+            elif isinstance(value, (dict, list)):
+                _blank_new_secrets(value)
+        return incoming
+    if isinstance(incoming, list) and isinstance(current, list):
+        def _keyof(x):
+            return str((x.get("clientId") or x.get("name") or "")).strip() if isinstance(x, dict) else None
+        cur_by_key = {}
+        for c in current:
+            k = _keyof(c)
+            if k:
+                cur_by_key.setdefault(k, c)
+        for i, item in enumerate(incoming):
+            if isinstance(item, dict):
+                match = cur_by_key.get(_keyof(item))
+                incoming[i] = _merge_config_secrets(match, item) if isinstance(match, dict) else _blank_new_secrets(item)
+        return incoming
+    return incoming
+
+
+def mask_config_secrets(obj):
+    if isinstance(obj, dict):
+        out = {}
+        for key, value in obj.items():
+            if key in SECRET_CONFIG_FIELDS and isinstance(value, str) and value:
+                out[key] = SECRET_MASK
+                out[key + "Set"] = True
+            elif isinstance(value, (dict, list)):
+                out[key] = mask_config_secrets(value)
+            else:
+                out[key] = value
+        return out
+    if isinstance(obj, list):
+        return [mask_config_secrets(v) for v in obj]
+    return obj
+
+
+def save_config_section(name, data):
+    if db is None:
+        return False
+    try:
+        current = load_owner_config_raw().get(name)
+        if isinstance(data, (dict, list)) and current is not None:
+            data = _merge_config_secrets(current, data)
+        db.owner_config.update_one({"_id": OWNER_CONFIG_ID}, {"$set": {name: data}}, upsert=True)
+        return True
+    except Exception:
+        return False
+
+
+
 def json_error(status_code, message):
     return JSONResponse(status_code=status_code, content={"error": message})
 
@@ -733,28 +891,39 @@ def sanitize_offer_code(raw_code):
 def build_public_legal_notice():
     public_url = (os.environ.get("PUBLIC_WEB_URL") or "").strip()
     fallback_email = extract_mailbox(os.environ.get("SMTP_FROM") or "")
+    c = get_config_section("company")
+
+    def val(field, env_key, default=""):
+        v = str(c.get(field) or "").strip()
+        if v:
+            return v
+        return str(os.environ.get(env_key) or "").strip() or default
+
+    kleinunternehmer = bool(c.get("kleinunternehmer", True))
     legal = {
-        "providerName": (os.environ.get("LEGAL_PROVIDER_NAME") or "").strip(),
-        "legalForm": (os.environ.get("LEGAL_LEGAL_FORM") or "").strip(),
-        "representative": (os.environ.get("LEGAL_REPRESENTATIVE") or "").strip(),
-        "streetAddress": (os.environ.get("LEGAL_STREET_ADDRESS") or "").strip(),
-        "postalCode": (os.environ.get("LEGAL_POSTAL_CODE") or "").strip(),
-        "city": (os.environ.get("LEGAL_CITY") or "").strip(),
-        "country": (os.environ.get("LEGAL_COUNTRY") or "").strip(),
-        "email": (os.environ.get("LEGAL_EMAIL") or "").strip() or fallback_email,
-        "phone": (os.environ.get("LEGAL_PHONE") or "").strip(),
-        "website": (os.environ.get("LEGAL_WEBSITE") or "").strip() or public_url,
-        "businessPurpose": (os.environ.get("LEGAL_BUSINESS_PURPOSE") or "").strip(),
-        "commercialRegisterNumber": (os.environ.get("LEGAL_COMMERCIAL_REGISTER_NUMBER") or "").strip(),
-        "commercialRegisterCourt": (os.environ.get("LEGAL_COMMERCIAL_REGISTER_COURT") or "").strip(),
-        "vatId": (os.environ.get("LEGAL_VAT_ID") or "").strip(),
-        "supervisoryAuthority": (os.environ.get("LEGAL_SUPERVISORY_AUTHORITY") or "").strip(),
-        "chamber": (os.environ.get("LEGAL_CHAMBER") or "").strip(),
-        "profession": (os.environ.get("LEGAL_PROFESSION") or "").strip(),
-        "professionRules": (os.environ.get("LEGAL_PROFESSION_RULES") or "").strip(),
-        "editorialResponsible": (os.environ.get("LEGAL_EDITORIAL_RESPONSIBLE") or "").strip(),
-        "mediaOwner": (os.environ.get("LEGAL_MEDIA_OWNER") or "").strip(),
-        "mediaLine": (os.environ.get("LEGAL_MEDIA_LINE") or "").strip(),
+        "providerName": val("providerName", "LEGAL_PROVIDER_NAME"),
+        "legalForm": val("legalForm", "LEGAL_LEGAL_FORM"),
+        "representative": val("representative", "LEGAL_REPRESENTATIVE"),
+        "streetAddress": val("streetAddress", "LEGAL_STREET_ADDRESS"),
+        "postalCode": val("postalCode", "LEGAL_POSTAL_CODE"),
+        "city": val("city", "LEGAL_CITY"),
+        "country": val("country", "LEGAL_COUNTRY", "\u00d6sterreich"),
+        "email": val("email", "LEGAL_EMAIL") or fallback_email,
+        "phone": val("phone", "LEGAL_PHONE"),
+        "website": val("website", "LEGAL_WEBSITE") or public_url,
+        "businessPurpose": val("businessPurpose", "LEGAL_BUSINESS_PURPOSE"),
+        "commercialRegisterNumber": val("commercialRegisterNumber", "LEGAL_COMMERCIAL_REGISTER_NUMBER"),
+        "commercialRegisterCourt": val("commercialRegisterCourt", "LEGAL_COMMERCIAL_REGISTER_COURT"),
+        "vatId": val("vatId", "LEGAL_VAT_ID"),
+        "supervisoryAuthority": val("supervisoryAuthority", "LEGAL_SUPERVISORY_AUTHORITY"),
+        "chamber": val("chamber", "LEGAL_CHAMBER"),
+        "profession": val("profession", "LEGAL_PROFESSION"),
+        "professionRules": val("professionRules", "LEGAL_PROFESSION_RULES"),
+        "editorialResponsible": val("editorialResponsible", "LEGAL_EDITORIAL_RESPONSIBLE"),
+        "mediaOwner": val("mediaOwner", "LEGAL_MEDIA_OWNER"),
+        "mediaLine": val("mediaLine", "LEGAL_MEDIA_LINE"),
+        "kleinunternehmer": kleinunternehmer,
+        "taxNote": "Umsatzsteuerbefreit als Kleinunternehmer gem\u00e4\u00df \u00a7 6 Abs. 1 Z 27 UStG (keine Umsatzsteuer, kein USt-Ausweis)." if kleinunternehmer else "",
     }
 
     missing_core_fields = []
@@ -781,6 +950,7 @@ def build_public_legal_notice():
 def build_public_privacy_notice():
     legal_notice = build_public_legal_notice()
     legal = legal_notice.get("legal", {})
+    c = get_config_section("company")
     has_stripe = bool(get_stripe_secret_key())
     has_smtp = bool((os.environ.get("SMTP_HOST") or "").strip())
     bot_id_candidate = (os.environ.get("DISCORDBOTLIST_BOT_ID") or os.environ.get("BOT_1_CLIENT_ID") or "").strip()
@@ -801,12 +971,12 @@ def build_public_privacy_notice():
         "phone": (os.environ.get("PRIVACY_CONTACT_PHONE") or "").strip() or legal.get("phone", ""),
     }
     dpo = {
-        "name": (os.environ.get("PRIVACY_DPO_NAME") or "").strip(),
-        "email": (os.environ.get("PRIVACY_DPO_EMAIL") or "").strip(),
+        "name": (os.environ.get("PRIVACY_DPO_NAME") or "").strip() or str(c.get("dpoName") or "").strip(),
+        "email": (os.environ.get("PRIVACY_DPO_EMAIL") or "").strip() or str(c.get("dpoEmail") or "").strip(),
     }
     hosting = {
-        "provider": (os.environ.get("PRIVACY_HOSTING_PROVIDER") or "").strip(),
-        "location": (os.environ.get("PRIVACY_HOSTING_LOCATION") or "").strip(),
+        "provider": (os.environ.get("PRIVACY_HOSTING_PROVIDER") or "").strip() or str(c.get("hostingProvider") or "").strip(),
+        "location": (os.environ.get("PRIVACY_HOSTING_LOCATION") or "").strip() or str(c.get("hostingLocation") or "").strip(),
     }
     authority = {
         "name": (os.environ.get("PRIVACY_AUTHORITY_NAME") or "").strip() or "Österreichische Datenschutzbehörde",
@@ -858,9 +1028,12 @@ def build_public_privacy_notice():
 def build_public_terms_notice():
     legal_notice = build_public_legal_notice()
     legal = legal_notice.get("legal", {})
+    c = get_config_section("company")
+    pay = get_config_section("payments")
     public_url = (os.environ.get("PUBLIC_WEB_URL") or "").strip()
     fallback_email = extract_mailbox(os.environ.get("SMTP_FROM") or "")
     has_stripe = bool(get_stripe_secret_key())
+    paypal_enabled = bool((pay.get("paypal") or {}).get("enabled"))
     has_smtp = bool((os.environ.get("SMTP_HOST") or "").strip())
 
     operator = {
@@ -877,8 +1050,8 @@ def build_public_terms_notice():
         "website": (os.environ.get("TERMS_SUPPORT_URL") or "").strip()
         or legal.get("website", "")
         or public_url,
-        "effectiveDate": (os.environ.get("TERMS_EFFECTIVE_DATE") or "").strip(),
-        "governingLaw": (os.environ.get("TERMS_GOVERNING_LAW") or "").strip(),
+        "effectiveDate": (os.environ.get("TERMS_EFFECTIVE_DATE") or "").strip() or str(c.get("effectiveDate") or "").strip(),
+        "governingLaw": (os.environ.get("TERMS_GOVERNING_LAW") or "").strip() or str(c.get("governingLaw") or "").strip(),
     }
 
     missing_core_fields = []
@@ -900,8 +1073,8 @@ def build_public_terms_notice():
             "customStationsEnabled": True,
         },
         "billing": {
-            "premiumCheckoutEnabled": has_stripe,
-            "paymentProvider": "Stripe" if has_stripe else "",
+            "premiumCheckoutEnabled": has_stripe or paypal_enabled,
+            "paymentProvider": " / ".join([p for p in ["Stripe" if has_stripe else "", "PayPal" if paypal_enabled else ""] if p]),
             "emailDeliveryEnabled": has_smtp,
             "trialEnabled": is_pro_trial_enabled(),
         },
@@ -1045,6 +1218,12 @@ def resolve_checkout_return_base(return_url):
 
 
 def get_stripe_secret_key():
+    try:
+        cfg_key = str(((get_config_section("payments") or {}).get("stripe") or {}).get("secretKey") or "").strip()
+        if cfg_key:
+            return cfg_key
+    except Exception:
+        pass
     key = (os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY") or "").strip()
     return key
 
@@ -1104,6 +1283,31 @@ def load_bots_from_env():
             "servers": 0, "users": 0, "connections": 0, "listeners": 0,
             "ready": False, "userTag": None, "uptimeSec": 0, "guildDetails": [],
         })
+
+    if not bots:
+        disc = get_config_section("discord")
+        entries = []
+        commander = disc.get("commander") or {}
+        if str(commander.get("clientId") or commander.get("name") or "").strip():
+            entries.append(("free", commander))
+        for w in (disc.get("workers") or []):
+            if isinstance(w, dict) and str(w.get("clientId") or w.get("name") or "").strip():
+                entries.append((str(w.get("tier") or "free").lower(), w))
+        for idx, (tier, b) in enumerate(entries, start=1):
+            cid = str(b.get("clientId") or "").strip()
+            is_premium_bot = tier != "free"
+            bots.append({
+                "botId": f"bot-{idx}", "index": idx,
+                "name": str(b.get("name") or f"OmniFM Bot {idx}").strip(),
+                "clientId": cid or f"0000000000000000{idx:02d}",
+                "inviteUrl": str(b.get("inviteUrl") or "").strip() or (None if is_premium_bot else (
+                    f"https://discord.com/oauth2/authorize?client_id={cid}&permissions=35186522836032&integration_type=0&scope=bot%20applications.commands" if cid else "")),
+                "requiredTier": tier,
+                "color": BOT_COLORS[(idx - 1) % len(BOT_COLORS)],
+                "avatarUrl": BOT_IMAGES[(idx - 1) % len(BOT_IMAGES)] if idx <= len(BOT_IMAGES) else "",
+                "servers": 0, "users": 0, "connections": 0, "listeners": 0,
+                "ready": False, "userTag": None, "uptimeSec": 0, "guildDetails": [],
+            })
 
     if not bots:
         for i in range(1, 3):
@@ -2964,7 +3168,17 @@ async def get_tiers(request: Request):
     rate_limited = enforce_api_rate_limit(request, "read")
     if rate_limited is not None:
         return rate_limited
-    return {"tiers": TIERS}
+    plans = get_config_section("plans")
+    tiers = {}
+    for key in ("free", "pro", "ultimate"):
+        base = dict(TIERS.get(key, {}))
+        p = plans.get(key) or {}
+        base["name"] = p.get("name", base.get("name"))
+        base["bitrate"] = p.get("bitrate", base.get("bitrate"))
+        base["maxBots"] = p.get("maxBots", base.get("maxBots"))
+        base["pricePerMonth"] = p.get("pricePerMonth", base.get("pricePerMonth"))
+        tiers[key] = base
+    return {"tiers": tiers}
 
 
 @app.post("/api/premium/trial")
@@ -3248,29 +3462,48 @@ async def get_pricing(request: Request, serverId: str = ""):
     if rate_limited is not None:
         return rate_limited
 
+    plans = get_config_section("plans")
+    raw_plans = load_owner_config_raw().get("plans")
+    raw_plans = raw_plans if isinstance(raw_plans, dict) else {}
+
+    def _fmt_cents(cents):
+        return f"{(int(cents) / 100):.2f}".replace(".", ",")
+
+    def _scaled(tier, mapping):
+        base = (TIERS.get(tier) or {}).get("pricePerMonth", 0) or 0
+        price = (plans.get(tier) or {}).get("pricePerMonth", base) or 0
+        ratio = (price / base) if base else 1
+        return {str(k): _fmt_cents(round(v * ratio)) for k, v in mapping.items()}
+
+    def _plan(key):
+        p = plans.get(key) or {}
+        raw = raw_plans.get(key) if isinstance(raw_plans, dict) else None
+        default_feats = ((DEFAULT_OWNER_CONFIG.get("plans") or {}).get(key) or {}).get("features") or []
+        raw_feats = raw.get("features") if isinstance(raw, dict) else None
+        # Only expose features when the owner truly customized them (different from defaults).
+        # Otherwise return [] so the frontend uses its localized (DE/EN) copy.
+        owner_customized = isinstance(raw_feats, list) and len(raw_feats) > 0 and raw_feats != default_feats
+        return {
+            "name": p.get("name", key.title()),
+            "pricePerMonth": p.get("pricePerMonth", (TIERS.get(key) or {}).get("pricePerMonth", 0)),
+            "features": raw_feats if owner_customized else [],
+        }
+
     result = {
         "brand": "OmniFM",
         "tiers": {
-            "free": {
-                "name": "Free",
-                "pricePerMonth": 0,
-                "features": ["64k Bitrate", "Bis zu 2 Bots", "20 Free Stationen", "Standard Reconnect (5s)"]
-            },
+            "free": _plan("free"),
             "pro": {
-                "name": "Pro",
-                "pricePerMonth": TIERS["pro"]["pricePerMonth"],
-                "startingAt": "2,99",
-                "durationPricing": {str(k): f"{v/100:.2f}" for k, v in DURATION_PRICING["pro"].items()},
-                "seatPricing": {str(k): f"{v/100:.2f}" for k, v in SEAT_MONTHLY_TOTAL_CENTS["pro"].items()},
-                "features": ["128k Bitrate (HQ Opus)", "Bis zu 8 Bots", "120 Stationen (Free + Pro)", "Priority Reconnect (1,5s)", "Rollenbasierte Berechtigungen", "Event-Scheduler"]
+                **_plan("pro"),
+                "startingAt": _fmt_cents((plans.get("pro") or {}).get("pricePerMonth", 299)),
+                "durationPricing": _scaled("pro", DURATION_PRICING["pro"]),
+                "seatPricing": _scaled("pro", SEAT_MONTHLY_TOTAL_CENTS["pro"]),
             },
             "ultimate": {
-                "name": "Ultimate",
-                "pricePerMonth": TIERS["ultimate"]["pricePerMonth"],
-                "startingAt": "4,99",
-                "durationPricing": {str(k): f"{v/100:.2f}" for k, v in DURATION_PRICING["ultimate"].items()},
-                "seatPricing": {str(k): f"{v/100:.2f}" for k, v in SEAT_MONTHLY_TOTAL_CENTS["ultimate"].items()},
-                "features": ["320k Bitrate (Ultra HQ)", "Bis zu 16 Bots", "Alle Stationen + Custom URLs", "Instant Reconnect (0,4s)", "Rollenbasierte Berechtigungen"]
+                **_plan("ultimate"),
+                "startingAt": _fmt_cents((plans.get("ultimate") or {}).get("pricePerMonth", 499)),
+                "durationPricing": _scaled("ultimate", DURATION_PRICING["ultimate"]),
+                "seatPricing": _scaled("ultimate", SEAT_MONTHLY_TOTAL_CENTS["ultimate"]),
             },
         },
         "durations": DURATION_OPTIONS,
@@ -3977,6 +4210,79 @@ async def admin_audit(request: Request):
     if not rows:
         rows = _read_json_list(OWNER_AUDIT_FILE)[:200]
     return {"audit": rows, "count": len(rows)}
+
+
+@app.get("/api/admin/config")
+async def admin_get_config(request: Request):
+    guard = _admin_guard(request)
+    if guard is not None:
+        return guard
+    return {
+        "company": get_config_section("company"),
+        "plans": get_config_section("plans"),
+        "discord": mask_config_secrets(get_config_section("discord")),
+        "payments": mask_config_secrets(get_config_section("payments")),
+        "env": {
+            "stripeEnvKey": bool((os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY") or "").strip()),
+        },
+    }
+
+
+@app.put("/api/admin/config")
+async def admin_put_config(request: Request, body: dict = None):
+    guard = _admin_guard(request)
+    if guard is not None:
+        return guard
+    if not isinstance(body, dict):
+        return json_error(400, "Ungueltiger Body.")
+    section = str(body.get("section") or "").strip()
+    data = body.get("data")
+    if section not in DEFAULT_OWNER_CONFIG:
+        return json_error(400, f"Unbekannter Config-Abschnitt: {section}")
+    if not isinstance(data, (dict, list)):
+        return json_error(400, "data muss ein Objekt oder eine Liste sein.")
+    if db is None:
+        return json_error(503, "Keine Datenbank verbunden \u2013 Speichern nicht m\u00f6glich.")
+    if not save_config_section(section, data):
+        record_owner_audit("config.update", target=section, status="error", request=request)
+        return json_error(500, "Speichern fehlgeschlagen.")
+    record_owner_audit("config.update", target=section, detail="aktualisiert", request=request)
+    fresh = get_config_section(section)
+    if section in ("discord", "payments"):
+        fresh = mask_config_secrets(fresh)
+    return {"ok": True, "section": section, "data": fresh}
+
+
+@app.get("/api/admin/discord/logs")
+async def admin_discord_logs(request: Request):
+    guard = _admin_guard(request)
+    if guard is not None:
+        return guard
+    disc = get_config_section("discord")
+    commander = disc.get("commander") or {}
+    workers = disc.get("workers") or []
+    connected = bool(str(commander.get("token") or "").strip())
+    logs = []
+    if db is not None:
+        try:
+            for doc in db.owner_audit.find({"action": {"$regex": "^(config|discord|station)"}}, {"_id": 0}).sort("at", -1).limit(60):
+                logs.append(doc)
+        except Exception:
+            logs = []
+    if not logs:
+        logs = [x for x in _read_json_list(OWNER_AUDIT_FILE) if str(x.get("action", "")).startswith(("config", "discord", "station"))][:60]
+    note = (
+        "Commander-Token gesetzt. Verbinde den Node-Commander auf deinem Server, um Live-Bot-Logs zu streamen."
+        if connected else
+        "Noch kein Commander-Token gesetzt. Live-Bot-Logs erscheinen, sobald ein Token hinterlegt und der Node-Commander verbunden ist."
+    )
+    return {
+        "connected": connected,
+        "commanderConfigured": bool(str(commander.get("clientId") or "").strip()),
+        "workerCount": len(workers),
+        "note": note,
+        "logs": logs,
+    }
 
 
 @app.post("/api/admin/stations/test")

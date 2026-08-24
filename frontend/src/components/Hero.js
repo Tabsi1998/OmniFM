@@ -39,6 +39,7 @@ function Equalizer({ bars = 14, height = 44, colorful = true }) {
 }
 
 function NowPlayingConsole({ listeners }) {
+  const { formatNumber, locale } = useI18n();
   const [idx, setIdx] = useState(0);
   const [cover, setCover] = useState(null);
   useEffect(() => {
@@ -84,7 +85,7 @@ function NowPlayingConsole({ listeners }) {
           ON AIR
         </span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#94a3b8', fontSize: 12.5, fontFamily: "'JetBrains Mono', monospace" }}>
-          <Users size={13} color="#ff6b00" /> {Number(listeners || 0).toLocaleString('de-DE')} hören zu
+          <Users size={13} color="#ff6b00" /> {formatNumber(Number(listeners || 0))} {locale === 'en' ? 'listening' : 'hören zu'}
         </span>
       </div>
 

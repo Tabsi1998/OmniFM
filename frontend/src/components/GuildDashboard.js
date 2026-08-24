@@ -7,6 +7,7 @@ import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell,
 } from 'recharts';
 import { buildApiUrl } from '../lib/api.js';
+import { useI18n } from '../i18n.js';
 
 const NAV = [
   { id: 'overview', label: 'Übersicht', icon: LayoutDashboard },
@@ -108,6 +109,15 @@ export default function GuildDashboard() {
   const [perms, setPerms] = useState({}); // `${cmd}:${roleId}` -> bool
   const [newStation, setNewStation] = useState({ name: '', url: '' });
   const [msg, setMsg] = useState(null);
+  const { locale } = useI18n();
+  const t = useCallback((de, en) => (String(locale || 'de').startsWith('de') ? de : en), [locale]);
+  const navLabel = (id) => ({
+    overview: t('Übersicht', 'Overview'),
+    stations: t('Meine Sender', 'My Stations'),
+    roles: t('Rollen & Rechte', 'Roles & Permissions'),
+    stats: t('Statistiken', 'Statistics'),
+    subscription: t('Abo', 'Subscription'),
+  }[id] || id);
 
   useEffect(() => {
     let stop = false;
@@ -214,14 +224,14 @@ export default function GuildDashboard() {
               <div className="oa-brand-logo"><Radio size={20} /></div>
               <div><div className="oa-display" style={{ fontSize: 20, fontWeight: 800 }}>OmniFM</div><div className="oa-owner-badge">Server Dashboard</div></div>
             </div>
-            <h1 className="oa-display" style={{ fontSize: 23, marginTop: 16 }}>Verwalte deine Server</h1>
-            <p style={{ color: '#94a3b8', fontSize: 14, marginTop: 8, lineHeight: 1.55 }}>Melde dich mit Discord an, um Sender, Rollen, Statistiken und dein Abo pro Server zu verwalten.</p>
+            <h1 className="oa-display" style={{ fontSize: 23, marginTop: 16 }}>{t('Verwalte deine Server', 'Manage your servers')}</h1>
+            <p style={{ color: '#94a3b8', fontSize: 14, marginTop: 8, lineHeight: 1.55 }}>{t('Melde dich mit Discord an, um Sender, Rollen, Statistiken und dein Abo pro Server zu verwalten.', 'Sign in with Discord to manage stations, roles, statistics and your subscription per server.')}</p>
             <a href={buildApiUrl('/api/auth/discord/login')} className="oa-btn primary" style={{ width: '100%', marginTop: 20, background: 'linear-gradient(135deg,#5865f2,#4752c4)', color: '#fff' }} data-testid="guild-discord-login">
               <svg width="18" height="14" viewBox="0 0 71 55" fill="currentColor"><path d="M60.1 4.9A58.5 58.5 0 0045.4.2a.2.2 0 00-.2.1 40.8 40.8 0 00-1.8 3.7 54 54 0 00-16.2 0A37.3 37.3 0 0025.4.3a.2.2 0 00-.2-.1A58.4 58.4 0 0010.5 5 59.6 59.6 0 00.4 45a.3.3 0 00.1.2 58.7 58.7 0 0017.7 9 .2.2 0 00.3-.1 42 42 0 003.6-5.9.2.2 0 00-.1-.3 38.7 38.7 0 01-5.5-2.6.2.2 0 010-.4l1.1-.9a.2.2 0 01.2 0 41.9 41.9 0 0035.6 0 .2.2 0 01.3 0l1 .9a.2.2 0 010 .3 36.4 36.4 0 01-5.5 2.7.2.2 0 00-.1.3 47.2 47.2 0 003.6 5.8.2.2 0 00.3.1A58.5 58.5 0 0070 45.2a.3.3 0 00.1-.2c1.6-16.4-2.6-30.6-11-43.2zM23.7 37c-3.7 0-6.8-3.4-6.8-7.7s3-7.6 6.8-7.6 6.9 3.4 6.8 7.6c0 4.3-3 7.7-6.8 7.7zm25.2 0c-3.7 0-6.8-3.4-6.8-7.7s3-7.6 6.8-7.6 6.9 3.4 6.8 7.6c0 4.3-3 7.7-6.8 7.7z" /></svg>
-              Mit Discord anmelden
+              {t('Mit Discord anmelden', 'Continue with Discord')}
             </a>
-            <button onClick={startDemo} className="oa-btn ghost" style={{ width: '100%', marginTop: 12 }} data-testid="guild-demo-button"><Play size={15} /> Live-Demo ansehen</button>
-            <div style={{ marginTop: 16, textAlign: 'center' }}><a href="/" className="oa-mono" style={{ fontSize: 11, color: '#64748b' }}>← Zurück zur Website</a></div>
+            <button onClick={startDemo} className="oa-btn ghost" style={{ width: '100%', marginTop: 12 }} data-testid="guild-demo-button"><Play size={15} /> {t('Live-Demo ansehen', 'View live demo')}</button>
+            <div style={{ marginTop: 16, textAlign: 'center' }}><a href="/" className="oa-mono" style={{ fontSize: 11, color: '#64748b' }}>← {t('Zurück zur Website', 'Back to website')}</a></div>
           </div>
         </div>
       </div>
@@ -241,7 +251,7 @@ export default function GuildDashboard() {
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
           {NAV.map((n) => (
             <button key={n.id} className={`oa-nav-btn ${section === n.id ? 'active' : ''}`} onClick={() => { setSection(n.id); setMsg(null); }} data-testid={`guild-nav-${n.id}`}>
-              <n.icon size={18} /> {n.label}
+              <n.icon size={18} /> {navLabel(n.id)}
             </button>
           ))}
         </nav>
@@ -253,7 +263,7 @@ export default function GuildDashboard() {
         <div className="oa-topbar">
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
             <div>
-              <h1 className="oa-h1 oa-display" data-testid="guild-section-title">{NAV.find((n) => n.id === section)?.label}</h1>
+              <h1 className="oa-h1 oa-display" data-testid="guild-section-title">{navLabel(section)}</h1>
               <div className="oa-sub">{guild?.name} · {fmtInt(guild?.members)} Mitglieder</div>
             </div>
           </div>
@@ -269,7 +279,7 @@ export default function GuildDashboard() {
         <div className="oa-mobile-nav">
           {NAV.map((n) => (
             <button key={n.id} className={`oa-nav-btn ${section === n.id ? 'active' : ''}`} style={{ width: 'auto', whiteSpace: 'nowrap' }} onClick={() => { setSection(n.id); setMsg(null); }} data-testid={`guild-mobile-nav-${n.id}`}>
-              <n.icon size={16} /> {n.label}
+              <n.icon size={16} /> {navLabel(n.id)}
             </button>
           ))}
         </div>

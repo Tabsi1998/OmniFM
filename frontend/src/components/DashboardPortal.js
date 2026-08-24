@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BarChart3, CalendarDays, Crown, Globe, Lock, LogOut, ShieldCheck, TrendingUp, Radio, Settings, ListMusic, CreditCard, ArrowLeft } from 'lucide-react';
+import { BarChart3, CalendarDays, Crown, Lock, LogOut, ShieldCheck, TrendingUp, Radio, Settings, ListMusic, CreditCard, ArrowLeft } from 'lucide-react';
 import { useI18n } from '../i18n.js';
 import { buildApiUrl } from '../lib/api.js';
 import { buildHomeHref } from '../lib/pageRouting.js';
@@ -198,7 +198,7 @@ function DashboardShell({ children, sidebar, topbar }) {
 }
 
 export default function DashboardPortal() {
-  const { locale, localeMeta, toggleLocale, formatDate } = useI18n();
+  const { locale, formatDate } = useI18n();
   const t = useCallback((de, en) => (String(locale || 'de').startsWith('de') ? de : en), [locale]);
   const apiRequest = useCallback((path, options = {}) => apiRequestWithLanguage(path, locale, options), [locale]);
   const authError = resolveAuthError();
@@ -544,29 +544,6 @@ export default function DashboardPortal() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Radio size={24} color="#5865F2" />
             <span style={{ fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#71717A' }}>OmniFM Dashboard</span>
-            <button
-              type="button"
-              data-testid="dashboard-login-language-toggle"
-              onClick={toggleLocale}
-              title={localeMeta.switchTitle}
-              style={{
-                marginLeft: 'auto',
-                border: '1px solid rgba(255,255,255,0.12)',
-                background: 'rgba(255,255,255,0.04)',
-                color: '#fff',
-                height: 30,
-                padding: '0 10px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                cursor: 'pointer',
-                fontSize: 11,
-                fontWeight: 700,
-              }}
-            >
-              <Globe size={12} color="#00F0FF" />
-              {localeMeta.label} / {localeMeta.switchLabel}
-            </button>
           </div>
           <h1 data-testid="dashboard-login-title" style={{ fontFamily: "'Outfit', sans-serif", fontSize: 40, lineHeight: 1.05, marginTop: 14 }}>
             {t('Discord-SSO-Login', 'Discord SSO login')}
@@ -757,28 +734,6 @@ export default function DashboardPortal() {
             </select>
           </label>
         )}
-        <button
-          type="button"
-          data-testid="dashboard-language-toggle"
-          onClick={toggleLocale}
-          title={localeMeta.switchTitle}
-          style={{
-            border: '1px solid rgba(255,255,255,0.12)',
-            background: 'rgba(255,255,255,0.04)',
-            color: '#fff',
-            height: 34,
-            padding: '0 12px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            cursor: 'pointer',
-            fontSize: 12,
-            fontWeight: 700,
-          }}
-        >
-          <Globe size={13} color="#00F0FF" />
-          {localeMeta.label} / {localeMeta.switchLabel}
-        </button>
         <a
           href={mainSiteHref}
           data-testid="dashboard-topbar-home-link"

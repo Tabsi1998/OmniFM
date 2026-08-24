@@ -3,25 +3,25 @@
 // partners can place the mark on any background (dark or light).
 export const BRAND_ASSETS = [
   // — Logo (nur das Zeichen: Unendlichkeit + Schallwelle) —
-  { slug: 'mark-svg', label: 'Logo — Vektor (SVG)', desc: 'Skalierbar, transparent. Beste Qualität für alles.', file: '/brand/omnifm-mark.svg', bg: 'dark', use: 'Print · App · Vektor' },
-  { slug: 'mark-color', label: 'Logo — Farbig (transparent)', desc: 'Hauptlogo als transparentes PNG.', file: '/brand/omnifm-mark-transparent.png', bg: 'dark', use: 'überall' },
-  { slug: 'mark-white', label: 'Logo — Weiß (transparent)', desc: 'Einfarbig weiß für dunkle Flächen.', file: '/brand/omnifm-mark-white.png', bg: 'dark', use: 'dunkle Hintergründe' },
-  { slug: 'mark-black', label: 'Logo — Dunkel (transparent)', desc: 'Einfarbig dunkel für helle Flächen.', file: '/brand/omnifm-mark-black.png', bg: 'light', use: 'helle Hintergründe' },
-  { slug: 'mark-on-dark', label: 'Logo-Kachel — Dunkel', desc: 'Logo auf Obsidian-Kachel.', file: '/brand/omnifm-mark-on-dark.png', bg: 'dark', use: 'App-Icon dunkel' },
-  { slug: 'mark-on-light', label: 'Logo-Kachel — Hell', desc: 'Logo auf heller Kachel.', file: '/brand/omnifm-mark-on-light.png', bg: 'light', use: 'App-Icon hell' },
-  { slug: 'discord-avatar', label: 'Discord Avatar', desc: 'Rundes Profilbild für den Bot.', file: '/brand/omnifm-discord-avatar.png', bg: 'discord', use: 'Discord-Profil' },
-  { slug: 'favicon', label: 'Favicon', desc: 'Kompaktes Logo für kleine Größen.', file: '/brand/omnifm-favicon.png', bg: 'dark', use: 'Favicon' },
+  { slug: 'mark-svg', label: 'Logo — Vektor (SVG)', labelEn: 'Logo — Vector (SVG)', desc: 'Skalierbar, transparent. Beste Qualität für alles.', descEn: 'Scalable, transparent. Best quality for anything.', file: '/brand/omnifm-mark.svg', bg: 'dark', use: 'Print · App · Vektor', useEn: 'Print · App · Vector' },
+  { slug: 'mark-color', label: 'Logo — Farbig (transparent)', labelEn: 'Logo — Colour (transparent)', desc: 'Hauptlogo als transparentes PNG.', descEn: 'Primary logo as a transparent PNG.', file: '/brand/omnifm-mark-transparent.png', bg: 'dark', use: 'überall', useEn: 'anywhere' },
+  { slug: 'mark-white', label: 'Logo — Weiß (transparent)', labelEn: 'Logo — White (transparent)', desc: 'Einfarbig weiß für dunkle Flächen.', descEn: 'Solid white for dark surfaces.', file: '/brand/omnifm-mark-white.png', bg: 'dark', use: 'dunkle Hintergründe', useEn: 'dark backgrounds' },
+  { slug: 'mark-black', label: 'Logo — Dunkel (transparent)', labelEn: 'Logo — Dark (transparent)', desc: 'Einfarbig dunkel für helle Flächen.', descEn: 'Solid dark for light surfaces.', file: '/brand/omnifm-mark-black.png', bg: 'light', use: 'helle Hintergründe', useEn: 'light backgrounds' },
+  { slug: 'mark-on-dark', label: 'Logo-Kachel — Dunkel', labelEn: 'Logo tile — Dark', desc: 'Logo auf Obsidian-Kachel.', descEn: 'Logo on an obsidian tile.', file: '/brand/omnifm-mark-on-dark.png', bg: 'dark', use: 'App-Icon dunkel', useEn: 'App icon dark' },
+  { slug: 'mark-on-light', label: 'Logo-Kachel — Hell', labelEn: 'Logo tile — Light', desc: 'Logo auf heller Kachel.', descEn: 'Logo on a light tile.', file: '/brand/omnifm-mark-on-light.png', bg: 'light', use: 'App-Icon hell', useEn: 'App icon light' },
+  { slug: 'discord-avatar', label: 'Discord Avatar', labelEn: 'Discord avatar', desc: 'Rundes Profilbild für den Bot.', descEn: 'Round profile picture for the bot.', file: '/brand/omnifm-discord-avatar.png', bg: 'discord', use: 'Discord-Profil', useEn: 'Discord profile' },
+  { slug: 'favicon', label: 'Favicon', labelEn: 'Favicon', desc: 'Kompaktes Logo für kleine Größen.', descEn: 'Compact logo for small sizes.', file: '/brand/omnifm-favicon.png', bg: 'dark', use: 'Favicon', useEn: 'Favicon' },
   // — Wortmarke (Logo + „omnifm") —
-  { slug: 'wordmark-dark', label: 'Wortmarke — Dunkel (transparent)', desc: 'Logo + „omnifm", helle Schrift.', file: '/brand/omnifm-wordmark-dark.png', bg: 'dark', use: 'dunkle Header' },
-  { slug: 'wordmark-light', label: 'Wortmarke — Hell (transparent)', desc: 'Logo + „omnifm", dunkle Schrift.', file: '/brand/omnifm-wordmark-light.png', bg: 'light', use: 'helle Header' },
-  { slug: 'wordmark-on-dark', label: 'Wortmarke-Kachel — Dunkel', desc: 'Wortmarke auf Obsidian-Panel.', file: '/brand/omnifm-wordmark-on-dark.png', bg: 'dark', use: 'Karten, Slides' },
-  { slug: 'wordmark-on-light', label: 'Wortmarke-Kachel — Hell', desc: 'Wortmarke auf hellem Panel.', file: '/brand/omnifm-wordmark-on-light.png', bg: 'light', use: 'Dokumente' },
+  { slug: 'wordmark-dark', label: 'Wortmarke — Dunkel (transparent)', labelEn: 'Wordmark — Dark (transparent)', desc: 'Logo + „omnifm", helle Schrift.', descEn: 'Logo + “omnifm”, light type.', file: '/brand/omnifm-wordmark-dark.png', bg: 'dark', use: 'dunkle Header', useEn: 'dark headers' },
+  { slug: 'wordmark-light', label: 'Wortmarke — Hell (transparent)', labelEn: 'Wordmark — Light (transparent)', desc: 'Logo + „omnifm", dunkle Schrift.', descEn: 'Logo + “omnifm”, dark type.', file: '/brand/omnifm-wordmark-light.png', bg: 'light', use: 'helle Header', useEn: 'light headers' },
+  { slug: 'wordmark-on-dark', label: 'Wortmarke-Kachel — Dunkel', labelEn: 'Wordmark tile — Dark', desc: 'Wortmarke auf Obsidian-Panel.', descEn: 'Wordmark on an obsidian panel.', file: '/brand/omnifm-wordmark-on-dark.png', bg: 'dark', use: 'Karten, Slides', useEn: 'Cards, slides' },
+  { slug: 'wordmark-on-light', label: 'Wortmarke-Kachel — Hell', labelEn: 'Wordmark tile — Light', desc: 'Wortmarke auf hellem Panel.', descEn: 'Wordmark on a light panel.', file: '/brand/omnifm-wordmark-on-light.png', bg: 'light', use: 'Dokumente', useEn: 'Documents' },
   // — Banner —
-  { slug: 'banner-dark', label: 'Banner — Dunkel', desc: 'Hero-Banner mit Tagline (Obsidian).', file: '/brand/omnifm-banner.png', bg: 'dark', use: 'Social, OG-Image' },
-  { slug: 'banner-light', label: 'Banner — Hell', desc: 'Hero-Banner auf hellem Grund.', file: '/brand/omnifm-banner-light.png', bg: 'light', use: 'helle Seiten' },
-  { slug: 'banner-transparent', label: 'Banner — Transparent', desc: 'Banner ohne Hintergrund.', file: '/brand/omnifm-banner-transparent.png', bg: 'dark', use: 'Overlays' },
+  { slug: 'banner-dark', label: 'Banner — Dunkel', labelEn: 'Banner — Dark', desc: 'Hero-Banner mit Tagline (Obsidian).', descEn: 'Hero banner with tagline (obsidian).', file: '/brand/omnifm-banner.png', bg: 'dark', use: 'Social, OG-Image', useEn: 'Social, OG image' },
+  { slug: 'banner-light', label: 'Banner — Hell', labelEn: 'Banner — Light', desc: 'Hero-Banner auf hellem Grund.', descEn: 'Hero banner on a light ground.', file: '/brand/omnifm-banner-light.png', bg: 'light', use: 'helle Seiten', useEn: 'light pages' },
+  { slug: 'banner-transparent', label: 'Banner — Transparent', labelEn: 'Banner — Transparent', desc: 'Banner ohne Hintergrund.', descEn: 'Banner without a background.', file: '/brand/omnifm-banner-transparent.png', bg: 'dark', use: 'Overlays', useEn: 'Overlays' },
   // — Sponsor —
-  { slug: 'sponsor-badge', label: 'Sponsor-Badge', desc: '„Powered by omnifm" zum Verlinken.', file: '/brand/omnifm-sponsor-badge.png', bg: 'dark', use: 'Sponsoren-Links' },
+  { slug: 'sponsor-badge', label: 'Sponsor-Badge', labelEn: 'Sponsor badge', desc: '„Powered by omnifm" zum Verlinken.', descEn: '“Powered by omnifm” for linking.', file: '/brand/omnifm-sponsor-badge.png', bg: 'dark', use: 'Sponsoren-Links', useEn: 'Sponsor links' },
 ];
 
 export const BRAND_PALETTE = [
