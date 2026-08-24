@@ -177,18 +177,30 @@ fi
 SERVER_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 [ -n "$SERVER_IP" ] || SERVER_IP="localhost"
 
-# PUBLIC_URL gesetzt = Betrieb hinter Reverse-Proxy unter einer Domain
-# (z.B. PUBLIC_URL=https://omnifm.xyz). Dann laufen ALLE Aufrufe über die Domain,
-# der Proxy leitet '/' -> :3000 und '/api' -> :8001.
+# --- API-URL fürs Frontend bestimmen ---------------------------------------
+# Standard: RELATIVE Same-Origin-API ("" => Frontend ruft /api auf derselben
+#           Domain auf). Ideal hinter einem Reverse-Proxy (kein Mixed-Content,
+#           kein CORS, kein Domain-spezifischer Rebuild nötig).
+# PUBLIC_URL=https://domain : absolute Domain (ebenfalls Same-Origin).
+# DIRECT_IP=1               : direkter Zugriff ohne Proxy -> http://SERVER_IP:8001
 if [ -n "${PUBLIC_URL:-}" ]; then
-  BACKEND_URL="$PUBLIC_URL"
+  FRONTEND_API="$PUBLIC_URL"
+  BACKEND_PUBLIC="$PUBLIC_URL"
   FRONTEND_ORIGIN="$PUBLIC_URL"
-  log "Reverse-Proxy-Modus: öffentliche URL = ${PUBLIC_URL}"
-else
-  BACKEND_URL="http://${SERVER_IP}:${BACKEND_PORT}"
+  log "Modus: öffentliche Domain = ${PUBLIC_URL}"
+elif [ "${DIRECT_IP:-0}" = "1" ]; then
+  FRONTEND_API="http://${SERVER_IP}:${BACKEND_PORT}"
+  BACKEND_PUBLIC="http://${SERVER_IP}:${BACKEND_PORT}"
   FRONTEND_ORIGIN="http://${SERVER_IP}:${FRONTEND_PORT}"
+  log "Modus: Direkter IP-Zugriff = ${FRONTEND_API}"
+else
+  FRONTEND_API=""
+  BACKEND_PUBLIC="http://${SERVER_IP}:${BACKEND_PORT}"
+  FRONTEND_ORIGIN=""
+  log "Modus: Reverse-Proxy (relative Same-Origin-API '/api'). Optional: PUBLIC_URL=https://domain"
 fi
-CORS_ORIGINS="${FRONTEND_ORIGIN},http://localhost:${FRONTEND_PORT},http://127.0.0.1:${FRONTEND_PORT}"
+CORS_ORIGINS="*"
+[ -n "$FRONTEND_ORIGIN" ] && CORS_ORIGINS="${FRONTEND_ORIGIN},http://localhost:${FRONTEND_PORT},http://127.0.0.1:${FRONTEND_PORT}"
 
 set_kv() { # file key value
   local f="$1" k="$2" v="$3"
@@ -205,9 +217,9 @@ if [ ! -f "$BACKEND_ENV" ]; then
 MONGO_URL=mongodb://127.0.0.1:27017
 DB_NAME=radio_bot
 API_ADMIN_TOKEN=${OWNER_TOKEN}
-PUBLIC_WEB_URL=${BACKEND_URL}
+PUBLIC_WEB_URL=${BACKEND_PUBLIC}
 CORS_ALLOWED_ORIGINS=${CORS_ORIGINS}
-CHECKOUT_RETURN_ORIGINS=${FRONTEND_ORIGIN},http://localhost:${FRONTEND_PORT}
+CHECKOUT_RETURN_ORIGINS=${CORS_ORIGINS}
 DEFAULT_LANGUAGE=en
 EOF
 else
@@ -215,21 +227,17 @@ else
   if ! grep -qE '^API_ADMIN_TOKEN=..+' "$BACKEND_ENV" || grep -qE '^API_ADMIN_TOKEN=(change-me|your_)' "$BACKEND_ENV"; then
     set_kv "$BACKEND_ENV" API_ADMIN_TOKEN "$OWNER_TOKEN"
   fi
-  # Bei gesetzter PUBLIC_URL öffentliche URL/CORS immer nachziehen (Domain-Wechsel)
-  if [ -n "${PUBLIC_URL:-}" ]; then
-    set_kv "$BACKEND_ENV" PUBLIC_WEB_URL "$BACKEND_URL"
-    set_kv "$BACKEND_ENV" CORS_ALLOWED_ORIGINS "$CORS_ORIGINS"
-    set_kv "$BACKEND_ENV" CHECKOUT_RETURN_ORIGINS "$FRONTEND_ORIGIN"
-  fi
+  set_kv "$BACKEND_ENV" PUBLIC_WEB_URL "$BACKEND_PUBLIC"
+  set_kv "$BACKEND_ENV" CORS_ALLOWED_ORIGINS "$CORS_ORIGINS"
 fi
 
-# Frontend wird bei JEDEM Lauf neu gebaut -> REACT_APP_BACKEND_URL immer setzen,
-# wenn PUBLIC_URL gesetzt ist (sonst nur beim ersten Mal).
-if [ ! -f "$FRONTEND_ENV" ]; then
+# Frontend wird bei JEDEM Lauf neu gebaut -> API-URL immer neu setzen
+# (verhindert veraltete/falsche URLs wie eine LAN-IP nach Proxy-Umstellung).
+if [ -f "$FRONTEND_ENV" ]; then
+  set_kv "$FRONTEND_ENV" REACT_APP_BACKEND_URL "$FRONTEND_API"
+else
   log "Erzeuge frontend/.env ..."
-  printf 'REACT_APP_BACKEND_URL=%s\n' "$BACKEND_URL" > "$FRONTEND_ENV"
-elif [ -n "${PUBLIC_URL:-}" ]; then
-  set_kv "$FRONTEND_ENV" REACT_APP_BACKEND_URL "$BACKEND_URL"
+  printf 'REACT_APP_BACKEND_URL=%s\n' "$FRONTEND_API" > "$FRONTEND_ENV"
 fi
 
 

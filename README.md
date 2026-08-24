@@ -83,19 +83,27 @@ Zugang: Website unter Port 3000 → `/admin` → Token eingeben.
 
 ### 🌐 Betrieb hinter einem Reverse-Proxy (eigene Domain, z.B. omnifm.xyz)
 
-Läuft OmniFM hinter nginx/Traefik/Caddy unter einer Domain, muss der Proxy so routen:
-`/` → Frontend `:3000`, `/api/` → Backend `:8001`. Sonst antwortet die Domain mit
-`{"detail":"Not Found"}` (dann zeigt der Proxy fälschlich aufs Backend).
+OmniFM ist standardmäßig **reverse-proxy-fertig**: Das Frontend ruft die API **relativ
+auf derselben Domain** auf (`/api/...`). Dadurch gibt es **kein Mixed-Content, kein CORS
+und keinen domainspezifischen Rebuild**. Es sind nur zwei Dinge nötig:
 
-Frontend **mit der Domain** bauen (sonst rufen Besucher-Browser die interne IP auf):
+**1. Der Proxy MUSS `/api/` ans Backend routen** (sonst kommt `{"detail":"Not Found"}`
+oder HTML statt JSON und die Sender/Login gehen nicht):
+- `/`      → OmniFM-Frontend `:3000`
+- `/api/`  → OmniFM-Backend  `:8001`
 
-```bash
-PUBLIC_URL=https://omnifm.xyz ./start.sh
-```
+Fertige nginx-Config liegt bei: `deploy/nginx/omnifm.conf` (auf dem Proxy-Server
+installieren; Ziel-IP des OmniFM-Servers dort eintragen). Danach `nginx -t && systemctl reload nginx`.
 
-Das setzt automatisch `REACT_APP_BACKEND_URL`, `PUBLIC_WEB_URL` und CORS auf die Domain
-(bestehender Owner-Token bleibt erhalten). Fertige nginx-Config liegt bei:
-`deploy/nginx/omnifm.conf` (inkl. certbot-Hinweis für HTTPS).
+**2. Frontend bauen** – einfach `./start.sh` bzw. `./update.sh` (nutzt automatisch die
+relative Same-Origin-API). Fertig.
+
+> Sonderfälle:
+> - `PUBLIC_URL=https://omnifm.xyz ./start.sh` – erzwingt die absolute Domain (auch Same-Origin).
+> - `DIRECT_IP=1 ./start.sh` – direkter Zugriff OHNE Proxy über `http://<server-ip>:8001`.
+
+Owner-Login danach: Domain → `/admin` → Owner-Token (aus `backend/.env`, wird beim ersten
+`start.sh` erzeugt und angezeigt).
 
 `start.sh` ist idempotent: es installiert Systempakete nur, wenn sie fehlen, erstellt bei Bedarf
 ein Python-venv, installiert Backend-, Frontend- und Bot-Abhängigkeiten, baut das Frontend,
