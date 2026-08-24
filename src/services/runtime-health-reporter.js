@@ -89,3 +89,28 @@ export function startRuntimeHealthReporter(runtimes, { intervalMs = 5000 } = {})
   log("INFO", `[health-reporter] Aktiv – meldet echte Metriken alle ${Math.round(Math.max(2000, intervalMs) / 1000)}s an MongoDB.`);
   return () => clearInterval(timer);
 }
+
+// Schreibt ein ECHTES Incident (z. B. Stream-Fehler, FFmpeg-Neustart, Reconnect)
+// in MongoDB `runtime_incidents` – genau die Collection, die das Owner-Dashboard liest.
+export async function recordRuntimeIncident({ severity = "info", source = "runtime", message = "", resolved = false } = {}) {
+  if (!isConnected()) return;
+  try {
+    const database = getDb();
+    await database.collection("runtime_incidents").insertOne({
+      at: new Date().toISOString(),
+      severity: String(severity).toLowerCase(),
+      source: String(source || "runtime").slice(0, 60),
+      message: String(message || "").slice(0, 240),
+      resolved: !!resolved,
+    });
+    // Best-effort: Collection klein halten (neueste ~200 behalten).
+    const count = await database.collection("runtime_incidents").countDocuments();
+    if (count > 250) {
+      const cutoff = await database.collection("runtime_incidents")
+        .find({}, { projection: { at: 1 } }).sort({ at: -1 }).skip(200).limit(1).toArray();
+      if (cutoff.length) {
+        await database.collection("runtime_incidents").deleteMany({ at: { $lt: cutoff[0].at } });
+      }
+    }
+  } catch { /* noop */ }
+}

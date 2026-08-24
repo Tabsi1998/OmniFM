@@ -175,6 +175,9 @@ import {
 } from "../scheduled-events-store.js";
 import { PLANS, BRAND } from "../config/plans.js";
 import { OMNI_COLORS, tierColor, brandFooter, brandAuthor } from "./brand-embed.js";
+import { recordRuntimeIncident } from "../services/runtime-health-reporter.js";
+
+const NP_PREFIX = "np:";
 import { normalizeLanguage, getDefaultLanguage } from "../i18n.js";
 import { buildVoiceChannelAccessMessage } from "../lib/user-facing-setup.js";
 import { premiumStationEmbed, customStationEmbed, botLimitEmbed } from "../ui/upgradeEmbeds.js";
@@ -555,6 +558,13 @@ class BotRuntime {
         if (this.shuttingDown) return;
         state.lastStreamErrorAt = new Date().toISOString();
         log("ERROR", `[${this.config.name}] AudioPlayer error: ${err?.message || err}`);
+        // Echtes Incident ins Owner-Dashboard (Stream-/FFmpeg-Fehler, Auto-Recovery folgt).
+        recordRuntimeIncident({
+          severity: "warning",
+          source: this.config.name,
+          message: `Stream-/FFmpeg-Fehler – Auto-Recovery aktiv: ${err?.message || err}`,
+          resolved: false,
+        }).catch(() => {});
         this.handleStreamEnd(guildId, state, "error").catch((streamErr) => {
           log("ERROR", `[${this.config.name}] handleStreamEnd error failed: ${streamErr?.message || streamErr}`);
         });
@@ -1382,42 +1392,77 @@ class BotRuntime {
   }
 
   buildTrackLinkComponents(guildId, station, meta) {
-    const query = this.buildTrackSearchQuery(station, meta);
-    if (!query) return [];
     const language = this.resolveGuildLanguage(guildId);
     const isDe = language === "de";
+    const rows = [];
 
-    const buttons = [
+    // Steuerungs-Row (immer sichtbar): Pause/Weiter · Stop · Lautstaerke -/+ · Sender wechseln.
+    const state = this.guildState.get(guildId);
+    const status = state?.player?.state?.status;
+    const paused = status === "paused" || status === "autopaused";
+    const controlRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setStyle(ButtonStyle.Link)
-        .setLabel(isDe ? "YouTube-Suche" : "YouTube search")
-        .setURL(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`)
-        .setEmoji("\u{1f4fa}"),
+        .setCustomId(`${NP_PREFIX}toggle`)
+        .setStyle(paused ? ButtonStyle.Success : ButtonStyle.Secondary)
+        .setEmoji(paused ? "\u25b6" : "\u23f8")
+        .setLabel(paused ? (isDe ? "Weiter" : "Resume") : "Pause"),
       new ButtonBuilder()
-        .setStyle(ButtonStyle.Link)
-        .setLabel(isDe ? "Spotify-Suche" : "Spotify search")
-        .setURL(`https://open.spotify.com/search/${encodeURIComponent(query)}`)
-        .setEmoji("\u{1f3b5}"),
-    ];
+        .setCustomId(`${NP_PREFIX}stop`)
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji("\u23f9")
+        .setLabel("Stop"),
+      new ButtonBuilder()
+        .setCustomId(`${NP_PREFIX}voldown`)
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji("\u{1f509}"),
+      new ButtonBuilder()
+        .setCustomId(`${NP_PREFIX}volup`)
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji("\u{1f50a}"),
+      new ButtonBuilder()
+        .setCustomId(STATIONS_COMPONENT_ID_OPEN)
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji("\u{1f4fb}")
+        .setLabel(isDe ? "Sender" : "Stations"),
+    );
+    rows.push(controlRow);
 
-    const musicBrainzUrl = meta?.musicBrainzReleaseId
-      ? `https://musicbrainz.org/release/${encodeURIComponent(meta.musicBrainzReleaseId)}`
-      : (meta?.musicBrainzRecordingId
-        ? `https://musicbrainz.org/recording/${encodeURIComponent(meta.musicBrainzRecordingId)}`
-        : null);
-
-    if (musicBrainzUrl) {
-      buttons.push(
+    // Link-Row (nur wenn ein Track erkannt wurde): YouTube / Spotify / MusicBrainz.
+    const query = this.buildTrackSearchQuery(station, meta);
+    if (query) {
+      const buttons = [
         new ButtonBuilder()
           .setStyle(ButtonStyle.Link)
-          .setLabel("MusicBrainz")
-          .setURL(musicBrainzUrl)
-          .setEmoji("\u{1f9e0}")
-      );
+          .setLabel(isDe ? "YouTube-Suche" : "YouTube search")
+          .setURL(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`)
+          .setEmoji("\u{1f4fa}"),
+        new ButtonBuilder()
+          .setStyle(ButtonStyle.Link)
+          .setLabel(isDe ? "Spotify-Suche" : "Spotify search")
+          .setURL(`https://open.spotify.com/search/${encodeURIComponent(query)}`)
+          .setEmoji("\u{1f3b5}"),
+      ];
+
+      const musicBrainzUrl = meta?.musicBrainzReleaseId
+        ? `https://musicbrainz.org/release/${encodeURIComponent(meta.musicBrainzReleaseId)}`
+        : (meta?.musicBrainzRecordingId
+          ? `https://musicbrainz.org/recording/${encodeURIComponent(meta.musicBrainzRecordingId)}`
+          : null);
+
+      if (musicBrainzUrl) {
+        buttons.push(
+          new ButtonBuilder()
+            .setStyle(ButtonStyle.Link)
+            .setLabel("MusicBrainz")
+            .setURL(musicBrainzUrl)
+            .setEmoji("\u{1f9e0}")
+        );
+      }
+
+      rows.push(new ActionRowBuilder().addComponents(...buttons));
     }
 
-    const row = new ActionRowBuilder().addComponents(...buttons);
-    return [row];
+    return rows;
   }
 
   buildNowPlayingSourceSummary(language, meta, hasTrack) {
@@ -1781,7 +1826,7 @@ class BotRuntime {
           ? "Dieser Sender liefert aktuell keine verwertbaren Song-Metadaten."
           : "This station is not providing usable track metadata right now."));
     const embed = new EmbedBuilder()
-      .setColor(hasTrack ? 0x1DB954 : 0xF1C40F)
+      .setColor(hasTrack ? OMNI_COLORS.success : OMNI_COLORS.warning)
       .setTitle(isDe ? "🎵 Jetzt live" : "🎵 Live now")
       .setDescription(
         hasTrack
@@ -1926,7 +1971,7 @@ class BotRuntime {
     }
 
     embed
-      .setColor(!hasTrack ? 0xF1C40F : (sourceSummary.metadataSource.includes("recognition") ? 0x5865F2 : 0x1DB954))
+      .setColor(!hasTrack ? OMNI_COLORS.warning : (sourceSummary.metadataSource.includes("recognition") ? OMNI_COLORS.info : OMNI_COLORS.success))
       .setTitle(isDe ? "\u{1f3b5} Jetzt live" : "\u{1f3b5} Live now")
       .setDescription(descriptionLines.join("\n"))
       .setAuthor({
@@ -2005,7 +2050,7 @@ class BotRuntime {
     }
 
     const embed = new EmbedBuilder()
-      .setColor(hasTrack ? 0x1DB954 : 0xF1C40F)
+      .setColor(hasTrack ? OMNI_COLORS.success : OMNI_COLORS.warning)
       .setTitle(isDe ? "🎵 Jetzt live" : "🎵 Live now")
       .setDescription(
         hasTrack
@@ -3199,6 +3244,9 @@ class BotRuntime {
       if (customId.startsWith(WORKERS_COMPONENT_PREFIX)) {
         return this.handleWorkersComponentInteraction(interaction);
       }
+      if (customId.startsWith(NP_PREFIX)) {
+        return this.handleNowPlayingControl(interaction);
+      }
       if (
         customId === PLAY_COMPONENT_ID_OPEN
         || customId === STATIONS_COMPONENT_ID_OPEN
@@ -3236,6 +3284,55 @@ class BotRuntime {
 
   buildHelpMessage(interaction) {
     return buildRuntimeHelpMessage(this, interaction);
+  }
+
+  // Live-Steuerung direkt aus der Now-Playing-Nachricht (Buttons).
+  async handleNowPlayingControl(interaction) {
+    const { t } = this.createInteractionTranslator(interaction);
+    const guildId = interaction.guildId;
+    if (!guildId) {
+      await interaction.reply({ content: t("Nur in Servern verfuegbar.", "Only available in servers."), flags: MessageFlags.Ephemeral });
+      return true;
+    }
+    const action = String(interaction.customId || "").slice(NP_PREFIX.length);
+    const state = this.guildState.get(guildId);
+
+    let result = { ok: false, error: t("Es laeuft gerade nichts.", "Nothing is playing right now.") };
+    let msg = "";
+
+    if (action === "toggle") {
+      const status = state?.player?.state?.status;
+      const paused = status === "paused" || status === "autopaused";
+      result = paused ? await this.resumeInGuild(guildId) : await this.pauseInGuild(guildId);
+      msg = paused ? t("\u25b6 Wiedergabe fortgesetzt.", "\u25b6 Resumed.") : t("\u23f8 Pausiert.", "\u23f8 Paused.");
+    } else if (action === "stop") {
+      result = await this.stopInGuild(guildId);
+      msg = t("\u23f9 Wiedergabe gestoppt.", "\u23f9 Playback stopped.");
+    } else if (action === "volup" || action === "voldown") {
+      const cur = Number(state?.volume ?? 100);
+      const next = Math.max(0, Math.min(100, cur + (action === "volup" ? 10 : -10)));
+      result = await this.setVolumeInGuild(guildId, next);
+      msg = `\u{1f50a} ${t("Lautstaerke", "Volume")}: ${next}%`;
+    } else {
+      await interaction.reply({ content: t("Unbekannte Aktion.", "Unknown action."), flags: MessageFlags.Ephemeral });
+      return true;
+    }
+
+    if (!result?.ok) {
+      await interaction.reply({ content: result?.error || t("Aktion fehlgeschlagen.", "Action failed."), flags: MessageFlags.Ephemeral });
+      return true;
+    }
+
+    // Now-Playing-Nachricht sofort aktualisieren (Buttons/State spiegeln).
+    try {
+      const fresh = this.guildState.get(guildId);
+      if (fresh && typeof this.updateNowPlayingEmbed === "function" && action !== "stop") {
+        await this.updateNowPlayingEmbed(guildId, fresh, { force: true }).catch(() => {});
+      }
+    } catch { /* noop */ }
+
+    await interaction.reply({ content: msg, flags: MessageFlags.Ephemeral });
+    return true;
   }
 
   getInteractionRoleIds(interaction) {
@@ -4117,10 +4214,10 @@ class BotRuntime {
     const resolvedClientId = this.getApplicationId() || this.config.clientId;
     const isPremiumBot = this.config.requiredTier && this.config.requiredTier !== "free";
     const accentColor = this.config.requiredTier === "ultimate"
-      ? "#BD00FF"
+      ? "#FF2A5F"
       : this.config.requiredTier === "pro"
-        ? "#FFB800"
-        : "#00F0FF";
+        ? "#FF6B00"
+        : "#00E5FF";
     const status = {
       id: this.config.id,
       botId: this.config.id,

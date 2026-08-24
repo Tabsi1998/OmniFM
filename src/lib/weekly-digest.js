@@ -158,7 +158,7 @@ function buildWeeklyDigestPreview({
 function buildWeeklyDigestEmbedData(input = {}) {
   const preview = buildWeeklyDigestPreview(input);
   return {
-    color: 0x5865F2,
+    color: 0xFF6B00,
     title: preview.title,
     description: preview.description,
     fields: preview.fields,

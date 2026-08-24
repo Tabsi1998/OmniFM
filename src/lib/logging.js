@@ -511,6 +511,7 @@ export {
   logStoreLoadError,
   shouldLogFfmpegStderrLine,
   getLogWriteQueue,
+  getRecentLogs,
   resetLogCooldownStateForTests,
   rootDir,
   webDir,

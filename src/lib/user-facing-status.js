@@ -111,7 +111,7 @@ function buildUserFacingRuntimeStatus(source = {}, { t = (de, en) => de } = {}) 
   return {
     code: "ready",
     label: t("Bereit", "Ready"),
-    accent: 0x5865F2,
+    accent: 0x00E5FF,
     summary: t(
       "OmniFM ist bereit fuer den naechsten Start auf diesem Server.",
       "OmniFM is ready for the next start on this server."
