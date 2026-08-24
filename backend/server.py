@@ -2263,6 +2263,39 @@ async def discordbotlist_status(request: Request, limit: int = 20):
     return get_discordbotlist_status(vote_limit=max(0, min(200, int(limit))))
 
 
+def read_runtime_health_fresh(max_age_sec=30):
+    """Liest die echte Runtime-Telemetrie (vom Node-Bot) aus MongoDB, wenn frisch."""
+    if db is None:
+        return None
+    try:
+        doc = db.runtime_health.find_one({"_id": "latest"}, {"_id": 0})
+    except Exception:
+        return None
+    if not doc:
+        return None
+    dt = _parse_iso_dt(doc.get("at"))
+    if dt is None:
+        return None
+    if (datetime.now(timezone.utc) - dt).total_seconds() > max_age_sec:
+        return None
+    return doc
+
+
+def live_runtime_totals():
+    """Echte Live-Zahlen (0, wenn kein Bot laeuft) – EINE Quelle der Wahrheit."""
+    doc = read_runtime_health_fresh()
+    if not doc:
+        return {"botsOnline": 0, "servers": 0, "voiceConnections": 0, "live": False}
+    nodes = doc.get("nodes") or []
+    online = [n for n in nodes if n.get("status") == "online"]
+    return {
+        "botsOnline": len(online),
+        "servers": sum(int(n.get("guilds") or 0) for n in online),
+        "voiceConnections": sum(int(n.get("voiceConnections") or 0) for n in online),
+        "live": True,
+    }
+
+
 @app.get("/api/stats")
 async def get_stats():
     bots = load_bots_from_env()
@@ -2284,12 +2317,20 @@ async def get_stats():
         station_count = len(official)
         free_count = sum(1 for s in official.values() if (s.get("tier", "free") or "free").lower() == "free")
         pro_count = station_count - free_count
-    totals = {"servers": 0, "users": 0, "connections": 0, "listeners": 0, "bots": len(bots), "stations": station_count, "freeStations": free_count, "proStations": pro_count}
-    for bot in bots:
-        totals["servers"] += bot.get("servers", 0)
-        totals["users"] += bot.get("users", 0)
-        totals["connections"] += bot.get("connections", 0)
-        totals["listeners"] += bot.get("listeners", 0)
+    # Live-Zahlen NUR aus echter Runtime-Telemetrie (0, wenn kein Bot laeuft) – keine Fake-Werte.
+    live = live_runtime_totals()
+    totals = {
+        "servers": live["servers"],
+        "users": 0,
+        "connections": live["voiceConnections"],
+        "listeners": 0,
+        "bots": live["botsOnline"],
+        "botsConfigured": len(bots),
+        "live": live["live"],
+        "stations": station_count,
+        "freeStations": free_count,
+        "proStations": pro_count,
+    }
     return totals
 
 
@@ -3916,9 +3957,7 @@ async def admin_overview(request: Request):
 
     stations = _station_summary()
     bots = load_bots_from_env()
-    dashboard = load_dashboard_data() or {}
-    guild_configs = dashboard.get("guilds", {})
-    guild_count = len(guild_configs) if isinstance(guild_configs, dict) else 0
+    live = live_runtime_totals()
 
     return {
         "generatedAt": datetime.now(timezone.utc).isoformat(),
@@ -3938,9 +3977,11 @@ async def admin_overview(request: Request):
         "stations": {"free": stations["free"], "pro": stations["pro"], "total": stations["total"]},
         "bots": {
             "configured": len(bots),
+            "online": live["botsOnline"],
             "commander": next((b["name"] for b in bots if b.get("index") == parse_int(os.environ.get("COMMANDER_BOT_INDEX", "1"), 1)), bots[0]["name"] if bots else None),
         },
-        "guilds": {"managed": guild_count},
+        # Echte verwaltete Server aus der laufenden Runtime (0, wenn kein Bot laeuft).
+        "guilds": {"managed": live["servers"], "live": live["live"]},
         "integrations": {
             "mongo": db is not None,
             "stripe": bool(get_stripe_secret_key()),

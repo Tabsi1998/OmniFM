@@ -570,6 +570,22 @@ class BotRuntime {
         });
       });
 
+      // Erholung nach Fehler: wenn nach einem Stream-Fehler wieder abgespielt wird,
+      // ein aufgeloestes "recovered"-Incident melden (einmalig pro Fehler).
+      player.on(AudioPlayerStatus.Playing, () => {
+        if (this.shuttingDown) return;
+        if (!state.lastStreamErrorAt) return;
+        const errAt = new Date(state.lastStreamErrorAt).getTime();
+        state.lastStreamErrorAt = null;
+        if (!Number.isFinite(errAt) || (Date.now() - errAt) > 120000) return;
+        recordRuntimeIncident({
+          severity: "info",
+          source: this.config.name,
+          message: "Stream nach Fehler automatisch wiederhergestellt (auto-recovered).",
+          resolved: true,
+        }).catch(() => {});
+      });
+
       this.guildState.set(guildId, state);
     }
 
@@ -3906,6 +3922,20 @@ class BotRuntime {
   }
 
   scheduleReconnect(guildId, options = {}) {
+    // Reconnect-Incident (throttled, damit es das Monitoring nicht flutet).
+    try {
+      const state = this.guildState.get(guildId);
+      const nowMs = Date.now();
+      if (state && (!state.lastReconnectIncidentAt || (nowMs - state.lastReconnectIncidentAt) > 30000)) {
+        state.lastReconnectIncidentAt = nowMs;
+        recordRuntimeIncident({
+          severity: "warning",
+          source: this.config.name,
+          message: `Voice-Reconnect wird ausgefuehrt (Guild ${guildId})${options?.reason ? ` – ${options.reason}` : ""}.`,
+          resolved: false,
+        }).catch(() => {});
+      }
+    } catch { /* noop */ }
     return scheduleRuntimeReconnect(this, guildId, options);
   }
 

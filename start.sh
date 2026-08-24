@@ -221,6 +221,7 @@ PUBLIC_WEB_URL=${BACKEND_PUBLIC}
 CORS_ALLOWED_ORIGINS=${CORS_ORIGINS}
 CHECKOUT_RETURN_ORIGINS=${CORS_ORIGINS}
 DEFAULT_LANGUAGE=en
+SEED_DEMO_DATA=0
 EOF
 else
   # Fehlenden/Platzhalter-Token nachtragen, damit Owner-Login funktioniert
@@ -229,6 +230,8 @@ else
   fi
   set_kv "$BACKEND_ENV" PUBLIC_WEB_URL "$BACKEND_PUBLIC"
   set_kv "$BACKEND_ENV" CORS_ALLOWED_ORIGINS "$CORS_ORIGINS"
+  # Produktion: niemals Demo-/Fake-Telemetrie. Alte SEED_DEMO_DATA=1 hart abschalten.
+  set_kv "$BACKEND_ENV" SEED_DEMO_DATA 0
 fi
 
 # Frontend wird bei JEDEM Lauf neu gebaut -> API-URL immer neu setzen

@@ -494,11 +494,14 @@ export default function OwnerAdmin() {
     { name: 'Free', value: stations.free, fill: '#64748b' },
     { name: 'Pro', value: stations.pro, fill: '#ff6b00' },
   ] : [];
-  // Deterministic revenue trend for the sparkline area chart (last 6 months, ramping to current MRR)
+  // Umsatz-Trend: echte laufende MRR flach über die letzten 6 Monate (keine erfundene Wachstumskurve).
   const mrr = ov?.revenue?.mrr || 0;
+  const monthNames = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
   const revenueTrend = Array.from({ length: 6 }, (_, i) => {
-    const m = ['Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug'][i];
-    return { month: m, mrr: Math.round(mrr * (0.55 + i * 0.09)) };
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - (5 - i));
+    return { month: monthNames[d.getMonth()], mrr: Math.round(mrr) };
   });
 
   return (
@@ -535,7 +538,10 @@ export default function OwnerAdmin() {
             <div className="oa-sub">Zentrale Steuerung der OmniFM Broadcast-Plattform</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span className="oa-onair"><span className="oa-dot" /> ON AIR 24/7</span>
+            <span className="oa-onair" data-testid="admin-live-badge" style={ov?.guilds?.live ? {} : { opacity: 0.75 }}>
+              <span className="oa-dot" style={{ background: ov?.guilds?.live ? '#10b981' : '#64748b' }} />
+              {ov?.guilds?.live ? 'ON AIR · LIVE' : `${ov?.bots?.online ?? 0}/${ov?.bots?.configured ?? 0} Bots · Standby`}
+            </span>
             <button className="oa-btn ghost" onClick={() => loadAll(token)} disabled={refreshing} data-testid="admin-refresh-button">
               <RefreshCw size={15} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} /> Aktualisieren
             </button>
@@ -560,8 +566,8 @@ export default function OwnerAdmin() {
                 foot={<span><b>{ov?.licenses?.seatsSold ?? 0}</b> Seats verkauft · {ov?.licenses?.expired ?? 0} abgelaufen</span>} />
               <StatTile testid="stat-mrr" label="MRR" value={fmtMoney(mrr)} icon={TrendingUp} accent="#10b981"
                 foot={<span className="oa-trend-up"><TrendingUp size={13} /> {fmtMoney(ov?.revenue?.arr)} ARR</span>} />
-              <StatTile testid="stat-guilds" label="Verwaltete Server" value={ov?.guilds?.managed ?? '—'} icon={Users} accent="#5865f2"
-                foot={<span>{ov?.bots?.configured ?? 0} Bots konfiguriert</span>} />
+              <StatTile testid="stat-guilds" label="Verwaltete Server" value={ov?.guilds?.managed ?? '—'} icon={Users} accent="#00e5ff"
+                foot={<span>{ov?.bots?.online ?? 0}/{ov?.bots?.configured ?? 0} Bots online{ov?.guilds?.live === false ? ' · Bot offline' : ''}</span>} />
               <StatTile testid="stat-stations" label="Radio-Stationen" value={ov?.stations?.total ?? '—'} icon={Music2} accent="#ff6b00"
                 foot={<span>{ov?.stations?.free ?? 0} Free · {ov?.stations?.pro ?? 0} Pro</span>} />
             </div>
