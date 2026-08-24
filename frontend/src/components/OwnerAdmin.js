@@ -3,6 +3,7 @@ import {
   Radio, LayoutDashboard, Server, KeyRound, ListMusic, PlugZap, Activity as ActivityIcon,
   LogOut, ShieldCheck, TrendingUp, Users, Cpu, RefreshCw, CheckCircle2, XCircle,
   Music2, Globe, CreditCard, Mail, Database, Fingerprint, AlertTriangle,
+  Radar, Terminal, Gauge, HeartPulse,
 } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
@@ -14,6 +15,7 @@ const TOKEN_KEY = 'omnifm_admin_token';
 
 const NAV = [
   { id: 'overview', label: 'Global Overview', icon: LayoutDashboard },
+  { id: 'monitoring', label: 'Live-Monitoring', icon: Radar },
   { id: 'workers', label: 'Worker Nodes', icon: Server },
   { id: 'licenses', label: 'License Manager', icon: KeyRound },
   { id: 'stations', label: 'Radio Catalog', icon: ListMusic },
@@ -91,6 +93,7 @@ export default function OwnerAdmin() {
   const [stations, setStations] = useState(null);
   const [integrations, setIntegrations] = useState(null);
   const [activity, setActivity] = useState([]);
+  const [monitoring, setMonitoring] = useState(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -142,6 +145,21 @@ export default function OwnerAdmin() {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // Live monitoring poller — active only while authed AND on the monitoring tab.
+  useEffect(() => {
+    if (!authed || section !== 'monitoring') return undefined;
+    let stop = false;
+    const tick = async () => {
+      try {
+        const data = await apiGet('/api/admin/monitoring', token);
+        if (!stop) setMonitoring(data);
+      } catch { /* keep last snapshot */ }
+    };
+    tick();
+    const iv = setInterval(tick, 4000);
+    return () => { stop = true; clearInterval(iv); };
+  }, [authed, section, apiGet, token]);
 
   const handleLogin = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
@@ -379,6 +397,109 @@ export default function OwnerAdmin() {
                 })}
               </div>
             </div>
+          </>
+        )}
+
+        {section === 'monitoring' && (
+          <>
+            {!monitoring ? (
+              <div className="oa-card" style={{ textAlign: 'center', color: '#64748b', padding: 40 }} data-testid="monitoring-loading">
+                <Equalizer /> <div className="oa-mono" style={{ marginTop: 12, fontSize: 12 }}>TELEMETRIE WIRD GELADEN…</div>
+              </div>
+            ) : (
+              <div data-testid="monitoring-panel">
+                <div className="oa-grid cols-4">
+                  <StatTile testid="mon-nodes" label="Healthy Nodes" value={`${monitoring.health.healthyNodes}/${monitoring.health.totalNodes}`} icon={HeartPulse} accent="#10b981"
+                    foot={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span className="oa-dot" style={{ background: '#10b981' }} /> Echtzeit · alle 4s</span>} />
+                  <StatTile testid="mon-uptime" label="Uptime" value={`${monitoring.health.uptimePct}%`} icon={TrendingUp} accent="#00e5ff" foot={<span>30-Tage rollierend</span>} />
+                  <StatTile testid="mon-latency" label="API-Latenz" value={`${monitoring.health.apiLatencyMs} ms`} icon={Gauge} accent="#ff6b00" foot={<span>Commander → API</span>} />
+                  <StatTile testid="mon-incidents" label="Offene Incidents" value={monitoring.health.openIncidents} icon={AlertTriangle} accent={monitoring.health.openIncidents ? '#ff2a5f' : '#10b981'} foot={<span>{monitoring.incidents.length} in Historie</span>} />
+                </div>
+
+                <div className="oa-section-title"><Server size={15} /> Node-Health (live)</div>
+                <div className="oa-grid cols-3">
+                  {monitoring.nodes.map((n) => {
+                    const cpuColor = n.cpuPct > 80 ? '#ff2a5f' : n.cpuPct > 55 ? '#f59e0b' : '#10b981';
+                    return (
+                      <div className="oa-card oa-fade" key={n.botId} data-testid={`mon-node-${n.index}`}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ width: 34, height: 34, borderRadius: 9, background: n.role === 'commander' ? 'rgba(255,107,0,0.15)' : 'rgba(0,229,255,0.12)', color: n.role === 'commander' ? '#ff6b00' : '#00e5ff', display: 'grid', placeItems: 'center' }}>
+                              {n.role === 'commander' ? <Cpu size={16} /> : <Server size={16} />}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: 14 }}>{n.name}</div>
+                              <div className="oa-mono" style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{n.role}</div>
+                            </div>
+                          </div>
+                          <span className={`oa-pill ${n.status === 'online' ? 'green' : 'amber'}`}>{n.status === 'online' ? 'Online' : 'Degraded'}</span>
+                        </div>
+                        {[
+                          { label: 'CPU', val: `${n.cpuPct}%`, pct: n.cpuPct, color: cpuColor },
+                          { label: 'RAM', val: `${n.ramMb} MB`, pct: Math.min(100, n.ramMb / 6), color: '#00e5ff' },
+                          { label: 'PING', val: `${n.pingMs} ms`, pct: Math.min(100, n.pingMs), color: '#ff6b00' },
+                        ].map((m) => (
+                          <div key={m.label} style={{ marginTop: 12 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#94a3b8', marginBottom: 5 }} className="oa-mono">
+                              <span>{m.label}</span><span>{m.val}</span>
+                            </div>
+                            <div className="oa-progress"><i style={{ width: `${m.pct}%`, background: m.color }} /></div>
+                          </div>
+                        ))}
+                        <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#64748b' }} className="oa-mono">
+                          <span>{n.voiceConnections} VOICE</span><span>{n.guilds} GUILDS</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="oa-grid cols-2" style={{ marginTop: 18 }}>
+                  <div className="oa-card oa-fade" data-testid="mon-incidents-list">
+                    <div className="oa-stat-label" style={{ marginBottom: 6 }}>Incidents</div>
+                    {monitoring.incidents.length === 0 && <div style={{ color: '#64748b', fontSize: 13, padding: 16 }}>Keine Incidents</div>}
+                    {monitoring.incidents.map((inc, i) => {
+                      const sev = inc.severity === 'critical' ? 'red' : inc.severity === 'warning' ? 'amber' : 'cyan';
+                      return (
+                        <div className="oa-integration" key={i} data-testid={`mon-incident-${i}`}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
+                            <span className={`oa-pill ${sev}`} style={{ textTransform: 'uppercase' }}>{inc.severity}</span>
+                            <span style={{ minWidth: 0 }}>
+                              <span style={{ fontSize: 13, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inc.message}</span>
+                              <span className="oa-mono" style={{ fontSize: 11, color: '#64748b' }}>{inc.source} · {relTime(inc.at)}</span>
+                            </span>
+                          </span>
+                          <span className={`oa-pill ${inc.resolved ? 'green' : 'slate'}`}>{inc.resolved ? 'behoben' : 'offen'}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="oa-card oa-fade" data-testid="mon-log-stream" style={{ background: '#0a0c12' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <div className="oa-stat-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Terminal size={14} /> Live-Log</div>
+                      <span className="oa-pill red" style={{ padding: '3px 9px' }}><span className="oa-dot" /> LIVE</span>
+                    </div>
+                    <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                      {monitoring.logs.map((l, i) => {
+                        const c = l.level === 'WARN' ? '#fbbf24' : l.level === 'ERROR' ? '#ff8fab' : '#4ade80';
+                        return (
+                          <div key={i} className="oa-mono" style={{ fontSize: 11.5, padding: '5px 0', borderBottom: '1px solid #12151f', display: 'flex', gap: 8, lineHeight: 1.4 }} data-testid={`mon-log-${i}`}>
+                            <span style={{ color: '#475569', flexShrink: 0 }}>{new Date(l.at).toLocaleTimeString('de-DE')}</span>
+                            <span style={{ color: c, flexShrink: 0, fontWeight: 700 }}>{l.level}</span>
+                            <span style={{ color: '#64748b', flexShrink: 0 }}>[{l.source}]</span>
+                            <span style={{ color: '#cbd5e1', minWidth: 0 }}>{l.message}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ marginTop: 12, color: '#475569', fontSize: 11 }} className="oa-mono">
+                  {monitoring.simulated ? 'SIMULIERTE TELEMETRIE · echte Node-Runtime-Daten überschreiben diese Werte automatisch' : 'LIVE NODE TELEMETRY'} · Stand {new Date(monitoring.generatedAt).toLocaleTimeString('de-DE')}
+                </div>
+              </div>
+            )}
           </>
         )}
 

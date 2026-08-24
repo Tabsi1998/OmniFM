@@ -56,7 +56,7 @@ function Navbar({ page = 'home' }) {
           color: '#fff',
         }}
       >
-        <Radio size={22} color="#00F0FF" />
+        <Radio size={22} color="#ff6b00" />
         <span
           style={{
             fontFamily: "'Orbitron', sans-serif",
@@ -65,7 +65,7 @@ function Navbar({ page = 'home' }) {
             letterSpacing: '0.05em',
           }}
         >
-          OMNI<span style={{ color: '#00F0FF' }}>FM</span>
+          OMNI<span style={{ color: '#ff6b00' }}>FM</span>
         </span>
       </a>
 
@@ -138,15 +138,15 @@ function Navbar({ page = 'home' }) {
             transition: 'border-color 0.2s, background 0.2s',
           }}
           onMouseEnter={(event) => {
-            event.currentTarget.style.borderColor = 'rgba(0,240,255,0.4)';
-            event.currentTarget.style.background = 'rgba(0,240,255,0.08)';
+            event.currentTarget.style.borderColor = 'rgba(255,107,0,0.4)';
+            event.currentTarget.style.background = 'rgba(255,107,0,0.08)';
           }}
           onMouseLeave={(event) => {
             event.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)';
             event.currentTarget.style.background = 'rgba(255,255,255,0.04)';
           }}
         >
-          <Globe size={14} color="#00F0FF" />
+          <Globe size={14} color="#ff6b00" />
           {localeMeta.label} / {localeMeta.switchLabel}
         </button>
 
@@ -267,7 +267,7 @@ function Navbar({ page = 'home' }) {
               cursor: 'pointer',
             }}
           >
-            <Globe size={16} color="#00F0FF" />
+            <Globe size={16} color="#ff6b00" />
             {copy.navbar.language}: {localeMeta.switchLabel}
           </button>
 
