@@ -35,6 +35,17 @@ const NAV = [
 
 const PLAN_COLORS = { free: '#64748b', pro: '#00e5ff', ultimate: '#ff6b00' };
 
+// Browser-Abspielbarkeit pro Sender cachen, damit der 120-Sender-Check nicht
+// jedes Mal alles neu ~2 Min probt. Key + URL + Zeitstempel; 24h gültig.
+const BROWSER_CACHE_KEY = 'omnifm_browser_playable_v1';
+const BROWSER_CACHE_TTL = 24 * 3600 * 1000;
+function readBrowserCache() {
+  try { return JSON.parse(window.localStorage.getItem(BROWSER_CACHE_KEY) || '{}') || {}; } catch { return {}; }
+}
+function writeBrowserCache(cache) {
+  try { window.localStorage.setItem(BROWSER_CACHE_KEY, JSON.stringify(cache)); } catch { /* noop */ }
+}
+
 function Equalizer() {
   return (
     <span className="oa-eq" aria-hidden="true">
@@ -59,6 +70,16 @@ function relTime(v) {
   if (d < 3600) return `vor ${Math.floor(d / 60)} Min`;
   if (d < 86400) return `vor ${Math.floor(d / 3600)} Std`;
   return `vor ${Math.floor(d / 86400)} Tagen`;
+}
+
+function fmtUptime(sec) {
+  const s = Math.max(0, Math.round(sec || 0));
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
 }
 
 function StatTile({ label, value, foot, icon: Icon, accent = '#ff6b00', testid }) {
@@ -115,6 +136,10 @@ export default function OwnerAdmin() {
   const [stHealthProg, setStHealthProg] = useState(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [licQuery, setLicQuery] = useState('');
+  const [licForm, setLicForm] = useState(null);
+  const [licBusy, setLicBusy] = useState(false);
+  const [licMsg, setLicMsg] = useState(null);
 
   const apiGet = useCallback(async (path, tk) => {
     const res = await fetch(buildApiUrl(path), { headers: { 'X-Admin-Token': tk || token }, cache: 'no-store' });
@@ -149,13 +174,62 @@ export default function OwnerAdmin() {
     try { const d = await apiGet('/api/admin/audit', token); setAuditLog(d.audit || []); } catch { /* keep */ }
   }, [apiGet, token]);
 
+  const loadLicenses = useCallback(async () => {
+    try { const d = await apiGet('/api/admin/licenses?full=1', token); setLicenses(d.licenses || []); } catch { /* keep */ }
+  }, [apiGet, token]);
+
+  const openNewLicense = () => { setLicMsg(null); setLicForm({ _isNew: true, email: '', tier: 'pro', months: 1, seats: 1, note: '', serverId: '' }); };
+  const openEditLicense = (l, keepMsg = false) => {
+    if (!keepMsg) setLicMsg(null);
+    setLicForm({
+      _isNew: false,
+      licenseKey: l.licenseKey || l.id,
+      email: l.email || '',
+      tier: l.plan === 'ultimate' ? 'ultimate' : 'pro',
+      seats: l.seats || 1,
+      note: l.note || '',
+      expiresAt: l.expiresAt ? String(l.expiresAt).slice(0, 10) : '',
+      linkedServerIds: l.linkedServerIds || [],
+      newGuild: '',
+      _daysLeft: l.daysLeft,
+      _expired: l.expired,
+    });
+  };
+  const closeLicForm = () => { setLicForm(null); setLicMsg(null); };
+
+  const createLicense = async () => {
+    setLicBusy(true); setLicMsg(null);
+    try {
+      await apiSend('/api/admin/licenses', 'POST', { email: licForm.email, tier: licForm.tier, months: Number(licForm.months) || 1, seats: Number(licForm.seats) || 1, note: licForm.note, guildId: licForm.serverId });
+      setLicMsg({ ok: true, text: 'Lizenz erstellt.' }); setLicForm(null); await loadLicenses();
+    } catch (e) { setLicMsg({ ok: false, text: e.message }); } finally { setLicBusy(false); }
+  };
+
+  const patchLicense = async (patch, note) => {
+    if (!licForm || !licForm.licenseKey) return;
+    setLicBusy(true); setLicMsg(null);
+    try {
+      const d = await apiSend(`/api/admin/licenses/${encodeURIComponent(licForm.licenseKey)}`, 'PATCH', patch);
+      if (d.license) openEditLicense(d.license, true);
+      setLicMsg({ ok: true, text: note || 'Gespeichert.' });
+      await loadLicenses();
+    } catch (e) { setLicMsg({ ok: false, text: e.message }); } finally { setLicBusy(false); }
+  };
+
+  const deleteLicense = async (key) => {
+    if (typeof window !== 'undefined' && !window.confirm('Diese Lizenz wirklich unwiderruflich löschen?')) return;
+    setLicBusy(true); setLicMsg(null);
+    try { await apiSend(`/api/admin/licenses/${encodeURIComponent(key)}`, 'DELETE'); setLicMsg({ ok: true, text: 'Lizenz gelöscht.' }); setLicForm(null); await loadLicenses(); }
+    catch (e) { setLicMsg({ ok: false, text: e.message }); } finally { setLicBusy(false); }
+  };
+
   const loadAll = useCallback(async (tk) => {
     setRefreshing(true);
     try {
       const [ov, wk, lic, st, integ, act] = await Promise.allSettled([
         apiGet('/api/admin/overview', tk),
         apiGet('/api/admin/workers', tk),
-        apiGet('/api/admin/licenses', tk),
+        apiGet('/api/admin/licenses?full=1', tk),
         apiGet('/api/admin/stations', tk),
         apiGet('/api/admin/integrations', tk),
         apiGet('/api/admin/activity', tk),
@@ -302,9 +376,22 @@ export default function OwnerAdmin() {
         // eslint-disable-next-line no-await-in-loop
         const r = await apiSend('/api/admin/stations/health', 'POST', { keys: batch });
         const serverResults = r.results || {};
-        // 2) Browser-Probe (nur für serverseitig erreichbare Sender).
+        // 2) Browser-Probe (nur für erreichbare Sender) – mit 24h-Cache.
+        const cache = readBrowserCache();
+        const nowMs = Date.now();
+        const reachableItems = batch.filter((k) => serverResults[k] && serverResults[k].reachable).map((k) => ({ key: k, url: urlByKey[k] }));
+        const cachedFlags = {};
+        const toProbe = [];
+        reachableItems.forEach((it) => {
+          const c = cache[it.key];
+          if (c && (nowMs - c.at) < BROWSER_CACHE_TTL && c.url === it.url) cachedFlags[it.key] = c.ok;
+          else toProbe.push(it);
+        });
         // eslint-disable-next-line no-await-in-loop
-        const browserFlags = await probeBrowserBatch(batch.filter((k) => serverResults[k] && serverResults[k].reachable).map((k) => ({ key: k, url: urlByKey[k] })));
+        const probed = await probeBrowserBatch(toProbe);
+        Object.entries(probed).forEach(([k, ok]) => { cache[k] = { ok, at: nowMs, url: urlByKey[k] }; });
+        writeBrowserCache(cache);
+        const browserFlags = { ...cachedFlags, ...probed };
         const merged = {};
         batch.forEach((k) => {
           const sr = serverResults[k] || { reachable: false, discordOk: false, ok: false };
@@ -563,13 +650,34 @@ export default function OwnerAdmin() {
               <div className="oa-card" style={{ textAlign: 'center', color: '#64748b', padding: 40 }} data-testid="monitoring-loading">
                 <Equalizer /> <div className="oa-mono" style={{ marginTop: 12, fontSize: 12 }}>TELEMETRIE WIRD GELADEN…</div>
               </div>
+            ) : monitoring.waiting ? (
+              <div className="oa-card oa-fade" style={{ textAlign: 'center', padding: 48 }} data-testid="monitoring-waiting">
+                <div style={{ width: 56, height: 56, borderRadius: 16, margin: '0 auto 18px', display: 'grid', placeItems: 'center', background: 'rgba(245,158,11,0.14)', color: '#f59e0b' }}><Radar size={26} /></div>
+                <div style={{ fontWeight: 800, fontSize: 18, fontFamily: "'Syne','Outfit',sans-serif", marginBottom: 10 }}>Warte auf Live-Daten vom Bot</div>
+                <div style={{ color: '#94a3b8', fontSize: 14, maxWidth: 560, margin: '0 auto', lineHeight: 1.6 }}>{monitoring.message}</div>
+                <div className="oa-mono" style={{ marginTop: 18, fontSize: 11, color: '#475569' }}>MongoDB: {monitoring.health?.mongo ? 'verbunden' : 'nicht verbunden'} · keine Fake-Werte</div>
+              </div>
             ) : (
               <div data-testid="monitoring-panel">
+                {(() => {
+                  const live = monitoring.live;
+                  const sim = monitoring.simulated;
+                  const bg = live ? 'rgba(16,185,129,0.12)' : sim ? 'rgba(245,158,11,0.12)' : 'rgba(100,116,139,0.12)';
+                  const bd = live ? 'rgba(16,185,129,0.4)' : sim ? 'rgba(245,158,11,0.4)' : '#2a3450';
+                  const col = live ? '#4ade80' : sim ? '#fbbf24' : '#94a3b8';
+                  const label = live ? 'LIVE · echte Node-Telemetrie' : sim ? 'DEMO · simulierte Werte (SEED_DEMO_DATA)' : 'KEINE LIVE-DATEN';
+                  return (
+                    <div data-testid="monitoring-banner" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: bg, border: `1px solid ${bd}`, color: col, fontSize: 12.5, fontWeight: 700, marginBottom: 16, fontFamily: "'JetBrains Mono',monospace" }}>
+                      <span className="oa-dot" style={{ background: col }} /> {label}
+                      {monitoring.process && <span style={{ marginLeft: 'auto', color: '#64748b', fontWeight: 500 }}>Prozess: 1 Node · CPU/RAM geteilt · {monitoring.process.cores} Cores · Node {monitoring.process.nodeVersion || ''}</span>}
+                    </div>
+                  );
+                })()}
                 <div className="oa-grid cols-4">
                   <StatTile testid="mon-nodes" label="Healthy Nodes" value={`${monitoring.health.healthyNodes}/${monitoring.health.totalNodes}`} icon={HeartPulse} accent="#10b981"
-                    foot={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span className="oa-dot" style={{ background: '#10b981' }} /> Echtzeit · alle 4s</span>} />
-                  <StatTile testid="mon-uptime" label="Uptime" value={`${monitoring.health.uptimePct}%`} icon={TrendingUp} accent="#00e5ff" foot={<span>30-Tage rollierend</span>} />
-                  <StatTile testid="mon-latency" label="API-Latenz" value={`${monitoring.health.apiLatencyMs} ms`} icon={Gauge} accent="#ff6b00" foot={<span>Commander → API</span>} />
+                    foot={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span className="oa-dot" style={{ background: '#10b981' }} /> Echtzeit · alle 5s</span>} />
+                  <StatTile testid="mon-uptime" label={monitoring.live ? 'Prozess-Uptime' : 'Uptime'} value={monitoring.live ? fmtUptime(monitoring.health.uptimeSec) : `${monitoring.health.uptimePct}%`} icon={TrendingUp} accent="#00e5ff" foot={<span>{monitoring.live ? 'seit letztem Start' : '30-Tage rollierend'}</span>} />
+                  <StatTile testid="mon-latency" label={monitoring.live ? 'RAM (Prozess)' : 'API-Latenz'} value={monitoring.live ? `${monitoring.process?.ramMb || 0} MB` : `${monitoring.health.apiLatencyMs} ms`} icon={Gauge} accent="#ff6b00" foot={<span>{monitoring.live ? 'geteilt für alle Bots' : 'Commander → API'}</span>} />
                   <StatTile testid="mon-incidents" label="Offene Incidents" value={monitoring.health.openIncidents} icon={AlertTriangle} accent={monitoring.health.openIncidents ? '#ff2a5f' : '#10b981'} foot={<span>{monitoring.incidents.length} in Historie</span>} />
                 </div>
 
@@ -589,12 +697,12 @@ export default function OwnerAdmin() {
                               <div className="oa-mono" style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{n.role}</div>
                             </div>
                           </div>
-                          <span className={`oa-pill ${n.status === 'online' ? 'green' : 'amber'}`}>{n.status === 'online' ? 'Online' : 'Degraded'}</span>
+                          <span className={`oa-pill ${n.status === 'online' ? 'green' : n.status === 'offline' ? 'red' : 'amber'}`}>{n.status === 'online' ? 'Online' : n.status === 'offline' ? 'Offline' : 'Degraded'}</span>
                         </div>
                         {[
-                          { label: 'CPU', val: `${n.cpuPct}%`, pct: n.cpuPct, color: cpuColor },
-                          { label: 'RAM', val: `${n.ramMb} MB`, pct: Math.min(100, n.ramMb / 6), color: '#00e5ff' },
-                          { label: 'PING', val: `${n.pingMs} ms`, pct: Math.min(100, n.pingMs), color: '#ff6b00' },
+                          { label: 'CPU', val: `${n.cpuPct || 0}%`, pct: n.cpuPct || 0, color: cpuColor },
+                          { label: 'RAM', val: `${n.ramMb || 0} MB`, pct: Math.min(100, (n.ramMb || 0) / 6), color: '#00e5ff' },
+                          { label: 'PING', val: n.pingMs == null ? '—' : `${n.pingMs} ms`, pct: Math.min(100, n.pingMs || 0), color: '#ff6b00' },
                         ].map((m) => (
                           <div key={m.label} style={{ marginTop: 12 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#94a3b8', marginBottom: 5 }} className="oa-mono">
@@ -695,30 +803,162 @@ export default function OwnerAdmin() {
         )}
 
         {section === 'licenses' && (
-          <div className="oa-table-wrap oa-fade" data-testid="licenses-table">
-            <table className="oa-table">
-              <thead>
-                <tr>
-                  <th>Lizenz-ID</th><th>Plan</th><th>Seats</th><th>Kontakt</th><th>Quelle</th><th>Läuft ab</th><th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {licenses.length === 0 && (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', color: '#64748b', padding: 28 }}>Keine Lizenzen vorhanden</td></tr>
+          <div className="oa-fade" data-testid="license-manager">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', flex: '1 1 260px', maxWidth: 420 }}>
+                <input
+                  className="oa-input"
+                  placeholder="Suche: Lizenz-ID (GUID), E-Mail oder Server-ID…"
+                  value={licQuery}
+                  onChange={(e) => setLicQuery(e.target.value)}
+                  data-testid="license-search"
+                />
+              </div>
+              <button className="oa-btn primary" style={{ height: 42 }} onClick={openNewLicense} data-testid="license-create-button"><Plus size={16} /> Lizenz erstellen</button>
+            </div>
+
+            {licMsg && (
+              <div className={`oa-pill ${licMsg.ok ? 'green' : 'red'}`} style={{ marginBottom: 14 }} data-testid="license-message">
+                {licMsg.ok ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />} {licMsg.text}
+              </div>
+            )}
+
+            {licForm && (
+              <div className="oa-card oa-fade" style={{ marginBottom: 18, borderColor: 'rgba(0,229,255,0.35)' }} data-testid="license-form">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontFamily: "'Syne','Outfit',sans-serif", fontSize: 17 }}>
+                    {licForm._isNew ? 'Neue Lizenz' : <>Lizenz bearbeiten · <span className="oa-mono" style={{ fontSize: 13, color: '#00e5ff' }}>{licForm.licenseKey}</span></>}
+                  </div>
+                  <button className="oa-btn ghost" style={{ height: 34, padding: '0 12px' }} onClick={closeLicForm} data-testid="license-form-close"><CloseIcon size={15} /></button>
+                </div>
+
+                <div className="oa-grid cols-2" style={{ gap: 14 }}>
+                  <div>
+                    <label className="oa-stat-label">E-Mail (Kontakt)</label>
+                    <input className="oa-input" style={{ marginTop: 6 }} value={licForm.email} placeholder="kunde@example.com" onChange={(e) => setLicForm({ ...licForm, email: e.target.value })} data-testid="license-input-email" />
+                  </div>
+                  <div>
+                    <label className="oa-stat-label">Plan / Tier</label>
+                    <select className="oa-input" style={{ marginTop: 6 }} value={licForm.tier} onChange={(e) => setLicForm({ ...licForm, tier: e.target.value })} data-testid="license-input-tier">
+                      <option value="pro">Pro</option>
+                      <option value="ultimate">Ultimate</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="oa-stat-label">Seats (1–5)</label>
+                    <input className="oa-input" type="number" min={1} max={5} style={{ marginTop: 6 }} value={licForm.seats} onChange={(e) => setLicForm({ ...licForm, seats: e.target.value })} data-testid="license-input-seats" />
+                  </div>
+                  {licForm._isNew ? (
+                    <div>
+                      <label className="oa-stat-label">Laufzeit (Monate)</label>
+                      <input className="oa-input" type="number" min={1} max={60} style={{ marginTop: 6 }} value={licForm.months} onChange={(e) => setLicForm({ ...licForm, months: e.target.value })} data-testid="license-input-months" />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="oa-stat-label">Läuft ab (Datum)</label>
+                      <input className="oa-input" type="date" style={{ marginTop: 6 }} value={licForm.expiresAt} onChange={(e) => setLicForm({ ...licForm, expiresAt: e.target.value })} data-testid="license-input-expiry" />
+                    </div>
+                  )}
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label className="oa-stat-label">Notiz</label>
+                    <input className="oa-input" style={{ marginTop: 6 }} value={licForm.note} placeholder="interne Notiz" onChange={(e) => setLicForm({ ...licForm, note: e.target.value })} data-testid="license-input-note" />
+                  </div>
+                  {licForm._isNew && (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label className="oa-stat-label">Server-ID verknüpfen (optional)</label>
+                      <input className="oa-input oa-mono" style={{ marginTop: 6 }} value={licForm.serverId} placeholder="Discord Guild-ID" onChange={(e) => setLicForm({ ...licForm, serverId: e.target.value })} data-testid="license-input-guild" />
+                    </div>
+                  )}
+                </div>
+
+                {licForm._isNew ? (
+                  <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
+                    <button className="oa-btn primary" style={{ height: 40 }} disabled={licBusy} onClick={createLicense} data-testid="license-save-new"><Save size={15} /> Lizenz erstellen</button>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ marginTop: 16, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      <button className="oa-btn primary" style={{ height: 40 }} disabled={licBusy} onClick={() => patchLicense({ email: licForm.email, tier: licForm.tier, seats: Number(licForm.seats) || 1, note: licForm.note, expiresAt: licForm.expiresAt || undefined }, 'Änderungen gespeichert.')} data-testid="license-save-edit"><Save size={15} /> Speichern</button>
+                    </div>
+
+                    <div style={{ marginTop: 18 }}>
+                      <label className="oa-stat-label">Schnell verlängern / verkürzen</label>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                        <button className="oa-btn ghost" style={{ height: 36 }} disabled={licBusy} onClick={() => patchLicense({ extendMonths: 1 }, '+1 Monat')} data-testid="license-extend-1m">+1 Monat</button>
+                        <button className="oa-btn ghost" style={{ height: 36 }} disabled={licBusy} onClick={() => patchLicense({ extendMonths: 3 }, '+3 Monate')} data-testid="license-extend-3m">+3 Monate</button>
+                        <button className="oa-btn ghost" style={{ height: 36 }} disabled={licBusy} onClick={() => patchLicense({ extendMonths: 12 }, '+12 Monate')} data-testid="license-extend-12m">+12 Monate</button>
+                        <button className="oa-btn ghost" style={{ height: 36 }} disabled={licBusy} onClick={() => patchLicense({ extendMonths: -1 }, '−1 Monat')} data-testid="license-shorten-1m">−1 Monat</button>
+                        <button className="oa-btn ghost" style={{ height: 36, color: '#ff8fab', borderColor: 'rgba(255,42,95,0.4)' }} disabled={licBusy} onClick={() => patchLicense({ expireNow: true }, 'Sofort deaktiviert (abgelaufen)')} data-testid="license-expire-now">Sofort deaktivieren</button>
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: 18 }}>
+                      <label className="oa-stat-label">Verknüpfte Server ({(licForm.linkedServerIds || []).length})</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '8px 0' }}>
+                        {(licForm.linkedServerIds || []).length === 0 && <span style={{ color: '#64748b', fontSize: 13 }}>Keine Server verknüpft</span>}
+                        {(licForm.linkedServerIds || []).map((sid) => (
+                          <span key={sid} className="oa-pill slate oa-mono" style={{ padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            {sid}
+                            <button style={{ background: 'none', border: 'none', color: '#ff8fab', cursor: 'pointer', padding: 0, lineHeight: 0 }} disabled={licBusy} onClick={() => patchLicense({ removeServerId: sid }, 'Server entfernt')} data-testid={`license-guild-remove-${sid}`}><CloseIcon size={13} /></button>
+                          </span>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input className="oa-input oa-mono" style={{ maxWidth: 260 }} placeholder="Discord Guild-ID hinzufügen" value={licForm.newGuild} onChange={(e) => setLicForm({ ...licForm, newGuild: e.target.value })} data-testid="license-guild-input" />
+                        <button className="oa-btn ghost" style={{ height: 42 }} disabled={licBusy || !licForm.newGuild} onClick={() => patchLicense({ addServerId: licForm.newGuild }, 'Server verknüpft')} data-testid="license-guild-add"><Plus size={15} /> Verknüpfen</button>
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #1a1f2e' }}>
+                      <button className="oa-btn ghost" style={{ height: 40, color: '#ff8fab', borderColor: 'rgba(255,42,95,0.4)' }} disabled={licBusy} onClick={() => deleteLicense(licForm.licenseKey)} data-testid="license-delete"><Trash2 size={15} /> Lizenz löschen</button>
+                    </div>
+                  </>
                 )}
-                {licenses.map((l) => (
-                  <tr key={l.id} data-testid={`license-row-${l.id}`}>
-                    <td className="oa-mono" style={{ fontSize: 12 }}>{l.id}</td>
-                    <td><span className={`oa-pill ${l.plan === 'ultimate' ? 'orange' : l.plan === 'pro' ? 'cyan' : 'slate'}`}>{l.planName}</span></td>
-                    <td>{l.seatsUsed}/{l.seats}</td>
-                    <td style={{ color: '#94a3b8' }}>{l.contactEmail || '—'}</td>
-                    <td className="oa-mono" style={{ fontSize: 12, color: '#94a3b8' }}>{l.source}</td>
-                    <td style={{ color: '#94a3b8' }}>{fmtDate(l.expiresAt)}{typeof l.daysLeft === 'number' && !l.expired && <span style={{ color: l.daysLeft <= 7 ? '#fbbf24' : '#64748b', marginLeft: 6, fontSize: 11 }}>({l.daysLeft}d)</span>}</td>
-                    <td><span className={`oa-pill ${l.expired ? 'red' : l.active ? 'green' : 'slate'}`}>{l.expired ? 'Abgelaufen' : l.active ? 'Aktiv' : 'Inaktiv'}</span></td>
+              </div>
+            )}
+
+            <div className="oa-table-wrap" data-testid="licenses-table">
+              <table className="oa-table">
+                <thead>
+                  <tr>
+                    <th>Lizenz-ID (GUID)</th><th>Plan</th><th>Seats</th><th>Kontakt</th><th>Server</th><th>Läuft ab</th><th>Status</th><th></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const q = licQuery.trim().toLowerCase();
+                    const rows = (licenses || []).filter((l) => {
+                      if (!q) return true;
+                      const key = String(l.licenseKey || l.id || '').toLowerCase();
+                      const email = String(l.email || l.contactEmail || '').toLowerCase();
+                      const guilds = (l.linkedServerIds || []).join(' ').toLowerCase();
+                      return key.includes(q) || email.includes(q) || guilds.includes(q);
+                    });
+                    if (rows.length === 0) {
+                      return <tr><td colSpan={8} style={{ textAlign: 'center', color: '#64748b', padding: 28 }}>{licQuery ? 'Keine Treffer' : 'Keine Lizenzen vorhanden'}</td></tr>;
+                    }
+                    return rows.map((l) => {
+                      const key = l.licenseKey || l.id;
+                      return (
+                        <tr key={key} data-testid={`license-row-${key}`}>
+                          <td className="oa-mono" style={{ fontSize: 12 }}>{key}</td>
+                          <td><span className={`oa-pill ${l.plan === 'ultimate' ? 'orange' : l.plan === 'pro' ? 'cyan' : 'slate'}`}>{l.planName}</span></td>
+                          <td>{l.seatsUsed}/{l.seats}</td>
+                          <td style={{ color: '#94a3b8' }}>{l.email || l.contactEmail || '—'}</td>
+                          <td style={{ color: '#94a3b8' }}>{(l.linkedServerIds || []).length}</td>
+                          <td style={{ color: '#94a3b8' }}>{fmtDate(l.expiresAt)}{typeof l.daysLeft === 'number' && !l.expired && <span style={{ color: l.daysLeft <= 7 ? '#fbbf24' : '#64748b', marginLeft: 6, fontSize: 11 }}>({l.daysLeft}d)</span>}</td>
+                          <td><span className={`oa-pill ${l.expired ? 'red' : l.active ? 'green' : 'slate'}`}>{l.expired ? 'Abgelaufen' : l.active ? 'Aktiv' : 'Inaktiv'}</span></td>
+                          <td style={{ display: 'flex', gap: 6 }}>
+                            <button className="oa-btn ghost" style={{ height: 32, padding: '0 10px' }} onClick={() => openEditLicense(l)} data-testid={`license-edit-${key}`}><Pencil size={13} /></button>
+                            <button className="oa-btn ghost" style={{ height: 32, padding: '0 10px', color: '#ff8fab' }} onClick={() => deleteLicense(key)} data-testid={`license-delete-${key}`}><Trash2 size={13} /></button>
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -734,6 +974,7 @@ export default function OwnerAdmin() {
               <div className="oa-section-title" style={{ margin: 0 }}><ListMusic size={15} /> Katalog verwalten ({stationList.length})</div>
               <div style={{ display: 'flex', gap: 10 }}>
                 <button className="oa-btn ghost" style={{ height: 40 }} disabled={stHealthBusy || !stationList.length} onClick={() => checkStationHealth()} data-testid="station-check-all-button"><SignalHigh size={16} /> {stHealthBusy ? `Prüfe… ${stHealthProg ? `${stHealthProg.done}/${stHealthProg.total}` : ''}` : 'Live-Status prüfen'}</button>
+                <button className="oa-btn ghost" style={{ height: 40 }} disabled={stHealthBusy} title="Browser-Playability-Cache leeren (erzwingt neue Prüfung)" onClick={() => { writeBrowserCache({}); setStMsg({ ok: true, text: 'Browser-Cache geleert – nächste Prüfung testet alle Sender neu.' }); }} data-testid="station-cache-clear-button"><RefreshCw size={15} /></button>
                 <button className="oa-btn primary" style={{ height: 40 }} onClick={openNewStation} data-testid="station-add-button"><Plus size={16} /> Station hinzufügen</button>
               </div>
             </div>

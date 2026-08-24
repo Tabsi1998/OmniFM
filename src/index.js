@@ -25,6 +25,7 @@ import { loadBotConfigs } from "./bot-config.js";
 import { BotRuntime } from "./bot/runtime.js";
 import { WorkerManager } from "./bot/worker-manager.js";
 import { startWebServer } from "./api/server.js";
+import { startRuntimeHealthReporter } from "./services/runtime-health-reporter.js";
 import { loadStations, initStationsStore } from "./stations-store.js";
 import { installOperatorIncidentRecorder, logRecentOperatorIncidentSummary } from "./operator-incidents-store.js";
 import {
@@ -215,6 +216,11 @@ for (const runtime of startedRuntimes) {
 
 // ---- Web Server ----
 const webServer = startWebServer(runtimes);
+
+// ---- Runtime Health Reporter (echte Metriken -> MongoDB fuer Owner-Dashboard) ----
+startRuntimeHealthReporter(runtimes, {
+  intervalMs: parseInt(process.env.RUNTIME_HEALTH_INTERVAL_MS || "5000", 10),
+});
 
 // ---- DiscordBotList Sync ----
 const discordBotListEnabled = isDiscordBotListEnabled(runtimes);

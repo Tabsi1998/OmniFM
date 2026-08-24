@@ -3952,13 +3952,215 @@ async def admin_overview(request: Request):
     }
 
 
+def _admin_license_rows(state):
+    """Wie _license_rows, aber mit vollständigen Daten für die Owner-Verwaltung
+    (unmaskierte E-Mail + Lizenz-Key/GUID, damit man gezielt suchen/bearbeiten kann)."""
+    rows = []
+    licenses = (state or {}).get("licenses", {}) or {}
+    for lid, lic in licenses.items():
+        if not isinstance(lic, dict):
+            continue
+        plan = str(lic.get("plan") or lic.get("tier") or "free").lower()
+        seats = max(1, parse_int(lic.get("seats", 1), 1))
+        try:
+            days_left = remaining_days(lic)
+        except Exception:
+            days_left = None
+        try:
+            expired = bool(is_expired(lic))
+        except Exception:
+            expired = False
+        active = bool(lic.get("active", True)) and not expired
+        linked = lic.get("linkedServerIds") or []
+        if not isinstance(linked, list):
+            linked = []
+        rows.append({
+            "licenseKey": str(lid),
+            "id": str(lic.get("id") or lid),
+            "plan": plan,
+            "planName": (TIERS.get(plan) or {}).get("name", plan.title()),
+            "seats": seats,
+            "seatsUsed": len(linked),
+            "active": active,
+            "expired": expired,
+            "daysLeft": days_left,
+            "expiresAt": lic.get("expiresAt"),
+            "activatedAt": lic.get("activatedAt"),
+            "createdAt": lic.get("createdAt") or lic.get("issuedAt") or lic.get("activatedAt"),
+            "durationMonths": lic.get("durationMonths"),
+            "source": lic.get("source") or lic.get("activatedBy") or "manual",
+            "email": str(lic.get("contactEmail") or lic.get("email") or ""),
+            "note": str(lic.get("note") or ""),
+            "linkedServerIds": [str(s) for s in linked][:50],
+        })
+    rows.sort(key=lambda r: str(r.get("createdAt") or ""), reverse=True)
+    return rows
+
+
+def _parse_iso_dt(value):
+    if not value:
+        return None
+    try:
+        s = str(value).replace("Z", "+00:00")
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except Exception:
+        return None
+
+
 @app.get("/api/admin/licenses")
 async def admin_licenses(request: Request):
     guard = _admin_guard(request)
     if guard is not None:
         return guard
-    rows = _license_rows(load_premium())
+    full = request.query_params.get("full", "0") == "1"
+    if full:
+        rows = _admin_license_rows(load_premium())
+    else:
+        rows = _license_rows(load_premium())
     return {"licenses": rows, "count": len(rows)}
+
+
+@app.post("/api/admin/licenses")
+async def admin_create_license(request: Request, body: dict = None):
+    guard = _admin_guard(request)
+    if guard is not None:
+        return guard
+    if db is None:
+        return json_error(503, "Keine Datenbank verbunden.")
+    body = body or {}
+    email = str(body.get("email") or "").strip()
+    tier = str(body.get("tier") or "pro").strip().lower()
+    months = parse_int(body.get("months", 1), 1)
+    seats = max(1, min(5, parse_int(body.get("seats", 1), 1)))
+    note = str(body.get("note") or "").strip()
+    if tier not in ("pro", "ultimate"):
+        return json_error(400, "Tier muss 'pro' oder 'ultimate' sein.")
+    try:
+        created = add_license(email, tier, months, seats=seats, activated_by="owner", note=note)
+    except ValueError as e:
+        return json_error(400, str(e))
+    # Optional: direkt eine Guild verknüpfen.
+    server_id = str(body.get("serverId") or body.get("guildId") or "").strip()
+    key = created.get("licenseKey")
+    if server_id and key:
+        data = load_premium()
+        lic = data.get("licenses", {}).get(key)
+        if lic is not None:
+            linked = lic.get("linkedServerIds") or []
+            if server_id not in linked:
+                linked.append(server_id)
+            lic["linkedServerIds"] = linked
+            save_premium(data)
+    record_owner_audit("license.create", target=key, detail=f"{tier} · {months}M · {seats} seats", request=request)
+    return {"ok": True, "licenseKey": key, "license": created}
+
+
+@app.patch("/api/admin/licenses/{license_key}")
+async def admin_patch_license(license_key: str, request: Request, body: dict = None):
+    guard = _admin_guard(request)
+    if guard is not None:
+        return guard
+    if db is None:
+        return json_error(503, "Keine Datenbank verbunden.")
+    body = body or {}
+    data = load_premium()
+    licenses = data.setdefault("licenses", {})
+    lic = licenses.get(license_key)
+    if not isinstance(lic, dict):
+        return json_error(404, "Lizenz nicht gefunden.")
+
+    changes = []
+
+    if "tier" in body and body.get("tier"):
+        new_tier = str(body["tier"]).strip().lower()
+        if new_tier not in ("pro", "ultimate"):
+            return json_error(400, "Tier muss 'pro' oder 'ultimate' sein.")
+        lic["tier"] = new_tier
+        lic["plan"] = new_tier
+        changes.append(f"tier={new_tier}")
+
+    if "seats" in body:
+        seats = max(1, min(5, parse_int(body.get("seats", 1), 1)))
+        lic["seats"] = seats
+        changes.append(f"seats={seats}")
+
+    if "email" in body:
+        email = str(body.get("email") or "").strip()
+        lic["email"] = email
+        lic["contactEmail"] = email
+        changes.append("email")
+
+    if "note" in body:
+        lic["note"] = str(body.get("note") or "").strip()
+        changes.append("note")
+
+    # Ablauf: direkt setzen, verlängern oder verkürzen.
+    base = _parse_iso_dt(lic.get("expiresAt")) or datetime.now(timezone.utc)
+    if body.get("expireNow"):
+        lic["expiresAt"] = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+        changes.append("expireNow")
+    elif body.get("expiresAt"):
+        dt = _parse_iso_dt(body.get("expiresAt"))
+        if not dt:
+            return json_error(400, "Ungültiges Ablaufdatum.")
+        lic["expiresAt"] = dt.isoformat()
+        changes.append("expiresAt")
+    else:
+        delta_days = 0
+        if body.get("extendMonths") is not None:
+            delta_days += parse_int(body.get("extendMonths"), 0) * 30
+        if body.get("extendDays") is not None:
+            delta_days += parse_int(body.get("extendDays"), 0)
+        if delta_days != 0:
+            lic["expiresAt"] = (base + timedelta(days=delta_days)).isoformat()
+            changes.append(f"expiry{'+' if delta_days > 0 else ''}{delta_days}d")
+
+    if "active" in body:
+        lic["active"] = bool(body.get("active"))
+        changes.append(f"active={bool(body.get('active'))}")
+
+    # Guild-Verknüpfungen.
+    if isinstance(body.get("linkedServerIds"), list):
+        lic["linkedServerIds"] = [str(s).strip() for s in body["linkedServerIds"] if str(s).strip()][:50]
+        changes.append("linkedServerIds")
+    if body.get("addServerId"):
+        sid = str(body["addServerId"]).strip()
+        linked = lic.get("linkedServerIds") or []
+        if sid and sid not in linked:
+            linked.append(sid)
+        lic["linkedServerIds"] = linked
+        changes.append(f"+guild {sid}")
+    if body.get("removeServerId"):
+        sid = str(body["removeServerId"]).strip()
+        lic["linkedServerIds"] = [s for s in (lic.get("linkedServerIds") or []) if str(s) != sid]
+        changes.append(f"-guild {sid}")
+
+    lic["updatedAt"] = datetime.now(timezone.utc).isoformat()
+    licenses[license_key] = lic
+    save_premium(data)
+    record_owner_audit("license.update", target=license_key, detail=", ".join(changes) or "no-op", request=request)
+    rows = [r for r in _admin_license_rows(data) if r["licenseKey"] == license_key]
+    return {"ok": True, "license": rows[0] if rows else None, "changes": changes}
+
+
+@app.delete("/api/admin/licenses/{license_key}")
+async def admin_delete_license(license_key: str, request: Request):
+    guard = _admin_guard(request)
+    if guard is not None:
+        return guard
+    if db is None:
+        return json_error(503, "Keine Datenbank verbunden.")
+    data = load_premium()
+    licenses = data.setdefault("licenses", {})
+    if license_key not in licenses:
+        return json_error(404, "Lizenz nicht gefunden.")
+    removed = licenses.pop(license_key)
+    save_premium(data)
+    record_owner_audit("license.delete", target=license_key, detail=str(removed.get("tier") or removed.get("plan") or ""), request=request)
+    return {"ok": True, "deleted": license_key}
 
 
 @app.get("/api/admin/workers")
@@ -4091,8 +4293,87 @@ async def admin_monitoring(request: Request):
     if guard is not None:
         return guard
 
-    now = time.time()
     now_iso = datetime.now(timezone.utc).isoformat()
+
+    # 1) Echte Runtime-Telemetrie aus MongoDB (vom Node-Bot geschrieben).
+    live_doc = None
+    if db is not None:
+        try:
+            live_doc = db.runtime_health.find_one({"_id": "latest"}, {"_id": 0})
+        except Exception:
+            live_doc = None
+    fresh = False
+    if live_doc:
+        dt = _parse_iso_dt(live_doc.get("at"))
+        if dt is not None:
+            fresh = (datetime.now(timezone.utc) - dt).total_seconds() <= 30
+
+    if fresh:
+        proc = live_doc.get("process") or {}
+        live_nodes = []
+        for n in (live_doc.get("nodes") or []):
+            live_nodes.append({
+                "botId": n.get("botId"),
+                "index": n.get("index"),
+                "name": n.get("name"),
+                "role": n.get("role"),
+                "status": n.get("status"),
+                "pingMs": n.get("pingMs"),
+                "guilds": n.get("guilds", 0),
+                "voiceConnections": n.get("voiceConnections", 0),
+                # CPU/RAM sind PROZESSWEIT (ein Node-Prozess) → zur Anzeige gespiegelt.
+                "cpuPct": proc.get("cpuPct", 0),
+                "ramMb": proc.get("ramMb", 0),
+            })
+        real_incidents = []
+        if db is not None:
+            try:
+                for doc in db.runtime_incidents.find({}, {"_id": 0}).sort("at", -1).limit(25):
+                    real_incidents.append({
+                        "at": doc.get("at") or doc.get("timestamp"),
+                        "severity": str(doc.get("severity") or doc.get("level") or "info").lower(),
+                        "source": doc.get("source") or "runtime",
+                        "message": clip_text(doc.get("message") or doc.get("summary") or "Incident", 240),
+                        "resolved": bool(doc.get("resolved")),
+                    })
+            except Exception:
+                real_incidents = []
+        healthy = sum(1 for n in live_nodes if n.get("status") == "online")
+        return {
+            "generatedAt": now_iso,
+            "simulated": False,
+            "live": True,
+            "process": proc,
+            "health": {
+                "healthyNodes": healthy,
+                "totalNodes": len(live_nodes),
+                "uptimeSec": proc.get("uptimeSec", 0),
+                "apiLatencyMs": None,
+                "mongo": db is not None,
+                "openIncidents": sum(1 for i in real_incidents if not i.get("resolved")),
+            },
+            "nodes": live_nodes,
+            "incidents": real_incidents,
+            "logs": (live_doc.get("logs") or [])[:40],
+        }
+
+    # 2) Keine frischen Runtime-Daten und kein Demo-Modus -> ehrlich leer.
+    if os.environ.get("SEED_DEMO_DATA") != "1":
+        return {
+            "generatedAt": now_iso,
+            "simulated": False,
+            "live": False,
+            "waiting": True,
+            "process": None,
+            "health": {"healthyNodes": 0, "totalNodes": 0, "uptimeSec": 0, "apiLatencyMs": None, "mongo": db is not None, "openIncidents": 0},
+            "nodes": [],
+            "incidents": [],
+            "logs": [],
+            "message": "Warte auf Live-Daten vom OmniFM-Bot. Sobald der Node-Bot laeuft (echte Tokens im Owner-Menue) und Metriken meldet, erscheinen hier CPU/RAM/Ping, Voice, Guilds, Incidents und Live-Log in Echtzeit.",
+        }
+
+    # 3) Demo-Modus (SEED_DEMO_DATA=1): simulierte Telemetrie.
+    now = time.time()
     bots = load_bots_from_env()
     commander_index = parse_int(os.environ.get("COMMANDER_BOT_INDEX", "1"), 1)
 
@@ -4167,6 +4448,8 @@ async def admin_monitoring(request: Request):
     return {
         "generatedAt": now_iso,
         "simulated": True,
+        "live": False,
+        "process": None,
         "health": {
             "healthyNodes": healthy,
             "totalNodes": len(nodes),

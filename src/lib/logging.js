@@ -362,9 +362,27 @@ function queueLogWrite(lines, { includeErrorLog = false } = {}) {
     });
 }
 
+const _recentLogs = [];
+const _recentLogsMax = 60;
+
+function pushRecentLog(ts, level, message) {
+  let source = "runtime";
+  let msg = String(message || "");
+  const m = msg.match(/^\s*\[([^\]]+)\]\s*(.*)$/);
+  if (m) { source = m[1]; msg = m[2]; }
+  _recentLogs.push({ at: ts, level, source, message: msg.slice(0, 240) });
+  if (_recentLogs.length > _recentLogsMax) _recentLogs.shift();
+}
+
+function getRecentLogs(limit = 40) {
+  const n = Math.max(1, Math.min(_recentLogsMax, limit));
+  return _recentLogs.slice(-n).reverse();
+}
+
 function log(level, message) {
   const ts = new Date().toISOString();
   const lines = normalizeLogLines(ts, level, redactSensitiveText(message));
+  pushRecentLog(ts, level, redactSensitiveText(message));
   for (const line of lines) {
     if (level === "ERROR") {
       console.error(line);
