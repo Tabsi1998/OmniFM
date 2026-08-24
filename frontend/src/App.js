@@ -15,6 +15,8 @@ import Navbar from './components/Navbar.js';
 import PlanMatrix from './components/PlanMatrix.js';
 import DashboardPortal from './components/DashboardPortal.js';
 import OwnerAdmin from './components/OwnerAdmin.js';
+import DiscordShowcase from './components/DiscordShowcase.js';
+import NowPlayingBar from './components/NowPlayingBar.js';
 import FaqSection from './components/FaqSection.js';
 import CookieConsent from './components/CookieConsent.js';
 import { I18nProvider } from './i18n.js';
@@ -238,6 +240,7 @@ function AppContent() {
       <Navbar page={currentPage} />
       <Hero stats={stats} bots={bots} />
       <TrustBar stats={stats} />
+      <DiscordShowcase />
       <Features />
       <WhyOmniFM />
       <StationBrowser stations={stations} loading={loading} />
@@ -247,6 +250,7 @@ function AppContent() {
       <PlanMatrix />
       <FaqSection />
       <StatsFooter stats={stats} bots={bots} legal={legal} />
+      <NowPlayingBar stats={stats} bots={bots} />
       <CookieConsent />
     </div>
   );

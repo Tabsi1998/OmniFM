@@ -19,6 +19,7 @@ from urllib.parse import urlparse, urlencode
 from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
+from starlette.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from pymongo import MongoClient
@@ -3914,3 +3915,179 @@ async def admin_monitoring(request: Request):
         "incidents": incidents[:25],
         "logs": logs,
     }
+
+
+# ------------------------------------------------------------
+# Owner audit log + full station management (replaces CLI config).
+# Every owner write action (station create/update/delete, stream
+# test) is persisted to the `owner_audit` collection / file.
+# ------------------------------------------------------------
+OWNER_AUDIT_FILE = Path(__file__).parent.parent / "data" / "owner-audit.json"
+VALID_TIERS = {"free", "pro", "ultimate"}
+STATION_KEY_REGEX = re.compile(r"^[a-z0-9][a-z0-9._-]{1,48}$")
+
+
+def _client_ip_safe(request):
+    try:
+        return get_client_ip(request)
+    except Exception:
+        return "-"
+
+
+def record_owner_audit(action, target=None, detail=None, status="ok", request=None):
+    entry = {
+        "at": datetime.now(timezone.utc).isoformat(),
+        "actor": "owner",
+        "action": str(action),
+        "target": (str(target) if target is not None else None),
+        "detail": clip_text(detail, 300) if detail else None,
+        "status": status,
+        "ip": _client_ip_safe(request) if request is not None else "-",
+    }
+    if db is not None:
+        try:
+            db.owner_audit.insert_one({**entry})
+            return entry
+        except Exception:
+            pass
+    try:
+        OWNER_AUDIT_FILE.parent.mkdir(parents=True, exist_ok=True)
+        existing = []
+        if OWNER_AUDIT_FILE.exists():
+            existing = json.loads(OWNER_AUDIT_FILE.read_text(encoding="utf-8") or "[]")
+        existing.insert(0, entry)
+        OWNER_AUDIT_FILE.write_text(json.dumps(existing[:500], ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+    return entry
+
+
+@app.get("/api/admin/audit")
+async def admin_audit(request: Request):
+    guard = _admin_guard(request)
+    if guard is not None:
+        return guard
+    rows = []
+    if db is not None:
+        try:
+            for doc in db.owner_audit.find({}, {"_id": 0}).sort("at", -1).limit(200):
+                rows.append(doc)
+        except Exception:
+            rows = []
+    if not rows:
+        rows = _read_json_list(OWNER_AUDIT_FILE)[:200]
+    return {"audit": rows, "count": len(rows)}
+
+
+@app.post("/api/admin/stations/test")
+async def admin_station_test(request: Request, body: dict = None):
+    guard = _admin_guard(request)
+    if guard is not None:
+        return guard
+    url = str((body or {}).get("url") or "").strip()
+    check = validate_custom_station_url(url)
+    if not check.get("ok"):
+        record_owner_audit("station.test", target=url, detail=check.get("error"), status="error", request=request)
+        return json_error(400, check.get("error") or "URL ungültig.")
+    started = time.time()
+    try:
+        resp = await run_in_threadpool(
+            lambda: requests.get(url, stream=True, timeout=6, headers={"Range": "bytes=0-2047", "User-Agent": "OmniFM-StreamTest/1.0", "Icy-MetaData": "1"})
+        )
+        elapsed = int((time.time() - started) * 1000)
+        ctype = resp.headers.get("Content-Type", "")
+        icy_name = resp.headers.get("icy-name") or resp.headers.get("Icy-Name")
+        icy_br = resp.headers.get("icy-br") or resp.headers.get("Icy-Br")
+        reachable = resp.status_code < 400
+        is_audio = any(t in ctype.lower() for t in ("audio", "mpeg", "ogg", "aac", "octet-stream")) or bool(icy_name)
+        try:
+            resp.close()
+        except Exception:
+            pass
+        ok = reachable and is_audio
+        record_owner_audit("station.test", target=url, detail=f"status={resp.status_code} type={ctype} {elapsed}ms", status="ok" if ok else "warn", request=request)
+        return {
+            "ok": ok, "reachable": reachable, "isAudioStream": is_audio,
+            "status": resp.status_code, "contentType": ctype,
+            "icyName": icy_name, "bitrate": icy_br, "latencyMs": elapsed,
+            "message": "Stream erreichbar und liefert Audio." if ok else ("Erreichbar, aber kein eindeutiger Audio-Stream." if reachable else f"HTTP {resp.status_code}"),
+        }
+    except requests.exceptions.Timeout:
+        record_owner_audit("station.test", target=url, detail="timeout", status="error", request=request)
+        return {"ok": False, "reachable": False, "message": "Zeitüberschreitung – Stream nicht erreichbar.", "latencyMs": int((time.time() - started) * 1000)}
+    except Exception as e:
+        record_owner_audit("station.test", target=url, detail=clip_text(e, 120), status="error", request=request)
+        return {"ok": False, "reachable": False, "message": f"Fehler: {clip_text(e, 120)}"}
+
+
+@app.post("/api/admin/stations")
+async def admin_station_upsert(request: Request, body: dict = None):
+    guard = _admin_guard(request)
+    if guard is not None:
+        return guard
+    if db is None:
+        return json_error(503, "MongoDB nicht verbunden – Stationsverwaltung nicht verfügbar.")
+    data = body or {}
+    key = str(data.get("key") or "").strip().lower()
+    name = clip_text(data.get("name"), 80).strip() if data.get("name") else ""
+    url = str(data.get("url") or "").strip()
+    tier = str(data.get("tier") or "free").strip().lower()
+    genre = clip_text(data.get("genre"), 60).strip() if data.get("genre") else "Radio"
+
+    if not STATION_KEY_REGEX.match(key):
+        return json_error(400, "Ungültiger Key (a-z, 0-9, . _ -, 2-49 Zeichen).")
+    if not name:
+        return json_error(400, "Name erforderlich.")
+    if tier not in VALID_TIERS:
+        return json_error(400, "Tier muss free, pro oder ultimate sein.")
+    check = validate_custom_station_url(url)
+    if not check.get("ok"):
+        return json_error(400, check.get("error") or "Stream-URL ungültig.")
+
+    existing = db.stations.find_one({"key": key})
+    doc = {"key": key, "name": name, "url": url, "tier": tier, "genre": genre}
+    if not existing:
+        doc["created_at"] = datetime.now(timezone.utc).isoformat()
+        doc["is_default"] = False
+    doc["updated_at"] = datetime.now(timezone.utc).isoformat()
+    db.stations.update_one({"key": key}, {"$set": doc}, upsert=True)
+    record_owner_audit("station.update" if existing else "station.create", target=key, detail=f"{name} · {tier} · {url}", request=request)
+    return {"ok": True, "created": not existing, "station": {k: v for k, v in doc.items() if k != "_id"}}
+
+
+@app.delete("/api/admin/stations/{key}")
+async def admin_station_delete(request: Request, key: str):
+    guard = _admin_guard(request)
+    if guard is not None:
+        return guard
+    if db is None:
+        return json_error(503, "MongoDB nicht verbunden.")
+    key = str(key or "").strip().lower()
+    existing = db.stations.find_one({"key": key})
+    if not existing:
+        return json_error(404, "Station nicht gefunden.")
+    if existing.get("is_default"):
+        return json_error(400, "Standard-Station kann nicht gelöscht werden. Setze zuerst eine andere Default-Station.")
+    db.stations.delete_one({"key": key})
+    record_owner_audit("station.delete", target=key, detail=existing.get("name"), request=request)
+    return {"ok": True, "deleted": key}
+
+
+@app.get("/api/admin/stations/list")
+async def admin_station_list(request: Request):
+    guard = _admin_guard(request)
+    if guard is not None:
+        return guard
+    rows = []
+    if db is not None:
+        try:
+            for doc in db.stations.find({"key": {"$not": {"$regex": "^custom:"}}}, {"_id": 0}).sort([("tier", 1), ("name", 1)]):
+                rows.append({
+                    "key": doc.get("key"), "name": doc.get("name"), "url": doc.get("url"),
+                    "tier": doc.get("tier", "free"), "genre": doc.get("genre") or "Radio",
+                    "isDefault": bool(doc.get("is_default")), "updatedAt": doc.get("updated_at"),
+                })
+        except Exception:
+            rows = []
+    return {"stations": rows, "count": len(rows)}
+

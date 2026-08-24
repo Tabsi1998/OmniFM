@@ -3,7 +3,7 @@ import {
   Radio, LayoutDashboard, Server, KeyRound, ListMusic, PlugZap, Activity as ActivityIcon,
   LogOut, ShieldCheck, TrendingUp, Users, Cpu, RefreshCw, CheckCircle2, XCircle,
   Music2, Globe, CreditCard, Mail, Database, Fingerprint, AlertTriangle,
-  Radar, Terminal, Gauge, HeartPulse,
+  Radar, Terminal, Gauge, HeartPulse, Plus, Pencil, Trash2, Save, ScrollText, SignalHigh, X as CloseIcon,
 } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
@@ -21,6 +21,7 @@ const NAV = [
   { id: 'stations', label: 'Radio Catalog', icon: ListMusic },
   { id: 'integrations', label: 'Integrations', icon: PlugZap },
   { id: 'activity', label: 'Activity Log', icon: ActivityIcon },
+  { id: 'audit', label: 'Audit-Log', icon: ScrollText },
 ];
 
 const PLAN_COLORS = { free: '#64748b', pro: '#00e5ff', ultimate: '#ff6b00' };
@@ -94,6 +95,12 @@ export default function OwnerAdmin() {
   const [integrations, setIntegrations] = useState(null);
   const [activity, setActivity] = useState([]);
   const [monitoring, setMonitoring] = useState(null);
+  const [stationList, setStationList] = useState([]);
+  const [auditLog, setAuditLog] = useState([]);
+  const [stForm, setStForm] = useState(null); // {key,name,url,tier,genre, _isNew}
+  const [stTest, setStTest] = useState(null);
+  const [stBusy, setStBusy] = useState(false);
+  const [stMsg, setStMsg] = useState(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -103,6 +110,32 @@ export default function OwnerAdmin() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   }, [token]);
+
+  const apiSend = useCallback(async (path, method, bodyObj) => {
+    const res = await fetch(buildApiUrl(path), {
+      method,
+      headers: { 'X-Admin-Token': token, 'Content-Type': 'application/json' },
+      body: bodyObj ? JSON.stringify(bodyObj) : undefined,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+  }, [token]);
+
+  const loadStations = useCallback(async () => {
+    try {
+      const [list, summary] = await Promise.all([
+        apiGet('/api/admin/stations/list', token),
+        apiGet('/api/admin/stations', token),
+      ]);
+      setStationList(list.stations || []);
+      setStations(summary);
+    } catch { /* keep */ }
+  }, [apiGet, token]);
+
+  const loadAudit = useCallback(async () => {
+    try { const d = await apiGet('/api/admin/audit', token); setAuditLog(d.audit || []); } catch { /* keep */ }
+  }, [apiGet, token]);
 
   const loadAll = useCallback(async (tk) => {
     setRefreshing(true);
@@ -160,6 +193,46 @@ export default function OwnerAdmin() {
     const iv = setInterval(tick, 4000);
     return () => { stop = true; clearInterval(iv); };
   }, [authed, section, apiGet, token]);
+
+  // Load section-specific data on tab open
+  useEffect(() => {
+    if (!authed) return;
+    if (section === 'stations') loadStations();
+    if (section === 'audit') loadAudit();
+  }, [authed, section, loadStations, loadAudit]);
+
+  const openNewStation = () => { setStTest(null); setStMsg(null); setStForm({ key: '', name: '', url: '', tier: 'free', genre: '', _isNew: true }); };
+  const openEditStation = (s) => { setStTest(null); setStMsg(null); setStForm({ key: s.key, name: s.name, url: s.url, tier: s.tier, genre: s.genre || '', _isNew: false }); };
+  const closeStationForm = () => { setStForm(null); setStTest(null); };
+
+  const testStationUrl = async (url) => {
+    setStBusy(true); setStTest({ loading: true });
+    try {
+      const r = await apiSend('/api/admin/stations/test', 'POST', { url });
+      setStTest(r);
+    } catch (e) { setStTest({ ok: false, message: e.message }); }
+    finally { setStBusy(false); }
+  };
+
+  const saveStation = async () => {
+    if (!stForm) return;
+    setStBusy(true); setStMsg(null);
+    try {
+      await apiSend('/api/admin/stations', 'POST', { key: stForm.key, name: stForm.name, url: stForm.url, tier: stForm.tier, genre: stForm.genre });
+      setStMsg({ ok: true, text: stForm._isNew ? 'Station angelegt.' : 'Station gespeichert.' });
+      setStForm(null); setStTest(null);
+      await loadStations();
+    } catch (e) { setStMsg({ ok: false, text: e.message }); }
+    finally { setStBusy(false); }
+  };
+
+  const deleteStation = async (key) => {
+    if (!window.confirm(`Station "${key}" wirklich löschen?`)) return;
+    setStBusy(true);
+    try { await apiSend(`/api/admin/stations/${encodeURIComponent(key)}`, 'DELETE'); setStMsg({ ok: true, text: `Station ${key} gelöscht.` }); await loadStations(); }
+    catch (e) { setStMsg({ ok: false, text: e.message }); }
+    finally { setStBusy(false); }
+  };
 
   const handleLogin = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
@@ -572,23 +645,112 @@ export default function OwnerAdmin() {
               <StatTile testid="station-stat-free" label="Free Stationen" value={stations.free} icon={Radio} accent="#64748b" />
               <StatTile testid="station-stat-pro" label="Pro Stationen" value={stations.pro} icon={Music2} accent="#00e5ff" />
             </div>
-            <div className="oa-section-title"><ListMusic size={15} /> Katalog ({stations.sample?.length || 0} angezeigt)</div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '28px 0 14px' }}>
+              <div className="oa-section-title" style={{ margin: 0 }}><ListMusic size={15} /> Katalog verwalten ({stationList.length})</div>
+              <button className="oa-btn primary" style={{ height: 40 }} onClick={openNewStation} data-testid="station-add-button"><Plus size={16} /> Station hinzufügen</button>
+            </div>
+
+            {stMsg && (
+              <div className={`oa-pill ${stMsg.ok ? 'green' : 'red'}`} style={{ marginBottom: 14 }} data-testid="station-message">
+                {stMsg.ok ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />} {stMsg.text}
+              </div>
+            )}
+
+            {stForm && (
+              <div className="oa-card oa-fade" style={{ marginBottom: 18, borderColor: 'rgba(255,107,0,0.35)' }} data-testid="station-form">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontFamily: "'Syne','Outfit',sans-serif", fontSize: 17 }}>{stForm._isNew ? 'Neue Station' : `Station bearbeiten: ${stForm.key}`}</div>
+                  <button className="oa-btn ghost" style={{ height: 34, padding: '0 12px' }} onClick={closeStationForm} data-testid="station-form-close"><CloseIcon size={15} /></button>
+                </div>
+                <div className="oa-grid cols-2" style={{ gap: 14 }}>
+                  <div>
+                    <label className="oa-stat-label">Key</label>
+                    <input className="oa-input" style={{ marginTop: 6 }} value={stForm.key} disabled={!stForm._isNew} placeholder="z.B. synthwave" onChange={(e) => setStForm({ ...stForm, key: e.target.value })} data-testid="station-input-key" />
+                  </div>
+                  <div>
+                    <label className="oa-stat-label">Name</label>
+                    <input className="oa-input" style={{ marginTop: 6, fontFamily: 'DM Sans' }} value={stForm.name} placeholder="Anzeigename" onChange={(e) => setStForm({ ...stForm, name: e.target.value })} data-testid="station-input-name" />
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label className="oa-stat-label">Stream-URL</label>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                      <input className="oa-input" value={stForm.url} placeholder="https://…/stream.mp3" onChange={(e) => { setStForm({ ...stForm, url: e.target.value }); setStTest(null); }} data-testid="station-input-url" />
+                      <button className="oa-btn ghost" style={{ height: 46, whiteSpace: 'nowrap' }} disabled={stBusy || !stForm.url} onClick={() => testStationUrl(stForm.url)} data-testid="station-test-button"><SignalHigh size={15} /> Test</button>
+                    </div>
+                    {stTest && (
+                      <div className={`oa-pill ${stTest.loading ? 'slate' : stTest.ok ? 'green' : 'amber'}`} style={{ marginTop: 10 }} data-testid="station-test-result">
+                        {stTest.loading ? <><Equalizer /> Teste Stream…</> : (
+                          <>{stTest.ok ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />} {stTest.message}{stTest.bitrate ? ` · ${stTest.bitrate} kbps` : ''}{typeof stTest.latencyMs === 'number' ? ` · ${stTest.latencyMs}ms` : ''}</>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="oa-stat-label">Tier</label>
+                    <select className="oa-input" style={{ marginTop: 6 }} value={stForm.tier} onChange={(e) => setStForm({ ...stForm, tier: e.target.value })} data-testid="station-input-tier">
+                      <option value="free">Free</option><option value="pro">Pro</option><option value="ultimate">Ultimate</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="oa-stat-label">Genre</label>
+                    <input className="oa-input" style={{ marginTop: 6, fontFamily: 'DM Sans' }} value={stForm.genre} placeholder="z.B. Lo-Fi / Chill" onChange={(e) => setStForm({ ...stForm, genre: e.target.value })} data-testid="station-input-genre" />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+                  <button className="oa-btn primary" disabled={stBusy} onClick={saveStation} data-testid="station-save-button"><Save size={16} /> {stForm._isNew ? 'Anlegen' : 'Speichern'}</button>
+                  <button className="oa-btn ghost" onClick={closeStationForm}>Abbrechen</button>
+                </div>
+              </div>
+            )}
+
             <div className="oa-table-wrap oa-fade" data-testid="stations-table">
               <table className="oa-table">
-                <thead><tr><th>Key</th><th>Name</th><th>Genre</th><th>Tier</th></tr></thead>
+                <thead><tr><th>Key</th><th>Name</th><th>Genre</th><th>Tier</th><th style={{ textAlign: 'right' }}>Aktionen</th></tr></thead>
                 <tbody>
-                  {(stations.sample || []).map((s, i) => (
-                    <tr key={s.key || i} data-testid={`station-row-${i}`}>
-                      <td className="oa-mono" style={{ fontSize: 12, color: '#94a3b8' }}>{s.key}</td>
+                  {stationList.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', color: '#64748b', padding: 24 }}>Lade Katalog…</td></tr>}
+                  {stationList.map((s, i) => (
+                    <tr key={s.key || i} data-testid={`station-row-${s.key}`}>
+                      <td className="oa-mono" style={{ fontSize: 12, color: '#94a3b8' }}>{s.key}{s.isDefault && <span className="oa-pill orange" style={{ marginLeft: 8, padding: '2px 7px' }}>default</span>}</td>
                       <td style={{ fontWeight: 600 }}>{s.name}</td>
                       <td style={{ color: '#94a3b8' }}>{s.genre || '—'}</td>
-                      <td><span className={`oa-pill ${s.tier === 'pro' ? 'cyan' : 'slate'}`}>{String(s.tier || 'free').toUpperCase()}</span></td>
+                      <td><span className={`oa-pill ${s.tier === 'ultimate' ? 'orange' : s.tier === 'pro' ? 'cyan' : 'slate'}`}>{String(s.tier || 'free').toUpperCase()}</span></td>
+                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <button title="Test" className="oa-btn ghost" style={{ height: 32, padding: '0 9px', marginLeft: 6 }} disabled={stBusy} onClick={() => { setStForm(null); testStationUrl(s.url); setStMsg(null); openEditStation(s); }} data-testid={`station-row-test-${s.key}`}><SignalHigh size={14} /></button>
+                        <button title="Bearbeiten" className="oa-btn ghost" style={{ height: 32, padding: '0 9px', marginLeft: 6 }} onClick={() => openEditStation(s)} data-testid={`station-row-edit-${s.key}`}><Pencil size={14} /></button>
+                        <button title={s.isDefault ? 'Standard-Station' : 'Löschen'} className="oa-btn ghost" style={{ height: 32, padding: '0 9px', marginLeft: 6, color: '#ff8fab', opacity: s.isDefault ? 0.4 : 1 }} disabled={stBusy || s.isDefault} onClick={() => deleteStation(s.key)} data-testid={`station-row-delete-${s.key}`}><Trash2 size={14} /></button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           </>
+        )}
+
+        {section === 'audit' && (
+          <div className="oa-card oa-fade" data-testid="audit-log">
+            <div className="oa-stat-label" style={{ marginBottom: 8 }}>Owner Audit-Log — jede Konfigurationsänderung wird protokolliert</div>
+            {auditLog.length === 0 && <div style={{ color: '#64748b', textAlign: 'center', padding: 24 }}>Noch keine Einträge</div>}
+            {auditLog.map((a, i) => {
+              const st = a.status === 'error' ? 'red' : a.status === 'warn' ? 'amber' : 'green';
+              return (
+                <div key={i} className="oa-integration" data-testid={`audit-row-${i}`}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                    <span className="oa-pill orange" style={{ fontFamily: 'JetBrains Mono' }}>{a.action}</span>
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ fontSize: 13.5, display: 'block' }}>{a.target || '—'}</span>
+                      <span className="oa-mono" style={{ fontSize: 11, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', maxWidth: 520 }}>{a.detail || ''} · {a.actor} · {a.ip}</span>
+                    </span>
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span className={`oa-pill ${st}`}>{a.status}</span>
+                    <span className="oa-mono" style={{ fontSize: 11, color: '#64748b' }}>{relTime(a.at)}</span>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         )}
 
         {section === 'integrations' && integrations && (
