@@ -1,5 +1,6 @@
 import React from 'react';
 import { useI18n } from '../i18n.js';
+import { useShowcaseStations } from '../lib/showcase.js';
 import LivePlaybackBar from './LivePlaybackBar.js';
 import { Volume2, Check, Plus, Sparkles } from 'lucide-react';
 
@@ -64,6 +65,9 @@ function StepShell({ step, s, children }) {
 export default function HowToDiscord() {
   const { locale } = useI18n();
   const s = STR[locale] || STR.de;
+  const showcase = useShowcaseStations(4);
+  const demoStation = showcase.length ? showcase[0].name : 'OmniFM Radio Network';
+  const streamLabel = locale === 'en' ? 'Live radio stream' : 'Live-Radio-Stream';
 
   return (
     <section id="how-to" data-testid="how-to-discord" style={{ padding: '90px 24px', position: 'relative' }}>
@@ -123,7 +127,7 @@ export default function HowToDiscord() {
               </div>
               <div style={{ minWidth: 0 }}>
                 <div style={{ color: '#00a8fc', fontSize: 13, fontWeight: 600 }}>OmniFM · {s.connected}</div>
-                <div style={{ color: '#dbdee1', fontSize: 12.5 }}>Lofi Lounge — Idealism</div>
+                <div style={{ color: '#dbdee1', fontSize: 12.5 }}>{demoStation} — {streamLabel}</div>
               </div>
             </div>
             <div style={{ color: '#b5bac1', fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>{s.nowPlaying}</div>

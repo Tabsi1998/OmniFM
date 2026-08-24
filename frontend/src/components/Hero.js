@@ -3,6 +3,7 @@ import { Headphones, Radio, Volume2, Play, SkipForward, Users } from 'lucide-rea
 import { useI18n } from '../i18n.js';
 import { resolvePrimaryInviteUrl } from '../lib/invite.js';
 import { buildApiUrl } from '../lib/api.js';
+import { useShowcaseStations } from '../lib/showcase.js';
 
 const heroCss = `
 @keyframes eq-bounce { 0%,100% { transform: scaleY(0.28);} 50% { transform: scaleY(1);} }
@@ -12,13 +13,6 @@ const heroCss = `
 @keyframes np-progress { from { width: 8%;} to { width: 92%;} }
 @media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr !important; } .hero-np { margin-top: 8px; } }
 `;
-
-const LIVE_TRACKS = [
-  { station: 'Synthwave Nights', genre: 'Retrowave · 320 kbps', artist: 'The Midnight — Vampires' },
-  { station: 'Lofi Lounge', genre: 'Lofi Hip-Hop · 256 kbps', artist: 'Idealism — Controlla' },
-  { station: 'BassDrop Network', genre: 'Drum & Bass · 320 kbps', artist: 'Netsky — Rio' },
-  { station: 'Neon City FM', genre: 'Cyber House · 320 kbps', artist: 'Gunship — Tech Noir' },
-];
 
 function Equalizer({ bars = 14, height = 44, colorful = true }) {
   const list = Array.from({ length: bars });
@@ -40,22 +34,26 @@ function Equalizer({ bars = 14, height = 44, colorful = true }) {
 
 function NowPlayingConsole({ listeners }) {
   const { formatNumber, locale } = useI18n();
+  const stations = useShowcaseStations(8);
   const [idx, setIdx] = useState(0);
   const [cover, setCover] = useState(null);
   useEffect(() => {
-    const t = setInterval(() => setIdx((v) => (v + 1) % LIVE_TRACKS.length), 4200);
+    if (stations.length < 2) return undefined;
+    const t = setInterval(() => setIdx((v) => (v + 1) % stations.length), 4200);
     return () => clearInterval(t);
-  }, []);
-  const track = LIVE_TRACKS[idx];
+  }, [stations.length]);
+  const track = stations.length
+    ? stations[idx % stations.length]
+    : { name: 'OmniFM Radio Network', tier: '', bitrate: 'Live' };
+  const streamLabel = locale === 'en' ? 'Live radio stream' : 'Live-Radio-Stream';
   useEffect(() => {
     let stop = false;
-    const term = track.artist.replace('—', ' ');
     setCover(null);
-    fetch(buildApiUrl(`/api/cover?term=${encodeURIComponent(term)}`))
+    fetch(buildApiUrl(`/api/cover?term=${encodeURIComponent(track.name)}`))
       .then((r) => r.json()).then((d) => { if (!stop && d && d.ok && d.artwork) setCover(d.artwork); })
       .catch(() => {});
     return () => { stop = true; };
-  }, [track.artist]);
+  }, [track.name]);
 
   return (
     <div
@@ -85,7 +83,9 @@ function NowPlayingConsole({ listeners }) {
           ON AIR
         </span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#94a3b8', fontSize: 12.5, fontFamily: "'JetBrains Mono', monospace" }}>
-          <Users size={13} color="#ff6b00" /> {formatNumber(Number(listeners || 0))} {locale === 'en' ? 'listening' : 'hören zu'}
+          {Number(listeners) > 0
+            ? <><Users size={13} color="#ff6b00" /> {formatNumber(Number(listeners))} {locale === 'en' ? 'listening' : 'hören zu'}</>
+            : <><span style={{ width: 7, height: 7, borderRadius: '50%', background: '#ff2a5f' }} /> {locale === 'en' ? 'LIVE' : 'LIVE'}</>}
         </span>
       </div>
 
@@ -96,24 +96,24 @@ function NowPlayingConsole({ listeners }) {
           display: 'grid', placeItems: 'center', boxShadow: '0 12px 30px rgba(255,107,0,0.35)',
         }}>
           {cover
-            ? <img src={cover} alt={track.station} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+            ? <img src={cover} alt={track.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
             : <Radio size={30} color="rgba(255,255,255,0.92)" />}
           <div style={{ position: 'absolute', bottom: 8, left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
             <Equalizer bars={7} height={20} colorful={false} />
           </div>
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div key={track.station} style={{ fontWeight: 800, fontSize: 19, fontFamily: "'Syne','Outfit',sans-serif", animation: 'hero-fade-in 0.5s ease-out both' }}>
-            {track.station}
+          <div key={track.name} style={{ fontWeight: 800, fontSize: 19, fontFamily: "'Syne','Outfit',sans-serif", animation: 'hero-fade-in 0.5s ease-out both' }}>
+            {track.name}
           </div>
           <div style={{ color: '#94a3b8', fontSize: 13, marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {track.artist}
+            {streamLabel}
           </div>
           <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             <span style={{
               fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, fontWeight: 700, color: '#ffb27a',
               background: 'rgba(255,107,0,0.14)', border: '1px solid rgba(255,107,0,0.3)', borderRadius: 999, padding: '3px 9px',
-            }}>{track.genre}</span>
+            }}>{track.bitrate}</span>
           </div>
         </div>
       </div>
@@ -146,11 +146,11 @@ function Hero({ stats, bots }) {
   const subtitleTail = String(copy.hero.subtitleTail || '').trim();
   const subtitleSpacer = subtitleTail && !/^[.,!?;:]/.test(subtitleTail) ? ' ' : '';
   const heroStats = [
-    { label: copy.hero.stats.servers, value: stats.servers || 1280, color: '#ff6b00' },
-    { label: copy.hero.stats.stations, value: stats.stations || 120, color: '#00e5ff' },
-    { label: copy.hero.stats.bots, value: stats.bots || 2, color: '#10b981' },
+    { label: copy.hero.stats.servers, value: stats.servers || 0, color: '#ff6b00' },
+    { label: copy.hero.stats.stations, value: stats.stations || 0, color: '#00e5ff' },
+    { label: copy.hero.stats.bots, value: stats.bots || 0, color: '#10b981' },
   ];
-  const listeners = stats.listeners || stats.users || 1240;
+  const listeners = stats.listeners || 0;
 
   return (
     <section

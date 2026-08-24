@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Hash, Play, Pause, SkipForward, Square, Heart, ListMusic, Radio } from 'lucide-react';
 import { buildApiUrl } from '../lib/api.js';
 import { useI18n } from '../i18n.js';
+import { useShowcaseStations } from '../lib/showcase.js';
 import LivePlaybackBar from './LivePlaybackBar.js';
 
 const STR = {
@@ -17,6 +18,7 @@ const STR = {
       ['/stations', 'Durchsuche 120+ kuratierte Sender'],
     ],
     nowPlaying: 'Now Playing', genre: 'Genre', bitrate: 'Bitrate', listeners: 'Hörer',
+    liveStream: 'Live-Radio-Stream', liveRadio: 'Live-Radio',
     time: 'heute um 21:14',
   },
   en: {
@@ -31,15 +33,12 @@ const STR = {
       ['/stations', 'Browse 120+ curated stations'],
     ],
     nowPlaying: 'Now Playing', genre: 'Genre', bitrate: 'Bitrate', listeners: 'Listeners',
+    liveStream: 'Live radio stream', liveRadio: 'Live radio',
     time: 'today at 21:14',
   },
 };
 
-const STATIONS = [
-  { name: 'Synthwave Nights', genre: 'Retrowave', bitrate: '320 kbps', listeners: 342, now: 'The Midnight — Vampires' },
-  { name: 'Lofi Lounge', genre: 'Lo-Fi Hip-Hop', bitrate: '256 kbps', listeners: 512, now: 'Idealism — Controlla' },
-  { name: 'BassDrop Network', genre: 'Drum & Bass', bitrate: '320 kbps', listeners: 208, now: 'Netsky — Rio' },
-];
+const STATIONS_FALLBACK = { name: 'OmniFM Radio Network', tier: 'free', bitrate: 'Live' };
 
 const css = `
 @keyframes ds-eq { 0%,100%{transform:scaleY(0.3);} 50%{transform:scaleY(1);} }
@@ -71,16 +70,18 @@ export default function DiscordShowcase() {
   const L = STR[locale] || STR.de;
   const [i, setI] = useState(0);
   const [cover, setCover] = useState(null);
-  useEffect(() => { const t = setInterval(() => setI((v) => (v + 1) % STATIONS.length), 4000); return () => clearInterval(t); }, []);
-  const s = STATIONS[i];
+  const stations = useShowcaseStations(8);
+  useEffect(() => { if (stations.length < 2) return undefined; const t = setInterval(() => setI((v) => (v + 1) % stations.length), 4000); return () => clearInterval(t); }, [stations.length]);
+  const s = stations.length ? stations[i % stations.length] : STATIONS_FALLBACK;
+  const tierLabel = s.tier ? s.tier.charAt(0).toUpperCase() + s.tier.slice(1) : 'Live';
   useEffect(() => {
     let stop = false;
     setCover(null);
-    fetch(buildApiUrl(`/api/cover?term=${encodeURIComponent(s.now.replace('—', ' '))}`))
+    fetch(buildApiUrl(`/api/cover?term=${encodeURIComponent(s.name)}`))
       .then((r) => r.json()).then((d) => { if (!stop && d && d.ok && d.artwork) setCover(d.artwork); })
       .catch(() => {});
     return () => { stop = true; };
-  }, [s.now]);
+  }, [s.name]);
 
   return (
     <section id="in-discord" data-testid="discord-showcase" style={{ position: 'relative', padding: '90px 24px' }}>
@@ -131,11 +132,11 @@ export default function DiscordShowcase() {
                           <EqMini /> {L.nowPlaying}
                         </div>
                         <div key={s.name} style={{ color: '#00a8fc', fontWeight: 600, fontSize: 15, marginTop: 6 }}>{s.name}</div>
-                        <div style={{ color: '#dbdee1', fontSize: 13.5, marginTop: 3 }}>{s.now}</div>
+                        <div style={{ color: '#dbdee1', fontSize: 13.5, marginTop: 3 }}>{L.liveStream}</div>
                         <div style={{ display: 'flex', gap: 22, marginTop: 12, flexWrap: 'wrap' }}>
-                          <div><div style={{ color: '#b5bac1', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>{L.genre}</div><div style={{ color: '#dbdee1', fontSize: 13, marginTop: 2 }}>{s.genre}</div></div>
+                          <div><div style={{ color: '#b5bac1', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>{L.genre}</div><div style={{ color: '#dbdee1', fontSize: 13, marginTop: 2 }}>{L.liveRadio}</div></div>
                           <div><div style={{ color: '#b5bac1', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>{L.bitrate}</div><div style={{ color: '#dbdee1', fontSize: 13, marginTop: 2 }}>{s.bitrate}</div></div>
-                          <div><div style={{ color: '#b5bac1', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>{L.listeners}</div><div style={{ color: '#dbdee1', fontSize: 13, marginTop: 2 }}>{s.listeners}</div></div>
+                          <div><div style={{ color: '#b5bac1', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Tier</div><div style={{ color: '#dbdee1', fontSize: 13, marginTop: 2 }}>{tierLabel}</div></div>
                         </div>
                       </div>
                       <div style={{ width: 68, height: 68, borderRadius: 8, flexShrink: 0, overflow: 'hidden', background: 'linear-gradient(135deg,#ff6b00,#7a1030)', display: 'grid', placeItems: 'center' }}>

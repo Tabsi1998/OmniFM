@@ -2,13 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Radio, Play, Users, Headphones, X } from 'lucide-react';
 import { resolvePrimaryInviteUrl } from '../lib/invite.js';
 import { useI18n } from '../i18n.js';
-
-const TRACKS = [
-  { s: 'Synthwave Nights', a: 'The Midnight — Vampires', g: '320 kbps' },
-  { s: 'Lofi Lounge', a: 'Idealism — Controlla', g: '256 kbps' },
-  { s: 'BassDrop Network', a: 'Netsky — Rio', g: '320 kbps' },
-  { s: 'Neon City FM', a: 'Gunship — Tech Noir', g: '320 kbps' },
-];
+import { useShowcaseStations } from '../lib/showcase.js';
 
 const barCss = `
 @keyframes npbar-eq { 0%,100%{transform:scaleY(0.3);} 50%{transform:scaleY(1);} }
@@ -33,10 +27,12 @@ export default function NowPlayingBar({ stats = {}, bots = [] }) {
   const [idx, setIdx] = useState(0);
   const [closed, setClosed] = useState(() => (typeof window !== 'undefined' && window.sessionStorage.getItem('omnifm_npbar_closed') === '1'));
   const invite = resolvePrimaryInviteUrl(bots);
-  useEffect(() => { const t = setInterval(() => setIdx((v) => (v + 1) % TRACKS.length), 4500); return () => clearInterval(t); }, []);
+  const stations = useShowcaseStations(8);
+  useEffect(() => { if (stations.length < 2) return undefined; const t = setInterval(() => setIdx((v) => (v + 1) % stations.length), 4500); return () => clearInterval(t); }, [stations.length]);
   if (closed) return null;
-  const track = TRACKS[idx];
-  const listeners = stats.listeners || stats.users || 1240;
+  const track = stations.length ? stations[idx % stations.length] : { name: 'OmniFM Radio Network', bitrate: 'Live' };
+  const streamLabel = locale === 'en' ? 'Live radio stream' : 'Live-Radio-Stream';
+  const listeners = stats.listeners || 0;
 
   return (
     <>
@@ -59,13 +55,15 @@ export default function NowPlayingBar({ stats = {}, bots = [] }) {
             <Radio size={19} color="#fff" />
           </div>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div key={track.s} style={{ fontWeight: 700, fontSize: 14, fontFamily: "'Syne','Outfit',sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{track.s}</div>
-            <div className="npbar-hidemobile" style={{ color: '#94a3b8', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{track.a}</div>
+            <div key={track.name} style={{ fontWeight: 700, fontSize: 14, fontFamily: "'Syne','Outfit',sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{track.name}</div>
+            <div className="npbar-hidemobile" style={{ color: '#94a3b8', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{streamLabel}</div>
           </div>
-          <span className="npbar-hidemobile" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#94a3b8', fontSize: 12, fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 }}>
-            <Users size={13} color="#ff6b00" /> {formatNumber(Number(listeners))}
-          </span>
-          <span className="npbar-hidemobile" style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, fontWeight: 700, color: '#ffb27a', background: 'rgba(255,107,0,0.14)', border: '1px solid rgba(255,107,0,0.3)', borderRadius: 999, padding: '3px 9px', flexShrink: 0 }}>{track.g}</span>
+          {listeners > 0 && (
+            <span className="npbar-hidemobile" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#94a3b8', fontSize: 12, fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 }}>
+              <Users size={13} color="#ff6b00" /> {formatNumber(Number(listeners))}
+            </span>
+          )}
+          <span className="npbar-hidemobile" style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, fontWeight: 700, color: '#ffb27a', background: 'rgba(255,107,0,0.14)', border: '1px solid rgba(255,107,0,0.3)', borderRadius: 999, padding: '3px 9px', flexShrink: 0 }}>{track.bitrate}</span>
           <Bars />
           <a
             href={invite}

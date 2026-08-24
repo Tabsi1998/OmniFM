@@ -1409,7 +1409,28 @@ def seed_premium_if_needed():
     except Exception:
         pass
 
-seed_premium_if_needed()
+# Demo-Lizenzen/-Entitlements NUR seeden, wenn ausdrücklich aktiviert (nicht im Live-Betrieb).
+if (os.environ.get("SEED_DEMO_DATA") or "").strip().lower() in ("1", "true", "yes"):
+    seed_premium_if_needed()
+
+
+def purge_demo_data_if_live():
+    """Entfernt beim Live-Betrieb übrig gebliebene Demo-Dokumente (idempotent, sicher)."""
+    if db is None:
+        return
+    if (os.environ.get("SEED_DEMO_DATA") or "").strip().lower() in ("1", "true", "yes"):
+        return
+    try:
+        rx = {"$regex": "^demo-", "$options": "i"}
+        removed = db.licenses.delete_many({"_licenseId": rx}).deleted_count
+        db.server_entitlements.delete_many({"_serverId": rx})
+        db.processed_sessions.delete_many({"_sessionId": rx})
+        if removed:
+            print(f"[live] Demo-Lizenzen entfernt: {removed}")
+    except Exception:
+        pass
+
+purge_demo_data_if_live()
 
 
 # === Premium Helper Functions (MongoDB) ===
@@ -3896,7 +3917,7 @@ async def admin_overview(request: Request):
     stations = _station_summary()
     bots = load_bots_from_env()
     dashboard = load_dashboard_data() or {}
-    guild_configs = dashboard.get("guilds", dashboard if isinstance(dashboard, dict) else {})
+    guild_configs = dashboard.get("guilds", {})
     guild_count = len(guild_configs) if isinstance(guild_configs, dict) else 0
 
     return {
@@ -4434,6 +4455,59 @@ async def admin_station_list(request: Request):
         except Exception:
             rows = []
     return {"stations": rows, "count": len(rows)}
+
+
+def _probe_station_url(url):
+    started = time.time()
+    try:
+        resp = requests.get(url, stream=True, timeout=5, headers={"Range": "bytes=0-2047", "User-Agent": "OmniFM-StreamTest/1.0", "Icy-MetaData": "1"})
+        elapsed = int((time.time() - started) * 1000)
+        ctype = resp.headers.get("Content-Type", "")
+        icy = resp.headers.get("icy-name") or resp.headers.get("Icy-Name")
+        reachable = resp.status_code < 400
+        is_audio = any(t in ctype.lower() for t in ("audio", "mpeg", "ogg", "aac", "octet-stream")) or bool(icy)
+        try:
+            resp.close()
+        except Exception:
+            pass
+        return {"ok": bool(reachable and is_audio), "reachable": bool(reachable), "status": resp.status_code, "latencyMs": elapsed}
+    except requests.exceptions.Timeout:
+        return {"ok": False, "reachable": False, "status": 0, "latencyMs": int((time.time() - started) * 1000), "message": "timeout"}
+    except Exception as e:
+        return {"ok": False, "reachable": False, "status": 0, "latencyMs": int((time.time() - started) * 1000), "message": clip_text(e, 80)}
+
+
+@app.post("/api/admin/stations/health")
+async def admin_station_health(request: Request, body: dict = None):
+    guard = _admin_guard(request)
+    if guard is not None:
+        return guard
+    if db is None:
+        return json_error(503, "MongoDB nicht verbunden.")
+    data = body or {}
+    keys = data.get("keys")
+    query = {"key": {"$not": {"$regex": "^custom:"}}}
+    if isinstance(keys, list) and keys:
+        norm = [str(k).strip().lower() for k in keys if str(k).strip()][:25]
+        query = {"key": {"$in": norm}}
+    rows = [r for r in db.stations.find(query, {"_id": 0, "key": 1, "url": 1}).limit(25) if r.get("url")]
+
+    def run_all():
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        out = {}
+        with ThreadPoolExecutor(max_workers=10) as ex:
+            futs = {ex.submit(_probe_station_url, r["url"]): r["key"] for r in rows}
+            for fut in as_completed(futs):
+                key = futs[fut]
+                try:
+                    out[key] = fut.result()
+                except Exception as e:
+                    out[key] = {"ok": False, "reachable": False, "message": clip_text(e, 80)}
+        return out
+
+    results = await run_in_threadpool(run_all)
+    truncated = isinstance(keys, list) and len([k for k in keys if str(k).strip()]) > 25
+    return {"results": results, "count": len(results), "truncated": truncated}
 
 
 

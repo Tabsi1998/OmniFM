@@ -110,6 +110,9 @@ export default function OwnerAdmin() {
   const [stTest, setStTest] = useState(null);
   const [stBusy, setStBusy] = useState(false);
   const [stMsg, setStMsg] = useState(null);
+  const [stHealth, setStHealth] = useState({});
+  const [stHealthBusy, setStHealthBusy] = useState(false);
+  const [stHealthProg, setStHealthProg] = useState(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -241,6 +244,27 @@ export default function OwnerAdmin() {
     try { await apiSend(`/api/admin/stations/${encodeURIComponent(key)}`, 'DELETE'); setStMsg({ ok: true, text: `Station ${key} gelöscht.` }); await loadStations(); }
     catch (e) { setStMsg({ ok: false, text: e.message }); }
     finally { setStBusy(false); }
+  };
+
+  const checkStationHealth = async (keys) => {
+    // Prüft Live-Status für die angegebenen Sender-Keys (in Batches à 15).
+    const list = (keys && keys.length ? keys : stationList.map((s) => s.key)).filter(Boolean);
+    if (!list.length) return;
+    setStHealthBusy(true);
+    setStHealthProg({ done: 0, total: list.length });
+    setStHealth((prev) => { const next = { ...prev }; list.forEach((k) => { next[k] = { checking: true }; }); return next; });
+    try {
+      let done = 0;
+      for (let i = 0; i < list.length; i += 15) {
+        const batch = list.slice(i, i + 15);
+        // eslint-disable-next-line no-await-in-loop
+        const r = await apiSend('/api/admin/stations/health', 'POST', { keys: batch });
+        setStHealth((prev) => ({ ...prev, ...(r.results || {}) }));
+        done += batch.length;
+        setStHealthProg({ done, total: list.length });
+      }
+    } catch (e) { setStMsg({ ok: false, text: e.message }); }
+    finally { setStHealthBusy(false); setStHealthProg(null); }
   };
 
   const handleLogin = async (e) => {
@@ -657,7 +681,10 @@ export default function OwnerAdmin() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '28px 0 14px' }}>
               <div className="oa-section-title" style={{ margin: 0 }}><ListMusic size={15} /> Katalog verwalten ({stationList.length})</div>
-              <button className="oa-btn primary" style={{ height: 40 }} onClick={openNewStation} data-testid="station-add-button"><Plus size={16} /> Station hinzufügen</button>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button className="oa-btn ghost" style={{ height: 40 }} disabled={stHealthBusy || !stationList.length} onClick={() => checkStationHealth()} data-testid="station-check-all-button"><SignalHigh size={16} /> {stHealthBusy ? `Prüfe… ${stHealthProg ? `${stHealthProg.done}/${stHealthProg.total}` : ''}` : 'Live-Status prüfen'}</button>
+                <button className="oa-btn primary" style={{ height: 40 }} onClick={openNewStation} data-testid="station-add-button"><Plus size={16} /> Station hinzufügen</button>
+              </div>
             </div>
 
             {stMsg && (
@@ -715,22 +742,32 @@ export default function OwnerAdmin() {
 
             <div className="oa-table-wrap oa-fade" data-testid="stations-table">
               <table className="oa-table">
-                <thead><tr><th>Key</th><th>Name</th><th>Genre</th><th>Tier</th><th style={{ textAlign: 'right' }}>Aktionen</th></tr></thead>
+                <thead><tr><th>Key</th><th>Name</th><th>Genre</th><th>Tier</th><th>Live-Status</th><th style={{ textAlign: 'right' }}>Aktionen</th></tr></thead>
                 <tbody>
-                  {stationList.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', color: '#64748b', padding: 24 }}>Lade Katalog…</td></tr>}
-                  {stationList.map((s, i) => (
+                  {stationList.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', color: '#64748b', padding: 24 }}>Lade Katalog…</td></tr>}
+                  {stationList.map((s, i) => {
+                    const h = stHealth[s.key];
+                    return (
                     <tr key={s.key || i} data-testid={`station-row-${s.key}`}>
                       <td className="oa-mono" style={{ fontSize: 12, color: '#94a3b8' }}>{s.key}{s.isDefault && <span className="oa-pill orange" style={{ marginLeft: 8, padding: '2px 7px' }}>default</span>}</td>
                       <td style={{ fontWeight: 600 }}>{s.name}</td>
                       <td style={{ color: '#94a3b8' }}>{s.genre || '—'}</td>
                       <td><span className={`oa-pill ${s.tier === 'ultimate' ? 'orange' : s.tier === 'pro' ? 'cyan' : 'slate'}`}>{String(s.tier || 'free').toUpperCase()}</span></td>
+                      <td data-testid={`station-status-${s.key}`}>
+                        {!h && <span className="oa-pill slate" style={{ padding: '2px 8px' }}>—</span>}
+                        {h && h.checking && <span className="oa-pill slate" style={{ padding: '2px 8px' }}>Prüfe…</span>}
+                        {h && !h.checking && h.ok && <span className="oa-pill green" style={{ padding: '2px 8px' }}><CheckCircle2 size={11} /> Live{typeof h.latencyMs === 'number' ? ` · ${h.latencyMs}ms` : ''}</span>}
+                        {h && !h.checking && !h.ok && h.reachable && <span className="oa-pill amber" style={{ padding: '2px 8px' }}><AlertTriangle size={11} /> Kein Audio</span>}
+                        {h && !h.checking && !h.ok && !h.reachable && <span className="oa-pill red" style={{ padding: '2px 8px' }}><XCircle size={11} /> Offline</span>}
+                      </td>
                       <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <button title="Test" className="oa-btn ghost" style={{ height: 32, padding: '0 9px', marginLeft: 6 }} disabled={stBusy} onClick={() => { setStForm(null); testStationUrl(s.url); setStMsg(null); openEditStation(s); }} data-testid={`station-row-test-${s.key}`}><SignalHigh size={14} /></button>
+                        <button title="Einzeln prüfen" className="oa-btn ghost" style={{ height: 32, padding: '0 9px', marginLeft: 6 }} disabled={stHealthBusy} onClick={() => checkStationHealth([s.key])} data-testid={`station-row-test-${s.key}`}><SignalHigh size={14} /></button>
                         <button title="Bearbeiten" className="oa-btn ghost" style={{ height: 32, padding: '0 9px', marginLeft: 6 }} onClick={() => openEditStation(s)} data-testid={`station-row-edit-${s.key}`}><Pencil size={14} /></button>
                         <button title={s.isDefault ? 'Standard-Station' : 'Löschen'} className="oa-btn ghost" style={{ height: 32, padding: '0 9px', marginLeft: 6, color: '#ff8fab', opacity: s.isDefault ? 0.4 : 1 }} disabled={stBusy || s.isDefault} onClick={() => deleteStation(s.key)} data-testid={`station-row-delete-${s.key}`}><Trash2 size={14} /></button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
