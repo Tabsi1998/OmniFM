@@ -328,6 +328,7 @@ fi
 # =============================================================================
 # FERTIG
 # =============================================================================
-log "Fertig. Backend: ${BACKEND_URL}  |  Frontend: ${FRONTEND_ORIGIN}"
+WEB_INFO="${PUBLIC_URL:-http://${SERVER_IP}:${FRONTEND_PORT}}"
+log "Fertig. Web: ${WEB_INFO}  |  Backend intern: http://127.0.0.1:${BACKEND_PORT}  |  API: ${FRONTEND_API:-/api (relativ)}"
 log "Logs: $LOG_DIR   Stoppen mit: ./stop.sh"
 print_owner_box
