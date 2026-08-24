@@ -6,11 +6,27 @@ const bgFor = (bg) => bg === 'light' ? '#f3f4f8' : bg === 'discord' ? '#313338' 
 
 function CopyBtn({ text, testid }) {
   const [done, setDone] = useState(false);
+  const doCopy = async () => {
+    let ok = false;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        ok = true;
+      }
+    } catch { ok = false; }
+    if (!ok) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch { ok = false; }
+    }
+    if (ok) { setDone(true); setTimeout(() => setDone(false), 1600); }
+  };
   return (
-    <button
-      className="oa-btn ghost" style={{ height: 38 }} data-testid={testid}
-      onClick={() => { navigator.clipboard?.writeText(text); setDone(true); setTimeout(() => setDone(false), 1600); }}
-    >
+    <button className="oa-btn ghost" style={{ height: 38 }} data-testid={testid} onClick={doCopy}>
       {done ? <Check size={15} color="#4ade80" /> : <Copy size={15} />} {done ? 'Kopiert' : 'Kopieren'}
     </button>
   );
@@ -29,7 +45,9 @@ export default function BrandKit({ embedded = false }) {
       <div style={{ maxWidth: 1120, margin: '0 auto', padding: embedded ? 0 : '90px 24px 80px' }} data-testid="brand-kit">
         {!embedded && (
           <>
-            <a href="/" className="oa-mono" style={{ fontSize: 12, color: '#94a3b8', display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 22 }} data-testid="brand-back-home"><ArrowLeft size={14} /> Zurück zur Website</a>
+            <div style={{ marginBottom: 18 }}>
+              <a href="/" className="oa-mono" style={{ fontSize: 12, color: '#94a3b8', display: 'inline-flex', alignItems: 'center', gap: 6 }} data-testid="brand-back-home"><ArrowLeft size={14} /> Zurück zur Website</a>
+            </div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, padding: '6px 14px', borderRadius: 999, background: 'rgba(255,107,0,0.08)', border: '1px solid rgba(255,107,0,0.28)', marginBottom: 20 }}>
               <Radio size={14} color="#ff6b00" />
               <span className="oa-mono" style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#ffb27a' }}>Presse &amp; Brand Kit</span>
@@ -43,7 +61,7 @@ export default function BrandKit({ embedded = false }) {
 
         {/* Logos */}
         <div className="oa-section-title" style={{ marginTop: embedded ? 0 : 8 }}><Download size={15} /> Logos &amp; Assets</div>
-        <div className="oa-grid cols-3" data-testid="brand-asset-grid">
+        <div className="oa-grid cols-3" data-testid="brand-catalog">
           {BRAND_ASSETS.map((a) => (
             <div className="oa-card hoverable" key={a.slug} data-testid={`brand-asset-${a.slug}`}>
               <div style={{ height: 150, borderRadius: 12, background: bgFor(a.bg), display: 'grid', placeItems: 'center', overflow: 'hidden', marginBottom: 14, border: '1px solid #1b2133' }}>

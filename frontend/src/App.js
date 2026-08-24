@@ -14,6 +14,7 @@ import StatsFooter from './components/StatsFooter.js';
 import Navbar from './components/Navbar.js';
 import PlanMatrix from './components/PlanMatrix.js';
 import DashboardPortal from './components/DashboardPortal.js';
+import GuildDashboard from './components/GuildDashboard.js';
 import OwnerAdmin from './components/OwnerAdmin.js';
 import BrandKit from './components/BrandKit.js';
 import DiscordShowcase from './components/DiscordShowcase.js';
@@ -142,7 +143,7 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    if (currentPage === 'dashboard' || currentPage === 'admin' || currentPage === 'brand') {
+    if (currentPage === 'dashboard' || currentPage === 'dashboard-classic' || currentPage === 'admin' || currentPage === 'brand') {
       setLoading(false);
       return () => {};
     }
@@ -222,6 +223,14 @@ function AppContent() {
   if (currentPage === 'dashboard') {
     return (
       <div data-testid="app-dashboard-root" style={{ position: 'relative', minHeight: '100vh' }}>
+        <GuildDashboard />
+      </div>
+    );
+  }
+
+  if (currentPage === 'dashboard-classic') {
+    return (
+      <div data-testid="app-dashboard-classic-root" style={{ position: 'relative', minHeight: '100vh' }}>
         <DashboardPortal />
       </div>
     );
