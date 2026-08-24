@@ -59,3 +59,8 @@ runtime-data.pre-restore-*/
 design_guidelines.json
 backend_test.py
 .gitconfig
+.env.*
+credentials.json
+*.pem
+*.key
+.credentials

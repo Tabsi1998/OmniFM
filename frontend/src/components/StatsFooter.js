@@ -8,10 +8,10 @@ function StatsFooter({ stats, legal }) {
   const operatorName = String(legal?.legal?.providerName || '').trim();
 
   const footerStats = [
-    { label: copy.footer.stats.servers, value: stats.servers || 0, color: '#00F0FF' },
-    { label: copy.footer.stats.connections, value: stats.connections || 0, color: '#39FF14' },
-    { label: copy.footer.stats.listeners, value: stats.listeners || 0, color: '#FFB800' },
-    { label: copy.footer.stats.stations, value: stats.stations || 0, color: '#BD00FF' },
+    { label: copy.footer.stats.servers, value: stats.servers || 0, color: '#ff6b00' },
+    { label: copy.footer.stats.connections, value: stats.connections || 0, color: '#00e5ff' },
+    { label: copy.footer.stats.listeners, value: stats.listeners || 0, color: '#f59e0b' },
+    { label: copy.footer.stats.stations, value: stats.stations || 0, color: '#ff2a5f' },
   ];
 
   return (
@@ -69,17 +69,7 @@ function StatsFooter({ stats, legal }) {
         >
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-              <Radio size={16} color="#00F0FF" />
-              <span
-                style={{
-                  fontFamily: "'Orbitron', sans-serif",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  letterSpacing: '0.05em',
-                }}
-              >
-                OMNI<span style={{ color: '#00F0FF' }}>FM</span>
-              </span>
+              <img src="/brand/omnifm-wordmark-dark.png" alt="OmniFM" style={{ height: 30, width: 'auto', display: 'block' }} data-testid="footer-logo" />
             </div>
             <p style={{ margin: 0, color: '#71717A', fontSize: 13, lineHeight: 1.7, maxWidth: 560 }}>
               {copy.footer.liveNote}
