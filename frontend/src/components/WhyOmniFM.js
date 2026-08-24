@@ -3,10 +3,10 @@ import { AudioLines, Gauge, LayoutDashboard, Users } from 'lucide-react';
 import { useI18n } from '../i18n.js';
 
 const CARD_META = [
-  { key: 'radio', icon: AudioLines, color: '#00F0FF' },
-  { key: 'workers', icon: Users, color: '#39FF14' },
-  { key: 'control', icon: LayoutDashboard, color: '#FFB800' },
-  { key: 'growth', icon: Gauge, color: '#BD00FF' },
+  { key: 'radio', icon: AudioLines, color: '#00e5ff' },
+  { key: 'workers', icon: Users, color: '#ff6b00' },
+  { key: 'control', icon: LayoutDashboard, color: '#ff6b00' },
+  { key: 'growth', icon: Gauge, color: '#ff2a5f' },
 ];
 
 export default function WhyOmniFM() {
@@ -22,12 +22,12 @@ export default function WhyOmniFM() {
         <div style={{ marginBottom: 36 }}>
           <span
             style={{
-              fontFamily: "'Orbitron', sans-serif",
+              fontFamily: "'Syne', sans-serif",
               fontSize: 11,
               fontWeight: 700,
               letterSpacing: '0.15em',
               textTransform: 'uppercase',
-              color: '#39FF14',
+              color: '#ff6b00',
             }}
           >
             {copy.whyOmniFM.eyebrow}
@@ -35,7 +35,7 @@ export default function WhyOmniFM() {
           <h2
             data-testid="why-omnifm-title"
             style={{
-              fontFamily: "'Orbitron', sans-serif",
+              fontFamily: "'Syne', sans-serif",
               fontWeight: 800,
               fontSize: 'clamp(24px, 4vw, 40px)',
               marginTop: 8,
@@ -68,7 +68,7 @@ export default function WhyOmniFM() {
                     {card.key}
                   </span>
                 </div>
-                <h3 style={{ fontFamily: "'Orbitron', sans-serif", fontSize: 15, fontWeight: 700, marginBottom: 8 }}>
+                <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 700, marginBottom: 8 }}>
                   {item.title}
                 </h3>
                 <p style={{ margin: 0, fontSize: 14, color: '#A1A1AA', lineHeight: 1.7 }}>

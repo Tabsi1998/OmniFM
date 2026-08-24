@@ -4,8 +4,8 @@ import { useI18n } from '../i18n.js';
 
 const CARD_META = [
   { key: 'free', icon: Shield, color: '#A1A1AA' },
-  { key: 'pro', icon: Zap, color: '#FFB800' },
-  { key: 'ultimate', icon: Crown, color: '#BD00FF' },
+  { key: 'pro', icon: Zap, color: '#ff6b00' },
+  { key: 'ultimate', icon: Crown, color: '#ff2a5f' },
 ];
 
 export default function UseCasesSection() {
@@ -21,12 +21,12 @@ export default function UseCasesSection() {
         <div style={{ marginBottom: 34 }}>
           <span
             style={{
-              fontFamily: "'Orbitron', sans-serif",
+              fontFamily: "'Syne', sans-serif",
               fontSize: 11,
               fontWeight: 700,
               letterSpacing: '0.15em',
               textTransform: 'uppercase',
-              color: '#FFB800',
+              color: '#ff6b00',
             }}
           >
             {copy.useCases.eyebrow}
@@ -34,7 +34,7 @@ export default function UseCasesSection() {
           <h2
             data-testid="use-cases-title"
             style={{
-              fontFamily: "'Orbitron', sans-serif",
+              fontFamily: "'Syne', sans-serif",
               fontWeight: 800,
               fontSize: 'clamp(24px, 4vw, 40px)',
               marginTop: 8,
@@ -100,7 +100,7 @@ export default function UseCasesSection() {
                 </div>
                 <h3
                   style={{
-                    fontFamily: "'Orbitron', sans-serif",
+                    fontFamily: "'Syne', sans-serif",
                     fontSize: 15,
                     fontWeight: 700,
                     marginBottom: 8,

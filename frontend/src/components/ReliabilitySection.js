@@ -3,10 +3,10 @@ import { Activity, RadioTower, ShieldCheck, Split } from 'lucide-react';
 import { useI18n } from '../i18n.js';
 
 const CARD_META = [
-  { key: 'uptime', icon: RadioTower, color: '#00F0FF' },
-  { key: 'workers', icon: Split, color: '#39FF14' },
-  { key: 'reconnect', icon: ShieldCheck, color: '#FFB800' },
-  { key: 'visibility', icon: Activity, color: '#BD00FF' },
+  { key: 'uptime', icon: RadioTower, color: '#00e5ff' },
+  { key: 'workers', icon: Split, color: '#ff6b00' },
+  { key: 'reconnect', icon: ShieldCheck, color: '#ff6b00' },
+  { key: 'visibility', icon: Activity, color: '#ff2a5f' },
 ];
 
 export default function ReliabilitySection() {
@@ -22,12 +22,12 @@ export default function ReliabilitySection() {
         <div style={{ marginBottom: 36 }}>
           <span
             style={{
-              fontFamily: "'Orbitron', sans-serif",
+              fontFamily: "'Syne', sans-serif",
               fontSize: 11,
               fontWeight: 700,
               letterSpacing: '0.15em',
               textTransform: 'uppercase',
-              color: '#BD00FF',
+              color: '#ff2a5f',
             }}
           >
             {copy.reliability.eyebrow}
@@ -35,7 +35,7 @@ export default function ReliabilitySection() {
           <h2
             data-testid="reliability-title"
             style={{
-              fontFamily: "'Orbitron', sans-serif",
+              fontFamily: "'Syne', sans-serif",
               fontWeight: 800,
               fontSize: 'clamp(24px, 4vw, 40px)',
               marginTop: 8,
@@ -82,7 +82,7 @@ export default function ReliabilitySection() {
                 </div>
                 <h3
                   style={{
-                    fontFamily: "'Orbitron', sans-serif",
+                    fontFamily: "'Syne', sans-serif",
                     fontSize: 14,
                     fontWeight: 700,
                     marginBottom: 8,

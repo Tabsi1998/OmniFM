@@ -13,14 +13,14 @@ import { useI18n } from '../i18n.js';
 import { buildApiUrl } from '../lib/api.js';
 
 const ROLE_COLORS = {
-  commander: { accent: '#00F0FF', bg: 'rgba(0, 240, 255, 0.06)', border: 'rgba(0, 240, 255, 0.2)', glow: 'rgba(0, 240, 255, 0.12)' },
-  worker: { accent: '#39FF14', bg: 'rgba(57, 255, 20, 0.04)', border: 'rgba(57, 255, 20, 0.15)', glow: 'rgba(57, 255, 20, 0.08)' },
+  commander: { accent: '#00e5ff', bg: 'rgba(0,229,255, 0.06)', border: 'rgba(0,229,255, 0.2)', glow: 'rgba(0,229,255, 0.12)' },
+  worker: { accent: '#ff6b00', bg: 'rgba(255,107,0, 0.04)', border: 'rgba(255,107,0, 0.15)', glow: 'rgba(255,107,0, 0.08)' },
 };
 
 const TIER_COLORS = {
   free: { label: 'Free', color: '#A1A1AA', bg: 'rgba(161,161,170,0.1)' },
-  pro: { label: 'Pro', color: '#FFB800', bg: 'rgba(255,184,0,0.1)' },
-  ultimate: { label: 'Ultimate', color: '#BD00FF', bg: 'rgba(189,0,255,0.1)' },
+  pro: { label: 'Pro', color: '#ff6b00', bg: 'rgba(255,107,0,0.1)' },
+  ultimate: { label: 'Ultimate', color: '#ff2a5f', bg: 'rgba(255,42,95,0.1)' },
 };
 
 function TierBadge({ tier }) {
@@ -37,7 +37,7 @@ function TierBadge({ tier }) {
         borderRadius: 6,
         fontSize: 10,
         fontWeight: 800,
-        fontFamily: "'Orbitron', sans-serif",
+        fontFamily: "'Syne', sans-serif",
         letterSpacing: '0.1em',
         background: tierConfig.bg,
         color: tierConfig.color,
@@ -88,7 +88,7 @@ function WorkerNode({ bot, isCommander, copy, formatNumber }) {
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontFamily: "'Orbitron', sans-serif", fontSize: 14, fontWeight: 700, color: '#fff' }}>
+              <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: '#fff' }}>
                 {bot.name}
               </span>
               <span style={{
@@ -97,9 +97,9 @@ function WorkerNode({ bot, isCommander, copy, formatNumber }) {
                 letterSpacing: '0.1em',
                 padding: '2px 6px',
                 borderRadius: 4,
-                background: isCommander ? `${colors.accent}15` : 'rgba(57,255,20,0.1)',
+                background: isCommander ? `${colors.accent}15` : 'rgba(255,107,0,0.1)',
                 color: colors.accent,
-                fontFamily: "'Orbitron', sans-serif",
+                fontFamily: "'Syne', sans-serif",
               }}>
                 {isCommander ? copy.workers.status.commander : `${copy.workers.status.workerPrefix}${bot.index}`}
               </span>
@@ -110,10 +110,10 @@ function WorkerNode({ bot, isCommander, copy, formatNumber }) {
                   width: 7,
                   height: 7,
                   borderRadius: '50%',
-                  background: bot.online ? '#39FF14' : '#52525B',
-                  boxShadow: bot.online ? '0 0 6px rgba(57,255,20,0.5)' : 'none',
+                  background: bot.online ? '#ff6b00' : '#52525B',
+                  boxShadow: bot.online ? '0 0 6px rgba(255,107,0,0.5)' : 'none',
                 }} />
-                <span style={{ fontSize: 11, color: bot.online ? '#39FF14' : '#52525B', fontWeight: 600 }}>
+                <span style={{ fontSize: 11, color: bot.online ? '#ff6b00' : '#52525B', fontWeight: 600 }}>
                   {bot.online ? copy.workers.status.online : copy.workers.status.offline}
                 </span>
               </div>
@@ -157,7 +157,7 @@ function TierCard({ name, maxWorkers, color, icon: IconComp, label }) {
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <IconComp size={16} color={color} />
-        <span style={{ fontFamily: "'Orbitron', sans-serif", fontSize: 12, fontWeight: 700, color, letterSpacing: '0.1em' }}>
+        <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 12, fontWeight: 700, color, letterSpacing: '0.1em' }}>
           {name}
         </span>
       </div>
@@ -220,22 +220,22 @@ function WorkerDashboard() {
 
   const summaryCards = [
     { label: copy.workers.labels.workersTotal, value: totalWorkers, color: '#A1A1AA', icon: Users },
-    { label: copy.workers.labels.workersOnline, value: onlineWorkers, color: '#39FF14', icon: Activity },
-    { label: copy.workers.labels.activeStreams, value: activeStreams, color: '#00F0FF', icon: Radio },
-    { label: copy.workers.labels.commanderServers, value: commander?.servers || 0, color: '#FFB800', icon: Server },
+    { label: copy.workers.labels.workersOnline, value: onlineWorkers, color: '#ff6b00', icon: Activity },
+    { label: copy.workers.labels.activeStreams, value: activeStreams, color: '#00e5ff', icon: Radio },
+    { label: copy.workers.labels.commanderServers, value: commander?.servers || 0, color: '#ff6b00', icon: Server },
   ];
 
   return (
     <section id="workers" data-testid="worker-dashboard" style={{ padding: '80px 0', position: 'relative', zIndex: 1 }}>
       <div className="section-container">
         <div style={{ marginBottom: 48 }}>
-          <span style={{ fontFamily: "'Orbitron', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#00F0FF' }}>
+          <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#00e5ff' }}>
             {copy.workers.eyebrow}
           </span>
           <h2
             data-testid="worker-dashboard-title"
             style={{
-              fontFamily: "'Orbitron', sans-serif",
+              fontFamily: "'Syne', sans-serif",
               fontWeight: 800,
               fontSize: 'clamp(24px, 4vw, 40px)',
               marginTop: 8,
@@ -253,8 +253,8 @@ function WorkerDashboard() {
           {tiers && (
             <>
               <TierCard name={copy.workers.tierCards.free.name} maxWorkers={tiers.free?.maxWorkers || 2} color="#A1A1AA" icon={Users} label={copy.workers.tierCards.free.maxWorkers} />
-              <TierCard name={copy.workers.tierCards.pro.name} maxWorkers={tiers.pro?.maxWorkers || 8} color="#FFB800" icon={Zap} label={copy.workers.tierCards.pro.maxWorkers} />
-              <TierCard name={copy.workers.tierCards.ultimate.name} maxWorkers={tiers.ultimate?.maxWorkers || 16} color="#BD00FF" icon={Crown} label={copy.workers.tierCards.ultimate.maxWorkers} />
+              <TierCard name={copy.workers.tierCards.pro.name} maxWorkers={tiers.pro?.maxWorkers || 8} color="#ff6b00" icon={Zap} label={copy.workers.tierCards.pro.maxWorkers} />
+              <TierCard name={copy.workers.tierCards.ultimate.name} maxWorkers={tiers.ultimate?.maxWorkers || 16} color="#ff2a5f" icon={Crown} label={copy.workers.tierCards.ultimate.maxWorkers} />
             </>
           )}
         </div>
@@ -288,9 +288,9 @@ function WorkerDashboard() {
 
           {workers && workers.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 20px' }}>
-              <div style={{ width: 2, height: 20, background: 'rgba(0,240,255,0.15)', marginLeft: 20 }} />
+              <div style={{ width: 2, height: 20, background: 'rgba(0,229,255,0.15)', marginLeft: 20 }} />
               <ChevronRight size={14} color="#52525B" />
-              <span style={{ fontSize: 11, color: '#52525B', fontWeight: 600, letterSpacing: '0.08em', fontFamily: "'Orbitron', sans-serif" }}>
+              <span style={{ fontSize: 11, color: '#52525B', fontWeight: 600, letterSpacing: '0.08em', fontFamily: "'Syne', sans-serif" }}>
                 {copy.workers.delegated} ({formatNumber(workers.length)})
               </span>
             </div>

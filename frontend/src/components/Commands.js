@@ -12,19 +12,19 @@ import { useI18n } from '../i18n.js';
 const COMMAND_TIERS = {
   free: {
     label: 'Free',
-    color: '#39FF14',
+    color: '#ff6b00',
     icon: Shield,
     commands: ['help', 'play', 'pause', 'resume', 'stop', 'stations', 'list', 'setvolume', 'status', 'health', 'diag', 'premium', 'language', 'license', 'invite', 'workers', 'stats'],
   },
   pro: {
     label: 'Pro',
-    color: '#FFB800',
+    color: '#ff6b00',
     icon: Zap,
     commands: ['now', 'history', 'event', 'perm'],
   },
   ultimate: {
     label: 'Ultimate',
-    color: '#BD00FF',
+    color: '#ff2a5f',
     icon: Crown,
     commands: ['addstation', 'removestation', 'mystations', 'voiceguard'],
   },
@@ -87,7 +87,7 @@ function TierColumn({ tier, config, commands, expanded, onToggle, countLabel, tr
           </div>
           <div>
             <div style={{
-              fontFamily: "'Orbitron', sans-serif",
+              fontFamily: "'Syne', sans-serif",
               fontSize: 13,
               fontWeight: 700,
               color: config.color,
@@ -178,14 +178,14 @@ function Commands({ commands, loading }) {
       <div className="section-container">
         <div style={{ marginBottom: 48 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <Terminal size={16} color="#BD00FF" />
+            <Terminal size={16} color="#ff2a5f" />
             <span style={{
-              fontFamily: "'Orbitron', sans-serif",
+              fontFamily: "'Syne', sans-serif",
               fontSize: 11,
               fontWeight: 600,
               letterSpacing: '0.15em',
               textTransform: 'uppercase',
-              color: '#BD00FF',
+              color: '#ff2a5f',
             }}>
               {copy.commands.eyebrow}
             </span>
@@ -193,7 +193,7 @@ function Commands({ commands, loading }) {
           <h2
             data-testid="commands-title"
             style={{
-              fontFamily: "'Orbitron', sans-serif",
+              fontFamily: "'Syne', sans-serif",
               fontWeight: 800,
               fontSize: 'clamp(24px, 4vw, 40px)',
               marginBottom: 12,

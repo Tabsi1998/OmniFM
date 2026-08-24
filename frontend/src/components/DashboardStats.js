@@ -213,7 +213,7 @@ export default function DashboardStatsPanel({ stats, detailStats, inviteLinks = 
               <YAxis tick={{ fill: '#52525B', fontSize: 10 }} width={34} />
               <Tooltip content={<CustomTooltip />} />
               <Bar dataKey="runtimeHours" fill="#52525B" radius={[2, 2, 0, 0]} name={t('Runtime (h)', 'Runtime (h)')} />
-              <Bar dataKey="listeningHours" fill="#00F0FF" radius={[2, 2, 0, 0]} name={t('Listening (h)', 'Listening (h)')} />
+              <Bar dataKey="listeningHours" fill="#00e5ff" radius={[2, 2, 0, 0]} name={t('Listening (h)', 'Listening (h)')} />
             </BarChart>
           </ResponsiveContainer>
         </Section>
@@ -278,7 +278,7 @@ export default function DashboardStatsPanel({ stats, detailStats, inviteLinks = 
               <XAxis dataKey="time" tick={{ fill: '#52525B', fontSize: 10 }} interval={Math.max(1, Math.floor(timelineData.length / 12))} />
               <YAxis tick={{ fill: '#52525B', fontSize: 10 }} width={30} />
               <Tooltip content={<CustomTooltip />} />
-              <Line type="monotone" dataKey="listeners" stroke="#00F0FF" strokeWidth={2} dot={false} name={t('Zuhörer', 'Listeners')} />
+              <Line type="monotone" dataKey="listeners" stroke="#00e5ff" strokeWidth={2} dot={false} name={t('Zuhörer', 'Listeners')} />
             </LineChart>
           </ResponsiveContainer>
         </Section>

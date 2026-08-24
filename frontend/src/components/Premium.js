@@ -7,8 +7,8 @@ import { resolvePrimaryInviteUrl } from '../lib/invite.js';
 const PLAN_ORDER = ['free', 'pro', 'ultimate'];
 const PLAN_META = {
   free: { color: '#A1A1AA', icon: Shield },
-  pro: { color: '#FFB800', icon: Zap },
-  ultimate: { color: '#BD00FF', icon: Crown },
+  pro: { color: '#ff6b00', icon: Zap },
+  ultimate: { color: '#ff2a5f', icon: Crown },
 };
 
 const BASE_FALLBACK_PRICING = {
@@ -90,8 +90,8 @@ function normalizePricing(rawPricing, fallbackPricing) {
 }
 
 function mapTierToColor(tier) {
-  if (tier === 'ultimate') return '#BD00FF';
-  if (tier === 'pro') return '#FFB800';
+  if (tier === 'ultimate') return '#ff2a5f';
+  if (tier === 'pro') return '#ff6b00';
   return '#A1A1AA';
 }
 
@@ -129,7 +129,7 @@ function CheckoutModal(props) {
   const [trialLoading, setTrialLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [noticeColor, setNoticeColor] = useState('#39FF14');
+  const [noticeColor, setNoticeColor] = useState('#ff6b00');
 
   const Icon = meta.icon;
   const trialEnabled = planId === 'pro' && trialConfig?.enabled !== false;
@@ -176,7 +176,7 @@ function CheckoutModal(props) {
     letterSpacing: '0.12em',
     textTransform: 'uppercase',
     marginBottom: 6,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "'Syne', sans-serif",
   };
 
   useEffect(() => {
@@ -222,7 +222,7 @@ function CheckoutModal(props) {
         return;
       }
       if (payload?.activated) {
-        setNoticeColor('#39FF14');
+        setNoticeColor('#ff6b00');
         setNotice(payload?.message || copy.premium.trialActivatedDefault);
         return;
       }
@@ -263,7 +263,7 @@ function CheckoutModal(props) {
         setError(payload?.error || payload?.message || copy.premium.trialFailed);
         return;
       }
-      setNoticeColor('#39FF14');
+      setNoticeColor('#ff6b00');
       setNotice(payload?.message || copy.premium.trialActivatedDefault);
     } catch {
       setError(copy.premium.trialFailed);
@@ -334,7 +334,7 @@ function CheckoutModal(props) {
           }}>
             <Icon size={26} color={meta.color} />
           </div>
-          <h3 style={{ fontFamily: "'Orbitron', sans-serif", fontWeight: 800, fontSize: 22, color: '#fff', margin: 0 }}>
+          <h3 style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 22, color: '#fff', margin: 0 }}>
             {copy.premium.checkoutTitle({ name: tier.name })}
           </h3>
         </div>
@@ -417,12 +417,12 @@ function CheckoutModal(props) {
                         right: -4,
                         padding: '2px 6px',
                         borderRadius: 6,
-                        background: '#00FF66',
+                        background: '#ff6b00',
                         color: '#050505',
                         fontSize: 8,
                         fontWeight: 800,
                         letterSpacing: '0.05em',
-                        fontFamily: "'Orbitron', sans-serif",
+                        fontFamily: "'Syne', sans-serif",
                       }}>
                         {copy.premium.bestValue}
                       </span>
@@ -475,12 +475,12 @@ function CheckoutModal(props) {
                       right: -4,
                       padding: '2px 6px',
                       borderRadius: 6,
-                      background: '#00FF66',
+                      background: '#ff6b00',
                       color: '#050505',
                       fontSize: 8,
                       fontWeight: 800,
                       letterSpacing: '0.05em',
-                      fontFamily: "'Orbitron', sans-serif",
+                      fontFamily: "'Syne', sans-serif",
                     }}>
                       {copy.premium.durationBonus}
                     </span>
@@ -526,7 +526,7 @@ function CheckoutModal(props) {
             {copy.premium.licenseHintLead}{' '}
             <strong style={{ color: meta.color }}>{copy.premium.licenseHintKey}</strong>{' '}
             {copy.premium.licenseHintMiddle}{' '}
-            <strong style={{ color: '#00F0FF' }}>{copy.premium.licenseHintCommand}</strong>{' '}
+            <strong style={{ color: '#00e5ff' }}>{copy.premium.licenseHintCommand}</strong>{' '}
             {copy.premium.licenseHintTail}
           </p>
         </div>
@@ -537,7 +537,7 @@ function CheckoutModal(props) {
           </p>
         )}
         {error && (
-          <p data-testid="checkout-error-msg" style={{ margin: '0 0 12px', fontSize: 12, color: '#FF2A2A', textAlign: 'center' }}>
+          <p data-testid="checkout-error-msg" style={{ margin: '0 0 12px', fontSize: 12, color: '#ff2a5f', textAlign: 'center' }}>
             {error}
           </p>
         )}
@@ -677,7 +677,7 @@ function Premium({ bots = [] }) {
     const normalizedServerId = serverId.trim();
     if (!/^\d{17,22}$/.test(normalizedServerId)) {
       setResult(copy.premium.serverIdInvalid);
-      setResultColor('#FF2A2A');
+      setResultColor('#ff2a5f');
       return;
     }
 
@@ -687,7 +687,7 @@ function Premium({ bots = [] }) {
       const payload = await response.json();
       if (!response.ok || payload?.error) {
         setResult(payload?.error || copy.premium.checkFailed);
-        setResultColor('#FF2A2A');
+        setResultColor('#ff2a5f');
         return;
       }
 
@@ -707,7 +707,7 @@ function Premium({ bots = [] }) {
       setResultColor(mapTierToColor(tier));
     } catch {
       setResult(copy.premium.checkFailed);
-      setResultColor('#FF2A2A');
+      setResultColor('#ff2a5f');
     } finally {
       setCheckingStatus(false);
     }
@@ -720,18 +720,18 @@ function Premium({ bots = [] }) {
       <div className="section-container">
         <div style={{ marginBottom: 48 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <Crown size={16} color="#FFB800" />
-            <span style={{ fontFamily: "'Orbitron', sans-serif", fontSize: 11, letterSpacing: '0.15em', color: '#FFB800', textTransform: 'uppercase', fontWeight: 700 }}>
+            <Crown size={16} color="#ff6b00" />
+            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 11, letterSpacing: '0.15em', color: '#ff6b00', textTransform: 'uppercase', fontWeight: 700 }}>
               {copy.premium.eyebrow}
             </span>
           </div>
-          <h2 style={{ fontFamily: "'Orbitron', sans-serif", fontWeight: 800, fontSize: 'clamp(24px, 4vw, 40px)', marginBottom: 12 }}>
+          <h2 style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 'clamp(24px, 4vw, 40px)', marginBottom: 12 }}>
             {copy.premium.title}
           </h2>
           <p style={{ color: '#A1A1AA', fontSize: 16, maxWidth: 560 }}>
             {copy.premium.subtitle}
           </p>
-          {pricingError && <p style={{ marginTop: 10, fontSize: 12, color: '#FFB800' }}>{pricingError}</p>}
+          {pricingError && <p style={{ marginTop: 10, fontSize: 12, color: '#ff6b00' }}>{pricingError}</p>}
         </div>
         <div style={{ marginBottom: 28 }}>
           <div style={{ fontSize: 12, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#71717A', marginBottom: 14 }}>
@@ -751,7 +751,7 @@ function Premium({ bots = [] }) {
                     border: `1px solid ${meta.color}20`,
                   }}
                 >
-                  <div style={{ color: meta.color, fontFamily: "'Orbitron', sans-serif", fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', marginBottom: 8 }}>
+                  <div style={{ color: meta.color, fontFamily: "'Syne', sans-serif", fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', marginBottom: 8 }}>
                     {(item.key || '').toUpperCase()}
                   </div>
                   <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>
@@ -804,7 +804,7 @@ function Premium({ bots = [] }) {
                     borderRadius: '0 0 8px 8px',
                     background: meta.color,
                     color: '#050505',
-                    fontFamily: "'Orbitron', sans-serif",
+                    fontFamily: "'Syne', sans-serif",
                     fontSize: 9,
                     fontWeight: 800,
                     letterSpacing: '0.1em',
@@ -826,7 +826,7 @@ function Premium({ bots = [] }) {
                   }}>
                     <Icon size={18} color={meta.color} />
                   </div>
-                  <strong style={{ color: meta.color, fontFamily: "'Orbitron', sans-serif", fontSize: 16 }}>
+                  <strong style={{ color: meta.color, fontFamily: "'Syne', sans-serif", fontSize: 16 }}>
                     {tier.name}
                   </strong>
                 </div>
@@ -888,8 +888,8 @@ function Premium({ bots = [] }) {
                     }}
                     onMouseEnter={(event) => {
                       event.currentTarget.style.transform = 'scale(1.02)';
-                      event.currentTarget.style.borderColor = 'rgba(0,240,255,0.35)';
-                      event.currentTarget.style.background = 'rgba(0,240,255,0.08)';
+                      event.currentTarget.style.borderColor = 'rgba(0,229,255,0.35)';
+                      event.currentTarget.style.background = 'rgba(0,229,255,0.08)';
                     }}
                     onMouseLeave={(event) => {
                       event.currentTarget.style.transform = 'scale(1)';
@@ -990,7 +990,7 @@ function Premium({ bots = [] }) {
                 outline: 'none',
                 transition: 'border-color 0.2s',
               }}
-              onFocus={(event) => { event.target.style.borderColor = 'rgba(0,240,255,0.3)'; }}
+              onFocus={(event) => { event.target.style.borderColor = 'rgba(0,229,255,0.3)'; }}
               onBlur={(event) => { event.target.style.borderColor = 'rgba(255,255,255,0.12)'; }}
             />
             <button
@@ -998,7 +998,7 @@ function Premium({ bots = [] }) {
               onClick={checkStatus}
               disabled={checkingStatus}
               style={{
-                background: checkingStatus ? 'rgba(0,240,255,0.5)' : '#00F0FF',
+                background: checkingStatus ? 'rgba(0,229,255,0.5)' : '#00e5ff',
                 border: 'none',
                 color: '#050505',
                 borderRadius: 10,

@@ -202,6 +202,16 @@ DEFAULT_OWNER_CONFIG = {
         "paypal": {"enabled": False, "mode": "sandbox", "clientId": "", "secret": ""},
         "providers": [],
     },
+    "marketing": {
+        "sponsors": [],
+        "botListings": [
+            {"name": "top.gg", "url": "", "enabled": True, "note": "Gr\u00f6\u00dfte Discord-Bot-Liste. Listing anlegen und URL hier einf\u00fcgen."},
+            {"name": "Discord Bot List", "url": "", "enabled": True, "note": "discordbotlist.com \u2013 Bot einreichen und Profil-URL hier eintragen."},
+            {"name": "Discords.com", "url": "", "enabled": False, "note": "discords.com/bots \u2013 optionales Listing."},
+            {"name": "Discadia", "url": "", "enabled": False, "note": "discadia.com \u2013 Server-/Bot-Verzeichnis."},
+            {"name": "Wumpus.store", "url": "", "enabled": False, "note": "wumpus.store \u2013 kuratiertes Verzeichnis."},
+        ],
+    },
 }
 
 
@@ -4212,6 +4222,33 @@ async def admin_audit(request: Request):
     return {"audit": rows, "count": len(rows)}
 
 
+@app.get("/api/marketing")
+async def get_marketing(request: Request):
+    rate_limited = enforce_api_rate_limit(request, "read")
+    if rate_limited is not None:
+        return rate_limited
+    m = get_config_section("marketing")
+
+    def _safe_url(u):
+        u = str(u or "").strip()
+        return u if u.lower().startswith(("http://", "https://")) else ""
+
+    sponsors = []
+    for s in (m.get("sponsors") or []):
+        if isinstance(s, dict) and str(s.get("name") or "").strip():
+            sponsors.append({
+                "name": str(s.get("name")).strip(),
+                "logoUrl": _safe_url(s.get("logoUrl")),
+                "url": _safe_url(s.get("url")),
+            })
+    listings = [
+        {"name": str(b.get("name") or "").strip(), "url": _safe_url(b.get("url"))}
+        for b in (m.get("botListings") or [])
+        if isinstance(b, dict) and b.get("enabled") and _safe_url(b.get("url"))
+    ]
+    return {"sponsors": sponsors, "botListings": listings}
+
+
 @app.get("/api/admin/config")
 async def admin_get_config(request: Request):
     guard = _admin_guard(request)
@@ -4222,6 +4259,7 @@ async def admin_get_config(request: Request):
         "plans": get_config_section("plans"),
         "discord": mask_config_secrets(get_config_section("discord")),
         "payments": mask_config_secrets(get_config_section("payments")),
+        "marketing": get_config_section("marketing"),
         "env": {
             "stripeEnvKey": bool((os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY") or "").strip()),
         },

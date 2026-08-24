@@ -17,12 +17,12 @@ export default function FaqSection() {
         <div style={{ marginBottom: 28 }}>
           <span
             style={{
-              fontFamily: "'Orbitron', sans-serif",
+              fontFamily: "'Syne', sans-serif",
               fontSize: 11,
               fontWeight: 700,
               letterSpacing: '0.15em',
               textTransform: 'uppercase',
-              color: '#FFB800',
+              color: '#ff6b00',
             }}
           >
             {copy.faq.eyebrow}
@@ -30,7 +30,7 @@ export default function FaqSection() {
           <h2
             data-testid="faq-title"
             style={{
-              fontFamily: "'Orbitron', sans-serif",
+              fontFamily: "'Syne', sans-serif",
               fontWeight: 800,
               fontSize: 'clamp(24px, 4vw, 40px)',
               marginTop: 8,
@@ -54,7 +54,7 @@ export default function FaqSection() {
                 style={{
                   borderRadius: 16,
                   background: 'rgba(255,255,255,0.02)',
-                  border: `1px solid ${isOpen ? 'rgba(255,184,0,0.28)' : 'rgba(255,255,255,0.06)'}`,
+                  border: `1px solid ${isOpen ? 'rgba(255,107,0,0.28)' : 'rgba(255,255,255,0.06)'}`,
                   overflow: 'hidden',
                 }}
               >
@@ -76,7 +76,7 @@ export default function FaqSection() {
                   }}
                 >
                   <span style={{ fontSize: 15, fontWeight: 700 }}>{item.question}</span>
-                  {isOpen ? <ChevronUp size={18} color="#FFB800" /> : <ChevronDown size={18} color="#71717A" />}
+                  {isOpen ? <ChevronUp size={18} color="#ff6b00" /> : <ChevronDown size={18} color="#71717A" />}
                 </button>
                 {isOpen && (
                   <div style={{ padding: '0 20px 18px', color: '#A1A1AA', fontSize: 14, lineHeight: 1.7 }}>

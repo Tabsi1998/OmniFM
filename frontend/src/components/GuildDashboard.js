@@ -72,7 +72,7 @@ const COMMANDS = [
   { id: 'volume', label: '/volume' },
 ];
 
-function fmtInt(n) { return Number(n || 0).toLocaleString('de-DE'); }
+function fmtInt(n) { return Number(n || 0).toLocaleString(); }
 function fmtMinutes(m) { const h = Math.floor((m || 0) / 60); return h >= 1 ? `${fmtInt(h)} h` : `${fmtInt(m)} min`; }
 
 function ChartTip({ active, payload, label }) {
@@ -111,6 +111,7 @@ export default function GuildDashboard() {
   const [msg, setMsg] = useState(null);
   const { locale } = useI18n();
   const t = useCallback((de, en) => (String(locale || 'de').startsWith('de') ? de : en), [locale]);
+  const en = !String(locale || 'de').startsWith('de');
   const navLabel = (id) => ({
     overview: t('Übersicht', 'Overview'),
     stations: t('Meine Sender', 'My Stations'),
@@ -155,19 +156,19 @@ export default function GuildDashboard() {
 
   const setDefaultStation = (key) => {
     setStore((s) => ({ ...s, [guildId]: { ...(s[guildId] || gdata), defaultStation: key } }));
-    setMsg({ ok: true, text: 'Standard-Sender aktualisiert.' });
+    setMsg({ ok: true, text: t('Standard-Sender aktualisiert.', 'Default station updated.') });
   };
   const addCustom = () => {
-    if (!newStation.name.trim() || !newStation.url.trim()) { setMsg({ ok: false, text: 'Name und URL erforderlich.' }); return; }
-    if (gdata.custom.length >= tm.customLimit) { setMsg({ ok: false, text: `Limit erreicht (${tm.name}: ${tm.customLimit === 0 ? 'keine' : tm.customLimit} eigene Sender).` }); return; }
+    if (!newStation.name.trim() || !newStation.url.trim()) { setMsg({ ok: false, text: t('Name und URL erforderlich.', 'Name and URL required.') }); return; }
+    if (gdata.custom.length >= tm.customLimit) { setMsg({ ok: false, text: t(`Limit erreicht (${tm.name}: ${tm.customLimit === 0 ? 'keine' : tm.customLimit} eigene Sender).`, `Limit reached (${tm.name}: ${tm.customLimit === 0 ? 'no' : tm.customLimit} custom stations).`) }); return; }
     const item = { key: `c${Date.now()}`, name: newStation.name.trim(), url: newStation.url.trim() };
     setStore((s) => { const cur = s[guildId] || gdata; return { ...s, [guildId]: { ...cur, custom: [...cur.custom, item] } }; });
     setNewStation({ name: '', url: '' });
-    setMsg({ ok: true, text: 'Eigener Sender hinzugefügt.' });
+    setMsg({ ok: true, text: t('Eigener Sender hinzugefügt.', 'Custom station added.') });
   };
   const removeCustom = (key) => {
     setStore((s) => { const cur = s[guildId] || gdata; return { ...s, [guildId]: { ...cur, custom: cur.custom.filter((c) => c.key !== key) } }; });
-    setMsg({ ok: true, text: 'Sender entfernt.' });
+    setMsg({ ok: true, text: t('Sender entfernt.', 'Station removed.') });
   };
   const togglePerm = (cmd, roleId) => setPerms((p) => ({ ...p, [`${cmd}:${roleId}`]: !p[`${cmd}:${roleId}`] }));
 
@@ -186,7 +187,7 @@ export default function GuildDashboard() {
   }, [demo, session.authenticated, guildId]);
 
   const savePerms = async () => {
-    if (demo) { setMsg({ ok: true, text: 'Berechtigungen gespeichert (Demo).' }); return; }
+    if (demo) { setMsg({ ok: true, text: t('Berechtigungen gespeichert (Demo).', 'Permissions saved (demo).') }); return; }
     const commandRoleMap = {};
     COMMANDS.forEach((c) => {
       const roles = gdata.roles.filter((r) => perms[`${c.id}:${r.id}`]).map((r) => r.id);
@@ -197,8 +198,8 @@ export default function GuildDashboard() {
         method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ commandRoleMap }),
       });
       if (!res.ok) throw new Error('save failed');
-      setMsg({ ok: true, text: 'Berechtigungen gespeichert.' });
-    } catch { setMsg({ ok: false, text: 'Speichern fehlgeschlagen.' }); }
+      setMsg({ ok: true, text: t('Berechtigungen gespeichert.', 'Permissions saved.') });
+    } catch { setMsg({ ok: false, text: t('Speichern fehlgeschlagen.', 'Saving failed.') }); }
   };
 
   useEffect(() => {
@@ -238,7 +239,7 @@ export default function GuildDashboard() {
     );
   }
 
-  const trendData = (gdata.trend || []).map((v, i) => ({ day: ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'][i] || `T${i}`, listeners: v }));
+  const trendData = (gdata.trend || []).map((v, i) => ({ day: (en ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] : ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'])[i] || `T${i}`, listeners: v }));
   const topData = (gdata.top || []).map(([name, min]) => ({ name, minutes: min }));
 
   return (
@@ -255,8 +256,8 @@ export default function GuildDashboard() {
             </button>
           ))}
         </nav>
-        <a href={demo ? '#' : '/dashboard/classic'} onClick={demo ? (e) => e.preventDefault() : undefined} className="oa-nav-btn" style={{ opacity: demo ? 0.5 : 1, fontSize: 12.5 }}><Server size={16} /> Klassische Ansicht</a>
-        <a href="/" className="oa-nav-btn" style={{ color: '#ff8fab' }} data-testid="guild-logout"><LogOut size={18} /> Verlassen</a>
+        <a href={demo ? '#' : '/dashboard/classic'} onClick={demo ? (e) => e.preventDefault() : undefined} className="oa-nav-btn" style={{ opacity: demo ? 0.5 : 1, fontSize: 12.5 }}><Server size={16} /> {t('Klassische Ansicht', 'Classic view')}</a>
+        <a href="/" className="oa-nav-btn" style={{ color: '#ff8fab' }} data-testid="guild-logout"><LogOut size={18} /> {t('Verlassen', 'Leave')}</a>
       </aside>
 
       <main className="oa-main">
@@ -264,11 +265,11 @@ export default function GuildDashboard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
             <div>
               <h1 className="oa-h1 oa-display" data-testid="guild-section-title">{navLabel(section)}</h1>
-              <div className="oa-sub">{guild?.name} · {fmtInt(guild?.members)} Mitglieder</div>
+              <div className="oa-sub">{guild?.name} · {fmtInt(guild?.members)} {t('Mitglieder', 'members')}</div>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {demo && <span className="oa-pill amber" style={{ whiteSpace: 'nowrap' }} data-testid="guild-demo-badge">DEMO-MODUS</span>}
+            {demo && <span className="oa-pill amber" style={{ whiteSpace: 'nowrap' }} data-testid="guild-demo-badge">{t('DEMO-MODUS', 'DEMO MODE')}</span>}
             <span className="oa-pill" style={{ background: `${tm.color}22`, color: tm.color, border: `1px solid ${tm.color}55` }}><tm.icon size={13} /> {tm.name}</span>
             <select className="oa-input" style={{ height: 40, width: 'auto', maxWidth: 220 }} value={guildId} onChange={(e) => { setGuildId(e.target.value); setMsg(null); }} data-testid="guild-switcher">
               {session.guilds.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
@@ -289,14 +290,14 @@ export default function GuildDashboard() {
         {section === 'overview' && (
           <>
             <div className="oa-grid cols-4">
-              <StatTile label="Aktive Hörer" value={fmtInt(gdata.listeners)} icon={Users} accent="#ff6b00" foot={<span>gerade im Voice-Channel</span>} />
-              <StatTile label="Uptime" value={`${gdata.uptimePct}%`} icon={Clock} accent="#10b981" foot={<span>letzte 30 Tage</span>} />
-              <StatTile label="Gestreamt (Monat)" value={fmtMinutes(gdata.minutesMonth)} icon={Music2} accent="#00e5ff" foot={<span>Wiedergabezeit</span>} />
-              <StatTile label="Aktive Bots" value={gdata.activeWorkers} icon={Server} accent="#5865f2" foot={<span>{tm.name}-Kontingent</span>} />
+              <StatTile label={t('Aktive Hörer', 'Active listeners')} value={fmtInt(gdata.listeners)} icon={Users} accent="#ff6b00" foot={<span>{t('gerade im Voice-Channel', 'in voice right now')}</span>} />
+              <StatTile label="Uptime" value={`${gdata.uptimePct}%`} icon={Clock} accent="#10b981" foot={<span>{t('letzte 30 Tage', 'last 30 days')}</span>} />
+              <StatTile label={t('Gestreamt (Monat)', 'Streamed (month)')} value={fmtMinutes(gdata.minutesMonth)} icon={Music2} accent="#00e5ff" foot={<span>{t('Wiedergabezeit', 'playback time')}</span>} />
+              <StatTile label={t('Aktive Bots', 'Active bots')} value={gdata.activeWorkers} icon={Server} accent="#5865f2" foot={<span>{t(`${tm.name}-Kontingent`, `${tm.name} quota`)}</span>} />
             </div>
             <div className="oa-grid cols-3" style={{ marginTop: 18 }}>
               <div className="oa-card oa-fade" style={{ gridColumn: 'span 2' }}>
-                <div className="oa-stat-label" style={{ marginBottom: 14 }}>Hörer-Trend (7 Tage)</div>
+                <div className="oa-stat-label" style={{ marginBottom: 14 }}>{t('Hörer-Trend (7 Tage)', 'Listener trend (7 days)')}</div>
                 <ResponsiveContainer width="100%" height={200}>
                   <AreaChart data={trendData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                     <defs><linearGradient id="gdArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#ff6b00" stopOpacity={0.5} /><stop offset="100%" stopColor="#ff6b00" stopOpacity={0} /></linearGradient></defs>
@@ -309,13 +310,13 @@ export default function GuildDashboard() {
                 </ResponsiveContainer>
               </div>
               <div className="oa-card oa-fade">
-                <div className="oa-stat-label" style={{ marginBottom: 12 }}>Aktueller Sender</div>
+                <div className="oa-stat-label" style={{ marginBottom: 12 }}>{t('Aktueller Sender', 'Current station')}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ width: 56, height: 56, borderRadius: 12, background: 'linear-gradient(135deg,#ff6b00,#ff2a5f)', display: 'grid', placeItems: 'center' }}><Radio size={24} color="#fff" /></div>
                   <div><div style={{ fontWeight: 700, fontSize: 16 }}>{(PRESET_STATIONS.find((s) => s.key === gdata.defaultStation) || {}).name || gdata.defaultStation}</div>
                     <div className="oa-pill orange" style={{ marginTop: 6 }}><span className="oa-dot" /> ON AIR</div></div>
                 </div>
-                <button className="oa-btn ghost" style={{ width: '100%', marginTop: 16 }} onClick={() => setSection('stations')}><ListMusic size={15} /> Sender wechseln</button>
+                <button className="oa-btn ghost" style={{ width: '100%', marginTop: 16 }} onClick={() => setSection('stations')}><ListMusic size={15} /> {t('Sender wechseln', 'Change station')}</button>
               </div>
             </div>
           </>
@@ -323,7 +324,7 @@ export default function GuildDashboard() {
 
         {section === 'stations' && (
           <>
-            <div className="oa-section-title"><Radio size={15} /> Standard-Sender</div>
+            <div className="oa-section-title"><Radio size={15} /> {t('Standard-Sender', 'Default stations')}</div>
             <div className="oa-grid cols-3" data-testid="guild-preset-stations">
               {PRESET_STATIONS.map((s) => {
                 const active = gdata.defaultStation === s.key;
@@ -342,29 +343,29 @@ export default function GuildDashboard() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '28px 0 12px' }}>
-              <div className="oa-section-title" style={{ margin: 0 }}><ListMusic size={15} /> Eigene Sender ({gdata.custom.length}/{tm.customLimit === 999 ? '∞' : tm.customLimit})</div>
+              <div className="oa-section-title" style={{ margin: 0 }}><ListMusic size={15} /> {t('Eigene Sender', 'Custom stations')} ({gdata.custom.length}/{tm.customLimit === 999 ? '∞' : tm.customLimit})</div>
             </div>
 
             {tm.customLimit === 0 ? (
               <div className="oa-card" style={{ display: 'flex', alignItems: 'center', gap: 14 }} data-testid="guild-custom-locked">
                 <Lock size={22} color="#94a3b8" />
-                <div><div style={{ fontWeight: 700 }}>Eigene Sender sind ein Pro-Feature</div><div style={{ color: '#94a3b8', fontSize: 13 }}>Upgrade auf Pro oder Ultimate, um eigene Stream-URLs hinzuzufügen.</div></div>
+                <div><div style={{ fontWeight: 700 }}>{t('Eigene Sender sind ein Pro-Feature', 'Custom stations are a Pro feature')}</div><div style={{ color: '#94a3b8', fontSize: 13 }}>{t('Upgrade auf Pro oder Ultimate, um eigene Stream-URLs hinzuzufügen.', 'Upgrade to Pro or Ultimate to add your own stream URLs.')}</div></div>
                 <button className="oa-btn primary" style={{ marginLeft: 'auto' }} onClick={() => setSection('subscription')}>Upgrade</button>
               </div>
             ) : (
               <>
                 <div className="oa-card" style={{ marginBottom: 16 }} data-testid="guild-custom-form">
                   <div className="oa-grid cols-2" style={{ gap: 12 }}>
-                    <div><label className="oa-stat-label">Name</label><input className="oa-input" style={{ marginTop: 6, fontFamily: 'DM Sans' }} value={newStation.name} placeholder="z.B. Server Chill" onChange={(e) => setNewStation({ ...newStation, name: e.target.value })} data-testid="guild-custom-name" /></div>
+                    <div><label className="oa-stat-label">Name</label><input className="oa-input" style={{ marginTop: 6, fontFamily: 'DM Sans' }} value={newStation.name} placeholder={t('z.B. Server Chill', 'e.g. Server Chill')} onChange={(e) => setNewStation({ ...newStation, name: e.target.value })} data-testid="guild-custom-name" /></div>
                     <div><label className="oa-stat-label">Stream-URL</label><input className="oa-input" style={{ marginTop: 6 }} value={newStation.url} placeholder="https://…/stream.mp3" onChange={(e) => setNewStation({ ...newStation, url: e.target.value })} data-testid="guild-custom-url" /></div>
                   </div>
-                  <button className="oa-btn primary" style={{ marginTop: 14 }} onClick={addCustom} data-testid="guild-custom-add"><Plus size={16} /> Hinzufügen</button>
+                  <button className="oa-btn primary" style={{ marginTop: 14 }} onClick={addCustom} data-testid="guild-custom-add"><Plus size={16} /> {t('Hinzufügen', 'Add')}</button>
                 </div>
                 <div className="oa-table-wrap" data-testid="guild-custom-list">
                   <table className="oa-table">
                     <thead><tr><th>Name</th><th>Stream-URL</th><th style={{ textAlign: 'right' }}></th></tr></thead>
                     <tbody>
-                      {gdata.custom.length === 0 && <tr><td colSpan={3} style={{ textAlign: 'center', color: '#64748b', padding: 22 }}>Noch keine eigenen Sender</td></tr>}
+                      {gdata.custom.length === 0 && <tr><td colSpan={3} style={{ textAlign: 'center', color: '#64748b', padding: 22 }}>{t('Noch keine eigenen Sender', 'No custom stations yet')}</td></tr>}
                       {gdata.custom.map((c) => (
                         <tr key={c.key} data-testid={`guild-custom-row-${c.key}`}>
                           <td style={{ fontWeight: 600 }}>{c.name}</td>
@@ -382,8 +383,8 @@ export default function GuildDashboard() {
 
         {section === 'roles' && (
           <>
-            <div className="oa-section-title"><ShieldCheck size={15} /> Command-Berechtigungen</div>
-            <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 16, marginTop: -6 }}>Lege fest, welche Rolle welche Slash-Commands nutzen darf.</p>
+            <div className="oa-section-title"><ShieldCheck size={15} /> {t('Command-Berechtigungen', 'Command permissions')}</div>
+            <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 16, marginTop: -6 }}>{t('Lege fest, welche Rolle welche Slash-Commands nutzen darf.', 'Define which role may use which slash commands.')}</p>
             <div className="oa-table-wrap" data-testid="guild-perms-matrix">
               <table className="oa-table">
                 <thead><tr><th>Command</th>{gdata.roles.map((r) => <th key={r.id} style={{ textAlign: 'center' }}><span style={{ color: r.color }}>{r.name}</span></th>)}</tr></thead>
@@ -406,19 +407,19 @@ export default function GuildDashboard() {
                 </tbody>
               </table>
             </div>
-            <button className="oa-btn primary" style={{ marginTop: 16 }} onClick={savePerms} data-testid="guild-perms-save"><Check size={16} /> Speichern</button>
+            <button className="oa-btn primary" style={{ marginTop: 16 }} onClick={savePerms} data-testid="guild-perms-save"><Check size={16} /> {t('Speichern', 'Save')}</button>
           </>
         )}
 
         {section === 'stats' && (
           <>
             <div className="oa-grid cols-3">
-              <StatTile label="Ø Hörer / Tag" value={fmtInt(Math.round((gdata.trend.reduce((a, b) => a + b, 0)) / Math.max(1, gdata.trend.length)))} icon={Users} accent="#ff6b00" />
-              <StatTile label="Peak Hörer" value={fmtInt(Math.max(0, ...gdata.trend))} icon={BarChart3} accent="#00e5ff" />
-              <StatTile label="Gestreamt (Monat)" value={fmtMinutes(gdata.minutesMonth)} icon={Music2} accent="#10b981" />
+              <StatTile label={t('Ø Hörer / Tag', 'Avg. listeners / day')} value={fmtInt(Math.round((gdata.trend.reduce((a, b) => a + b, 0)) / Math.max(1, gdata.trend.length)))} icon={Users} accent="#ff6b00" />
+              <StatTile label={t('Peak Hörer', 'Peak listeners')} value={fmtInt(Math.max(0, ...gdata.trend))} icon={BarChart3} accent="#00e5ff" />
+              <StatTile label={t('Gestreamt (Monat)', 'Streamed (month)')} value={fmtMinutes(gdata.minutesMonth)} icon={Music2} accent="#10b981" />
             </div>
             <div className="oa-card oa-fade" style={{ marginTop: 18 }} data-testid="guild-top-stations">
-              <div className="oa-stat-label" style={{ marginBottom: 14 }}>Top-Sender nach Wiedergabezeit (Minuten)</div>
+              <div className="oa-stat-label" style={{ marginBottom: 14 }}>{t('Top-Sender nach Wiedergabezeit (Minuten)', 'Top stations by playback time (minutes)')}</div>
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={topData} layout="vertical" margin={{ top: 4, right: 16, left: 20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1b2133" horizontal={false} />
@@ -440,18 +441,18 @@ export default function GuildDashboard() {
               const current = key === tier;
               return (
                 <div className="oa-card oa-fade" key={key} style={{ borderColor: current ? `${meta.color}66` : undefined, position: 'relative' }} data-testid={`guild-plan-${key}`}>
-                  {current && <span className="oa-pill" style={{ position: 'absolute', top: 16, right: 16, background: `${meta.color}22`, color: meta.color, border: `1px solid ${meta.color}55` }}>Aktiv</span>}
+                  {current && <span className="oa-pill" style={{ position: 'absolute', top: 16, right: 16, background: `${meta.color}22`, color: meta.color, border: `1px solid ${meta.color}55` }}>{t('Aktiv', 'Active')}</span>}
                   <div style={{ width: 44, height: 44, borderRadius: 12, background: `${meta.color}1f`, color: meta.color, display: 'grid', placeItems: 'center', marginBottom: 14 }}><meta.icon size={22} /></div>
                   <div className="oa-display" style={{ fontSize: 22, fontWeight: 800 }}>{meta.name}</div>
                   <div style={{ margin: '10px 0 16px' }}>
                     {[
-                      key === 'free' ? '1 Bot · Standard-Sender' : key === 'pro' ? '2 Bots · 5 eigene Sender' : 'Bis 5 Bots · ∞ eigene Sender',
-                      key === 'free' ? '64 kbps Qualität' : key === 'pro' ? '256 kbps Qualität' : '320 kbps HiFi',
-                      key === 'free' ? 'Basis-Statistiken' : 'Erweiterte Statistiken',
-                      key === 'ultimate' ? 'Priorisierter Support' : 'Community-Support',
+                      key === 'free' ? t('1 Bot · Standard-Sender', '1 bot · default stations') : key === 'pro' ? t('2 Bots · 5 eigene Sender', '2 bots · 5 custom stations') : t('Bis 5 Bots · ∞ eigene Sender', 'Up to 5 bots · ∞ custom stations'),
+                      key === 'free' ? t('64 kbps Qualität', '64 kbps quality') : key === 'pro' ? t('256 kbps Qualität', '256 kbps quality') : t('320 kbps HiFi', '320 kbps HiFi'),
+                      key === 'free' ? t('Basis-Statistiken', 'Basic statistics') : t('Erweiterte Statistiken', 'Advanced statistics'),
+                      key === 'ultimate' ? t('Priorisierter Support', 'Priority support') : t('Community-Support', 'Community support'),
                     ].map((f, i) => <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: '#cbd5e1', marginBottom: 8 }}><Check size={14} color={meta.color} /> {f}</div>)}
                   </div>
-                  {current ? <button className="oa-btn ghost" style={{ width: '100%' }} disabled>Aktueller Plan</button>
+                  {current ? <button className="oa-btn ghost" style={{ width: '100%' }} disabled>{t('Aktueller Plan', 'Current plan')}</button>
                     : <a className="oa-btn primary" style={{ width: '100%', textDecoration: 'none' }} href="/#pricing" data-testid={`guild-upgrade-${key}`}><ChevronRight size={15} /> {key === 'free' ? 'Downgrade' : 'Upgrade'}</a>}
                 </div>
               );

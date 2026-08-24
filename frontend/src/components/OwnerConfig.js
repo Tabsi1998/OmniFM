@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Save, Plus, Trash2, CheckCircle2, XCircle, Bot, CreditCard, Building2,
-  Tag, Terminal, ShieldCheck, Info,
+  Tag, Terminal, ShieldCheck, Info, Star, Heart,
 } from 'lucide-react';
 
 const labelStyle = {
@@ -79,6 +79,7 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
   const [plans, setPlans] = useState(null);
   const [discord, setDiscord] = useState(null);
   const [payments, setPayments] = useState(null);
+  const [marketing, setMarketing] = useState(null);
   const [env, setEnv] = useState({});
   const [logs, setLogs] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -87,7 +88,7 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
   const load = useCallback(async () => {
     try {
       const d = await apiGet('/api/admin/config', token);
-      setCompany(d.company); setPlans(d.plans); setDiscord(d.discord); setPayments(d.payments); setEnv(d.env || {});
+      setCompany(d.company); setPlans(d.plans); setDiscord(d.discord); setPayments(d.payments); setMarketing(d.marketing); setEnv(d.env || {});
     } catch { /* keep */ }
   }, [apiGet, token]);
 
@@ -324,6 +325,60 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
           ))}
         </div>
         <SaveBar onSave={() => save('payments', payments)} saving={saving} msg={msg} testid="cfg-payments-save" />
+      </div>
+    );
+  }
+
+  // ---------------- MARKETING (bot listings + sponsors) ----------------
+  if (section === 'marketing') {
+    if (!marketing) return <div className="oa-sub">Lade Konfiguration…</div>;
+    const listings = marketing.botListings || [];
+    const sponsors = marketing.sponsors || [];
+    const setListing = (i, k, v) => setMarketing((p) => ({ ...p, botListings: p.botListings.map((x, idx) => idx === i ? { ...x, [k]: v } : x) }));
+    const addListing = () => setMarketing((p) => ({ ...p, botListings: [...(p.botListings || []), { name: '', url: '', enabled: true, note: '' }] }));
+    const removeListing = (i) => setMarketing((p) => ({ ...p, botListings: p.botListings.filter((_, idx) => idx !== i) }));
+    const setSponsor = (i, k, v) => setMarketing((p) => ({ ...p, sponsors: p.sponsors.map((x, idx) => idx === i ? { ...x, [k]: v } : x) }));
+    const addSponsor = () => setMarketing((p) => ({ ...p, sponsors: [...(p.sponsors || []), { name: '', logoUrl: '', url: '' }] }));
+    const removeSponsor = (i) => setMarketing((p) => ({ ...p, sponsors: p.sponsors.filter((_, idx) => idx !== i) }));
+    return (
+      <div className="oa-fade" data-testid="config-marketing">
+        <div className="oa-card" style={{ marginBottom: 18 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div className="oa-section-title" style={{ margin: 0 }}><Star size={15} /> Bot-Listing-Seiten ({listings.length})</div>
+            <button className="oa-btn ghost" onClick={addListing} data-testid="cfg-listing-add"><Plus size={15} /> Seite</button>
+          </div>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14 }}>Trage die URL deines Bot-Profils ein (top.gg usw.). Aktivierte Einträge mit URL erscheinen auf der Startseite unter „OmniFM findest du auf“.</div>
+          {listings.map((b, i) => (
+            <div key={i} style={{ background: 'var(--oa-bg)', border: '1px solid var(--oa-border-active)', borderRadius: 12, padding: 14, marginBottom: 12 }} data-testid={`cfg-listing-${i}`}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <Toggle label={b.name || `Listing #${i + 1}`} checked={!!b.enabled} onChange={(v) => setListing(i, 'enabled', v)} testid={`cfg-listing-${i}-enabled`} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0 18px' }}>
+                <Field label="Name" value={b.name} onChange={(v) => setListing(i, 'name', v)} testid={`cfg-listing-${i}-name`} />
+                <Field label="Profil-URL" value={b.url} onChange={(v) => setListing(i, 'url', v)} placeholder="https://top.gg/bot/…" testid={`cfg-listing-${i}-url`} />
+                <Field label="Notiz / Anleitung" value={b.note} onChange={(v) => setListing(i, 'note', v)} testid={`cfg-listing-${i}-note`} width="full" />
+              </div>
+              <button className="oa-btn ghost" style={{ color: '#ff8fab', height: 34 }} onClick={() => removeListing(i)} data-testid={`cfg-listing-${i}-remove`}><Trash2 size={14} /> Entfernen</button>
+            </div>
+          ))}
+        </div>
+
+        <div className="oa-card" style={{ marginBottom: 18 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div className="oa-section-title" style={{ margin: 0 }}><Heart size={15} /> Sponsoren / Partner ({sponsors.length})</div>
+            <button className="oa-btn ghost" onClick={addSponsor} data-testid="cfg-sponsor-add"><Plus size={15} /> Sponsor</button>
+          </div>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14 }}>Erscheinen als Logo-Wand auf der Startseite („Unterstützt von“). Ohne Logo-URL wird der Name als Text angezeigt.</div>
+          {sponsors.map((s, i) => (
+            <div key={i} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr)) 44px', gap: '0 14px', alignItems: 'end', marginBottom: 6 }} data-testid={`cfg-sponsor-${i}`}>
+              <Field label="Name" value={s.name} onChange={(v) => setSponsor(i, 'name', v)} testid={`cfg-sponsor-${i}-name`} />
+              <Field label="Logo-URL" value={s.logoUrl} onChange={(v) => setSponsor(i, 'logoUrl', v)} placeholder="https://…/logo.png" testid={`cfg-sponsor-${i}-logo`} />
+              <Field label="Link" value={s.url} onChange={(v) => setSponsor(i, 'url', v)} placeholder="https://…" testid={`cfg-sponsor-${i}-url`} />
+              <button className="oa-btn ghost" style={{ color: '#ff8fab', marginBottom: 14 }} onClick={() => removeSponsor(i)} data-testid={`cfg-sponsor-${i}-remove`}><Trash2 size={14} /></button>
+            </div>
+          ))}
+        </div>
+        <SaveBar onSave={() => save('marketing', marketing)} saving={saving} msg={msg} testid="cfg-marketing-save" />
       </div>
     );
   }

@@ -3,12 +3,12 @@ import { Check, CheckCircle2, Copy, Crown, ExternalLink, Lock, RadioTower, Serve
 import { useI18n } from '../i18n.js';
 
 const BOT_COLORS = {
-  cyan: { accent: '#00F0FF', bg: 'rgba(0, 240, 255, 0.08)', glow: 'rgba(0, 240, 255, 0.15)', border: 'rgba(0, 240, 255, 0.25)' },
-  green: { accent: '#39FF14', bg: 'rgba(57, 255, 20, 0.08)', glow: 'rgba(57, 255, 20, 0.15)', border: 'rgba(57, 255, 20, 0.25)' },
+  cyan: { accent: '#00e5ff', bg: 'rgba(0,229,255, 0.08)', glow: 'rgba(0,229,255, 0.15)', border: 'rgba(0,229,255, 0.25)' },
+  green: { accent: '#ff6b00', bg: 'rgba(255,107,0, 0.08)', glow: 'rgba(255,107,0, 0.15)', border: 'rgba(255,107,0, 0.25)' },
   pink: { accent: '#EC4899', bg: 'rgba(236, 72, 153, 0.08)', glow: 'rgba(236, 72, 153, 0.15)', border: 'rgba(236, 72, 153, 0.25)' },
-  amber: { accent: '#FFB800', bg: 'rgba(255, 184, 0, 0.08)', glow: 'rgba(255, 184, 0, 0.15)', border: 'rgba(255, 184, 0, 0.25)' },
-  purple: { accent: '#BD00FF', bg: 'rgba(189, 0, 255, 0.08)', glow: 'rgba(189, 0, 255, 0.15)', border: 'rgba(189, 0, 255, 0.25)' },
-  red: { accent: '#FF2A2A', bg: 'rgba(255, 42, 42, 0.08)', glow: 'rgba(255, 42, 42, 0.15)', border: 'rgba(255, 42, 42, 0.25)' },
+  amber: { accent: '#ff6b00', bg: 'rgba(255,107,0, 0.08)', glow: 'rgba(255,107,0, 0.15)', border: 'rgba(255,107,0, 0.25)' },
+  purple: { accent: '#ff2a5f', bg: 'rgba(255,42,95, 0.08)', glow: 'rgba(255,42,95, 0.15)', border: 'rgba(255,42,95, 0.25)' },
+  red: { accent: '#ff2a5f', bg: 'rgba(255,42,95, 0.08)', glow: 'rgba(255,42,95, 0.15)', border: 'rgba(255,42,95, 0.25)' },
 };
 
 function BotCard({ bot, index, copy, formatNumber }) {
@@ -22,7 +22,7 @@ function BotCard({ bot, index, copy, formatNumber }) {
     ? null
     : (bot.inviteUrl || bot.invite_url || `https://discord.com/oauth2/authorize?client_id=${bot.clientId || bot.client_id || ''}&permissions=35186522836032&integration_type=0&scope=bot%20applications.commands`);
   const botImage = bot.avatarUrl || bot.avatar_url || `/img/bot-${(index % 4) + 1}.png`;
-  const tierBadgeColors = { pro: '#FFB800', ultimate: '#BD00FF' };
+  const tierBadgeColors = { pro: '#ff6b00', ultimate: '#ff2a5f' };
 
   const handleCopy = async () => {
     if (!inviteUrl) return;
@@ -80,7 +80,7 @@ function BotCard({ bot, index, copy, formatNumber }) {
         </div>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <h3 style={{ fontFamily: "'Orbitron', sans-serif", fontSize: 16, fontWeight: 700, letterSpacing: '0.02em', margin: 0 }}>
+            <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 700, letterSpacing: '0.02em', margin: 0 }}>
               {bot.name}
             </h3>
             {isPremiumBot && (
@@ -94,11 +94,11 @@ function BotCard({ bot, index, copy, formatNumber }) {
                   borderRadius: 6,
                   fontSize: 10,
                   fontWeight: 800,
-                  fontFamily: "'Orbitron', sans-serif",
+                  fontFamily: "'Syne', sans-serif",
                   letterSpacing: '0.1em',
-                  background: `${tierBadgeColors[bot.requiredTier] || '#FFB800'}15`,
-                  color: tierBadgeColors[bot.requiredTier] || '#FFB800',
-                  border: `1px solid ${tierBadgeColors[bot.requiredTier] || '#FFB800'}30`,
+                  background: `${tierBadgeColors[bot.requiredTier] || '#ff6b00'}15`,
+                  color: tierBadgeColors[bot.requiredTier] || '#ff6b00',
+                  border: `1px solid ${tierBadgeColors[bot.requiredTier] || '#ff6b00'}30`,
                 }}
               >
                 <Crown size={10} />
@@ -111,10 +111,10 @@ function BotCard({ bot, index, copy, formatNumber }) {
               width: 8,
               height: 8,
               borderRadius: '50%',
-              background: bot.ready ? '#39FF14' : '#52525B',
-              boxShadow: bot.ready ? '0 0 8px rgba(57,255,20,0.5)' : 'none',
+              background: bot.ready ? '#ff6b00' : '#52525B',
+              boxShadow: bot.ready ? '0 0 8px rgba(255,107,0,0.5)' : 'none',
             }} />
-            <span style={{ fontSize: 12, color: bot.ready ? '#39FF14' : '#52525B', fontWeight: 600 }}>
+            <span style={{ fontSize: 12, color: bot.ready ? '#ff6b00' : '#52525B', fontWeight: 600 }}>
               {bot.ready ? copy.bots.status.online : copy.bots.status.configurable}
             </span>
           </div>
@@ -127,7 +127,7 @@ function BotCard({ bot, index, copy, formatNumber }) {
         borderTop: `1px solid ${colors.accent}15`,
         borderBottom: `1px solid ${colors.accent}15`,
       }}>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: colors.accent, marginBottom: 10, fontFamily: "'Orbitron', sans-serif" }}>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: colors.accent, marginBottom: 10, fontFamily: "'Syne', sans-serif" }}>
           {copy.bots.statsTitle}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
@@ -162,9 +162,9 @@ function BotCard({ bot, index, copy, formatNumber }) {
               gap: 8,
               padding: '12px 20px',
               borderRadius: 12,
-              background: `${tierBadgeColors[bot.requiredTier] || '#FFB800'}15`,
-              border: `1px solid ${tierBadgeColors[bot.requiredTier] || '#FFB800'}30`,
-              color: tierBadgeColors[bot.requiredTier] || '#FFB800',
+              background: `${tierBadgeColors[bot.requiredTier] || '#ff6b00'}15`,
+              border: `1px solid ${tierBadgeColors[bot.requiredTier] || '#ff6b00'}30`,
+              color: tierBadgeColors[bot.requiredTier] || '#ff6b00',
               fontWeight: 700,
               fontSize: 13,
               textDecoration: 'none',
@@ -175,11 +175,11 @@ function BotCard({ bot, index, copy, formatNumber }) {
             }}
             onMouseEnter={(event) => {
               event.currentTarget.style.transform = 'scale(1.02)';
-              event.currentTarget.style.background = `${tierBadgeColors[bot.requiredTier] || '#FFB800'}25`;
+              event.currentTarget.style.background = `${tierBadgeColors[bot.requiredTier] || '#ff6b00'}25`;
             }}
             onMouseLeave={(event) => {
               event.currentTarget.style.transform = 'scale(1)';
-              event.currentTarget.style.background = `${tierBadgeColors[bot.requiredTier] || '#FFB800'}15`;
+              event.currentTarget.style.background = `${tierBadgeColors[bot.requiredTier] || '#ff6b00'}15`;
             }}
           >
             <Lock size={14} />
@@ -235,7 +235,7 @@ function BotCard({ bot, index, copy, formatNumber }) {
                 borderRadius: 12,
                 background: 'rgba(255,255,255,0.05)',
                 border: '1px solid rgba(255,255,255,0.1)',
-                color: copied ? '#39FF14' : '#A1A1AA',
+                color: copied ? '#ff6b00' : '#A1A1AA',
                 cursor: 'pointer',
                 transition: 'color 0.2s',
               }}
@@ -274,15 +274,15 @@ function BotDirectory({ bots, loading }) {
     <section id="bots" data-testid="bot-directory" style={{ padding: '80px 0', position: 'relative', zIndex: 1 }}>
       <div className="section-container">
         <div style={{ marginBottom: 48 }}>
-          <span style={{ fontFamily: "'Orbitron', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#00F0FF' }}>
+          <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#00e5ff' }}>
             {copy.bots.eyebrow}
           </span>
-          <h2 data-testid="bot-directory-title" style={{ fontFamily: "'Orbitron', sans-serif", fontWeight: 800, fontSize: 'clamp(24px, 4vw, 40px)', marginTop: 8, marginBottom: 12 }}>
+          <h2 data-testid="bot-directory-title" style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 'clamp(24px, 4vw, 40px)', marginTop: 8, marginBottom: 12 }}>
             {copy.bots.title}
           </h2>
           <p style={{ color: '#A1A1AA', fontSize: 16, maxWidth: 620 }}>
             {copy.bots.subtitleLead}{' '}
-            <span style={{ color: '#00F0FF', fontFamily: "'JetBrains Mono', monospace", fontSize: 14 }}>
+            <span style={{ color: '#00e5ff', fontFamily: "'JetBrains Mono', monospace", fontSize: 14 }}>
               /invite
             </span>{' '}
             {copy.bots.subtitleTail}
@@ -306,7 +306,7 @@ function BotDirectory({ bots, loading }) {
               flexDirection: 'column',
               justifyContent: 'center',
             }}>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#FFB800', marginBottom: 16, fontFamily: "'Orbitron', sans-serif" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#ff6b00', marginBottom: 16, fontFamily: "'Syne', sans-serif" }}>
                 {copy.bots.workerTiersTitle}
               </div>
               {copy.bots.workerTiers.map((tier) => (
@@ -318,7 +318,7 @@ function BotDirectory({ bots, loading }) {
                   borderBottom: '1px solid rgba(255,255,255,0.05)',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, paddingRight: 12 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', marginTop: 6, background: tier.tier === 'Free' ? '#39FF14' : tier.tier === 'Pro' ? '#FFB800' : '#BD00FF' }} />
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', marginTop: 6, background: tier.tier === 'Free' ? '#ff6b00' : tier.tier === 'Pro' ? '#ff6b00' : '#ff2a5f' }} />
                     <div>
                       <div style={{ fontSize: 13, color: '#fff', fontWeight: 600 }}>{tier.tier}</div>
                       {tier.desc && (
@@ -335,7 +335,7 @@ function BotDirectory({ bots, loading }) {
               ))}
               <p style={{ marginTop: 16, fontSize: 12, color: '#52525B', lineHeight: 1.5 }}>
                 {copy.bots.workerHintLead}{' '}
-                <span style={{ color: '#00F0FF', fontFamily: "'JetBrains Mono', monospace" }}>
+                <span style={{ color: '#00e5ff', fontFamily: "'JetBrains Mono', monospace" }}>
                   /invite {'<worker>'}
                 </span>{' '}
                 {copy.bots.workerHintTail}
@@ -345,14 +345,14 @@ function BotDirectory({ bots, loading }) {
             <div style={{
               borderRadius: 20,
               padding: 28,
-              background: 'linear-gradient(180deg, rgba(0,240,255,0.05) 0%, rgba(255,255,255,0.02) 100%)',
-              border: '1px solid rgba(0,240,255,0.14)',
+              background: 'linear-gradient(180deg, rgba(0,229,255,0.05) 0%, rgba(255,255,255,0.02) 100%)',
+              border: '1px solid rgba(0,229,255,0.14)',
               display: 'flex',
               flexDirection: 'column',
             }}>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <RadioTower size={15} color="#00F0FF" />
-                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#00F0FF', fontFamily: "'Orbitron', sans-serif" }}>
+                <RadioTower size={15} color="#00e5ff" />
+                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#00e5ff', fontFamily: "'Syne', sans-serif" }}>
                   {copy.bots.networkTitle}
                 </span>
               </div>
@@ -362,8 +362,8 @@ function BotDirectory({ bots, loading }) {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, marginBottom: 18 }}>
                 {[
-                  { key: 'ready', label: copy.bots.networkMetrics.readyBots, value: networkSnapshot.readyBots, color: '#39FF14' },
-                  { key: 'servers', label: copy.bots.networkMetrics.totalServers, value: networkSnapshot.totalServers, color: '#00F0FF' },
+                  { key: 'ready', label: copy.bots.networkMetrics.readyBots, value: networkSnapshot.readyBots, color: '#ff6b00' },
+                  { key: 'servers', label: copy.bots.networkMetrics.totalServers, value: networkSnapshot.totalServers, color: '#00e5ff' },
                   { key: 'connections', label: copy.bots.networkMetrics.totalConnections, value: networkSnapshot.totalConnections, color: '#EC4899' },
                 ].map((item) => (
                   <div
@@ -395,15 +395,15 @@ function BotDirectory({ bots, loading }) {
                 marginBottom: 16,
               }}>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                  <ServerCog size={15} color="#FFB800" />
-                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#FFB800', fontFamily: "'Orbitron', sans-serif" }}>
+                  <ServerCog size={15} color="#ff6b00" />
+                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#ff6b00', fontFamily: "'Syne', sans-serif" }}>
                     {copy.bots.proofListTitle}
                   </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {copy.bots.proofChecks.map((item) => (
                     <div key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, color: '#D4D4D8', fontSize: 13, lineHeight: 1.6 }}>
-                      <CheckCircle2 size={14} color="#39FF14" style={{ flexShrink: 0, marginTop: 3 }} />
+                      <CheckCircle2 size={14} color="#ff6b00" style={{ flexShrink: 0, marginTop: 3 }} />
                       <span>{item}</span>
                     </div>
                   ))}

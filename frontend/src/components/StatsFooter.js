@@ -97,7 +97,7 @@ function StatsFooter({ stats, legal }) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#52525B' }}>
-            {copy.footer.builtWith} <Heart size={12} color="#FF2A2A" /> {copy.footer.forDiscord}
+            {copy.footer.builtWith} <Heart size={12} color="#ff2a5f" /> {copy.footer.forDiscord}
           </div>
         </div>
       </div>

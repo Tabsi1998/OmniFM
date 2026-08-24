@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Hero from './components/Hero.js';
-import Features from './components/Features.js';
 import TrustBar from './components/TrustBar.js';
 import WhyOmniFM from './components/WhyOmniFM.js';
 import DashboardShowcase from './components/DashboardShowcase.js';
@@ -12,13 +11,13 @@ import PrivacySection from './components/PrivacySection.js';
 import TermsSection from './components/TermsSection.js';
 import StatsFooter from './components/StatsFooter.js';
 import Navbar from './components/Navbar.js';
-import PlanMatrix from './components/PlanMatrix.js';
 import DashboardPortal from './components/DashboardPortal.js';
 import GuildDashboard from './components/GuildDashboard.js';
 import OwnerAdmin from './components/OwnerAdmin.js';
 import BrandKit from './components/BrandKit.js';
 import DiscordShowcase from './components/DiscordShowcase.js';
 import HowToDiscord from './components/HowToDiscord.js';
+import CommunitySection from './components/CommunitySection.js';
 import NowPlayingBar from './components/NowPlayingBar.js';
 import FaqSection from './components/FaqSection.js';
 import CookieConsent from './components/CookieConsent.js';
@@ -261,13 +260,12 @@ function AppContent() {
       <TrustBar stats={stats} />
       <DiscordShowcase />
       <HowToDiscord />
-      <Features />
-      <WhyOmniFM />
       <StationBrowser stations={stations} loading={loading} />
+      <WhyOmniFM />
       <DashboardShowcase />
       <UseCasesSection />
       <Premium bots={bots} />
-      <PlanMatrix />
+      <CommunitySection />
       <FaqSection />
       <StatsFooter stats={stats} bots={bots} legal={legal} />
       <NowPlayingBar stats={stats} bots={bots} />

@@ -4,7 +4,7 @@ import {
   LogOut, ShieldCheck, TrendingUp, Users, Cpu, RefreshCw, CheckCircle2, XCircle,
   Music2, Globe, CreditCard, Mail, Database, Fingerprint, AlertTriangle,
   Radar, Terminal, Gauge, HeartPulse, Plus, Pencil, Trash2, Save, ScrollText, SignalHigh, X as CloseIcon, Palette,
-  Building2, Tag, Bot,
+  Building2, Tag, Bot, Megaphone,
 } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
@@ -23,6 +23,7 @@ const NAV = [
   { id: 'plans', label: 'Pläne & Preise', icon: Tag },
   { id: 'discord', label: 'Discord & Bots', icon: Bot },
   { id: 'payments', label: 'Zahlungen', icon: CreditCard },
+  { id: 'marketing', label: 'Marketing & Listings', icon: Megaphone },
   { id: 'workers', label: 'Worker Nodes', icon: Server },
   { id: 'licenses', label: 'License Manager', icon: KeyRound },
   { id: 'stations', label: 'Radio Catalog', icon: ListMusic },
@@ -812,7 +813,7 @@ export default function OwnerAdmin() {
             ))}
           </div>
         )}
-        {(section === 'company' || section === 'plans' || section === 'discord' || section === 'payments') && (
+        {(section === 'company' || section === 'plans' || section === 'discord' || section === 'payments' || section === 'marketing') && (
           <OwnerConfig section={section} apiGet={apiGet} apiSend={apiSend} token={token} />
         )}
         {section === 'brand' && (

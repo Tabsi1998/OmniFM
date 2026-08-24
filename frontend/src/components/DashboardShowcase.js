@@ -3,10 +3,10 @@ import { Activity, CalendarClock, LayoutDashboard, Shield, Webhook } from 'lucid
 import { useI18n } from '../i18n.js';
 
 const CAPABILITY_META = [
-  { key: 'events', icon: CalendarClock, color: '#00F0FF', tier: 'pro' },
-  { key: 'permissions', icon: Shield, color: '#FFB800', tier: 'pro' },
-  { key: 'health', icon: Activity, color: '#39FF14', tier: 'pro' },
-  { key: 'automation', icon: Webhook, color: '#BD00FF', tier: 'ultimate' },
+  { key: 'events', icon: CalendarClock, color: '#00e5ff', tier: 'pro' },
+  { key: 'permissions', icon: Shield, color: '#ff6b00', tier: 'pro' },
+  { key: 'health', icon: Activity, color: '#ff6b00', tier: 'pro' },
+  { key: 'automation', icon: Webhook, color: '#ff2a5f', tier: 'ultimate' },
 ];
 
 function buildDashboardHref(locale) {
@@ -30,21 +30,21 @@ export default function DashboardShowcase() {
           style={{
             borderRadius: 18,
             overflow: 'hidden',
-            border: '1px solid rgba(0,240,255,0.14)',
-            background: 'linear-gradient(180deg, rgba(0,240,255,0.08) 0%, rgba(255,255,255,0.02) 100%)',
+            border: '1px solid rgba(0,229,255,0.14)',
+            background: 'linear-gradient(180deg, rgba(0,229,255,0.08) 0%, rgba(255,255,255,0.02) 100%)',
           }}
         >
           <div style={{ padding: '28px 28px 18px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-              <LayoutDashboard size={18} color="#00F0FF" />
+              <LayoutDashboard size={18} color="#00e5ff" />
               <span
                 style={{
-                  fontFamily: "'Orbitron', sans-serif",
+                  fontFamily: "'Syne', sans-serif",
                   fontSize: 11,
                   letterSpacing: '0.15em',
                   textTransform: 'uppercase',
                   fontWeight: 700,
-                  color: '#00F0FF',
+                  color: '#00e5ff',
                 }}
               >
                 {copy.dashboardShowcase.eyebrow}
@@ -53,7 +53,7 @@ export default function DashboardShowcase() {
             <h2
               data-testid="dashboard-showcase-title"
               style={{
-                fontFamily: "'Orbitron', sans-serif",
+                fontFamily: "'Syne', sans-serif",
                 fontWeight: 800,
                 fontSize: 'clamp(24px, 4vw, 40px)',
                 marginBottom: 12,
@@ -90,7 +90,7 @@ export default function DashboardShowcase() {
                         {card.tier}
                       </span>
                     </div>
-                    <div style={{ fontFamily: "'Orbitron', sans-serif", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
+                    <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
                       {content.title}
                     </div>
                     <div style={{ fontSize: 13, color: '#A1A1AA', lineHeight: 1.65 }}>
@@ -110,7 +110,7 @@ export default function DashboardShowcase() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   padding: '13px 22px',
-                  background: '#00F0FF',
+                  background: '#00e5ff',
                   color: '#050505',
                   fontWeight: 800,
                   textDecoration: 'none',

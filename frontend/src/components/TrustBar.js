@@ -3,10 +3,10 @@ import { Layers3, LayoutDashboard, Radio, ShieldCheck } from 'lucide-react';
 import { useI18n } from '../i18n.js';
 
 const ITEMS = [
-  { key: 'stations', icon: Radio, color: '#00F0FF' },
-  { key: 'network', icon: Layers3, color: '#39FF14' },
-  { key: 'dashboard', icon: LayoutDashboard, color: '#FFB800' },
-  { key: 'reliability', icon: ShieldCheck, color: '#BD00FF' },
+  { key: 'stations', icon: Radio, color: '#00e5ff' },
+  { key: 'network', icon: Layers3, color: '#ff6b00' },
+  { key: 'dashboard', icon: LayoutDashboard, color: '#ff6b00' },
+  { key: 'reliability', icon: ShieldCheck, color: '#ff2a5f' },
 ];
 
 function resolveValue(itemKey, stats, copy, formatNumber) {

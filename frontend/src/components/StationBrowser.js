@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Music, Pause, Play, Radio, Search, Volume2, VolumeX } from 'lucide-react';
 import { useI18n } from '../i18n.js';
 
-const STATION_COLORS = ['#00F0FF', '#39FF14', '#EC4899', '#FFB800', '#BD00FF', '#FF2A2A'];
+const STATION_COLORS = ['#00e5ff', '#ff6b00', '#EC4899', '#ff6b00', '#ff2a5f', '#ff2a5f'];
 
 function StationCard({ station, index, isPlaying, onPlay, onStop, copy }) {
   const [hovered, setHovered] = useState(false);
@@ -10,10 +10,10 @@ function StationCard({ station, index, isPlaying, onPlay, onStop, copy }) {
   const tier = String(station.tier || 'free').toLowerCase();
   const tierText = copy.stations.tiers[tier] || copy.stations.tiers.free;
   const tierBadge = {
-    free: { text: tierText, bg: 'rgba(57,255,20,0.08)', border: 'rgba(57,255,20,0.2)', color: '#39FF14' },
-    pro: { text: tierText, bg: 'rgba(255,184,0,0.12)', border: 'rgba(255,184,0,0.3)', color: '#FFB800' },
-    ultimate: { text: tierText, bg: 'rgba(189,0,255,0.12)', border: 'rgba(189,0,255,0.3)', color: '#BD00FF' },
-  }[tier] || { text: copy.stations.tiers.free, bg: 'rgba(57,255,20,0.08)', border: 'rgba(57,255,20,0.2)', color: '#39FF14' };
+    free: { text: tierText, bg: 'rgba(0,229,255,0.08)', border: 'rgba(0,229,255,0.22)', color: '#00e5ff' },
+    pro: { text: tierText, bg: 'rgba(255,107,0,0.12)', border: 'rgba(255,107,0,0.3)', color: '#ff6b00' },
+    ultimate: { text: tierText, bg: 'rgba(255,42,95,0.12)', border: 'rgba(255,42,95,0.3)', color: '#ff2a5f' },
+  }[tier] || { text: copy.stations.tiers.free, bg: 'rgba(0,229,255,0.08)', border: 'rgba(0,229,255,0.22)', color: '#00e5ff' };
 
   return (
     <div
@@ -67,7 +67,7 @@ function StationCard({ station, index, isPlaying, onPlay, onStop, copy }) {
           letterSpacing: '0.08em',
           padding: '3px 8px',
           borderRadius: 6,
-          fontFamily: "'Orbitron', sans-serif",
+          fontFamily: "'Syne', sans-serif",
           whiteSpace: 'nowrap',
           flexShrink: 0,
           background: tierBadge.bg,
@@ -107,8 +107,8 @@ function StationBrowser({ stations, loading }) {
 
   const tierFilters = [
     { id: null, label: copy.stations.filters.all, color: '#fff' },
-    { id: 'free', label: copy.stations.filters.free, color: '#39FF14' },
-    { id: 'pro', label: copy.stations.filters.pro, color: '#FFB800' },
+    { id: 'free', label: copy.stations.filters.free, color: '#00e5ff' },
+    { id: 'pro', label: copy.stations.filters.pro, color: '#ff6b00' },
   ];
 
   const counts = useMemo(() => ({
@@ -210,10 +210,10 @@ function StationBrowser({ stations, loading }) {
     <section id="stations" data-testid="station-browser" style={{ padding: '80px 0', position: 'relative', zIndex: 1 }}>
       <div className="section-container">
         <div style={{ marginBottom: 36 }}>
-          <span style={{ fontFamily: "'Orbitron', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#00F0FF' }}>
+          <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#00e5ff' }}>
             {copy.stations.eyebrow}
           </span>
-          <h2 data-testid="stations-title" style={{ fontFamily: "'Orbitron', sans-serif", fontWeight: 800, fontSize: 'clamp(24px, 4vw, 40px)', marginTop: 8, marginBottom: 12 }}>
+          <h2 data-testid="stations-title" style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 'clamp(24px, 4vw, 40px)', marginTop: 8, marginBottom: 12 }}>
             {copy.stations.title}
           </h2>
           <p style={{ color: '#A1A1AA', fontSize: 16, maxWidth: 620 }}>
@@ -232,8 +232,8 @@ function StationBrowser({ stations, loading }) {
               padding: '14px 20px',
               borderRadius: 14,
               marginBottom: 20,
-              background: 'rgba(0, 240, 255, 0.06)',
-              border: '1px solid rgba(0, 240, 255, 0.15)',
+              background: 'rgba(0,229,255, 0.06)',
+              border: '1px solid rgba(0,229,255, 0.15)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 20, flexShrink: 0 }}>
@@ -242,7 +242,7 @@ function StationBrowser({ stations, loading }) {
                   width: 3,
                   borderRadius: 1,
                   height: `${height * 100}%`,
-                  background: '#00F0FF',
+                  background: '#00e5ff',
                   animationDuration: `${0.4 + Math.random() * 0.6}s`,
                   animationDelay: `${index * 0.08}s`,
                 }} />
@@ -250,7 +250,7 @@ function StationBrowser({ stations, loading }) {
             </div>
 
             <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ fontSize: 11, color: '#00F0FF', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
+              <div style={{ fontSize: 11, color: '#00e5ff', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
                 {copy.stations.nowPlaying}
               </div>
               <span style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
@@ -266,7 +266,7 @@ function StationBrowser({ stations, loading }) {
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: muted ? '#FF2A2A' : '#A1A1AA',
+                  color: muted ? '#ff2a5f' : '#A1A1AA',
                   cursor: 'pointer',
                   padding: 4,
                   lineHeight: 0,
@@ -286,7 +286,7 @@ function StationBrowser({ stations, loading }) {
                   height: 4,
                   appearance: 'none',
                   WebkitAppearance: 'none',
-                  background: `linear-gradient(to right, #00F0FF ${muted ? 0 : volume}%, rgba(255,255,255,0.1) ${muted ? 0 : volume}%)`,
+                  background: `linear-gradient(to right, #00e5ff ${muted ? 0 : volume}%, rgba(255,255,255,0.1) ${muted ? 0 : volume}%)`,
                   borderRadius: 2,
                   outline: 'none',
                   cursor: 'pointer',
@@ -372,7 +372,7 @@ function StationBrowser({ stations, loading }) {
           </div>
         ) : (
           <>
-            <div data-testid="station-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 8, padding: '4px 0' }}>
+            <div data-testid="station-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(340px, 100%), 1fr))', gap: 8, padding: '4px 0' }}>
               {visibleStations.map((station, index) => (
                 <StationCard
                   key={station.key}

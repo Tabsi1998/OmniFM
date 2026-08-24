@@ -22,7 +22,7 @@ const COLORS = ['#5865F2', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#06B6D4'
 const DAYS_DE = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 const DAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-function StatCard({ label, value, sub, accent = '#00F0FF', testId }) {
+function StatCard({ label, value, sub, accent = '#00e5ff', testId }) {
   return (
     <div data-testid={testId} style={{
       background: '#0A0A0A', border: '1px solid #1A1A2E', padding: '18px 16px',
@@ -278,7 +278,7 @@ export default function DashboardOverview({
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
-        <StatCard testId="metric-listeners" label={t('Live-Zuhoerer', 'Live listeners')} value={basic.listenersNow ?? 0} accent="#00F0FF" />
+        <StatCard testId="metric-listeners" label={t('Live-Zuhoerer', 'Live listeners')} value={basic.listenersNow ?? 0} accent="#00e5ff" />
         <StatCard testId="metric-streams" label={t('Aktive Streams', 'Active streams')} value={basic.activeStreams ?? 0} accent="#10B981" />
         <StatCard testId="metric-peak" label={t('Peak-Zuhoerer', 'Peak listeners')} value={basic.peakListeners ?? 0} accent="#8B5CF6" />
         <StatCard
@@ -307,9 +307,9 @@ export default function DashboardOverview({
               </p>
             </div>
             <div style={{
-              border: '1px solid rgba(0,240,255,0.2)',
-              background: 'rgba(0,240,255,0.08)',
-              color: '#00F0FF',
+              border: '1px solid rgba(0,229,255,0.2)',
+              background: 'rgba(0,229,255,0.08)',
+              color: '#00e5ff',
               padding: '10px 12px',
               minWidth: 180,
             }}>

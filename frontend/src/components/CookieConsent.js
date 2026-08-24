@@ -16,8 +16,8 @@ function ConsentButton({ children, onClick, variant = 'secondary', testId }) {
       onClick={onClick}
       style={{
         minHeight: 40,
-        border: isPrimary ? '1px solid rgba(0,240,255,0.5)' : '1px solid rgba(255,255,255,0.14)',
-        background: isPrimary ? 'rgba(0,240,255,0.16)' : 'rgba(255,255,255,0.04)',
+        border: isPrimary ? '1px solid rgba(0,229,255,0.5)' : '1px solid rgba(255,255,255,0.14)',
+        background: isPrimary ? 'rgba(0,229,255,0.16)' : 'rgba(255,255,255,0.04)',
         color: '#F4F4F5',
         padding: '10px 14px',
         fontSize: 13,
@@ -52,7 +52,7 @@ function ToggleRow({ title, body, checked, disabled, onChange, testId }) {
         checked={checked}
         disabled={disabled}
         onChange={(event) => onChange?.(event.target.checked)}
-        style={{ width: 20, height: 20, accentColor: '#00F0FF', marginTop: 2 }}
+        style={{ width: 20, height: 20, accentColor: '#00e5ff', marginTop: 2 }}
       />
     </label>
   );
@@ -127,12 +127,12 @@ export default function CookieConsent() {
                       height: 38,
                       display: 'grid',
                       placeItems: 'center',
-                      background: 'rgba(0,240,255,0.1)',
-                      border: '1px solid rgba(0,240,255,0.18)',
+                      background: 'rgba(0,229,255,0.1)',
+                      border: '1px solid rgba(0,229,255,0.18)',
                       flexShrink: 0,
                     }}
                   >
-                    <ShieldCheck size={18} color="#00F0FF" />
+                    <ShieldCheck size={18} color="#00e5ff" />
                   </div>
                   <div>
                     <h2 style={{ margin: 0, fontSize: 18, lineHeight: 1.25 }}>{consentCopy.title}</h2>

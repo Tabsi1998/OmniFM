@@ -69,7 +69,7 @@ a {
   font-family: 'JetBrains Mono', monospace;
   font-size: 13px;
   font-weight: 600;
-  color: #00F0FF;
+  color: #00e5ff;
 }
 
 /* Station search */
@@ -92,14 +92,14 @@ a {
 }
 
 .station-search:focus {
-  border-color: rgba(0, 240, 255, 0.45);
+  border-color: rgba(0,229,255, 0.45);
   background: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 0 0 3px rgba(0, 240, 255, 0.12);
+  box-shadow: 0 0 0 3px rgba(0,229,255, 0.12);
 }
 
 /* Selection */
 ::selection {
-  background: rgba(0, 240, 255, 0.3);
+  background: rgba(0,229,255, 0.3);
   color: #fff;
 }
 
@@ -220,6 +220,7 @@ a {
   border: 1px solid var(--oa-border);
   border-radius: 16px;
   padding: 20px;
+  color: inherit;
   transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 .oa-card.hoverable:hover { border-color: rgba(255,107,0,0.4); transform: translateY(-2px); box-shadow: 0 12px 30px rgba(0,0,0,0.35); }

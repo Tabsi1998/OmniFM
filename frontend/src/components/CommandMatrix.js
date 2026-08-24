@@ -40,7 +40,7 @@ export default function CommandMatrix() {
 
             {matrix.rows.map((row) => (
               <div key={row.command} data-testid={`command-matrix-row-${row.command.replace('/', '')}`} style={{ display: 'grid', gridTemplateColumns: '220px repeat(3, 1fr)', borderBottom: '1px solid #27272A' }}>
-                <div style={{ padding: 14, fontFamily: "'JetBrains Mono', monospace", color: '#00F0FF' }}>{row.command}</div>
+                <div style={{ padding: 14, fontFamily: "'JetBrains Mono', monospace", color: '#00e5ff' }}>{row.command}</div>
                 <div style={{ padding: 14, color: '#A1A1AA' }}>{row.free}</div>
                 <div style={{ padding: 14, color: '#E4E4E7' }}>{row.pro}</div>
                 <div style={{ padding: 14, color: '#DDD6FE' }}>{row.ultimate}</div>

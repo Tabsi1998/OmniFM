@@ -59,7 +59,7 @@ function Navbar({ page = 'home' }) {
         <img src="/brand/omnifm-mark.svg" alt="OmniFM" width="28" height="28" style={{ display: 'block' }} />
         <span
           style={{
-            fontFamily: "'Orbitron', sans-serif",
+            fontFamily: "'Syne', sans-serif",
             fontWeight: 700,
             fontSize: 16,
             letterSpacing: '0.05em',

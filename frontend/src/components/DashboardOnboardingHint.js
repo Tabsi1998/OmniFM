@@ -3,8 +3,8 @@ import { Copy, ExternalLink } from 'lucide-react';
 
 const ACTION_VARIANTS = {
   primary: {
-    border: '1px solid rgba(0,240,255,0.35)',
-    background: 'rgba(0,240,255,0.14)',
+    border: '1px solid rgba(0,229,255,0.35)',
+    background: 'rgba(0,229,255,0.14)',
     color: '#F4FDFF',
   },
   subtle: {
@@ -47,14 +47,14 @@ export default function DashboardOnboardingHint({
 
   return (
     <div data-testid={dataTestId} style={{
-      border: '1px solid rgba(0,240,255,0.16)',
-      background: 'linear-gradient(180deg, rgba(0,240,255,0.08), rgba(5,5,5,0.94))',
+      border: '1px solid rgba(0,229,255,0.16)',
+      background: 'linear-gradient(180deg, rgba(0,229,255,0.08), rgba(5,5,5,0.94))',
       padding: '14px 16px',
       display: 'grid',
       gap: 12,
     }}>
       <div style={{ display: 'grid', gap: 6 }}>
-        <div style={{ fontSize: 11, color: '#00F0FF', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        <div style={{ fontSize: 11, color: '#00e5ff', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           {hint.eyebrow || t('Naechste Aktion', 'Next action')}
         </div>
         <strong style={{ color: '#F4FDFF', fontSize: 16 }}>{hint.title}</strong>

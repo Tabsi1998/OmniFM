@@ -71,11 +71,11 @@ function FieldCard({ icon: Icon, title, rows, emptyLabel }) {
             borderRadius: 14,
             display: 'grid',
             placeItems: 'center',
-            background: 'rgba(0,240,255,0.08)',
-            border: '1px solid rgba(0,240,255,0.18)',
+            background: 'rgba(0,229,255,0.08)',
+            border: '1px solid rgba(0,229,255,0.18)',
           }}
         >
-          <Icon size={18} color="#00F0FF" />
+          <Icon size={18} color="#00e5ff" />
         </div>
         <h3
           style={{
@@ -168,7 +168,7 @@ function PolicyBlock({ title, body, items = [] }) {
                   position: 'absolute',
                   left: 0,
                   top: 0,
-                  color: '#39FF14',
+                  color: '#ff6b00',
                   fontWeight: 700,
                 }}
               >
@@ -257,9 +257,9 @@ function PrivacySection({ legal, privacy }) {
               gap: 8,
               padding: '6px 16px',
               borderRadius: 999,
-              background: 'rgba(57,255,20,0.08)',
-              border: '1px solid rgba(57,255,20,0.18)',
-              color: '#39FF14',
+              background: 'rgba(255,107,0,0.08)',
+              border: '1px solid rgba(255,107,0,0.18)',
+              color: '#ff6b00',
               fontSize: 11,
               fontWeight: 700,
               letterSpacing: '0.14em',
@@ -274,7 +274,7 @@ function PrivacySection({ legal, privacy }) {
           <h2
             style={{
               margin: '0 0 14px',
-              fontFamily: "'Orbitron', sans-serif",
+              fontFamily: "'Syne', sans-serif",
               fontSize: 'clamp(30px, 4vw, 44px)',
               lineHeight: 1.08,
             }}
@@ -301,15 +301,15 @@ function PrivacySection({ legal, privacy }) {
               marginBottom: 28,
               padding: '18px 20px',
               borderRadius: 20,
-              background: 'rgba(255,184,0,0.08)',
-              border: '1px solid rgba(255,184,0,0.18)',
+              background: 'rgba(255,107,0,0.08)',
+              border: '1px solid rgba(255,107,0,0.18)',
               color: '#F4F4F5',
               display: 'flex',
               alignItems: 'flex-start',
               gap: 14,
             }}
           >
-            <AlertTriangle size={18} color="#FFB800" style={{ marginTop: 2, flexShrink: 0 }} />
+            <AlertTriangle size={18} color="#ff6b00" style={{ marginTop: 2, flexShrink: 0 }} />
             <div style={{ lineHeight: 1.6 }}>
               <div style={{ fontWeight: 700, marginBottom: 4 }}>
                 {copy.privacy.warningTitle}
