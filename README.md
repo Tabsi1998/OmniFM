@@ -55,30 +55,38 @@ cd frontend && yarn install && yarn start
 
 MongoDB muss erreichbar sein (siehe `.env`).
 
-## 🖥️ Deployment auf Ubuntu (kompletter Stack inkl. Discord-Bot)
+## 🖥️ Deployment auf Ubuntu 24.04 (kompletter Stack inkl. Discord-Bot)
 
-**Voraussetzungen** (einmalig, für die nativen Voice-Abhängigkeiten des Bots):
-
-```bash
-sudo apt-get update && sudo apt-get install -y python3 python3-venv build-essential ffmpeg nodejs npm
-# Node 18+ (LTS 20/22 ok). ffmpeg wird vom Bot fürs Voice-Streaming benötigt.
-# MongoDB lokal oder MONGO_URL in backend/.env auf eine erreichbare DB
-```
+**Keine manuellen Voraussetzungen mehr.** `start.sh` installiert beim ersten Lauf automatisch
+alles Nötige: **Node.js 22 LTS, MongoDB 8.0 Community (lokal), FFmpeg, Python-venv, Build-Tools
+und Yarn**. Außerdem erzeugt es beim ersten Lauf automatisch `backend/.env` + `frontend/.env`.
 
 Klonen → einmalig `./start.sh` → ab dann Updates per `./update.sh`:
 
 ```bash
 git clone <repo> omnifm && cd omnifm
-./start.sh     # installiert alles, baut Frontend, startet Mongo + Backend + Frontend + Discord-Bot
-./stop.sh      # alles stoppen  (./stop.sh --all stoppt auch die von start.sh gestartete MongoDB)
-./update.sh    # git pull + Abhängigkeiten aktualisieren + Neustart (inkl. Bot)
+chmod +x start.sh stop.sh update.sh
+sudo ./start.sh   # installiert ALLES, erzeugt .env, generiert Owner-Passwort, startet den Stack
+./stop.sh         # alles stoppen  (./stop.sh --all stoppt auch MongoDB)
+./update.sh       # git pull + Abhängigkeiten aktualisieren + Neustart (inkl. Bot)
 ```
 
-`start.sh` ist idempotent: erstellt bei Bedarf ein Python-venv, installiert Backend-, Frontend- und
-Bot-Abhängigkeiten, baut das Frontend, serviert es und startet den Discord-Bot **aus der Owner-Config**.
-Ist noch kein Commander-Token im Owner-Menü hinterlegt, wird der Bot sauber übersprungen (der Rest läuft
-trotzdem). Logs unter `logs/` (`bot.log`, `backend.log`, `frontend.log`), PIDs unter `run/`.
-Ports via `BACKEND_PORT` / `FRONTEND_PORT` überschreibbar.
+> `sudo` wird für die Systeminstallation benötigt (Node/MongoDB/FFmpeg). Läufst du bereits als
+> `root`, reicht `./start.sh`. Setup-Logs landen unter `logs/setup.log`.
+
+### 🔑 Owner-Passwort
+
+Beim **allerersten** Start generiert `start.sh` als Erstes einen sicheren **Owner-Token**
+(= Passwort für `/admin`), zeigt ihn oben und unten in der Ausgabe an und speichert ihn in
+`backend/.env` (`API_ADMIN_TOKEN`). Bei jedem weiteren Lauf bleibt derselbe Token erhalten.
+Zugang: Website unter Port 3000 → `/admin` → Token eingeben.
+
+`start.sh` ist idempotent: es installiert Systempakete nur, wenn sie fehlen, erstellt bei Bedarf
+ein Python-venv, installiert Backend-, Frontend- und Bot-Abhängigkeiten, baut das Frontend,
+serviert es und startet den Discord-Bot **aus der Owner-Config**. Ist noch kein Commander-Token
+im Owner-Menü hinterlegt, wird der Bot sauber übersprungen (der Rest läuft trotzdem). Logs unter
+`logs/`, PIDs unter `run/`. Ports via `BACKEND_PORT` / `FRONTEND_PORT` überschreibbar, öffentliche
+URL via `PUBLIC_URL=https://domain.tld ./start.sh`.
 
 ### Discord-Bot einrichten (100 % über die Owner-Konsole)
 

@@ -33,7 +33,13 @@ kill_pid backend
 kill_pid bot
 
 if [ "${1:-}" = "--all" ]; then
-  kill_pid mongod
+  if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet mongod 2>/dev/null; then
+    SUDO=""; [ "$(id -u)" -eq 0 ] || SUDO="sudo"
+    log "Stoppe MongoDB (systemd)..."
+    $SUDO systemctl stop mongod || true
+  else
+    kill_pid mongod
+  fi
 fi
 
 log "Gestoppt."
