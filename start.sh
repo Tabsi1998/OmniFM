@@ -124,8 +124,13 @@ if command -v node >/dev/null 2>&1; then
 fi
 if [ "$NODE_OK" -eq 0 ]; then
   log "Installiere Node.js 22 LTS (NodeSource)..."
-  curl -fsSL https://deb.nodesource.com/setup_22.x | $SUDO -E bash - >>"$LOG_DIR/setup.log" 2>&1 \
-    || die "NodeSource-Setup fehlgeschlagen (siehe logs/setup.log)."
+  if [ -n "$SUDO" ]; then
+    curl -fsSL https://deb.nodesource.com/setup_22.x | $SUDO -E bash - >>"$LOG_DIR/setup.log" 2>&1 \
+      || die "NodeSource-Setup fehlgeschlagen (siehe logs/setup.log)."
+  else
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >>"$LOG_DIR/setup.log" 2>&1 \
+      || die "NodeSource-Setup fehlgeschlagen (siehe logs/setup.log)."
+  fi
   $SUDO apt-get install -y nodejs >>"$LOG_DIR/setup.log" 2>&1 \
     || die "Node.js-Installation fehlgeschlagen (siehe logs/setup.log)."
   log "Node.js $(node -v) installiert."
@@ -249,6 +254,43 @@ if [ -f "$ROOT/package.json" ]; then
     warn "Trage Tokens unter /admin → 'Discord & Bots' ein und führe ./update.sh (oder ./start.sh) erneut aus."
   fi
 fi
+
+# =============================================================================
+# 7) SYSTEMD-AUTOSTART (nach Server-Neustart automatisch hochfahren)
+# =============================================================================
+if command -v systemctl >/dev/null 2>&1 && [ "${OMNIFM_SKIP_SYSTEMD:-0}" != "1" ]; then
+  UNIT_FILE="/etc/systemd/system/omnifm.service"
+  RUN_USER="$(id -un)"
+  if [ ! -f "$UNIT_FILE" ]; then
+    log "Richte systemd-Autostart ein (omnifm.service)..."
+    $SUDO tee "$UNIT_FILE" >/dev/null <<UNIT
+[Unit]
+Description=OmniFM Full Stack (Website, API, Discord-Bot)
+After=network-online.target mongod.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=${ROOT}
+Environment=OMNIFM_SKIP_SYSTEMD=1
+ExecStart=${ROOT}/start.sh
+ExecStop=${ROOT}/stop.sh
+User=${RUN_USER}
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+    $SUDO systemctl daemon-reload >>"$LOG_DIR/setup.log" 2>&1 || true
+    $SUDO systemctl enable omnifm.service >>"$LOG_DIR/setup.log" 2>&1 \
+      && log "Autostart aktiv: OmniFM startet nach jedem Server-Neustart automatisch." \
+      || warn "systemd-Autostart konnte nicht aktiviert werden (siehe logs/setup.log)."
+  else
+    log "systemd-Autostart bereits eingerichtet (omnifm.service)."
+  fi
+fi
+
 
 # =============================================================================
 # FERTIG
