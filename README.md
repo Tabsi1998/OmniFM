@@ -81,6 +81,22 @@ Beim **allerersten** Start generiert `start.sh` als Erstes einen sicheren **Owne
 `backend/.env` (`API_ADMIN_TOKEN`). Bei jedem weiteren Lauf bleibt derselbe Token erhalten.
 Zugang: Website unter Port 3000 → `/admin` → Token eingeben.
 
+### 🌐 Betrieb hinter einem Reverse-Proxy (eigene Domain, z.B. omnifm.xyz)
+
+Läuft OmniFM hinter nginx/Traefik/Caddy unter einer Domain, muss der Proxy so routen:
+`/` → Frontend `:3000`, `/api/` → Backend `:8001`. Sonst antwortet die Domain mit
+`{"detail":"Not Found"}` (dann zeigt der Proxy fälschlich aufs Backend).
+
+Frontend **mit der Domain** bauen (sonst rufen Besucher-Browser die interne IP auf):
+
+```bash
+PUBLIC_URL=https://omnifm.xyz ./start.sh
+```
+
+Das setzt automatisch `REACT_APP_BACKEND_URL`, `PUBLIC_WEB_URL` und CORS auf die Domain
+(bestehender Owner-Token bleibt erhalten). Fertige nginx-Config liegt bei:
+`deploy/nginx/omnifm.conf` (inkl. certbot-Hinweis für HTTPS).
+
 `start.sh` ist idempotent: es installiert Systempakete nur, wenn sie fehlen, erstellt bei Bedarf
 ein Python-venv, installiert Backend-, Frontend- und Bot-Abhängigkeiten, baut das Frontend,
 serviert es und startet den Discord-Bot **aus der Owner-Config**. Ist noch kein Commander-Token

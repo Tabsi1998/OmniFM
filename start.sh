@@ -172,12 +172,32 @@ elif ! pgrep -x mongod >/dev/null 2>&1; then
 fi
 
 # =============================================================================
-# 3) .env-DATEIEN ERZEUGEN (falls fehlend)
+# 3) .env-DATEIEN ERZEUGEN / AKTUALISIEREN
 # =============================================================================
 SERVER_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 [ -n "$SERVER_IP" ] || SERVER_IP="localhost"
-BACKEND_URL="${PUBLIC_URL:-http://${SERVER_IP}:${BACKEND_PORT}}"
-FRONTEND_ORIGIN="http://${SERVER_IP}:${FRONTEND_PORT}"
+
+# PUBLIC_URL gesetzt = Betrieb hinter Reverse-Proxy unter einer Domain
+# (z.B. PUBLIC_URL=https://omnifm.xyz). Dann laufen ALLE Aufrufe über die Domain,
+# der Proxy leitet '/' -> :3000 und '/api' -> :8001.
+if [ -n "${PUBLIC_URL:-}" ]; then
+  BACKEND_URL="$PUBLIC_URL"
+  FRONTEND_ORIGIN="$PUBLIC_URL"
+  log "Reverse-Proxy-Modus: öffentliche URL = ${PUBLIC_URL}"
+else
+  BACKEND_URL="http://${SERVER_IP}:${BACKEND_PORT}"
+  FRONTEND_ORIGIN="http://${SERVER_IP}:${FRONTEND_PORT}"
+fi
+CORS_ORIGINS="${FRONTEND_ORIGIN},http://localhost:${FRONTEND_PORT},http://127.0.0.1:${FRONTEND_PORT}"
+
+set_kv() { # file key value
+  local f="$1" k="$2" v="$3"
+  if grep -qE "^${k}=" "$f" 2>/dev/null; then
+    sed -i "s|^${k}=.*|${k}=${v}|" "$f"
+  else
+    printf '%s=%s\n' "$k" "$v" >> "$f"
+  fi
+}
 
 if [ ! -f "$BACKEND_ENV" ]; then
   log "Erzeuge backend/.env ..."
@@ -186,27 +206,32 @@ MONGO_URL=mongodb://127.0.0.1:27017
 DB_NAME=radio_bot
 API_ADMIN_TOKEN=${OWNER_TOKEN}
 PUBLIC_WEB_URL=${BACKEND_URL}
-CORS_ALLOWED_ORIGINS=${FRONTEND_ORIGIN},http://localhost:${FRONTEND_PORT},http://127.0.0.1:${FRONTEND_PORT}
+CORS_ALLOWED_ORIGINS=${CORS_ORIGINS}
 CHECKOUT_RETURN_ORIGINS=${FRONTEND_ORIGIN},http://localhost:${FRONTEND_PORT}
 DEFAULT_LANGUAGE=en
 EOF
 else
   # Fehlenden/Platzhalter-Token nachtragen, damit Owner-Login funktioniert
   if ! grep -qE '^API_ADMIN_TOKEN=..+' "$BACKEND_ENV" || grep -qE '^API_ADMIN_TOKEN=(change-me|your_)' "$BACKEND_ENV"; then
-    if grep -qE '^API_ADMIN_TOKEN=' "$BACKEND_ENV"; then
-      sed -i "s|^API_ADMIN_TOKEN=.*|API_ADMIN_TOKEN=${OWNER_TOKEN}|" "$BACKEND_ENV"
-    else
-      printf "\nAPI_ADMIN_TOKEN=%s\n" "$OWNER_TOKEN" >> "$BACKEND_ENV"
-    fi
+    set_kv "$BACKEND_ENV" API_ADMIN_TOKEN "$OWNER_TOKEN"
+  fi
+  # Bei gesetzter PUBLIC_URL öffentliche URL/CORS immer nachziehen (Domain-Wechsel)
+  if [ -n "${PUBLIC_URL:-}" ]; then
+    set_kv "$BACKEND_ENV" PUBLIC_WEB_URL "$BACKEND_URL"
+    set_kv "$BACKEND_ENV" CORS_ALLOWED_ORIGINS "$CORS_ORIGINS"
+    set_kv "$BACKEND_ENV" CHECKOUT_RETURN_ORIGINS "$FRONTEND_ORIGIN"
   fi
 fi
 
+# Frontend wird bei JEDEM Lauf neu gebaut -> REACT_APP_BACKEND_URL immer setzen,
+# wenn PUBLIC_URL gesetzt ist (sonst nur beim ersten Mal).
 if [ ! -f "$FRONTEND_ENV" ]; then
   log "Erzeuge frontend/.env ..."
-  cat > "$FRONTEND_ENV" <<EOF
-REACT_APP_BACKEND_URL=${BACKEND_URL}
-EOF
+  printf 'REACT_APP_BACKEND_URL=%s\n' "$BACKEND_URL" > "$FRONTEND_ENV"
+elif [ -n "${PUBLIC_URL:-}" ]; then
+  set_kv "$FRONTEND_ENV" REACT_APP_BACKEND_URL "$BACKEND_URL"
 fi
+
 
 # =============================================================================
 # 4) BACKEND (FastAPI)
@@ -232,7 +257,7 @@ log "Baue Frontend..."
 ( cd "$ROOT/frontend" && yarn build )
 
 log "Serviere Frontend auf Port $FRONTEND_PORT..."
-( cd "$ROOT/frontend" && nohup npx --yes serve -s build -l "$FRONTEND_PORT" \
+( cd "$ROOT/frontend" && nohup npx --yes serve -s build -l "tcp://0.0.0.0:${FRONTEND_PORT}" \
   >"$LOG_DIR/frontend.log" 2>&1 & echo $! > "$RUN_DIR/frontend.pid" )
 
 # =============================================================================
