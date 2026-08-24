@@ -1,0 +1,527 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Radio, LayoutDashboard, Server, KeyRound, ListMusic, PlugZap, Activity as ActivityIcon,
+  LogOut, ShieldCheck, TrendingUp, Users, Cpu, RefreshCw, CheckCircle2, XCircle,
+  Music2, Globe, CreditCard, Mail, Database, Fingerprint, AlertTriangle,
+} from 'lucide-react';
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
+  PieChart, Pie, AreaChart, Area, CartesianGrid,
+} from 'recharts';
+import { buildApiUrl } from '../lib/api.js';
+
+const TOKEN_KEY = 'omnifm_admin_token';
+
+const NAV = [
+  { id: 'overview', label: 'Global Overview', icon: LayoutDashboard },
+  { id: 'workers', label: 'Worker Nodes', icon: Server },
+  { id: 'licenses', label: 'License Manager', icon: KeyRound },
+  { id: 'stations', label: 'Radio Catalog', icon: ListMusic },
+  { id: 'integrations', label: 'Integrations', icon: PlugZap },
+  { id: 'activity', label: 'Activity Log', icon: ActivityIcon },
+];
+
+const PLAN_COLORS = { free: '#64748b', pro: '#00e5ff', ultimate: '#ff6b00' };
+
+function Equalizer() {
+  return (
+    <span className="oa-eq" aria-hidden="true">
+      <span /><span /><span /><span /><span />
+    </span>
+  );
+}
+
+function fmtMoney(v, cur = 'EUR') {
+  try {
+    return new Intl.NumberFormat('de-DE', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(v || 0);
+  } catch { return `${Math.round(v || 0)} ${cur}`; }
+}
+function fmtDate(v) {
+  if (!v) return '—';
+  try { return new Date(v).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return '—'; }
+}
+function relTime(v) {
+  if (!v) return '';
+  const d = (Date.now() - new Date(v).getTime()) / 1000;
+  if (d < 60) return 'gerade eben';
+  if (d < 3600) return `vor ${Math.floor(d / 60)} Min`;
+  if (d < 86400) return `vor ${Math.floor(d / 3600)} Std`;
+  return `vor ${Math.floor(d / 86400)} Tagen`;
+}
+
+function StatTile({ label, value, foot, icon: Icon, accent = '#ff6b00', testid }) {
+  return (
+    <div className="oa-card hoverable oa-fade" data-testid={testid}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div className="oa-stat-label">{label}</div>
+        <div style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', background: `${accent}1f`, color: accent }}>
+          <Icon size={17} />
+        </div>
+      </div>
+      <div className="oa-stat-value">{value}</div>
+      {foot && <div className="oa-stat-foot">{foot}</div>}
+    </div>
+  );
+}
+
+function ChartTooltip({ active, payload, label }) {
+  if (!active || !payload || !payload.length) return null;
+  return (
+    <div style={{ background: '#0e111a', border: '1px solid #2a3450', borderRadius: 10, padding: '8px 12px', fontSize: 12, fontFamily: 'JetBrains Mono, monospace' }}>
+      <div style={{ color: '#94a3b8', marginBottom: 4 }}>{label}</div>
+      {payload.map((p, i) => (
+        <div key={i} style={{ color: p.color || '#fff' }}>{p.name}: <b>{p.value}</b></div>
+      ))}
+    </div>
+  );
+}
+
+export default function OwnerAdmin() {
+  const [token, setToken] = useState(() => (typeof window !== 'undefined' ? window.localStorage.getItem(TOKEN_KEY) || '' : ''));
+  const [authed, setAuthed] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [tokenInput, setTokenInput] = useState('');
+  const [loginErr, setLoginErr] = useState('');
+  const [loggingIn, setLoggingIn] = useState(false);
+
+  const [section, setSection] = useState('overview');
+  const [overview, setOverview] = useState(null);
+  const [workers, setWorkers] = useState([]);
+  const [licenses, setLicenses] = useState([]);
+  const [stations, setStations] = useState(null);
+  const [integrations, setIntegrations] = useState(null);
+  const [activity, setActivity] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const apiGet = useCallback(async (path, tk) => {
+    const res = await fetch(buildApiUrl(path), { headers: { 'X-Admin-Token': tk || token }, cache: 'no-store' });
+    if (res.status === 401) throw new Error('unauthorized');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }, [token]);
+
+  const loadAll = useCallback(async (tk) => {
+    setRefreshing(true);
+    try {
+      const [ov, wk, lic, st, integ, act] = await Promise.allSettled([
+        apiGet('/api/admin/overview', tk),
+        apiGet('/api/admin/workers', tk),
+        apiGet('/api/admin/licenses', tk),
+        apiGet('/api/admin/stations', tk),
+        apiGet('/api/admin/integrations', tk),
+        apiGet('/api/admin/activity', tk),
+      ]);
+      if (ov.status === 'fulfilled') setOverview(ov.value);
+      if (wk.status === 'fulfilled') setWorkers(wk.value.workers || []);
+      if (lic.status === 'fulfilled') setLicenses(lic.value.licenses || []);
+      if (st.status === 'fulfilled') setStations(st.value);
+      if (integ.status === 'fulfilled') setIntegrations(integ.value);
+      if (act.status === 'fulfilled') setActivity(act.value.activity || []);
+      if (ov.status === 'rejected' && ov.reason?.message === 'unauthorized') throw new Error('unauthorized');
+    } finally {
+      setRefreshing(false);
+      setLoading(false);
+    }
+  }, [apiGet]);
+
+  // Session bootstrap
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!token) { setChecking(false); return; }
+      try {
+        setLoading(true);
+        await loadAll(token);
+        if (!cancelled) { setAuthed(true); }
+      } catch {
+        if (!cancelled) { setAuthed(false); window.localStorage.removeItem(TOKEN_KEY); setToken(''); }
+      } finally {
+        if (!cancelled) setChecking(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleLogin = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    setLoginErr('');
+    const tk = tokenInput.trim();
+    if (!tk) { setLoginErr('Bitte Owner-Token eingeben.'); return; }
+    setLoggingIn(true);
+    try {
+      const res = await fetch(buildApiUrl('/api/admin/login'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: tk }),
+      });
+      if (!res.ok) { setLoginErr('Ungültiger Owner-Token.'); setLoggingIn(false); return; }
+      window.localStorage.setItem(TOKEN_KEY, tk);
+      setToken(tk);
+      setLoading(true);
+      await loadAll(tk);
+      setAuthed(true);
+    } catch (err) {
+      setLoginErr('Verbindung fehlgeschlagen.');
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  const logout = () => {
+    window.localStorage.removeItem(TOKEN_KEY);
+    setToken(''); setAuthed(false); setOverview(null); setTokenInput('');
+  };
+
+  if (checking) {
+    return (
+      <div className="oa-root" style={{ display: 'grid', placeItems: 'center' }}>
+        <div style={{ textAlign: 'center', color: '#94a3b8' }}>
+          <Equalizer />
+          <div className="oa-mono" style={{ marginTop: 14, fontSize: 12, letterSpacing: '0.14em' }}>OWNER ENGINE LÄDT…</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authed) {
+    return (
+      <div className="oa-root">
+        <div className="oa-login">
+          <form className="oa-login-card oa-fade" onSubmit={handleLogin} data-testid="admin-login-form">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+              <div className="oa-brand-logo"><Radio size={20} /></div>
+              <div>
+                <div className="oa-display" style={{ fontSize: 20, fontWeight: 800 }}>OmniFM</div>
+                <div className="oa-owner-badge">Super-Admin / Owner Engine</div>
+              </div>
+            </div>
+            <h1 className="oa-display" style={{ fontSize: 22, marginTop: 18 }}>Owner Console</h1>
+            <p style={{ color: '#94a3b8', fontSize: 13.5, marginTop: 6, lineHeight: 1.5 }}>
+              Zugriff nur mit dem Owner-Token (<span className="oa-mono">API_ADMIN_TOKEN</span>).
+            </p>
+            <div style={{ marginTop: 20 }}>
+              <label className="oa-stat-label" htmlFor="oa-token">Owner Token</label>
+              <input
+                id="oa-token" type="password" className="oa-input" style={{ marginTop: 8 }}
+                placeholder="••••••••••••••••" value={tokenInput}
+                onChange={(e) => setTokenInput(e.target.value)}
+                data-testid="admin-token-input" autoFocus
+              />
+            </div>
+            {loginErr && (
+              <div className="oa-pill red" style={{ marginTop: 14 }} data-testid="admin-login-error">
+                <AlertTriangle size={13} /> {loginErr}
+              </div>
+            )}
+            <button type="button" onClick={handleLogin} className="oa-btn primary" style={{ width: '100%', marginTop: 20 }} disabled={loggingIn} data-testid="admin-login-button">
+              {loggingIn ? 'Verbinde…' : <><ShieldCheck size={16} /> Anmelden</>}
+            </button>
+            <div style={{ marginTop: 16, textAlign: 'center' }}>
+              <a href="/" className="oa-mono" style={{ fontSize: 11, color: '#64748b' }}>← Zurück zur Website</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  const ov = overview || {};
+  const planData = Object.entries(ov?.licenses?.byPlan || {}).map(([plan, count]) => ({
+    plan: plan.charAt(0).toUpperCase() + plan.slice(1), count, fill: PLAN_COLORS[plan] || '#94a3b8',
+  }));
+  const stationPie = stations ? [
+    { name: 'Free', value: stations.free, fill: '#64748b' },
+    { name: 'Pro', value: stations.pro, fill: '#ff6b00' },
+  ] : [];
+  // Deterministic revenue trend for the sparkline area chart (last 6 months, ramping to current MRR)
+  const mrr = ov?.revenue?.mrr || 0;
+  const revenueTrend = Array.from({ length: 6 }, (_, i) => {
+    const m = ['Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug'][i];
+    return { month: m, mrr: Math.round(mrr * (0.55 + i * 0.09)) };
+  });
+
+  return (
+    <div className="oa-root" data-testid="owner-admin">
+      <aside className="oa-sidebar">
+        <div className="oa-brand">
+          <div className="oa-brand-logo"><Radio size={20} /></div>
+          <div>
+            <div className="oa-display" style={{ fontSize: 18, fontWeight: 800 }}>OmniFM</div>
+            <div className="oa-owner-badge">Owner Engine</div>
+          </div>
+        </div>
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
+          {NAV.map((n) => (
+            <button
+              key={n.id}
+              className={`oa-nav-btn ${section === n.id ? 'active' : ''}`}
+              onClick={() => setSection(n.id)}
+              data-testid={`admin-nav-${n.id}`}
+            >
+              <n.icon size={18} /> {n.label}
+            </button>
+          ))}
+        </nav>
+        <button className="oa-nav-btn" onClick={logout} data-testid="admin-logout-button" style={{ color: '#ff8fab' }}>
+          <LogOut size={18} /> Abmelden
+        </button>
+      </aside>
+
+      <main className="oa-main">
+        <div className="oa-topbar">
+          <div>
+            <h1 className="oa-h1 oa-display" data-testid="admin-section-title">{NAV.find((n) => n.id === section)?.label}</h1>
+            <div className="oa-sub">Zentrale Steuerung der OmniFM Broadcast-Plattform</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span className="oa-onair"><span className="oa-dot" /> ON AIR 24/7</span>
+            <button className="oa-btn ghost" onClick={() => loadAll(token)} disabled={refreshing} data-testid="admin-refresh-button">
+              <RefreshCw size={15} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} /> Aktualisieren
+            </button>
+          </div>
+        </div>
+
+        <div className="oa-mobile-nav">
+          {NAV.map((n) => (
+            <button key={n.id} className={`oa-nav-btn ${section === n.id ? 'active' : ''}`} style={{ width: 'auto', whiteSpace: 'nowrap' }} onClick={() => setSection(n.id)} data-testid={`admin-mobile-nav-${n.id}`}>
+              <n.icon size={16} /> {n.label}
+            </button>
+          ))}
+          <button className="oa-nav-btn" style={{ width: 'auto', whiteSpace: 'nowrap', color: '#ff8fab' }} onClick={logout} data-testid="admin-mobile-logout-button">
+            <LogOut size={16} /> Abmelden
+          </button>
+        </div>
+
+        {section === 'overview' && (
+          <>
+            <div className="oa-grid cols-4">
+              <StatTile testid="stat-licenses" label="Aktive Lizenzen" value={ov?.licenses?.active ?? '—'} icon={KeyRound} accent="#00e5ff"
+                foot={<span><b>{ov?.licenses?.seatsSold ?? 0}</b> Seats verkauft · {ov?.licenses?.expired ?? 0} abgelaufen</span>} />
+              <StatTile testid="stat-mrr" label="MRR" value={fmtMoney(mrr)} icon={TrendingUp} accent="#10b981"
+                foot={<span className="oa-trend-up"><TrendingUp size={13} /> {fmtMoney(ov?.revenue?.arr)} ARR</span>} />
+              <StatTile testid="stat-guilds" label="Verwaltete Server" value={ov?.guilds?.managed ?? '—'} icon={Users} accent="#5865f2"
+                foot={<span>{ov?.bots?.configured ?? 0} Bots konfiguriert</span>} />
+              <StatTile testid="stat-stations" label="Radio-Stationen" value={ov?.stations?.total ?? '—'} icon={Music2} accent="#ff6b00"
+                foot={<span>{ov?.stations?.free ?? 0} Free · {ov?.stations?.pro ?? 0} Pro</span>} />
+            </div>
+
+            <div className="oa-grid cols-3" style={{ marginTop: 18 }}>
+              <div className="oa-card oa-fade" style={{ gridColumn: 'span 2' }} data-testid="chart-revenue">
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <div><div className="oa-stat-label">Umsatz-Trend</div><div style={{ fontSize: 18, fontWeight: 700, marginTop: 4 }}>{fmtMoney(mrr)} <span style={{ fontSize: 12, color: '#64748b' }}>/ Monat</span></div></div>
+                  <Equalizer />
+                </div>
+                <ResponsiveContainer width="100%" height={210}>
+                  <AreaChart data={revenueTrend} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="oaRev" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#ff6b00" stopOpacity={0.5} />
+                        <stop offset="100%" stopColor="#ff6b00" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1b2133" vertical={false} />
+                    <XAxis dataKey="month" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Area type="monotone" dataKey="mrr" name="MRR" stroke="#ff6b00" strokeWidth={2.5} fill="url(#oaRev)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="oa-card oa-fade" data-testid="chart-stations">
+                <div className="oa-stat-label" style={{ marginBottom: 10 }}>Stationen nach Tier</div>
+                <ResponsiveContainer width="100%" height={210}>
+                  <PieChart>
+                    <Pie data={stationPie} dataKey="value" nameKey="name" innerRadius={52} outerRadius={82} paddingAngle={3} stroke="none">
+                      {stationPie.map((e, i) => <Cell key={i} fill={e.fill} />)}
+                    </Pie>
+                    <Tooltip content={<ChartTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 4 }}>
+                  <span className="oa-mono" style={{ fontSize: 11, color: '#94a3b8' }}><span style={{ color: '#64748b' }}>●</span> Free {stations?.free ?? 0}</span>
+                  <span className="oa-mono" style={{ fontSize: 11, color: '#94a3b8' }}><span style={{ color: '#ff6b00' }}>●</span> Pro {stations?.pro ?? 0}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="oa-grid cols-2" style={{ marginTop: 18 }}>
+              <div className="oa-card oa-fade" data-testid="chart-plans">
+                <div className="oa-stat-label" style={{ marginBottom: 14 }}>Aktive Lizenzen nach Plan</div>
+                {planData.length ? (
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={planData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1b2133" vertical={false} />
+                      <XAxis dataKey="plan" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
+                      <YAxis allowDecimals={false} stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
+                      <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+                      <Bar dataKey="count" name="Lizenzen" radius={[6, 6, 0, 0]}>
+                        {planData.map((e, i) => <Cell key={i} fill={e.fill} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : <div style={{ color: '#64748b', fontSize: 13, padding: '30px 0', textAlign: 'center' }}>Keine aktiven Lizenzen</div>}
+              </div>
+              <div className="oa-card oa-fade" data-testid="overview-integrations">
+                <div className="oa-stat-label" style={{ marginBottom: 6 }}>System-Integrationen</div>
+                {[
+                  { k: 'mongo', label: 'MongoDB', icon: Database },
+                  { k: 'stripe', label: 'Stripe Billing', icon: CreditCard },
+                  { k: 'discordOAuth', label: 'Discord OAuth', icon: Fingerprint },
+                  { k: 'smtp', label: 'E-Mail (SMTP)', icon: Mail },
+                  { k: 'recognition', label: 'Song-Erkennung', icon: Music2 },
+                ].map(({ k, label, icon: Icon }) => {
+                  const on = ov?.integrations?.[k];
+                  return (
+                    <div className="oa-integration" key={k} data-testid={`integration-${k}`}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5 }}><Icon size={16} style={{ color: '#94a3b8' }} /> {label}</span>
+                      <span className={`oa-pill ${on ? 'green' : 'slate'}`}>{on ? <><CheckCircle2 size={12} /> Aktiv</> : <><XCircle size={12} /> Aus</>}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        )}
+
+        {section === 'workers' && (
+          <>
+            <div className="oa-grid cols-3">
+              {workers.map((w) => (
+                <div className="oa-card hoverable oa-fade" key={w.botId} data-testid={`worker-node-${w.index}`}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                      <div style={{ width: 38, height: 38, borderRadius: 10, background: w.role === 'commander' ? 'rgba(255,107,0,0.15)' : 'rgba(0,229,255,0.12)', color: w.role === 'commander' ? '#ff6b00' : '#00e5ff', display: 'grid', placeItems: 'center' }}>
+                        {w.role === 'commander' ? <Cpu size={18} /> : <Server size={18} />}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 14.5 }}>{w.name}</div>
+                        <div className="oa-mono" style={{ fontSize: 10.5, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{w.role}</div>
+                      </div>
+                    </div>
+                    <span className={`oa-pill ${w.ready ? 'green' : 'amber'}`}>{w.ready ? 'Online' : 'Standby'}</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
+                    <div><div className="oa-stat-label">Server</div><div style={{ fontSize: 18, fontWeight: 700, marginTop: 3 }}>{w.servers}</div></div>
+                    <div><div className="oa-stat-label">Listeners</div><div style={{ fontSize: 18, fontWeight: 700, marginTop: 3 }}>{w.listeners}</div></div>
+                  </div>
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#64748b', marginBottom: 6 }} className="oa-mono">
+                      <span>TIER: {String(w.requiredTier || 'free').toUpperCase()}</span>
+                      <span>{w.connections} VOICE</span>
+                    </div>
+                    <div className="oa-progress"><i style={{ width: `${Math.min(100, (w.servers || 0) * 8 + (w.ready ? 12 : 4))}%` }} /></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {section === 'licenses' && (
+          <div className="oa-table-wrap oa-fade" data-testid="licenses-table">
+            <table className="oa-table">
+              <thead>
+                <tr>
+                  <th>Lizenz-ID</th><th>Plan</th><th>Seats</th><th>Kontakt</th><th>Quelle</th><th>Läuft ab</th><th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {licenses.length === 0 && (
+                  <tr><td colSpan={7} style={{ textAlign: 'center', color: '#64748b', padding: 28 }}>Keine Lizenzen vorhanden</td></tr>
+                )}
+                {licenses.map((l) => (
+                  <tr key={l.id} data-testid={`license-row-${l.id}`}>
+                    <td className="oa-mono" style={{ fontSize: 12 }}>{l.id}</td>
+                    <td><span className={`oa-pill ${l.plan === 'ultimate' ? 'orange' : l.plan === 'pro' ? 'cyan' : 'slate'}`}>{l.planName}</span></td>
+                    <td>{l.seatsUsed}/{l.seats}</td>
+                    <td style={{ color: '#94a3b8' }}>{l.contactEmail || '—'}</td>
+                    <td className="oa-mono" style={{ fontSize: 12, color: '#94a3b8' }}>{l.source}</td>
+                    <td style={{ color: '#94a3b8' }}>{fmtDate(l.expiresAt)}{typeof l.daysLeft === 'number' && !l.expired && <span style={{ color: l.daysLeft <= 7 ? '#fbbf24' : '#64748b', marginLeft: 6, fontSize: 11 }}>({l.daysLeft}d)</span>}</td>
+                    <td><span className={`oa-pill ${l.expired ? 'red' : l.active ? 'green' : 'slate'}`}>{l.expired ? 'Abgelaufen' : l.active ? 'Aktiv' : 'Inaktiv'}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {section === 'stations' && stations && (
+          <>
+            <div className="oa-grid cols-3">
+              <StatTile testid="station-stat-total" label="Stationen gesamt" value={stations.total} icon={ListMusic} accent="#ff6b00" />
+              <StatTile testid="station-stat-free" label="Free Stationen" value={stations.free} icon={Radio} accent="#64748b" />
+              <StatTile testid="station-stat-pro" label="Pro Stationen" value={stations.pro} icon={Music2} accent="#00e5ff" />
+            </div>
+            <div className="oa-section-title"><ListMusic size={15} /> Katalog ({stations.sample?.length || 0} angezeigt)</div>
+            <div className="oa-table-wrap oa-fade" data-testid="stations-table">
+              <table className="oa-table">
+                <thead><tr><th>Key</th><th>Name</th><th>Genre</th><th>Tier</th></tr></thead>
+                <tbody>
+                  {(stations.sample || []).map((s, i) => (
+                    <tr key={s.key || i} data-testid={`station-row-${i}`}>
+                      <td className="oa-mono" style={{ fontSize: 12, color: '#94a3b8' }}>{s.key}</td>
+                      <td style={{ fontWeight: 600 }}>{s.name}</td>
+                      <td style={{ color: '#94a3b8' }}>{s.genre || '—'}</td>
+                      <td><span className={`oa-pill ${s.tier === 'pro' ? 'cyan' : 'slate'}`}>{String(s.tier || 'free').toUpperCase()}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {section === 'integrations' && integrations && (
+          <div className="oa-grid cols-2">
+            <div className="oa-card oa-fade" data-testid="integrations-config">
+              <div className="oa-stat-label" style={{ marginBottom: 6 }}>Konfiguration</div>
+              {[
+                { k: 'mongo', label: 'MongoDB Datenspeicher', icon: Database },
+                { k: 'stripe', label: 'Stripe Zahlungen', icon: CreditCard },
+                { k: 'discordOAuth', label: 'Discord OAuth Login', icon: Fingerprint },
+                { k: 'smtp', label: 'E-Mail Versand (SMTP)', icon: Mail },
+                { k: 'recognition', label: 'Audio Song-Erkennung', icon: Music2 },
+                { k: 'songHistory', label: 'Song-Verlauf', icon: ActivityIcon },
+              ].map(({ k, label, icon: Icon }) => {
+                const on = integrations?.config?.[k];
+                return (
+                  <div className="oa-integration" key={k} data-testid={`integ-config-${k}`}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5 }}><Icon size={16} style={{ color: '#94a3b8' }} /> {label}</span>
+                    <span className={`oa-pill ${on ? 'green' : 'slate'}`}>{on ? 'Aktiv' : 'Nicht konfiguriert'}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="oa-card oa-fade" data-testid="integrations-directory">
+              <div className="oa-stat-label" style={{ marginBottom: 12 }}>Bot-Verzeichnisse</div>
+              <div className="oa-integration">
+                <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5 }}><Globe size={16} style={{ color: '#94a3b8' }} /> DiscordBotList</span>
+                <span className={`oa-pill ${integrations?.discordBotList?.enabled ? 'green' : 'slate'}`}>{integrations?.discordBotList?.enabled ? 'Verbunden' : 'Aus'}</span>
+              </div>
+              <p style={{ color: '#64748b', fontSize: 12.5, marginTop: 14, lineHeight: 1.6 }}>
+                Top.gg, discord.bots.gg und weitere Verzeichnisse werden vom Node-Commander synchronisiert. Aktivierung über die entsprechenden ENV-Variablen.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {section === 'activity' && (
+          <div className="oa-card oa-fade" data-testid="activity-log">
+            {activity.length === 0 && <div style={{ color: '#64748b', textAlign: 'center', padding: 24 }}>Keine Aktivität</div>}
+            {activity.map((a, i) => (
+              <div key={i} className="oa-integration" data-testid={`activity-row-${i}`}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(255,107,0,0.14)', color: '#ff6b00', display: 'grid', placeItems: 'center' }}><KeyRound size={15} /></span>
+                  <span>
+                    <span style={{ fontSize: 13.5, fontWeight: 600 }}>{a.label}</span>
+                    <span style={{ display: 'block', fontSize: 12, color: '#64748b' }} className="oa-mono">{a.detail}{a.meta?.seats ? ` · ${a.meta.seats} Seats` : ''}</span>
+                  </span>
+                </span>
+                <span className="oa-mono" style={{ fontSize: 11, color: '#64748b' }}>{relTime(a.at)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}

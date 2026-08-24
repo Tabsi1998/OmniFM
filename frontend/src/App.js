@@ -14,6 +14,7 @@ import StatsFooter from './components/StatsFooter.js';
 import Navbar from './components/Navbar.js';
 import PlanMatrix from './components/PlanMatrix.js';
 import DashboardPortal from './components/DashboardPortal.js';
+import OwnerAdmin from './components/OwnerAdmin.js';
 import FaqSection from './components/FaqSection.js';
 import CookieConsent from './components/CookieConsent.js';
 import { I18nProvider } from './i18n.js';
@@ -138,7 +139,7 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    if (currentPage === 'dashboard') {
+    if (currentPage === 'dashboard' || currentPage === 'admin') {
       setLoading(false);
       return () => {};
     }
@@ -219,6 +220,14 @@ function AppContent() {
     return (
       <div data-testid="app-dashboard-root" style={{ position: 'relative', minHeight: '100vh' }}>
         <DashboardPortal />
+      </div>
+    );
+  }
+
+  if (currentPage === 'admin') {
+    return (
+      <div data-testid="app-admin-root" style={{ position: 'relative', minHeight: '100vh' }}>
+        <OwnerAdmin />
       </div>
     );
   }

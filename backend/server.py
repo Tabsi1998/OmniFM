@@ -3515,3 +3515,268 @@ async def verify_premium(request: Request, body: dict):
         return {"success": False, "message": "Zahlung nicht abgeschlossen."}
     except Exception as e:
         return json_error(500, f"Verifizierung fehlgeschlagen: {clip_text(e)}")
+
+
+
+# ============================================================
+# Owner / Super-Admin API (2026 Rework)
+# Token-protected management surface for the OmniFM operator.
+# All routes require a valid API admin token via `X-Admin-Token`
+# header or `Authorization: Bearer <token>`.
+# ============================================================
+
+def _admin_guard(request: Request):
+    if not ADMIN_API_TOKEN:
+        return json_error(503, "Owner-API ist nicht konfiguriert (API_ADMIN_TOKEN fehlt).")
+    if not is_admin_request(request):
+        return json_error(401, "Nicht autorisiert. Gueltiger Owner-Token erforderlich.")
+    return None
+
+
+def _license_rows(state):
+    rows = []
+    licenses = (state or {}).get("licenses", {}) or {}
+    for lid, lic in licenses.items():
+        if not isinstance(lic, dict):
+            continue
+        plan = str(lic.get("plan") or lic.get("tier") or "free").lower()
+        seats = max(1, parse_int(lic.get("seats", 1), 1))
+        try:
+            days_left = remaining_days(lic)
+        except Exception:
+            days_left = None
+        try:
+            expired = bool(is_expired(lic))
+        except Exception:
+            expired = False
+        active = bool(lic.get("active", True)) and not expired
+        linked = lic.get("linkedServerIds") or []
+        if not isinstance(linked, list):
+            linked = []
+        rows.append({
+            "id": str(lic.get("id") or lid),
+            "plan": plan,
+            "planName": (TIERS.get(plan) or {}).get("name", plan.title()),
+            "seats": seats,
+            "seatsUsed": len(linked),
+            "active": active,
+            "expired": expired,
+            "daysLeft": days_left,
+            "expiresAt": lic.get("expiresAt"),
+            "createdAt": lic.get("createdAt") or lic.get("issuedAt"),
+            "source": lic.get("source") or "manual",
+            "contactEmail": mask_email(str(lic.get("contactEmail") or lic.get("email") or "")),
+            "linkedServerIds": [str(s) for s in linked][:25],
+        })
+    rows.sort(key=lambda r: str(r.get("createdAt") or ""), reverse=True)
+    return rows
+
+
+def _station_summary():
+    free_count = 0
+    pro_count = 0
+    sample = []
+    if db is not None:
+        try:
+            free_count = db.stations.count_documents({"key": {"$not": {"$regex": "^custom:"}}, "tier": "free"})
+            pro_count = db.stations.count_documents({"key": {"$not": {"$regex": "^custom:"}}, "tier": "pro"})
+            for doc in db.stations.find({"key": {"$not": {"$regex": "^custom:"}}}, {"_id": 0}).limit(60):
+                sample.append({
+                    "key": doc.get("key"),
+                    "name": doc.get("name"),
+                    "tier": (doc.get("tier") or "free"),
+                    "genre": doc.get("genre") or doc.get("category"),
+                    "url": doc.get("url"),
+                })
+        except Exception:
+            pass
+    if free_count == 0 and pro_count == 0:
+        data = load_stations_from_file()
+        stations = data.get("stations", {}) or {}
+        for key, st in stations.items():
+            if str(key).startswith("custom:"):
+                continue
+            tier = (st.get("tier", "free") or "free").lower()
+            if tier == "free":
+                free_count += 1
+            elif tier == "pro":
+                pro_count += 1
+            if len(sample) < 60:
+                sample.append({
+                    "key": key,
+                    "name": st.get("name"),
+                    "tier": tier,
+                    "genre": st.get("genre") or st.get("category"),
+                    "url": st.get("url"),
+                })
+    return {"free": free_count, "pro": pro_count, "total": free_count + pro_count, "sample": sample}
+
+
+@app.post("/api/admin/login")
+async def admin_login(request: Request, body: dict = None):
+    if not ADMIN_API_TOKEN:
+        return json_error(503, "Owner-API ist nicht konfiguriert (API_ADMIN_TOKEN fehlt).")
+    token = ""
+    if isinstance(body, dict):
+        token = str(body.get("token") or "").strip()
+    if not token:
+        header_token = (request.headers.get("x-admin-token") or "").strip()
+        auth = (request.headers.get("authorization") or "").strip()
+        if header_token:
+            token = header_token
+        elif auth.lower().startswith("bearer "):
+            token = auth[7:].strip()
+    if token and hmac.compare_digest(token, ADMIN_API_TOKEN):
+        return {"ok": True, "role": "owner"}
+    return json_error(401, "Ungueltiger Owner-Token.")
+
+
+@app.get("/api/admin/overview")
+async def admin_overview(request: Request):
+    guard = _admin_guard(request)
+    if guard is not None:
+        return guard
+
+    state = load_premium()
+    rows = _license_rows(state)
+    active_rows = [r for r in rows if r["active"]]
+    by_plan = {}
+    mrr = 0.0
+    total_seats = 0
+    for r in active_rows:
+        by_plan[r["plan"]] = by_plan.get(r["plan"], 0) + 1
+        total_seats += r["seats"]
+        price = float((TIERS.get(r["plan"]) or {}).get("pricePerMonth", 0) or 0) / 100.0
+        mrr += price * r["seats"]
+
+    stations = _station_summary()
+    bots = load_bots_from_env()
+    dashboard = load_dashboard_data() or {}
+    guild_configs = dashboard.get("guilds", dashboard if isinstance(dashboard, dict) else {})
+    guild_count = len(guild_configs) if isinstance(guild_configs, dict) else 0
+
+    return {
+        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "brand": "OmniFM",
+        "licenses": {
+            "total": len(rows),
+            "active": len(active_rows),
+            "expired": sum(1 for r in rows if r["expired"]),
+            "byPlan": by_plan,
+            "seatsSold": total_seats,
+        },
+        "revenue": {
+            "mrr": round(mrr, 2),
+            "arr": round(mrr * 12, 2),
+            "currency": "EUR",
+        },
+        "stations": {"free": stations["free"], "pro": stations["pro"], "total": stations["total"]},
+        "bots": {
+            "configured": len(bots),
+            "commander": next((b["name"] for b in bots if b.get("index") == parse_int(os.environ.get("COMMANDER_BOT_INDEX", "1"), 1)), bots[0]["name"] if bots else None),
+        },
+        "guilds": {"managed": guild_count},
+        "integrations": {
+            "mongo": db is not None,
+            "stripe": bool(get_stripe_secret_key()),
+            "discordOAuth": is_discord_oauth_configured(),
+            "smtp": bool((os.environ.get("SMTP_HOST") or "").strip()),
+            "discordBotList": bool((os.environ.get("DISCORDBOTLIST_TOKEN") or "").strip()),
+            "recognition": (os.environ.get("NOW_PLAYING_RECOGNITION_ENABLED") or "").strip() == "1",
+        },
+    }
+
+
+@app.get("/api/admin/licenses")
+async def admin_licenses(request: Request):
+    guard = _admin_guard(request)
+    if guard is not None:
+        return guard
+    rows = _license_rows(load_premium())
+    return {"licenses": rows, "count": len(rows)}
+
+
+@app.get("/api/admin/workers")
+async def admin_workers(request: Request):
+    guard = _admin_guard(request)
+    if guard is not None:
+        return guard
+    bots = load_bots_from_env()
+    commander_index = parse_int(os.environ.get("COMMANDER_BOT_INDEX", "1"), 1)
+    workers = []
+    for b in bots:
+        workers.append({
+            "botId": b.get("botId"),
+            "index": b.get("index"),
+            "name": b.get("name"),
+            "role": "commander" if b.get("index") == commander_index else "worker",
+            "requiredTier": b.get("requiredTier"),
+            "clientId": b.get("clientId"),
+            "ready": bool(b.get("ready")),
+            "servers": b.get("servers", 0),
+            "listeners": b.get("listeners", 0),
+            "connections": b.get("connections", 0),
+            "uptimeSec": b.get("uptimeSec", 0),
+            "color": b.get("color"),
+        })
+    return {"workers": workers, "count": len(workers), "commanderIndex": commander_index}
+
+
+@app.get("/api/admin/stations")
+async def admin_stations(request: Request):
+    guard = _admin_guard(request)
+    if guard is not None:
+        return guard
+    return _station_summary()
+
+
+@app.get("/api/admin/activity")
+async def admin_activity(request: Request):
+    guard = _admin_guard(request)
+    if guard is not None:
+        return guard
+    events = []
+    try:
+        for r in list_recent_redemptions(50):
+            events.append({
+                "type": "redemption",
+                "at": r.get("processedAt") or r.get("createdAt"),
+                "label": f"{str(r.get('tier') or 'premium').title()} Lizenz eingeloest",
+                "detail": mask_email(str(r.get("email") or "")),
+                "meta": {"seats": r.get("seats"), "sessionId": r.get("sessionId")},
+            })
+    except Exception:
+        pass
+    if not events:
+        for r in _license_rows(load_premium()):
+            events.append({
+                "type": "license",
+                "at": r.get("createdAt"),
+                "label": f"{r.get('planName')} Lizenz ausgestellt",
+                "detail": r.get("contactEmail"),
+                "meta": {"seats": r.get("seats"), "source": r.get("source"), "status": "expired" if r.get("expired") else "active"},
+            })
+    events.sort(key=lambda e: str(e.get("at") or ""), reverse=True)
+    return {"activity": events[:50], "count": len(events)}
+
+
+@app.get("/api/admin/integrations")
+async def admin_integrations(request: Request):
+    guard = _admin_guard(request)
+    if guard is not None:
+        return guard
+    try:
+        dbl = get_discordbotlist_status(vote_limit=10)
+    except Exception:
+        dbl = {"enabled": False}
+    return {
+        "discordBotList": dbl,
+        "config": {
+            "mongo": db is not None,
+            "stripe": bool(get_stripe_secret_key()),
+            "discordOAuth": is_discord_oauth_configured(),
+            "smtp": bool((os.environ.get("SMTP_HOST") or "").strip()),
+            "recognition": (os.environ.get("NOW_PLAYING_RECOGNITION_ENABLED") or "").strip() == "1",
+            "songHistory": (os.environ.get("SONG_HISTORY_ENABLED") or "").strip() != "0",
+        },
+    }
