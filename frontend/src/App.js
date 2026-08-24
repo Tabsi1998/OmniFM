@@ -15,6 +15,7 @@ import Navbar from './components/Navbar.js';
 import PlanMatrix from './components/PlanMatrix.js';
 import DashboardPortal from './components/DashboardPortal.js';
 import OwnerAdmin from './components/OwnerAdmin.js';
+import BrandKit from './components/BrandKit.js';
 import DiscordShowcase from './components/DiscordShowcase.js';
 import NowPlayingBar from './components/NowPlayingBar.js';
 import FaqSection from './components/FaqSection.js';
@@ -141,7 +142,7 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    if (currentPage === 'dashboard' || currentPage === 'admin') {
+    if (currentPage === 'dashboard' || currentPage === 'admin' || currentPage === 'brand') {
       setLoading(false);
       return () => {};
     }
@@ -230,6 +231,14 @@ function AppContent() {
     return (
       <div data-testid="app-admin-root" style={{ position: 'relative', minHeight: '100vh' }}>
         <OwnerAdmin />
+      </div>
+    );
+  }
+
+  if (currentPage === 'brand') {
+    return (
+      <div data-testid="app-brand-root" style={{ position: 'relative', minHeight: '100vh' }}>
+        <BrandKit />
       </div>
     );
   }

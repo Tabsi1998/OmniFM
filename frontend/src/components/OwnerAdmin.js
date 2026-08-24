@@ -3,13 +3,14 @@ import {
   Radio, LayoutDashboard, Server, KeyRound, ListMusic, PlugZap, Activity as ActivityIcon,
   LogOut, ShieldCheck, TrendingUp, Users, Cpu, RefreshCw, CheckCircle2, XCircle,
   Music2, Globe, CreditCard, Mail, Database, Fingerprint, AlertTriangle,
-  Radar, Terminal, Gauge, HeartPulse, Plus, Pencil, Trash2, Save, ScrollText, SignalHigh, X as CloseIcon,
+  Radar, Terminal, Gauge, HeartPulse, Plus, Pencil, Trash2, Save, ScrollText, SignalHigh, X as CloseIcon, Palette,
 } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
   PieChart, Pie, AreaChart, Area, CartesianGrid,
 } from 'recharts';
 import { buildApiUrl } from '../lib/api.js';
+import BrandKit from './BrandKit.js';
 
 const TOKEN_KEY = 'omnifm_admin_token';
 
@@ -22,6 +23,7 @@ const NAV = [
   { id: 'integrations', label: 'Integrations', icon: PlugZap },
   { id: 'activity', label: 'Activity Log', icon: ActivityIcon },
   { id: 'audit', label: 'Audit-Log', icon: ScrollText },
+  { id: 'brand', label: 'Brand Kit', icon: Palette },
 ];
 
 const PLAN_COLORS = { free: '#64748b', pro: '#00e5ff', ultimate: '#ff6b00' };
@@ -803,6 +805,9 @@ export default function OwnerAdmin() {
               </div>
             ))}
           </div>
+        )}
+        {section === 'brand' && (
+          <div data-testid="owner-brand-kit"><BrandKit embedded /></div>
         )}
       </main>
     </div>
