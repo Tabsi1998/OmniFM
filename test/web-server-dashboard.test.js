@@ -57,6 +57,11 @@ async function restoreFile(filePath, snapshot) {
   await fs.rm(filePath, { force: true });
 }
 
+// Preview-/CI-Umgebungen können globale Stripe-Keys setzen — für deterministische
+// "Stripe nicht konfiguriert"-Tests hier hart entfernen.
+delete process.env.STRIPE_SECRET_KEY;
+delete process.env.STRIPE_API_KEY;
+
 function setEnv(overrides) {
   const previous = new Map();
   for (const [key, value] of Object.entries(overrides)) {

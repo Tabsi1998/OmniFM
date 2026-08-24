@@ -197,11 +197,15 @@ export default function OwnerAdmin() {
   };
   const closeLicForm = () => { setLicForm(null); setLicMsg(null); };
 
+  const refreshOverview = useCallback(async () => {
+    try { setOverview(await apiGet('/api/admin/overview', token)); } catch { /* Übersicht bleibt beim alten Stand */ }
+  }, [apiGet, token]);
+
   const createLicense = async () => {
     setLicBusy(true); setLicMsg(null);
     try {
       await apiSend('/api/admin/licenses', 'POST', { email: licForm.email, tier: licForm.tier, months: Number(licForm.months) || 1, seats: Number(licForm.seats) || 1, note: licForm.note, guildId: licForm.serverId });
-      setLicMsg({ ok: true, text: 'Lizenz erstellt.' }); setLicForm(null); await loadLicenses();
+      setLicMsg({ ok: true, text: 'Lizenz erstellt.' }); setLicForm(null); await Promise.all([loadLicenses(), refreshOverview()]);
     } catch (e) { setLicMsg({ ok: false, text: e.message }); } finally { setLicBusy(false); }
   };
 
@@ -212,14 +216,14 @@ export default function OwnerAdmin() {
       const d = await apiSend(`/api/admin/licenses/${encodeURIComponent(licForm.licenseKey)}`, 'PATCH', patch);
       if (d.license) openEditLicense(d.license, true);
       setLicMsg({ ok: true, text: note || 'Gespeichert.' });
-      await loadLicenses();
+      await Promise.all([loadLicenses(), refreshOverview()]);
     } catch (e) { setLicMsg({ ok: false, text: e.message }); } finally { setLicBusy(false); }
   };
 
   const deleteLicense = async (key) => {
     if (typeof window !== 'undefined' && !window.confirm('Diese Lizenz wirklich unwiderruflich löschen?')) return;
     setLicBusy(true); setLicMsg(null);
-    try { await apiSend(`/api/admin/licenses/${encodeURIComponent(key)}`, 'DELETE'); setLicMsg({ ok: true, text: 'Lizenz gelöscht.' }); setLicForm(null); await loadLicenses(); }
+    try { await apiSend(`/api/admin/licenses/${encodeURIComponent(key)}`, 'DELETE'); setLicMsg({ ok: true, text: 'Lizenz gelöscht.' }); setLicForm(null); await Promise.all([loadLicenses(), refreshOverview()]); }
     catch (e) { setLicMsg({ ok: false, text: e.message }); } finally { setLicBusy(false); }
   };
 
@@ -575,7 +579,7 @@ export default function OwnerAdmin() {
             <div className="oa-grid cols-3" style={{ marginTop: 18 }}>
               <div className="oa-card oa-fade" style={{ gridColumn: 'span 2' }} data-testid="chart-revenue">
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-                  <div><div className="oa-stat-label">Umsatz-Trend</div><div style={{ fontSize: 18, fontWeight: 700, marginTop: 4 }}>{fmtMoney(mrr)} <span style={{ fontSize: 12, color: '#64748b' }}>/ Monat</span></div></div>
+                  <div><div className="oa-stat-label">MRR — aktueller Stand</div><div style={{ fontSize: 18, fontWeight: 700, marginTop: 4 }}>{fmtMoney(mrr)} <span style={{ fontSize: 12, color: '#64748b' }}>/ Monat · keine Historie</span></div></div>
                   <Equalizer />
                 </div>
                 <ResponsiveContainer width="100%" height={210}>
@@ -587,7 +591,7 @@ export default function OwnerAdmin() {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1b2133" vertical={false} />
-                    <XAxis dataKey="month" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
+                    <XAxis dataKey="month" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} tick={false} />
                     <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
                     <Tooltip content={<ChartTooltip />} />
                     <Area type="monotone" dataKey="mrr" name="MRR" stroke="#ff6b00" strokeWidth={2.5} fill="url(#oaRev)" />
@@ -661,7 +665,7 @@ export default function OwnerAdmin() {
                 <div style={{ width: 56, height: 56, borderRadius: 16, margin: '0 auto 18px', display: 'grid', placeItems: 'center', background: 'rgba(245,158,11,0.14)', color: '#f59e0b' }}><Radar size={26} /></div>
                 <div style={{ fontWeight: 800, fontSize: 18, fontFamily: "'Syne','Outfit',sans-serif", marginBottom: 10 }}>Warte auf Live-Daten vom Bot</div>
                 <div style={{ color: '#94a3b8', fontSize: 14, maxWidth: 560, margin: '0 auto', lineHeight: 1.6 }}>{monitoring.message}</div>
-                <div className="oa-mono" style={{ marginTop: 18, fontSize: 11, color: '#475569' }}>MongoDB: {monitoring.health?.mongo ? 'verbunden' : 'nicht verbunden'} · keine Fake-Werte</div>
+                <div className="oa-mono" style={{ marginTop: 18, fontSize: 11, color: '#94a3b8' }}>MongoDB: {monitoring.health?.mongo ? 'verbunden' : 'nicht verbunden'} · keine Fake-Werte</div>
               </div>
             ) : (
               <div data-testid="monitoring-panel">
@@ -766,7 +770,7 @@ export default function OwnerAdmin() {
                     </div>
                   </div>
                 </div>
-                <div style={{ marginTop: 12, color: '#475569', fontSize: 11 }} className="oa-mono">
+                <div style={{ marginTop: 12, color: '#94a3b8', fontSize: 11 }} className="oa-mono">
                   {monitoring.simulated ? 'SIMULIERTE TELEMETRIE · echte Node-Runtime-Daten überschreiben diese Werte automatisch' : 'LIVE NODE TELEMETRY'} · Stand {new Date(monitoring.generatedAt).toLocaleTimeString('de-DE')}
                 </div>
               </div>

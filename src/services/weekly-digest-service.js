@@ -8,7 +8,7 @@
 
 import { EmbedBuilder } from "discord.js";
 import { log } from "../lib/logging.js";
-import { OMNI_COLORS, brandFooter } from "../bot/brand-embed.js";
+import { OMNI_COLORS, brandFooter, brandAuthor } from "../bot/brand-embed.js";
 import { getGuildListeningStats, getGuildDailyStats } from "../listening-stats-store.js";
 import { getDb, isConnected as isMongoConnected } from "../lib/db.js";
 import {
@@ -105,6 +105,7 @@ async function sendWeeklyDigest(runtime, guildId, channelId, language = "de") {
 
   const embed = new EmbedBuilder()
     .setColor(OMNI_COLORS.orange)
+    .setAuthor(brandAuthor("OmniFM · Weekly Digest"))
     .setTitle(t("📈 Wöchentlicher Radio-Report", "📈 Weekly radio report"))
     .setDescription(
       t(

@@ -193,7 +193,7 @@ function streamStaticFile(res, resolved, { headOnly = false, statusCode = 200 } 
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "no-store",
     });
-    res.end("Not found");
+    res.end("404 — Not found");
     return;
   }
   if (!stat.isFile()) {
@@ -202,7 +202,7 @@ function streamStaticFile(res, resolved, { headOnly = false, statusCode = 200 } 
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "no-store",
     });
-    res.end("Not found");
+    res.end("404 — Not found");
     return;
   }
 
@@ -256,7 +256,7 @@ function sendStaticFile(res, filePath, { headOnly = false, notFoundPath = "" } =
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "no-store",
     });
-    res.end("Not found");
+    res.end("404 — Not found");
     return;
   }
 

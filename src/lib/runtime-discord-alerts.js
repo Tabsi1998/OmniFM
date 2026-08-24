@@ -1,4 +1,5 @@
 import { ChannelType, EmbedBuilder, PermissionFlagsBits } from "discord.js";
+import { brandAuthor, brandFooter } from "../bot/brand-embed.js";
 import { getDb, isConnected } from "./db.js";
 import {
   normalizeDashboardIncidentAlertsConfig,
@@ -178,6 +179,7 @@ function buildRuntimeIncidentAlertMessage(input) {
 
   const embed = new EmbedBuilder()
     .setColor(copy.color)
+    .setAuthor(brandAuthor("OmniFM · Incident"))
     .setTitle(copy.title)
     .setDescription(copy.description)
     .setTimestamp(input?.timestamp ? new Date(input.timestamp) : new Date());
@@ -188,7 +190,7 @@ function buildRuntimeIncidentAlertMessage(input) {
 
   const guildName = clipText(input?.guildName || input?.guildId || "", 120);
   if (guildName) {
-    embed.setFooter({ text: guildName });
+    embed.setFooter(brandFooter(guildName));
   }
 
   return {

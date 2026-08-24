@@ -7,6 +7,22 @@
 // ============================================================
 
 import { WEBSITE_URL } from "./runtime-links.js";
+import { buildReleaseInfo } from "../lib/release-info.js";
+
+// "v1.2.3 · abc1234" — sichtbarer Beweis, welcher Code-Stand läuft.
+let cachedVersionTag = null;
+export function versionTag() {
+  if (cachedVersionTag !== null) return cachedVersionTag;
+  try {
+    const info = buildReleaseInfo();
+    const version = info?.appVersion && info.appVersion !== "unknown" ? `v${info.appVersion}` : "";
+    const commit = info?.commit && info.commit !== "unknown" ? info.commit.slice(0, 7) : "";
+    cachedVersionTag = [version, commit].filter(Boolean).join(" · ");
+  } catch {
+    cachedVersionTag = "";
+  }
+  return cachedVersionTag;
+}
 
 // Website-Palette (exakt wie im Frontend).
 export const OMNI_COLORS = {

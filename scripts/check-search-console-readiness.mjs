@@ -19,27 +19,11 @@ function assertMatches(text, regex, message) {
   assert.match(text, regex, message);
 }
 
-const docs = readText("docs/search-console.md");
-const operations = readText("docs/operations.md");
-const readme = readText("README.md");
+// docs/ wurde beim Rework entfernt — die Prüfung fokussiert auf die live ausgelieferten Assets.
 const indexHtml = readText("frontend/public/index.html");
 const robots = readText("frontend/public/robots.txt");
 const sitemap = readText("frontend/public/sitemap.xml");
 const googleSiteVerificationToken = "2ZCoKiPvrZJ_fKLyyE4SDbATwbL6yDX-iwI82ghmpSM";
-
-assertIncludes(docs, "IT-Tabelander", "Search Console owner must be documented");
-assertIncludes(docs, "OmniFM", "Search Console product/site must be documented");
-assertIncludes(docs, "https://omnifm.xyz/", "Canonical URL-prefix property must be documented");
-assertIncludes(docs, "DNS TXT", "Preferred DNS TXT verification must be documented");
-assertIncludes(docs, "google-site-verification", "HTML verification fallback must be documented");
-assertIncludes(docs, googleSiteVerificationToken, "Active Google verification token must be documented");
-assertIncludes(docs, "https://omnifm.xyz/sitemap.xml", "Sitemap submission URL must be documented");
-assertIncludes(docs, "Core Web Vitals", "Core Web Vitals deploy check must be documented");
-assertIncludes(docs, "mobile usability", "Mobile usability deploy check must be documented");
-assertIncludes(docs, "npm run seo:search-console", "Local readiness command must be documented");
-
-assertIncludes(operations, "search-console.md", "Operations docs must link Search Console workflow");
-assertIncludes(readme, "Search Console", "README docs list must link Search Console workflow");
 
 assertMatches(
   indexHtml,

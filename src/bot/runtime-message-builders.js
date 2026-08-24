@@ -24,6 +24,7 @@ import {
   withLanguageParam,
 } from "./runtime-links.js";
 import { buildOmniEmbed, buildLinkRow } from "./discord-ui.js";
+import { brandAuthor, brandFooter, brandIconUrl, OMNI_RULE } from "./brand-embed.js";
 
 function getTierConfig(guildId) {
   const config = getServerPlanConfig(guildId);
@@ -138,120 +139,114 @@ export function buildRuntimeHelpMessage(runtime, interaction) {
 
   const headerEmbed = buildOmniEmbed({
     tone: "info",
-    title: isDe ? `🧭 ${BRAND.name} Hilfe` : `🧭 ${BRAND.name} Help`,
-    description: isDe
-      ? `Server: **${interaction.guild?.name || guildId || "-"}**\nPlan: **${tierConfig.name}** | Audio: **${tierConfig.bitrate}** | Worker-Slots: **${tierConfig.maxBots}**`
-      : `Server: **${interaction.guild?.name || guildId || "-"}**\nPlan: **${tierConfig.name}** | Audio: **${tierConfig.bitrate}** | Worker slots: **${tierConfig.maxBots}**`,
+    author: isDe ? "OmniFM · Hilfe-Center" : "OmniFM · Help Center",
+    description: [
+      isDe ? "## 📡 Willkommen bei OmniFM" : "## 📡 Welcome to OmniFM",
+      isDe
+        ? "-# Dein 24/7-Radio für Discord — der Commander nimmt Befehle entgegen, Worker halten die Streams."
+        : "-# Your 24/7 radio for Discord — the commander takes commands, workers keep the streams alive.",
+      OMNI_RULE,
+    ].join("\n"),
     fields: [
       {
-        name: isDe ? "Schnellstart" : "Quick start",
-        value: isDe
-          ? "1. `/play` öffnet den geführten Schnellstart.\n2. `/stations` zeigt einen Browser mit Auswahl.\n3. `/workers` und `/invite` regeln deine Worker.\n4. `/setup` erklärt den Server-Start Schritt für Schritt."
-          : "1. `/play` opens the guided quick start.\n2. `/stations` opens a browser with selection controls.\n3. `/workers` and `/invite` manage your workers.\n4. `/setup` explains the server start step by step.",
-        inline: false,
+        name: isDe ? "🖥️ Server" : "🖥️ Server",
+        value: clipText(interaction.guild?.name || guildId || "—", 60),
+        inline: true,
+      },
+      { name: "💠 Plan", value: `**${tierConfig.name}**`, inline: true },
+      { name: "🎚️ Audio", value: String(tierConfig.bitrate || "—"), inline: true },
+      { name: "🤖 Worker-Slots", value: String(tierConfig.maxBots || 0), inline: true },
+      {
+        name: isDe ? "🌍 Sprache" : "🌍 Language",
+        value: "`/language set value:de|en`",
+        inline: true,
       },
       {
-        name: isDe ? "Sprache" : "Language",
-        value: isDe
-          ? "OmniFM erkennt Server- und Discord-Sprache automatisch. Mit `/language set value:de|en` kannst du sie fest setzen."
-          : "OmniFM auto-detects the server/Discord language. Use `/language set value:de|en` to force it.",
-        inline: false,
+        name: "📊 Dashboard",
+        value: isDe ? "Web-Dashboard mit SSO" : "Web dashboard with SSO",
+        inline: true,
       },
       {
-        name: isDe ? "Dashboard" : "Dashboard",
+        name: isDe ? "🚀 Schnellstart" : "🚀 Quick start",
         value: isDe
-          ? "Web-Dashboard mit SSO: Statistiken, Events, Abo und Server-Einstellungen."
-          : "Web dashboard with SSO: stats, events, subscription, and server settings.",
+          ? "> **1.** `/play` — geführter Schnellstart mit Buttons\n> **2.** `/stations` — Sender-Browser öffnen\n> **3.** `/invite` — Worker auf den Server holen\n> **4.** `/setup` — Server-Start Schritt für Schritt"
+          : "> **1.** `/play` — guided quick start with buttons\n> **2.** `/stations` — open the station browser\n> **3.** `/invite` — bring workers to your server\n> **4.** `/setup` — server start step by step",
         inline: false,
       },
     ],
+    thumbnail: brandIconUrl(),
+    withFooter: false,
+    timestamp: false,
   });
 
   const playbackEmbed = buildOmniEmbed({
     tone: "live",
-    title: isDe ? "🎧 Wiedergabe & Live" : "🎧 Playback & Live",
-    fields: [
-      {
-        name: "/play /pause /resume /stop",
-        value: isDe
-          ? "Startet, pausiert oder beendet Streams im Voice- oder Stage-Channel. `/play` führt jetzt per Buttons und Menüs."
-          : "Start, pause, or stop streams in voice or stage channels. `/play` now guides you with buttons and menus.",
-        inline: false,
-      },
-      {
-        name: "/stations /list /now /history /stats",
-        value: isDe
-          ? "Zeigt verfügbare Sender, aktuelle Songs, History und Server-Statistiken. `/stations` ist jetzt ein Browser statt Textwand."
-          : "Shows available stations, current songs, history, and server statistics. `/stations` is now a browser instead of a text wall.",
-        inline: false,
-      },
-      {
-        name: "/setvolume /status /health /diag",
-        value: isDe
-          ? "Audio, Worker-Zustand und technische Checks für Admins."
-          : "Audio, worker status, and technical checks for admins.",
-        inline: false,
-      },
-    ],
+    withAuthor: false,
+    withFooter: false,
+    timestamp: false,
+    description: [
+      isDe ? "### 🎧 Wiedergabe & Live" : "### 🎧 Playback & Live",
+      "`/play` `/pause` `/resume` `/stop`",
+      isDe
+        ? "-# Streams im Voice- oder Stage-Channel starten, pausieren und beenden — komplett per Buttons & Menüs."
+        : "-# Start, pause, and stop streams in voice or stage channels — fully via buttons & menus.",
+      "",
+      "`/stations` `/list` `/now` `/history` `/stats`",
+      isDe
+        ? "-# Sender-Browser, aktueller Song, Song-History und Server-Statistiken."
+        : "-# Station browser, current song, song history, and server statistics.",
+      "",
+      "`/setvolume` `/status` `/health` `/diag`",
+      isDe
+        ? "-# Lautstärke, Worker-Zustand und Technik-Checks für Admins."
+        : "-# Volume, worker health, and technical checks for admins.",
+    ].join("\n"),
   });
 
   const automationEmbed = buildOmniEmbed({
     tone: "info",
-    title: isDe ? "🗓 Events & Automationen" : "🗓 Events & Automation",
-    fields: [
-      {
-        name: "/event create|edit|list|delete",
-        value: isDe
-          ? "Flexible Event-Planung mit Voice-/Stage-Channel, Wiederholung, Server-Event und Ankündigung."
-          : "Flexible event scheduling with voice/stage channel, recurrence, server event, and announcement.",
-        inline: false,
-      },
-      {
-        name: isDe ? "Datumsformate" : "Date formats",
-        value: isDe
-          ? "`DD.MM.YYYY HH:MM`, `YYYY-MM-DD HH:MM`, `20:00`, `heute`, `morgen` oder getrennt über `startdate` + `starttime`."
-          : "`DD.MM.YYYY HH:MM`, `YYYY-MM-DD HH:MM`, `20:00`, `today`, `tomorrow`, or split across `startdate` + `starttime`.",
-        inline: false,
-      },
-      {
-        name: isDe ? "Wichtig" : "Important",
-        value: isDe
-          ? "Ohne `serverevent` darf ein Event sofort starten. Mit `serverevent` muss der Start mindestens 60 Sekunden in der Zukunft liegen."
-          : "Without `serverevent`, an event may start immediately. With `serverevent`, start time must be at least 60 seconds in the future.",
-        inline: false,
-      },
-    ],
+    withAuthor: false,
+    withFooter: false,
+    timestamp: false,
+    description: [
+      isDe ? "### 🗓️ Events & Automationen" : "### 🗓️ Events & Automation",
+      "`/event create` `/event edit` `/event list` `/event delete`",
+      isDe
+        ? "-# Radio-Events mit Voice-/Stage-Channel, Wiederholung, Server-Event und Ankündigung."
+        : "-# Radio events with voice/stage channel, recurrence, server event, and announcement.",
+      "",
+      isDe
+        ? "**Datumsformate:** `DD.MM.YYYY HH:MM` · `YYYY-MM-DD HH:MM` · `20:00` · `heute` · `morgen`"
+        : "**Date formats:** `DD.MM.YYYY HH:MM` · `YYYY-MM-DD HH:MM` · `20:00` · `today` · `tomorrow`",
+      isDe
+        ? "-# Mit `serverevent` muss der Start mindestens 60 Sekunden in der Zukunft liegen."
+        : "-# With `serverevent`, the start must be at least 60 seconds in the future.",
+    ].join("\n"),
   });
 
   const adminEmbed = buildOmniEmbed({
-    tone: tierConfig.tier === "ultimate" ? "admin" : "info",
-    title: "🛠 Admin & Premium",
-    fields: [
-      {
-        name: "/setup /invite /workers /perm",
-        value: isDe
-          ? "Geführten Start öffnen, Worker-Setup prüfen, Worker einladen und Rollenrechte für Commands regeln."
-          : "Open the guided start, inspect worker setup, invite workers, and manage role permissions for commands.",
-        inline: false,
-      },
-      {
-        name: "/premium /license",
-        value: isDe
-          ? "Lizenzstatus, Upgrades und Seat-Verwaltung für deinen Server."
-          : "License status, upgrades, and seat management for your server.",
-        inline: false,
-      },
-      {
-        name: "/addstation /removestation /mystations",
-        value: isDe
-          ? "Ultimate-only für eigene Sender und private Streams."
-          : "Ultimate-only for custom stations and private streams.",
-        inline: false,
-      },
-    ],
+    tone: "admin",
+    withAuthor: false,
+    description: [
+      isDe ? "### 🛠️ Admin & Premium" : "### 🛠️ Admin & Premium",
+      "`/setup` `/invite` `/workers` `/perm`",
+      isDe
+        ? "-# Geführter Start, Worker-Setup, Einladungen und Rollenrechte für Commands."
+        : "-# Guided start, worker setup, invites, and role permissions for commands.",
+      "",
+      "`/premium` `/license`",
+      isDe
+        ? "-# Lizenzstatus, Upgrades und Seat-Verwaltung für deinen Server."
+        : "-# License status, upgrades, and seat management for your server.",
+      "",
+      "`/addstation` `/removestation` `/mystations`",
+      isDe
+        ? "-# Eigene Sender & private Streams (Ultimate)."
+        : "-# Custom stations & private streams (Ultimate).",
+    ].join("\n"),
     footer: isDe
-      ? "Commander nimmt Befehle entgegen, Worker halten die Voice-/Stage-Streams."
-      : "The commander handles commands, workers keep the voice/stage streams running.",
+      ? "Commander steuert · Worker streamen"
+      : "Commander controls · workers stream",
   });
 
   const actionRow = new ActionRowBuilder().addComponents(
@@ -367,7 +362,9 @@ export async function buildRuntimeWorkersStatusPayload(runtime, interaction, { h
 
   const summaryEmbed = new EmbedBuilder()
     .setColor(BRAND.color)
-    .setTitle(t("Worker-Status", "Worker status"))
+    .setAuthor(brandAuthor())
+    .setTimestamp(new Date())
+    .setTitle(t("🤖 Worker-Status", "🤖 Worker status"))
     .setDescription(
       t(
         `Plan: **${runtime.formatTierLabel(guildTier, language)}** | Freigeschaltet: **1-${maxIndex}**\nOnline: **${onlineCount}/${statuses.length}** | Aktiv: **${activeTotal}**`,
@@ -387,12 +384,10 @@ export async function buildRuntimeWorkersStatusPayload(runtime, interaction, { h
       inline: false,
     });
   }
-  summaryEmbed.setFooter({
-    text: t(
-      `Seite ${resolvedPage + 1}/${totalPages} | 🟢 Spielt | 🟡 Bereit | 🔴 Offline | 📨 Nicht eingeladen | 🔒 Upgrade`,
-      `Page ${resolvedPage + 1}/${totalPages} | 🟢 Playing | 🟡 Ready | 🔴 Offline | 📨 Not invited | 🔒 Upgrade`
-    ),
-  });
+  summaryEmbed.setFooter(brandFooter(t(
+    `Seite ${resolvedPage + 1}/${totalPages} · 🟢 Spielt · 🟡 Bereit · 🔴 Offline · 📨 Nicht eingeladen · 🔒 Upgrade`,
+    `Page ${resolvedPage + 1}/${totalPages} · 🟢 Playing · 🟡 Ready · 🔴 Offline · 📨 Not invited · 🔒 Upgrade`
+  )));
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()

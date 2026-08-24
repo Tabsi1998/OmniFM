@@ -81,7 +81,7 @@ function resolveCommanderIndex(env = {}, botCount = countConfiguredBots(env)) {
 
 function determineDeploymentMode(env = {}, { hasSplitCompose = true } = {}) {
   const requested = String(env.OMNIFM_DEPLOYMENT_MODE || "auto").trim().toLowerCase();
-  if (requested === "split") return hasSplitCompose ? "split" : "monolith";
+  if (requested === "split") return "split";
   if (["monolith", "single", "legacy"].includes(requested)) return "monolith";
   return countConfiguredBots(env) > 1 && hasSplitCompose ? "split" : "monolith";
 }

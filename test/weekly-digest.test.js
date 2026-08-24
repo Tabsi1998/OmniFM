@@ -119,7 +119,7 @@ test("buildWeeklyDigestEmbedData maps preview fields into an embed payload", () 
     now: new Date("2026-03-09T10:00:00.000Z"),
   });
 
-  assert.equal(embed.color, 0x5865F2);
+  assert.equal(embed.color, 0xFF6B00);
   assert.equal(embed.footer.text, "OmniFM Weekly Digest");
   assert.equal(embed.title, "Woechentlicher Radio-Report");
   assert.ok(Array.isArray(embed.fields));

@@ -44,6 +44,7 @@ import { recordCommandUsage } from "../listening-stats-store.js";
 import { listScheduledEvents } from "../scheduled-events-store.js";
 import { getDefaultLanguage } from "../i18n.js";
 import { premiumStationEmbed, customStationEmbed } from "../ui/upgradeEmbeds.js";
+import { brandAuthor, brandFooter } from "./brand-embed.js";
 import { buildInviteUrl } from "../bot-config.js";
 import { updateGuildSettings } from "../lib/guild-settings.js";
 import {
@@ -1620,6 +1621,10 @@ export async function handleRuntimeInteraction(runtime, interaction) {
         }
       );
 
+    diagEmbed.setAuthor(brandAuthor());
+    diagEmbed.setFooter(brandFooter(t("OmniFM · /diag", "OmniFM · /diag")));
+    diagEmbed.setTimestamp(new Date());
+
     await interaction.reply({
       embeds: [diagEmbed],
       components: [
@@ -1692,6 +1697,10 @@ export async function handleRuntimeInteraction(runtime, interaction) {
           inline: false,
         }
       );
+
+    statusEmbed.setAuthor(brandAuthor());
+    statusEmbed.setFooter(brandFooter(t("OmniFM · /status", "OmniFM · /status")));
+    statusEmbed.setTimestamp(new Date());
 
     await interaction.reply({
       embeds: [statusEmbed],

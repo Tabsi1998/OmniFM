@@ -96,9 +96,10 @@ async function sendWeeklyDigest(runtime, guildId, channelId, language = "de") {
   const weekPeak = Math.max(0, ...dailyStats.map((entry) => entry.peakListeners || 0));
 
   const { EmbedBuilder } = await import("discord.js");
-  const { OMNI_COLORS, brandFooter } = await import("../bot/brand-embed.js");
+  const { OMNI_COLORS, brandFooter, brandAuthor } = await import("../bot/brand-embed.js");
   const embed = new EmbedBuilder()
     .setColor(OMNI_COLORS.orange)
+    .setAuthor(brandAuthor("OmniFM · Weekly Digest"))
     .setTitle(t("📈 Wöchentlicher Radio-Report", "📈 Weekly radio report"))
     .setDescription(t(
       `Hier ist die Zusammenfassung der letzten 7 Tage fuer **${guild.name}**:`,

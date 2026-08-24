@@ -32,7 +32,7 @@ function Equalizer({ bars = 14, height = 44, colorful = true }) {
   );
 }
 
-function NowPlayingConsole({ listeners }) {
+function NowPlayingConsole({ listeners, live }) {
   const { formatNumber, locale } = useI18n();
   const stations = useShowcaseStations(8);
   const [idx, setIdx] = useState(0);
@@ -79,13 +79,13 @@ function NowPlayingConsole({ listeners }) {
           border: '1px solid rgba(255,42,95,0.4)', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.16em',
           color: '#ffd9e2', fontFamily: "'JetBrains Mono', monospace",
         }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ff2a5f', animation: 'onair-pulse 1.8s infinite' }} />
-          ON AIR
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: live ? '#ff2a5f' : '#00e5ff', animation: 'onair-pulse 1.8s infinite' }} />
+          {live ? 'ON AIR' : (locale === 'en' ? 'PREVIEW' : 'VORSCHAU')}
         </span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#94a3b8', fontSize: 12.5, fontFamily: "'JetBrains Mono', monospace" }}>
           {Number(listeners) > 0
             ? <><Users size={13} color="#ff6b00" /> {formatNumber(Number(listeners))} {locale === 'en' ? 'listening' : 'hören zu'}</>
-            : <><span style={{ width: 7, height: 7, borderRadius: '50%', background: '#ff2a5f' }} /> {locale === 'en' ? 'LIVE' : 'LIVE'}</>}
+            : <><span style={{ width: 7, height: 7, borderRadius: '50%', background: live ? '#ff2a5f' : '#00e5ff' }} /> {live ? 'LIVE' : (locale === 'en' ? 'DEMO' : 'DEMO')}</>}
         </span>
       </div>
 
@@ -123,7 +123,7 @@ function NowPlayingConsole({ listeners }) {
           <div style={{ height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, #ff6b00, #00e5ff)', animation: 'np-progress 30s linear infinite' }} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, color: '#64748b', fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>
-          <span>LIVE STREAM</span><span>24 / 7</span>
+          <span>{live ? 'LIVE STREAM' : (locale === 'en' ? 'STATION PREVIEW' : 'SENDER-VORSCHAU')}</span><span>24 / 7</span>
         </div>
       </div>
 
@@ -233,7 +233,7 @@ function Hero({ stats, bots }) {
           </div>
 
           <div className="hero-np">
-            <NowPlayingConsole listeners={listeners} />
+            <NowPlayingConsole listeners={listeners} live={Boolean(stats.live)} />
           </div>
         </div>
       </div>

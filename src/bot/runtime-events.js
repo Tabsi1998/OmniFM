@@ -57,7 +57,7 @@ import {
   getScheduledEvent,
 } from "../scheduled-events-store.js";
 import { BRAND } from "../config/plans.js";
-import { OMNI_COLORS } from "./brand-embed.js";
+import { OMNI_COLORS, brandAuthor, brandFooter } from "./brand-embed.js";
 import {
   DASHBOARD_URL,
   PLAY_COMPONENT_ID_OPEN,
@@ -472,9 +472,8 @@ export function buildScheduledEventEmbed(runtime, event, stationName, language =
         inline: true,
       }
     )
-    .setFooter({
-      text: languagePick(language, "OmniFM Event Scheduler", "OmniFM Event Scheduler"),
-    })
+    .setAuthor(brandAuthor(languagePick(language, "OmniFM · Events", "OmniFM · Events")))
+    .setFooter(brandFooter(languagePick(language, "OmniFM Event Scheduler", "OmniFM Event Scheduler")))
     .setTimestamp(new Date());
 
   if (event?.stageTopic) {
@@ -505,9 +504,10 @@ export function buildScheduledEventEmbed(runtime, event, stationName, language =
 export function buildScheduledEventsListEmbed(runtime, events, guildId, language = "de") {
   const embed = new EmbedBuilder()
     .setColor(BRAND.color)
-    .setTitle(languagePick(language, "Geplante Events", "Scheduled events"))
+    .setAuthor(brandAuthor(languagePick(language, "OmniFM · Events", "OmniFM · Events")))
+    .setTitle(languagePick(language, "🗓️ Geplante Events", "🗓️ Scheduled events"))
     .setDescription(`${events.length} ${languagePick(language, "Eintrag(e) auf diesem Server", "item(s) on this server")}`)
-    .setFooter({ text: `${runtime.config.name} | /event list` })
+    .setFooter(brandFooter(`${runtime.config.name} · /event list`))
     .setTimestamp(new Date());
 
   const guild = runtime.client.guilds.cache.get(guildId) || null;

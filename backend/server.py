@@ -1410,7 +1410,11 @@ def seed_premium_if_needed():
         pass
 
 # Demo-Lizenzen/-Entitlements NUR seeden, wenn ausdrücklich aktiviert (nicht im Live-Betrieb).
-if (os.environ.get("SEED_DEMO_DATA") or "").strip().lower() in ("1", "true", "yes"):
+def seed_demo_enabled() -> bool:
+    return (os.environ.get("SEED_DEMO_DATA") or "").strip().lower() in ("1", "true", "yes")
+
+
+if seed_demo_enabled():
     seed_premium_if_needed()
 
 
@@ -1418,7 +1422,7 @@ def purge_demo_data_if_live():
     """Entfernt beim Live-Betrieb übrig gebliebene Demo-Dokumente (idempotent, sicher)."""
     if db is None:
         return
-    if (os.environ.get("SEED_DEMO_DATA") or "").strip().lower() in ("1", "true", "yes"):
+    if seed_demo_enabled():
         return
     try:
         rx = {"$regex": "^demo-", "$options": "i"}
@@ -4399,7 +4403,7 @@ async def admin_monitoring(request: Request):
         }
 
     # 2) Keine frischen Runtime-Daten und kein Demo-Modus -> ehrlich leer.
-    if os.environ.get("SEED_DEMO_DATA") != "1":
+    if not seed_demo_enabled():
         return {
             "generatedAt": now_iso,
             "simulated": False,

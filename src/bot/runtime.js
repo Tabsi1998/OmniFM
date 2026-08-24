@@ -174,7 +174,7 @@ import {
   deleteScheduledEventsByFilter,
 } from "../scheduled-events-store.js";
 import { PLANS, BRAND } from "../config/plans.js";
-import { OMNI_COLORS, tierColor, brandFooter, brandAuthor } from "./brand-embed.js";
+import { OMNI_COLORS, tierColor, brandFooter, brandAuthor, versionTag } from "./brand-embed.js";
 import { recordRuntimeIncident } from "../services/runtime-health-reporter.js";
 
 const NP_PREFIX = "np:";
@@ -1657,6 +1657,7 @@ class BotRuntime {
 
     const embed = new EmbedBuilder()
       .setColor(OMNI_COLORS.cyan)
+      .setAuthor(brandAuthor())
       .setTitle(t("📊 Listening-Stats", "📊 Listening stats"))
       .setDescription(
         t(
@@ -1762,6 +1763,7 @@ class BotRuntime {
     const latest = history[0] || null;
     const embed = new EmbedBuilder()
       .setColor(OMNI_COLORS.orange)
+      .setAuthor(brandAuthor())
       .setTitle(t("🕘 Song-History", "🕘 Song history"))
       .setDescription(clipText(lines.join("\n\n"), 3800))
       .setFooter(brandFooter(playbackRuntime
@@ -1812,202 +1814,6 @@ class BotRuntime {
     return fallbackChannels[0] || null;
   }
 
-  buildNowPlayingEmbedLegacy(guildId, station, meta, context = {}) {
-    const language = this.resolveGuildLanguage(guildId);
-    const isDe = language === "de";
-    const tierConfig = getTierConfig(guildId);
-    const stationName = clipText(station?.name || meta?.name || "-", 120) || "-";
-    const artist = clipText(this.normalizeNowPlayingValue(meta?.artist, station, meta, 120), 120);
-    const title = clipText(this.normalizeNowPlayingValue(meta?.title, station, meta, 140), 140);
-    const album = clipText(this.normalizeNowPlayingValue(meta?.album, station, meta, 140), 140);
-    const trackLabel = clipText(
-      this.normalizeNowPlayingValue(meta?.displayTitle || meta?.streamTitle, station, meta, 180)
-      || ([artist, title].filter(Boolean).join(" - ")),
-      140
-    );
-    const headline = clipText(title || trackLabel || "", 110) || trackLabel;
-    const streamInfo = this.normalizeNowPlayingValue(meta?.description, station, meta, 240);
-    const hasTrack = Boolean(trackLabel);
-    const listenerCount = Math.max(0, Number.parseInt(String(context?.listenerCount || 0), 10) || 0);
-    const voiceChannelId = String(context?.channelId || "").trim();
-    const workerName = clipText(String(context?.workerName || this.config.name || BRAND.name), 60) || BRAND.name;
-    const metadataStatus = String(meta?.metadataStatus || (hasTrack ? "ok" : "empty")).trim().toLowerCase();
-    const metadataHint = hasTrack
-      ? null
-      : (metadataStatus === "unsupported"
-        ? (isDe
-          ? "Dieser Stream sendet aktuell keine auslesbaren Song-Metadaten."
-          : "This stream is not sending readable track metadata right now.")
-        : (isDe
-          ? "Dieser Sender liefert aktuell keine verwertbaren Song-Metadaten."
-          : "This station is not providing usable track metadata right now."));
-    const embed = new EmbedBuilder()
-      .setColor(hasTrack ? OMNI_COLORS.success : OMNI_COLORS.warning)
-      .setTitle(isDe ? "🎵 Jetzt live" : "🎵 Live now")
-      .setDescription(
-        hasTrack
-          ? `**${headline}**`
-          : `⚠️ ${metadataHint}`
-      )
-      .addFields(
-        {
-          name: isDe ? "📻 Sender" : "📻 Station",
-          value: stationName,
-          inline: true,
-        },
-        {
-          name: isDe ? "🔊 Qualität" : "🔊 Quality",
-          value: tierConfig.bitrate || "-",
-          inline: true,
-        },
-        {
-          name: isDe ? "👥 Zuhörer" : "👥 Listeners",
-          value: String(listenerCount),
-          inline: true,
-        },
-        {
-          name: isDe ? "🎙 Voice" : "🎙 Voice",
-          value: voiceChannelId ? `<#${voiceChannelId}>` : (isDe ? "unbekannt" : "unknown"),
-          inline: true,
-        }
-      )
-      .setAuthor({
-        name: `${workerName} • ${BRAND.name}`,
-      })
-      .setFooter({
-        text: isDe
-          ? `↻ Auto-Update ${Math.round(NOW_PLAYING_POLL_MS / 1000)}s`
-          : `↻ Auto update ${Math.round(NOW_PLAYING_POLL_MS / 1000)}s`,
-      })
-      .setTimestamp(new Date(meta?.updatedAt || Date.now()));
-
-    if (artist) {
-      embed.addFields({ name: isDe ? "🎤 Künstler" : "🎤 Artist", value: artist, inline: true });
-    }
-    if (title) {
-      embed.addFields({ name: isDe ? "📝 Titel" : "📝 Title", value: title, inline: true });
-    }
-    if (streamInfo) {
-      embed.addFields({ name: isDe ? "ℹ Stream-Info" : "ℹ Stream info", value: streamInfo, inline: false });
-    }
-    if (!hasTrack) {
-      embed.addFields({
-        name: isDe ? "🧭 Hinweis" : "🧭 Note",
-        value: isDe
-          ? "Der Stream laeuft normal weiter. Sobald der Radiosender wieder Metadaten liefert, aktualisiert OmniFM die Einbettung automatisch."
-          : "The stream continues normally. As soon as the station sends metadata again, OmniFM updates the embed automatically.",
-        inline: false,
-      });
-    }
-    if (meta?.artworkUrl) {
-      embed.setThumbnail(meta.artworkUrl);
-    }
-
-    const sourceSummary = this.buildNowPlayingSourceSummary(language, meta, hasTrack);
-    const visibleListenerCount = listenerCount >= 2 ? String(listenerCount) : null;
-    const descriptionLines = [];
-    if (hasTrack) {
-      descriptionLines.push(`**${headline}**`);
-      if (sourceSummary.sourceNote) {
-        descriptionLines.push(`_${sourceSummary.sourceNote}_`);
-      }
-    } else {
-      descriptionLines.push(`\u26a0\ufe0f ${sourceSummary.metadataHint}`);
-    }
-
-    const summaryLines = [
-      `**${isDe ? "\u{1f4fb} Sender" : "\u{1f4fb} Station"}**: ${stationName}`,
-      `**${isDe ? "\u{1f50a} Qualit\u00e4t" : "\u{1f50a} Quality"}**: ${tierConfig.bitrate || "-"}`,
-      `**${isDe ? "\u{1f9e0} Quelle" : "\u{1f9e0} Source"}**: ${sourceSummary.sourceDetail || sourceSummary.sourceLabel}`,
-    ];
-    const stableFields = [
-      {
-        name: isDe ? "\u{1f4ca} Stream" : "\u{1f4ca} Stream",
-        value: summaryLines.join("\n"),
-        inline: false,
-      },
-    ];
-
-    const trackLines = [];
-    if (artist) {
-      trackLines.push(`**${isDe ? "\u{1f3a4} K\u00fcnstler" : "\u{1f3a4} Artist"}**: ${artist}`);
-    }
-    if (title) {
-      trackLines.push(`**${isDe ? "\u{1f4dd} Titel" : "\u{1f4dd} Title"}**: ${title}`);
-    }
-    if (album) {
-      trackLines.push(`**\u{1f4bf} Album**: ${album}`);
-    }
-    if (trackLines.length) {
-      stableFields.push({
-        name: hasTrack ? (isDe ? "\u{1f3b6} Track-Infos" : "\u{1f3b6} Track details") : (isDe ? "\u{1f3b6} Erkannt" : "\u{1f3b6} Recognized"),
-        value: trackLines.join("\n"),
-        inline: false,
-      });
-    }
-
-    const voiceLines = [];
-    if (voiceChannelId) {
-      voiceLines.push(`**${isDe ? "\u{1f39b} L\u00e4uft in" : "\u{1f39b} Running in"}**: <#${voiceChannelId}>`);
-    }
-    if (visibleListenerCount) {
-      voiceLines.push(`**${isDe ? "\u{1f465} H\u00f6ren gerade" : "\u{1f465} Listening now"}**: ${visibleListenerCount}`);
-    }
-    if (voiceLines.length) {
-      stableFields.push({
-        name: isDe ? "\u{1f50a} Wiedergabe" : "\u{1f50a} Playback",
-        value: voiceLines.join("\n"),
-        inline: false,
-      });
-    }
-
-    if (streamInfo) {
-      stableFields.push({
-        name: isDe ? "\u2139\ufe0f Stream-Info" : "\u2139\ufe0f Stream info",
-        value: streamInfo,
-        inline: false,
-      });
-    }
-    if (!hasTrack) {
-      stableFields.push({
-        name: isDe ? "\u{1f9ed} Hinweis" : "\u{1f9ed} Note",
-        value: isDe
-          ? "Der Stream l\u00e4uft normal weiter. OmniFM versucht weiterhin zuerst Sender-Metadaten und danach den Fingerprint-Fallback."
-          : "The stream continues normally. OmniFM keeps trying station metadata first and then the fingerprint fallback.",
-        inline: false,
-      });
-    }
-
-    const stableFooterParts = [
-      workerName,
-      isDe ? `Auto-Update ${Math.round(NOW_PLAYING_POLL_MS / 1000)}s` : `Auto update ${Math.round(NOW_PLAYING_POLL_MS / 1000)}s`,
-    ];
-    if (sourceSummary.metadataSource.includes("recognition")) {
-      stableFooterParts.push(isDe ? "Fingerprint-Fallback" : "Fingerprint fallback");
-    }
-
-    embed
-      .setColor(!hasTrack ? OMNI_COLORS.warning : (sourceSummary.metadataSource.includes("recognition") ? OMNI_COLORS.info : OMNI_COLORS.success))
-      .setTitle(isDe ? "\u{1f3b5} Jetzt live" : "\u{1f3b5} Live now")
-      .setDescription(descriptionLines.join("\n"))
-      .setAuthor({
-        name: workerName,
-        iconURL: this.client.user?.displayAvatarURL?.({ extension: "png", size: 128 }) || undefined,
-      })
-      .setFooter({
-        text: stableFooterParts.join(" | "),
-      });
-
-    const existingFieldCount = Array.isArray(embed.data?.fields) ? embed.data.fields.length : 0;
-    if (existingFieldCount > 0) {
-      embed.spliceFields(0, existingFieldCount, ...stableFields);
-    } else if (stableFields.length > 0) {
-      embed.addFields(...stableFields);
-    }
-
-    return embed;
-  }
-
   buildNowPlayingEmbed(guildId, station, meta, context = {}) {
     const language = this.resolveGuildLanguage(guildId);
     const isDe = language === "de";
@@ -2031,104 +1837,8 @@ class BotRuntime {
       : null;
     const voiceChannelId = String(context?.channelId || "").trim();
     const workerName = clipText(String(context?.workerName || this.config.name || BRAND.name), 60) || BRAND.name;
-    const metadataSource = String(meta?.metadataSource || "").trim().toLowerCase();
-    const metadataStatus = String(meta?.metadataStatus || (hasTrack ? "ok" : "empty")).trim().toLowerCase();
-    const recognitionConfidence = Number.parseFloat(String(meta?.recognitionConfidence ?? ""));
-    const sourceLabel = metadataSource.includes("recognition")
-      ? (isDe ? "Audio-Fingerprint" : "Audio fingerprint")
-      : (metadataSource === "icy"
-        ? (isDe ? "Sender-Metadaten" : "Station metadata")
-        : (metadataSource === "stream"
-          ? (isDe ? "Stream-Info" : "Stream info")
-          : (isDe ? "Unbekannt" : "Unknown")));
-    const sourceDetail = metadataSource.includes("recognition")
-      ? [
-          meta?.recognitionProvider || "AcoustID",
-          Number.isFinite(recognitionConfidence) ? `${Math.round(recognitionConfidence * 100)}%` : "",
-        ].filter(Boolean).join(" | ")
-      : sourceLabel;
-    const metadataHint = hasTrack
-      ? null
-      : (metadataStatus === "unsupported"
-        ? (isDe
-          ? "Dieser Stream sendet aktuell keine auslesbaren Songdaten."
-          : "This stream is not sending readable track metadata right now.")
-        : (isDe
-          ? "Dieser Sender liefert aktuell keine verwertbaren Songdaten."
-          : "This station is not providing usable track metadata right now."));
-    const footerParts = [
-      isDe
-        ? `↻ Auto-Update ${Math.round(NOW_PLAYING_POLL_MS / 1000)}s`
-        : `↻ Auto update ${Math.round(NOW_PLAYING_POLL_MS / 1000)}s`,
-    ];
-    if (metadataSource.includes("recognition")) {
-      footerParts.push(isDe ? "Fingerprint aktiv" : "Fingerprint active");
-    }
-
     const embed = new EmbedBuilder()
-      .setColor(hasTrack ? OMNI_COLORS.success : OMNI_COLORS.warning)
-      .setTitle(isDe ? "🎵 Jetzt live" : "🎵 Live now")
-      .setDescription(
-        hasTrack
-          ? `**${headline}**`
-          : `⚠️ ${metadataHint}`
-      )
-      .addFields(
-        {
-          name: isDe ? "📻 Sender" : "📻 Station",
-          value: stationName,
-          inline: true,
-        },
-        {
-          name: isDe ? "🔊 Qualität" : "🔊 Quality",
-          value: tierConfig.bitrate || "-",
-          inline: true,
-        },
-        {
-          name: isDe ? "👥 Zuhörer" : "👥 Listeners",
-          value: String(listenerCount),
-          inline: true,
-        },
-        {
-          name: "🎙 Voice",
-          value: voiceChannelId ? `<#${voiceChannelId}>` : (isDe ? "unbekannt" : "unknown"),
-          inline: true,
-        },
-        {
-          name: isDe ? "🧠 Quelle" : "🧠 Source",
-          value: sourceDetail || sourceLabel,
-          inline: true,
-        }
-      )
-      .setAuthor({
-        name: `${workerName} • ${BRAND.name}`,
-      })
-      .setFooter({
-        text: footerParts.join(" | "),
-      })
       .setTimestamp(new Date(meta?.updatedAt || Date.now()));
-
-    if (artist) {
-      embed.addFields({ name: isDe ? "🎤 Artist" : "🎤 Artist", value: artist, inline: true });
-    }
-    if (title) {
-      embed.addFields({ name: isDe ? "📝 Titel" : "📝 Title", value: title, inline: true });
-    }
-    if (album) {
-      embed.addFields({ name: isDe ? "💿 Album" : "💿 Album", value: album, inline: true });
-    }
-    if (streamInfo) {
-      embed.addFields({ name: isDe ? "ℹ Stream-Info" : "ℹ Stream info", value: streamInfo, inline: false });
-    }
-    if (!hasTrack) {
-      embed.addFields({
-        name: isDe ? "🧭 Hinweis" : "🧭 Note",
-        value: isDe
-          ? "Der Stream läuft normal weiter. Sobald der Radiosender wieder Metadaten liefert oder die Audio-Erkennung greift, aktualisiert OmniFM die Einbettung automatisch."
-          : "The stream continues normally. As soon as the station sends metadata again or audio recognition succeeds, OmniFM updates the embed automatically.",
-        inline: false,
-      });
-    }
     if (meta?.artworkUrl) {
       embed.setThumbnail(meta.artworkUrl);
     }
@@ -2196,6 +1906,7 @@ class BotRuntime {
       `${workerName} \u00b7 ${BRAND.name}`,
       sourceSummary.sourceLabel,
       isDe ? `\u21bb Auto-Update ${Math.round(NOW_PLAYING_POLL_MS / 1000)}s` : `\u21bb Auto update ${Math.round(NOW_PLAYING_POLL_MS / 1000)}s`,
+      versionTag(),
     ].filter(Boolean);
 
     embed
@@ -3032,6 +2743,7 @@ class BotRuntime {
 
     const embed = new EmbedBuilder()
       .setColor(BRAND.color)
+      .setAuthor(brandAuthor())
       .setTitle(t("Worker-Bots einladen", "Invite worker bots"))
       .setDescription(
         t(
@@ -3058,19 +2770,15 @@ class BotRuntime {
       );
 
     if (selectedWorker) {
-      embed.setFooter({
-        text: t(
-          `Ausgewaehlt: ${selectedWorker.name} (${this.formatWorkerBadge(selectedWorker)})`,
-          `Selected: ${selectedWorker.name} (${this.formatWorkerBadge(selectedWorker)})`
-        ),
-      });
+      embed.setFooter(brandFooter(t(
+        `Ausgewaehlt: ${selectedWorker.name} (${this.formatWorkerBadge(selectedWorker)})`,
+        `Selected: ${selectedWorker.name} (${this.formatWorkerBadge(selectedWorker)})`
+      )));
     } else {
-      embed.setFooter({
-        text: t(
-          "Kein Worker auswaehlbar. Entweder schon eingeladen oder Plan-Limit erreicht.",
-          "No worker is selectable. Workers are already invited or plan-limited."
-        ),
-      });
+      embed.setFooter(brandFooter(t(
+        "Kein Worker auswaehlbar. Entweder schon eingeladen oder Plan-Limit erreicht.",
+        "No worker is selectable. Workers are already invited or plan-limited."
+      )));
     }
 
     if (hint) {

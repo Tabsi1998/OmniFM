@@ -6,7 +6,7 @@ import {
 } from "discord.js";
 
 import { BRAND } from "../config/plans.js";
-import { OMNI_COLORS, brandFooter } from "./brand-embed.js";
+import { OMNI_COLORS, brandFooter, brandAuthor, versionTag } from "./brand-embed.js";
 
 export const DISCORD_UI_COLORS = {
   info: OMNI_COLORS.cyan,
@@ -24,6 +24,11 @@ export function buildOmniEmbed({
   description = "",
   fields = [],
   footer = "",
+  author = "",
+  withAuthor = true,
+  withFooter = true,
+  thumbnail = "",
+  timestamp = true,
 } = {}) {
   const embed = new EmbedBuilder().setColor(DISCORD_UI_COLORS[tone] || DISCORD_UI_COLORS.info);
   if (title) embed.setTitle(title);
@@ -31,7 +36,14 @@ export function buildOmniEmbed({
   if (Array.isArray(fields) && fields.length > 0) {
     embed.addFields(fields);
   }
-  embed.setFooter(brandFooter(footer || BRAND.footer));
+  if (withAuthor) embed.setAuthor(brandAuthor(author || `${BRAND.name} · 24/7 Discord Radio`));
+  if (thumbnail) embed.setThumbnail(thumbnail);
+  if (withFooter) {
+    const tag = versionTag();
+    const text = footer || BRAND.footer;
+    embed.setFooter(brandFooter(tag ? `${text} · ${tag}` : text));
+  }
+  if (timestamp) embed.setTimestamp(new Date());
   return embed;
 }
 

@@ -10,7 +10,6 @@ const repoRoot = path.resolve(__dirname, "..");
 
 test("React public folder does not ship legacy standalone frontend assets", () => {
   const reactPublicDir = path.join(repoRoot, "frontend", "public");
-  const legacyWebDir = path.join(repoRoot, "web");
 
   assert.equal(
     fs.existsSync(path.join(reactPublicDir, "app.js")),
@@ -24,25 +23,10 @@ test("React public folder does not ship legacy standalone frontend assets", () =
   );
 
   assert.equal(
-    fs.existsSync(path.join(legacyWebDir, "app.js")),
-    true,
-    "web/app.js remains the explicit legacy fallback asset"
+    fs.existsSync(path.join(repoRoot, "web")),
+    false,
+    "the legacy standalone web/ folder was removed in the rework and must not come back"
   );
-  assert.equal(
-    fs.existsSync(path.join(legacyWebDir, "styles.css")),
-    true,
-    "web/styles.css remains the explicit legacy fallback asset"
-  );
-});
-
-test("legacy fallback refresh has one complete implementation", () => {
-  const legacyApp = fs.readFileSync(path.join(repoRoot, "web", "app.js"), "utf8");
-  const refreshDeclarations = legacyApp.match(/async function refresh\(\)/g) || [];
-
-  assert.equal(refreshDeclarations.length, 1, "legacy refresh must have one implementation");
-  assert.doesNotMatch(legacyApp, /\brefresh\s*=\s*async function/);
-  assert.match(legacyApp, /setInterval\(refresh,\s*15000\)/);
-  assert.match(legacyApp, /if \(!_countUpDone\)/);
 });
 
 test("React public index references only the React mount and no legacy root assets", () => {
@@ -139,16 +123,4 @@ test("SEO helper returns route-specific canonical metadata and structured data",
   assert.ok(englishFaq.some((entry) => /Who operates OmniFM/.test(entry.question)));
 });
 
-test("SEO content strategy documents bilingual intents and page goals", () => {
-  const strategy = fs.readFileSync(path.join(repoRoot, "docs", "seo-content-strategy.md"), "utf8");
-
-  assert.match(strategy, /German Intent Map/);
-  assert.match(strategy, /English Intent Map/);
-  assert.match(strategy, /Discord Radio Bot/);
-  assert.match(strategy, /24\/7 Discord music bot/);
-  assert.match(strategy, /\/stations/);
-  assert.match(strategy, /\/premium/);
-  assert.match(strategy, /\/faq/);
-  assert.match(strategy, /OmniFM` is the product name/);
-  assert.match(strategy, /IT-Tabelander` is the operator/);
-});
+test("SEO content strategy documents bilingual intents and page goals", { skip: "docs/ wurde beim Rework entfernt — SEO-Intents leben jetzt in frontend/src/lib/seo.js" }, () => {});

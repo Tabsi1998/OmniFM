@@ -5,7 +5,7 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { BRAND, PLANS } from "../config/plans.js";
 import { getDefaultLanguage, normalizeLanguage } from "../i18n.js";
-import { brandFooter } from "../bot/brand-embed.js";
+import { brandFooter, brandAuthor } from "../bot/brand-embed.js";
 
 function pick(language, de, en) {
   return normalizeLanguage(language, getDefaultLanguage()) === "de" ? de : en;
@@ -25,6 +25,8 @@ function upgradeButton(language = getDefaultLanguage(), label = null) {
 function baseEmbed() {
   return new EmbedBuilder()
     .setColor(BRAND.color)
+    .setAuthor(brandAuthor())
+    .setTimestamp(new Date())
     .setFooter(brandFooter(BRAND.footer));
 }
 

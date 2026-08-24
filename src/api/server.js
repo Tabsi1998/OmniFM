@@ -3323,10 +3323,8 @@ function startWebServer(runtimes) {
       : (normalizedPathname === "/" ? "index.html" : normalizedPathname.replace(/^\/+/, ""));
     const filePath = path.join(webDir, staticPath);
 
-    // 404-Fallback: Wenn statische Datei nicht existiert → 404.html
-    const notFoundFile = fs.existsSync(path.join(webDir, "404.html"))
-      ? path.join(webDir, "404.html")
-      : path.join(rootDir, "web", "404.html");
+    // 404-Fallback: optionales 404.html aus dem Frontend-Build.
+    const notFoundFile = path.join(webDir, "404.html");
     sendStaticFile(res, filePath, {
       headOnly: req.method === "HEAD",
       notFoundPath: notFoundFile,
