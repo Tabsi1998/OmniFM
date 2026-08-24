@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Music, Pause, Play, Radio, Search, Volume2, VolumeX } from 'lucide-react';
+import { usePlayer } from '../lib/player.js';
 import { useI18n } from '../i18n.js';
 
 const STATION_COLORS = ['#00e5ff', '#ff6b00', '#EC4899', '#ff6b00', '#ff2a5f', '#ff2a5f'];
@@ -97,13 +98,16 @@ function StationCard({ station, index, isPlaying, onPlay, onStop, copy }) {
 
 function StationBrowser({ stations, loading }) {
   const { copy, formatNumber, locale } = useI18n();
+  const player = usePlayer();
   const [search, setSearch] = useState('');
   const [activeTier, setActiveTier] = useState(null);
-  const [playingKey, setPlayingKey] = useState(null);
-  const [volume, setVolume] = useState(80);
-  const [muted, setMuted] = useState(false);
   const [visibleCount, setVisibleCount] = useState(8);
-  const audioRef = useRef(null);
+  // activeKey = ausgewählter Sender (auch bei Fehler), playingKey = wirklich spielend.
+  const activeKey = player.current ? player.current.key : null;
+  const playingKey = player.playing && player.current ? player.current.key : null;
+  const playerError = player.error || null;
+  const volume = typeof player.volume === 'number' ? player.volume : 80;
+  const muted = !!player.muted;
 
   const tierFilters = [
     { id: null, label: copy.stations.filters.all, color: '#fff' },
@@ -132,48 +136,12 @@ function StationBrowser({ stations, loading }) {
   const hasMore = filtered.length > visibleCount;
   const remaining = filtered.length - visibleCount;
 
-  const getAudio = useCallback(() => {
-    if (!audioRef.current) {
-      audioRef.current = new Audio();
-      audioRef.current.volume = volume / 100;
-      audioRef.current.addEventListener('error', () => setPlayingKey(null));
-    }
-    return audioRef.current;
-  }, [volume]);
+  const handlePlay = useCallback((station) => { player.play(station); }, [player]);
+  const handleStop = useCallback(() => { player.stop(); }, [player]);
+  const handleVolume = useCallback((event) => { player.setVolume(Number(event.target.value)); }, [player]);
+  const toggleMute = useCallback(() => { player.toggleMute(); }, [player]);
 
-  const handlePlay = useCallback((station) => {
-    const audio = getAudio();
-    audio.src = station.url;
-    audio.volume = muted ? 0 : volume / 100;
-    audio.play()
-      .then(() => setPlayingKey(station.key))
-      .catch(() => setPlayingKey(null));
-  }, [getAudio, muted, volume]);
-
-  const handleStop = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = '';
-    }
-    setPlayingKey(null);
-  }, []);
-
-  const handleVolume = useCallback((event) => {
-    const nextVolume = Number(event.target.value);
-    setVolume(nextVolume);
-    setMuted(nextVolume === 0);
-    if (audioRef.current) audioRef.current.volume = nextVolume / 100;
-  }, []);
-
-  const toggleMute = useCallback(() => {
-    const nextMuted = !muted;
-    setMuted(nextMuted);
-    if (audioRef.current) {
-      audioRef.current.volume = nextMuted ? 0 : volume / 100;
-    }
-  }, [muted, volume]);
-
-  const playingStation = stations.find((station) => station.key === playingKey);
+  const playingStation = stations.find((station) => station.key === activeKey);
   const summaryText = copy.stations.summary({
     count: formatNumber(stations.length),
     free: formatNumber(counts.free),
@@ -223,7 +191,7 @@ function StationBrowser({ stations, loading }) {
 
         {playingStation && (
           <div
-            data-testid="now-playing-bar"
+            data-testid="station-browser-now-playing"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -232,8 +200,8 @@ function StationBrowser({ stations, loading }) {
               padding: '14px 20px',
               borderRadius: 14,
               marginBottom: 20,
-              background: 'rgba(0,229,255, 0.06)',
-              border: '1px solid rgba(0,229,255, 0.15)',
+              background: playerError ? 'rgba(255,42,95,0.07)' : 'rgba(0,229,255, 0.06)',
+              border: `1px solid ${playerError ? 'rgba(255,42,95,0.28)' : 'rgba(0,229,255, 0.15)'}`,
             }}
           >
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 20, flexShrink: 0 }}>
@@ -242,20 +210,26 @@ function StationBrowser({ stations, loading }) {
                   width: 3,
                   borderRadius: 1,
                   height: `${height * 100}%`,
-                  background: '#00e5ff',
+                  background: playerError ? '#ff2a5f' : '#00e5ff',
+                  animationPlayState: playingKey ? 'running' : 'paused',
                   animationDuration: `${0.4 + Math.random() * 0.6}s`,
                   animationDelay: `${index * 0.08}s`,
                 }} />
               ))}
             </div>
 
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ fontSize: 11, color: '#00e5ff', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
-                {copy.stations.nowPlaying}
+            <div style={{ minWidth: 0, flex: '1 1 200px' }}>
+              <div style={{ fontSize: 11, color: playerError ? '#ff8fab' : '#00e5ff', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
+                {playerError ? (locale && String(locale).startsWith('de') ? 'Nicht abspielbar' : 'Cannot play') : copy.stations.nowPlaying}
               </div>
-              <span style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
+              <span style={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
                 {playingStation.name}
               </span>
+              {playerError && (
+                <span data-testid="player-error-message" style={{ display: 'block', fontSize: 12, color: '#ff8fab', marginTop: 4, lineHeight: 1.4 }}>
+                  {playerError.message}
+                </span>
+              )}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>

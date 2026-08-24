@@ -23,7 +23,7 @@ export function useShowcaseStations(limit = 8) {
         for (let i = 0; i < clean.length && picked.length < limit; i += step) {
           const s = clean[i];
           const tier = (s.tier || 'free').toLowerCase();
-          picked.push({ name: s.name, tier, bitrate: TIER_BITRATE[tier] || 'Live' });
+          picked.push({ key: s.key, url: s.url, name: s.name, tier, bitrate: TIER_BITRATE[tier] || 'Live' });
         }
         setItems(picked);
       })

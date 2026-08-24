@@ -57,6 +57,7 @@ import {
   getScheduledEvent,
 } from "../scheduled-events-store.js";
 import { BRAND } from "../config/plans.js";
+import { OMNI_COLORS } from "./brand-embed.js";
 import {
   DASHBOARD_URL,
   PLAY_COMPONENT_ID_OPEN,
@@ -433,7 +434,7 @@ export function buildScheduledEventEmbed(runtime, event, stationName, language =
     ? `${stationName} (\`${event?.stationKey || "-"}\`)`
     : `\`${event?.stationKey || "-"}\``;
   const embed = new EmbedBuilder()
-    .setColor(!event?.enabled ? 0x80848e : (isActive ? 0x1DB954 : BRAND.color))
+    .setColor(!event?.enabled ? OMNI_COLORS.neutral : (isActive ? OMNI_COLORS.success : BRAND.color))
     .setTitle(`${titlePrefix}${clipText(event?.name || "-", 120)}`)
     .setDescription(includeId ? `${languagePick(language, "Event-ID", "Event ID")}: \`${event?.id || "-"}\`` : null)
     .addFields(

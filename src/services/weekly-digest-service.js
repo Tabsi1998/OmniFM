@@ -8,6 +8,7 @@
 
 import { EmbedBuilder } from "discord.js";
 import { log } from "../lib/logging.js";
+import { OMNI_COLORS, brandFooter } from "../bot/brand-embed.js";
 import { getGuildListeningStats, getGuildDailyStats } from "../listening-stats-store.js";
 import { getDb, isConnected as isMongoConnected } from "../lib/db.js";
 import {
@@ -103,8 +104,8 @@ async function sendWeeklyDigest(runtime, guildId, channelId, language = "de") {
     .join("\n") || t("Keine Daten", "No data");
 
   const embed = new EmbedBuilder()
-    .setColor(0x5865F2)
-    .setTitle(t("Wöchentlicher Radio-Report", "Weekly radio report"))
+    .setColor(OMNI_COLORS.orange)
+    .setTitle(t("📈 Wöchentlicher Radio-Report", "📈 Weekly radio report"))
     .setDescription(
       t(
         `Hier ist die Zusammenfassung der letzten 7 Tage für **${guild.name}**:`,
@@ -120,7 +121,7 @@ async function sendWeeklyDigest(runtime, guildId, channelId, language = "de") {
       { name: t("Gesamt Sessions", "Total sessions"), value: String(stats?.totalSessions || 0), inline: true },
       { name: t("Top 5 Stationen", "Top 5 stations"), value: topStations, inline: false }
     )
-    .setFooter({ text: "OmniFM Weekly Digest" })
+    .setFooter(brandFooter("OmniFM · Weekly Digest"))
     .setTimestamp(new Date());
 
   try {

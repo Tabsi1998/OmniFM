@@ -6,15 +6,16 @@ import {
 } from "discord.js";
 
 import { BRAND } from "../config/plans.js";
+import { OMNI_COLORS, brandFooter } from "./brand-embed.js";
 
 export const DISCORD_UI_COLORS = {
-  info: BRAND.color,
-  live: BRAND.proColor,
-  admin: BRAND.ultimateColor,
-  success: 0x10B981,
-  warning: 0xF59E0B,
-  danger: 0xEF4444,
-  neutral: 0x64748B,
+  info: OMNI_COLORS.cyan,
+  live: OMNI_COLORS.red,
+  admin: OMNI_COLORS.orange,
+  success: OMNI_COLORS.success,
+  warning: OMNI_COLORS.warning,
+  danger: OMNI_COLORS.danger,
+  neutral: OMNI_COLORS.neutral,
 };
 
 export function buildOmniEmbed({
@@ -30,9 +31,7 @@ export function buildOmniEmbed({
   if (Array.isArray(fields) && fields.length > 0) {
     embed.addFields(fields);
   }
-  if (footer) {
-    embed.setFooter({ text: String(footer) });
-  }
+  embed.setFooter(brandFooter(footer || BRAND.footer));
   return embed;
 }
 

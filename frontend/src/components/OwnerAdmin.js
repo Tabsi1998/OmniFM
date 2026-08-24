@@ -246,22 +246,73 @@ export default function OwnerAdmin() {
     finally { setStBusy(false); }
   };
 
+  // Echte Browser-Abspielbarkeit: Audio-Element laden und auf canplay/error hören.
+  const probeBrowserPlayable = (url) => new Promise((resolve) => {
+    if (!url) { resolve(false); return; }
+    const a = new Audio();
+    a.muted = true;
+    a.preload = 'auto';
+    let done = false;
+    let timer = null;
+    const cleanup = () => {
+      a.removeEventListener('canplay', onOk);
+      a.removeEventListener('loadeddata', onOk);
+      a.removeEventListener('error', onErr);
+      try { a.pause(); a.removeAttribute('src'); a.load(); } catch { /* noop */ }
+      if (timer) clearTimeout(timer);
+    };
+    const finish = (ok) => { if (done) return; done = true; cleanup(); resolve(ok); };
+    const onOk = () => finish(true);
+    const onErr = () => finish(false);
+    a.addEventListener('canplay', onOk);
+    a.addEventListener('loadeddata', onOk);
+    a.addEventListener('error', onErr);
+    timer = setTimeout(() => finish(false), 6000);
+    try { a.src = url; a.load(); } catch { finish(false); }
+  });
+
+  const probeBrowserBatch = async (items) => {
+    const flags = {};
+    const CONCURRENCY = 6;
+    for (let i = 0; i < items.length; i += CONCURRENCY) {
+      const group = items.slice(i, i + CONCURRENCY);
+      // eslint-disable-next-line no-await-in-loop
+      const results = await Promise.all(group.map((it) => probeBrowserPlayable(it.url)));
+      group.forEach((it, gi) => { flags[it.key] = results[gi]; });
+    }
+    return flags;
+  };
+
   const checkStationHealth = async (keys) => {
-    // Prüft Live-Status für die angegebenen Sender-Keys (in Batches à 15).
-    const list = (keys && keys.length ? keys : stationList.map((s) => s.key)).filter(Boolean);
-    if (!list.length) return;
+    // Prüft Live-Status: Discord/erreichbar serverseitig (/health) + echte
+    // Browser-Abspielbarkeit per Audio-Probe direkt im Owner-Browser
+    // (serverseitige Browser-Simulation ist unzuverlässig, z. B. SomaFM 403).
+    const wanted = (keys && keys.length ? keys : stationList.map((s) => s.key)).filter(Boolean);
+    if (!wanted.length) return;
+    const urlByKey = {};
+    stationList.forEach((s) => { if (s.key) urlByKey[s.key] = s.url; });
     setStHealthBusy(true);
-    setStHealthProg({ done: 0, total: list.length });
-    setStHealth((prev) => { const next = { ...prev }; list.forEach((k) => { next[k] = { checking: true }; }); return next; });
+    setStHealthProg({ done: 0, total: wanted.length });
+    setStHealth((prev) => { const next = { ...prev }; wanted.forEach((k) => { next[k] = { checking: true }; }); return next; });
     try {
       let done = 0;
-      for (let i = 0; i < list.length; i += 15) {
-        const batch = list.slice(i, i + 15);
+      for (let i = 0; i < wanted.length; i += 15) {
+        const batch = wanted.slice(i, i + 15);
+        // 1) Serverseitig: erreichbar + Discord-fähig.
         // eslint-disable-next-line no-await-in-loop
         const r = await apiSend('/api/admin/stations/health', 'POST', { keys: batch });
-        setStHealth((prev) => ({ ...prev, ...(r.results || {}) }));
+        const serverResults = r.results || {};
+        // 2) Browser-Probe (nur für serverseitig erreichbare Sender).
+        // eslint-disable-next-line no-await-in-loop
+        const browserFlags = await probeBrowserBatch(batch.filter((k) => serverResults[k] && serverResults[k].reachable).map((k) => ({ key: k, url: urlByKey[k] })));
+        const merged = {};
+        batch.forEach((k) => {
+          const sr = serverResults[k] || { reachable: false, discordOk: false, ok: false };
+          merged[k] = { ...sr, browserOk: k in browserFlags ? browserFlags[k] : false };
+        });
+        setStHealth((prev) => ({ ...prev, ...merged }));
         done += batch.length;
-        setStHealthProg({ done, total: list.length });
+        setStHealthProg({ done, total: wanted.length });
       }
     } catch (e) { setStMsg({ ok: false, text: e.message }); }
     finally { setStHealthBusy(false); setStHealthProg(null); }
@@ -687,6 +738,14 @@ export default function OwnerAdmin() {
               </div>
             </div>
 
+            <div data-testid="station-status-legend" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '0 0 6px', fontSize: 12, color: '#94a3b8' }}>
+              <span style={{ marginRight: 4 }}>Status:</span>
+              <span className="oa-pill green" style={{ padding: '2px 8px' }}>Discord = Bot kann streamen</span>
+              <span className="oa-pill cyan" style={{ padding: '2px 8px' }}>Browser = Website-Player spielbar</span>
+              <span className="oa-pill amber" style={{ padding: '2px 8px' }}>Nur Discord = Browser blockiert</span>
+              <span className="oa-pill red" style={{ padding: '2px 8px' }}>Offline = nicht erreichbar</span>
+            </div>
+
             {stMsg && (
               <div className={`oa-pill ${stMsg.ok ? 'green' : 'red'}`} style={{ marginBottom: 14 }} data-testid="station-message">
                 {stMsg.ok ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />} {stMsg.text}
@@ -756,9 +815,16 @@ export default function OwnerAdmin() {
                       <td data-testid={`station-status-${s.key}`}>
                         {!h && <span className="oa-pill slate" style={{ padding: '2px 8px' }}>—</span>}
                         {h && h.checking && <span className="oa-pill slate" style={{ padding: '2px 8px' }}>Prüfe…</span>}
-                        {h && !h.checking && h.ok && <span className="oa-pill green" style={{ padding: '2px 8px' }}><CheckCircle2 size={11} /> Live{typeof h.latencyMs === 'number' ? ` · ${h.latencyMs}ms` : ''}</span>}
-                        {h && !h.checking && !h.ok && h.reachable && <span className="oa-pill amber" style={{ padding: '2px 8px' }}><AlertTriangle size={11} /> Kein Audio</span>}
-                        {h && !h.checking && !h.ok && !h.reachable && <span className="oa-pill red" style={{ padding: '2px 8px' }}><XCircle size={11} /> Offline</span>}
+                        {h && !h.checking && !h.reachable && <span className="oa-pill red" style={{ padding: '2px 8px' }}><XCircle size={11} /> Offline</span>}
+                        {h && !h.checking && h.reachable && !h.discordOk && !h.ok && <span className="oa-pill amber" style={{ padding: '2px 8px' }}><AlertTriangle size={11} /> Kein Audio</span>}
+                        {h && !h.checking && (h.discordOk || h.ok) && (
+                          <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
+                            <span className="oa-pill green" style={{ padding: '2px 8px' }} title="Server-seitig streambar – Discord-Bot kann diesen Sender abspielen"><CheckCircle2 size={11} /> Discord{typeof h.latencyMs === 'number' ? ` · ${h.latencyMs}ms` : ''}</span>
+                            {h.browserOk
+                              ? <span className="oa-pill cyan" style={{ padding: '2px 8px' }} title="Direkt im Website-Player abspielbar"><CheckCircle2 size={11} /> Browser</span>
+                              : <span className="oa-pill amber" style={{ padding: '2px 8px' }} title="Browser-Direktzugriff blockiert (z. B. 403/Hotlink). Im Discord-Bot funktioniert der Sender."><AlertTriangle size={11} /> Nur Discord</span>}
+                          </span>
+                        )}
                       </td>
                       <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <button title="Einzeln prüfen" className="oa-btn ghost" style={{ height: 32, padding: '0 9px', marginLeft: 6 }} disabled={stHealthBusy} onClick={() => checkStationHealth([s.key])} data-testid={`station-row-test-${s.key}`}><SignalHigh size={14} /></button>

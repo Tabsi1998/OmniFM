@@ -198,11 +198,11 @@ export const FEATURE_LABELS = {
 export const BRAND = {
   name: "OmniFM",
   tagline: "Streaming the future of radio",
-  footer: "Powered by OmniFM",
+  footer: "OmniFM · 24/7 Discord Radio",
   presence: "Streaming the future of radio | /play",
-  color: 0x00F0FF,
-  colorHex: "#00F0FF",
-  proColor: 0xFFB800,
-  ultimateColor: 0xBD00FF,
+  color: 0x00E5FF,
+  colorHex: "#00E5FF",
+  proColor: 0xFF6B00,
+  ultimateColor: 0xFF2A5F,
   upgradeUrl: "",
 };

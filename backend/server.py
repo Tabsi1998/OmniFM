@@ -4458,6 +4458,11 @@ async def admin_station_list(request: Request):
 
 
 def _probe_station_url(url):
+    # Serverseitige Prüfung = Bot-/Discord-Sicht: erreichbar + Audio-Content
+    # => der Discord-Bot (FFmpeg) kann den Sender abspielen.
+    # Browser-Abspielbarkeit wird NICHT hier bestimmt (serverseitige
+    # Browser-Simulation ist unzuverlässig, z. B. SomaFM), sondern per
+    # echter Audio-Probe im Owner-Browser.
     started = time.time()
     try:
         resp = requests.get(url, stream=True, timeout=5, headers={"Range": "bytes=0-2047", "User-Agent": "OmniFM-StreamTest/1.0", "Icy-MetaData": "1"})
@@ -4466,15 +4471,16 @@ def _probe_station_url(url):
         icy = resp.headers.get("icy-name") or resp.headers.get("Icy-Name")
         reachable = resp.status_code < 400
         is_audio = any(t in ctype.lower() for t in ("audio", "mpeg", "ogg", "aac", "octet-stream")) or bool(icy)
+        discord_ok = bool(reachable and is_audio)
         try:
             resp.close()
         except Exception:
             pass
-        return {"ok": bool(reachable and is_audio), "reachable": bool(reachable), "status": resp.status_code, "latencyMs": elapsed}
+        return {"ok": discord_ok, "reachable": bool(reachable), "discordOk": discord_ok, "status": resp.status_code, "latencyMs": elapsed}
     except requests.exceptions.Timeout:
-        return {"ok": False, "reachable": False, "status": 0, "latencyMs": int((time.time() - started) * 1000), "message": "timeout"}
+        return {"ok": False, "reachable": False, "discordOk": False, "status": 0, "latencyMs": int((time.time() - started) * 1000), "message": "timeout"}
     except Exception as e:
-        return {"ok": False, "reachable": False, "status": 0, "latencyMs": int((time.time() - started) * 1000), "message": clip_text(e, 80)}
+        return {"ok": False, "reachable": False, "discordOk": False, "status": 0, "latencyMs": int((time.time() - started) * 1000), "message": clip_text(e, 80)}
 
 
 @app.post("/api/admin/stations/health")

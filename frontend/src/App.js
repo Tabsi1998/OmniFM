@@ -22,6 +22,7 @@ import NowPlayingBar from './components/NowPlayingBar.js';
 import FaqSection from './components/FaqSection.js';
 import CookieConsent from './components/CookieConsent.js';
 import { I18nProvider } from './i18n.js';
+import { PlayerProvider } from './lib/player.js';
 import { buildApiUrl } from './lib/api.js';
 import { getSectionAnchorForPage, resolvePageFromUrl } from './lib/pageRouting.js';
 
@@ -277,7 +278,9 @@ function AppContent() {
 function App() {
   return (
     <I18nProvider>
-      <AppContent />
+      <PlayerProvider>
+        <AppContent />
+      </PlayerProvider>
     </I18nProvider>
   );
 }

@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Radio, Play, Users, Headphones, X } from 'lucide-react';
+import { Play, Pause, Users, Headphones, X } from 'lucide-react';
 import { resolvePrimaryInviteUrl } from '../lib/invite.js';
 import { useI18n } from '../i18n.js';
 import { useShowcaseStations } from '../lib/showcase.js';
+import { usePlayer } from '../lib/player.js';
+import { buildApiUrl } from '../lib/api.js';
 
 const barCss = `
 @keyframes npbar-eq { 0%,100%{transform:scaleY(0.3);} 50%{transform:scaleY(1);} }
@@ -11,11 +13,13 @@ const barCss = `
 @media (max-width: 720px){ .npbar-hidemobile{ display:none !important; } }
 `;
 
-function Bars() {
+const TIER_BITRATE = { free: '64 kbps', pro: '128 kbps', ultimate: '320 kbps' };
+
+function Bars({ active }) {
   return (
     <span style={{ display: 'inline-flex', alignItems: 'flex-end', gap: 2.5, height: 20 }} aria-hidden="true">
       {[0, 1, 2, 3, 4].map((i) => (
-        <span key={i} style={{ width: 3, height: `${40 + i * 12}%`, borderRadius: 2, background: 'linear-gradient(180deg,#ff6b00,#00e5ff)', transformOrigin: 'bottom', animation: `npbar-eq ${0.7 + i * 0.12}s ease-in-out ${i * 0.09}s infinite` }} />
+        <span key={i} style={{ width: 3, height: `${40 + i * 12}%`, borderRadius: 2, background: 'linear-gradient(180deg,#ff6b00,#00e5ff)', transformOrigin: 'bottom', animationName: 'npbar-eq', animationDuration: `${0.7 + i * 0.12}s`, animationTimingFunction: 'ease-in-out', animationDelay: `${i * 0.09}s`, animationIterationCount: 'infinite', animationPlayState: active ? 'running' : 'paused', opacity: active ? 1 : 0.4 }} />
       ))}
     </span>
   );
@@ -23,16 +27,44 @@ function Bars() {
 
 export default function NowPlayingBar({ stats = {}, bots = [] }) {
   const { locale, formatNumber } = useI18n();
-  const ctaLabel = locale === 'en' ? 'Start in Discord' : 'In Discord starten';
+  const player = usePlayer();
+  const showcase = useShowcaseStations(8);
   const [idx, setIdx] = useState(0);
+  const [cover, setCover] = useState(null);
   const [closed, setClosed] = useState(() => (typeof window !== 'undefined' && window.sessionStorage.getItem('omnifm_npbar_closed') === '1'));
   const invite = resolvePrimaryInviteUrl(bots);
-  const stations = useShowcaseStations(8);
-  useEffect(() => { if (stations.length < 2) return undefined; const t = setInterval(() => setIdx((v) => (v + 1) % stations.length), 4500); return () => clearInterval(t); }, [stations.length]);
-  if (closed) return null;
-  const track = stations.length ? stations[idx % stations.length] : { name: 'OmniFM Radio Network', bitrate: 'Live' };
+
+  // Rotiert nur die Vorschau, solange NICHTS läuft.
+  useEffect(() => {
+    if (player.current || showcase.length < 2) return undefined;
+    const t = setInterval(() => setIdx((v) => (v + 1) % showcase.length), 4500);
+    return () => clearInterval(t);
+  }, [player.current, showcase.length]);
+
+  const station = player.current || (showcase.length ? showcase[idx % showcase.length] : { name: 'OmniFM Radio Network', bitrate: 'Live' });
+  const isPlaying = !!player.playing;
+  const err = (player.current && player.error) ? player.error : null;
+  const bitrate = station.bitrate || TIER_BITRATE[String(station.tier || '').toLowerCase()] || null;
   const streamLabel = locale === 'en' ? 'Live radio stream' : 'Live-Radio-Stream';
   const listeners = stats.listeners || 0;
+
+  useEffect(() => {
+    let stop = false;
+    setCover(null);
+    if (!station || !station.name) return undefined;
+    fetch(buildApiUrl(`/api/cover?term=${encodeURIComponent(station.name)}`))
+      .then((r) => r.json()).then((d) => { if (!stop && d && d.ok && d.artwork) setCover(d.artwork); })
+      .catch(() => {});
+    return () => { stop = true; };
+  }, [station && station.name]);
+
+  if (closed) return null;
+
+  const onPlayClick = () => {
+    if (player.current) { player.toggle(); return; }
+    const target = showcase.find((s) => s.url) || null;
+    if (target) player.play(target);
+  };
 
   return (
     <>
@@ -48,23 +80,31 @@ export default function NowPlayingBar({ stats = {}, bots = [] }) {
         }}
       >
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '4px 9px', borderRadius: 999, border: '1px solid rgba(255,42,95,0.4)', background: 'rgba(255,42,95,0.12)', color: '#ffd9e2', fontSize: 10, fontWeight: 800, letterSpacing: '0.14em', fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#ff2a5f', animation: 'onair-pulse 1.8s infinite' }} /> LIVE
+          <span data-testid="now-playing-bar-status" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '4px 9px', borderRadius: 999, border: `1px solid ${err ? 'rgba(255,168,0,0.45)' : (isPlaying ? 'rgba(255,42,95,0.4)' : '#2a3450')}`, background: err ? 'rgba(255,168,0,0.12)' : (isPlaying ? 'rgba(255,42,95,0.12)' : 'rgba(255,255,255,0.03)'), color: err ? '#ffcf80' : (isPlaying ? '#ffd9e2' : '#94a3b8'), fontSize: 10, fontWeight: 800, letterSpacing: '0.14em', fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: err ? '#ffa800' : (isPlaying ? '#ff2a5f' : '#64748b'), animation: isPlaying && !err ? 'onair-pulse 1.8s infinite' : 'none' }} /> {err ? (locale === 'en' ? 'ERROR' : 'FEHLER') : (isPlaying ? 'LIVE' : (player.loading ? '…' : (locale === 'en' ? 'PREVIEW' : 'VORSCHAU')))}
           </span>
-          <div style={{ width: 42, height: 42, borderRadius: 10, flexShrink: 0, background: 'linear-gradient(135deg,#ff6b00,#ff2a5f)', display: 'grid', placeItems: 'center', boxShadow: '0 6px 18px rgba(255,107,0,0.35)' }}>
-            <Radio size={19} color="#fff" />
-          </div>
+          <button
+            onClick={onPlayClick}
+            data-testid="now-playing-bar-play"
+            aria-label={isPlaying ? 'Pause' : 'Play'}
+            style={{ width: 42, height: 42, borderRadius: 10, flexShrink: 0, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#ff6b00,#ff2a5f)', display: 'grid', placeItems: 'center', boxShadow: '0 6px 18px rgba(255,107,0,0.35)', overflow: 'hidden', position: 'relative' }}
+          >
+            {cover && <img src={cover} alt={station.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.55 }} />}
+            <span style={{ position: 'relative', display: 'grid', placeItems: 'center' }}>
+              {isPlaying ? <Pause size={19} color="#fff" fill="#fff" /> : <Play size={19} color="#fff" fill="#fff" />}
+            </span>
+          </button>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div key={track.name} style={{ fontWeight: 700, fontSize: 14, fontFamily: "'Syne','Outfit',sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{track.name}</div>
-            <div className="npbar-hidemobile" style={{ color: '#94a3b8', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{streamLabel}</div>
+            <div key={station.name} style={{ fontWeight: 700, fontSize: 14, fontFamily: "'Syne','Outfit',sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{station.name}</div>
+            <div className="npbar-hidemobile" data-testid="now-playing-bar-sub" style={{ color: err ? '#ffcf80' : '#94a3b8', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{err ? err.message : (isPlaying ? streamLabel : (locale === 'en' ? 'Tap play to listen live' : 'Play drücken zum Live-Hören'))}</div>
           </div>
           {listeners > 0 && (
             <span className="npbar-hidemobile" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#94a3b8', fontSize: 12, fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 }}>
               <Users size={13} color="#ff6b00" /> {formatNumber(Number(listeners))}
             </span>
           )}
-          <span className="npbar-hidemobile" style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, fontWeight: 700, color: '#ffb27a', background: 'rgba(255,107,0,0.14)', border: '1px solid rgba(255,107,0,0.3)', borderRadius: 999, padding: '3px 9px', flexShrink: 0 }}>{track.bitrate}</span>
-          <Bars />
+          {bitrate && <span className="npbar-hidemobile" style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, fontWeight: 700, color: '#ffb27a', background: 'rgba(255,107,0,0.14)', border: '1px solid rgba(255,107,0,0.3)', borderRadius: 999, padding: '3px 9px', flexShrink: 0 }}>{bitrate}</span>}
+          <Bars active={isPlaying} />
           <a
             href={invite}
             target={invite.startsWith('http') ? '_blank' : undefined}
@@ -72,7 +112,7 @@ export default function NowPlayingBar({ stats = {}, bots = [] }) {
             data-testid="now-playing-bar-cta"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 11, background: 'linear-gradient(135deg,#ff6b00,#ff2a5f)', color: '#08090d', fontWeight: 800, fontSize: 13, flexShrink: 0 }}
           >
-            <Headphones size={15} /> <span className="npbar-hidemobile">{ctaLabel}</span><Play size={14} style={{ display: 'none' }} />
+            <Headphones size={15} /> <span className="npbar-hidemobile">{locale === 'en' ? 'Start in Discord' : 'In Discord starten'}</span>
           </a>
           <button
             onClick={() => { setClosed(true); try { window.sessionStorage.setItem('omnifm_npbar_closed', '1'); } catch { /* noop */ } }}

@@ -174,6 +174,7 @@ import {
   deleteScheduledEventsByFilter,
 } from "../scheduled-events-store.js";
 import { PLANS, BRAND } from "../config/plans.js";
+import { OMNI_COLORS, tierColor, brandFooter, brandAuthor } from "./brand-embed.js";
 import { normalizeLanguage, getDefaultLanguage } from "../i18n.js";
 import { buildVoiceChannelAccessMessage } from "../lib/user-facing-setup.js";
 import { premiumStationEmbed, customStationEmbed, botLimitEmbed } from "../ui/upgradeEmbeds.js";
@@ -1594,8 +1595,8 @@ class BotRuntime {
       : "-";
 
     const embed = new EmbedBuilder()
-      .setColor(0x5865F2)
-      .setTitle(t("Listening-Stats", "Listening stats"))
+      .setColor(OMNI_COLORS.cyan)
+      .setTitle(t("📊 Listening-Stats", "📊 Listening stats"))
       .setDescription(
         t(
           `Server: **${guild?.name || guildId}**\nLive-Zuhörer jetzt: **${totalLiveListeners}**`,
@@ -1681,9 +1682,7 @@ class BotRuntime {
           inline: true,
         }
       )
-      .setFooter({
-        text: t("OmniFM Analytics | /stats", "OmniFM analytics | /stats"),
-      })
+      .setFooter(brandFooter(t("OmniFM Analytics · /stats", "OmniFM analytics · /stats")))
       .setTimestamp(new Date());
 
     return embed;
@@ -1701,14 +1700,12 @@ class BotRuntime {
 
     const latest = history[0] || null;
     const embed = new EmbedBuilder()
-      .setColor(0x3BA55D)
+      .setColor(OMNI_COLORS.orange)
       .setTitle(t("🕘 Song-History", "🕘 Song history"))
       .setDescription(clipText(lines.join("\n\n"), 3800))
-      .setFooter({
-        text: playbackRuntime
-          ? `${playbackRuntime.config?.name || BRAND.name} | ${t("letzte", "latest")} ${history.length}`
-          : `${BRAND.name} | ${t("letzte", "latest")} ${history.length}`,
-      })
+      .setFooter(brandFooter(playbackRuntime
+        ? `${playbackRuntime.config?.name || BRAND.name} · ${t("letzte", "latest")} ${history.length}`
+        : `${BRAND.name} · ${t("letzte", "latest")} ${history.length}`))
       .setTimestamp(new Date());
 
     if (latest?.artworkUrl) {
@@ -2079,28 +2076,21 @@ class BotRuntime {
     const visibleListenerCount = listenerCount >= 2 ? String(listenerCount) : null;
     const descriptionLines = [];
     if (hasTrack) {
-      descriptionLines.push(`**${headline}**`);
-      if (sourceSummary.sourceNote) {
-        descriptionLines.push(`_${sourceSummary.sourceNote}_`);
-      }
+      // Großer Titel + dezente Unterzeile (Artist · Sender) im Website-Stil.
+      descriptionLines.push(`## ${headline}`);
+      const subParts = [artist, stationName].filter(Boolean);
+      if (subParts.length) descriptionLines.push(`-# ${subParts.join("  ·  ")}`);
+      if (sourceSummary.sourceNote) descriptionLines.push(`-# ${sourceSummary.sourceNote}`);
     } else {
-      descriptionLines.push(`\u26a0\ufe0f ${sourceSummary.metadataHint}`);
+      descriptionLines.push(`## ${stationName}`);
+      descriptionLines.push(`-# ${isDe ? "Live-Radio-Stream läuft" : "Live radio stream playing"}`);
+      descriptionLines.push(`> ⚠️ ${sourceSummary.metadataHint}`);
     }
 
     const stableFields = [
       {
-        name: isDe ? "\u{1f4fb} Sender" : "\u{1f4fb} Station",
-        value: stationName,
-        inline: true,
-      },
-      {
-        name: isDe ? "\u{1f50a} Qualit\u00e4t" : "\u{1f50a} Quality",
-        value: tierConfig.bitrate || "-",
-        inline: true,
-      },
-      {
-        name: isDe ? "\u{1f9e0} Quelle" : "\u{1f9e0} Source",
-        value: sourceSummary.sourceDetail || sourceSummary.sourceLabel,
+        name: isDe ? "\u{1f3a7} Qualit\u00e4t" : "\u{1f3a7} Quality",
+        value: tierConfig.bitrate || "\u2014",
         inline: true,
       },
     ];
@@ -2126,20 +2116,6 @@ class BotRuntime {
         inline: true,
       });
     }
-    if (artist) {
-      stableFields.push({
-        name: isDe ? "\u{1f3a4} K\u00fcnstler" : "\u{1f3a4} Artist",
-        value: artist,
-        inline: true,
-      });
-    }
-    if (title) {
-      stableFields.push({
-        name: isDe ? "\u{1f4dd} Titel" : "\u{1f4dd} Title",
-        value: title,
-        inline: true,
-      });
-    }
     if (album) {
       stableFields.push({
         name: "\u{1f4bf} Album",
@@ -2154,35 +2130,19 @@ class BotRuntime {
         inline: false,
       });
     }
-    if (!hasTrack) {
-      stableFields.push({
-        name: isDe ? "\u{1f9ed} Hinweis" : "\u{1f9ed} Note",
-        value: isDe
-          ? "Der Stream l\u00e4uft normal weiter. OmniFM versucht weiterhin zuerst Sender-Metadaten und danach den Fingerprint-Fallback."
-          : "The stream continues normally. OmniFM keeps trying station metadata first and then the fingerprint fallback.",
-        inline: false,
-      });
-    }
 
     const stableFooterParts = [
-      workerName,
-      isDe ? `Auto-Update ${Math.round(NOW_PLAYING_POLL_MS / 1000)}s` : `Auto update ${Math.round(NOW_PLAYING_POLL_MS / 1000)}s`,
-    ];
-    if (sourceSummary.metadataSource.includes("recognition")) {
-      stableFooterParts.push(isDe ? "Fingerprint-Fallback" : "Fingerprint fallback");
-    }
+      `${workerName} \u00b7 ${BRAND.name}`,
+      sourceSummary.sourceLabel,
+      isDe ? `\u21bb Auto-Update ${Math.round(NOW_PLAYING_POLL_MS / 1000)}s` : `\u21bb Auto update ${Math.round(NOW_PLAYING_POLL_MS / 1000)}s`,
+    ].filter(Boolean);
 
     embed
-      .setColor(!hasTrack ? 0xF1C40F : (sourceSummary.metadataSource.includes("recognition") ? 0x5865F2 : 0x1DB954))
-      .setTitle(isDe ? "\u{1f3b5} Jetzt live" : "\u{1f3b5} Live now")
+      .setColor(hasTrack ? tierColor(tierConfig.tier) : OMNI_COLORS.warning)
+      .setTitle(isDe ? "\u{1f534} LIVE \u00b7 Jetzt auf Sendung" : "\u{1f534} LIVE \u00b7 On air now")
       .setDescription(descriptionLines.join("\n"))
-      .setAuthor({
-        name: workerName,
-        iconURL: this.client.user?.displayAvatarURL?.({ extension: "png", size: 128 }) || undefined,
-      })
-      .setFooter({
-        text: stableFooterParts.join(" | "),
-      });
+      .setAuthor(brandAuthor(`${workerName} \u00b7 ${BRAND.name}`, this.client.user?.displayAvatarURL?.({ extension: "png", size: 128 })))
+      .setFooter(brandFooter(stableFooterParts.join("  \u00b7  ")));
 
     const existingFieldCount = Array.isArray(embed.data?.fields) ? embed.data.fields.length : 0;
     if (existingFieldCount > 0) {

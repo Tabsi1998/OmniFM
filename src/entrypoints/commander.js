@@ -96,9 +96,10 @@ async function sendWeeklyDigest(runtime, guildId, channelId, language = "de") {
   const weekPeak = Math.max(0, ...dailyStats.map((entry) => entry.peakListeners || 0));
 
   const { EmbedBuilder } = await import("discord.js");
+  const { OMNI_COLORS, brandFooter } = await import("../bot/brand-embed.js");
   const embed = new EmbedBuilder()
-    .setColor(0x5865F2)
-    .setTitle(t("Woechentlicher Radio-Report", "Weekly radio report"))
+    .setColor(OMNI_COLORS.orange)
+    .setTitle(t("📈 Wöchentlicher Radio-Report", "📈 Weekly radio report"))
     .setDescription(t(
       `Hier ist die Zusammenfassung der letzten 7 Tage fuer **${guild.name}**:`,
       `Here is the summary for the last 7 days on **${guild.name}**:`
@@ -109,7 +110,7 @@ async function sendWeeklyDigest(runtime, guildId, channelId, language = "de") {
       { name: t("Starts", "Starts"), value: String(weekStarts), inline: true },
       { name: t("Peak-Zuhoerer", "Peak listeners"), value: String(weekPeak), inline: true },
     )
-    .setFooter({ text: "OmniFM Weekly Digest" })
+    .setFooter(brandFooter("OmniFM · Weekly Digest"))
     .setTimestamp(new Date());
 
   try {
