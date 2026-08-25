@@ -125,78 +125,50 @@ setLicenseProvider((serverId) => {
 });
 
 // ---- Bot Startup: Commander/Worker Architecture ----
-let botConfigs;
-try {
-  botConfigs = loadBotConfigs(process.env);
-} catch (err) {
-  log("ERROR", err.message || String(err));
-  process.exit(1);
-}
-
-// Commander per BOT_N waehlen (COMMANDER_BOT_INDEX=N), fallback auf ersten konfigurierten Bot.
-const configuredCommander = Number.parseInt(String(process.env.COMMANDER_BOT_INDEX || "1"), 10);
-const commanderIndex = Number.isFinite(configuredCommander) && configuredCommander >= 1
-  ? botConfigs.findIndex((cfg) => Number(cfg?.index || 0) === configuredCommander)
-  : -1;
-const resolvedCommanderIndex = commanderIndex >= 0 ? commanderIndex : 0;
-if (commanderIndex >= 0) {
-  log("INFO", `Commander-Bot aus ENV: BOT_${configuredCommander}`);
-} else if (Number.isFinite(configuredCommander) && configuredCommander >= 1) {
-  log("WARN", `COMMANDER_BOT_INDEX=${configuredCommander} ist nicht konfiguriert. Fallback auf BOT_${botConfigs[0]?.index || 1}.`);
-}
-const commanderConfig = botConfigs[resolvedCommanderIndex];
-const workerConfigs = botConfigs.filter((_, idx) => idx !== resolvedCommanderIndex);
-
-// Create worker runtimes first (so WorkerManager can reference them)
-const workerRuntimes = workerConfigs.map((config) => new BotRuntime(config, { role: "worker" }));
-const workerManager = new WorkerManager(workerRuntimes);
-
-// Create commander runtime with worker manager reference
-const commanderRuntime = new BotRuntime(commanderConfig, { role: "commander", workerManager });
-
-// All runtimes for shared operations
-const runtimes = [commanderRuntime, ...workerRuntimes];
-
-log("INFO", `Bot-Architektur: Commander="${commanderConfig.name}", Worker=${workerConfigs.length} (${workerConfigs.map(c => c.name).join(", ") || "keine"})`);
-
-const startResults = await Promise.all(runtimes.map((runtime) => runtime.start()));
+// Die Website und das Owner-Menue muessen auch beim Erstbetrieb erreichbar
+// sein, damit Bot-Tokens und Client-IDs dort erst eingerichtet werden koennen.
+const runtimes = [];
 const startedRuntimes = [];
-const failedRuntimes = [];
-
-for (let index = 0; index < runtimes.length; index++) {
-  if (startResults[index]) {
-    startedRuntimes.push(runtimes[index]);
-  } else {
-    failedRuntimes.push(runtimes[index]);
+try {
+  const botConfigs = loadBotConfigs(process.env);
+  const configuredCommander = Number.parseInt(String(process.env.COMMANDER_BOT_INDEX || "1"), 10);
+  const commanderIndex = Number.isFinite(configuredCommander) && configuredCommander >= 1
+    ? botConfigs.findIndex((cfg) => Number(cfg?.index || 0) === configuredCommander)
+    : -1;
+  const resolvedCommanderIndex = commanderIndex >= 0 ? commanderIndex : 0;
+  if (commanderIndex >= 0) {
+    log("INFO", `Commander-Bot aus ENV: BOT_${configuredCommander}`);
+  } else if (Number.isFinite(configuredCommander) && configuredCommander >= 1) {
+    log("WARN", `COMMANDER_BOT_INDEX=${configuredCommander} ist nicht konfiguriert. Fallback auf BOT_${botConfigs[0]?.index || 1}.`);
   }
-}
 
-log(
-  "INFO",
-  `Bot-Startup abgeschlossen: started=${startedRuntimes.length}/${runtimes.length}, failed=${failedRuntimes.length}/${runtimes.length}`
-);
+  const commanderConfig = botConfigs[resolvedCommanderIndex];
+  const workerConfigs = botConfigs.filter((_, idx) => idx !== resolvedCommanderIndex);
+  const workerRuntimes = workerConfigs.map((config) => new BotRuntime(config, { role: "worker" }));
+  const workerManager = new WorkerManager(workerRuntimes);
+  const commanderRuntime = new BotRuntime(commanderConfig, { role: "commander", workerManager });
+  runtimes.push(commanderRuntime, ...workerRuntimes);
 
-for (const failedRuntime of failedRuntimes) {
-  const errText = failedRuntime.startError?.message || String(failedRuntime.startError || "unbekannt");
-  log(
-    "ERROR",
-    `[${failedRuntime.config.name}] Start fehlgeschlagen. Dieser Bot liefert keine Slash-Commands, bis der Login/Token-Fehler behoben ist. Grund: ${errText}`
-  );
-  // Operator-Webhook: Bot-Login fehlgeschlagen
-  notifyBotLoginFailed(failedRuntime.config.name, errText).catch(() => null);
-}
+  log("INFO", `Bot-Architektur: Commander="${commanderConfig.name}", Worker=${workerConfigs.length} (${workerConfigs.map(c => c.name).join(", ") || "keine"})`);
+  const startResults = await Promise.all(runtimes.map((runtime) => runtime.start()));
+  const failedRuntimes = [];
+  for (let index = 0; index < runtimes.length; index++) {
+    if (startResults[index]) startedRuntimes.push(runtimes[index]);
+    else failedRuntimes.push(runtimes[index]);
+  }
 
-if (!startResults.some(Boolean)) {
-  log("ERROR", "Kein Bot konnte gestartet werden. Backend wird beendet.");
-  process.exit(1);
-}
+  log("INFO", `Bot-Startup abgeschlossen: started=${startedRuntimes.length}/${runtimes.length}, failed=${failedRuntimes.length}/${runtimes.length}`);
+  for (const failedRuntime of failedRuntimes) {
+    const errText = failedRuntime.startError?.message || String(failedRuntime.startError || "unbekannt");
+    log("ERROR", `[${failedRuntime.config.name}] Start fehlgeschlagen. Dieser Bot liefert keine Slash-Commands, bis der Login/Token-Fehler behoben ist. Grund: ${errText}`);
+    notifyBotLoginFailed(failedRuntime.config.name, errText).catch(() => null);
+  }
 
-// Operator-Webhook: Startup-Benachrichtigung
-if (OPERATOR_WEBHOOK_ENABLED) {
-  notifyStartup(
-    startedRuntimes.map((r) => r.config.name),
-    runtimes.length
-  ).catch(() => null);
+  if (startedRuntimes.length > 0 && OPERATOR_WEBHOOK_ENABLED) {
+    notifyStartup(startedRuntimes.map((runtime) => runtime.config.name), runtimes.length).catch(() => null);
+  }
+} catch (err) {
+  log("WARN", `[Bootstrap] Bot-Runtimes nicht gestartet: ${err?.message || err}. Website und Owner-Konsole bleiben zum Konfigurieren erreichbar.`);
 }
 
 // ---- Auto-Restore ----
