@@ -588,6 +588,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     });
     assert.equal(adminConfigResponse.status, 200);
     const adminConfig = await adminConfigResponse.json();
+    assert.equal(adminConfig.schemaVersion, "owner-config-v1");
     assert.equal(adminConfig.envFile.path, ownerEnvFile);
     assert.ok(adminConfig.groups.some((group) => group.id === "legal"));
     assert.ok(adminConfig.groups.some((group) => group.id === "integrations"));

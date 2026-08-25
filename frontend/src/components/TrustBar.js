@@ -25,8 +25,13 @@ function resolveSupport(itemKey, stats, copy, formatNumber) {
     });
   }
   if (itemKey === 'network') {
+    const configuredBots = Number(stats?.configuredBots ?? stats?.bots ?? 0) || 0;
+    const readyBots = Number(stats?.readyBots ?? stats?.bots ?? 0) || 0;
+    if (configuredBots > 0 && readyBots === 0) {
+      return `${formatNumber(configuredBots)} ${copy.hero.stats.bots} · ${copy.trustBar.networkOffline}`;
+    }
     return copy.trustBar.support.network({
-      bots: formatNumber(stats?.bots || 0),
+      bots: formatNumber(readyBots),
       servers: formatNumber(stats?.servers || 0),
     });
   }
@@ -99,7 +104,9 @@ export default function TrustBar({ stats }) {
                   {resolveSupport(item.key, stats, copy, formatNumber)}
                 </div>
                 <p style={{ margin: 0, fontSize: 13, color: '#A1A1AA', lineHeight: 1.6 }}>
-                  {copy.trustBar.items[item.key].detail}
+                  {item.key === 'network' && Number(stats?.configuredBots ?? stats?.bots ?? 0) > 0 && Number(stats?.readyBots ?? stats?.bots ?? 0) === 0
+                    ? copy.trustBar.networkOfflineDetail
+                    : copy.trustBar.items[item.key].detail}
                 </p>
               </div>
             );

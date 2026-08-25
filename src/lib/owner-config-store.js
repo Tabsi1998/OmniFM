@@ -432,6 +432,7 @@ function writeEnvUpdates(updates) {
 function buildSnapshot(parsed = readEnvFile(), { updatedKeys = [] } = {}) {
   const envFile = parsed.envFile;
   return {
+    schemaVersion: "owner-config-v1",
     generatedAt: new Date().toISOString(),
     envFile: {
       path: envFile,

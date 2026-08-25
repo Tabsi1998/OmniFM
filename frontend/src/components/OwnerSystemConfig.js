@@ -11,13 +11,20 @@ function inputType(type) {
 
 export default function OwnerSystemConfig({ apiGet, apiSend, token }) {
   const [snapshot, setSnapshot] = useState(null);
+  const [loadError, setLoadError] = useState(null);
   const [changes, setChanges] = useState({});
   const [secrets, setSecrets] = useState({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(null);
 
   const load = useCallback(async () => {
-    try { setSnapshot(await apiGet('/api/admin/config', token)); } catch (error) { setMessage({ ok: false, text: error.message }); }
+    setLoadError(null);
+    try {
+      setSnapshot(await apiGet('/api/admin/config', token));
+    } catch (error) {
+      setSnapshot(null);
+      setLoadError(error.message || 'Die Systemkonfiguration konnte nicht geladen werden.');
+    }
   }, [apiGet, token]);
   useEffect(() => { load(); }, [load]);
 
@@ -39,7 +46,29 @@ export default function OwnerSystemConfig({ apiGet, apiSend, token }) {
     } catch (error) { setMessage({ ok: false, text: error.message }); } finally { setBusy(false); }
   };
 
-  if (!snapshot) return <div className="oa-card" style={{ color: '#94a3b8', padding: 28 }}>Systemkonfiguration wird geladen…</div>;
+  if (!snapshot) {
+    return (
+      <div className="oa-card" style={{ color: loadError ? '#ff8fab' : '#94a3b8', padding: 28 }} data-testid="owner-system-config-loading">
+        {loadError || 'Systemkonfiguration wird geladen…'}
+        {loadError && <button className="oa-btn ghost" style={{ marginLeft: 14 }} onClick={load}>Erneut versuchen</button>}
+      </div>
+    );
+  }
+
+  const hasSchema = snapshot.schemaVersion === 'owner-config-v1'
+    && Array.isArray(snapshot.groups)
+    && snapshot.groups.some((group) => Array.isArray(group?.fields) && group.fields.length > 0);
+  if (!hasSchema) {
+    return (
+      <div className="oa-card" style={{ padding: 28 }} data-testid="owner-system-config-schema-error">
+        <div className="oa-section-title"><XCircle size={16} /> Konfigurations-API ist nicht aktuell</div>
+        <p style={{ color: '#ffb4c7', fontSize: 13, lineHeight: 1.6, margin: '0 0 16px' }}>
+          Das Web-Frontend und der Server liefern unterschiedliche Versionen der Owner-Konfiguration. Deshalb werden keine leeren Formulare angezeigt. Bitte den Backend-Container auf denselben Git-Stand deployen und neu starten.
+        </p>
+        <button className="oa-btn ghost" onClick={load}>Nach Deployment erneut laden</button>
+      </div>
+    );
+  }
   return (
     <div className="oa-fade" data-testid="owner-system-config">
       <div className="oa-card" style={{ marginBottom: 18 }}>
