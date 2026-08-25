@@ -25,7 +25,10 @@ stop_pid() {
 }
 
 stop_pid omnifm
-# Clean up only stale PID files from the retired split start script. No broad
-# process lookup is used, so unrelated services are never touched.
-rm -f "$RUN_DIR/frontend.pid" "$RUN_DIR/backend.pid" "$RUN_DIR/bot.pid"
+# Releases before the unified Node runtime wrote these PID files. Stop only
+# the explicitly recorded processes; never use a broad process search that
+# could affect unrelated services on the host.
+stop_pid frontend
+stop_pid backend
+stop_pid bot
 log "Gestoppt."
