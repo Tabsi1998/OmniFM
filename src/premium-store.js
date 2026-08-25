@@ -483,7 +483,8 @@ export function getServerLicense(serverId) {
 export function getServerPlan(serverId) {
   const lic = getServerLicense(serverId);
   if (!lic || lic.active === false || lic.expired) return "free";
-  return PLANS[lic.plan] ? lic.plan : "free";
+  const plan = String(lic.plan || lic.tier || "free").toLowerCase();
+  return PLANS[plan] ? plan : "free";
 }
 
 export function isServerLicensed(serverId) {

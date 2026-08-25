@@ -296,6 +296,16 @@ log "Stoppe bestehende OmniFM-Prozesse unmittelbar vor dem Neustart..."
 "$ROOT/stop.sh" || true
 DEPLOY_STARTED=1
 
+port_is_open() {
+  "$VENV/bin/python" -c 'import socket,sys; s=socket.socket(); s.settimeout(.4); rc=s.connect_ex(("127.0.0.1", int(sys.argv[1]))); s.close(); raise SystemExit(0 if rc == 0 else 1)' "$1"
+}
+
+for port in "$BACKEND_PORT" "$FRONTEND_PORT"; do
+  if port_is_open "$port"; then
+    die "Port $port ist nach stop.sh weiterhin belegt. Start abgebrochen, damit kein alter oder fremder Prozess als neue Version ausgegeben wird."
+  fi
+done
+
 log "Starte Backend auf Port $BACKEND_PORT..."
 ( cd "$ROOT/backend" && nohup "$VENV/bin/uvicorn" server:app --host 0.0.0.0 --port "$BACKEND_PORT" --workers 1 \
   >"$LOG_DIR/backend.log" 2>&1 & echo $! > "$RUN_DIR/backend.pid" )
@@ -313,7 +323,26 @@ wait_for_http() {
   die "$name wurde nicht bereit. Details: $log_file"
 }
 
-wait_for_http "FastAPI-Backend" "http://127.0.0.1:${BACKEND_PORT}/api/health" "$LOG_DIR/backend.log"
+wait_for_backend_contract() {
+  local url="http://127.0.0.1:${BACKEND_PORT}/api/health" body backend_pid
+  backend_pid="$(cat "$RUN_DIR/backend.pid" 2>/dev/null || true)"
+  for _ in {1..20}; do
+    if [ -n "$backend_pid" ] && ! kill -0 "$backend_pid" 2>/dev/null; then
+      tail -n 80 "$LOG_DIR/backend.log" >&2 || true
+      die "FastAPI-Backend ist beim Start beendet worden."
+    fi
+    body="$(curl --fail --silent --show-error --max-time 2 "$url" 2>/dev/null || true)"
+    if [ -n "$body" ] && printf '%s' "$body" | "$VENV/bin/python" -c 'import json,sys; data=json.load(sys.stdin); raise SystemExit(0 if data.get("contractVersion") == "owner-live-v3" else 1)' 2>/dev/null; then
+      log "FastAPI-Backend ist bereit und API-Vertrag owner-live-v3 ist aktiv: $url"
+      return 0
+    fi
+    sleep 1
+  done
+  tail -n 80 "$LOG_DIR/backend.log" >&2 || true
+  die "FastAPI-Backend liefert nicht den erwarteten API-Vertrag owner-live-v3. Ein alter Prozess oder ein fehlerhaftes Deployment ist aktiv."
+}
+
+wait_for_backend_contract
 
 # =============================================================================
 # 5) FRONTEND (React)

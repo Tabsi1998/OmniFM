@@ -121,6 +121,7 @@ export default function OwnerAdmin() {
   const [section, setSection] = useState('overview');
   const [overview, setOverview] = useState(null);
   const [workers, setWorkers] = useState([]);
+  const [workerMeta, setWorkerMeta] = useState({ live: false, generatedAt: null, resourceModel: null });
   const [licenses, setLicenses] = useState([]);
   const [knownGuilds, setKnownGuilds] = useState([]);
   const [stations, setStations] = useState(null);
@@ -253,7 +254,10 @@ export default function OwnerAdmin() {
         apiGet('/api/admin/activity', tk),
       ]);
       if (ov.status === 'fulfilled') setOverview(ov.value);
-      if (wk.status === 'fulfilled') setWorkers(wk.value.workers || []);
+      if (wk.status === 'fulfilled') {
+        setWorkers(wk.value.workers || []);
+        setWorkerMeta({ live: wk.value.live === true, generatedAt: wk.value.generatedAt || null, resourceModel: wk.value.resourceModel || null });
+      }
       if (lic.status === 'fulfilled') setLicenses(lic.value.licenses || []);
       if (guilds.status === 'fulfilled') setKnownGuilds(guilds.value.guilds || []);
       if (st.status === 'fulfilled') setStations(st.value);
@@ -296,6 +300,24 @@ export default function OwnerAdmin() {
     };
     tick();
     const iv = setInterval(tick, 4000);
+    return () => { stop = true; clearInterval(iv); };
+  }, [authed, section, apiGet, token]);
+
+  // The Worker page reads the same live runtime source as monitoring.
+  useEffect(() => {
+    if (!authed || section !== 'workers') return undefined;
+    let stop = false;
+    const tick = async () => {
+      try {
+        const data = await apiGet('/api/admin/workers', token);
+        if (!stop) {
+          setWorkers(data.workers || []);
+          setWorkerMeta({ live: data.live === true, generatedAt: data.generatedAt || null, resourceModel: data.resourceModel || null });
+        }
+      } catch { /* keep last snapshot */ }
+    };
+    tick();
+    const iv = setInterval(tick, 5000);
     return () => { stop = true; clearInterval(iv); };
   }, [authed, section, apiGet, token]);
 
@@ -706,6 +728,18 @@ export default function OwnerAdmin() {
                   <StatTile testid="mon-incidents" label="Offene Incidents" value={monitoring.health.openIncidents} icon={AlertTriangle} accent={monitoring.health.openIncidents ? '#ff2a5f' : '#10b981'} foot={<span>{monitoring.incidents.length} in Historie</span>} />
                 </div>
 
+                {monitoring.live && monitoring.process && (
+                  <div className="oa-card oa-fade" style={{ marginTop: 18 }} data-testid="monitoring-shared-process">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div>
+                        <div className="oa-section-title" style={{ margin: 0 }}><Cpu size={15} /> Gemeinsamer Node.js-Prozess</div>
+                        <div className="oa-stat-foot" style={{ marginTop: 7 }}>Commander und Worker laufen in diesem Stack in einem Prozess. Nur diese Ressourcen sind deshalb gemeinsam.</div>
+                      </div>
+                      <div className="oa-mono" style={{ color: '#94a3b8', fontSize: 11 }}>CPU {monitoring.process.cpuPct ?? '—'}% · RAM {monitoring.process.ramMb ?? '—'} MB · {monitoring.process.cores ?? '—'} Cores · {monitoring.process.nodeVersion || 'Node'}</div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="oa-section-title"><Server size={15} /> Node-Health (live)</div>
                 <div className="oa-grid cols-3">
                   {monitoring.nodes.map((n) => {
@@ -744,7 +778,7 @@ export default function OwnerAdmin() {
                           </div>
                         ))}
                         <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#64748b' }} className="oa-mono">
-                          <span>{n.voiceConnections} VOICE</span><span>{n.guilds} GUILDS</span>
+                          <span>{n.voiceConnections} VOICE · {n.listeners || 0} LISTENERS</span><span>{n.guilds} GUILDS</span>
                         </div>
                         {monitoring.live && n.resourceScope === 'shared-process' && <div style={{ marginTop: 8, fontSize: 10.5, color: '#64748b' }}>CPU/RAM werden oben einmal für den gemeinsamen Node-Prozess angezeigt.</div>}
                       </div>
@@ -815,6 +849,10 @@ export default function OwnerAdmin() {
 
         {section === 'workers' && (
           <>
+            <div className="oa-card" style={{ marginBottom: 16, padding: '12px 16px', borderColor: workerMeta.live ? 'rgba(16,185,129,0.4)' : 'rgba(245,158,11,0.4)' }} data-testid="worker-runtime-source">
+              <span className={`oa-pill ${workerMeta.live ? 'green' : 'amber'}`}>{workerMeta.live ? 'LIVE-RUNTIME' : 'KEINE LIVE-DATEN'}</span>
+              <span style={{ marginLeft: 10, color: '#94a3b8', fontSize: 12 }}>{workerMeta.live ? `Echte Discord-Werte · Stand ${workerMeta.generatedAt ? new Date(workerMeta.generatedAt).toLocaleTimeString('de-DE') : 'jetzt'}` : 'Nur konfigurierte Bots sichtbar, bis die Runtime Telemetrie meldet.'}</span>
+            </div>
             <div className="oa-grid cols-3">
               {workers.map((w) => (
                 <div className="oa-card hoverable oa-fade" key={w.botId} data-testid={`worker-node-${w.index}`}>
@@ -828,16 +866,18 @@ export default function OwnerAdmin() {
                         <div className="oa-mono" style={{ fontSize: 10.5, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{w.role}</div>
                       </div>
                     </div>
-                    <span className={`oa-pill ${w.ready ? 'green' : 'amber'}`}>{w.ready ? 'Online' : 'Standby'}</span>
+                    <span className={`oa-pill ${w.ready ? 'green' : workerMeta.live ? 'red' : 'amber'}`}>{w.ready ? 'Online' : workerMeta.live ? 'Offline' : 'Unbekannt'}</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
                     <div><div className="oa-stat-label">Server</div><div style={{ fontSize: 18, fontWeight: 700, marginTop: 3 }}>{w.servers}</div></div>
                     <div><div className="oa-stat-label">Listeners</div><div style={{ fontSize: 18, fontWeight: 700, marginTop: 3 }}>{w.listeners}</div></div>
+                    <div><div className="oa-stat-label">Voice</div><div style={{ fontSize: 18, fontWeight: 700, marginTop: 3 }}>{w.connections}</div></div>
+                    <div><div className="oa-stat-label">Discord-Ping</div><div style={{ fontSize: 18, fontWeight: 700, marginTop: 3 }}>{w.pingMs == null ? '—' : `${w.pingMs} ms`}</div></div>
                   </div>
                   <div style={{ marginTop: 14 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#64748b', marginBottom: 6 }} className="oa-mono">
-                      <span>TIER: {String(w.requiredTier || 'free').toUpperCase()}</span>
-                      <span>{w.connections} VOICE</span>
+                      <span>BOT-SLOT: {String(w.requiredTier || 'nicht gesetzt').toUpperCase()}</span>
+                      <span>{w.servers || 0} GUILDS</span>
                     </div>
                     <div className="oa-progress"><i style={{ width: `${Math.min(100, (w.servers || 0) * 8 + (w.ready ? 12 : 4))}%` }} /></div>
                   </div>
@@ -957,6 +997,11 @@ export default function OwnerAdmin() {
                           );
                         })}
                       </div>
+                      {(licForm.linkedServers || []).map((server) => (
+                        <div key={`status-${server.id}`} style={{ fontSize: 11.5, margin: '5px 0', color: server.licenseResolved ? '#4ade80' : '#ff8fab' }} data-testid={`license-guild-status-${server.id}`}>
+                          {server.licenseResolved ? `✓ Lizenzauflösung: ${String(server.effectivePlan || 'free').toUpperCase()}` : '✕ Keine aktive Lizenzauflösung'} · {server.known ? `Live erkannt als ${server.name}` : 'nicht im Live-Guild-Verzeichnis – Guild-ID prüfen oder Commander-Telemetrie abwarten'}
+                        </div>
+                      ))}
                       <div style={{ display: 'flex', gap: 8 }}>
                         <input className="oa-input oa-mono" list="owner-known-guilds" style={{ maxWidth: 320 }} placeholder="Discord Guild-ID hinzufügen" value={licForm.newGuild} onChange={(e) => setLicForm({ ...licForm, newGuild: e.target.value.trim() })} data-testid="license-guild-input" />
                         <button className="oa-btn ghost" style={{ height: 42 }} disabled={licBusy || !/^\d{17,22}$/.test(licForm.newGuild || '')} onClick={() => patchLicense({ addServerId: licForm.newGuild }, 'Server verknüpft')} data-testid="license-guild-add"><Plus size={15} /> Verknüpfen</button>

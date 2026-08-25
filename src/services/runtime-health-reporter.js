@@ -29,7 +29,7 @@ function processCpuPct() {
   return Math.max(0, Math.min(100, Math.round(pct)));
 }
 
-function nodeMetrics(runtimes) {
+export function buildRuntimeHealthNodes(runtimes) {
   return runtimes.map((rt) => {
     const client = rt?.client;
     const ready = !!client?.isReady?.();
@@ -39,24 +39,29 @@ function nodeMetrics(runtimes) {
     try { guilds = ready ? client.guilds.cache.size : 0; } catch { guilds = 0; }
     let guildIds = [];
     try { guildIds = ready ? [...client.guilds.cache.keys()].map(String) : []; } catch { guildIds = []; }
+    let runtimeDetails = [];
+    try { runtimeDetails = rt?.getDashboardStatus?.()?.guildDetails || []; } catch { runtimeDetails = []; }
+    const runtimeDetailByGuild = new Map(runtimeDetails.map((detail) => [String(detail.guildId || detail.id || ""), detail]));
     let guildDetails = [];
-    try {
-      const runtimeDetails = rt?.getDashboardStatus?.()?.guildDetails || [];
-      const runtimeDetailByGuild = new Map(runtimeDetails.map((detail) => [String(detail.guildId || ""), detail]));
-      guildDetails = ready
-        ? [...client.guilds.cache.values()].map((guild) => {
+    if (ready) {
+      try {
+        guildDetails = [...client.guilds.cache.values()].map((guild) => {
           const includeDirectory = rt?.role === "commander";
-          const roles = includeDirectory ? [...(guild.roles?.cache?.values?.() || [])]
-            .filter((role) => String(role.id) !== String(guild.id) && !role.managed)
-            .sort((a, b) => Number(b.position || 0) - Number(a.position || 0))
-            .slice(0, 100)
-            .map((role) => ({
-              id: String(role.id),
-              name: String(role.name || role.id).slice(0, 100),
-              color: role.hexColor && role.hexColor !== "#000000" ? role.hexColor : "#94a3b8",
-              position: Number(role.position || 0),
-            })) : [];
-          const channels = includeDirectory ? [...(guild.channels?.cache?.values?.() || [])] : [];
+          let roles = [];
+          let channels = [];
+          try {
+            roles = includeDirectory ? [...(guild.roles?.cache?.values?.() || [])]
+              .filter((role) => String(role.id) !== String(guild.id) && !role.managed)
+              .sort((a, b) => Number(b.position || 0) - Number(a.position || 0))
+              .slice(0, 100)
+              .map((role) => ({
+                id: String(role.id),
+                name: String(role.name || role.id).slice(0, 100),
+                color: role.hexColor && role.hexColor !== "#000000" ? role.hexColor : "#94a3b8",
+                position: Number(role.position || 0),
+              })) : [];
+          } catch { roles = []; }
+          try { channels = includeDirectory ? [...(guild.channels?.cache?.values?.() || [])] : []; } catch { channels = []; }
           const live = runtimeDetailByGuild.get(String(guild.id)) || {};
           const mapChannel = (channel) => ({
             id: String(channel.id),
@@ -65,6 +70,7 @@ function nodeMetrics(runtimes) {
           });
           return {
             id: String(guild.id),
+            guildId: String(guild.id),
             name: String(guild.name || guild.id).slice(0, 120),
             memberCount: Math.max(0, Number(guild.memberCount || 0) || 0),
             iconUrl: guild.iconURL?.({ extension: "png", size: 128 }) || null,
@@ -81,9 +87,9 @@ function nodeMetrics(runtimes) {
             playing: live.playing === true,
             recovering: live.recovering === true,
           };
-        })
-        : [];
-    } catch { guildDetails = []; }
+        });
+      } catch { guildDetails = []; }
+    }
     let ping = null;
     try { ping = ready ? Math.max(0, Math.round(client.ws.ping)) : null; } catch { ping = null; }
     let stats = {};
@@ -112,7 +118,7 @@ export function startRuntimeHealthReporter(runtimes, { intervalMs = 5000 } = {})
   const write = async () => {
     if (!isConnected()) return;
     try {
-      const nodes = nodeMetrics(runtimes);
+      const nodes = buildRuntimeHealthNodes(runtimes);
       const doc = {
         _id: "latest",
         at: new Date().toISOString(),

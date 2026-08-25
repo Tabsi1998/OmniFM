@@ -6,6 +6,7 @@ import {
   getPlanLimits,
   getServerCapabilities,
   getServerSeats,
+  getServerPlan,
   setLicenseProvider,
   buildUpgradeHints,
   getCapabilityRequirementPlan,
@@ -15,6 +16,12 @@ import {
   getDashboardCapabilityRequiredTier,
   normalizeDashboardCapabilityPayload,
 } from "../frontend/src/lib/dashboardCapabilities.js";
+
+test("legacy tier-only licenses retain their paid plan", (t) => {
+  setLicenseProvider(() => ({ active: true, tier: "ultimate", seats: 1 }));
+  t.after(() => setLicenseProvider(() => null));
+  assert.equal(getServerPlan("1342542257747923004"), "ultimate");
+});
 
 test("plan capabilities preserve free, pro, and ultimate package boundaries", () => {
   const freeCapabilities = getPlanCapabilities("free", { apiShape: true });

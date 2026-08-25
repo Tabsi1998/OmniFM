@@ -31,6 +31,11 @@ load_dotenv()
 
 app = FastAPI(title="OmniFM API")
 
+# start.sh verifies this value after launching Uvicorn.  A generic 200 health
+# response is not sufficient because an orphaned, older backend on the same
+# port would otherwise look healthy while serving a different API contract.
+BACKEND_CONTRACT_VERSION = "owner-live-v3"
+
 MONGO_URL = os.environ.get("MONGO_URL")
 DB_NAME = os.environ.get("DB_NAME")
 
@@ -2159,46 +2164,56 @@ def remaining_days(license_info):
 def get_server_license(server_id):
     """Get license for a server - supports both old and new format"""
     data = load_premium()
-    sid = str(server_id)
+    sid = str(server_id or "").strip()
+    if not sid:
+        return None
+
+    def resolved_license(lic, source, license_id=None):
+        expired = is_expired(lic)
+        active = bool(lic.get("active", True)) and not expired
+        plan = str(lic.get("plan") or lic.get("tier") or "free").strip().lower()
+        if plan not in TIERS:
+            plan = "free"
+        return {
+            **lic,
+            "expired": expired,
+            "remainingDays": remaining_days(lic),
+            "active": active,
+            "activeTier": plan if active else "free",
+            "tier": plan,
+            "plan": plan,
+            "resolutionSource": source,
+            "_licenseId": str(license_id or lic.get("id") or ""),
+        }
 
     # New format: serverEntitlements -> licenseId -> licenses
     if "serverEntitlements" in data:
-        ent = data.get("serverEntitlements", {}).get(sid)
+        entitlements = data.get("serverEntitlements", {})
+        ent = entitlements.get(sid)
+        if not ent:
+            # Be tolerant of old Mongo documents whose _serverId was stored as
+            # a number. New writes are always normalized strings.
+            ent = next((value for key, value in entitlements.items() if str(key) == sid), None)
         # Compatibility/self-healing read for links created by older Owner APIs,
         # which updated linkedServerIds but forgot serverEntitlements.
         if not ent:
             for license_id, candidate in data.get("licenses", {}).items():
                 if sid in [str(item) for item in (candidate.get("linkedServerIds") or [])]:
-                    ent = {"serverId": sid, "licenseId": license_id}
+                    ent = {"serverId": sid, "licenseId": license_id, "_legacyLink": True}
                     break
         if ent:
-            lic = data.get("licenses", {}).get(ent.get("licenseId", ""))
+            license_id = str(ent.get("licenseId") or "")
+            lic = data.get("licenses", {}).get(license_id)
+            if not lic:
+                lic = next((value for key, value in data.get("licenses", {}).items() if str(key) == license_id), None)
             if lic:
-                expired = is_expired(lic)
-                active = bool(lic.get("active", True)) and not expired
-                return {
-                    **lic,
-                    "expired": expired,
-                    "remainingDays": remaining_days(lic),
-                    "active": active,
-                    "activeTier": lic.get("plan", "free") if active else "free",
-                    "tier": lic.get("plan", "free"),
-                }
+                return resolved_license(lic, "linkedServerIds" if ent.get("_legacyLink") else "serverEntitlement", license_id)
 
     # Old format: licenses keyed by serverId
     lic = data.get("licenses", {}).get(sid)
     if not lic:
         return None
-    expired = is_expired(lic)
-    active = bool(lic.get("active", True)) and not expired
-    return {
-        **lic,
-        "expired": expired,
-        "active": active,
-        "remainingDays": remaining_days(lic),
-        "activeTier": lic.get("tier", lic.get("plan", "free")) if active else "free",
-        "tier": lic.get("tier", lic.get("plan", "free")),
-    }
+    return resolved_license(lic, "legacyServerKey", sid)
 
 
 def get_license_by_key(license_key):
@@ -2439,6 +2454,7 @@ async def health():
         "ready": mongo_ready,
         "status": "online" if mongo_ready else "degraded",
         "brand": "OmniFM",
+        "contractVersion": BACKEND_CONTRACT_VERSION,
         "services": {"api": True, "mongo": mongo_ready},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
@@ -3493,6 +3509,7 @@ async def dashboard_license(request: Request, serverId: str = ""):
 
     result = {
         "serverId": guild.get("id"),
+        "serverName": guild.get("name"),
         "tier": tier,
         "tierName": tier_config.get("name", "Free"),
         "dashboardEnabled": guild.get("dashboardEnabled", False),
@@ -3514,6 +3531,7 @@ async def dashboard_license(request: Request, serverId: str = ""):
             "billingPeriod": lic.get("billingPeriod", "monthly"),
             "durationMonths": lic.get("durationMonths"),
             "emailMasked": mask_email(lic.get("email") or lic.get("contactEmail") or ""),
+            "resolutionSource": lic.get("resolutionSource"),
         }
 
     return result
@@ -4539,6 +4557,14 @@ def _admin_license_rows(state):
         if not isinstance(linked, list):
             linked = []
         linked_ids = [str(s) for s in linked][:50]
+        linked_resolution = {}
+        for server_id in linked_ids:
+            resolved = get_server_license(server_id)
+            linked_resolution[server_id] = {
+                "resolved": bool(resolved and resolved.get("active") and not resolved.get("expired") and str(resolved.get("_licenseId") or "") == str(lid)),
+                "effectivePlan": (resolved or {}).get("activeTier", "free"),
+                "resolutionSource": (resolved or {}).get("resolutionSource"),
+            }
         rows.append({
             "licenseKey": str(lid),
             "id": str(lic.get("id") or lid),
@@ -4566,6 +4592,9 @@ def _admin_license_rows(state):
                 "iconUrl": (guild_directory.get(server_id) or {}).get("iconUrl"),
                 "bots": (guild_directory.get(server_id) or {}).get("bots", []),
                 "discordUrl": f"https://discord.com/channels/{server_id}" if is_valid_server_id(server_id) else None,
+                "licenseResolved": linked_resolution[server_id]["resolved"],
+                "effectivePlan": linked_resolution[server_id]["effectivePlan"],
+                "resolutionSource": linked_resolution[server_id]["resolutionSource"],
             } for server_id in linked_ids],
         })
     rows.sort(key=lambda r: str(r.get("createdAt") or ""), reverse=True)
@@ -4767,24 +4796,67 @@ async def admin_workers(request: Request):
     if guard is not None:
         return guard
     bots = load_bots_from_env()
+    live_doc = read_runtime_health_fresh()
+    live_nodes = (live_doc or {}).get("nodes") or []
+    nodes_by_id = {str(node.get("botId") or ""): node for node in live_nodes if node.get("botId")}
+    nodes_by_index = {parse_int(node.get("index"), 0): node for node in live_nodes if parse_int(node.get("index"), 0) > 0}
     commander_index = parse_int(os.environ.get("COMMANDER_BOT_INDEX", "1"), 1)
     workers = []
+    matched_node_keys = set()
     for b in bots:
+        node = nodes_by_id.get(str(b.get("clientId") or "")) or nodes_by_id.get(str(b.get("botId") or "")) or nodes_by_index.get(parse_int(b.get("index"), 0))
+        if node:
+            matched_node_keys.add((str(node.get("botId") or ""), parse_int(node.get("index"), 0)))
         workers.append({
-            "botId": b.get("botId"),
+            "botId": (node or {}).get("botId") or b.get("botId"),
             "index": b.get("index"),
-            "name": b.get("name"),
-            "role": "commander" if b.get("index") == commander_index else "worker",
+            "name": (node or {}).get("name") or b.get("name"),
+            "role": (node or {}).get("role") or ("commander" if b.get("index") == commander_index else "worker"),
             "requiredTier": b.get("requiredTier"),
             "clientId": b.get("clientId"),
-            "ready": bool(b.get("ready")),
-            "servers": b.get("servers", 0),
-            "listeners": b.get("listeners", 0),
-            "connections": b.get("connections", 0),
-            "uptimeSec": b.get("uptimeSec", 0),
+            "ready": (node or {}).get("status") == "online" if node else False,
+            "status": (node or {}).get("status") or "offline",
+            "servers": parse_int((node or {}).get("guilds", b.get("servers", 0)), 0),
+            "listeners": parse_int((node or {}).get("listeners", b.get("listeners", 0)), 0),
+            "connections": parse_int((node or {}).get("voiceConnections", b.get("connections", 0)), 0),
+            "pingMs": (node or {}).get("pingMs"),
+            "guildDetails": (node or {}).get("guildDetails") or [],
+            "uptimeSec": parse_int(((live_doc or {}).get("process") or {}).get("uptimeSec", 0), 0),
             "color": b.get("color"),
         })
-    return {"workers": workers, "count": len(workers), "commanderIndex": commander_index}
+
+    # A just-started runtime can report a node before the corresponding Owner
+    # configuration response has been reloaded. Keep the live node visible.
+    for node in live_nodes:
+        key = (str(node.get("botId") or ""), parse_int(node.get("index"), 0))
+        if key in matched_node_keys:
+            continue
+        workers.append({
+            "botId": node.get("botId") or f"runtime-{node.get('index')}",
+            "index": node.get("index"),
+            "name": node.get("name") or f"Bot {node.get('index')}",
+            "role": node.get("role") or "worker",
+            "requiredTier": None,
+            "clientId": node.get("botId"),
+            "ready": node.get("status") == "online",
+            "status": node.get("status") or "offline",
+            "servers": parse_int(node.get("guilds"), 0),
+            "listeners": parse_int(node.get("listeners"), 0),
+            "connections": parse_int(node.get("voiceConnections"), 0),
+            "pingMs": node.get("pingMs"),
+            "guildDetails": node.get("guildDetails") or [],
+            "uptimeSec": parse_int(((live_doc or {}).get("process") or {}).get("uptimeSec"), 0),
+            "color": None,
+        })
+    workers.sort(key=lambda item: parse_int(item.get("index"), 999))
+    return {
+        "workers": workers,
+        "count": len(workers),
+        "commanderIndex": commander_index,
+        "live": bool(live_doc),
+        "generatedAt": (live_doc or {}).get("at"),
+        "resourceModel": (((live_doc or {}).get("process") or {}).get("resourceModel")),
+    }
 
 
 @app.get("/api/admin/stations")
@@ -5027,6 +5099,7 @@ async def admin_monitoring(request: Request):
                 "guilds": n.get("guilds", 0),
                 "guildDetails": n.get("guildDetails") or [],
                 "voiceConnections": n.get("voiceConnections", 0),
+                "listeners": n.get("listeners", 0),
                 # CPU/RAM are process-wide in monolith mode. Never present the
                 # same host values as fake per-bot measurements.
                 "cpuPct": None,

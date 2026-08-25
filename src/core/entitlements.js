@@ -38,7 +38,8 @@ export function getServerPlan(serverId) {
   if (!_getLicenseForServer) return "free";
   const license = _getLicenseForServer(String(serverId));
   if (!license || !license.active) return "free";
-  return PLANS[license.plan] ? license.plan : "free";
+  const plan = String(license.plan || license.tier || "free").toLowerCase();
+  return PLANS[plan] ? plan : "free";
 }
 
 export function getServerPlanConfig(serverId) {
