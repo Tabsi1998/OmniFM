@@ -7,6 +7,17 @@ import { resolveRuntimeDataPath } from "./runtime-data-path.js";
 const ENV_LINE_RE = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/;
 const MAX_VALUE_LENGTH = 2000;
 
+const BOT_CONFIGURATION_FIELDS = Array.from({ length: 20 }, (_, offset) => {
+  const index = offset + 1;
+  const label = index === 1 ? "Commander" : `Worker ${index}`;
+  return [
+    { key: `BOT_${index}_CLIENT_ID`, label: `${label} Client ID`, type: "snowflake" },
+    { key: `BOT_${index}_NAME`, label: `${label} Name`, type: "text" },
+    { key: `BOT_${index}_TIER`, label: `${label} Mindest-Tier`, type: "enum", values: ["free", "pro", "ultimate"] },
+    { key: `BOT_${index}_PERMISSIONS`, label: `${label} Discord Permissions`, type: "text", example: "35186522836032" },
+  ];
+}).flat();
+
 const GROUPS = [
   {
     id: "web",
@@ -28,14 +39,12 @@ const GROUPS = [
   {
     id: "bots",
     title: "Discord-Bots & Topologie",
-    description: "Commander, Worker und deren Einsatzmodus. Bot-Tokens werden unten ausschliesslich write-only gepflegt.",
+    description: "Commander, bis zu 19 Worker und deren Einsatzmodus. Bot-Tokens werden unten ausschliesslich write-only gepflegt.",
     fields: [
-      { key: "BOT_1_CLIENT_ID", label: "Commander Client ID", type: "snowflake" },
-      { key: "BOT_1_NAME", label: "Commander Name", type: "text" },
-      { key: "BOT_1_TIER", label: "Commander Mindest-Tier", type: "enum", values: ["free", "pro", "ultimate"] },
       { key: "BOT_COUNT", label: "Anzahl Bots", type: "integer", min: 1, max: 20, example: "1" },
       { key: "COMMANDER_BOT_INDEX", label: "Commander Bot-Index", type: "integer", min: 1, max: 20, example: "1" },
       { key: "OMNIFM_DEPLOYMENT_MODE", label: "Deployment-Modus", type: "enum", values: ["auto", "monolith", "split", "commander", "worker"] },
+      ...BOT_CONFIGURATION_FIELDS,
     ],
   },
   {
@@ -183,10 +192,10 @@ const GROUPS = [
 const SECRET_FIELDS = [
   { group: "Owner", key: "API_ADMIN_TOKEN", label: "Owner API Token", writeOnly: false },
   { group: "Owner", key: "ADMIN_API_TOKEN", label: "Legacy Owner API Token", writeOnly: false },
-  { group: "Discord", key: "BOT_1_TOKEN", label: "Commander Bot Token", writeOnly: true },
-  { group: "Discord", key: "BOT_2_TOKEN", label: "Worker 2 Bot Token", writeOnly: true },
-  { group: "Discord", key: "BOT_3_TOKEN", label: "Worker 3 Bot Token", writeOnly: true },
-  { group: "Discord", key: "BOT_4_TOKEN", label: "Worker 4 Bot Token", writeOnly: true },
+  ...Array.from({ length: 20 }, (_, offset) => {
+    const index = offset + 1;
+    return { group: "Discord", key: `BOT_${index}_TOKEN`, label: index === 1 ? "Commander Bot Token" : `Worker ${index} Bot Token`, writeOnly: true };
+  }),
   { group: "Discord", key: "BOT_TOKEN", label: "Legacy Discord Bot Token", writeOnly: true },
   { group: "Discord", key: "DISCORD_CLIENT_SECRET", label: "Discord OAuth Secret", writeOnly: true },
   { group: "Stripe", key: "STRIPE_SECRET_KEY", label: "Stripe Secret Key", writeOnly: true },

@@ -39,6 +39,7 @@ test("owner config snapshot reads editable values and hides secret values", asyn
   try {
     const snapshot = getOwnerConfigSnapshot();
     const webGroup = snapshot.groups.find((group) => group.id === "web");
+    const botsGroup = snapshot.groups.find((group) => group.id === "bots");
     const publicUrl = webGroup.fields.find((field) => field.key === "PUBLIC_WEB_URL");
     const adminToken = snapshot.secrets.find((secret) => secret.key === "API_ADMIN_TOKEN");
 
@@ -47,6 +48,8 @@ test("owner config snapshot reads editable values and hides secret values", asyn
     assert.equal(adminToken.configured, true);
     assert.equal(adminToken.secret, true);
     assert.equal(Object.hasOwn(adminToken, "value"), false);
+    assert.ok(botsGroup.fields.some((field) => field.key === "BOT_20_CLIENT_ID"));
+    assert.ok(snapshot.secrets.some((secret) => secret.key === "BOT_20_TOKEN" && secret.writeOnly));
   } finally {
     restoreEnv();
     await fs.rm(dir, { recursive: true, force: true });
