@@ -124,8 +124,15 @@ export function createAdminRoutesHandler(deps) {
     ADMIN_TOKEN,
     getStationHealthReport,
     listLicenses,
+    createLicense,
+    removeLicense,
+    extendLicense,
+    linkServerToLicense,
+    unlinkServerFromLicense,
     patchLicenseById,
     loadStations,
+    saveStations,
+    normalizeStationKey,
     log,
     methodNotAllowed,
     sendJson,
@@ -158,6 +165,89 @@ export function createAdminRoutesHandler(deps) {
   function getStationCatalogCount() {
     const stationsData = loadStations?.() || {};
     return Object.keys(stationsData?.stations || {}).length;
+  }
+
+  function isValidOwnerEmail(value) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+  }
+
+  function toOwnerLicense(license) {
+    if (!license || typeof license !== "object") return null;
+    const expiresAt = license.expiresAt ? new Date(license.expiresAt) : null;
+    const expired = Boolean(license.expired) || Boolean(expiresAt && !Number.isNaN(expiresAt.getTime()) && expiresAt.getTime() <= Date.now());
+    const linkedServerIds = Array.isArray(license.linkedServerIds) ? license.linkedServerIds.map(String) : [];
+    const seats = Number(license.seats || 1) || 1;
+    return {
+      ...license,
+      licenseKey: license.id,
+      email: license.contactEmail || "",
+      planName: String(license.plan || "free").replace(/^./, (char) => char.toUpperCase()),
+      linkedServerIds,
+      seats,
+      seatsUsed: linkedServerIds.length,
+      seatsAvailable: Math.max(0, seats - linkedServerIds.length),
+      expired,
+      daysLeft: expiresAt && !Number.isNaN(expiresAt.getTime()) ? Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / 86400000)) : null,
+    };
+  }
+
+  function buildLiveMonitoringSnapshot() {
+    const runtimes = getRuntimes();
+    if (runtimes.length === 0) {
+      return {
+        waiting: true,
+        live: false,
+        simulated: false,
+        generatedAt: new Date().toISOString(),
+        message: "Noch keine Bot-Runtime ist mit dem Webserver verbunden. Es werden keine Demo-Werte angezeigt.",
+        health: { mongo: Boolean(process.env.MONGO_URL), healthyNodes: 0, totalNodes: 0, uptimeSec: 0, uptimePct: 0, apiLatencyMs: null, openIncidents: 0 },
+      };
+    }
+
+    const now = Date.now();
+    const nodes = runtimes.map((runtime, index) => {
+      const stats = runtime.collectStats?.() || {};
+      const online = Boolean(runtime.client?.isReady?.());
+      const startedAt = Number(runtime.startedAt || 0);
+      return {
+        index,
+        botId: String(runtime.config?.id || runtime.config?.clientId || runtime.config?.name || index),
+        name: runtime.config?.name || `Bot ${index + 1}`,
+        role: runtime.role || (index === 0 ? "commander" : "worker"),
+        status: online ? "online" : "offline",
+        cpuPct: 0,
+        ramMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
+        pingMs: Number.isFinite(Number(runtime.client?.ws?.ping)) && Number(runtime.client.ws.ping) >= 0 ? Math.round(Number(runtime.client.ws.ping)) : null,
+        voiceConnections: Number(stats.connections || 0) || 0,
+        guilds: Number(stats.servers || runtime.client?.guilds?.cache?.size || 0) || 0,
+        uptimeSec: startedAt ? Math.max(0, Math.floor((now - startedAt) / 1000)) : Math.floor(process.uptime()),
+      };
+    });
+    const rawIncidents = getRecentOperatorIncidents?.() || [];
+    const sourceIncidents = Array.isArray(rawIncidents) ? rawIncidents : (Array.isArray(rawIncidents?.incidents) ? rawIncidents.incidents : []);
+    const incidents = sourceIncidents.slice(0, 50).map((incident) => ({
+      severity: String(incident?.severity || incident?.level || "info").toLowerCase() === "error" ? "critical" : String(incident?.severity || incident?.level || "info").toLowerCase(),
+      message: String(incident?.message || incident?.msg || "Unbekannter Incident").slice(0, 300),
+      source: String(incident?.source || incident?.bot || "runtime"),
+      at: incident?.at || incident?.timestamp || incident?.time || new Date().toISOString(),
+      resolved: Boolean(incident?.resolved),
+    }));
+    const healthyNodes = nodes.filter((node) => node.status === "online").length;
+    return {
+      waiting: false,
+      live: true,
+      simulated: false,
+      generatedAt: new Date().toISOString(),
+      process: { ramMb: Math.round(process.memoryUsage().rss / 1024 / 1024), cores: process.availableParallelism?.() || 1, nodeVersion: process.version },
+      health: {
+        mongo: Boolean(process.env.MONGO_URL), healthyNodes, totalNodes: nodes.length,
+        uptimeSec: Math.floor(process.uptime()), uptimePct: null, apiLatencyMs: null,
+        openIncidents: incidents.filter((incident) => !incident.resolved && ["warning", "critical", "error"].includes(incident.severity)).length,
+      },
+      nodes,
+      incidents,
+      logs: [],
+    };
   }
 
   function hasEnvValue(name) {
@@ -978,12 +1068,69 @@ export function createAdminRoutesHandler(deps) {
       const stationsDown = stationHealth.filter((s) => s.status === "down").length;
 
       sendJson(res, 200, {
+        // `bots` bleibt fuer die bestehende Owner-API eine Liste; die React-Konsole
+        // nutzt die zusammengefassten Werte aus `botSummary`.
         bots: botStats,
-        licenses: { total: licenseList.length, active: activeLicenses, expired: expiredLicenses },
-        stations: { total: Math.max(stationCatalogCount, stationHealth.length), up: stationsUp, down: stationsDown },
+        botSummary: { configured: botStats.length, online: botStats.filter((bot) => bot.online).length },
+        guilds: { managed: botStats.reduce((total, bot) => total + bot.guilds, 0), live: botStats.some((bot) => bot.connections > 0) },
+        licenses: {
+          total: licenseList.length, active: activeLicenses, expired: expiredLicenses,
+          seatsSold: licenseList.reduce((total, license) => total + (Number(license?.seats || 0) || 0), 0),
+          byPlan: Object.fromEntries(["free", "pro", "ultimate"].map((plan) => [plan, licenseList.filter((license) => String(license?.plan || "free") === plan).length])),
+        },
+        revenue: { mrr: 0, arr: 0 },
+        stations: {
+          total: Math.max(stationCatalogCount, stationHealth.length), up: stationsUp, down: stationsDown,
+          free: Object.values(loadStations?.()?.stations || {}).filter((station) => station?.tier === "free").length,
+          pro: Object.values(loadStations?.()?.stations || {}).filter((station) => station?.tier === "pro").length,
+        },
         release: typeof getReleaseInfo === "function" ? getReleaseInfo() : null,
         serverTime: new Date().toISOString(),
       });
+      return true;
+    }
+
+    // GET /api/admin/workers - reale, konfigurierte Runtimes.
+    if (pathname === "/api/admin/workers") {
+      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
+      const workers = getRuntimes().map((runtime, index) => {
+        const stats = runtime.collectStats?.() || {};
+        return {
+          index,
+          botId: String(runtime.config?.id || runtime.config?.clientId || runtime.config?.name || index),
+          name: runtime.config?.name || `Bot ${index + 1}`,
+          role: runtime.role || (index === 0 ? "commander" : "worker"),
+          ready: Boolean(runtime.client?.isReady?.()),
+          servers: Number(stats.servers || runtime.client?.guilds?.cache?.size || 0) || 0,
+          connections: Number(stats.connections || 0) || 0,
+          listeners: Number(stats.listeners || 0) || 0,
+          requiredTier: runtime.config?.tier || "free",
+        };
+      });
+      sendJson(res, 200, { workers });
+      return true;
+    }
+
+    // GET /api/admin/integrations - nur Konfigurationsstatus, niemals Secrets.
+    if (pathname === "/api/admin/integrations") {
+      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
+      const has = (name) => String(process.env[name] || "").trim().length > 0;
+      sendJson(res, 200, {
+        config: {
+          mongo: has("MONGO_URL"), stripe: has("STRIPE_SECRET_KEY") || has("STRIPE_API_KEY"),
+          discordOAuth: has("DISCORD_CLIENT_ID") && has("DISCORD_CLIENT_SECRET") && has("DISCORD_REDIRECT_URI"),
+          smtp: has("SMTP_HOST") && has("SMTP_USER") && has("SMTP_PASS"), recognition: has("ACOUSTID_API_KEY"), songHistory: true,
+        },
+        discordBotList: { enabled: ["1", "true", "yes"].includes(String(process.env.DISCORDBOTLIST_ENABLED || "").toLowerCase()) },
+      });
+      return true;
+    }
+
+    // GET /api/admin/activity - aus dem echten Owner-Audit-Log.
+    if (pathname === "/api/admin/activity") {
+      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
+      const audit = getOwnerAuditSnapshot({ limit: 50 }).audit || [];
+      sendJson(res, 200, { activity: audit.map((entry) => ({ at: entry.at, label: entry.action, detail: entry.detail || entry.summary || entry.target || "", meta: entry.metadata || {} })) });
       return true;
     }
 
@@ -1470,28 +1617,110 @@ export function createAdminRoutesHandler(deps) {
       return true;
     }
 
-    // GET /api/admin/licenses
-    if (pathname === "/api/admin/licenses") {
+    // GET /api/admin/monitoring - ausschliesslich echte Runtime-Daten, nie Seed-/Demo-Daten.
+    if (pathname === "/api/admin/monitoring") {
       if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
-      const licenses = listLicenses?.() || {};
-      sendJson(res, 200, { licenses });
+      sendJson(res, 200, buildLiveMonitoringSnapshot());
       return true;
     }
 
-    // POST /api/admin/licenses/:id
+    // GET/POST /api/admin/licenses
+    if (pathname === "/api/admin/licenses") {
+      if (req.method === "GET") {
+        const licenses = Object.values(listLicenses?.() || {}).map(toOwnerLicense).filter(Boolean);
+        licenses.sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+        sendJson(res, 200, { licenses });
+        return true;
+      }
+      if (req.method !== "POST") { methodNotAllowed(res, ["GET", "POST"]); return true; }
+      try {
+        const payload = JSON.parse(await readRequestBody(req) || "{}");
+        const email = String(payload?.email || payload?.contactEmail || "").trim().toLowerCase();
+        const plan = String(payload?.tier || payload?.plan || "pro").trim().toLowerCase();
+        const months = Math.max(1, Math.min(60, Number.parseInt(String(payload?.months || "1"), 10) || 1));
+        const seats = Number.parseInt(String(payload?.seats || "1"), 10) || 1;
+        const guildId = String(payload?.guildId || payload?.serverId || "").trim();
+        if (!isValidOwnerEmail(email)) throw Object.assign(new Error("Bitte eine gueltige Kontakt-E-Mail eingeben."), { statusCode: 400 });
+        if (!["pro", "ultimate"].includes(plan)) throw Object.assign(new Error("Plan muss Pro oder Ultimate sein."), { statusCode: 400 });
+        if (![1, 2, 3, 5].includes(seats)) throw Object.assign(new Error("Seats muessen 1, 2, 3 oder 5 sein."), { statusCode: 400 });
+        if (guildId && !/^\d{17,22}$/.test(guildId)) throw Object.assign(new Error("Server-ID muss eine Discord Guild-ID mit 17 bis 22 Ziffern sein."), { statusCode: 400 });
+        if (typeof createLicense !== "function") throw Object.assign(new Error("Lizenzverwaltung ist nicht verfuegbar."), { statusCode: 500 });
+        const license = createLicense({ plan, seats, months, contactEmail: email, note: String(payload?.note || "").trim(), activatedBy: "owner-portal" });
+        if (guildId) {
+          const linked = linkServerToLicense?.(guildId, license.id);
+          if (!linked?.ok) throw Object.assign(new Error(linked?.message || "Server konnte nicht mit der Lizenz verknuepft werden."), { statusCode: 400 });
+        }
+        const result = toOwnerLicense((listLicenses?.() || {})[license.id] || license);
+        auditOwnerAction(req, { action: "owner.license.create", status: "success", target: license.id, summary: `Lizenz erstellt: ${license.id}`, metadata: { plan, seats, guildId: guildId || null } });
+        sendJson(res, 201, { ok: true, license: result });
+      } catch (err) {
+        auditOwnerAction(req, { action: "owner.license.create", status: "failed", summary: err?.message || "Lizenz konnte nicht erstellt werden" });
+        sendJson(res, err?.statusCode || 400, { ok: false, error: err?.message || "Lizenz konnte nicht erstellt werden" });
+      }
+      return true;
+    }
+
+    // PATCH /api/admin/licenses/:id
     const licenseMatch = pathname.match(/^\/api\/admin\/licenses\/([^/]+)$/);
     if (licenseMatch) {
-      if (req.method !== "POST" && req.method !== "PATCH") { methodNotAllowed(res, ["POST", "PATCH"]); return true; }
+      if (req.method === "DELETE") {
+        const licenseId = decodeURIComponent(licenseMatch[1]);
+        const removed = removeLicense?.(licenseId);
+        if (!removed) { sendJson(res, 404, { ok: false, error: "Lizenz nicht gefunden." }); return true; }
+        auditOwnerAction(req, { action: "owner.license.delete", status: "success", target: licenseId, summary: `Lizenz geloescht: ${licenseId}` });
+        sendJson(res, 200, { ok: true });
+        return true;
+      }
+      if (req.method !== "POST" && req.method !== "PATCH") { methodNotAllowed(res, ["POST", "PATCH", "DELETE"]); return true; }
       const licenseId = decodeURIComponent(licenseMatch[1]);
       try {
         const patch = JSON.parse(await readRequestBody(req) || "{}");
-        // Sicherheit: Nur erlaubte Felder patchen
-        const allowed = ["active", "expired", "expiresAt", "plan", "tier", "seats", "linkedServerIds", "contactEmail", "notes"];
-        const safePatch = {};
-        for (const key of allowed) {
-          if (key in patch) safePatch[key] = patch[key];
+        const current = (listLicenses?.() || {})[licenseId];
+        if (!current) throw Object.assign(new Error("Lizenz nicht gefunden."), { statusCode: 404 });
+        if (patch.extendMonths !== undefined) {
+          const months = Number.parseInt(String(patch.extendMonths), 10);
+          if (!Number.isInteger(months) || months === 0 || Math.abs(months) > 60) throw Object.assign(new Error("Ungueltige Laufzeit-Aenderung."), { statusCode: 400 });
+          extendLicense?.(licenseId, months);
         }
-        patchLicenseById?.(licenseId, safePatch);
+        if (patch.expireNow) patchLicenseById?.(licenseId, { active: false, expiresAt: new Date().toISOString() });
+        if (patch.addServerId !== undefined) {
+          const serverId = String(patch.addServerId || "").trim();
+          if (!/^\d{17,22}$/.test(serverId)) throw Object.assign(new Error("Server-ID muss eine Discord Guild-ID mit 17 bis 22 Ziffern sein."), { statusCode: 400 });
+          const linked = linkServerToLicense?.(serverId, licenseId);
+          if (!linked?.ok) throw Object.assign(new Error(linked?.message || "Server konnte nicht verknuepft werden."), { statusCode: 400 });
+        }
+        if (patch.removeServerId !== undefined) {
+          const serverId = String(patch.removeServerId || "").trim();
+          const unlinked = unlinkServerFromLicense?.(serverId, licenseId);
+          if (!unlinked?.ok) throw Object.assign(new Error(unlinked?.message || "Server konnte nicht entfernt werden."), { statusCode: 400 });
+        }
+        // Sicherheit: Nur erlaubte und normalisierte Felder patchen.
+        const safePatch = {};
+        if (patch.active !== undefined) safePatch.active = Boolean(patch.active);
+        if (patch.expiresAt) {
+          const expiresAt = new Date(patch.expiresAt);
+          if (Number.isNaN(expiresAt.getTime())) throw Object.assign(new Error("Ungueltiges Ablaufdatum."), { statusCode: 400 });
+          safePatch.expiresAt = expiresAt.toISOString();
+        }
+        if (patch.tier !== undefined || patch.plan !== undefined) {
+          const plan = String(patch.tier ?? patch.plan).trim().toLowerCase();
+          if (!["pro", "ultimate"].includes(plan)) throw Object.assign(new Error("Plan muss Pro oder Ultimate sein."), { statusCode: 400 });
+          safePatch.plan = plan;
+        }
+        if (patch.seats !== undefined) {
+          const seats = Number.parseInt(String(patch.seats), 10);
+          if (![1, 2, 3, 5].includes(seats)) throw Object.assign(new Error("Seats muessen 1, 2, 3 oder 5 sein."), { statusCode: 400 });
+          if (seats < (current.linkedServerIds || []).length) throw Object.assign(new Error("Seats koennen nicht unter der Zahl verknuepfter Server liegen."), { statusCode: 400 });
+          safePatch.seats = seats;
+        }
+        if (patch.email !== undefined || patch.contactEmail !== undefined) {
+          const email = String(patch.email ?? patch.contactEmail).trim().toLowerCase();
+          if (!isValidOwnerEmail(email)) throw Object.assign(new Error("Bitte eine gueltige Kontakt-E-Mail eingeben."), { statusCode: 400 });
+          safePatch.contactEmail = email;
+        }
+        if (patch.note !== undefined || patch.notes !== undefined) safePatch.note = String((patch.note ?? patch.notes) || "").trim().slice(0, 1000);
+        const updated = Object.keys(safePatch).length ? patchLicenseById?.(licenseId, safePatch) : ((listLicenses?.() || {})[licenseId]);
+        const license = toOwnerLicense(updated || (listLicenses?.() || {})[licenseId]);
         log?.("INFO", `[Admin] Lizenz ${licenseId} gepatcht: ${JSON.stringify(safePatch)}`);
         auditOwnerAction(req, {
           action: "owner.license.patch",
@@ -1500,7 +1729,7 @@ export function createAdminRoutesHandler(deps) {
           summary: `Lizenz gepatcht: ${licenseId}`,
           metadata: { patchedKeys: Object.keys(safePatch) },
         });
-        sendJson(res, 200, { ok: true, licenseId, patched: safePatch });
+        sendJson(res, 200, { ok: true, licenseId, patched: safePatch, license });
       } catch (err) {
         auditOwnerAction(req, {
           action: "owner.license.patch",
@@ -1574,6 +1803,93 @@ export function createAdminRoutesHandler(deps) {
       return true;
     }
 
+    // POST /api/admin/stations/test - Test einer noch nicht gespeicherten URL.
+    if (pathname === "/api/admin/stations/test") {
+      if (req.method !== "POST") { methodNotAllowed(res, ["POST"]); return true; }
+      try {
+        const payload = JSON.parse(await readRequestBody(req) || "{}");
+        const result = await testOwnerStationStream({ key: "preview", name: "Vorschau", url: payload?.url || "" });
+        sendJson(res, 200, { ...result, message: result.ok ? `Erreichbar (${result.httpStatus}, ${result.responseTimeMs}ms)` : (result.error || "Nicht erreichbar"), latencyMs: result.responseTimeMs });
+      } catch (err) {
+        sendJson(res, err?.statusCode || 400, { ok: false, error: err?.message || "Station-Test konnte nicht ausgefuehrt werden" });
+      }
+      return true;
+    }
+
+    // GET /api/admin/stations/list
+    if (pathname === "/api/admin/stations/list") {
+      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
+      const stationsData = loadStations?.() || {};
+      const stations = Object.entries(stationsData?.stations || {}).map(([key, station]) => ({
+        key, name: station.name || key, url: station.url || "", tier: station.tier || "free", genre: station.genre || "",
+        isDefault: key === stationsData.defaultStationKey,
+      }));
+      sendJson(res, 200, { stations, total: stations.length });
+      return true;
+    }
+
+    // POST /api/admin/stations/health - echte Server-Erreichbarkeit fuer den Katalog.
+    if (pathname === "/api/admin/stations/health") {
+      if (req.method !== "POST") { methodNotAllowed(res, ["POST"]); return true; }
+      try {
+        const payload = JSON.parse(await readRequestBody(req, 32_768) || "{}");
+        const requestedKeys = Array.isArray(payload?.keys) ? payload.keys.slice(0, 30).map((key) => String(key || "").trim()).filter(Boolean) : [];
+        const stationsData = loadStations?.() || {};
+        const results = {};
+        await Promise.all(requestedKeys.map(async (key) => {
+          const station = stationsData?.stations?.[key];
+          if (!station) { results[key] = { ok: false, reachable: false, discordOk: false, error: "Station nicht gefunden" }; return; }
+          const result = await testOwnerStationStream({ key, name: station.name || key, url: station.url || "" });
+          results[key] = { ok: result.ok, reachable: result.ok, discordOk: result.ok, latencyMs: result.responseTimeMs, httpStatus: result.httpStatus, error: result.error || null, checkedAt: result.checkedAt };
+        }));
+        sendJson(res, 200, { ok: true, results });
+      } catch (err) {
+        sendJson(res, err?.statusCode || 400, { ok: false, error: err?.message || "Statuspruefung konnte nicht ausgefuehrt werden" });
+      }
+      return true;
+    }
+
+    // POST /api/admin/stations - Station anlegen oder bearbeiten.
+    if (pathname === "/api/admin/stations" && req.method === "POST") {
+      try {
+        const payload = JSON.parse(await readRequestBody(req) || "{}");
+        const key = typeof normalizeStationKey === "function" ? normalizeStationKey(payload?.key) : String(payload?.key || "").trim().toLowerCase();
+        const name = String(payload?.name || "").trim();
+        const url = String(payload?.url || "").trim();
+        const tier = String(payload?.tier || "free").trim().toLowerCase();
+        const genre = String(payload?.genre || "").trim().slice(0, 120);
+        if (!key || !name || !url) throw Object.assign(new Error("Key, Name und Stream-URL sind erforderlich."), { statusCode: 400 });
+        if (!["free", "pro", "ultimate"].includes(tier)) throw Object.assign(new Error("Ungueltiger Station-Tier."), { statusCode: 400 });
+        await testOwnerStationStream({ key, name, url }); // validiert die URL auch ohne dass ein erreichbarer Stream Pflicht ist.
+        const data = loadStations?.() || {};
+        const next = { ...data, stations: { ...(data.stations || {}), [key]: { name, url, tier, genre } } };
+        const saved = await saveStations?.(next);
+        const station = saved?.stations?.[key] || next.stations[key];
+        auditOwnerAction(req, { action: "owner.station.save", status: "success", target: key, summary: `Station gespeichert: ${key}` });
+        sendJson(res, 200, { ok: true, station: { key, ...station } });
+      } catch (err) {
+        auditOwnerAction(req, { action: "owner.station.save", status: "failed", summary: err?.message || "Station konnte nicht gespeichert werden" });
+        sendJson(res, err?.statusCode || 400, { ok: false, error: err?.message || "Station konnte nicht gespeichert werden" });
+      }
+      return true;
+    }
+
+    // DELETE /api/admin/stations/:key
+    const stationDeleteMatch = pathname.match(/^\/api\/admin\/stations\/([^/]+)$/);
+    if (stationDeleteMatch && req.method === "DELETE") {
+      const key = decodeURIComponent(stationDeleteMatch[1]);
+      const data = loadStations?.() || {};
+      if (!data?.stations?.[key]) { sendJson(res, 404, { ok: false, error: "Station nicht gefunden." }); return true; }
+      if (key === data.defaultStationKey) { sendJson(res, 400, { ok: false, error: "Die Standard-Station kann nicht geloescht werden." }); return true; }
+      const nextStations = { ...(data.stations || {}) };
+      delete nextStations[key];
+      const next = { ...data, stations: nextStations, fallbackKeys: (data.fallbackKeys || []).filter((fallbackKey) => fallbackKey !== key) };
+      await saveStations?.(next);
+      auditOwnerAction(req, { action: "owner.station.delete", status: "success", target: key, summary: `Station geloescht: ${key}` });
+      sendJson(res, 200, { ok: true });
+      return true;
+    }
+
     // GET /api/admin/stations
     if (pathname === "/api/admin/stations") {
       if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
@@ -1605,6 +1921,9 @@ export function createAdminRoutesHandler(deps) {
       sendJson(res, 200, {
         stations,
         total: stations.length,
+        free: tierSummary.free,
+        pro: tierSummary.pro,
+        ultimate: tierSummary.ultimate,
         defaultStationKey,
         fallbackKeys,
         locked: Boolean(stationsData?.locked),

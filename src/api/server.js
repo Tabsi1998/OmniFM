@@ -125,7 +125,7 @@ import {
   getPrimaryFailoverStation,
   normalizeFailoverChain,
 } from "../lib/failover-chain.js";
-import { loadStations, filterStationsByTier } from "../stations-store.js";
+import { loadStations, saveStations, normalizeKey, filterStationsByTier } from "../stations-store.js";
 import { buildPublicStationCatalog } from "../lib/public-stations.js";
 import {
   getGuildStations as getCustomStations,
@@ -150,6 +150,9 @@ import {
   unlinkServerFromLicense,
   listLicensesByContactEmail,
   listLicenses,
+  createLicense,
+  removeLicense,
+  extendLicense,
   patchLicenseById,
   listProcessedSessionsByEmail,
   updateLicenseContactEmail,
@@ -3074,8 +3077,15 @@ const handleAdminRoutes = createAdminRoutesHandler({
   getRuntimes: () => _runtimes,
   getStationHealthReport,
   listLicenses,
+  createLicense,
+  removeLicense,
+  extendLicense,
+  linkServerToLicense,
+  unlinkServerFromLicense,
   patchLicenseById,
   loadStations,
+  saveStations,
+  normalizeStationKey: normalizeKey,
   log,
   methodNotAllowed,
   sendJson,

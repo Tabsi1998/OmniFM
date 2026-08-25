@@ -18,6 +18,23 @@ const GROUPS = [
       { key: "CHECKOUT_RETURN_ORIGINS", label: "Checkout Return Origins", type: "origin-list", example: "https://omnifm.xyz" },
       { key: "DEFAULT_LANGUAGE", label: "Standardsprache", type: "enum", values: ["de", "en"], example: "de" },
       { key: "PRO_TRIAL_ENABLED", label: "Pro Trial aktiv", type: "boolean", example: "1" },
+      { key: "WEB_PORT", label: "Oeffentlicher Web-Port", type: "integer", min: 1, max: 65535, example: "8081" },
+      { key: "WEB_INTERNAL_PORT", label: "Interner Web-Port", type: "integer", min: 1, max: 65535, example: "8080" },
+      { key: "TRUST_PROXY_HEADERS", label: "Proxy-Header vertrauen", type: "boolean", example: "0" },
+      { key: "TRUSTED_PROXY_IPS", label: "Vertrauenswuerdige Proxy-IPs", type: "text", example: "127.0.0.1,::1" },
+    ],
+  },
+  {
+    id: "bots",
+    title: "Discord-Bots & Topologie",
+    description: "Commander, Worker und deren Einsatzmodus. Bot-Tokens werden unten ausschliesslich write-only gepflegt.",
+    fields: [
+      { key: "BOT_1_CLIENT_ID", label: "Commander Client ID", type: "snowflake" },
+      { key: "BOT_1_NAME", label: "Commander Name", type: "text" },
+      { key: "BOT_1_TIER", label: "Commander Mindest-Tier", type: "enum", values: ["free", "pro", "ultimate"] },
+      { key: "BOT_COUNT", label: "Anzahl Bots", type: "integer", min: 1, max: 20, example: "1" },
+      { key: "COMMANDER_BOT_INDEX", label: "Commander Bot-Index", type: "integer", min: 1, max: 20, example: "1" },
+      { key: "OMNIFM_DEPLOYMENT_MODE", label: "Deployment-Modus", type: "enum", values: ["auto", "monolith", "split", "commander", "worker"] },
     ],
   },
   {
@@ -96,6 +113,34 @@ const GROUPS = [
       { key: "CLEAN_GLOBAL_COMMANDS_ON_BOOT", label: "Globale Commands beim Start bereinigen", type: "boolean", example: "0" },
       { key: "CLEAN_GUILD_COMMANDS_ON_BOOT", label: "Guild Commands beim Start bereinigen", type: "boolean", example: "0" },
       { key: "CLEAN_WORKER_GUILD_COMMANDS_ON_BOOT", label: "Worker Guild Commands bereinigen", type: "boolean", example: "0" },
+      { key: "STATION_HEALTH_ENABLED", label: "Station-Healthchecks aktiv", type: "boolean", example: "1" },
+      { key: "STATION_HEALTH_INTERVAL_MS", label: "Station-Healthcheck Intervall ms", type: "integer", min: 10000, max: 86400000, example: "300000" },
+    ],
+  },
+  {
+    id: "storage",
+    title: "MongoDB & Datenspeicher",
+    description: "Datenbankmodus, Datenbankname und Song-Verlauf. Die MongoDB-URL ist ein write-only Secret.",
+    fields: [
+      { key: "MONGO_ENABLED", label: "MongoDB aktivieren", type: "boolean", example: "1" },
+      { key: "DB_NAME", label: "MongoDB Datenbankname", type: "text", example: "radio_bot" },
+      { key: "SONG_HISTORY_ENABLED", label: "Song-Verlauf aktiv", type: "boolean", example: "1" },
+      { key: "SONG_HISTORY_MAX_PER_GUILD", label: "Song-Verlauf pro Guild", type: "integer", min: 20, max: 500, example: "120" },
+      { key: "SONG_HISTORY_DEDUPE_WINDOW_MS", label: "Song-Verlauf Deduplizierung ms", type: "integer", min: 15000, max: 600000, example: "120000" },
+    ],
+  },
+  {
+    id: "audio",
+    title: "Audio, Now Playing & Erkennung",
+    description: "Metadaten, Song-Verlauf und Audio-Erkennung. Der AcoustID-Key ist ein write-only Secret.",
+    fields: [
+      { key: "NOW_PLAYING_ENABLED", label: "Now Playing aktiv", type: "boolean", example: "1" },
+      { key: "NOW_PLAYING_COVER_ENABLED", label: "Cover-Art aktiv", type: "boolean", example: "1" },
+      { key: "NOW_PLAYING_RECOGNITION_ENABLED", label: "Audio-Erkennung aktiv", type: "boolean", example: "0" },
+      { key: "NOW_PLAYING_MUSICBRAINZ_ENABLED", label: "MusicBrainz-Abgleich aktiv", type: "boolean", example: "1" },
+      { key: "NOW_PLAYING_RECOGNITION_SAMPLE_SECONDS", label: "Erkennungs-Sample Sekunden", type: "integer", min: 5, max: 60, example: "18" },
+      { key: "NOW_PLAYING_RECOGNITION_TIMEOUT_MS", label: "Erkennungs-Timeout ms", type: "integer", min: 1000, max: 120000, example: "28000" },
+      { key: "NOW_PLAYING_RECOGNITION_SCORE_THRESHOLD", label: "Erkennungs-Score", type: "text", example: "0.55" },
     ],
   },
   {
@@ -135,7 +180,11 @@ const GROUPS = [
 const SECRET_FIELDS = [
   { group: "Owner", key: "API_ADMIN_TOKEN", label: "Owner API Token", writeOnly: false },
   { group: "Owner", key: "ADMIN_API_TOKEN", label: "Legacy Owner API Token", writeOnly: false },
-  { group: "Discord", key: "BOT_TOKEN", label: "Discord Bot Token" },
+  { group: "Discord", key: "BOT_1_TOKEN", label: "Commander Bot Token", writeOnly: true },
+  { group: "Discord", key: "BOT_2_TOKEN", label: "Worker 2 Bot Token", writeOnly: true },
+  { group: "Discord", key: "BOT_3_TOKEN", label: "Worker 3 Bot Token", writeOnly: true },
+  { group: "Discord", key: "BOT_4_TOKEN", label: "Worker 4 Bot Token", writeOnly: true },
+  { group: "Discord", key: "BOT_TOKEN", label: "Legacy Discord Bot Token", writeOnly: true },
   { group: "Discord", key: "DISCORD_CLIENT_SECRET", label: "Discord OAuth Secret", writeOnly: true },
   { group: "Stripe", key: "STRIPE_SECRET_KEY", label: "Stripe Secret Key", writeOnly: true },
   { group: "Stripe", key: "STRIPE_API_KEY", label: "Stripe API Key Legacy", writeOnly: true },
@@ -148,6 +197,7 @@ const SECRET_FIELDS = [
   { group: "Vote Plattformen", key: "TOPGG_TOKEN", label: "Top.gg Token", writeOnly: true },
   { group: "Vote Plattformen", key: "TOPGG_WEBHOOK_SECRET", label: "Top.gg Webhook Secret", writeOnly: true },
   { group: "Audio", key: "ACOUSTID_API_KEY", label: "AcoustID API Key", writeOnly: true },
+  { group: "Datenspeicher", key: "MONGO_URL", label: "MongoDB Connection URL", writeOnly: true },
 ];
 
 const FIELD_BY_KEY = new Map(GROUPS.flatMap((group) => group.fields.map((field) => [field.key, { ...field, group: group.id }])));

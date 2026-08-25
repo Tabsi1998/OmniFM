@@ -12,12 +12,13 @@ import {
 } from 'recharts';
 import { buildApiUrl } from '../lib/api.js';
 import BrandKit from './BrandKit.js';
-import OwnerConfig from './OwnerConfig.js';
+import OwnerSystemConfig from './OwnerSystemConfig.js';
 
 const TOKEN_KEY = 'omnifm_admin_token';
 
 const NAV = [
   { id: 'overview', label: 'Global Overview', icon: LayoutDashboard },
+  { id: 'system', label: 'System-Konfiguration', icon: ShieldCheck },
   { id: 'monitoring', label: 'Live-Monitoring', icon: Radar },
   { id: 'company', label: 'Unternehmen & Recht', icon: Building2 },
   { id: 'plans', label: 'Pläne & Preise', icon: Tag },
@@ -416,7 +417,7 @@ export default function OwnerAdmin() {
     if (!tk) { setLoginErr('Bitte Owner-Token eingeben.'); return; }
     setLoggingIn(true);
     try {
-      const res = await fetch(buildApiUrl('/api/admin/login'), {
+      const res = await fetch(buildApiUrl('/api/admin/session'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: tk }),
       });
       if (!res.ok) { setLoginErr('Ungültiger Owner-Token.'); setLoggingIn(false); return; }
@@ -544,7 +545,7 @@ export default function OwnerAdmin() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span className="oa-onair" data-testid="admin-live-badge" style={ov?.guilds?.live ? {} : { opacity: 0.75 }}>
               <span className="oa-dot" style={{ background: ov?.guilds?.live ? '#10b981' : '#64748b' }} />
-              {ov?.guilds?.live ? 'ON AIR · LIVE' : `${ov?.bots?.online ?? 0}/${ov?.bots?.configured ?? 0} Bots · Standby`}
+              {ov?.guilds?.live ? 'ON AIR · LIVE' : `${ov?.botSummary?.online ?? 0}/${ov?.botSummary?.configured ?? 0} Bots · Standby`}
             </span>
             <button className="oa-btn ghost" onClick={() => loadAll(token)} disabled={refreshing} data-testid="admin-refresh-button">
               <RefreshCw size={15} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} /> Aktualisieren
@@ -571,7 +572,7 @@ export default function OwnerAdmin() {
               <StatTile testid="stat-mrr" label="MRR" value={fmtMoney(mrr)} icon={TrendingUp} accent="#10b981"
                 foot={<span className="oa-trend-up"><TrendingUp size={13} /> {fmtMoney(ov?.revenue?.arr)} ARR</span>} />
               <StatTile testid="stat-guilds" label="Verwaltete Server" value={ov?.guilds?.managed ?? '—'} icon={Users} accent="#00e5ff"
-                foot={<span>{ov?.bots?.online ?? 0}/{ov?.bots?.configured ?? 0} Bots online{ov?.guilds?.live === false ? ' · Bot offline' : ''}</span>} />
+                foot={<span>{ov?.botSummary?.online ?? 0}/{ov?.botSummary?.configured ?? 0} Bots online{ov?.guilds?.live === false ? ' · Bot offline' : ''}</span>} />
               <StatTile testid="stat-stations" label="Radio-Stationen" value={ov?.stations?.total ?? '—'} icon={Music2} accent="#ff6b00"
                 foot={<span>{ov?.stations?.free ?? 0} Free · {ov?.stations?.pro ?? 0} Pro</span>} />
             </div>
@@ -1167,8 +1168,11 @@ export default function OwnerAdmin() {
             ))}
           </div>
         )}
+        {section === 'system' && (
+          <OwnerSystemConfig apiGet={apiGet} apiSend={apiSend} token={token} />
+        )}
         {(section === 'company' || section === 'plans' || section === 'discord' || section === 'payments' || section === 'marketing') && (
-          <OwnerConfig section={section} apiGet={apiGet} apiSend={apiSend} token={token} />
+          <OwnerSystemConfig apiGet={apiGet} apiSend={apiSend} token={token} />
         )}
         {section === 'brand' && (
           <div data-testid="owner-brand-kit"><BrandKit embedded /></div>
