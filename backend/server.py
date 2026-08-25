@@ -971,6 +971,7 @@ def get_dashboard_session(request: Request):
 
 def resolve_dashboard_guilds_for_session(session_payload):
     guilds = session_payload.get("guilds") if isinstance(session_payload.get("guilds"), list) else []
+    runtime_guilds = _runtime_guild_directory()
     output = []
     for item in guilds:
         if not isinstance(item, dict):
@@ -981,6 +982,7 @@ def resolve_dashboard_guilds_for_session(session_payload):
         if not has_manage_guild_permission(item.get("permissions", "0")):
             continue
         tier = get_tier(guild_id)
+        runtime_guild = runtime_guilds.get(guild_id) or {}
         output.append({
             "id": guild_id,
             "name": clip_text(item.get("name") or guild_id, 120),
@@ -988,6 +990,8 @@ def resolve_dashboard_guilds_for_session(session_payload):
             "owner": bool(item.get("owner", False)),
             "permissions": str(item.get("permissions") or "0"),
             "tier": tier,
+            "memberCount": max(0, parse_int(runtime_guild.get("memberCount"), 0)),
+            "iconUrl": runtime_guild.get("iconUrl"),
             "dashboardEnabled": (TIER_RANK.get(tier, 0) >= TIER_RANK.get("pro", 1)),
             "ultimateEnabled": tier == "ultimate",
         })
@@ -2237,13 +2241,32 @@ def get_dashboard_guild_stats(server_id, tier):
     telemetry_raw = telemetry_map.get(server_id, {}) if isinstance(telemetry_map.get(server_id), dict) else {}
     telemetry = normalize_dashboard_telemetry(telemetry_raw)
 
+    live_rows = []
+    live_doc = read_runtime_health_fresh()
+    for node in (live_doc or {}).get("nodes", []):
+        for detail in node.get("guildDetails") or []:
+            detail_id = str(detail.get("guildId") or detail.get("id") or "").strip()
+            if detail_id != server_id:
+                continue
+            if detail.get("playing") is True or detail.get("voiceConnected") is True:
+                live_rows.append(detail)
+
+    live_listeners = sum(max(0, parse_int(row.get("listenerCount"), 0)) for row in live_rows)
+    live_top = None
+    if live_rows:
+        live_top_row = sorted(live_rows, key=lambda row: parse_int(row.get("listenerCount"), 0), reverse=True)[0]
+        live_top = {
+            "name": clip_text(live_top_row.get("stationName") or live_top_row.get("stationKey") or "-", 120),
+            "listeners": max(0, parse_int(live_top_row.get("listenerCount"), 0)),
+        }
+
     active_events = len([item for item in guild_events if isinstance(item, dict) and item.get("enabled") is not False])
     basic = {
-        "listenersNow": telemetry.get("listenersNow", 0),
-        "activeStreams": telemetry.get("activeStreams", 0),
-        "peakListeners": telemetry.get("peakListeners", 0),
+        "listenersNow": live_listeners if live_doc else telemetry.get("listenersNow", 0),
+        "activeStreams": len(live_rows) if live_doc else telemetry.get("activeStreams", 0),
+        "peakListeners": max(live_listeners, telemetry.get("peakListeners", 0)),
         "peakTime": telemetry.get("peakTime"),
-        "topStation": telemetry.get("topStation", {"name": "-", "listeners": 0}),
+        "topStation": live_top or telemetry.get("topStation", {"name": "-", "listeners": 0}),
         "eventsConfigured": len(guild_events),
         "eventsActive": active_events,
         "permRules": len((guild_perms.get("commandRoleMap") or {}).keys()) if isinstance(guild_perms.get("commandRoleMap"), dict) else 0,
@@ -3063,7 +3086,11 @@ async def dashboard_channels(request: Request, serverId: str = ""):
     guild = resolve_session_guild_for_server(session, serverId)
     if not guild:
         return json_error(403, "Kein Zugriff auf diesen Server.")
-    return {"voiceChannels": [], "textChannels": []}
+    runtime_guild = _runtime_guild_directory().get(guild.get("id")) or {}
+    return {
+        "voiceChannels": runtime_guild.get("voiceChannels", []),
+        "textChannels": runtime_guild.get("textChannels", []),
+    }
 
 
 @app.get("/api/dashboard/roles")
@@ -3077,7 +3104,8 @@ async def dashboard_roles(request: Request, serverId: str = ""):
     guild = resolve_session_guild_for_server(session, serverId)
     if not guild:
         return json_error(403, "Kein Zugriff auf diesen Server.")
-    return {"roles": []}
+    runtime_guild = _runtime_guild_directory().get(guild.get("id")) or {}
+    return {"roles": runtime_guild.get("roles", [])}
 
 
 @app.get("/api/dashboard/stations")
@@ -3479,7 +3507,7 @@ async def dashboard_license(request: Request, serverId: str = ""):
             "plan": lic.get("plan", lic.get("tier", "free")),
             "seats": seats,
             "seatsUsed": len(linked_servers) if isinstance(linked_servers, list) else 0,
-            "active": not bool(lic.get("expired")),
+            "active": bool(lic.get("active", True)) and not bool(lic.get("expired")),
             "expired": bool(lic.get("expired")),
             "expiresAt": lic.get("expiresAt"),
             "remainingDays": lic.get("remainingDays", 0),
@@ -4415,6 +4443,9 @@ def _runtime_guild_directory():
                 "name": str(guild.get("name") or existing.get("name") or guild_id)[:120],
                 "memberCount": max(parse_int(guild.get("memberCount", existing.get("memberCount", 0)), 0), parse_int(existing.get("memberCount", 0), 0)),
                 "iconUrl": guild.get("iconUrl") or existing.get("iconUrl"),
+                "roles": guild.get("roles") or existing.get("roles") or [],
+                "voiceChannels": guild.get("voiceChannels") or existing.get("voiceChannels") or [],
+                "textChannels": guild.get("textChannels") or existing.get("textChannels") or [],
                 "bots": sorted(set((existing.get("bots") or []) + [str(node.get("name") or node.get("index") or "Bot")])),
                 "discordUrl": f"https://discord.com/channels/{guild_id}",
             }

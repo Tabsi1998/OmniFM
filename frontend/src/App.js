@@ -11,7 +11,6 @@ import PrivacySection from './components/PrivacySection.js';
 import TermsSection from './components/TermsSection.js';
 import StatsFooter from './components/StatsFooter.js';
 import Navbar from './components/Navbar.js';
-import DashboardPortal from './components/DashboardPortal.js';
 import GuildDashboard from './components/GuildDashboard.js';
 import OwnerAdmin from './components/OwnerAdmin.js';
 import BrandKit from './components/BrandKit.js';
@@ -224,7 +223,7 @@ function AppContent() {
   if (currentPage === 'dashboard') {
     return (
       <div data-testid="app-dashboard-root" style={{ position: 'relative', minHeight: '100vh' }}>
-        <DashboardPortal />
+        <GuildDashboard />
       </div>
     );
   }
@@ -232,7 +231,7 @@ function AppContent() {
   if (currentPage === 'dashboard-classic') {
     return (
       <div data-testid="app-dashboard-classic-root" style={{ position: 'relative', minHeight: '100vh' }}>
-        <DashboardPortal />
+        <GuildDashboard />
       </div>
     );
   }

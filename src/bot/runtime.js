@@ -394,10 +394,16 @@ class BotRuntime {
       this.startVoiceStateReconciler();
     });
 
-    // Only commander handles interactions (slash commands)
-    if (this.role === "commander") {
-      this.client.on("interactionCreate", (interaction) => {
-        this.handleInteraction(interaction).catch(async (err) => {
+    // Slash commands belong to the commander, but component interactions are
+    // delivered to the application that created the message. Worker-owned
+    // now-playing messages therefore have to be handled by the worker itself.
+    this.client.on("interactionCreate", (interaction) => {
+      const isComponent = interaction?.isButton?.() || interaction?.isStringSelectMenu?.();
+      if (this.role !== "commander" && !isComponent) return;
+      const task = this.role === "commander"
+        ? this.handleInteraction(interaction)
+        : this.handleComponentInteraction(interaction);
+      task.catch(async (err) => {
           const commandName = interaction?.isChatInputCommand?.() ? `/${interaction.commandName}` : interaction?.type || "unknown";
           const guildId = String(interaction?.guildId || "-");
           const userId = String(interaction?.user?.id || interaction?.member?.user?.id || "-");
@@ -420,9 +426,8 @@ class BotRuntime {
           } catch {
             // ignore secondary reply failures
           }
-        });
       });
-    }
+    });
 
     this.client.on("voiceStateUpdate", (oldState, newState) => {
       if (this.shuttingDown) return;
@@ -3006,7 +3011,9 @@ class BotRuntime {
       };
       try {
         if (interaction.deferred || interaction.replied) {
-          await interaction.followUp(payload);
+          const editPayload = { ...payload };
+          delete editPayload.flags;
+          await interaction.editReply(editPayload);
         } else {
           await interaction.reply(payload);
         }
@@ -3029,6 +3036,9 @@ class BotRuntime {
       await interaction.reply({ content: t("Nur in Servern verfuegbar.", "Only available in servers."), flags: MessageFlags.Ephemeral });
       return true;
     }
+    // Discord requires an acknowledgement within three seconds. Voice/player
+    // operations and the embed refresh can take longer, so acknowledge first.
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const action = String(interaction.customId || "").slice(NP_PREFIX.length);
     const state = this.guildState.get(guildId);
 
@@ -3049,12 +3059,12 @@ class BotRuntime {
       result = await this.setVolumeInGuild(guildId, next);
       msg = `\u{1f50a} ${t("Lautstaerke", "Volume")}: ${next}%`;
     } else {
-      await interaction.reply({ content: t("Unbekannte Aktion.", "Unknown action."), flags: MessageFlags.Ephemeral });
+      await interaction.editReply({ content: t("Unbekannte Aktion.", "Unknown action.") });
       return true;
     }
 
     if (!result?.ok) {
-      await interaction.reply({ content: result?.error || t("Aktion fehlgeschlagen.", "Action failed."), flags: MessageFlags.Ephemeral });
+      await interaction.editReply({ content: result?.error || t("Aktion fehlgeschlagen.", "Action failed.") });
       return true;
     }
 
@@ -3066,7 +3076,7 @@ class BotRuntime {
       }
     } catch { /* noop */ }
 
-    await interaction.reply({ content: msg, flags: MessageFlags.Ephemeral });
+    await interaction.editReply({ content: msg });
     return true;
   }
 

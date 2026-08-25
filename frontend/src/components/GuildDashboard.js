@@ -1,67 +1,28 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Radio, LayoutDashboard, ListMusic, ShieldCheck, BarChart3, CreditCard, LogOut,
-  Plus, Trash2, Check, Crown, Zap, Music2, Users, Clock, Play, Lock, Server, ChevronRight,
+  Plus, Trash2, Check, Crown, Zap, Music2, Users, Clock, Lock, Server,
+  ChevronRight, RefreshCw, AlertTriangle,
 } from 'lucide-react';
 import {
-  ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell,
+  ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
+  CartesianGrid, Cell,
 } from 'recharts';
 import { buildApiUrl } from '../lib/api.js';
 import { useI18n } from '../i18n.js';
 
 const NAV = [
-  { id: 'overview', label: 'Übersicht', icon: LayoutDashboard },
-  { id: 'stations', label: 'My Stations', icon: ListMusic },
-  { id: 'roles', label: 'Rollen & Rechte', icon: ShieldCheck },
-  { id: 'stats', label: 'Statistiken', icon: BarChart3 },
-  { id: 'subscription', label: 'Abo', icon: CreditCard },
+  { id: 'overview', icon: LayoutDashboard },
+  { id: 'stations', icon: ListMusic },
+  { id: 'roles', icon: ShieldCheck },
+  { id: 'stats', icon: BarChart3 },
+  { id: 'subscription', icon: CreditCard },
 ];
 
 const TIER_META = {
-  free: { name: 'Free', color: '#64748b', icon: Radio, customLimit: 0 },
-  pro: { name: 'Pro', color: '#00e5ff', icon: Zap, customLimit: 5 },
-  ultimate: { name: 'Ultimate', color: '#ff6b00', icon: Crown, customLimit: 999 },
-};
-
-const PRESET_STATIONS = [
-  { key: 'synthwave', name: 'Synthwave Nights', genre: 'Retrowave' },
-  { key: 'lofi', name: 'Lofi Lounge', genre: 'Lo-Fi' },
-  { key: 'dnb', name: 'BassDrop Network', genre: 'Drum & Bass' },
-  { key: 'chillhop', name: 'Chillhop Café', genre: 'Chillhop' },
-  { key: 'trance', name: 'Trance Nation', genre: 'Trance' },
-  { key: 'jazz', name: 'Midnight Jazz', genre: 'Jazz' },
-];
-
-const DEMO = {
-  user: { name: 'DemoAdmin', tag: '#0001' },
-  guilds: [
-    { id: 'g1', name: 'NightWave HQ', tier: 'ultimate', members: 4820 },
-    { id: 'g2', name: 'Lofi Lounge', tier: 'pro', members: 1290 },
-    { id: 'g3', name: 'Indie Corner', tier: 'free', members: 340 },
-  ],
-  perServer: {
-    g1: {
-      defaultStation: 'synthwave', listeners: 42, uptimePct: 99.8, minutesMonth: 18240, activeWorkers: 2,
-      custom: [{ key: 'c1', name: 'HQ House Party', url: 'https://ice.example.com/house' }, { key: 'c2', name: 'Focus Beats', url: 'https://ice.example.com/focus' }],
-      roles: [{ id: 'r1', name: 'DJ', color: '#ff6b00' }, { id: 'r2', name: 'Moderator', color: '#00e5ff' }, { id: 'r3', name: '@everyone', color: '#64748b' }],
-      trend: [58, 72, 65, 90, 84, 102, 96],
-      top: [['Synthwave Nights', 8200], ['Lofi Lounge', 5100], ['BassDrop', 3400], ['Trance Nation', 1540]],
-    },
-    g2: {
-      defaultStation: 'lofi', listeners: 18, uptimePct: 99.4, minutesMonth: 9600, activeWorkers: 1,
-      custom: [{ key: 'c3', name: 'Study Session', url: 'https://ice.example.com/study' }],
-      roles: [{ id: 'r1', name: 'DJ', color: '#ff6b00' }, { id: 'r3', name: '@everyone', color: '#64748b' }],
-      trend: [22, 28, 25, 31, 27, 35, 33],
-      top: [['Lofi Lounge', 6100], ['Chillhop Café', 2200], ['Midnight Jazz', 900]],
-    },
-    g3: {
-      defaultStation: 'chillhop', listeners: 4, uptimePct: 98.9, minutesMonth: 1200, activeWorkers: 1,
-      custom: [],
-      roles: [{ id: 'r3', name: '@everyone', color: '#64748b' }],
-      trend: [3, 5, 4, 6, 5, 7, 6],
-      top: [['Chillhop Café', 700], ['Lofi Lounge', 410]],
-    },
-  },
+  free: { name: 'Free', color: '#64748b', icon: Radio, customLimit: 0, maxBots: 2, bitrate: '64k' },
+  pro: { name: 'Pro', color: '#00e5ff', icon: Zap, customLimit: 0, maxBots: 8, bitrate: '128k' },
+  ultimate: { name: 'Ultimate', color: '#ff6b00', icon: Crown, customLimit: 50, maxBots: 16, bitrate: '320k' },
 };
 
 const COMMANDS = [
@@ -72,15 +33,72 @@ const COMMANDS = [
   { id: 'volume', label: '/volume' },
 ];
 
-function fmtInt(n) { return Number(n || 0).toLocaleString(); }
-function fmtMinutes(m) { const h = Math.floor((m || 0) / 60); return h >= 1 ? `${fmtInt(h)} h` : `${fmtInt(m)} min`; }
+const EMPTY_DATA = Object.freeze({
+  stations: [], custom: [], roles: [], trend: [], top: [], listeners: 0,
+  uptimePct: null, minutesMonth: 0, activeStreams: 0, currentStation: null,
+  license: null, loading: false,
+});
+
+function fmtInt(value) { return Number(value || 0).toLocaleString(); }
+function fmtMinutes(value) {
+  const minutes = Math.max(0, Number(value || 0));
+  const hours = Math.floor(minutes / 60);
+  return hours >= 1 ? `${fmtInt(hours)} h` : `${fmtInt(minutes)} min`;
+}
+
+async function apiRequest(path, options = {}) {
+  const response = await fetch(buildApiUrl(path), {
+    credentials: 'include', cache: 'no-store', ...options,
+    headers: {
+      Accept: 'application/json',
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(options.headers || {}),
+    },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(payload?.error || payload?.detail || `HTTP ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  return payload;
+}
+
+function normalizeTrend(detail, advanced) {
+  const rows = Array.isArray(detail?.dailyStats) && detail.dailyStats.length
+    ? [...detail.dailyStats].reverse().slice(-7)
+    : (Array.isArray(advanced?.dailyReport) ? advanced.dailyReport.slice(-7) : []);
+  return rows.map((row, index) => ({
+    day: String(row?.date || row?.day || index + 1).slice(-5),
+    listeners: Number(row?.avgListeners ?? row?.listeners ?? row?.peakListeners ?? 0),
+  }));
+}
+
+function normalizeTopStations(detail, advanced) {
+  const listening = detail?.listeningStats?.stationListeningMs;
+  const names = detail?.listeningStats?.stationNames || {};
+  if (listening && typeof listening === 'object') {
+    return Object.entries(listening)
+      .map(([key, value]) => ({ name: names[key] || key, minutes: Math.round(Number(value || 0) / 60000) }))
+      .filter((row) => row.minutes > 0)
+      .sort((a, b) => b.minutes - a.minutes)
+      .slice(0, 8);
+  }
+  return (Array.isArray(advanced?.stationBreakdown) ? advanced.stationBreakdown : [])
+    .map((row) => ({
+      name: row?.name || row?.stationName || row?.stationKey || '-',
+      minutes: Number(row?.minutes ?? row?.listeningMinutes ?? 0),
+    }))
+    .filter((row) => row.minutes > 0)
+    .slice(0, 8);
+}
 
 function ChartTip({ active, payload, label }) {
-  if (!active || !payload || !payload.length) return null;
+  if (!active || !payload?.length) return null;
   return (
     <div style={{ background: '#0e111a', border: '1px solid #2a3450', borderRadius: 10, padding: '8px 12px', fontSize: 12, fontFamily: 'JetBrains Mono, monospace' }}>
       <div style={{ color: '#94a3b8', marginBottom: 4 }}>{label}</div>
-      {payload.map((p, i) => <div key={i} style={{ color: p.color || '#fff' }}>{p.name}: <b>{p.value}</b></div>)}
+      {payload.map((item, index) => <div key={index} style={{ color: item.color || '#fff' }}>{item.name}: <b>{item.value}</b></div>)}
     </div>
   );
 }
@@ -100,365 +118,233 @@ function StatTile({ label, value, foot, icon: Icon, accent }) {
 
 export default function GuildDashboard() {
   const [loading, setLoading] = useState(true);
-  const [demo, setDemo] = useState(false);
   const [session, setSession] = useState({ authenticated: false, user: null, guilds: [] });
   const [guildId, setGuildId] = useState('');
   const [section, setSection] = useState('overview');
-  // per-guild working state (demo/local)
-  const [store, setStore] = useState({}); // guildId -> data
-  const [perms, setPerms] = useState({}); // `${cmd}:${roleId}` -> bool
+  const [store, setStore] = useState({});
+  const [perms, setPerms] = useState({});
   const [newStation, setNewStation] = useState({ name: '', url: '' });
   const [msg, setMsg] = useState(null);
   const { locale } = useI18n();
   const t = useCallback((de, en) => (String(locale || 'de').startsWith('de') ? de : en), [locale]);
-  const en = !String(locale || 'de').startsWith('de');
-  const navLabel = (id) => ({
-    overview: t('Übersicht', 'Overview'),
-    stations: t('Meine Sender', 'My Stations'),
-    roles: t('Rollen & Rechte', 'Roles & Permissions'),
-    stats: t('Statistiken', 'Statistics'),
-    subscription: t('Abo', 'Subscription'),
-  }[id] || id);
+  const navLabel = useCallback((id) => ({
+    overview: t('Übersicht', 'Overview'), stations: t('Sender', 'Stations'),
+    roles: t('Rollen & Rechte', 'Roles & Permissions'), stats: t('Statistiken', 'Statistics'),
+    subscription: t('Abo & Lizenz', 'Subscription & License'),
+  }[id] || id), [t]);
 
-  useEffect(() => {
-    let stop = false;
-    (async () => {
-      try {
-        const res = await fetch(buildApiUrl('/api/auth/session'), { cache: 'no-store' });
-        const data = await res.json().catch(() => ({}));
-        if (stop) return;
-        if (data && data.authenticated && Array.isArray(data.guilds) && data.guilds.length) {
-          setSession({ authenticated: true, user: data.user, guilds: data.guilds });
-          setGuildId(data.guilds[0].id);
-        }
-      } catch { /* gate */ }
-      finally { if (!stop) setLoading(false); }
-    })();
-    return () => { stop = true; };
+  const loadSession = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await apiRequest('/api/auth/session');
+      const guilds = Array.isArray(data.guilds) ? data.guilds : [];
+      setSession({ authenticated: data.authenticated === true, user: data.user || null, guilds });
+      setGuildId((current) => (guilds.some((guild) => guild.id === current) ? current : (guilds[0]?.id || '')));
+    } catch {
+      setSession({ authenticated: false, user: null, guilds: [] });
+      setGuildId('');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const startDemo = () => {
-    setDemo(true);
-    setSession({ authenticated: true, user: DEMO.user, guilds: DEMO.guilds });
-    setGuildId(DEMO.guilds[0].id);
-    setStore(JSON.parse(JSON.stringify(DEMO.perServer)));
-    // seed permission matrix
-    const seed = {};
-    ['r1', 'r2'].forEach((r) => COMMANDS.forEach((c) => { seed[`${c.id}:${r}`] = true; }));
-    COMMANDS.forEach((c) => { seed[`${c.id}:r3`] = c.id === 'play' || c.id === 'station'; });
-    setPerms(seed);
-  };
+  useEffect(() => { loadSession(); }, [loadSession]);
 
-  const guild = useMemo(() => session.guilds.find((g) => g.id === guildId) || null, [session.guilds, guildId]);
-  const tier = (guild?.tier || 'free');
-  const tm = TIER_META[tier] || TIER_META.free;
-  const gdata = store[guildId] || DEMO.perServer[guildId] || { custom: [], roles: [], trend: [], top: [], listeners: 0, uptimePct: 0, minutesMonth: 0, activeWorkers: 0, defaultStation: 'lofi' };
+  const loadGuild = useCallback(async (selectedGuildId) => {
+    if (!selectedGuildId) return;
+    setStore((current) => ({ ...current, [selectedGuildId]: { ...(current[selectedGuildId] || EMPTY_DATA), loading: true } }));
+    try {
+      const license = await apiRequest(`/api/dashboard/license?serverId=${encodeURIComponent(selectedGuildId)}`);
+      const tier = TIER_META[license?.tier] ? license.tier : 'free';
+      setSession((current) => ({
+        ...current,
+        guilds: current.guilds.map((guild) => (guild.id === selectedGuildId
+          ? { ...guild, tier, dashboardEnabled: license.dashboardEnabled, ultimateEnabled: license.ultimateEnabled }
+          : guild)),
+      }));
 
-  const setDefaultStation = (key) => {
-    setStore((s) => ({ ...s, [guildId]: { ...(s[guildId] || gdata), defaultStation: key } }));
-    setMsg({ ok: true, text: t('Standard-Sender aktualisiert.', 'Default station updated.') });
-  };
-  const addCustom = () => {
-    if (!newStation.name.trim() || !newStation.url.trim()) { setMsg({ ok: false, text: t('Name und URL erforderlich.', 'Name and URL required.') }); return; }
-    if (gdata.custom.length >= tm.customLimit) { setMsg({ ok: false, text: t(`Limit erreicht (${tm.name}: ${tm.customLimit === 0 ? 'keine' : tm.customLimit} eigene Sender).`, `Limit reached (${tm.name}: ${tm.customLimit === 0 ? 'no' : tm.customLimit} custom stations).`) }); return; }
-    const item = { key: `c${Date.now()}`, name: newStation.name.trim(), url: newStation.url.trim() };
-    setStore((s) => { const cur = s[guildId] || gdata; return { ...s, [guildId]: { ...cur, custom: [...cur.custom, item] } }; });
-    setNewStation({ name: '', url: '' });
-    setMsg({ ok: true, text: t('Eigener Sender hinzugefügt.', 'Custom station added.') });
-  };
-  const removeCustom = (key) => {
-    setStore((s) => { const cur = s[guildId] || gdata; return { ...s, [guildId]: { ...cur, custom: cur.custom.filter((c) => c.key !== key) } }; });
-    setMsg({ ok: true, text: t('Sender entfernt.', 'Station removed.') });
-  };
-  const togglePerm = (cmd, roleId) => setPerms((p) => ({ ...p, [`${cmd}:${roleId}`]: !p[`${cmd}:${roleId}`] }));
+      const safe = (path) => apiRequest(path).catch(() => null);
+      const base = `serverId=${encodeURIComponent(selectedGuildId)}`;
+      const [catalog, custom, rolesPayload, stats, detail, permsPayload] = await Promise.all([
+        safe(`/api/dashboard/stations?${base}`),
+        safe(`/api/dashboard/custom-stations?${base}`),
+        safe(`/api/dashboard/roles?${base}`),
+        tier === 'free' ? null : safe(`/api/dashboard/stats?${base}`),
+        tier === 'ultimate' ? safe(`/api/dashboard/stats/detail?${base}&days=30`) : null,
+        tier === 'free' ? null : safe(`/api/dashboard/perms?${base}`),
+      ]);
+      const stations = [...(catalog?.free || []), ...(catalog?.pro || [])];
+      const basic = stats?.basic || {};
+      const advanced = stats?.advanced || null;
+      const listeningMs = Number(detail?.listeningStats?.totalListeningMs || 0);
+      const currentStation = Number(basic.activeStreams || 0) > 0 && basic.topStation && basic.topStation.name !== '-'
+        ? basic.topStation
+        : null;
+      const commandRoleMap = permsPayload?.commandRoleMap || {};
+      const nextPerms = {};
+      Object.entries(commandRoleMap).forEach(([command, roleIds]) => {
+        (Array.isArray(roleIds) ? roleIds : []).forEach((roleId) => { nextPerms[`${command}:${roleId}`] = true; });
+      });
+      setPerms(nextPerms);
+      setStore((current) => ({
+        ...current,
+        [selectedGuildId]: {
+          stations,
+          custom: custom?.stations || catalog?.custom || [],
+          roles: rolesPayload?.roles || [],
+          trend: normalizeTrend(detail, advanced),
+          top: normalizeTopStations(detail, advanced),
+          listeners: Number(basic.listenersNow || 0),
+          uptimePct: detail?.connectionHealth?.uptimePct ?? null,
+          minutesMonth: Math.round(listeningMs / 60000),
+          activeStreams: Number(basic.activeStreams || 0),
+          currentStation,
+          license,
+          loading: false,
+        },
+      }));
+    } catch (error) {
+      setStore((current) => ({ ...current, [selectedGuildId]: { ...(current[selectedGuildId] || EMPTY_DATA), loading: false } }));
+      setMsg({ ok: false, text: error.message || t('Dashboard-Daten konnten nicht geladen werden.', 'Dashboard data could not be loaded.') });
+    }
+  }, [t]);
 
-  // Real mode: seed permission matrix from the backend for the selected guild.
   useEffect(() => {
-    if (demo || !session.authenticated || !guildId) return undefined;
-    let stop = false;
-    fetch(buildApiUrl(`/api/dashboard/perms?serverId=${encodeURIComponent(guildId)}`), { credentials: 'include', cache: 'no-store' })
-      .then((r) => r.json()).then((d) => {
-        if (stop || !d || !d.commandRoleMap) return;
-        const seed = {};
-        Object.entries(d.commandRoleMap).forEach(([cmd, roles]) => (Array.isArray(roles) ? roles : []).forEach((rid) => { seed[`${cmd}:${rid}`] = true; }));
-        setPerms(seed);
-      }).catch(() => {});
-    return () => { stop = true; };
-  }, [demo, session.authenticated, guildId]);
+    if (session.authenticated && guildId) loadGuild(guildId);
+  }, [guildId, loadGuild, session.authenticated]);
 
+  const guild = useMemo(() => session.guilds.find((item) => item.id === guildId) || null, [session.guilds, guildId]);
+  const gdata = store[guildId] || EMPTY_DATA;
+  const tier = gdata.license?.tier || guild?.tier || 'free';
+  const tm = TIER_META[tier] || TIER_META.free;
+
+  const addCustom = async () => {
+    const name = newStation.name.trim();
+    const url = newStation.url.trim();
+    if (!name || !url) { setMsg({ ok: false, text: t('Name und URL sind erforderlich.', 'Name and URL are required.') }); return; }
+    const slug = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 55) || 'station';
+    try {
+      const payload = await apiRequest(`/api/dashboard/custom-stations?serverId=${encodeURIComponent(guildId)}`, {
+        method: 'POST', body: JSON.stringify({ key: `${slug}-${Date.now().toString(36)}`, name, url }),
+      });
+      setStore((current) => ({ ...current, [guildId]: { ...gdata, custom: [...gdata.custom, payload.station] } }));
+      setNewStation({ name: '', url: '' });
+      setMsg({ ok: true, text: t('Sender wurde gespeichert.', 'Station saved.') });
+    } catch (error) { setMsg({ ok: false, text: error.message }); }
+  };
+
+  const removeCustom = async (key) => {
+    try {
+      await apiRequest(`/api/dashboard/custom-stations?serverId=${encodeURIComponent(guildId)}&key=${encodeURIComponent(key)}`, { method: 'DELETE' });
+      setStore((current) => ({ ...current, [guildId]: { ...gdata, custom: gdata.custom.filter((item) => item.key !== key) } }));
+      setMsg({ ok: true, text: t('Sender wurde entfernt.', 'Station removed.') });
+    } catch (error) { setMsg({ ok: false, text: error.message }); }
+  };
+
+  const togglePerm = (command, roleId) => setPerms((current) => ({ ...current, [`${command}:${roleId}`]: !current[`${command}:${roleId}`] }));
   const savePerms = async () => {
-    if (demo) { setMsg({ ok: true, text: t('Berechtigungen gespeichert (Demo).', 'Permissions saved (demo).') }); return; }
     const commandRoleMap = {};
-    COMMANDS.forEach((c) => {
-      const roles = gdata.roles.filter((r) => perms[`${c.id}:${r.id}`]).map((r) => r.id);
-      if (roles.length) commandRoleMap[c.id] = roles;
+    COMMANDS.forEach((command) => {
+      const roleIds = gdata.roles.filter((role) => perms[`${command.id}:${role.id}`]).map((role) => role.id);
+      if (roleIds.length) commandRoleMap[command.id] = roleIds;
     });
     try {
-      const res = await fetch(buildApiUrl(`/api/dashboard/perms?serverId=${encodeURIComponent(guildId)}`), {
-        method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ commandRoleMap }),
-      });
-      if (!res.ok) throw new Error('save failed');
-      setMsg({ ok: true, text: t('Berechtigungen gespeichert.', 'Permissions saved.') });
-    } catch { setMsg({ ok: false, text: t('Speichern fehlgeschlagen.', 'Saving failed.') }); }
+      await apiRequest(`/api/dashboard/perms?serverId=${encodeURIComponent(guildId)}`, { method: 'PUT', body: JSON.stringify({ commandRoleMap }) });
+      setMsg({ ok: true, text: t('Berechtigungen wurden gespeichert.', 'Permissions saved.') });
+    } catch (error) { setMsg({ ok: false, text: error.message }); }
+  };
+
+  const logout = async () => {
+    try { await apiRequest('/api/auth/logout', { method: 'POST' }); } catch { /* cookie is cleared best-effort */ }
+    window.location.assign('/');
   };
 
   useEffect(() => {
     if (!msg) return undefined;
-    const t = setTimeout(() => setMsg(null), 2800);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setMsg(null), 4000);
+    return () => clearTimeout(timer);
   }, [msg]);
 
-  if (loading) {
-    return <div className="oa-root" style={{ display: 'grid', placeItems: 'center' }}>
-      <div style={{ textAlign: 'center', color: '#94a3b8' }}><span className="oa-eq"><span /><span /><span /><span /><span /></span>
-        <div className="oa-mono" style={{ marginTop: 14, fontSize: 12, letterSpacing: '0.14em' }}>DASHBOARD LÄDT…</div></div>
-    </div>;
-  }
+  if (loading) return (
+    <div className="oa-root" style={{ display: 'grid', placeItems: 'center' }}>
+      <div style={{ textAlign: 'center', color: '#94a3b8' }}><span className="oa-eq"><span /><span /><span /><span /><span /></span><div className="oa-mono" style={{ marginTop: 14, fontSize: 12, letterSpacing: '0.14em' }}>DASHBOARD LÄDT…</div></div>
+    </div>
+  );
 
-  // Gate
-  if (!session.authenticated) {
-    return (
-      <div className="oa-root">
-        <div className="oa-login">
-          <div className="oa-login-card oa-fade" data-testid="guild-login-gate">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-              <div className="oa-brand-logo"><Radio size={20} /></div>
-              <div><div className="oa-display" style={{ fontSize: 20, fontWeight: 800 }}>OmniFM</div><div className="oa-owner-badge">Server Dashboard</div></div>
-            </div>
-            <h1 className="oa-display" style={{ fontSize: 23, marginTop: 16 }}>{t('Verwalte deine Server', 'Manage your servers')}</h1>
-            <p style={{ color: '#94a3b8', fontSize: 14, marginTop: 8, lineHeight: 1.55 }}>{t('Melde dich mit Discord an, um Sender, Rollen, Statistiken und dein Abo pro Server zu verwalten.', 'Sign in with Discord to manage stations, roles, statistics and your subscription per server.')}</p>
-            <a href={buildApiUrl('/api/auth/discord/login?redirect=1&nextPage=dashboard')} className="oa-btn primary" style={{ width: '100%', marginTop: 20, background: 'linear-gradient(135deg,#5865f2,#4752c4)', color: '#fff' }} data-testid="guild-discord-login">
-              <svg width="18" height="14" viewBox="0 0 71 55" fill="currentColor"><path d="M60.1 4.9A58.5 58.5 0 0045.4.2a.2.2 0 00-.2.1 40.8 40.8 0 00-1.8 3.7 54 54 0 00-16.2 0A37.3 37.3 0 0025.4.3a.2.2 0 00-.2-.1A58.4 58.4 0 0010.5 5 59.6 59.6 0 00.4 45a.3.3 0 00.1.2 58.7 58.7 0 0017.7 9 .2.2 0 00.3-.1 42 42 0 003.6-5.9.2.2 0 00-.1-.3 38.7 38.7 0 01-5.5-2.6.2.2 0 010-.4l1.1-.9a.2.2 0 01.2 0 41.9 41.9 0 0035.6 0 .2.2 0 01.3 0l1 .9a.2.2 0 010 .3 36.4 36.4 0 01-5.5 2.7.2.2 0 00-.1.3 47.2 47.2 0 003.6 5.8.2.2 0 00.3.1A58.5 58.5 0 0070 45.2a.3.3 0 00.1-.2c1.6-16.4-2.6-30.6-11-43.2zM23.7 37c-3.7 0-6.8-3.4-6.8-7.7s3-7.6 6.8-7.6 6.9 3.4 6.8 7.6c0 4.3-3 7.7-6.8 7.7zm25.2 0c-3.7 0-6.8-3.4-6.8-7.7s3-7.6 6.8-7.6 6.9 3.4 6.8 7.6c0 4.3-3 7.7-6.8 7.7z" /></svg>
-              {t('Mit Discord anmelden', 'Continue with Discord')}
-            </a>
-            <button onClick={startDemo} className="oa-btn ghost" style={{ width: '100%', marginTop: 12 }} data-testid="guild-demo-button"><Play size={15} /> {t('Live-Demo ansehen', 'View live demo')}</button>
-            <div style={{ marginTop: 16, textAlign: 'center' }}><a href="/" className="oa-mono" style={{ fontSize: 11, color: '#64748b' }}>← {t('Zurück zur Website', 'Back to website')}</a></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (!session.authenticated) return (
+    <div className="oa-root"><div className="oa-login"><div className="oa-login-card oa-fade" data-testid="guild-login-gate">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><div className="oa-brand-logo"><Radio size={20} /></div><div><div className="oa-display" style={{ fontSize: 20, fontWeight: 800 }}>OmniFM</div><div className="oa-owner-badge">Server Dashboard</div></div></div>
+      <h1 className="oa-display" style={{ fontSize: 23, marginTop: 22 }}>{t('Verwalte deine Server', 'Manage your servers')}</h1>
+      <p style={{ color: '#94a3b8', fontSize: 14, lineHeight: 1.55 }}>{t('Melde dich mit Discord an. Alle angezeigten Daten stammen live aus OmniFM und deiner Lizenz.', 'Sign in with Discord. All displayed data comes live from OmniFM and your license.')}</p>
+      <a href={buildApiUrl('/api/auth/discord/login?redirect=1&nextPage=dashboard')} className="oa-btn primary" style={{ width: '100%', marginTop: 18, background: 'linear-gradient(135deg,#5865f2,#4752c4)', color: '#fff' }} data-testid="guild-discord-login">{t('Mit Discord anmelden', 'Continue with Discord')}</a>
+      <div style={{ marginTop: 16, textAlign: 'center' }}><a href="/" className="oa-mono" style={{ fontSize: 11, color: '#64748b' }}>← {t('Zurück zur Website', 'Back to website')}</a></div>
+    </div></div></div>
+  );
 
-  const trendData = (gdata.trend || []).map((v, i) => ({ day: (en ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] : ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'])[i] || `T${i}`, listeners: v }));
-  const topData = (gdata.top || []).map(([name, min]) => ({ name, minutes: min }));
+  if (!guild) return (
+    <div className="oa-root" style={{ display: 'grid', placeItems: 'center' }}><div className="oa-card" style={{ maxWidth: 560, textAlign: 'center' }}>
+      <AlertTriangle size={28} color="#ffb020" /><h2>{t('Kein verwaltbarer Discord-Server', 'No manageable Discord server')}</h2>
+      <p style={{ color: '#94a3b8' }}>{t('Du benötigst auf dem Server die Berechtigung „Server verwalten“.', 'You need the Manage Server permission on the server.')}</p>
+      <button className="oa-btn ghost" onClick={logout}><LogOut size={16} /> {t('Abmelden', 'Sign out')}</button>
+    </div></div>
+  );
+
+  const trendData = gdata.trend;
+  const topData = gdata.top;
+  const currentStationName = gdata.currentStation?.name || t('Kein aktiver Stream', 'No active stream');
 
   return (
     <div className="oa-root" data-testid="guild-dashboard">
       <aside className="oa-sidebar">
-        <div className="oa-brand">
-          <div className="oa-brand-logo"><Radio size={20} /></div>
-          <div><div className="oa-display" style={{ fontSize: 18, fontWeight: 800 }}>OmniFM</div><div className="oa-owner-badge">Server Dashboard</div></div>
-        </div>
+        <div className="oa-brand"><div className="oa-brand-logo"><Radio size={20} /></div><div><div className="oa-display" style={{ fontSize: 18, fontWeight: 800 }}>OmniFM</div><div className="oa-owner-badge">Server Dashboard</div></div></div>
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
-          {NAV.map((n) => (
-            <button key={n.id} className={`oa-nav-btn ${section === n.id ? 'active' : ''}`} onClick={() => { setSection(n.id); setMsg(null); }} data-testid={`guild-nav-${n.id}`}>
-              <n.icon size={18} /> {navLabel(n.id)}
-            </button>
-          ))}
+          {NAV.map((item) => <button key={item.id} className={`oa-nav-btn ${section === item.id ? 'active' : ''}`} onClick={() => setSection(item.id)} data-testid={`guild-nav-${item.id}`}><item.icon size={18} /> {navLabel(item.id)}</button>)}
         </nav>
-        <a href={demo ? '#' : '/dashboard/classic'} onClick={demo ? (e) => e.preventDefault() : undefined} className="oa-nav-btn" style={{ opacity: demo ? 0.5 : 1, fontSize: 12.5 }}><Server size={16} /> {t('Klassische Ansicht', 'Classic view')}</a>
-        <a href="/" className="oa-nav-btn" style={{ color: '#ff8fab' }} data-testid="guild-logout"><LogOut size={18} /> {t('Verlassen', 'Leave')}</a>
+        <button className="oa-nav-btn" style={{ color: '#ff8fab' }} onClick={logout} data-testid="guild-logout"><LogOut size={18} /> {t('Abmelden', 'Sign out')}</button>
       </aside>
 
       <main className="oa-main">
         <div className="oa-topbar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-            <div>
-              <h1 className="oa-h1 oa-display" data-testid="guild-section-title">{navLabel(section)}</h1>
-              <div className="oa-sub">{guild?.name} · {fmtInt(guild?.members)} {t('Mitglieder', 'members')}</div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {demo && <span className="oa-pill amber" style={{ whiteSpace: 'nowrap' }} data-testid="guild-demo-badge">{t('DEMO-MODUS', 'DEMO MODE')}</span>}
-            <span className="oa-pill" style={{ background: `${tm.color}22`, color: tm.color, border: `1px solid ${tm.color}55` }}><tm.icon size={13} /> {tm.name}</span>
-            <select className="oa-input" style={{ height: 40, width: 'auto', maxWidth: 220 }} value={guildId} onChange={(e) => { setGuildId(e.target.value); setMsg(null); }} data-testid="guild-switcher">
-              {session.guilds.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
+          <div><h1 className="oa-h1 oa-display" data-testid="guild-section-title">{navLabel(section)}</h1><div className="oa-sub">{guild.name}{Number(guild.memberCount || guild.members) > 0 ? ` · ${fmtInt(guild.memberCount || guild.members)} ${t('Mitglieder', 'members')}` : ''}</div></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button className="oa-btn ghost" onClick={() => loadGuild(guildId)} disabled={gdata.loading} title={t('Aktualisieren', 'Refresh')}><RefreshCw size={15} /></button>
+            <span className="oa-pill" style={{ background: `${tm.color}22`, color: tm.color, border: `1px solid ${tm.color}55` }} data-testid="guild-active-tier"><tm.icon size={13} /> {tm.name}</span>
+            <select className="oa-input" style={{ height: 40, width: 'auto', maxWidth: 240 }} value={guildId} onChange={(event) => setGuildId(event.target.value)} data-testid="guild-switcher">{session.guilds.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
           </div>
         </div>
+        <div className="oa-mobile-nav">{NAV.map((item) => <button key={item.id} className={`oa-nav-btn ${section === item.id ? 'active' : ''}`} style={{ width: 'auto', whiteSpace: 'nowrap' }} onClick={() => setSection(item.id)}><item.icon size={16} /> {navLabel(item.id)}</button>)}</div>
+        {msg && <div className={`oa-pill ${msg.ok ? 'green' : 'red'}`} style={{ marginBottom: 16 }} data-testid="guild-message">{msg.ok ? <Check size={13} /> : <AlertTriangle size={13} />} {msg.text}</div>}
 
-        <div className="oa-mobile-nav">
-          {NAV.map((n) => (
-            <button key={n.id} className={`oa-nav-btn ${section === n.id ? 'active' : ''}`} style={{ width: 'auto', whiteSpace: 'nowrap' }} onClick={() => { setSection(n.id); setMsg(null); }} data-testid={`guild-mobile-nav-${n.id}`}>
-              <n.icon size={16} /> {navLabel(n.id)}
-            </button>
-          ))}
-        </div>
-
-        {msg && <div className={`oa-pill ${msg.ok ? 'green' : 'red'}`} style={{ marginBottom: 16 }} data-testid="guild-message">{msg.ok ? <Check size={13} /> : null} {msg.text}</div>}
-
-        {section === 'overview' && (
-          <>
-            <div className="oa-grid cols-4">
-              <StatTile label={t('Aktive Hörer', 'Active listeners')} value={fmtInt(gdata.listeners)} icon={Users} accent="#ff6b00" foot={<span>{t('gerade im Voice-Channel', 'in voice right now')}</span>} />
-              <StatTile label="Uptime" value={`${gdata.uptimePct}%`} icon={Clock} accent="#10b981" foot={<span>{t('letzte 30 Tage', 'last 30 days')}</span>} />
-              <StatTile label={t('Gestreamt (Monat)', 'Streamed (month)')} value={fmtMinutes(gdata.minutesMonth)} icon={Music2} accent="#00e5ff" foot={<span>{t('Wiedergabezeit', 'playback time')}</span>} />
-              <StatTile label={t('Aktive Bots', 'Active bots')} value={gdata.activeWorkers} icon={Server} accent="#5865f2" foot={<span>{t(`${tm.name}-Kontingent`, `${tm.name} quota`)}</span>} />
-            </div>
-            <div className="oa-grid cols-3" style={{ marginTop: 18 }}>
-              <div className="oa-card oa-fade" style={{ gridColumn: 'span 2' }}>
-                <div className="oa-stat-label" style={{ marginBottom: 14 }}>{t('Hörer-Trend (7 Tage)', 'Listener trend (7 days)')}</div>
-                <ResponsiveContainer width="100%" height={200}>
-                  <AreaChart data={trendData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                    <defs><linearGradient id="gdArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#ff6b00" stopOpacity={0.5} /><stop offset="100%" stopColor="#ff6b00" stopOpacity={0} /></linearGradient></defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1b2133" vertical={false} />
-                    <XAxis dataKey="day" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
-                    <Tooltip content={<ChartTip />} />
-                    <Area type="monotone" dataKey="listeners" name="Hörer" stroke="#ff6b00" strokeWidth={2.5} fill="url(#gdArea)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="oa-card oa-fade">
-                <div className="oa-stat-label" style={{ marginBottom: 12 }}>{t('Aktueller Sender', 'Current station')}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 56, height: 56, borderRadius: 12, background: 'linear-gradient(135deg,#ff6b00,#ff2a5f)', display: 'grid', placeItems: 'center' }}><Radio size={24} color="#fff" /></div>
-                  <div><div style={{ fontWeight: 700, fontSize: 16 }}>{(PRESET_STATIONS.find((s) => s.key === gdata.defaultStation) || {}).name || gdata.defaultStation}</div>
-                    <div className="oa-pill orange" style={{ marginTop: 6 }}><span className="oa-dot" /> ON AIR</div></div>
-                </div>
-                <button className="oa-btn ghost" style={{ width: '100%', marginTop: 16 }} onClick={() => setSection('stations')}><ListMusic size={15} /> {t('Sender wechseln', 'Change station')}</button>
-              </div>
-            </div>
-          </>
-        )}
-
-        {section === 'stations' && (
-          <>
-            <div className="oa-section-title"><Radio size={15} /> {t('Standard-Sender', 'Default stations')}</div>
-            <div className="oa-grid cols-3" data-testid="guild-preset-stations">
-              {PRESET_STATIONS.map((s) => {
-                const active = gdata.defaultStation === s.key;
-                return (
-                  <button key={s.key} className="oa-card hoverable" style={{ textAlign: 'left', cursor: 'pointer', borderColor: active ? 'rgba(255,107,0,0.6)' : undefined, background: active ? 'rgba(255,107,0,0.08)' : undefined }} onClick={() => setDefaultStation(s.key)} data-testid={`guild-station-${s.key}`}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 38, height: 38, borderRadius: 10, background: active ? 'linear-gradient(135deg,#ff6b00,#ff2a5f)' : '#1c2235', display: 'grid', placeItems: 'center' }}><Music2 size={17} color={active ? '#fff' : '#94a3b8'} /></div>
-                        <div><div style={{ fontWeight: 700 }}>{s.name}</div><div className="oa-mono" style={{ fontSize: 11, color: '#64748b' }}>{s.genre}</div></div>
-                      </div>
-                      {active && <Check size={18} color="#ff6b00" />}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '28px 0 12px' }}>
-              <div className="oa-section-title" style={{ margin: 0 }}><ListMusic size={15} /> {t('Eigene Sender', 'Custom stations')} ({gdata.custom.length}/{tm.customLimit === 999 ? '∞' : tm.customLimit})</div>
-            </div>
-
-            {tm.customLimit === 0 ? (
-              <div className="oa-card" style={{ display: 'flex', alignItems: 'center', gap: 14 }} data-testid="guild-custom-locked">
-                <Lock size={22} color="#94a3b8" />
-                <div><div style={{ fontWeight: 700 }}>{t('Eigene Sender sind ein Pro-Feature', 'Custom stations are a Pro feature')}</div><div style={{ color: '#94a3b8', fontSize: 13 }}>{t('Upgrade auf Pro oder Ultimate, um eigene Stream-URLs hinzuzufügen.', 'Upgrade to Pro or Ultimate to add your own stream URLs.')}</div></div>
-                <button className="oa-btn primary" style={{ marginLeft: 'auto' }} onClick={() => setSection('subscription')}>Upgrade</button>
-              </div>
-            ) : (
-              <>
-                <div className="oa-card" style={{ marginBottom: 16 }} data-testid="guild-custom-form">
-                  <div className="oa-grid cols-2" style={{ gap: 12 }}>
-                    <div><label className="oa-stat-label">Name</label><input className="oa-input" style={{ marginTop: 6, fontFamily: 'DM Sans' }} value={newStation.name} placeholder={t('z.B. Server Chill', 'e.g. Server Chill')} onChange={(e) => setNewStation({ ...newStation, name: e.target.value })} data-testid="guild-custom-name" /></div>
-                    <div><label className="oa-stat-label">Stream-URL</label><input className="oa-input" style={{ marginTop: 6 }} value={newStation.url} placeholder="https://…/stream.mp3" onChange={(e) => setNewStation({ ...newStation, url: e.target.value })} data-testid="guild-custom-url" /></div>
-                  </div>
-                  <button className="oa-btn primary" style={{ marginTop: 14 }} onClick={addCustom} data-testid="guild-custom-add"><Plus size={16} /> {t('Hinzufügen', 'Add')}</button>
-                </div>
-                <div className="oa-table-wrap" data-testid="guild-custom-list">
-                  <table className="oa-table">
-                    <thead><tr><th>Name</th><th>Stream-URL</th><th style={{ textAlign: 'right' }}></th></tr></thead>
-                    <tbody>
-                      {gdata.custom.length === 0 && <tr><td colSpan={3} style={{ textAlign: 'center', color: '#64748b', padding: 22 }}>{t('Noch keine eigenen Sender', 'No custom stations yet')}</td></tr>}
-                      {gdata.custom.map((c) => (
-                        <tr key={c.key} data-testid={`guild-custom-row-${c.key}`}>
-                          <td style={{ fontWeight: 600 }}>{c.name}</td>
-                          <td className="oa-mono" style={{ fontSize: 12, color: '#94a3b8', maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.url}</td>
-                          <td style={{ textAlign: 'right' }}><button className="oa-btn ghost" style={{ height: 32, padding: '0 9px', color: '#ff8fab' }} onClick={() => removeCustom(c.key)} data-testid={`guild-custom-remove-${c.key}`}><Trash2 size={14} /></button></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
-          </>
-        )}
-
-        {section === 'roles' && (
-          <>
-            <div className="oa-section-title"><ShieldCheck size={15} /> {t('Command-Berechtigungen', 'Command permissions')}</div>
-            <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 16, marginTop: -6 }}>{t('Lege fest, welche Rolle welche Slash-Commands nutzen darf.', 'Define which role may use which slash commands.')}</p>
-            <div className="oa-table-wrap" data-testid="guild-perms-matrix">
-              <table className="oa-table">
-                <thead><tr><th>Command</th>{gdata.roles.map((r) => <th key={r.id} style={{ textAlign: 'center' }}><span style={{ color: r.color }}>{r.name}</span></th>)}</tr></thead>
-                <tbody>
-                  {COMMANDS.map((c) => (
-                    <tr key={c.id}>
-                      <td className="oa-mono" style={{ color: '#ffb27a' }}>{c.label}</td>
-                      {gdata.roles.map((r) => {
-                        const on = !!perms[`${c.id}:${r.id}`];
-                        return (
-                          <td key={r.id} style={{ textAlign: 'center' }}>
-                            <button onClick={() => togglePerm(c.id, r.id)} data-testid={`guild-perm-${c.id}-${r.id}`} style={{ width: 42, height: 24, borderRadius: 999, border: 'none', cursor: 'pointer', background: on ? 'linear-gradient(90deg,#ff6b00,#ff2a5f)' : '#2a3450', position: 'relative', transition: 'background 0.2s' }}>
-                              <span style={{ position: 'absolute', top: 3, left: on ? 21 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
-                            </button>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <button className="oa-btn primary" style={{ marginTop: 16 }} onClick={savePerms} data-testid="guild-perms-save"><Check size={16} /> {t('Speichern', 'Save')}</button>
-          </>
-        )}
-
-        {section === 'stats' && (
-          <>
-            <div className="oa-grid cols-3">
-              <StatTile label={t('Ø Hörer / Tag', 'Avg. listeners / day')} value={fmtInt(Math.round((gdata.trend.reduce((a, b) => a + b, 0)) / Math.max(1, gdata.trend.length)))} icon={Users} accent="#ff6b00" />
-              <StatTile label={t('Peak Hörer', 'Peak listeners')} value={fmtInt(Math.max(0, ...gdata.trend))} icon={BarChart3} accent="#00e5ff" />
-              <StatTile label={t('Gestreamt (Monat)', 'Streamed (month)')} value={fmtMinutes(gdata.minutesMonth)} icon={Music2} accent="#10b981" />
-            </div>
-            <div className="oa-card oa-fade" style={{ marginTop: 18 }} data-testid="guild-top-stations">
-              <div className="oa-stat-label" style={{ marginBottom: 14 }}>{t('Top-Sender nach Wiedergabezeit (Minuten)', 'Top stations by playback time (minutes)')}</div>
-              <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={topData} layout="vertical" margin={{ top: 4, right: 16, left: 20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1b2133" horizontal={false} />
-                  <XAxis type="number" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
-                  <YAxis type="category" dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} width={130} />
-                  <Tooltip content={<ChartTip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-                  <Bar dataKey="minutes" name="Minuten" radius={[0, 6, 6, 0]}>
-                    {topData.map((_, i) => <Cell key={i} fill={['#ff6b00', '#00e5ff', '#5865f2', '#10b981'][i % 4]} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </>
-        )}
-
-        {section === 'subscription' && (
-          <div className="oa-grid cols-3" data-testid="guild-subscription">
-            {Object.entries(TIER_META).map(([key, meta]) => {
-              const current = key === tier;
-              return (
-                <div className="oa-card oa-fade" key={key} style={{ borderColor: current ? `${meta.color}66` : undefined, position: 'relative' }} data-testid={`guild-plan-${key}`}>
-                  {current && <span className="oa-pill" style={{ position: 'absolute', top: 16, right: 16, background: `${meta.color}22`, color: meta.color, border: `1px solid ${meta.color}55` }}>{t('Aktiv', 'Active')}</span>}
-                  <div style={{ width: 44, height: 44, borderRadius: 12, background: `${meta.color}1f`, color: meta.color, display: 'grid', placeItems: 'center', marginBottom: 14 }}><meta.icon size={22} /></div>
-                  <div className="oa-display" style={{ fontSize: 22, fontWeight: 800 }}>{meta.name}</div>
-                  <div style={{ margin: '10px 0 16px' }}>
-                    {[
-                      key === 'free' ? t('1 Bot · Standard-Sender', '1 bot · default stations') : key === 'pro' ? t('2 Bots · 5 eigene Sender', '2 bots · 5 custom stations') : t('Bis 5 Bots · ∞ eigene Sender', 'Up to 5 bots · ∞ custom stations'),
-                      key === 'free' ? t('64 kbps Qualität', '64 kbps quality') : key === 'pro' ? t('256 kbps Qualität', '256 kbps quality') : t('320 kbps HiFi', '320 kbps HiFi'),
-                      key === 'free' ? t('Basis-Statistiken', 'Basic statistics') : t('Erweiterte Statistiken', 'Advanced statistics'),
-                      key === 'ultimate' ? t('Priorisierter Support', 'Priority support') : t('Community-Support', 'Community support'),
-                    ].map((f, i) => <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: '#cbd5e1', marginBottom: 8 }}><Check size={14} color={meta.color} /> {f}</div>)}
-                  </div>
-                  {current ? <button className="oa-btn ghost" style={{ width: '100%' }} disabled>{t('Aktueller Plan', 'Current plan')}</button>
-                    : <a className="oa-btn primary" style={{ width: '100%', textDecoration: 'none' }} href="/#pricing" data-testid={`guild-upgrade-${key}`}><ChevronRight size={15} /> {key === 'free' ? 'Downgrade' : 'Upgrade'}</a>}
-                </div>
-              );
-            })}
+        {section === 'overview' && <>
+          <div className="oa-grid cols-4">
+            <StatTile label={t('Aktive Hörer', 'Active listeners')} value={fmtInt(gdata.listeners)} icon={Users} accent="#ff6b00" foot={t('Echtzeit-Telemetrie', 'Real-time telemetry')} />
+            <StatTile label="Uptime" value={gdata.uptimePct == null ? '—' : `${gdata.uptimePct}%`} icon={Clock} accent="#10b981" foot={t('Keine Schätzung', 'No estimate')} />
+            <StatTile label={t('Gestreamt', 'Streamed')} value={fmtMinutes(gdata.minutesMonth)} icon={Music2} accent="#00e5ff" foot={t('erfasste Wiedergabezeit', 'recorded playback time')} />
+            <StatTile label={t('Aktive Streams', 'Active streams')} value={fmtInt(gdata.activeStreams)} icon={Server} accent="#5865f2" foot={`${tm.name} · ${tm.maxBots} ${t('Bots max.', 'bots max.')}`} />
           </div>
-        )}
+          <div className="oa-grid cols-3" style={{ marginTop: 18 }}>
+            <div className="oa-card oa-fade" style={{ gridColumn: 'span 2' }}><div className="oa-stat-label" style={{ marginBottom: 14 }}>{t('Hörer-Trend', 'Listener trend')}</div>
+              {trendData.length ? <ResponsiveContainer width="100%" height={200}><AreaChart data={trendData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}><defs><linearGradient id="gdArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#ff6b00" stopOpacity={0.5} /><stop offset="100%" stopColor="#ff6b00" stopOpacity={0} /></linearGradient></defs><CartesianGrid strokeDasharray="3 3" stroke="#1b2133" vertical={false} /><XAxis dataKey="day" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} /><YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} /><Tooltip content={<ChartTip />} /><Area type="monotone" dataKey="listeners" name={t('Hörer', 'Listeners')} stroke="#ff6b00" strokeWidth={2.5} fill="url(#gdArea)" /></AreaChart></ResponsiveContainer> : <div className="oa-sub" style={{ padding: '64px 0', textAlign: 'center' }}>{t('Noch keine Messwerte vorhanden.', 'No measurements available yet.')}</div>}
+            </div>
+            <div className="oa-card oa-fade"><div className="oa-stat-label" style={{ marginBottom: 12 }}>{t('Aktueller Stream', 'Current stream')}</div><div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><div style={{ width: 56, height: 56, borderRadius: 12, background: gdata.currentStation ? 'linear-gradient(135deg,#ff6b00,#ff2a5f)' : '#1c2235', display: 'grid', placeItems: 'center' }}><Radio size={24} color="#fff" /></div><div><div style={{ fontWeight: 700, fontSize: 16 }}>{currentStationName}</div>{gdata.currentStation && <div className="oa-pill orange" style={{ marginTop: 6 }}><span className="oa-dot" /> LIVE</div>}</div></div><button className="oa-btn ghost" style={{ width: '100%', marginTop: 16 }} onClick={() => setSection('stations')}><ListMusic size={15} /> {t('Senderkatalog', 'Station catalog')}</button></div>
+          </div>
+        </>}
+
+        {section === 'stations' && <>
+          <div className="oa-section-title"><Radio size={15} /> {t('Verfügbare Sender', 'Available stations')} ({gdata.stations.length})</div>
+          <div className="oa-grid cols-3" data-testid="guild-preset-stations">{gdata.stations.map((station) => <div key={station.key} className="oa-card hoverable"><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 38, height: 38, borderRadius: 10, background: '#1c2235', display: 'grid', placeItems: 'center' }}><Music2 size={17} color="#94a3b8" /></div><div><div style={{ fontWeight: 700 }}>{station.name}</div><div className="oa-mono" style={{ fontSize: 11, color: '#64748b' }}>{station.genre || 'Radio'}</div></div></div></div>)}</div>
+          <div className="oa-section-title" style={{ marginTop: 28 }}><ListMusic size={15} /> {t('Eigene Sender', 'Custom stations')} ({gdata.custom.length}/{tm.customLimit || 0})</div>
+          {tier !== 'ultimate' ? <div className="oa-card" style={{ display: 'flex', alignItems: 'center', gap: 14 }} data-testid="guild-custom-locked"><Lock size={22} color="#94a3b8" /><div><div style={{ fontWeight: 700 }}>{t('Eigene Stream-URLs sind ein Ultimate-Feature', 'Custom stream URLs are an Ultimate feature')}</div><div style={{ color: '#94a3b8', fontSize: 13 }}>{t('Im offiziellen Senderkatalog stehen dir weiterhin alle Sender deines Plans zur Verfügung.', 'The official catalog remains available according to your plan.')}</div></div><button className="oa-btn primary" style={{ marginLeft: 'auto' }} onClick={() => setSection('subscription')}>Upgrade</button></div> : <>
+            <div className="oa-card" style={{ marginBottom: 16 }} data-testid="guild-custom-form"><div className="oa-grid cols-2" style={{ gap: 12 }}><div><label className="oa-stat-label">Name</label><input className="oa-input" style={{ marginTop: 6 }} value={newStation.name} onChange={(event) => setNewStation({ ...newStation, name: event.target.value })} /></div><div><label className="oa-stat-label">Stream-URL</label><input className="oa-input" style={{ marginTop: 6 }} value={newStation.url} placeholder="https://…/stream.mp3" onChange={(event) => setNewStation({ ...newStation, url: event.target.value })} /></div></div><button className="oa-btn primary" style={{ marginTop: 14 }} onClick={addCustom}><Plus size={16} /> {t('Hinzufügen', 'Add')}</button></div>
+            <div className="oa-table-wrap"><table className="oa-table"><thead><tr><th>Name</th><th>Stream-URL</th><th /></tr></thead><tbody>{!gdata.custom.length && <tr><td colSpan={3} style={{ textAlign: 'center', color: '#64748b', padding: 22 }}>{t('Noch keine eigenen Sender', 'No custom stations yet')}</td></tr>}{gdata.custom.map((station) => <tr key={station.key}><td style={{ fontWeight: 600 }}>{station.name}</td><td className="oa-mono" style={{ fontSize: 12, color: '#94a3b8' }}>{station.url}</td><td style={{ textAlign: 'right' }}><button className="oa-btn ghost" style={{ color: '#ff8fab' }} onClick={() => removeCustom(station.key)}><Trash2 size={14} /></button></td></tr>)}</tbody></table></div>
+          </>}
+        </>}
+
+        {section === 'roles' && <>{tier === 'free' ? <div className="oa-card" style={{ display: 'flex', alignItems: 'center', gap: 14 }}><Lock size={22} /><div><b>{t('Rollenrechte sind ab Pro verfügbar.', 'Role permissions are available from Pro.')}</b></div><button className="oa-btn primary" style={{ marginLeft: 'auto' }} onClick={() => setSection('subscription')}>Upgrade</button></div> : <><div className="oa-section-title"><ShieldCheck size={15} /> {t('Command-Berechtigungen', 'Command permissions')}</div>{!gdata.roles.length ? <div className="oa-card"><AlertTriangle size={18} color="#ffb020" /> {t('Discord-Rollen sind noch nicht synchronisiert. Aktualisiere die Ansicht, sobald der Commander online ist.', 'Discord roles have not been synchronized yet. Refresh once the commander is online.')}</div> : <><div className="oa-table-wrap" data-testid="guild-perms-matrix"><table className="oa-table"><thead><tr><th>Command</th>{gdata.roles.map((role) => <th key={role.id} style={{ textAlign: 'center', color: role.color || '#cbd5e1' }}>{role.name}</th>)}</tr></thead><tbody>{COMMANDS.map((command) => <tr key={command.id}><td className="oa-mono" style={{ color: '#ffb27a' }}>{command.label}</td>{gdata.roles.map((role) => { const enabled = !!perms[`${command.id}:${role.id}`]; return <td key={role.id} style={{ textAlign: 'center' }}><button onClick={() => togglePerm(command.id, role.id)} style={{ width: 42, height: 24, borderRadius: 999, border: 'none', cursor: 'pointer', background: enabled ? 'linear-gradient(90deg,#ff6b00,#ff2a5f)' : '#2a3450', position: 'relative' }}><span style={{ position: 'absolute', top: 3, left: enabled ? 21 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff' }} /></button></td>; })}</tr>)}</tbody></table></div><button className="oa-btn primary" style={{ marginTop: 16 }} onClick={savePerms}><Check size={16} /> {t('Speichern', 'Save')}</button></>}</>}</>}
+
+        {section === 'stats' && <>{tier === 'free' ? <div className="oa-card"><Lock size={22} /> <b>{t('Statistiken sind ab Pro verfügbar.', 'Statistics are available from Pro.')}</b></div> : <><div className="oa-grid cols-3"><StatTile label={t('Ø Hörer', 'Avg. listeners')} value={fmtInt(Math.round(trendData.reduce((sum, row) => sum + row.listeners, 0) / Math.max(1, trendData.length)))} icon={Users} accent="#ff6b00" /><StatTile label={t('Peak Hörer', 'Peak listeners')} value={fmtInt(Math.max(0, ...trendData.map((row) => row.listeners)))} icon={BarChart3} accent="#00e5ff" /><StatTile label={t('Gestreamt', 'Streamed')} value={fmtMinutes(gdata.minutesMonth)} icon={Music2} accent="#10b981" /></div><div className="oa-card oa-fade" style={{ marginTop: 18 }}>{topData.length ? <ResponsiveContainer width="100%" height={260}><BarChart data={topData} layout="vertical" margin={{ right: 16, left: 20 }}><CartesianGrid strokeDasharray="3 3" stroke="#1b2133" horizontal={false} /><XAxis type="number" stroke="#64748b" fontSize={11} /><YAxis type="category" dataKey="name" stroke="#94a3b8" fontSize={12} width={140} /><Tooltip content={<ChartTip />} /><Bar dataKey="minutes" name={t('Minuten', 'Minutes')} radius={[0, 6, 6, 0]}>{topData.map((_, index) => <Cell key={index} fill={['#ff6b00', '#00e5ff', '#5865f2', '#10b981'][index % 4]} />)}</Bar></BarChart></ResponsiveContainer> : <div className="oa-sub" style={{ padding: 50, textAlign: 'center' }}>{t('Noch keine Wiedergabestatistik vorhanden.', 'No playback statistics available yet.')}</div>}</div></>}</>}
+
+        {section === 'subscription' && <><div className="oa-card" style={{ marginBottom: 18 }} data-testid="guild-license-details"><div className="oa-section-title"><CreditCard size={15} /> {t('Aktive Lizenz', 'Active license')}</div><div className="oa-grid cols-3"><div><div className="oa-stat-label">Plan</div><div className="oa-stat-value" style={{ color: tm.color }}>{tm.name}</div></div><div><div className="oa-stat-label">Seats</div><div className="oa-stat-value">{gdata.license?.license ? `${gdata.license.license.seatsUsed}/${gdata.license.license.seats}` : '—'}</div></div><div><div className="oa-stat-label">{t('Läuft ab', 'Expires')}</div><div style={{ marginTop: 12, fontWeight: 700 }}>{gdata.license?.license?.expiresAt ? new Date(gdata.license.license.expiresAt).toLocaleDateString() : t('Keine aktive Kauf-Lizenz', 'No active paid license')}</div></div></div></div><div className="oa-grid cols-3" data-testid="guild-subscription">{Object.entries(TIER_META).map(([key, meta]) => { const current = key === tier; return <div className="oa-card oa-fade" key={key} style={{ borderColor: current ? `${meta.color}66` : undefined, position: 'relative' }}>{current && <span className="oa-pill" style={{ position: 'absolute', top: 16, right: 16, color: meta.color }}>{t('Aktiv', 'Active')}</span>}<div style={{ width: 44, height: 44, borderRadius: 12, background: `${meta.color}1f`, color: meta.color, display: 'grid', placeItems: 'center', marginBottom: 14 }}><meta.icon size={22} /></div><div className="oa-display" style={{ fontSize: 22, fontWeight: 800 }}>{meta.name}</div><div style={{ margin: '12px 0 18px', color: '#cbd5e1', lineHeight: 1.8 }}><div><Check size={14} color={meta.color} /> {meta.maxBots} Bots</div><div><Check size={14} color={meta.color} /> {meta.bitrate} Audio</div><div><Check size={14} color={meta.color} /> {key === 'ultimate' ? t('Eigene Sender & Analytics', 'Custom stations & analytics') : key === 'pro' ? t('Dashboard & Rollenrechte', 'Dashboard & role permissions') : t('Basis-Radio', 'Basic radio')}</div></div>{current ? <button className="oa-btn ghost" style={{ width: '100%' }} disabled>{t('Aktueller Plan', 'Current plan')}</button> : <a className="oa-btn primary" style={{ width: '100%', textDecoration: 'none' }} href="/#pricing"><ChevronRight size={15} /> {key === 'free' ? 'Downgrade' : 'Upgrade'}</a>}</div>; })}</div></>}
       </main>
     </div>
   );

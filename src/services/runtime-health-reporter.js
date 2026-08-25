@@ -41,13 +41,47 @@ function nodeMetrics(runtimes) {
     try { guildIds = ready ? [...client.guilds.cache.keys()].map(String) : []; } catch { guildIds = []; }
     let guildDetails = [];
     try {
+      const runtimeDetails = rt?.getDashboardStatus?.()?.guildDetails || [];
+      const runtimeDetailByGuild = new Map(runtimeDetails.map((detail) => [String(detail.guildId || ""), detail]));
       guildDetails = ready
-        ? [...client.guilds.cache.values()].map((guild) => ({
-          id: String(guild.id),
-          name: String(guild.name || guild.id).slice(0, 120),
-          memberCount: Math.max(0, Number(guild.memberCount || 0) || 0),
-          iconUrl: guild.iconURL?.({ extension: "png", size: 128 }) || null,
-        }))
+        ? [...client.guilds.cache.values()].map((guild) => {
+          const includeDirectory = rt?.role === "commander";
+          const roles = includeDirectory ? [...(guild.roles?.cache?.values?.() || [])]
+            .filter((role) => String(role.id) !== String(guild.id) && !role.managed)
+            .sort((a, b) => Number(b.position || 0) - Number(a.position || 0))
+            .slice(0, 100)
+            .map((role) => ({
+              id: String(role.id),
+              name: String(role.name || role.id).slice(0, 100),
+              color: role.hexColor && role.hexColor !== "#000000" ? role.hexColor : "#94a3b8",
+              position: Number(role.position || 0),
+            })) : [];
+          const channels = includeDirectory ? [...(guild.channels?.cache?.values?.() || [])] : [];
+          const live = runtimeDetailByGuild.get(String(guild.id)) || {};
+          const mapChannel = (channel) => ({
+            id: String(channel.id),
+            name: String(channel.name || channel.id).slice(0, 100),
+            position: Number(channel.position || 0),
+          });
+          return {
+            id: String(guild.id),
+            name: String(guild.name || guild.id).slice(0, 120),
+            memberCount: Math.max(0, Number(guild.memberCount || 0) || 0),
+            iconUrl: guild.iconURL?.({ extension: "png", size: 128 }) || null,
+            roles,
+            voiceChannels: channels.filter((channel) => channel.isVoiceBased?.()).map(mapChannel),
+            textChannels: channels.filter((channel) => channel.isTextBased?.() && !channel.isThread?.()).map(mapChannel),
+            stationKey: live.stationKey || null,
+            stationName: live.stationName || null,
+            channelId: live.channelId || null,
+            channelName: live.channelName || null,
+            listenerCount: Math.max(0, Number(live.listenerCount || 0) || 0),
+            volume: Number.isFinite(Number(live.volume)) ? Number(live.volume) : null,
+            voiceConnected: live.voiceConnected === true,
+            playing: live.playing === true,
+            recovering: live.recovering === true,
+          };
+        })
         : [];
     } catch { guildDetails = []; }
     let ping = null;

@@ -956,13 +956,15 @@ export async function handleRuntimePanelInteraction(runtime, interaction) {
   const customId = String(interaction.customId || "");
 
   if (customId === PLAY_COMPONENT_ID_OPEN) {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const payload = await openRuntimePlayWizard(runtime, interaction);
-    await respondWithPayload(runtime, interaction, payload, { update: true });
+    await respondWithPayload(runtime, interaction, payload);
     return true;
   }
   if (customId === STATIONS_COMPONENT_ID_OPEN) {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const payload = await openRuntimeStationsBrowser(runtime, interaction);
-    await respondWithPayload(runtime, interaction, payload, { update: true });
+    await respondWithPayload(runtime, interaction, payload);
     return true;
   }
 

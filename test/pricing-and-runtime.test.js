@@ -83,6 +83,52 @@ import {
   openRuntimeStationsBrowser,
 } from "../src/bot/runtime-panels.js";
 
+test("worker runtimes handle component interactions created by their own Discord application", async (t) => {
+  const runtime = new BotRuntime({
+    token: "worker-token",
+    clientId: "100000000000000001",
+    index: 2,
+    name: "OmniFM 2",
+  }, { role: "worker" });
+  t.after(() => {
+    runtime.unsubscribeNetworkRecovery?.();
+    runtime.client.destroy();
+  });
+
+  let handled = null;
+  runtime.handleComponentInteraction = async (interaction) => { handled = interaction.customId; };
+  runtime.client.emit("interactionCreate", {
+    customId: "np:toggle",
+    isButton: () => true,
+    isStringSelectMenu: () => false,
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(handled, "np:toggle");
+});
+
+test("now-playing controls acknowledge Discord before running voice operations", async () => {
+  const calls = [];
+  const runtime = {
+    guildState: new Map([["guild-1", { player: { state: { status: "playing" } }, volume: 100 }]]),
+    createInteractionTranslator: () => ({ t: (de) => de }),
+    pauseInGuild: async () => { calls.push("pause"); return { ok: true }; },
+    resumeInGuild: async () => ({ ok: true }),
+    stopInGuild: async () => ({ ok: true }),
+    setVolumeInGuild: async () => ({ ok: true }),
+    updateNowPlayingEmbed: async () => { calls.push("refresh"); },
+  };
+  const interaction = {
+    guildId: "guild-1",
+    customId: "np:toggle",
+    deferReply: async () => { calls.push("defer"); },
+    editReply: async () => { calls.push("reply"); },
+  };
+
+  const handled = await BotRuntime.prototype.handleNowPlayingControl.call(runtime, interaction);
+  assert.equal(handled, true);
+  assert.deepEqual(calls, ["defer", "pause", "refresh", "reply"]);
+});
+
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const botStatePath = path.join(repoRoot, "bot-state.json");
 const botStateBackupPath = `${botStatePath}.bak`;
