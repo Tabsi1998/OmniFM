@@ -2,21 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { rootDir } from "./logging.js";
-import { resolveRuntimeDataPath } from "./runtime-data-path.js";
 
 const ENV_LINE_RE = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/;
 const MAX_VALUE_LENGTH = 2000;
-
-const BOT_CONFIGURATION_FIELDS = Array.from({ length: 20 }, (_, offset) => {
-  const index = offset + 1;
-  const label = index === 1 ? "Commander" : `Worker ${index}`;
-  return [
-    { key: `BOT_${index}_CLIENT_ID`, label: `${label} Client ID`, type: "snowflake" },
-    { key: `BOT_${index}_NAME`, label: `${label} Name`, type: "text" },
-    { key: `BOT_${index}_TIER`, label: `${label} Mindest-Tier`, type: "enum", values: ["free", "pro", "ultimate"] },
-    { key: `BOT_${index}_PERMISSIONS`, label: `${label} Discord Permissions`, type: "text", example: "35186522836032" },
-  ];
-}).flat();
 
 const GROUPS = [
   {
@@ -30,21 +18,6 @@ const GROUPS = [
       { key: "CHECKOUT_RETURN_ORIGINS", label: "Checkout Return Origins", type: "origin-list", example: "https://omnifm.xyz" },
       { key: "DEFAULT_LANGUAGE", label: "Standardsprache", type: "enum", values: ["de", "en"], example: "de" },
       { key: "PRO_TRIAL_ENABLED", label: "Pro Trial aktiv", type: "boolean", example: "1" },
-      { key: "WEB_PORT", label: "Oeffentlicher Web-Port", type: "integer", min: 1, max: 65535, example: "8081" },
-      { key: "WEB_INTERNAL_PORT", label: "Interner Web-Port", type: "integer", min: 1, max: 65535, example: "8080" },
-      { key: "TRUST_PROXY_HEADERS", label: "Proxy-Header vertrauen", type: "boolean", example: "0" },
-      { key: "TRUSTED_PROXY_IPS", label: "Vertrauenswuerdige Proxy-IPs", type: "text", example: "127.0.0.1,::1" },
-    ],
-  },
-  {
-    id: "bots",
-    title: "Discord-Bots & Topologie",
-    description: "Commander, bis zu 19 Worker und deren Einsatzmodus. Bot-Tokens werden unten ausschliesslich write-only gepflegt.",
-    fields: [
-      { key: "BOT_COUNT", label: "Anzahl Bots", type: "integer", min: 1, max: 20, example: "1" },
-      { key: "COMMANDER_BOT_INDEX", label: "Commander Bot-Index", type: "integer", min: 1, max: 20, example: "1" },
-      { key: "OMNIFM_DEPLOYMENT_MODE", label: "Deployment-Modus", type: "enum", values: ["auto", "monolith", "split", "commander", "worker"] },
-      ...BOT_CONFIGURATION_FIELDS,
     ],
   },
   {
@@ -123,36 +96,6 @@ const GROUPS = [
       { key: "CLEAN_GLOBAL_COMMANDS_ON_BOOT", label: "Globale Commands beim Start bereinigen", type: "boolean", example: "0" },
       { key: "CLEAN_GUILD_COMMANDS_ON_BOOT", label: "Guild Commands beim Start bereinigen", type: "boolean", example: "0" },
       { key: "CLEAN_WORKER_GUILD_COMMANDS_ON_BOOT", label: "Worker Guild Commands bereinigen", type: "boolean", example: "0" },
-      { key: "STATION_HEALTH_ENABLED", label: "Station-Healthchecks aktiv", type: "boolean", example: "1" },
-      { key: "STATION_HEALTH_INTERVAL_MS", label: "Station-Healthcheck Intervall ms", type: "integer", min: 10000, max: 86400000, example: "300000" },
-      { key: "STATION_HEALTH_TIMEOUT_MS", label: "Station-Healthcheck Timeout ms", type: "integer", min: 1000, max: 30000, example: "8000" },
-      { key: "STATION_HEALTH_CONCURRENCY", label: "Station-Healthcheck Parallelitaet", type: "integer", min: 1, max: 20, example: "5" },
-    ],
-  },
-  {
-    id: "storage",
-    title: "MongoDB & Datenspeicher",
-    description: "Datenbankmodus, Datenbankname und Song-Verlauf. Die MongoDB-URL ist ein write-only Secret.",
-    fields: [
-      { key: "MONGO_ENABLED", label: "MongoDB aktivieren", type: "boolean", example: "1" },
-      { key: "DB_NAME", label: "MongoDB Datenbankname", type: "text", example: "radio_bot" },
-      { key: "SONG_HISTORY_ENABLED", label: "Song-Verlauf aktiv", type: "boolean", example: "1" },
-      { key: "SONG_HISTORY_MAX_PER_GUILD", label: "Song-Verlauf pro Guild", type: "integer", min: 20, max: 500, example: "120" },
-      { key: "SONG_HISTORY_DEDUPE_WINDOW_MS", label: "Song-Verlauf Deduplizierung ms", type: "integer", min: 15000, max: 600000, example: "120000" },
-    ],
-  },
-  {
-    id: "audio",
-    title: "Audio, Now Playing & Erkennung",
-    description: "Metadaten, Song-Verlauf und Audio-Erkennung. Der AcoustID-Key ist ein write-only Secret.",
-    fields: [
-      { key: "NOW_PLAYING_ENABLED", label: "Now Playing aktiv", type: "boolean", example: "1" },
-      { key: "NOW_PLAYING_COVER_ENABLED", label: "Cover-Art aktiv", type: "boolean", example: "1" },
-      { key: "NOW_PLAYING_RECOGNITION_ENABLED", label: "Audio-Erkennung aktiv", type: "boolean", example: "0" },
-      { key: "NOW_PLAYING_MUSICBRAINZ_ENABLED", label: "MusicBrainz-Abgleich aktiv", type: "boolean", example: "1" },
-      { key: "NOW_PLAYING_RECOGNITION_SAMPLE_SECONDS", label: "Erkennungs-Sample Sekunden", type: "integer", min: 5, max: 60, example: "18" },
-      { key: "NOW_PLAYING_RECOGNITION_TIMEOUT_MS", label: "Erkennungs-Timeout ms", type: "integer", min: 1000, max: 120000, example: "28000" },
-      { key: "NOW_PLAYING_RECOGNITION_SCORE_THRESHOLD", label: "Erkennungs-Score", type: "text", example: "0.55" },
     ],
   },
   {
@@ -192,11 +135,7 @@ const GROUPS = [
 const SECRET_FIELDS = [
   { group: "Owner", key: "API_ADMIN_TOKEN", label: "Owner API Token", writeOnly: false },
   { group: "Owner", key: "ADMIN_API_TOKEN", label: "Legacy Owner API Token", writeOnly: false },
-  ...Array.from({ length: 20 }, (_, offset) => {
-    const index = offset + 1;
-    return { group: "Discord", key: `BOT_${index}_TOKEN`, label: index === 1 ? "Commander Bot Token" : `Worker ${index} Bot Token`, writeOnly: true };
-  }),
-  { group: "Discord", key: "BOT_TOKEN", label: "Legacy Discord Bot Token", writeOnly: true },
+  { group: "Discord", key: "BOT_TOKEN", label: "Discord Bot Token" },
   { group: "Discord", key: "DISCORD_CLIENT_SECRET", label: "Discord OAuth Secret", writeOnly: true },
   { group: "Stripe", key: "STRIPE_SECRET_KEY", label: "Stripe Secret Key", writeOnly: true },
   { group: "Stripe", key: "STRIPE_API_KEY", label: "Stripe API Key Legacy", writeOnly: true },
@@ -209,7 +148,6 @@ const SECRET_FIELDS = [
   { group: "Vote Plattformen", key: "TOPGG_TOKEN", label: "Top.gg Token", writeOnly: true },
   { group: "Vote Plattformen", key: "TOPGG_WEBHOOK_SECRET", label: "Top.gg Webhook Secret", writeOnly: true },
   { group: "Audio", key: "ACOUSTID_API_KEY", label: "AcoustID API Key", writeOnly: true },
-  { group: "Datenspeicher", key: "MONGO_URL", label: "MongoDB Connection URL", writeOnly: true },
 ];
 
 const FIELD_BY_KEY = new Map(GROUPS.flatMap((group) => group.fields.map((field) => [field.key, { ...field, group: group.id }])));
@@ -220,12 +158,6 @@ function resolveEnvFilePath() {
   const explicit = String(process.env.OMNIFM_ENV_FILE || "").trim();
   if (explicit) return path.isAbsolute(explicit) ? explicit : path.resolve(rootDir, explicit);
   return path.join(rootDir, ".env");
-}
-
-function resolveOwnerConfigStorePath() {
-  const explicit = String(process.env.OMNIFM_OWNER_CONFIG_FILE || "").trim();
-  if (explicit) return path.isAbsolute(explicit) ? explicit : path.resolve(rootDir, explicit);
-  return resolveRuntimeDataPath("owner-config.env");
 }
 
 function stripUnsafeValueCharacters(value) {
@@ -272,27 +204,9 @@ function getFileWritableState(envFile) {
   }
 }
 
-function readConfigSources() {
-  const primary = readEnvFile(resolveEnvFilePath());
-  const ownerStorePath = resolveOwnerConfigStorePath();
-  const ownerStore = ownerStorePath === primary.envFile
-    ? { envFile: ownerStorePath, exists: false, lines: [], values: {} }
-    : readEnvFile(ownerStorePath);
-  return { primary, ownerStore };
-}
-
-function getWritableConfigTarget(sources) {
-  if (sources.ownerStore.exists && getFileWritableState(sources.ownerStore.envFile)) return sources.ownerStore;
-  if (getFileWritableState(sources.primary.envFile)) return sources.primary;
-  return sources.ownerStore;
-}
-
-function readEffectiveValue(sources, key) {
-  if (Object.prototype.hasOwnProperty.call(sources.ownerStore.values, key)) {
-    return { value: sources.ownerStore.values[key], source: "owner-store" };
-  }
-  if (Object.prototype.hasOwnProperty.call(sources.primary.values, key)) {
-    return { value: sources.primary.values[key], source: "env-file" };
+function readEffectiveValue(values, key) {
+  if (Object.prototype.hasOwnProperty.call(values, key)) {
+    return { value: values[key], source: "env-file" };
   }
   if (process.env[key] != null) {
     return { value: String(process.env[key]), source: "process" };
@@ -445,21 +359,15 @@ function serializeEnvLines(parsed, updates) {
 }
 
 function writeEnvUpdates(updates) {
-  const sources = readConfigSources();
-  const target = getWritableConfigTarget(sources);
-  const envFile = target.envFile;
-  if (!getFileWritableState(envFile)) {
-    const err = new Error("Weder .env noch der persistente Owner-Speicher sind schreibbar.");
-    err.statusCode = 503;
-    throw err;
-  }
+  const parsed = readEnvFile();
+  const envFile = parsed.envFile;
   fs.mkdirSync(path.dirname(envFile), { recursive: true });
 
-  if (target.exists) {
+  if (parsed.exists) {
     fs.copyFileSync(envFile, `${envFile}.bak-owner`);
   }
 
-  const content = serializeEnvLines(target, updates);
+  const content = serializeEnvLines(parsed, updates);
   const tmpFile = `${envFile}.tmp-${process.pid}-${Date.now()}`;
   fs.writeFileSync(tmpFile, content, { encoding: "utf8", mode: 0o600 });
   fs.renameSync(tmpFile, envFile);
@@ -468,21 +376,17 @@ function writeEnvUpdates(updates) {
     process.env[key] = value;
   }
 
-  return readConfigSources();
+  return readEnvFile(envFile);
 }
 
-function buildSnapshot(sources = readConfigSources(), { updatedKeys = [] } = {}) {
-  const target = getWritableConfigTarget(sources);
-  const usingOwnerStore = target.envFile === sources.ownerStore.envFile;
+function buildSnapshot(parsed = readEnvFile(), { updatedKeys = [] } = {}) {
+  const envFile = parsed.envFile;
   return {
-    schemaVersion: "owner-config-v1",
     generatedAt: new Date().toISOString(),
     envFile: {
-      path: target.envFile,
-      exists: target.exists,
-      writable: getFileWritableState(target.envFile),
-      storage: usingOwnerStore ? "owner-store" : "env-file",
-      primaryPath: sources.primary.envFile,
+      path: envFile,
+      exists: parsed.exists,
+      writable: getFileWritableState(envFile),
     },
     restartRequired: updatedKeys.length > 0,
     updatedKeys,
@@ -491,7 +395,7 @@ function buildSnapshot(sources = readConfigSources(), { updatedKeys = [] } = {})
       title: group.title,
       description: group.description,
       fields: group.fields.map((field) => {
-        const effective = readEffectiveValue(sources, field.key);
+        const effective = readEffectiveValue(parsed.values, field.key);
         return {
           ...field,
           value: effective.value,
@@ -502,7 +406,7 @@ function buildSnapshot(sources = readConfigSources(), { updatedKeys = [] } = {})
       }),
     })),
     secrets: SECRET_FIELDS.map((field) => {
-      const effective = readEffectiveValue(sources, field.key);
+      const effective = readEffectiveValue(parsed.values, field.key);
       return {
         ...field,
         configured: effective.value.trim().length > 0,
@@ -516,7 +420,7 @@ function buildSnapshot(sources = readConfigSources(), { updatedKeys = [] } = {})
 }
 
 function getOwnerConfigSnapshot() {
-  return buildSnapshot(readConfigSources());
+  return buildSnapshot(readEnvFile());
 }
 
 function patchOwnerConfig(input) {
@@ -585,5 +489,4 @@ export {
   patchOwnerConfig,
   patchOwnerSecrets,
   resolveEnvFilePath,
-  resolveOwnerConfigStorePath,
 };

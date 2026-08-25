@@ -172,8 +172,7 @@ function sanitizeStations(stationsInput) {
     const url = String(rawValue?.url || "").trim();
     if (!key || !name || !url) continue;
     const tier = String(rawValue?.tier || "free").toLowerCase();
-    const genre = String(rawValue?.genre || "").trim().slice(0, 120);
-    out[key] = { name, url, tier: ["free", "pro", "ultimate"].includes(tier) ? tier : "free", ...(genre ? { genre } : {}) };
+    out[key] = { name, url, tier: ["free", "pro", "ultimate"].includes(tier) ? tier : "free" };
   }
   return out;
 }
@@ -264,7 +263,7 @@ export async function initStationsStore() {
     for (const doc of docs) {
       const key = doc.key;
       if (key) {
-        stations[key] = { name: doc.name || key, url: doc.url || "", tier: doc.tier || "free", ...(doc.genre ? { genre: String(doc.genre) } : {}) };
+        stations[key] = { name: doc.name || key, url: doc.url || "", tier: doc.tier || "free" };
         if (doc.is_default) defaultKey = key;
       }
     }
@@ -310,7 +309,7 @@ export async function saveStations(data) {
             filter: { key },
             update: {
               $set: {
-                key, name: station.name, url: station.url, tier: station.tier, genre: station.genre || "",
+                key, name: station.name, url: station.url, tier: station.tier,
                 is_default: key === normalized.defaultStationKey,
               },
             },

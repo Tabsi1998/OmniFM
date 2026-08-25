@@ -1,7 +1,5 @@
 # OmniFM
 
-> **Produktiver Stack:** `src/` ist das Node.js-Backend inklusive Discord-Runtime und liefert das gebaute React-Frontend selbst aus. Der Ordner `backend/` ist nur noch archivierte Referenz und darf nicht separat mit FastAPI deployed werden. Für einen vollständigen Release immer `./update.sh` verwenden.
-
 **OmniFM** ist eine moderne, professionelle 24/7 **Discord Radio- & Music-Plattform** – gehört wird direkt in Discord-Voice-Channels, verwaltet über ein hochwertiges Web-Dashboard.
 
 <p align="center">

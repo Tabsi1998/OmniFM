@@ -123,14 +123,10 @@ export function createPublicRoutesHandler(deps) {
       }
       const bots = runtimes.map((runtime) => runtime.getPublicStatus());
       const totals = buildPublicBotTotals(bots);
-      const readyBots = bots.filter((bot) => Boolean(bot?.ready)).length;
       const publicStations = buildPublicStationCatalog(loadStations());
       sendJson(res, 200, {
         ...totals,
         bots: runtimes.length,
-        configuredBots: runtimes.length,
-        readyBots,
-        live: readyBots > 0,
         stations: publicStations.total,
         freeStations: publicStations.freeStations,
         proStations: publicStations.proStations,

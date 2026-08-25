@@ -148,7 +148,7 @@ function Hero({ stats, bots }) {
   const heroStats = [
     { label: copy.hero.stats.servers, value: stats.servers || 0, color: '#ff6b00' },
     { label: copy.hero.stats.stations, value: stats.stations || 0, color: '#00e5ff' },
-    { label: copy.hero.stats.bots, value: stats.readyBots ?? stats.bots ?? 0, color: '#10b981' },
+    { label: copy.hero.stats.bots, value: stats.bots || 0, color: '#10b981' },
   ];
   const listeners = stats.listeners || 0;
 

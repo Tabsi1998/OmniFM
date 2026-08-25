@@ -129,8 +129,6 @@ const LOCALE_MESSAGES = {
     trustBar: {
       introEyebrow: 'Live-Proof',
       introBody: 'Diese Signale zeigen direkt auf der Startseite, dass OmniFM nicht nur gut klingt, sondern bereits als laufendes Discord-Radio-Produkt arbeitet.',
-      networkOffline: 'konfiguriert · derzeit offline',
-      networkOfflineDetail: 'Keine Bot-Runtime ist verbunden. Server-, Verbindungs- und Hörerzahlen erscheinen automatisch, sobald die Bots online sind.',
       items: {
         stations: {
           label: 'Stationen',
@@ -1105,8 +1103,6 @@ const LOCALE_MESSAGES = {
     trustBar: {
       introEyebrow: 'Live proof',
       introBody: 'These signals show right on the homepage that OmniFM is not just positioned well, but already operates as a live Discord radio product.',
-      networkOffline: 'configured · currently offline',
-      networkOfflineDetail: 'No bot runtime is connected. Server, connection and listener counts appear automatically once the bots are online.',
       items: {
         stations: {
           label: 'Stations',

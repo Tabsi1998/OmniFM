@@ -260,7 +260,7 @@ function AppContent() {
       <Hero stats={stats} bots={bots} />
       <TrustBar stats={stats} />
       <DiscordShowcase />
-      <HowToDiscord bots={bots} />
+      <HowToDiscord />
       <StationBrowser stations={stations} loading={loading} />
       <WhyOmniFM />
       <DashboardShowcase />

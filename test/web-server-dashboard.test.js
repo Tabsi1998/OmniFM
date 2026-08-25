@@ -627,9 +627,6 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
   const publicStatsResponse = await requestJson(baseUrl, "/api/stats");
   assert.equal(publicStatsResponse.status, 200);
   assert.equal(publicStatsResponse.payload.bots, 1);
-  assert.equal(publicStatsResponse.payload.configuredBots, 1);
-  assert.equal(publicStatsResponse.payload.readyBots, 1);
-  assert.equal(publicStatsResponse.payload.live, true);
   assert.ok(publicStatsResponse.payload.stations >= 1);
 
   const publicStationsResponse = await requestJson(baseUrl, "/api/stations");

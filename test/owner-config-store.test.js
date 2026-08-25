@@ -39,7 +39,6 @@ test("owner config snapshot reads editable values and hides secret values", asyn
   try {
     const snapshot = getOwnerConfigSnapshot();
     const webGroup = snapshot.groups.find((group) => group.id === "web");
-    const botsGroup = snapshot.groups.find((group) => group.id === "bots");
     const publicUrl = webGroup.fields.find((field) => field.key === "PUBLIC_WEB_URL");
     const adminToken = snapshot.secrets.find((secret) => secret.key === "API_ADMIN_TOKEN");
 
@@ -48,8 +47,6 @@ test("owner config snapshot reads editable values and hides secret values", asyn
     assert.equal(adminToken.configured, true);
     assert.equal(adminToken.secret, true);
     assert.equal(Object.hasOwn(adminToken, "value"), false);
-    assert.ok(botsGroup.fields.some((field) => field.key === "BOT_20_CLIENT_ID"));
-    assert.ok(snapshot.secrets.some((secret) => secret.key === "BOT_20_TOKEN" && secret.writeOnly));
   } finally {
     restoreEnv();
     await fs.rm(dir, { recursive: true, force: true });
@@ -161,31 +158,6 @@ test("owner config stores write-only secrets without exposing values", async () 
       () => patchOwnerSecrets({ values: { STRIPE_WEBHOOK_SECRET: "" } }),
       /Keine Secret-Werte/
     );
-  } finally {
-    restoreEnv();
-    await fs.rm(dir, { recursive: true, force: true });
-  }
-});
-
-test("owner config uses the persistent owner store when the primary env file cannot be written", async () => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omnifm-owner-config-store-"));
-  const envFile = path.join(dir, "read-only", ".env");
-  const ownerStore = path.join(dir, "owner-config.env");
-  const restoreEnv = setEnv({
-    OMNIFM_ENV_FILE: envFile,
-    OMNIFM_OWNER_CONFIG_FILE: ownerStore,
-    PUBLIC_WEB_URL: undefined,
-  });
-
-  try {
-    const patched = patchOwnerConfig({ values: { PUBLIC_WEB_URL: "https://omnifm.xyz" } });
-    const content = await fs.readFile(ownerStore, "utf8");
-    const publicUrl = patched.groups.find((group) => group.id === "web").fields.find((field) => field.key === "PUBLIC_WEB_URL");
-
-    assert.equal(patched.envFile.storage, "owner-store");
-    assert.equal(patched.envFile.writable, true);
-    assert.match(content, /PUBLIC_WEB_URL=https:\/\/omnifm\.xyz/);
-    assert.equal(publicUrl.source, "owner-store");
   } finally {
     restoreEnv();
     await fs.rm(dir, { recursive: true, force: true });

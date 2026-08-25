@@ -1,7 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
-import { resolveOwnerConfigStorePath } from "../lib/owner-config-store.js";
 
 import { log, logError, getLogWriteQueue } from "../lib/logging.js";
 import { connect as connectDb } from "../lib/db.js";
@@ -19,7 +18,6 @@ import { installOperatorIncidentRecorder, logRecentOperatorIncidentSummary } fro
 const entryDir = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.resolve(entryDir, "..", "..", ".env");
 dotenv.config({ path: envPath });
-dotenv.config({ path: resolveOwnerConfigStorePath(), override: true });
 installOperatorIncidentRecorder({
   entry: path.basename(process.argv[1] || "entrypoint.js"),
 });
