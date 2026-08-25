@@ -52,6 +52,27 @@ done
 log "Konfigurations-Backup: $BACKUP_DIR"
 
 if [ -d .git ]; then
+  # Releases before f38b631 used `npm install` during deployment. Depending on
+  # the npm version this could rewrite tracked lockfiles and permanently block
+  # the next fast-forward pull. Lockfiles are generated deployment artifacts,
+  # never runtime configuration: back up their exact diff, then restore only
+  # those known files. Any other tracked local change remains a hard stop.
+  LOCK_DIFF_DIR="$BACKUP_DIR/local-lockfile-diffs"
+  for lock_file in package-lock.json frontend/package-lock.json; do
+    if [ -f "$ROOT/$lock_file" ] && ! git diff --quiet HEAD -- "$lock_file"; then
+      mkdir -p "$LOCK_DIFF_DIR/$(dirname "$lock_file")"
+      git diff --binary HEAD -- "$lock_file" > "$LOCK_DIFF_DIR/$lock_file.patch"
+      git restore --source=HEAD --staged --worktree -- "$lock_file" \
+        || die "Automatisch erzeugte Änderung an $lock_file konnte nicht zurückgesetzt werden."
+      log "Legacy-Änderung an $lock_file gesichert und bereinigt."
+    fi
+  done
+
+  if ! git diff --quiet HEAD --; then
+    git status --short >&2
+    die "Andere lokale Git-Änderungen erkannt. Dienste bleiben unverändert; Änderungen zuerst committen oder sichern."
+  fi
+
   log "Hole neuesten Stand (git pull)..."
   git pull --ff-only || die "git pull fehlgeschlagen. Dienste und Konfiguration wurden nicht verändert."
   log "Code-Stand: $(git log -1 --pretty='%h — %s' 2>/dev/null | head -c 120 || echo 'unbekannt')"

@@ -115,6 +115,9 @@ URL via `PUBLIC_URL=https://domain.tld ./start.sh`.
 
 Bei Updates bleiben `backend/.env`, `frontend/.env` und alle MongoDB-Daten unverändert. Vor jedem
 Pull legt `update.sh` zusätzlich eine lokale Sicherung der Env-Dateien unter `.update-backups/` an.
+Von älteren Deployments automatisch veränderte `package-lock.json`-Dateien werden dort als Patch
+gesichert und auf den letzten Git-Stand zurückgeführt, damit sie den Fast-Forward-Pull nicht blockieren.
+Andere lokale Quellcodeänderungen bleiben unangetastet und stoppen das Update mit einer klaren Meldung.
 Abhängigkeiten, Frontend-Build, FastAPI/MongoDB und die DB-gesteuerte Bot-Konfiguration werden vor
 dem Stoppen der laufenden Version geprüft. Frontend und Backend wechseln danach gemeinsam auf den
 neuen Git-Stand.
