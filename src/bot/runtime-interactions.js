@@ -827,6 +827,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
       ...meta,
       name: meta.name || current.station.name || null,
     }, {
+      stationKey: activeState.currentStationKey,
       channelId,
       listenerCount: activeRuntime.getCurrentListenerCount(interaction.guildId, activeState),
       volume: activeState.volume,
@@ -908,7 +909,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
     const requestedBot = interaction.options.getInteger("bot");
     if (runtime.role === "commander" && runtime.workerManager) {
       const workers = requestedBot
-        ? [runtime.workerManager.getWorkerByIndex(requestedBot, { prefer: "botIndex" })].filter(Boolean)
+        ? [runtime.workerManager.getWorkerByIndex(requestedBot, { prefer: "slot", strict: true })].filter(Boolean)
         : runtime.workerManager.getStreamingWorkers(interaction.guildId);
       if (workers.length === 0) {
         await interaction.reply(buildNoticePayload({
@@ -980,7 +981,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
     const requestedBot = interaction.options.getInteger("bot");
     if (runtime.role === "commander" && runtime.workerManager) {
       const workers = requestedBot
-        ? [runtime.workerManager.getWorkerByIndex(requestedBot, { prefer: "botIndex" })].filter(Boolean)
+        ? [runtime.workerManager.getWorkerByIndex(requestedBot, { prefer: "slot", strict: true })].filter(Boolean)
         : runtime.workerManager.getStreamingWorkers(interaction.guildId);
       if (workers.length === 0) {
         await interaction.reply(buildNoticePayload({
@@ -1056,7 +1057,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
       
       // Priorität 1: Explizit bot: Parameter
       if (requestedBot) {
-        const worker = runtime.workerManager.getWorkerByIndex(requestedBot, { prefer: "botIndex" });
+        const worker = runtime.workerManager.getWorkerByIndex(requestedBot, { prefer: "slot", strict: true });
         if (!worker) {
           // Worker-Index nicht gefunden / nicht konfiguriert
           await interaction.reply(buildNoticePayload({
@@ -1243,7 +1244,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
       let targetWorkers = [];
 
       if (Number.isInteger(requestedBot)) {
-        const check = runtime.workerManager.canUseWorker(requestedBot, interaction.guildId, guildTier, { prefer: "botIndex" });
+        const check = runtime.workerManager.canUseWorker(requestedBot, interaction.guildId, guildTier, { prefer: "slot", strict: true });
         if (!check.ok) {
           const reasons = {
             tier: t(`Worker ${requestedBot} erfordert ein hoeheres Abo (max: ${check.maxIndex}).`, `Worker ${requestedBot} requires a higher plan (max: ${check.maxIndex}).`),
@@ -2390,7 +2391,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
       station: interaction.options.getString("station"),
       requestedVoiceChannel: interaction.options.getChannel("voice"),
       requestedBotIndex: interaction.options.getInteger("bot"),
-      requestedWorkerSelectionMode: "botIndex",
+      requestedWorkerSelectionMode: "slot",
       openWizardWhenIncomplete: true,
     });
     return;

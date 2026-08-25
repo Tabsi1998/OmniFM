@@ -7,6 +7,7 @@ import path from "node:path";
 import { PLANS } from "./config/plans.js";
 import { getDefaultLanguage, normalizeLanguage } from "./i18n.js";
 import { log, logStoreLoadError } from "./lib/logging.js";
+import { getDb } from "./lib/db.js";
 import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 
 const premiumFile = resolveRuntimeDataPath("premium.json");
@@ -16,6 +17,12 @@ const MAX_PROCESSED_ENTRIES = 5000;
 const TRIAL_RESERVATION_STALE_MS = 15 * 60 * 1000;
 const PLAN_RANK = { free: 0, pro: 1, ultimate: 2 };
 const VALID_SEATS = [1, 2, 3, 5];
+const MONGO_REFRESH_MS = Math.max(1000, Number(process.env.PREMIUM_STORE_REFRESH_MS || 2000) || 2000);
+
+let mongoSnapshot = null;
+let mongoRefreshTimer = null;
+let mongoWriteQueue = Promise.resolve();
+let mongoWritesPending = 0;
 
 // --- Internal helpers ---
 
@@ -26,7 +33,25 @@ function emptyStore() {
     processedSessions: {},
     processedEvents: {},
     trialClaims: {},
+    offers: {},
+    discordBotListState: {},
+    recentRedemptions: [],
   };
+}
+
+function cloneStore(data) {
+  return JSON.parse(JSON.stringify(data || emptyStore()));
+}
+
+function normalizeStore(input) {
+  const data = input && typeof input === "object" && !Array.isArray(input)
+    ? input
+    : emptyStore();
+  for (const key of ["licenses", "serverEntitlements", "processedSessions", "processedEvents", "trialClaims", "offers", "discordBotListState"]) {
+    if (!data[key] || typeof data[key] !== "object" || Array.isArray(data[key])) data[key] = {};
+  }
+  if (!Array.isArray(data.recentRedemptions)) data.recentRedemptions = [];
+  return data;
 }
 
 function readFileSafe(filePath) {
@@ -43,15 +68,9 @@ function readFileSafe(filePath) {
 }
 
 function load() {
-  const data = readFileSafe(premiumFile) || readFileSafe(premiumBackupFile) || emptyStore();
-  // Ensure all fields exist
-  if (!data.licenses) data.licenses = {};
-  if (!data.serverEntitlements) data.serverEntitlements = {};
-  if (!data.processedSessions) data.processedSessions = {};
-  if (!data.processedEvents) data.processedEvents = {};
-  if (!data.trialClaims || typeof data.trialClaims !== "object" || Array.isArray(data.trialClaims)) {
-    data.trialClaims = {};
-  }
+  const data = normalizeStore(mongoSnapshot
+    ? cloneStore(mongoSnapshot)
+    : (readFileSafe(premiumFile) || readFileSafe(premiumBackupFile) || emptyStore()));
 
   // Migrate old format: if a license key looks like a guild ID (17+ digits),
   // convert to new format
@@ -81,7 +100,7 @@ function load() {
   return data;
 }
 
-function save(data) {
+function saveFile(data) {
   const tmpFile = `${premiumFile}.tmp-${process.pid}-${Date.now()}`;
   try {
     if (fs.existsSync(premiumFile) && fs.statSync(premiumFile).isDirectory()) return;
@@ -112,9 +131,187 @@ function save(data) {
   }
 }
 
-export function initPremiumStore() {
-  // File-backed store is loaded lazily. We preload once for startup diagnostics.
-  return load();
+async function readMongoStore(database) {
+  const [licenseDocs, entitlementDocs, sessionDocs, eventDocs, metaDoc] = await Promise.all([
+    database.collection("licenses").find({}, { projection: { _id: 0 } }).toArray(),
+    database.collection("server_entitlements").find({}, { projection: { _id: 0 } }).toArray(),
+    database.collection("processed_sessions").find({}, { projection: { _id: 0 } }).toArray(),
+    database.collection("processed_events").find({}, { projection: { _id: 0 } }).toArray(),
+    database.collection("premium_state").findOne({ _id: "meta" }, { projection: { _id: 0 } }),
+  ]);
+  const data = normalizeStore({ ...(metaDoc || {}) });
+  data.licenses = Object.fromEntries(licenseDocs
+    .filter((doc) => doc?._licenseId)
+    .map((doc) => {
+      const { _licenseId, ...license } = doc;
+      return [String(_licenseId), license];
+    }));
+  data.serverEntitlements = Object.fromEntries(entitlementDocs
+    .filter((doc) => doc?._serverId)
+    .map((doc) => {
+      const { _serverId, ...entitlement } = doc;
+      return [String(_serverId), entitlement];
+    }));
+  data.processedSessions = Object.fromEntries(sessionDocs
+    .filter((doc) => doc?._sessionId)
+    .map((doc) => {
+      const { _sessionId, ...session } = doc;
+      return [String(_sessionId), session];
+    }));
+  data.processedEvents = Object.fromEntries(eventDocs
+    .filter((doc) => doc?._eventId)
+    .map((doc) => {
+      const { _eventId, ...event } = doc;
+      return [String(_eventId), event];
+    }));
+  return data;
+}
+
+async function replaceMapCollection(database, collectionName, idField, values) {
+  const ids = [];
+  for (const [id, value] of Object.entries(values || {})) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+    await database.collection(collectionName).replaceOne(
+      { [idField]: id },
+      { ...value, [idField]: id },
+      { upsert: true }
+    );
+    ids.push(id);
+  }
+  if (ids.length) {
+    await database.collection(collectionName).deleteMany({ [idField]: { $nin: ids } });
+  } else {
+    await database.collection(collectionName).deleteMany({});
+  }
+}
+
+function valuesEqual(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+async function writeMapDelta(database, collectionName, idField, beforeValues, nextValues) {
+  const before = beforeValues && typeof beforeValues === "object" ? beforeValues : {};
+  const next = nextValues && typeof nextValues === "object" ? nextValues : {};
+  for (const [id, value] of Object.entries(next)) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+    if (valuesEqual(before[id], value)) continue;
+    await database.collection(collectionName).replaceOne(
+      { [idField]: id },
+      { ...value, [idField]: id },
+      { upsert: true }
+    );
+  }
+  const removedIds = Object.keys(before).filter((id) => !Object.hasOwn(next, id));
+  if (removedIds.length) {
+    await database.collection(collectionName).deleteMany({ [idField]: { $in: removedIds } });
+  }
+}
+
+async function writeMongoStore(database, input) {
+  const data = normalizeStore(cloneStore(input));
+  await replaceMapCollection(database, "licenses", "_licenseId", data.licenses);
+  await replaceMapCollection(database, "server_entitlements", "_serverId", data.serverEntitlements);
+  await replaceMapCollection(database, "processed_sessions", "_sessionId", data.processedSessions);
+  await replaceMapCollection(database, "processed_events", "_eventId", data.processedEvents);
+  await database.collection("premium_state").replaceOne(
+    { _id: "meta" },
+    {
+      _id: "meta",
+      trialClaims: data.trialClaims,
+      offers: data.offers,
+      discordBotListState: data.discordBotListState,
+      recentRedemptions: data.recentRedemptions,
+    },
+    { upsert: true }
+  );
+}
+
+async function writeMongoDelta(database, beforeInput, nextInput) {
+  const before = normalizeStore(cloneStore(beforeInput));
+  const next = normalizeStore(cloneStore(nextInput));
+  await writeMapDelta(database, "licenses", "_licenseId", before.licenses, next.licenses);
+  await writeMapDelta(database, "server_entitlements", "_serverId", before.serverEntitlements, next.serverEntitlements);
+  await writeMapDelta(database, "processed_sessions", "_sessionId", before.processedSessions, next.processedSessions);
+  await writeMapDelta(database, "processed_events", "_eventId", before.processedEvents, next.processedEvents);
+
+  const changedMeta = {};
+  for (const key of ["trialClaims", "offers", "discordBotListState", "recentRedemptions"]) {
+    if (!valuesEqual(before[key], next[key])) changedMeta[key] = next[key];
+  }
+  if (Object.keys(changedMeta).length) {
+    await database.collection("premium_state").updateOne(
+      { _id: "meta" },
+      { $set: changedMeta },
+      { upsert: true }
+    );
+  }
+}
+
+function hasStoreData(data) {
+  return ["licenses", "serverEntitlements", "processedSessions", "processedEvents", "trialClaims", "offers", "discordBotListState"]
+    .some((key) => Object.keys(data?.[key] || {}).length > 0)
+    || (data?.recentRedemptions || []).length > 0;
+}
+
+async function refreshMongoSnapshot() {
+  const database = getDb();
+  if (!database || mongoWritesPending > 0) return false;
+  const remote = await readMongoStore(database);
+  mongoSnapshot = normalizeStore(remote);
+  saveFile(mongoSnapshot);
+  return true;
+}
+
+function queueMongoWrite(data, baseline) {
+  const database = getDb();
+  if (!database) return;
+  const snapshot = cloneStore(data);
+  const previous = cloneStore(baseline);
+  mongoWritesPending += 1;
+  mongoWriteQueue = mongoWriteQueue
+    .then(() => writeMongoDelta(database, previous, snapshot))
+    .catch((err) => log("ERROR", `[OmniFM] MongoDB license save error: ${err?.message || err}`))
+    .finally(() => { mongoWritesPending = Math.max(0, mongoWritesPending - 1); });
+}
+
+function save(data) {
+  const normalized = normalizeStore(data);
+  saveFile(normalized);
+  if (getDb()) {
+    const baseline = cloneStore(mongoSnapshot || emptyStore());
+    mongoSnapshot = cloneStore(normalized);
+    queueMongoWrite(normalized, baseline);
+  }
+}
+
+export async function initPremiumStore() {
+  const fileStore = normalizeStore(readFileSafe(premiumFile) || readFileSafe(premiumBackupFile) || emptyStore());
+  const database = getDb();
+  if (!database) return fileStore;
+
+  try {
+    const remote = await readMongoStore(database);
+    if (hasStoreData(remote) || !hasStoreData(fileStore)) {
+      mongoSnapshot = normalizeStore(remote);
+      saveFile(mongoSnapshot);
+    } else {
+      mongoSnapshot = cloneStore(fileStore);
+      await writeMongoStore(database, mongoSnapshot);
+      log("INFO", "[OmniFM] Premium-Store einmalig von JSON nach MongoDB migriert.");
+    }
+    if (!mongoRefreshTimer) {
+      mongoRefreshTimer = setInterval(() => {
+        refreshMongoSnapshot().catch((err) => log("WARN", `[OmniFM] Premium-Store Refresh fehlgeschlagen: ${err?.message || err}`));
+      }, MONGO_REFRESH_MS);
+      mongoRefreshTimer.unref?.();
+    }
+    log("INFO", `[OmniFM] Premium-Store nutzt MongoDB (Live-Refresh ${MONGO_REFRESH_MS}ms).`);
+    return cloneStore(mongoSnapshot);
+  } catch (err) {
+    mongoSnapshot = null;
+    log("WARN", `[OmniFM] Premium-Store MongoDB nicht lesbar: ${err?.message || err}. Nutze JSON-Fallback.`);
+    return fileStore;
+  }
 }
 
 // --- License CRUD ---
@@ -205,7 +402,7 @@ export function linkServerToLicense(serverId, licenseId) {
   const data = load();
   const lic = data.licenses[lid];
   if (!lic) return { ok: false, message: "License not found." };
-  if (!lic.active || isExpired(lic)) return { ok: false, message: "License is not active or has expired." };
+  if (lic.active === false || isExpired(lic)) return { ok: false, message: "License is not active or has expired." };
 
   // If server is linked to a different license, release that seat first.
   const currentEntitlement = data.serverEntitlements[sid];
@@ -216,6 +413,14 @@ export function linkServerToLicense(serverId, licenseId) {
       oldLicense.linkedServerIds = (oldLicense.linkedServerIds || []).filter((id) => id !== sid);
       oldLicense.updatedAt = new Date().toISOString();
     }
+  }
+  // Repair assignments written by older Owner versions that had no matching
+  // serverEntitlements document, and guarantee one active seat per guild.
+  for (const [otherLicenseId, otherLicense] of Object.entries(data.licenses)) {
+    if (otherLicenseId === lid || !otherLicense) continue;
+    if (!(otherLicense.linkedServerIds || []).some((id) => String(id) === sid)) continue;
+    otherLicense.linkedServerIds = (otherLicense.linkedServerIds || []).filter((id) => String(id) !== sid);
+    otherLicense.updatedAt = new Date().toISOString();
   }
 
   const linked = lic.linkedServerIds || [];
@@ -252,17 +457,32 @@ export function unlinkServerFromLicense(serverId, licenseId) {
 
 export function getServerLicense(serverId) {
   const data = load();
-  const entitlement = data.serverEntitlements[String(serverId)];
+  const normalizedServerId = String(serverId);
+  let entitlement = data.serverEntitlements[normalizedServerId];
+  // Older Owner releases only wrote linkedServerIds. Accept those records so
+  // existing production licenses start working immediately after deployment.
+  if (!entitlement) {
+    const legacyLink = Object.entries(data.licenses).find(([, license]) =>
+      (license?.linkedServerIds || []).some((id) => String(id) === normalizedServerId)
+    );
+    if (legacyLink) entitlement = { serverId: normalizedServerId, licenseId: legacyLink[0] };
+  }
   if (!entitlement) return null;
   const lic = data.licenses[entitlement.licenseId];
   if (!lic) return null;
-  if (isExpired(lic)) return { ...lic, active: false, expired: true };
-  return { ...lic, expired: false, remainingDays: remainingDays(lic) };
+  if (isExpired(lic)) return { ...lic, id: lic.id || entitlement.licenseId, active: false, expired: true };
+  return {
+    ...lic,
+    id: lic.id || entitlement.licenseId,
+    active: lic.active !== false,
+    expired: false,
+    remainingDays: remainingDays(lic),
+  };
 }
 
 export function getServerPlan(serverId) {
   const lic = getServerLicense(serverId);
-  if (!lic || !lic.active || lic.expired) return "free";
+  if (!lic || lic.active === false || lic.expired) return "free";
   return PLANS[lic.plan] ? lic.plan : "free";
 }
 

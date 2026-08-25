@@ -542,6 +542,7 @@ def empty_premium_state():
         "licenses": {},
         "serverEntitlements": {},
         "processedSessions": {},
+        "processedEvents": {},
         "trialClaims": {},
         "offers": {},
         "discordBotListState": {},
@@ -1673,6 +1674,11 @@ def seed_premium_if_needed():
                     if isinstance(sess, dict):
                         sess["_sessionId"] = sess_id
                         db.processed_sessions.replace_one({"_sessionId": sess_id}, sess, upsert=True)
+                events = data.get("processedEvents", {})
+                for event_id, event in events.items():
+                    if isinstance(event, dict):
+                        event["_eventId"] = event_id
+                        db.processed_events.replace_one({"_eventId": event_id}, event, upsert=True)
                 extra_state = {
                     "trialClaims": data.get("trialClaims", {}),
                     "offers": data.get("offers", {}),
@@ -1731,13 +1737,30 @@ def load_premium():
                 sess_id = doc.pop("_sessionId", None)
                 if sess_id:
                     processed[sess_id] = doc
+            processed_events = {}
+            for doc in db.processed_events.find({}, {"_id": 0}):
+                event_id = doc.pop("_eventId", None)
+                if event_id:
+                    processed_events[event_id] = doc
             meta = db.premium_state.find_one({"_id": "meta"}, {"_id": 0}) or {}
-            return ensure_premium_state({
+            state = ensure_premium_state({
                 **meta,
                 "licenses": licenses,
                 "serverEntitlements": server_ents,
                 "processedSessions": processed,
+                "processedEvents": processed_events,
             })
+            # Keep the exact Mongo snapshot with the in-memory state. save_premium
+            # uses it to write only the caller's changes instead of replacing
+            # collections that the Discord runtime may be updating concurrently.
+            state["_mongoBaseline"] = {
+                key: json.loads(json.dumps(state.get(key)))
+                for key in (
+                    "licenses", "serverEntitlements", "processedSessions", "processedEvents",
+                    "trialClaims", "offers", "discordBotListState", "recentRedemptions",
+                )
+            }
+            return state
         except Exception:
             pass
     try:
@@ -1750,52 +1773,46 @@ def load_premium():
 
 def save_premium(data):
     safe_data = ensure_premium_state(data)
-    if db is not None:
-        try:
-            license_ids = []
-            for lic_id, lic in safe_data.get("licenses", {}).items():
-                if isinstance(lic, dict):
-                    doc = {**lic, "_licenseId": lic_id}
-                    db.licenses.replace_one({"_licenseId": lic_id}, doc, upsert=True)
-                    license_ids.append(lic_id)
-            if license_ids:
-                db.licenses.delete_many({"_licenseId": {"$nin": license_ids}})
-            else:
-                db.licenses.delete_many({})
+    baseline = safe_data.pop("_mongoBaseline", {})
 
-            server_ids = []
-            for srv_id, ent in safe_data.get("serverEntitlements", {}).items():
-                if isinstance(ent, dict):
-                    doc = {**ent, "_serverId": srv_id}
-                    db.server_entitlements.replace_one({"_serverId": srv_id}, doc, upsert=True)
-                    server_ids.append(srv_id)
-            if server_ids:
-                db.server_entitlements.delete_many({"_serverId": {"$nin": server_ids}})
-            else:
-                db.server_entitlements.delete_many({})
-
-            session_ids = []
-            for sess_id, sess in safe_data.get("processedSessions", {}).items():
-                if isinstance(sess, dict):
-                    doc = {**sess, "_sessionId": sess_id}
-                    db.processed_sessions.replace_one({"_sessionId": sess_id}, doc, upsert=True)
-                    session_ids.append(sess_id)
-            if session_ids:
-                db.processed_sessions.delete_many({"_sessionId": {"$nin": session_ids}})
-            else:
-                db.processed_sessions.delete_many({})
-
-            db.premium_state.replace_one(
-                {"_id": "meta"},
-                {
-                    "_id": "meta",
-                    "trialClaims": safe_data.get("trialClaims", {}),
-                    "offers": safe_data.get("offers", {}),
-                    "discordBotListState": safe_data.get("discordBotListState", {}),
-                    "recentRedemptions": safe_data.get("recentRedemptions", []),
-                },
+    def sync_map(collection, id_field, map_key):
+        before = baseline.get(map_key, {}) if isinstance(baseline, dict) else {}
+        before = before if isinstance(before, dict) else {}
+        current = safe_data.get(map_key, {})
+        current = current if isinstance(current, dict) else {}
+        for record_id, value in current.items():
+            if not isinstance(value, dict) or isinstance(value, list):
+                continue
+            if before.get(record_id) == value:
+                continue
+            collection.replace_one(
+                {id_field: record_id},
+                {**value, id_field: record_id},
                 upsert=True,
             )
+        removed_ids = list(set(before.keys()) - set(current.keys()))
+        if removed_ids:
+            collection.delete_many({id_field: {"$in": removed_ids}})
+
+    if db is not None:
+        try:
+            sync_map(db.licenses, "_licenseId", "licenses")
+            sync_map(db.server_entitlements, "_serverId", "serverEntitlements")
+            sync_map(db.processed_sessions, "_sessionId", "processedSessions")
+            sync_map(db.processed_events, "_eventId", "processedEvents")
+
+            # Meta sections are updated independently so an offer edit cannot
+            # overwrite a concurrent trial claim or bot-list statistics update.
+            changed_meta = {}
+            for key in ("trialClaims", "offers", "discordBotListState", "recentRedemptions"):
+                if not isinstance(baseline, dict) or baseline.get(key) != safe_data.get(key):
+                    changed_meta[key] = safe_data.get(key)
+            if changed_meta:
+                db.premium_state.update_one(
+                    {"_id": "meta"},
+                    {"$set": changed_meta},
+                    upsert=True,
+                )
             return
         except Exception:
             pass
@@ -2124,7 +2141,7 @@ def mark_processed_session(session_id, payload):
 
 def is_expired(license_info):
     if not license_info or not license_info.get("expiresAt"):
-        return True
+        return False
     return datetime.fromisoformat(license_info["expiresAt"].replace("Z", "+00:00")) <= datetime.now(timezone.utc)
 
 
@@ -2143,15 +2160,24 @@ def get_server_license(server_id):
     # New format: serverEntitlements -> licenseId -> licenses
     if "serverEntitlements" in data:
         ent = data.get("serverEntitlements", {}).get(sid)
+        # Compatibility/self-healing read for links created by older Owner APIs,
+        # which updated linkedServerIds but forgot serverEntitlements.
+        if not ent:
+            for license_id, candidate in data.get("licenses", {}).items():
+                if sid in [str(item) for item in (candidate.get("linkedServerIds") or [])]:
+                    ent = {"serverId": sid, "licenseId": license_id}
+                    break
         if ent:
             lic = data.get("licenses", {}).get(ent.get("licenseId", ""))
             if lic:
                 expired = is_expired(lic)
+                active = bool(lic.get("active", True)) and not expired
                 return {
                     **lic,
                     "expired": expired,
                     "remainingDays": remaining_days(lic),
-                    "activeTier": "free" if expired else lic.get("plan", "free"),
+                    "active": active,
+                    "activeTier": lic.get("plan", "free") if active else "free",
                     "tier": lic.get("plan", "free"),
                 }
 
@@ -2160,11 +2186,13 @@ def get_server_license(server_id):
     if not lic:
         return None
     expired = is_expired(lic)
+    active = bool(lic.get("active", True)) and not expired
     return {
         **lic,
         "expired": expired,
+        "active": active,
         "remainingDays": remaining_days(lic),
-        "activeTier": "free" if expired else lic.get("tier", lic.get("plan", "free")),
+        "activeTier": lic.get("tier", lic.get("plan", "free")) if active else "free",
         "tier": lic.get("tier", lic.get("plan", "free")),
     }
 
@@ -2178,19 +2206,21 @@ def get_license_by_key(license_key):
     if not lic:
         return None
     expired = is_expired(lic)
+    active = bool(lic.get("active", True)) and not expired
     return {
         **lic,
         "licenseKey": key,
         "expired": expired,
+        "active": active,
         "remainingDays": remaining_days(lic),
-        "activeTier": "free" if expired else lic.get("tier", lic.get("plan", "free")),
+        "activeTier": lic.get("tier", lic.get("plan", "free")) if active else "free",
         "tier": lic.get("tier", lic.get("plan", "free")),
     }
 
 
 def get_tier(server_id):
     lic = get_server_license(server_id)
-    if not lic or lic.get("expired"):
+    if not lic or lic.get("expired") or not lic.get("active", True):
         return "free"
     tier = lic.get("tier", lic.get("plan", "free"))
     return tier if tier in TIERS else "free"
@@ -2310,11 +2340,16 @@ def add_license(email, tier, months, seats=1, activated_by="stripe", note=""):
         license_key = generate_license_key()
 
     data.setdefault("licenses", {})[license_key] = {
+        "id": license_key,
         "tier": tier,
         "plan": tier,
         "seats": seats,
+        "active": True,
         "email": email,
+        "contactEmail": email,
         "linkedServerIds": [],
+        "createdAt": now.isoformat(),
+        "updatedAt": now.isoformat(),
         "activatedAt": now.isoformat(),
         "expiresAt": (now + timedelta(days=months * 30)).isoformat(),
         "durationMonths": months,
@@ -2329,7 +2364,7 @@ def upgrade_license(server_id, new_tier):
     data = load_premium()
     sid = str(server_id)
     lic = data.get("licenses", {}).get(sid)
-    if not lic or is_expired(lic):
+    if not lic or lic.get("active", True) is False or is_expired(lic):
         raise ValueError("Keine aktive Lizenz zum Upgraden.")
     data["licenses"][sid] = {
         **lic,
@@ -2347,12 +2382,14 @@ def sanitize_license_for_api(license_info, include_sensitive=False):
         return None
 
     plan = license_info.get("tier", license_info.get("plan", "free"))
+    expired = bool(license_info.get("expired"))
+    active = bool(license_info.get("active", True)) and not expired
     payload = {
         "tier": plan,
         "plan": plan,
         "seats": 1,
-        "active": not bool(license_info.get("expired")),
-        "expired": bool(license_info.get("expired")),
+        "active": active,
+        "expired": expired,
         "expiresAt": license_info.get("expiresAt"),
         "remainingDays": license_info.get("remainingDays", 0),
     }
@@ -2678,7 +2715,7 @@ async def get_commands():
 
 
 @app.get("/api/auth/discord/login")
-async def auth_discord_login(request: Request, nextPage: str = "dashboard"):
+async def auth_discord_login(request: Request, nextPage: str = "dashboard", redirect: bool = False):
     rate_limited = enforce_api_rate_limit(request, "read")
     if rate_limited is not None:
         return rate_limited
@@ -2700,9 +2737,15 @@ async def auth_discord_login(request: Request, nextPage: str = "dashboard"):
         "expiresAt": int(time.time()) + DISCORD_OAUTH_STATE_TTL_SECONDS,
         "origin": get_frontend_base_url(request),
     }, DISCORD_OAUTH_STATE_STORE)
+    auth_url = build_discord_authorize_url(state_token)
+    # A normal browser navigation must continue to Discord. Programmatic callers
+    # keep the JSON contract used by the SPA and API tests.
+    accepts_html = "text/html" in str(request.headers.get("accept") or "").lower()
+    if redirect or accepts_html:
+        return RedirectResponse(url=auth_url, status_code=302)
     return {
         "oauthConfigured": True,
-        "authUrl": build_discord_authorize_url(state_token),
+        "authUrl": auth_url,
         "state": state_token,
     }
 
@@ -4358,11 +4401,95 @@ async def admin_overview(request: Request):
     }
 
 
+def _runtime_guild_directory():
+    guilds = {}
+    live_doc = read_runtime_health_fresh()
+    for node in (live_doc or {}).get("nodes", []):
+        for guild in node.get("guildDetails") or []:
+            guild_id = str(guild.get("id") or "").strip()
+            if not is_valid_server_id(guild_id):
+                continue
+            existing = guilds.get(guild_id) or {}
+            guilds[guild_id] = {
+                "id": guild_id,
+                "name": str(guild.get("name") or existing.get("name") or guild_id)[:120],
+                "memberCount": max(parse_int(guild.get("memberCount", existing.get("memberCount", 0)), 0), parse_int(existing.get("memberCount", 0), 0)),
+                "iconUrl": guild.get("iconUrl") or existing.get("iconUrl"),
+                "bots": sorted(set((existing.get("bots") or []) + [str(node.get("name") or node.get("index") or "Bot")])),
+                "discordUrl": f"https://discord.com/channels/{guild_id}",
+            }
+    return guilds
+
+
+def _normalize_license_server_ids(values):
+    raw_values = values if isinstance(values, list) else [values]
+    normalized = []
+    invalid = []
+    for value in raw_values:
+        server_id = str(value or "").strip()
+        if not server_id:
+            continue
+        if not is_valid_server_id(server_id):
+            invalid.append(server_id)
+            continue
+        if server_id not in normalized:
+            normalized.append(server_id)
+    return normalized, invalid
+
+
+def _set_license_server_links(state, license_key, server_ids):
+    licenses = state.setdefault("licenses", {})
+    entitlements = state.setdefault("serverEntitlements", {})
+    license_info = licenses.get(license_key)
+    if not isinstance(license_info, dict):
+        raise ValueError("Lizenz nicht gefunden.")
+
+    normalized, invalid = _normalize_license_server_ids(server_ids)
+    if invalid:
+        raise ValueError(f"Ungültige Discord Guild-ID: {invalid[0]}. Erwartet werden 17–22 Ziffern.")
+    seats = max(1, parse_int(license_info.get("seats", 1), 1))
+    if len(normalized) > seats:
+        raise ValueError(f"Diese Lizenz hat {seats} Seat(s), angefordert wurden {len(normalized)} Server.")
+
+    previous = {str(item) for item in (license_info.get("linkedServerIds") or [])}
+    target = set(normalized)
+    for server_id in previous - target:
+        current = entitlements.get(server_id)
+        if str((current or {}).get("licenseId") or "") == str(license_key):
+            entitlements.pop(server_id, None)
+
+    for server_id in normalized:
+        current_license_id = str((entitlements.get(server_id) or {}).get("licenseId") or "")
+        conflicting_ids = {current_license_id} if current_license_id else set()
+        conflicting_ids.update(
+            str(other_id) for other_id, other_license in licenses.items()
+            if str(other_id) != str(license_key)
+            and server_id in [str(item) for item in (other_license.get("linkedServerIds") or [])]
+        )
+        for old_license_id in conflicting_ids:
+            if not old_license_id or old_license_id == str(license_key):
+                continue
+            old_license = licenses.get(old_license_id)
+            if not isinstance(old_license, dict):
+                continue
+            old_license["linkedServerIds"] = [
+                item for item in (old_license.get("linkedServerIds") or [])
+                if str(item) != server_id
+            ]
+            old_license["updatedAt"] = datetime.now(timezone.utc).isoformat()
+        entitlements[server_id] = {"serverId": server_id, "licenseId": str(license_key)}
+
+    license_info["linkedServerIds"] = normalized
+    license_info["updatedAt"] = datetime.now(timezone.utc).isoformat()
+    return normalized
+
+
 def _admin_license_rows(state):
     """Wie _license_rows, aber mit vollständigen Daten für die Owner-Verwaltung
     (unmaskierte E-Mail + Lizenz-Key/GUID, damit man gezielt suchen/bearbeiten kann)."""
     rows = []
     licenses = (state or {}).get("licenses", {}) or {}
+    guild_directory = _runtime_guild_directory()
     for lid, lic in licenses.items():
         if not isinstance(lic, dict):
             continue
@@ -4380,6 +4507,7 @@ def _admin_license_rows(state):
         linked = lic.get("linkedServerIds") or []
         if not isinstance(linked, list):
             linked = []
+        linked_ids = [str(s) for s in linked][:50]
         rows.append({
             "licenseKey": str(lid),
             "id": str(lic.get("id") or lid),
@@ -4397,7 +4525,17 @@ def _admin_license_rows(state):
             "source": lic.get("source") or lic.get("activatedBy") or "manual",
             "email": str(lic.get("contactEmail") or lic.get("email") or ""),
             "note": str(lic.get("note") or ""),
-            "linkedServerIds": [str(s) for s in linked][:50],
+            "linkedServerIds": linked_ids,
+            "linkedServers": [{
+                "id": server_id,
+                "name": (guild_directory.get(server_id) or {}).get("name") or server_id,
+                "known": server_id in guild_directory,
+                "valid": is_valid_server_id(server_id),
+                "memberCount": (guild_directory.get(server_id) or {}).get("memberCount", 0),
+                "iconUrl": (guild_directory.get(server_id) or {}).get("iconUrl"),
+                "bots": (guild_directory.get(server_id) or {}).get("bots", []),
+                "discordUrl": f"https://discord.com/channels/{server_id}" if is_valid_server_id(server_id) else None,
+            } for server_id in linked_ids],
         })
     rows.sort(key=lambda r: str(r.get("createdAt") or ""), reverse=True)
     return rows
@@ -4429,6 +4567,15 @@ async def admin_licenses(request: Request):
     return {"licenses": rows, "count": len(rows)}
 
 
+@app.get("/api/admin/guilds")
+async def admin_guilds(request: Request):
+    guard = _admin_guard(request)
+    if guard is not None:
+        return guard
+    guilds = sorted(_runtime_guild_directory().values(), key=lambda item: str(item.get("name") or "").lower())
+    return {"guilds": guilds, "count": len(guilds), "live": bool(read_runtime_health_fresh())}
+
+
 @app.post("/api/admin/licenses")
 async def admin_create_license(request: Request, body: dict = None):
     guard = _admin_guard(request)
@@ -4455,13 +4602,13 @@ async def admin_create_license(request: Request, body: dict = None):
     key = created.get("licenseKey")
     if server_id and key:
         data = load_premium()
-        lic = data.get("licenses", {}).get(key)
-        if lic is not None:
-            linked = lic.get("linkedServerIds") or []
-            if server_id not in linked:
-                linked.append(server_id)
-            lic["linkedServerIds"] = linked
+        try:
+            _set_license_server_links(data, key, [server_id])
             save_premium(data)
+        except ValueError as error:
+            data.get("licenses", {}).pop(key, None)
+            save_premium(data)
+            return json_error(400, str(error))
     record_owner_audit("license.create", target=key, detail=f"{tier} · {months}M · {seats} seats", request=request)
     return {"ok": True, "licenseKey": key, "license": created}
 
@@ -4492,6 +4639,9 @@ async def admin_patch_license(license_key: str, request: Request, body: dict = N
 
     if "seats" in body:
         seats = max(1, min(5, parse_int(body.get("seats", 1), 1)))
+        linked_count = len(lic.get("linkedServerIds") or [])
+        if seats < linked_count:
+            return json_error(400, f"Seats können nicht unter die {linked_count} verknüpften Server reduziert werden.")
         lic["seats"] = seats
         changes.append(f"seats={seats}")
 
@@ -4533,20 +4683,24 @@ async def admin_patch_license(license_key: str, request: Request, body: dict = N
         changes.append(f"active={bool(body.get('active'))}")
 
     # Guild-Verknüpfungen.
+    requested_links = [str(item) for item in (lic.get("linkedServerIds") or [])]
     if isinstance(body.get("linkedServerIds"), list):
-        lic["linkedServerIds"] = [str(s).strip() for s in body["linkedServerIds"] if str(s).strip()][:50]
+        requested_links = body["linkedServerIds"]
         changes.append("linkedServerIds")
     if body.get("addServerId"):
         sid = str(body["addServerId"]).strip()
-        linked = lic.get("linkedServerIds") or []
-        if sid and sid not in linked:
-            linked.append(sid)
-        lic["linkedServerIds"] = linked
+        if sid and sid not in requested_links:
+            requested_links.append(sid)
         changes.append(f"+guild {sid}")
     if body.get("removeServerId"):
         sid = str(body["removeServerId"]).strip()
-        lic["linkedServerIds"] = [s for s in (lic.get("linkedServerIds") or []) if str(s) != sid]
+        requested_links = [s for s in requested_links if str(s) != sid]
         changes.append(f"-guild {sid}")
+
+    try:
+        _set_license_server_links(data, license_key, requested_links)
+    except ValueError as error:
+        return json_error(400, str(error))
 
     lic["updatedAt"] = datetime.now(timezone.utc).isoformat()
     licenses[license_key] = lic
@@ -4568,6 +4722,9 @@ async def admin_delete_license(license_key: str, request: Request):
     if license_key not in licenses:
         return json_error(404, "Lizenz nicht gefunden.")
     removed = licenses.pop(license_key)
+    for server_id, entitlement in list(data.setdefault("serverEntitlements", {}).items()):
+        if str((entitlement or {}).get("licenseId") or "") == str(license_key):
+            data["serverEntitlements"].pop(server_id, None)
     save_premium(data)
     record_owner_audit("license.delete", target=license_key, detail=str(removed.get("tier") or removed.get("plan") or ""), request=request)
     return {"ok": True, "deleted": license_key}
@@ -4837,10 +4994,13 @@ async def admin_monitoring(request: Request):
                 "status": n.get("status"),
                 "pingMs": n.get("pingMs"),
                 "guilds": n.get("guilds", 0),
+                "guildDetails": n.get("guildDetails") or [],
                 "voiceConnections": n.get("voiceConnections", 0),
-                # CPU/RAM sind PROZESSWEIT (ein Node-Prozess) → zur Anzeige gespiegelt.
-                "cpuPct": proc.get("cpuPct", 0),
-                "ramMb": proc.get("ramMb", 0),
+                # CPU/RAM are process-wide in monolith mode. Never present the
+                # same host values as fake per-bot measurements.
+                "cpuPct": None,
+                "ramMb": None,
+                "resourceScope": "shared-process",
             })
         real_incidents = []
         if db is not None:
@@ -4871,7 +5031,7 @@ async def admin_monitoring(request: Request):
             },
             "nodes": live_nodes,
             "incidents": real_incidents,
-            "logs": (live_doc.get("logs") or [])[:40],
+            "logs": (live_doc.get("logs") or [])[:500],
         }
 
     # 2) Keine frischen Runtime-Daten und kein Demo-Modus -> ehrlich leer.

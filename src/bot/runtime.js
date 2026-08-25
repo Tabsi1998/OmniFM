@@ -107,6 +107,7 @@ import {
   isPersistableGuildState,
   setBotGuildVolume,
   getBotGuildVolume,
+  getBotGuildChannelVolumes,
 } from "../bot-state.js";
 import {
   addCustomStation,
@@ -454,6 +455,7 @@ class BotRuntime {
   getState(guildId) {
     if (!this.guildState.has(guildId)) {
       const savedVolume = getBotGuildVolume(this.config.id, guildId);
+      const channelVolumes = getBotGuildChannelVolumes(this.config.id, guildId);
       const player = createAudioPlayer({
         behaviors: { noSubscriber: NoSubscriberBehavior.Play }
       });
@@ -467,6 +469,7 @@ class BotRuntime {
         lastChannelId: null,
         volume: savedVolume ?? 100,
         volumePreferenceSet: savedVolume !== null,
+        channelVolumes,
         currentProcess: null,
         streamStableTimer: null,
         streamHealthTimer: null,
@@ -1819,6 +1822,9 @@ class BotRuntime {
     const isDe = language === "de";
     const tierConfig = getTierConfig(guildId);
     const stationName = clipText(station?.name || meta?.name || "-", 120) || "-";
+    const stationKey = clipText(String(context?.stationKey || station?.key || "").trim(), 80);
+    const stationGenre = clipText(String(station?.genre || station?.category || (isDe ? "Radio" : "Radio")).trim(), 80) || "Radio";
+    const stationTier = String(station?.tier || "free").trim().toUpperCase();
     const artist = clipText(this.normalizeNowPlayingValue(meta?.artist, station, meta, 120), 120);
     const title = clipText(this.normalizeNowPlayingValue(meta?.title, station, meta, 140), 140);
     const album = clipText(this.normalizeNowPlayingValue(meta?.album, station, meta, 140), 140);
@@ -1849,7 +1855,7 @@ class BotRuntime {
     if (hasTrack) {
       // Großer Titel + dezente Unterzeile (Artist · Sender) im Website-Stil.
       descriptionLines.push(`## ${headline}`);
-      const subParts = [artist, stationName].filter(Boolean);
+      const subParts = [artist].filter(Boolean);
       if (subParts.length) descriptionLines.push(`-# ${subParts.join("  ·  ")}`);
       if (sourceSummary.sourceNote) descriptionLines.push(`-# ${sourceSummary.sourceNote}`);
     } else {
@@ -1858,7 +1864,13 @@ class BotRuntime {
       descriptionLines.push(`> ⚠️ ${sourceSummary.metadataHint}`);
     }
 
+    const stationDetails = [stationGenre, stationTier !== "FREE" ? stationTier : null].filter(Boolean).join(" · ");
     const stableFields = [
+      {
+        name: isDe ? "📻 Sender" : "📻 Station",
+        value: `**${stationName}**\n${stationDetails}${stationKey ? `\n-# ID: \`${stationKey}\`` : ""}`,
+        inline: false,
+      },
       {
         name: isDe ? "\u{1f3a7} Qualit\u00e4t" : "\u{1f3a7} Quality",
         value: tierConfig.bitrate || "\u2014",
@@ -2089,6 +2101,7 @@ class BotRuntime {
         includeLastKnown: true,
       }) || null;
       const payload = this.buildNowPlayingMessagePayload(guildId, station, nextMeta, {
+        stationKey,
         channelId: voiceChannelId,
         listenerCount,
         volume: state.volume,
@@ -2526,9 +2539,7 @@ class BotRuntime {
       : null;
     const requestedWorkerIndex = requestedBotIndex ?? requestedSlotIndex;
     if (requestedWorkerIndex !== null) {
-      const resolvedWorker = this.workerManager.resolveWorker(requestedWorkerIndex, {
-        prefer: requestedBotIndex !== null ? "botIndex" : "slot",
-      });
+      const resolvedWorker = this.workerManager.resolveWorker(requestedWorkerIndex, { prefer: "slot", strict: true });
       const streamingWorkers = this.workerManager.getStreamingWorkers(guildId);
       const isStreamingWorker = resolvedWorker?.worker && streamingWorkers.includes(resolvedWorker.worker);
       if (!resolvedWorker?.worker || !isStreamingWorker) {
@@ -3730,11 +3741,15 @@ class BotRuntime {
         }
         this.clearRestoreRetry(guildId);
         const parsedVolume = Number.parseInt(String(volume ?? ""), 10);
+        const savedChannelVolume = getBotGuildVolume(this.config.id, guildId, channelId);
         const resolvedVolume = Number.isFinite(parsedVolume)
           ? Math.max(0, Math.min(100, parsedVolume))
-          : (Number.isFinite(Number(state.volume)) ? Math.max(0, Math.min(100, Number(state.volume))) : 100);
+          : (savedChannelVolume !== null
+            ? savedChannelVolume
+            : (Number.isFinite(Number(state.volume)) ? Math.max(0, Math.min(100, Number(state.volume))) : 100));
         state.volume = resolvedVolume;
         state.volumePreferenceSet = true;
+        state.channelVolumes = { ...(state.channelVolumes || {}), [channelId]: resolvedVolume };
         state.shouldReconnect = true;
         state.lastChannelId = channelId;
         if (options?.scheduledEventId) {
@@ -3864,7 +3879,9 @@ class BotRuntime {
       const state = this.getState(guildId);
       state.volume = normalizedValue;
       state.volumePreferenceSet = true;
-      setBotGuildVolume(this.config.id, guildId, normalizedValue);
+      const channelId = String(state.connection?.joinConfig?.channelId || state.lastChannelId || "").trim();
+      if (channelId) state.channelVolumes = { ...(state.channelVolumes || {}), [channelId]: normalizedValue };
+      setBotGuildVolume(this.config.id, guildId, normalizedValue, channelId || null);
 
       const resource = state.player.state.resource;
       const appliedLive = applyVolumeTransformerLevel(resource?.volume, normalizedValue);

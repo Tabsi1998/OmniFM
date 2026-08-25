@@ -70,7 +70,13 @@ import {
   shouldLogRecognitionFailure,
 } from "../src/services/audio-recognition.js";
 import { getDefaultLanguage } from "../src/i18n.js";
-import { getBotState, saveBotState, saveState } from "../src/bot-state.js";
+import {
+  getBotState,
+  getBotGuildVolume,
+  saveBotState,
+  saveState,
+  setBotGuildVolume,
+} from "../src/bot-state.js";
 import {
   executeRuntimePlay,
   openRuntimePlayWizard,
@@ -3899,7 +3905,7 @@ test("buildNowPlayingEmbed shows the current worker volume", () => {
   const embed = BotRuntime.prototype.buildNowPlayingEmbed.call(
     runtime,
     "guild-1",
-    { name: "Reggaeton FM" },
+    { name: "Reggaeton FM", genre: "Latin / Reggaeton", tier: "pro" },
     {
       artist: "Artist",
       title: "Track",
@@ -3910,6 +3916,7 @@ test("buildNowPlayingEmbed shows the current worker volume", () => {
     },
     {
       channelId: "voice-1",
+      stationKey: "reggaetonfm",
       listenerCount: 3,
       volume: 37,
       workerName: "OmniFM 4",
@@ -3917,7 +3924,11 @@ test("buildNowPlayingEmbed shows the current worker volume", () => {
   );
 
   const volumeField = (embed.data.fields || []).find((field) => String(field?.name || "").includes("Lautst"));
+  const stationField = (embed.data.fields || []).find((field) => String(field?.name || "").includes("Sender"));
   assert.equal(volumeField?.value, "37%");
+  assert.match(stationField?.value || "", /Reggaeton FM/);
+  assert.match(stationField?.value || "", /Latin \/ Reggaeton/);
+  assert.match(stationField?.value || "", /reggaetonfm/);
 });
 
 test("restoreState reconnects the saved radio in the same voice channel", async (t) => {
@@ -3934,6 +3945,7 @@ test("restoreState reconnects the saved radio in the same voice channel", async 
         channelId: "voice-9",
         stationKey: "station-a",
         volume: 64,
+        channelVolumes: { "voice-9": 37 },
       },
     },
   });
@@ -4010,7 +4022,8 @@ test("restoreState reconnects the saved radio in the same voice channel", async 
   assert.equal(restoredState.lastChannelId, "voice-9");
   assert.equal(restoredState.currentStationKey, "station-a");
   assert.equal(restoredState.currentStationName, "Station A");
-  assert.equal(restoredState.volume, 64);
+  assert.equal(restoredState.volume, 37);
+  assert.deepEqual(restoredState.channelVolumes, { "voice-9": 37 });
 });
 
 test("restoreState refreshes voice guard settings before reconnecting restored playback", async (t) => {
@@ -4817,6 +4830,27 @@ test("saveBotState keeps reconnectable targets even without an active voice conn
   assert.equal(saved["guild-1"]?.restoreBlockCount, 2);
   assert.equal(saved["guild-1"]?.restoreBlockReason, "worker-autoheal");
   assert.match(String(saved["guild-1"]?.savedAt || ""), /^\d{4}-\d{2}-\d{2}T/);
+});
+
+test("volume preferences persist independently per bot, guild, and voice channel", async (t) => {
+  const botStateSnapshot = snapshotOptionalTextFile(botStatePath);
+  const botStateBackupSnapshot = snapshotOptionalTextFile(botStateBackupPath);
+  t.after(() => {
+    restoreOptionalTextFile(botStatePath, botStateSnapshot);
+    restoreOptionalTextFile(botStateBackupPath, botStateBackupSnapshot);
+  });
+
+  saveState({});
+  setBotGuildVolume("bot-channel-volume", "guild-1", 35, "voice-1");
+  setBotGuildVolume("bot-channel-volume", "guild-1", 82, "voice-2");
+
+  assert.equal(getBotGuildVolume("bot-channel-volume", "guild-1", "voice-1"), 35);
+  assert.equal(getBotGuildVolume("bot-channel-volume", "guild-1", "voice-2"), 82);
+  assert.equal(getBotGuildVolume("bot-channel-volume", "guild-1"), 82);
+  assert.deepEqual(getBotState("bot-channel-volume")["guild-1"]?.channelVolumes, {
+    "voice-1": 35,
+    "voice-2": 82,
+  });
 });
 
 test("getBotState normalizes malformed persisted guild state entries", async (t) => {

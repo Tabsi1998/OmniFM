@@ -192,8 +192,8 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
         </div>
 
         <div className="oa-card" style={{ marginBottom: 18 }}>
-          <div className="oa-section-title"><Globe2 size={15} /> Bot-Verzeichnisse & Vote-Plattformen</div>
-          <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 14 }}>API-Tokens, Bot-IDs und Statistik-Sync werden zentral gespeichert und beim nÃ¤chsten Bot-Neustart aktiv.</div>
+          <div className="oa-section-title"><Globe2 size={15} /> Technische Bot-Verzeichnis-Integrationen</div>
+          <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 14 }}>Private API-Tokens, Webhook-Secrets, Bot-IDs und Statistik-Sync. Diese Daten steuern die technische Anbindung und werden nicht öffentlich angezeigt. Öffentliche Profil-Links pflegst du separat unter „Marketing & Listings“.</div>
           <div className="oa-grid cols-3">
             {[
               ['discordBotList', 'Discord Bot List', true, true],
@@ -479,10 +479,10 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
       <div className="oa-fade" data-testid="config-marketing">
         <div className="oa-card" style={{ marginBottom: 18 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <div className="oa-section-title" style={{ margin: 0 }}><Star size={15} /> Bot-Listing-Seiten ({listings.length})</div>
+            <div className="oa-section-title" style={{ margin: 0 }}><Star size={15} /> Öffentliche Bot-Profilseiten ({listings.length})</div>
             <button className="oa-btn ghost" onClick={addListing} data-testid="cfg-listing-add"><Plus size={15} /> Seite</button>
           </div>
-          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14 }}>Trage die URL deines Bot-Profils ein (top.gg usw.). Aktivierte Einträge mit URL erscheinen auf der Startseite unter „OmniFM findest du auf“.</div>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14 }}>Nur öffentliche Profil- und Werbelinks für Website und Marketing. API-Tokens, Webhooks und Statistik-Sync gehören in die System-Konfiguration unter „Technische Bot-Verzeichnis-Integrationen“.</div>
           {listings.map((b, i) => (
             <div key={i} style={{ background: 'var(--oa-bg)', border: '1px solid var(--oa-border-active)', borderRadius: 12, padding: 14, marginBottom: 12 }} data-testid={`cfg-listing-${i}`}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>

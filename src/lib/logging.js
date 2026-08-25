@@ -363,7 +363,7 @@ function queueLogWrite(lines, { includeErrorLog = false } = {}) {
 }
 
 const _recentLogs = [];
-const _recentLogsMax = 60;
+const _recentLogsMax = 500;
 
 function pushRecentLog(ts, level, message) {
   let source = "runtime";

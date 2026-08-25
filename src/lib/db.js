@@ -90,6 +90,12 @@ async function initCollections(database) {
       { key: { guildId: 1 }, name: "guild_unique", unique: true },
     ]).catch(() => null);
 
+    // Shared licensing store used by FastAPI, Commander and workers.
+    await database.collection("licenses").createIndex({ _licenseId: 1 }, { name: "license_id", unique: true }).catch(() => null);
+    await database.collection("server_entitlements").createIndex({ _serverId: 1 }, { name: "server_id", unique: true }).catch(() => null);
+    await database.collection("processed_sessions").createIndex({ _sessionId: 1 }, { name: "session_id", unique: true }).catch(() => null);
+    await database.collection("processed_events").createIndex({ _eventId: 1 }, { name: "event_id", unique: true }).catch(() => null);
+
     initialized = true;
     log("INFO", "MongoDB Kollektionen und Indizes initialisiert.");
   } catch (err) {

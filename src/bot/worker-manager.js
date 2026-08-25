@@ -93,14 +93,17 @@ class WorkerManager {
    */
   resolveWorker(inputIndex, options = {}) {
     const prefer = String(options?.prefer || "slot").trim() === "botIndex" ? "botIndex" : "slot";
+    const strict = options?.strict === true;
     const resolvers = prefer === "botIndex"
       ? [
         () => this.getWorkerByBotIndex(inputIndex),
       ]
-      : [
-        () => this.getWorkerBySlot(inputIndex),
-        () => this.getWorkerByBotIndex(inputIndex),
-      ];
+      : (strict
+        ? [() => this.getWorkerBySlot(inputIndex)]
+        : [
+          () => this.getWorkerBySlot(inputIndex),
+          () => this.getWorkerByBotIndex(inputIndex),
+        ]);
 
     for (const resolve of resolvers) {
       const worker = resolve();

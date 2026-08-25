@@ -1775,7 +1775,12 @@ export async function restoreRuntimeGuildEntry(runtime, guildId, data, stations,
   state.restoreBlockedAt = restoreBlockedAt;
   state.restoreBlockedUntil = restoreBlockedUntil > nowMs ? restoreBlockedUntil : 0;
   state.restoreBlockReason = restoreBlockReason;
-  state.volume = data.volume ?? state.volume ?? 100;
+  const restoredChannelVolume = data?.channelVolumes?.[String(data.channelId || "").trim()];
+  state.volume = restoredChannelVolume ?? data.volume ?? state.volume ?? 100;
+  state.channelVolumes = {
+    ...(state.channelVolumes || {}),
+    ...(data.channelVolumes || {}),
+  };
   state.volumePreferenceSet = Number.isFinite(Number(state.volume));
   state.shouldReconnect = true;
   state.lastChannelId = data.channelId;

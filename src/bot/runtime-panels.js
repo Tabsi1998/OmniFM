@@ -673,6 +673,7 @@ export async function executeRuntimePlay(runtime, interaction, {
     if (requestedBotIndex) {
       const check = runtime.workerManager.canUseWorker(requestedBotIndex, guildId, playable.guildTier, {
         prefer: requestedWorkerSelectionMode === "botIndex" ? "botIndex" : "slot",
+        strict: requestedWorkerSelectionMode !== "botIndex",
       });
       if (!check.ok) {
         const reasons = {

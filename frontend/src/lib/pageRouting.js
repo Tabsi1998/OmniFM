@@ -6,6 +6,8 @@ const PAGE_ALIASES = new Map([
   ["dashboard", "dashboard"],
   ["dashboard-classic", "dashboard-classic"],
   ["classic", "dashboard-classic"],
+  ["dashboard-studio", "dashboard-studio"],
+  ["studio", "dashboard-studio"],
   ["admin", "admin"],
   ["owner", "admin"],
   ["brand", "brand"],
@@ -35,6 +37,7 @@ const PATH_ALIASES = new Map([
   ["/home", "home"],
   ["/dashboard", "dashboard"],
   ["/dashboard/classic", "dashboard-classic"],
+  ["/dashboard/studio", "dashboard-studio"],
   ["/admin", "admin"],
   ["/owner", "admin"],
   ["/brand", "brand"],
@@ -90,6 +93,8 @@ export function getCanonicalPagePath(page, locale = "de") {
   const useGerman = normalizedLocale.startsWith("de");
 
   if (normalizedPage === "dashboard") return "/dashboard";
+  if (normalizedPage === "dashboard-classic") return "/dashboard/classic";
+  if (normalizedPage === "dashboard-studio") return "/dashboard/studio";
   if (normalizedPage === "stations") return "/stations";
   if (normalizedPage === "premium") return "/premium";
   if (normalizedPage === "faq") return "/faq";

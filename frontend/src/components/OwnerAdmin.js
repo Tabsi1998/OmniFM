@@ -122,10 +122,13 @@ export default function OwnerAdmin() {
   const [overview, setOverview] = useState(null);
   const [workers, setWorkers] = useState([]);
   const [licenses, setLicenses] = useState([]);
+  const [knownGuilds, setKnownGuilds] = useState([]);
   const [stations, setStations] = useState(null);
   const [integrations, setIntegrations] = useState(null);
   const [activity, setActivity] = useState([]);
   const [monitoring, setMonitoring] = useState(null);
+  const [monitorLogLevel, setMonitorLogLevel] = useState('ALL');
+  const [monitorLogQuery, setMonitorLogQuery] = useState('');
   const [stationList, setStationList] = useState([]);
   const [auditLog, setAuditLog] = useState([]);
   const [stForm, setStForm] = useState(null); // {key,name,url,tier,genre, _isNew}
@@ -177,7 +180,14 @@ export default function OwnerAdmin() {
   }, [apiGet, token]);
 
   const loadLicenses = useCallback(async () => {
-    try { const d = await apiGet('/api/admin/licenses?full=1', token); setLicenses(d.licenses || []); } catch { /* keep */ }
+    try {
+      const [licenseData, guildData] = await Promise.all([
+        apiGet('/api/admin/licenses?full=1', token),
+        apiGet('/api/admin/guilds', token),
+      ]);
+      setLicenses(licenseData.licenses || []);
+      setKnownGuilds(guildData.guilds || []);
+    } catch { /* keep */ }
   }, [apiGet, token]);
 
   const openNewLicense = () => { setLicMsg(null); setLicForm({ _isNew: true, email: '', tier: 'pro', months: 1, seats: 1, note: '', serverId: '' }); };
@@ -192,6 +202,7 @@ export default function OwnerAdmin() {
       note: l.note || '',
       expiresAt: l.expiresAt ? String(l.expiresAt).slice(0, 10) : '',
       linkedServerIds: l.linkedServerIds || [],
+      linkedServers: l.linkedServers || [],
       newGuild: '',
       _daysLeft: l.daysLeft,
       _expired: l.expired,
@@ -232,10 +243,11 @@ export default function OwnerAdmin() {
   const loadAll = useCallback(async (tk) => {
     setRefreshing(true);
     try {
-      const [ov, wk, lic, st, integ, act] = await Promise.allSettled([
+      const [ov, wk, lic, guilds, st, integ, act] = await Promise.allSettled([
         apiGet('/api/admin/overview', tk),
         apiGet('/api/admin/workers', tk),
         apiGet('/api/admin/licenses?full=1', tk),
+        apiGet('/api/admin/guilds', tk),
         apiGet('/api/admin/stations', tk),
         apiGet('/api/admin/integrations', tk),
         apiGet('/api/admin/activity', tk),
@@ -243,6 +255,7 @@ export default function OwnerAdmin() {
       if (ov.status === 'fulfilled') setOverview(ov.value);
       if (wk.status === 'fulfilled') setWorkers(wk.value.workers || []);
       if (lic.status === 'fulfilled') setLicenses(lic.value.licenses || []);
+      if (guilds.status === 'fulfilled') setKnownGuilds(guilds.value.guilds || []);
       if (st.status === 'fulfilled') setStations(st.value);
       if (integ.status === 'fulfilled') setIntegrations(integ.value);
       if (act.status === 'fulfilled') setActivity(act.value.activity || []);
@@ -697,6 +710,17 @@ export default function OwnerAdmin() {
                 <div className="oa-grid cols-3">
                   {monitoring.nodes.map((n) => {
                     const cpuColor = n.cpuPct > 80 ? '#ff2a5f' : n.cpuPct > 55 ? '#f59e0b' : '#10b981';
+                    const nodeMetrics = monitoring.live && n.resourceScope === 'shared-process'
+                      ? [
+                        { label: 'PING', val: n.pingMs == null ? '—' : `${n.pingMs} ms`, pct: Math.min(100, n.pingMs || 0), color: '#ff6b00' },
+                        { label: 'VOICE-AUSLASTUNG', val: `${n.voiceConnections || 0} Streams`, pct: Math.min(100, (n.voiceConnections || 0) * 10), color: '#00e5ff' },
+                        { label: 'SERVER-AUSLASTUNG', val: `${n.guilds || 0} Guilds`, pct: Math.min(100, (n.guilds || 0) * 2), color: '#10b981' },
+                      ]
+                      : [
+                        { label: 'CPU', val: `${n.cpuPct || 0}%`, pct: n.cpuPct || 0, color: cpuColor },
+                        { label: 'RAM', val: `${n.ramMb || 0} MB`, pct: Math.min(100, (n.ramMb || 0) / 6), color: '#00e5ff' },
+                        { label: 'PING', val: n.pingMs == null ? '—' : `${n.pingMs} ms`, pct: Math.min(100, n.pingMs || 0), color: '#ff6b00' },
+                      ];
                     return (
                       <div className="oa-card oa-fade" key={n.botId} data-testid={`mon-node-${n.index}`}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -711,11 +735,7 @@ export default function OwnerAdmin() {
                           </div>
                           <span className={`oa-pill ${n.status === 'online' ? 'green' : n.status === 'offline' ? 'red' : 'amber'}`}>{n.status === 'online' ? 'Online' : n.status === 'offline' ? 'Offline' : 'Degraded'}</span>
                         </div>
-                        {[
-                          { label: 'CPU', val: `${n.cpuPct || 0}%`, pct: n.cpuPct || 0, color: cpuColor },
-                          { label: 'RAM', val: `${n.ramMb || 0} MB`, pct: Math.min(100, (n.ramMb || 0) / 6), color: '#00e5ff' },
-                          { label: 'PING', val: n.pingMs == null ? '—' : `${n.pingMs} ms`, pct: Math.min(100, n.pingMs || 0), color: '#ff6b00' },
-                        ].map((m) => (
+                        {nodeMetrics.map((m) => (
                           <div key={m.label} style={{ marginTop: 12 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#94a3b8', marginBottom: 5 }} className="oa-mono">
                               <span>{m.label}</span><span>{m.val}</span>
@@ -726,6 +746,7 @@ export default function OwnerAdmin() {
                         <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#64748b' }} className="oa-mono">
                           <span>{n.voiceConnections} VOICE</span><span>{n.guilds} GUILDS</span>
                         </div>
+                        {monitoring.live && n.resourceScope === 'shared-process' && <div style={{ marginTop: 8, fontSize: 10.5, color: '#64748b' }}>CPU/RAM werden oben einmal für den gemeinsamen Node-Prozess angezeigt.</div>}
                       </div>
                     );
                   })}
@@ -757,8 +778,20 @@ export default function OwnerAdmin() {
                       <div className="oa-stat-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Terminal size={14} /> Live-Log</div>
                       <span className="oa-pill red" style={{ padding: '3px 9px' }}><span className="oa-dot" /> LIVE</span>
                     </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '130px minmax(160px, 1fr)', gap: 8, marginBottom: 10 }}>
+                      <select className="oa-input" value={monitorLogLevel} onChange={(event) => setMonitorLogLevel(event.target.value)} aria-label="Log-Level filtern" style={{ height: 36, padding: '0 9px' }}>
+                        <option value="ALL">Alle Level</option>
+                        <option value="INFO">Info</option>
+                        <option value="WARN">Warnungen</option>
+                        <option value="ERROR">Fehler</option>
+                      </select>
+                      <input className="oa-input" value={monitorLogQuery} onChange={(event) => setMonitorLogQuery(event.target.value)} placeholder="Quelle oder Meldung filtern…" aria-label="Logs durchsuchen" style={{ height: 36 }} />
+                    </div>
                     <div style={{ maxHeight: 320, overflowY: 'auto' }}>
-                      {monitoring.logs.map((l, i) => {
+                      {monitoring.logs.filter((entry) => monitorLogLevel === 'ALL' || entry.level === monitorLogLevel).filter((entry) => {
+                        const query = monitorLogQuery.trim().toLowerCase();
+                        return !query || `${entry.source || ''} ${entry.message || ''}`.toLowerCase().includes(query);
+                      }).map((l, i) => {
                         const c = l.level === 'WARN' ? '#fbbf24' : l.level === 'ERROR' ? '#ff8fab' : '#4ade80';
                         return (
                           <div key={i} className="oa-mono" style={{ fontSize: 11.5, padding: '5px 0', borderBottom: '1px solid #12151f', display: 'flex', gap: 8, lineHeight: 1.4 }} data-testid={`mon-log-${i}`}>
@@ -835,6 +868,10 @@ export default function OwnerAdmin() {
               </div>
             )}
 
+            <datalist id="owner-known-guilds">
+              {knownGuilds.map((guild) => <option key={guild.id} value={guild.id}>{guild.name} · {guild.id}</option>)}
+            </datalist>
+
             {licForm && (
               <div className="oa-card oa-fade" style={{ marginBottom: 18, borderColor: 'rgba(0,229,255,0.35)' }} data-testid="license-form">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -878,14 +915,15 @@ export default function OwnerAdmin() {
                   {licForm._isNew && (
                     <div style={{ gridColumn: '1 / -1' }}>
                       <label className="oa-stat-label">Server-ID verknüpfen (optional)</label>
-                      <input className="oa-input oa-mono" style={{ marginTop: 6 }} value={licForm.serverId} placeholder="Discord Guild-ID" onChange={(e) => setLicForm({ ...licForm, serverId: e.target.value })} data-testid="license-input-guild" />
+                      <input className="oa-input oa-mono" list="owner-known-guilds" style={{ marginTop: 6 }} value={licForm.serverId} placeholder="Discord Guild-ID (17–22 Ziffern)" onChange={(e) => setLicForm({ ...licForm, serverId: e.target.value.trim() })} data-testid="license-input-guild" />
+                      <div className="oa-stat-foot" style={{ marginTop: 6 }}>Bekannte Server werden vorgeschlagen. Werte wie „1“ sind keine gültige Discord-Guild-ID.</div>
                     </div>
                   )}
                 </div>
 
                 {licForm._isNew ? (
                   <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
-                    <button className="oa-btn primary" style={{ height: 40 }} disabled={licBusy} onClick={createLicense} data-testid="license-save-new"><Save size={15} /> Lizenz erstellen</button>
+                    <button className="oa-btn primary" style={{ height: 40 }} disabled={licBusy || Boolean(licForm.serverId) && !/^\d{17,22}$/.test(licForm.serverId)} onClick={createLicense} data-testid="license-save-new"><Save size={15} /> Lizenz erstellen</button>
                   </div>
                 ) : (
                   <>
@@ -908,16 +946,20 @@ export default function OwnerAdmin() {
                       <label className="oa-stat-label">Verknüpfte Server ({(licForm.linkedServerIds || []).length})</label>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '8px 0' }}>
                         {(licForm.linkedServerIds || []).length === 0 && <span style={{ color: '#64748b', fontSize: 13 }}>Keine Server verknüpft</span>}
-                        {(licForm.linkedServerIds || []).map((sid) => (
-                          <span key={sid} className="oa-pill slate oa-mono" style={{ padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                            {sid}
-                            <button style={{ background: 'none', border: 'none', color: '#ff8fab', cursor: 'pointer', padding: 0, lineHeight: 0 }} disabled={licBusy} onClick={() => patchLicense({ removeServerId: sid }, 'Server entfernt')} data-testid={`license-guild-remove-${sid}`}><CloseIcon size={13} /></button>
-                          </span>
-                        ))}
+                        {(licForm.linkedServerIds || []).map((sid) => {
+                          const server = (licForm.linkedServers || []).find((item) => item.id === sid) || knownGuilds.find((item) => item.id === sid) || { id: sid, name: sid, valid: /^\d{17,22}$/.test(sid) };
+                          return (
+                            <span key={sid} className={`oa-pill ${server.valid === false ? 'red' : server.known === false ? 'amber' : 'slate'}`} style={{ padding: '6px 9px', display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                              <span><strong>{server.name}</strong> <span className="oa-mono" style={{ opacity: 0.75 }}>{sid}</span></span>
+                              {server.discordUrl && <a href={server.discordUrl} target="_blank" rel="noreferrer" style={{ color: '#00e5ff' }} title="Server in Discord öffnen"><Globe size={13} /></a>}
+                              <button style={{ background: 'none', border: 'none', color: '#ff8fab', cursor: 'pointer', padding: 0, lineHeight: 0 }} disabled={licBusy} onClick={() => patchLicense({ removeServerId: sid }, 'Server entfernt')} data-testid={`license-guild-remove-${sid}`}><CloseIcon size={13} /></button>
+                            </span>
+                          );
+                        })}
                       </div>
                       <div style={{ display: 'flex', gap: 8 }}>
-                        <input className="oa-input oa-mono" style={{ maxWidth: 260 }} placeholder="Discord Guild-ID hinzufügen" value={licForm.newGuild} onChange={(e) => setLicForm({ ...licForm, newGuild: e.target.value })} data-testid="license-guild-input" />
-                        <button className="oa-btn ghost" style={{ height: 42 }} disabled={licBusy || !licForm.newGuild} onClick={() => patchLicense({ addServerId: licForm.newGuild }, 'Server verknüpft')} data-testid="license-guild-add"><Plus size={15} /> Verknüpfen</button>
+                        <input className="oa-input oa-mono" list="owner-known-guilds" style={{ maxWidth: 320 }} placeholder="Discord Guild-ID hinzufügen" value={licForm.newGuild} onChange={(e) => setLicForm({ ...licForm, newGuild: e.target.value.trim() })} data-testid="license-guild-input" />
+                        <button className="oa-btn ghost" style={{ height: 42 }} disabled={licBusy || !/^\d{17,22}$/.test(licForm.newGuild || '')} onClick={() => patchLicense({ addServerId: licForm.newGuild }, 'Server verknüpft')} data-testid="license-guild-add"><Plus size={15} /> Verknüpfen</button>
                       </div>
                     </div>
 
@@ -943,7 +985,7 @@ export default function OwnerAdmin() {
                       if (!q) return true;
                       const key = String(l.licenseKey || l.id || '').toLowerCase();
                       const email = String(l.email || l.contactEmail || '').toLowerCase();
-                      const guilds = (l.linkedServerIds || []).join(' ').toLowerCase();
+                      const guilds = [...(l.linkedServerIds || []), ...(l.linkedServers || []).map((server) => server.name)].join(' ').toLowerCase();
                       return key.includes(q) || email.includes(q) || guilds.includes(q);
                     });
                     if (rows.length === 0) {
@@ -957,7 +999,14 @@ export default function OwnerAdmin() {
                           <td><span className={`oa-pill ${l.plan === 'ultimate' ? 'orange' : l.plan === 'pro' ? 'cyan' : 'slate'}`}>{l.planName}</span></td>
                           <td>{l.seatsUsed}/{l.seats}</td>
                           <td style={{ color: '#94a3b8' }}>{l.email || l.contactEmail || '—'}</td>
-                          <td style={{ color: '#94a3b8' }}>{(l.linkedServerIds || []).length}</td>
+                          <td style={{ color: '#94a3b8' }}>
+                            {(l.linkedServers || []).length ? (l.linkedServers || []).map((server) => (
+                              <div key={server.id} style={{ marginBottom: 3 }}>
+                                {server.discordUrl ? <a href={server.discordUrl} target="_blank" rel="noreferrer" style={{ color: server.valid === false ? '#ff8fab' : '#00e5ff' }}>{server.name}</a> : server.name}
+                                <span className="oa-mono" style={{ display: 'block', fontSize: 10, color: '#64748b' }}>{server.id}</span>
+                              </div>
+                            )) : '—'}
+                          </td>
                           <td style={{ color: '#94a3b8' }}>{fmtDate(l.expiresAt)}{typeof l.daysLeft === 'number' && !l.expired && <span style={{ color: l.daysLeft <= 7 ? '#fbbf24' : '#64748b', marginLeft: 6, fontSize: 11 }}>({l.daysLeft}d)</span>}</td>
                           <td><span className={`oa-pill ${l.expired ? 'red' : l.active ? 'green' : 'slate'}`}>{l.expired ? 'Abgelaufen' : l.active ? 'Aktiv' : 'Inaktiv'}</span></td>
                           <td style={{ display: 'flex', gap: 6 }}>

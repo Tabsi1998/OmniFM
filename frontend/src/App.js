@@ -144,7 +144,7 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    if (currentPage === 'dashboard' || currentPage === 'dashboard-classic' || currentPage === 'admin' || currentPage === 'brand') {
+    if (currentPage === 'dashboard' || currentPage === 'dashboard-classic' || currentPage === 'dashboard-studio' || currentPage === 'admin' || currentPage === 'brand') {
       setLoading(false);
       return () => {};
     }
@@ -224,7 +224,7 @@ function AppContent() {
   if (currentPage === 'dashboard') {
     return (
       <div data-testid="app-dashboard-root" style={{ position: 'relative', minHeight: '100vh' }}>
-        <GuildDashboard />
+        <DashboardPortal />
       </div>
     );
   }
@@ -233,6 +233,14 @@ function AppContent() {
     return (
       <div data-testid="app-dashboard-classic-root" style={{ position: 'relative', minHeight: '100vh' }}>
         <DashboardPortal />
+      </div>
+    );
+  }
+
+  if (currentPage === 'dashboard-studio') {
+    return (
+      <div data-testid="app-dashboard-studio-root" style={{ position: 'relative', minHeight: '100vh' }}>
+        <GuildDashboard />
       </div>
     );
   }

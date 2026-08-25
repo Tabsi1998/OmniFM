@@ -46,6 +46,17 @@ function normalizeStoredVolume(rawValue) {
   return Math.max(0, Math.min(100, parsed));
 }
 
+function normalizeChannelVolumes(rawValue) {
+  const normalized = {};
+  if (!rawValue || typeof rawValue !== "object" || Array.isArray(rawValue)) return normalized;
+  for (const [rawChannelId, rawVolume] of Object.entries(rawValue)) {
+    const channelId = sanitizeStateIdentifier(rawChannelId);
+    const volume = normalizeStoredVolume(rawVolume);
+    if (channelId && volume !== null) normalized[channelId] = volume;
+  }
+  return normalized;
+}
+
 function normalizeStoredTimestampMs(rawValue) {
   if (!rawValue) return 0;
   const numeric = Number.parseInt(String(rawValue ?? ""), 10);
@@ -129,9 +140,11 @@ function writeTextFileWithDirRetry(filePath, content) {
 
 function buildVolumeOnlyEntry(entry = {}) {
   const volume = normalizeStoredVolume(entry?.volume);
-  if (volume === null) return null;
+  const channelVolumes = normalizeChannelVolumes(entry?.channelVolumes);
+  if (volume === null && Object.keys(channelVolumes).length === 0) return null;
   return {
-    volume,
+    ...(volume !== null ? { volume } : {}),
+    ...(Object.keys(channelVolumes).length ? { channelVolumes } : {}),
     volumePreference: true,
     savedAt: entry?.savedAt || new Date().toISOString(),
   };
@@ -141,6 +154,7 @@ function normalizeStoredBotStateEntry(rawEntry = {}) {
   const input = rawEntry && typeof rawEntry === "object" ? rawEntry : {};
   const volume = normalizeStoredVolume(input.volume);
   const volumePreference = input.volumePreference === true;
+  const channelVolumes = normalizeChannelVolumes(input.channelVolumes);
   const channelId = sanitizeStateIdentifier(input.channelId);
   const stationKey = sanitizeText(input.stationKey, 120);
   const stationName = sanitizeText(input.stationName, 200) || null;
@@ -156,7 +170,7 @@ function normalizeStoredBotStateEntry(rawEntry = {}) {
   })();
 
   const hasPlaybackTarget = Boolean(channelId && stationKey);
-  const hasVolumePreference = volume !== null && (volumePreference || hasPlaybackTarget);
+  const hasVolumePreference = (volume !== null || Object.keys(channelVolumes).length > 0) && (volumePreference || hasPlaybackTarget);
   if (!hasPlaybackTarget && !hasVolumePreference) {
     return null;
   }
@@ -175,7 +189,8 @@ function normalizeStoredBotStateEntry(rawEntry = {}) {
   }
 
   if (hasVolumePreference) {
-    normalized.volume = volume;
+    if (volume !== null) normalized.volume = volume;
+    if (Object.keys(channelVolumes).length > 0) normalized.channelVolumes = channelVolumes;
   }
   if (volumePreference) {
     normalized.volumePreference = true;
@@ -317,6 +332,7 @@ function saveBotState(botId, guildStates) {
     const restoreBlockedAt = normalizeStoredTimestampMs(state?.restoreBlockedAt);
     const restoreBlockCount = Math.max(0, Number.parseInt(String(state?.restoreBlockCount || 0), 10) || 0);
     const restoreBlockReason = String(state?.restoreBlockReason || "").trim().slice(0, 200) || null;
+    const channelVolumes = normalizeChannelVolumes(state?.channelVolumes);
     const entry = {
       savedAt: new Date().toISOString(),
     };
@@ -341,6 +357,10 @@ function saveBotState(botId, guildStates) {
       entry.volume = volume ?? 100;
     }
     if (persistVolumePreference) {
+      entry.volumePreference = true;
+    }
+    if (Object.keys(channelVolumes).length > 0) {
+      entry.channelVolumes = channelVolumes;
       entry.volumePreference = true;
     }
 
@@ -414,16 +434,21 @@ function saveResolvedBotState(botId, state) {
   saveState(allState);
 }
 
-function setBotGuildVolume(botId, guildId, value) {
+function setBotGuildVolume(botId, guildId, value, channelId = null) {
   const normalizedGuildId = String(guildId || "").trim();
   const normalizedVolume = normalizeStoredVolume(value);
   if (!normalizedGuildId || normalizedVolume === null) return false;
   const botState = getBotState(botId);
+  const currentEntry = botState?.[normalizedGuildId] && typeof botState[normalizedGuildId] === "object"
+    ? botState[normalizedGuildId]
+    : {};
+  const normalizedChannelId = sanitizeStateIdentifier(channelId);
+  const channelVolumes = normalizeChannelVolumes(currentEntry.channelVolumes);
+  if (normalizedChannelId) channelVolumes[normalizedChannelId] = normalizedVolume;
   const nextEntry = {
-    ...(botState?.[normalizedGuildId] && typeof botState[normalizedGuildId] === "object"
-      ? botState[normalizedGuildId]
-      : {}),
+    ...currentEntry,
     volume: normalizedVolume,
+    ...(Object.keys(channelVolumes).length ? { channelVolumes } : {}),
     volumePreference: true,
     savedAt: new Date().toISOString(),
   };
@@ -432,11 +457,23 @@ function setBotGuildVolume(botId, guildId, value) {
   return true;
 }
 
-function getBotGuildVolume(botId, guildId) {
+function getBotGuildVolume(botId, guildId, channelId = null) {
   const normalizedGuildId = String(guildId || "").trim();
   if (!normalizedGuildId) return null;
   const botState = getBotState(botId);
+  const normalizedChannelId = sanitizeStateIdentifier(channelId);
+  if (normalizedChannelId) {
+    const channelVolume = normalizeStoredVolume(botState?.[normalizedGuildId]?.channelVolumes?.[normalizedChannelId]);
+    if (channelVolume !== null) return channelVolume;
+  }
   return normalizeStoredVolume(botState?.[normalizedGuildId]?.volume);
+}
+
+function getBotGuildChannelVolumes(botId, guildId) {
+  const normalizedGuildId = String(guildId || "").trim();
+  if (!normalizedGuildId) return {};
+  const botState = getBotState(botId);
+  return normalizeChannelVolumes(botState?.[normalizedGuildId]?.channelVolumes);
 }
 
 function clearBotGuild(botId, guildId) {
@@ -489,4 +526,5 @@ export {
   saveState,
   setBotGuildVolume,
   getBotGuildVolume,
+  getBotGuildChannelVolumes,
 };

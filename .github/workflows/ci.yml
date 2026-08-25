@@ -271,5 +271,9 @@ jobs:
             --data '{"integration":"songhistory"}' \
             http://127.0.0.1:8001/api/admin/integrations/test | python -c 'import json,sys; d=json.load(sys.stdin); assert d["ok"] and d["results"]["songHistory"]["ok"]'
           curl -fsS -X POST -H 'X-Admin-Token: ci-owner-token' -H 'Content-Type: application/json' \
-            --data '{"email":"owner-contract@example.test","tier":"pro","months":1,"seats":1}' \
+            --data '{"email":"owner-contract@example.test","tier":"pro","months":1,"seats":1,"guildId":"123456789012345678"}' \
             http://127.0.0.1:8001/api/admin/licenses | python -c 'import json,sys; d=json.load(sys.stdin); assert d["ok"] and d["licenseKey"].startswith("OMNI-")'
+          python -c 'from pymongo import MongoClient; d=MongoClient("mongodb://127.0.0.1:27017").omnifm_ci_fastapi; e=d.server_entitlements.find_one({"_serverId":"123456789012345678"}); assert e and e["licenseId"].startswith("OMNI-")'
+          test "$(curl -sS -o /tmp/invalid-license.json -w '%{http_code}' -X POST -H 'X-Admin-Token: ci-owner-token' -H 'Content-Type: application/json' --data '{"email":"invalid-guild@example.test","tier":"pro","months":1,"seats":1,"guildId":"1"}' http://127.0.0.1:8001/api/admin/licenses)" = "400"
+          curl -sS -D /tmp/oauth-headers.txt -o /dev/null 'http://127.0.0.1:8001/api/auth/discord/login?redirect=1&nextPage=dashboard'
+          grep -Eiq '^location: https://discord.com/' /tmp/oauth-headers.txt

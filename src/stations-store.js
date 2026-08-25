@@ -172,7 +172,14 @@ function sanitizeStations(stationsInput) {
     const url = String(rawValue?.url || "").trim();
     if (!key || !name || !url) continue;
     const tier = String(rawValue?.tier || "free").toLowerCase();
-    out[key] = { name, url, tier: ["free", "pro", "ultimate"].includes(tier) ? tier : "free" };
+    out[key] = {
+      name,
+      url,
+      tier: ["free", "pro", "ultimate"].includes(tier) ? tier : "free",
+      genre: String(rawValue?.genre || rawValue?.category || "Radio").trim().slice(0, 80) || "Radio",
+      country: String(rawValue?.country || "").trim().slice(0, 60),
+      language: String(rawValue?.language || "").trim().slice(0, 40),
+    };
   }
   return out;
 }
@@ -263,7 +270,14 @@ export async function initStationsStore() {
     for (const doc of docs) {
       const key = doc.key;
       if (key) {
-        stations[key] = { name: doc.name || key, url: doc.url || "", tier: doc.tier || "free" };
+        stations[key] = {
+          name: doc.name || key,
+          url: doc.url || "",
+          tier: doc.tier || "free",
+          genre: doc.genre || doc.category || "Radio",
+          country: doc.country || "",
+          language: doc.language || "",
+        };
         if (doc.is_default) defaultKey = key;
       }
     }

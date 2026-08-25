@@ -39,6 +39,17 @@ function nodeMetrics(runtimes) {
     try { guilds = ready ? client.guilds.cache.size : 0; } catch { guilds = 0; }
     let guildIds = [];
     try { guildIds = ready ? [...client.guilds.cache.keys()].map(String) : []; } catch { guildIds = []; }
+    let guildDetails = [];
+    try {
+      guildDetails = ready
+        ? [...client.guilds.cache.values()].map((guild) => ({
+          id: String(guild.id),
+          name: String(guild.name || guild.id).slice(0, 120),
+          memberCount: Math.max(0, Number(guild.memberCount || 0) || 0),
+          iconUrl: guild.iconURL?.({ extension: "png", size: 128 }) || null,
+        }))
+        : [];
+    } catch { guildDetails = []; }
     let ping = null;
     try { ping = ready ? Math.max(0, Math.round(client.ws.ping)) : null; } catch { ping = null; }
     let stats = {};
@@ -52,6 +63,7 @@ function nodeMetrics(runtimes) {
       pingMs: ping,
       guilds: Number(stats.servers ?? guilds) || 0,
       guildIds,
+      guildDetails,
       users: Number(stats.users || 0) || 0,
       voiceConnections: Number(stats.connections ?? voice) || 0,
       listeners: Number(stats.listeners || 0) || 0,
@@ -78,9 +90,10 @@ export function startRuntimeHealthReporter(runtimes, { intervalMs = 5000 } = {})
           uptimeSec: Math.round(process.uptime()),
           cores: (os.cpus() || []).length || 1,
           nodeVersion: process.version,
+          resourceModel: "shared-process",
         },
         nodes,
-        logs: getRecentLogs(40),
+        logs: getRecentLogs(500),
         healthyNodes: nodes.filter((n) => n.status === "online").length,
         totalNodes: nodes.length,
       };
