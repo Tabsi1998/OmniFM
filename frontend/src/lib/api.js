@@ -1,5 +1,10 @@
-const explicitApiBase = (process.env.REACT_APP_BACKEND_URL || '').trim().replace(/\/+$/, '');
-const localDevBackendPort = String(process.env.REACT_APP_BACKEND_PORT || '8001').trim() || '8001';
+const frontendEnv = import.meta.env || {};
+const explicitApiBase = String(
+  frontendEnv.VITE_BACKEND_URL || frontendEnv.REACT_APP_BACKEND_URL || ''
+).trim().replace(/\/+$/, '');
+const localDevBackendPort = String(
+  frontendEnv.VITE_BACKEND_PORT || frontendEnv.REACT_APP_BACKEND_PORT || '8001'
+).trim() || '8001';
 
 function resolveApiBase() {
   if (explicitApiBase) return explicitApiBase;

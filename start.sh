@@ -129,11 +129,11 @@ fi
 # --- Node.js 22 LTS ----------------------------------------------------------
 NODE_OK=0
 if command -v node >/dev/null 2>&1; then
-  NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
-  [ "$NODE_MAJOR" -eq 22 ] 2>/dev/null && NODE_OK=1
+  node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major === 22 && minor >= 12 ? 0 : 1)' \
+    >/dev/null 2>&1 && NODE_OK=1
 fi
 if [ "$NODE_OK" -eq 0 ]; then
-  log "Installiere Node.js 22 LTS (NodeSource)..."
+  log "Installiere Node.js 22 LTS ab 22.12 (NodeSource)..."
   if [ -n "$SUDO" ]; then
     curl -fsSL https://deb.nodesource.com/setup_22.x | $SUDO -E bash - >>"$LOG_DIR/setup.log" 2>&1 \
       || die "NodeSource-Setup fehlgeschlagen (siehe logs/setup.log)."

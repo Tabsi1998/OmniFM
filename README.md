@@ -29,7 +29,7 @@
       :3000                          :8001
 ```
 
-- **Frontend:** React (CRA), Design-System „Broadcast Studio" (Obsidian + Signal-Orange + Cyber-Cyan), `recharts`, `lucide-react`.
+- **Frontend:** React + Vite, Design-System „Broadcast Studio" (Obsidian + Signal-Orange + Cyber-Cyan), `recharts`, `lucide-react`.
 - **Backend:** FastAPI, alle Endpunkte unter `/api`, MongoDB über `MONGO_URL`.
 - **Discord-Voice-Bot:** Node.js / `discord.js` (Commander/Worker-Split) – der eigentliche Streaming-Runtime unter `src/`. **Wird von `start.sh` mitgestartet und liest Commander + Worker vollständig aus dem Owner-Menü (MongoDB `owner_config.discord`) – keine Token-Env-Variablen nötig.** Teilt sich dieselbe MongoDB wie das Backend.
 
@@ -58,7 +58,7 @@ MongoDB muss erreichbar sein (siehe `.env`).
 ## 🖥️ Deployment auf Ubuntu 24.04 (kompletter Stack inkl. Discord-Bot)
 
 **Keine manuellen Voraussetzungen mehr.** `start.sh` installiert beim ersten Lauf automatisch
-alles Nötige: **Node.js 22 LTS, MongoDB 8.0 Community (lokal), FFmpeg, Python-venv und
+alles Nötige: **Node.js 22 LTS (mindestens 22.12), MongoDB 8.0 Community (lokal), FFmpeg, Python-venv und
 Build-Tools**. Außerdem erzeugt es beim ersten Lauf automatisch `backend/.env` + `frontend/.env`.
 
 Klonen → einmalig `./start.sh` → ab dann Updates per `./update.sh`:

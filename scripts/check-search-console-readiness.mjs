@@ -20,7 +20,7 @@ function assertMatches(text, regex, message) {
 }
 
 // docs/ wurde beim Rework entfernt — die Prüfung fokussiert auf die live ausgelieferten Assets.
-const indexHtml = readText("frontend/public/index.html");
+const indexHtml = readText("frontend/index.html");
 const robots = readText("frontend/public/robots.txt");
 const sitemap = readText("frontend/public/sitemap.xml");
 const googleSiteVerificationToken = "2ZCoKiPvrZJ_fKLyyE4SDbATwbL6yDX-iwI82ghmpSM";
@@ -28,7 +28,7 @@ const googleSiteVerificationToken = "2ZCoKiPvrZJ_fKLyyE4SDbATwbL6yDX-iwI82ghmpSM
 assertMatches(
   indexHtml,
   new RegExp(`<meta\\s+name=["']google-site-verification["']\\s+content=["']${googleSiteVerificationToken}["']\\s*/?>`, "i"),
-  "frontend/public/index.html must keep the active Google verification meta tag in the homepage head"
+  "frontend/index.html must keep the active Google verification meta tag in the homepage head"
 );
 
 assertMatches(robots, /User-agent:\s*\*/i, "robots.txt must allow a generic crawler directive");

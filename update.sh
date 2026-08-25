@@ -22,8 +22,9 @@ doctor() {
   command -v npm >/dev/null 2>&1 || { log "FEHLT: npm"; failed=1; }
   command -v curl >/dev/null 2>&1 || { log "FEHLT: curl"; failed=1; }
   if command -v node >/dev/null 2>&1; then
-    [ "$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)" = "22" ] \
-      || { log "FALSCH: Node.js 22 ist erforderlich (gefunden: $(node -v 2>/dev/null || echo unbekannt))"; failed=1; }
+    node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major === 22 && minor >= 12 ? 0 : 1)' \
+      >/dev/null 2>&1 \
+      || { log "FALSCH: Node.js 22.12 oder neuer ist erforderlich (gefunden: $(node -v 2>/dev/null || echo unbekannt))"; failed=1; }
   fi
   if [ -f "$ROOT/backend/.env" ]; then
     grep -qE '^MONGO_URL=..+' "$ROOT/backend/.env" || { log "FEHLT: MONGO_URL in backend/.env"; failed=1; }

@@ -10,6 +10,13 @@ const repoRoot = path.resolve(__dirname, "..");
 
 test("React public folder does not ship legacy standalone frontend assets", () => {
   const reactPublicDir = path.join(repoRoot, "frontend", "public");
+  const frontendPackage = JSON.parse(
+    fs.readFileSync(path.join(repoRoot, "frontend", "package.json"), "utf8")
+  );
+
+  assert.equal(frontendPackage.devDependencies["react-scripts"], undefined);
+  assert.equal(frontendPackage.devDependencies.vite, "8.2.2");
+  assert.equal(frontendPackage.scripts.build, "vite build");
 
   assert.equal(
     fs.existsSync(path.join(reactPublicDir, "app.js")),
@@ -29,20 +36,26 @@ test("React public folder does not ship legacy standalone frontend assets", () =
   );
 });
 
-test("React public index references only the React mount and no legacy root assets", () => {
+test("Vite entry document references the React mount and module entry", () => {
   const indexHtml = fs.readFileSync(
-    path.join(repoRoot, "frontend", "public", "index.html"),
+    path.join(repoRoot, "frontend", "index.html"),
     "utf8"
   );
 
   assert.match(indexHtml, /<div id="root"><\/div>/);
+  assert.match(indexHtml, /<script type="module" src="\/src\/index\.js"><\/script>/);
   assert.doesNotMatch(indexHtml, /src=["']\/app\.js["']/i);
   assert.doesNotMatch(indexHtml, /href=["']\/styles\.css["']/i);
+  assert.equal(
+    fs.existsSync(path.join(repoRoot, "frontend", "public", "index.html")),
+    false,
+    "Vite must have a single root entry document"
+  );
 });
 
-test("React public SEO assets and base metadata are present", () => {
+test("React SEO assets and base metadata are present", () => {
   const publicDir = path.join(repoRoot, "frontend", "public");
-  const indexHtml = fs.readFileSync(path.join(publicDir, "index.html"), "utf8");
+  const indexHtml = fs.readFileSync(path.join(repoRoot, "frontend", "index.html"), "utf8");
   const robotsTxt = fs.readFileSync(path.join(publicDir, "robots.txt"), "utf8");
   const sitemapXml = fs.readFileSync(path.join(publicDir, "sitemap.xml"), "utf8");
   const manifest = JSON.parse(fs.readFileSync(path.join(publicDir, "manifest.json"), "utf8"));
