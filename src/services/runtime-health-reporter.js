@@ -37,8 +37,12 @@ function nodeMetrics(runtimes) {
     try { voice = client?.voice?.adapters?.size || 0; } catch { voice = 0; }
     let guilds = 0;
     try { guilds = ready ? client.guilds.cache.size : 0; } catch { guilds = 0; }
+    let guildIds = [];
+    try { guildIds = ready ? [...client.guilds.cache.keys()].map(String) : []; } catch { guildIds = []; }
     let ping = null;
     try { ping = ready ? Math.max(0, Math.round(client.ws.ping)) : null; } catch { ping = null; }
+    let stats = {};
+    try { stats = rt?.collectStats?.() || {}; } catch { stats = {}; }
     return {
       botId: String(rt?.config?.clientId || rt?.config?.id || rt?.config?.index || ""),
       index: Number(rt?.config?.index || 0),
@@ -46,8 +50,12 @@ function nodeMetrics(runtimes) {
       role: rt?.role === "commander" ? "commander" : "worker",
       status: ready ? "online" : "offline",
       pingMs: ping,
-      guilds,
-      voiceConnections: voice,
+      guilds: Number(stats.servers ?? guilds) || 0,
+      guildIds,
+      users: Number(stats.users || 0) || 0,
+      voiceConnections: Number(stats.connections ?? voice) || 0,
+      listeners: Number(stats.listeners || 0) || 0,
+      userTag: ready ? (client.user?.tag || client.user?.username || null) : null,
     };
   });
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Save, Plus, Trash2, CheckCircle2, XCircle, Bot, CreditCard, Building2,
-  Tag, Terminal, ShieldCheck, Info, Star, Heart,
+  Tag, Terminal, ShieldCheck, Info, Star, Heart, Settings2, Mail, Music2, History, Fingerprint, Globe2,
 } from 'lucide-react';
 
 const labelStyle = {
@@ -80,16 +80,20 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
   const [discord, setDiscord] = useState(null);
   const [payments, setPayments] = useState(null);
   const [marketing, setMarketing] = useState(null);
+  const [system, setSystem] = useState(null);
   const [env, setEnv] = useState({});
   const [logs, setLogs] = useState(null);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
+  const [systemTest, setSystemTest] = useState(null);
+  const [loadError, setLoadError] = useState('');
 
   const load = useCallback(async () => {
+    setLoadError('');
     try {
       const d = await apiGet('/api/admin/config', token);
-      setCompany(d.company); setPlans(d.plans); setDiscord(d.discord); setPayments(d.payments); setMarketing(d.marketing); setEnv(d.env || {});
-    } catch { /* keep */ }
+      setCompany(d.company); setPlans(d.plans); setDiscord(d.discord); setPayments(d.payments); setMarketing(d.marketing); setSystem(d.system); setEnv(d.env || {});
+    } catch (error) { setLoadError(error?.message || 'Konfiguration konnte nicht geladen werden.'); }
   }, [apiGet, token]);
 
   useEffect(() => { load(); }, [load]);
@@ -110,6 +114,133 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
 
   const setC = (k, v) => setCompany((p) => ({ ...p, [k]: v }));
   const setPlan = (tier, k, v) => setPlans((p) => ({ ...p, [tier]: { ...p[tier], [k]: v } }));
+
+  if (loadError) {
+    return (
+      <div className="oa-card oa-fade" style={{ borderColor: '#ef476f' }} data-testid="config-load-error">
+        <div className="oa-section-title"><XCircle size={16} /> Konfiguration nicht erreichbar</div>
+        <div style={{ color: '#ff8fab', marginBottom: 14 }}>{loadError}</div>
+        <button className="oa-btn ghost" onClick={load}>Erneut laden</button>
+      </div>
+    );
+  }
+
+  // ---------------- SYSTEM / INTEGRATIONS ----------------
+  if (section === 'system') {
+    if (!system) return <div className="oa-sub">Lade Konfiguration…</div>;
+    const oauth = system.discordOAuth || {};
+    const smtp = system.smtp || {};
+    const recognition = system.audioRecognition || {};
+    const history = system.songHistory || {};
+    const directories = system.botDirectories || {};
+    const setGroup = (group, key, value) => setSystem((p) => ({ ...p, [group]: { ...(p[group] || {}), [key]: value } }));
+    const setDirectory = (directory, key, value) => setSystem((p) => ({
+      ...p,
+      botDirectories: {
+        ...(p.botDirectories || {}),
+        [directory]: { ...(p.botDirectories?.[directory] || {}), [key]: value },
+      },
+    }));
+    const secretValue = (group, key) => group?.[`${key}Set`] ? '' : (group?.[key] || '');
+    const secretHint = (group, key) => group?.[`${key}Set`] ? 'Bereits gesetzt – leer lassen, um den Wert beizubehalten.' : 'Wird verschlüsselt übertragen und nie wieder angezeigt.';
+    const testSystem = async () => {
+      setSystemTest({ loading: true });
+      try { setSystemTest(await apiSend('/api/admin/integrations/test', 'POST', { integration: 'all' })); }
+      catch (error) { setSystemTest({ ok: false, error: error.message }); }
+    };
+    return (
+      <div className="oa-fade" data-testid="config-system">
+        <div className="oa-card" style={{ marginBottom: 18 }}>
+          <div className="oa-section-title"><Settings2 size={15} /> Zentrale System-Konfiguration</div>
+          <div style={{ fontSize: 13, color: '#94a3b8' }}>Diese Werte werden dauerhaft in MongoDB gespeichert. Bot-Runtime-Einstellungen werden beim nächsten Neustart übernommen; Web-Funktionen sofort.</div>
+        </div>
+
+        <div className="oa-card" style={{ marginBottom: 18 }}>
+          <div className="oa-section-title"><Fingerprint size={15} /> Discord OAuth Login</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 18px' }}>
+            <Field label="OAuth Client ID" value={oauth.clientId} onChange={(v) => setGroup('discordOAuth', 'clientId', v)} testid="cfg-oauth-client" />
+            <Field label="OAuth Client Secret" value={secretValue(oauth, 'clientSecret')} onChange={(v) => setGroup('discordOAuth', 'clientSecret', v)} type="password" hint={secretHint(oauth, 'clientSecret')} testid="cfg-oauth-secret" />
+            <Field label="Redirect URI" value={oauth.redirectUri} onChange={(v) => setGroup('discordOAuth', 'redirectUri', v)} placeholder="https://omnifm.xyz/api/auth/discord/callback" testid="cfg-oauth-redirect" />
+            <Field label="Scopes" value={oauth.scopes} onChange={(v) => setGroup('discordOAuth', 'scopes', v)} placeholder="identify guilds" testid="cfg-oauth-scopes" />
+          </div>
+        </div>
+
+        <div className="oa-card" style={{ marginBottom: 18 }}>
+          <div className="oa-section-title"><Mail size={15} /> E-Mail Versand (SMTP)</div>
+          <Toggle label="SMTP aktivieren" checked={!!smtp.enabled} onChange={(v) => setGroup('smtp', 'enabled', v)} testid="cfg-smtp-enabled" />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0 18px' }}>
+            <Field label="SMTP Host" value={smtp.host} onChange={(v) => setGroup('smtp', 'host', v)} testid="cfg-smtp-host" />
+            <Field label="Port" value={smtp.port} onChange={(v) => setGroup('smtp', 'port', parseInt(v, 10) || 587)} type="number" testid="cfg-smtp-port" />
+            <Field label="Benutzer" value={smtp.user} onChange={(v) => setGroup('smtp', 'user', v)} testid="cfg-smtp-user" />
+            <Field label="Passwort" value={secretValue(smtp, 'password')} onChange={(v) => setGroup('smtp', 'password', v)} type="password" hint={secretHint(smtp, 'password')} testid="cfg-smtp-password" />
+            <Field label="Absender" value={smtp.from} onChange={(v) => setGroup('smtp', 'from', v)} placeholder="OmniFM <noreply@omnifm.xyz>" testid="cfg-smtp-from" />
+          </div>
+          <Toggle label="TLS-Verbindung (SMTPS)" checked={!!smtp.secure} onChange={(v) => setGroup('smtp', 'secure', v)} testid="cfg-smtp-secure" />
+        </div>
+
+        <div className="oa-grid cols-2" style={{ marginBottom: 18 }}>
+          <div className="oa-card">
+            <div className="oa-section-title"><Music2 size={15} /> Audio Song-Erkennung</div>
+            <Toggle label="Song-Erkennung aktivieren" checked={!!recognition.enabled} onChange={(v) => setGroup('audioRecognition', 'enabled', v)} testid="cfg-recognition-enabled" />
+            <Field label="AcoustID API Key" value={secretValue(recognition, 'apiKey')} onChange={(v) => setGroup('audioRecognition', 'apiKey', v)} type="password" hint={secretHint(recognition, 'apiKey')} testid="cfg-recognition-key" />
+          </div>
+          <div className="oa-card">
+            <div className="oa-section-title"><History size={15} /> Song-Verlauf</div>
+            <Toggle label="Song-Verlauf aktivieren" checked={history.enabled !== false} onChange={(v) => setGroup('songHistory', 'enabled', v)} testid="cfg-history-enabled" />
+            <Field label="Max. Einträge pro Server" value={history.maxPerGuild} onChange={(v) => setGroup('songHistory', 'maxPerGuild', Math.max(10, parseInt(v, 10) || 100))} type="number" testid="cfg-history-max" />
+          </div>
+        </div>
+
+        <div className="oa-card" style={{ marginBottom: 18 }}>
+          <div className="oa-section-title"><Globe2 size={15} /> Bot-Verzeichnisse & Vote-Plattformen</div>
+          <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 14 }}>API-Tokens, Bot-IDs und Statistik-Sync werden zentral gespeichert und beim nÃ¤chsten Bot-Neustart aktiv.</div>
+          <div className="oa-grid cols-3">
+            {[
+              ['discordBotList', 'Discord Bot List', true, true],
+              ['botsGG', 'Bots.gg', false, false],
+              ['topGG', 'Top.gg', false, true],
+            ].map(([key, label, hasSlug, hasWebhook]) => {
+              const directory = directories[key] || {};
+              return (
+                <div key={key} className="oa-card" style={{ background: 'var(--oa-bg)' }}>
+                  <div style={{ fontWeight: 800, color: '#fff', marginBottom: 12 }}>{label}</div>
+                  <Toggle label="Integration aktiv" checked={!!directory.enabled} onChange={(v) => setDirectory(key, 'enabled', v)} />
+                  <Field label="Bot ID" value={directory.botId} onChange={(v) => setDirectory(key, 'botId', v)} placeholder="Discord Application ID" />
+                  {hasSlug && <Field label="Slug" value={directory.slug} onChange={(v) => setDirectory(key, 'slug', v)} placeholder="omnifm-dj" />}
+                  <Field label="API Token" value={secretValue(directory, 'token')} onChange={(v) => setDirectory(key, 'token', v)} type="password" hint={secretHint(directory, 'token')} />
+                  {hasWebhook && <Field label="Webhook Secret" value={secretValue(directory, 'webhookSecret')} onChange={(v) => setDirectory(key, 'webhookSecret', v)} type="password" hint={secretHint(directory, 'webhookSecret')} />}
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={labelStyle}>Statistik-Umfang</label>
+                    <select className="oa-input" value={directory.statsScope || 'aggregate'} onChange={(e) => setDirectory(key, 'statsScope', e.target.value)}>
+                      <option value="aggregate">Alle Bots zusammen</option>
+                      <option value="commander">Nur Commander</option>
+                    </select>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <SaveBar onSave={() => save('system', system)} saving={saving} msg={msg} testid="cfg-system-save" />
+          <button className="oa-btn ghost" onClick={testSystem} disabled={systemTest?.loading} data-testid="cfg-system-test">
+            <ShieldCheck size={16} /> {systemTest?.loading ? 'Prüft…' : 'Alle Integrationen prüfen'}
+          </button>
+        </div>
+        {systemTest?.results && (
+          <div className="oa-grid cols-3" style={{ marginTop: 16 }}>
+            {Object.entries(systemTest.results).map(([key, result]) => (
+              <div key={key} className="oa-card" style={{ padding: 14, borderColor: result.ok ? '#10b981' : '#ef476f' }}>
+                <div style={{ fontWeight: 800, color: result.ok ? '#10b981' : '#ff8fab' }}>{result.ok ? '✓' : '×'} {key}</div>
+                <div style={{ color: '#94a3b8', fontSize: 12, marginTop: 5 }}>{result.message}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        {systemTest?.error && <div style={{ color: '#ff8fab', marginTop: 12 }}>{systemTest.error}</div>}
+      </div>
+    );
+  }
 
   // ---------------- COMPANY / LEGAL ----------------
   if (section === 'company') {
@@ -280,6 +411,9 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
             </div>
           )}
           <Toggle label="Stripe-Checkout aktivieren" checked={!!stripe.enabled} onChange={(v) => setStripe('enabled', v)} testid="cfg-stripe-enabled" />
+          <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 14 }}>
+            Stripe Webhook-Ziel: <code className="oa-mono">https://omnifm.xyz/api/premium/webhook</code> · Ereignis: <code className="oa-mono">checkout.session.completed</code>
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 18px' }}>
             <div style={{ marginBottom: 14 }}>
               <label style={labelStyle}>Modus</label>
@@ -295,8 +429,9 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
         </div>
 
         <div className="oa-card" style={{ marginBottom: 18 }}>
-          <div className="oa-section-title"><CreditCard size={15} /> PayPal</div>
-          <Toggle label="PayPal aktivieren" checked={!!paypal.enabled} onChange={(v) => setPaypal('enabled', v)} testid="cfg-paypal-enabled" />
+          <div className="oa-section-title"><CreditCard size={15} /> PayPal · vorbereitet, noch nicht live</div>
+          <div style={{ fontSize: 12, color: '#f59e0b', marginBottom: 12 }}>Die FastAPI-Zahlungsstrecke unterstützt derzeit Stripe. PayPal wird erst nach Implementierung der Checkout- und Webhook-Strecke aktivierbar.</div>
+          <Toggle label="PayPal-Konfiguration vormerken" checked={!!paypal.enabled} onChange={(v) => setPaypal('enabled', v)} testid="cfg-paypal-enabled" />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 18px' }}>
             <div style={{ marginBottom: 14 }}>
               <label style={labelStyle}>Modus</label>

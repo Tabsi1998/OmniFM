@@ -212,11 +212,10 @@ Rollback plan:
    - Do not run additional update or CLI write operations.
    - Capture current commit: git rev-parse --short HEAD.
 
-2. Roll code/container back.
+2. Roll code back.
    - git fetch origin
    - git checkout <known-good-commit-or-tag>
-   - bash ./scripts/compose.sh up -d --build
-   - In split mode, prefer commander first, then workers, unless the incident is worker-only.
+   - ./start.sh
 
 3. Runtime files.
    - Restore JSON runtime files from the latest verified backup only when the incident is data-related.
@@ -224,11 +223,11 @@ Rollback plan:
 
 4. MongoDB and migrations.
    - Prefer forward fixes for already-applied Mongo changes.
-   - If a backup restore is required, stop OmniFM containers first, restore Mongo, then start commander before workers.
+   - If a backup restore is required, run ./stop.sh first, restore Mongo, then run ./start.sh.
 
 5. Verification.
    - OMNIFM_LIVE_ADMIN_TOKEN="$API_ADMIN_TOKEN" node scripts/release-gate.mjs --post-deploy --base-url https://omnifm.xyz
-   - Check /admin release card, /api/health/detail, live-smoke workflow, and Docker logs.
+   - Check /admin, /api/health, the live-smoke workflow, and logs/backend.log, logs/frontend.log, logs/bot.log.
 `);
 }
 

@@ -62,5 +62,4 @@ body:
     id: environment
     attributes:
       label: Environment details
-      description: Host OS, Docker yes/no, Node version if local, Discord voice/stage context
-
+      description: Host OS, Node 22 version, Python version, and Discord voice/stage context

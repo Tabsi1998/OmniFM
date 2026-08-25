@@ -32,12 +32,12 @@ const backendEnv = readEnvFile(path.resolve(here, "..", "..", "backend", ".env")
 const MONGO_URL = process.env.MONGO_URL || backendEnv.MONGO_URL || "mongodb://localhost:27017";
 const DB_NAME = process.env.DB_NAME || backendEnv.DB_NAME || "omnifm";
 
-async function loadDiscordConfig() {
+async function loadOwnerConfig() {
   const client = new MongoClient(MONGO_URL, { serverSelectionTimeoutMS: 8000 });
   try {
     await client.connect();
     const doc = (await client.db(DB_NAME).collection("owner_config").findOne({ _id: "global" })) || {};
-    return doc.discord || {};
+    return doc;
   } finally {
     await client.close().catch(() => {});
   }
@@ -48,13 +48,16 @@ function isSet(v) {
 }
 
 async function main() {
-  let discord;
+  let ownerConfig;
   try {
-    discord = await loadDiscordConfig();
+    ownerConfig = await loadOwnerConfig();
   } catch (err) {
     console.error(`[OmniFM] Konnte Owner-Config nicht laden (${MONGO_URL} / ${DB_NAME}): ${err.message}`);
     process.exit(1);
   }
+
+  const discord = ownerConfig.discord || {};
+  const system = ownerConfig.system || {};
 
   const commander = discord.commander || {};
   const workers = Array.isArray(discord.workers) ? discord.workers : [];
@@ -84,6 +87,49 @@ async function main() {
   process.env.COMMANDER_BOT_INDEX = "1";
   process.env.MONGO_URL = MONGO_URL;
   process.env.DB_NAME = DB_NAME;
+  // FastAPI :8001 is the only production HTTP backend. The Node process is
+  // exclusively the Discord voice runtime in this deployment.
+  process.env.WEB_SERVER_ENABLED = "0";
+
+  // Apply the Owner Console system settings to the Discord runtime. Mongo
+  // connection settings remain boot configuration because they are required
+  // before the Owner document can be read.
+  const oauth = system.discordOAuth || {};
+  const smtp = system.smtp || {};
+  const recognition = system.audioRecognition || {};
+  const history = system.songHistory || {};
+  const directories = system.botDirectories || {};
+  const setRuntimeEnv = (key, value) => {
+    if (value !== undefined && value !== null && String(value).trim() !== "") process.env[key] = String(value).trim();
+  };
+  setRuntimeEnv("DISCORD_CLIENT_ID", oauth.clientId);
+  setRuntimeEnv("DISCORD_CLIENT_SECRET", oauth.clientSecret);
+  setRuntimeEnv("DISCORD_REDIRECT_URI", oauth.redirectUri);
+  setRuntimeEnv("DISCORD_OAUTH_SCOPES", oauth.scopes);
+  setRuntimeEnv("SMTP_HOST", smtp.host);
+  setRuntimeEnv("SMTP_PORT", smtp.port);
+  setRuntimeEnv("SMTP_SECURE", smtp.secure ? "1" : "0");
+  setRuntimeEnv("SMTP_USER", smtp.user);
+  setRuntimeEnv("SMTP_PASS", smtp.password);
+  setRuntimeEnv("SMTP_FROM", smtp.from);
+  setRuntimeEnv("NOW_PLAYING_RECOGNITION_ENABLED", recognition.enabled ? "1" : "0");
+  setRuntimeEnv("ACOUSTID_API_KEY", recognition.apiKey);
+  setRuntimeEnv("SONG_HISTORY_ENABLED", history.enabled === false ? "0" : "1");
+  setRuntimeEnv("SONG_HISTORY_MAX_PER_GUILD", history.maxPerGuild);
+
+  const directoryEnv = [
+    [directories.discordBotList || {}, "DISCORDBOTLIST", ["slug", "webhookSecret"]],
+    [directories.botsGG || {}, "BOTSGG", []],
+    [directories.topGG || {}, "TOPGG", ["webhookSecret"]],
+  ];
+  for (const [directory, prefix, extraFields] of directoryEnv) {
+    if (Object.hasOwn(directory, "enabled")) setRuntimeEnv(`${prefix}_ENABLED`, directory.enabled ? "1" : "0");
+    setRuntimeEnv(`${prefix}_TOKEN`, directory.token);
+    setRuntimeEnv(`${prefix}_BOT_ID`, directory.botId);
+    setRuntimeEnv(`${prefix}_STATS_SCOPE`, directory.statsScope);
+    if (extraFields.includes("slug")) setRuntimeEnv(`${prefix}_SLUG`, directory.slug);
+    if (extraFields.includes("webhookSecret")) setRuntimeEnv(`${prefix}_WEBHOOK_SECRET`, directory.webhookSecret);
+  }
 
   console.log(`[OmniFM] Bot-Config aus Owner-Menü: Commander="${entries[0].name || "OmniFM Commander"}", Worker=${entries.length - 1}`);
 

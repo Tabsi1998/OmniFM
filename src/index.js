@@ -214,8 +214,14 @@ for (const runtime of startedRuntimes) {
   }
 }
 
-// ---- Web Server ----
-const webServer = startWebServer(runtimes);
+// ---- Optional Node web server ----
+// Production uses FastAPI :8001; keep this available only for explicit legacy
+// or test entrypoints that opt in.
+const webServerEnabled = String(process.env.WEB_SERVER_ENABLED ?? "1").trim() !== "0";
+const webServer = webServerEnabled ? startWebServer(runtimes) : null;
+if (!webServerEnabled) {
+  log("INFO", "Node-Webserver deaktiviert; FastAPI ist das produktive HTTP-Backend.");
+}
 
 // ---- Runtime Health Reporter (echte Metriken -> MongoDB fuer Owner-Dashboard) ----
 startRuntimeHealthReporter(runtimes, {
@@ -585,7 +591,7 @@ async function shutdown(signal) {
   }
   log("INFO", "Bot-State gespeichert.");
 
-  webServer.close();
+  webServer?.close();
   await Promise.all(runtimes.map((runtime) => runtime.stop()));
   try {
     await getLogWriteQueue();

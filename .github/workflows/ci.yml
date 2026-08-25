@@ -15,8 +15,8 @@ concurrency:
 permissions:
   contents: read
 
-# The Python backend under backend/ is archived legacy/reference code.
-# CI intentionally gates the canonical Node.js runtime, React frontend, and Docker image only.
+# Production architecture: React :3000, FastAPI :8001, MongoDB, and the
+# separate Node.js Discord runtime. CI gates every production component.
 jobs:
   syntax:
     name: syntax (node ${{ matrix.node-version }})
@@ -49,6 +49,9 @@ jobs:
           set -o pipefail
           mkdir -p test_reports/ci
           npm run test:syntax 2>&1 | tee test_reports/ci/syntax-node${{ matrix.node-version }}.log
+
+      - name: Validate deployment shell scripts
+        run: bash -n start.sh stop.sh update.sh
 
       - name: Upload syntax logs
         if: always()
@@ -214,63 +217,59 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  docker-build:
-    name: docker build and entrypoint smoke
+  fastapi-smoke:
+    name: FastAPI production smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
+    services:
+      mongo:
+        image: mongo:7.0.39-jammy
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval \"db.adminCommand({ ping: 1 })\""
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      MONGO_URL: mongodb://127.0.0.1:27017
+      DB_NAME: omnifm_ci_fastapi
+      API_ADMIN_TOKEN: ci-owner-token
+      SEED_DEMO_DATA: 0
     steps:
       - uses: actions/checkout@v7
-
-      - name: Validate Compose manifests
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Validate and smoke FastAPI
         shell: bash
         run: |
           set -euo pipefail
-          cp .env.example .env
-          trap 'rm -f .env' EXIT
-          docker compose -f docker-compose.yml config --quiet
-          docker compose -f docker-compose.split.yml --profile worker-1 config --quiet
-
-      - name: Build container
-        shell: bash
-        run: |
-          set -o pipefail
-          mkdir -p test_reports/ci
-          docker build -t omnifm-ci . 2>&1 | tee test_reports/ci/docker-build.log
-
-      - name: Start entrypoint as the unprivileged runtime user
-        shell: bash
-        run: |
-          set -o pipefail
-          docker run --rm omnifm-ci node -e "const fs = require('fs'); if (process.getuid() === 0) throw new Error('runtime must not run as root'); for (const file of ['stations.json', 'owner-audit.json']) { if (!fs.statSync('/app/runtime-data/' + file).isFile()) throw new Error('missing initialized runtime file: ' + file); } console.log('entrypoint runtime-data smoke passed');" 2>&1 | tee test_reports/ci/docker-entrypoint-smoke.log
-
-      - name: Smoke native audio and FFmpeg in the runtime image
-        shell: bash
-        run: |
-          set -o pipefail
-          docker run --rm -i --entrypoint node omnifm-ci - <<'NODE' 2>&1 | tee test_reports/ci/docker-audio-smoke.log
-          const { spawnSync } = require('node:child_process');
-          const { OpusEncoder } = require('@discordjs/opus');
-          const pcm = Buffer.alloc(960 * 2 * 2);
-          const encoder = new OpusEncoder(48_000, 2);
-          try {
-            const packet = encoder.encode(pcm);
-            if (!packet.length) throw new Error('native Opus encoder produced no packet');
-          } finally {
-            encoder.delete?.();
-          }
-          const ffmpeg = spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 's16le', '-ar', '48000', '-ac', '2', '-i', 'pipe:0', '-f', 'null', '-'], { input: pcm });
-          if (ffmpeg.status !== 0) throw new Error(ffmpeg.stderr.toString() || 'FFmpeg PCM smoke failed');
-          console.log('runtime native Opus and FFmpeg smoke passed');
-          NODE
-
-      - name: Upload docker build log
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: docker-build-log
-          path: |
-            test_reports/ci/docker-build.log
-            test_reports/ci/docker-entrypoint-smoke.log
-            test_reports/ci/docker-audio-smoke.log
-          if-no-files-found: error
-          retention-days: 14
+          python -m py_compile backend/server.py
+          python -m uvicorn backend.server:app --host 127.0.0.1 --port 8001 >fastapi.log 2>&1 &
+          api_pid=$!
+          trap 'kill "$api_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            curl -fsS http://127.0.0.1:8001/api/health >/dev/null && break
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8001/api/health | python -m json.tool
+          curl -fsS http://127.0.0.1:8001/api/stats | python -m json.tool
+          curl -fsS -H 'X-Admin-Token: ci-owner-token' http://127.0.0.1:8001/api/admin/config | python -m json.tool
+          curl -fsS -X PUT -H 'X-Admin-Token: ci-owner-token' -H 'Content-Type: application/json' \
+            --data '{"section":"system","data":{"discordOAuth":{"clientId":"123456789012345678","clientSecret":"ci-secret","redirectUri":"https://example.test/api/auth/discord/callback","scopes":"identify guilds"},"smtp":{"enabled":false},"audioRecognition":{"enabled":false},"songHistory":{"enabled":true,"maxPerGuild":100}}}' \
+            http://127.0.0.1:8001/api/admin/config | python -c 'import json,sys; d=json.load(sys.stdin); assert d["ok"] and d["data"]["discordOAuth"]["clientSecretSet"] is True and d["data"]["discordOAuth"]["clientSecret"] == "••••••••"'
+          curl -fsS -X PUT -H 'X-Admin-Token: ci-owner-token' -H 'Content-Type: application/json' \
+            --data '{"section":"system","data":{"discordOAuth":{"clientId":"123456789012345678","clientSecret":"••••••••","clientSecretSet":true,"redirectUri":"https://example.test/api/auth/discord/callback","scopes":"identify guilds"}}}' \
+            http://127.0.0.1:8001/api/admin/config >/dev/null
+          python -c 'from pymongo import MongoClient; d=MongoClient("mongodb://127.0.0.1:27017").omnifm_ci_fastapi.owner_config.find_one({"_id":"global"}); o=d["system"]["discordOAuth"]; assert o["clientSecret"] == "ci-secret" and "clientSecretSet" not in o'
+          curl -fsS -X POST -H 'X-Admin-Token: ci-owner-token' -H 'Content-Type: application/json' \
+            --data '{"integration":"songhistory"}' \
+            http://127.0.0.1:8001/api/admin/integrations/test | python -c 'import json,sys; d=json.load(sys.stdin); assert d["ok"] and d["results"]["songHistory"]["ok"]'
+          curl -fsS -X POST -H 'X-Admin-Token: ci-owner-token' -H 'Content-Type: application/json' \
+            --data '{"email":"owner-contract@example.test","tier":"pro","months":1,"seats":1}' \
+            http://127.0.0.1:8001/api/admin/licenses | python -c 'import json,sys; d=json.load(sys.stdin); assert d["ok"] and d["licenseKey"].startswith("OMNI-")'

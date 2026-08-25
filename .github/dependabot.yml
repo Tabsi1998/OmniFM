@@ -40,8 +40,7 @@ updates:
       - dependencies
       - frontend
 
-  # backend/ is an archived reference path, but remains installable and must
-  # receive security updates while it is published in this repository.
+  # Production FastAPI backend dependencies.
   - package-ecosystem: pip
     directory: /backend
     schedule:
@@ -51,4 +50,4 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - dependencies
-      - legacy-python
+      - backend

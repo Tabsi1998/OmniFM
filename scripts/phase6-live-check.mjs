@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import { redactSensitiveText, sanitizeUrlForLog } from "../src/lib/redact-sensitive.js";
 
 function parseArgs(argv) {
@@ -37,7 +38,7 @@ function parseArgs(argv) {
 }
 
 function normalizeBaseUrl(rawValue) {
-  const value = String(rawValue || "").trim() || "http://localhost:8081";
+  const value = String(rawValue || "").trim() || "http://localhost:3000";
   return value.replace(/\/+$/, "");
 }
 
@@ -53,15 +54,14 @@ function resolveAdminToken() {
 
 function printUsage() {
   console.log("Usage:");
-  console.log("  OMNIFM_LIVE_ADMIN_TOKEN=... node scripts/phase6-live-check.mjs --base-url https://omnifm.xyz [--docker-service omnifm] [--log-since 30m]");
+  console.log("  OMNIFM_LIVE_ADMIN_TOKEN=... node scripts/phase6-live-check.mjs --base-url https://omnifm.xyz [--log-dir ./logs]");
   console.log("");
   console.log("Options:");
-  console.log("  --base-url        API base URL, default: OMNIFM_BASE_URL, PUBLIC_WEB_URL, or http://localhost:8081");
+  console.log("  --base-url        Website URL, default: OMNIFM_BASE_URL, PUBLIC_WEB_URL, or http://localhost:3000");
   console.log("  OMNIFM_LIVE_ADMIN_TOKEN  Admin API token (legacy environment aliases remain supported)");
-  console.log("  --docker-service  Docker Compose service name, default: OMNIFM_DOCKER_SERVICE or omnifm");
-  console.log("  --log-since       docker logs lookback window, default: OMNIFM_LOG_SINCE or 30m");
+  console.log("  --log-dir         Deployment log directory, default: OMNIFM_LOG_DIR or ./logs");
   console.log("  --skip-api        Skip authenticated API checks");
-  console.log("  --skip-logs       Skip Docker log checks");
+  console.log("  --skip-logs       Skip deployment log checks");
 }
 
 function logLine(level, message) {
@@ -213,11 +213,11 @@ async function inspectCoreRoutes(baseUrl) {
 
   const healthResponse = await fetchJson(baseUrl, "/api/health");
   const healthError = expectJsonObject(healthResponse, "health");
-  if (healthError || healthResponse.body?.ok !== true || !Number.isFinite(Number(healthResponse.body?.bots)) || !Number.isFinite(Number(healthResponse.body?.readyBots))) {
+  if (healthError || healthResponse.body?.ok !== true || healthResponse.body?.ready !== true || healthResponse.body?.services?.mongo !== true) {
     ok = false;
-    logLine("FAIL", `core api health: ${healthError || `invalid payload ok=${healthResponse.body?.ok}, bots=${healthResponse.body?.bots}, readyBots=${healthResponse.body?.readyBots}`}`);
+    logLine("FAIL", `core api health: ${healthError || `invalid readiness payload status=${healthResponse.body?.status}, mongo=${healthResponse.body?.services?.mongo}`}`);
   } else {
-    logLine("OK", `core api health: bots=${healthResponse.body.bots}, readyBots=${healthResponse.body.readyBots}`);
+    logLine("OK", `core api health: status=${healthResponse.body.status}, mongo=ready`);
   }
 
   const stationsResponse = await fetchJson(baseUrl, "/api/stations");
@@ -469,52 +469,20 @@ function printProviderSummary(name, payload, syncFields) {
   return { ok: true, warnings };
 }
 
-function pickDockerCommand() {
-  const dockerCompose = spawnSync("docker", ["compose", "version"], {
-    encoding: "utf8",
-    stdio: "pipe",
-  });
-  if (dockerCompose.status === 0) {
-    return { command: "docker", argsPrefix: ["compose"] };
-  }
-
-  const legacy = spawnSync("docker-compose", ["version"], {
-    encoding: "utf8",
-    stdio: "pipe",
-  });
-  if (legacy.status === 0) {
-    return { command: "docker-compose", argsPrefix: [] };
-  }
-
-  return null;
-}
-
-function inspectLogs(dockerService, logSince) {
-  const docker = pickDockerCommand();
-  if (!docker) {
-    logLine("WARN", "Docker Compose not available; skipping log scan.");
+function inspectLogs(logDir) {
+  const files = ["backend.log", "frontend.log", "bot.log"]
+    .map((name) => path.resolve(logDir, name))
+    .filter((file) => fs.existsSync(file));
+  if (files.length === 0) {
+    logLine("WARN", `No deployment logs found in ${logDir}; skipping log scan.`);
     return { ok: true };
   }
 
-  const result = spawnSync(
-    docker.command,
-    [...docker.argsPrefix, "logs", "--since", logSince, dockerService],
-    {
-      encoding: "utf8",
-      stdio: "pipe",
-    }
-  );
-
-  if (result.status !== 0) {
-    const errorText = clipLine(result.stderr || result.stdout || "docker logs failed");
-    logLine("WARN", `Docker log scan skipped: ${errorText}`);
-    return { ok: true };
-  }
-
-  const lines = String(result.stdout || "")
+  const lines = files.flatMap((file) => String(fs.readFileSync(file, "utf8") || "")
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .slice(-2000));
 
   const failurePatterns = [
     { label: "guild access denied", regex: /Guild-Zugriff verweigert|access denied/i },
@@ -544,7 +512,7 @@ function inspectLogs(dockerService, logSince) {
   }
 
   if (!hadFailure) {
-    logLine("OK", `logs: scanned ${lines.length} line(s) for service ${dockerService} over ${logSince}`);
+    logLine("OK", `logs: scanned ${lines.length} recent line(s) from ${files.length} deployment log(s)`);
   }
 
   return { ok: !hadFailure };
@@ -564,15 +532,14 @@ async function main() {
 
   const baseUrl = normalizeBaseUrl(args["base-url"] || process.env.OMNIFM_BASE_URL || process.env.PUBLIC_WEB_URL);
   const adminToken = resolveAdminToken();
-  const dockerService = String(args["docker-service"] || process.env.OMNIFM_DOCKER_SERVICE || "omnifm").trim() || "omnifm";
-  const logSince = String(args["log-since"] || process.env.OMNIFM_LOG_SINCE || "30m").trim() || "30m";
+  const logDir = String(args["log-dir"] || process.env.OMNIFM_LOG_DIR || "./logs").trim() || "./logs";
   const skipApi = args["skip-api"] === true;
   const skipLogs = args["skip-logs"] === true;
 
   let hadFailure = false;
 
   logLine("INFO", `baseUrl=${sanitizeUrlForLog(baseUrl)}`);
-  logLine("INFO", `dockerService=${dockerService}, logSince=${logSince}`);
+  logLine("INFO", `logDir=${logDir}`);
 
   const coreResult = await inspectCoreRoutes(baseUrl);
   if (!coreResult.ok) hadFailure = true;
@@ -592,26 +559,11 @@ async function main() {
       hadFailure = true;
     } else {
       const requests = [
-        {
-          name: "discordbotlist",
-          path: "/api/discordbotlist/status?live=1",
-          syncFields: ["lastCommandsSync", "lastStatsSync", "lastVoteSync"],
-        },
-        {
-          name: "botsgg",
-          path: "/api/botsgg/status?live=1",
-          syncFields: ["lastStatsSync"],
-        },
-        {
-          name: "topgg",
-          path: "/api/topgg/status?live=1",
-          syncFields: ["lastProjectSync", "lastCommandsSync", "lastStatsSync", "lastVoteSync"],
-        },
-        {
-          name: "vote-events",
-          path: "/api/vote-events/status?limit=10",
-          syncFields: [],
-        },
+        { name: "owner overview", path: "/api/admin/overview" },
+        { name: "owner configuration", path: "/api/admin/config" },
+        { name: "owner integrations", path: "/api/admin/integrations" },
+        { name: "owner monitoring", path: "/api/admin/monitoring" },
+        { name: "owner licenses", path: "/api/admin/licenses?full=1" },
       ];
 
       for (const request of requests) {
@@ -625,20 +577,12 @@ async function main() {
           continue;
         }
 
-        if (request.name === "vote-events") {
-          const body = response.body || {};
-          const supported = Array.isArray(body?.rewardReadiness?.supportedVoteProviders)
-            ? body.rewardReadiness.supportedVoteProviders.join(", ")
-            : "none";
-          logLine(
-            "OK",
-            `vote-events: totalVotes=${body.totalVotes || 0}, supportedProviders=${supported}, rewardEngineImplemented=${body?.rewardReadiness?.rewardEngineImplemented === true ? "yes" : "no"}`
-          );
+        if (!isObject(response.body)) {
+          hadFailure = true;
+          logLine("FAIL", `${request.name}: JSON object expected`);
           continue;
         }
-
-        const summary = printProviderSummary(request.name, response.body || {}, request.syncFields);
-        if (!summary.ok) hadFailure = true;
+        logLine("OK", `${request.name}: GET ${request.path} status=${response.status}`);
       }
     }
   } else {
@@ -646,10 +590,10 @@ async function main() {
   }
 
   if (!skipLogs) {
-    const logResult = inspectLogs(dockerService, logSince);
+    const logResult = inspectLogs(logDir);
     if (!logResult.ok) hadFailure = true;
   } else {
-    logLine("WARN", "Docker log checks skipped.");
+    logLine("WARN", "Deployment log checks skipped.");
   }
 
   if (hadFailure) {

@@ -9,7 +9,6 @@
 #   - Node.js 22 LTS  (NodeSource)
 #   - MongoDB 8.0 Community  (lokal, systemd)
 #   - FFmpeg, Python-venv, Build-Tools
-#   - Yarn
 #
 # Als ERSTES wird ein Owner-Passwort (Admin-Token) erzeugt und angezeigt.
 #
@@ -29,6 +28,17 @@ FRONTEND_PORT="${FRONTEND_PORT:-3000}"
 BACKEND_PORT="${BACKEND_PORT:-8001}"
 
 mkdir -p "$RUN_DIR" "$LOG_DIR"
+
+DEPLOY_STARTED=0
+cleanup_failed_start() {
+  local code=$?
+  if [ "$code" -ne 0 ] && [ "$DEPLOY_STARTED" -eq 1 ]; then
+    printf "\033[1;31m[error]\033[0m Start fehlgeschlagen; räume teilweise gestartete Prozesse auf.\n" >&2
+    "$ROOT/stop.sh" >/dev/null 2>&1 || true
+  fi
+  return "$code"
+}
+trap cleanup_failed_start EXIT
 
 log()  { printf "\033[1;36m[OmniFM]\033[0m %s\n" "$*"; }
 warn() { printf "\033[1;33m[warn]\033[0m %s\n" "$*"; }
@@ -120,7 +130,7 @@ fi
 NODE_OK=0
 if command -v node >/dev/null 2>&1; then
   NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
-  [ "$NODE_MAJOR" -ge 18 ] 2>/dev/null && NODE_OK=1
+  [ "$NODE_MAJOR" -eq 22 ] 2>/dev/null && NODE_OK=1
 fi
 if [ "$NODE_OK" -eq 0 ]; then
   log "Installiere Node.js 22 LTS (NodeSource)..."
@@ -136,12 +146,6 @@ if [ "$NODE_OK" -eq 0 ]; then
   log "Node.js $(node -v) installiert."
 else
   log "Node.js $(node -v) ist vorhanden."
-fi
-
-# --- Yarn --------------------------------------------------------------------
-if ! command -v yarn >/dev/null 2>&1; then
-  log "Installiere Yarn..."
-  $SUDO npm install -g yarn >>"$LOG_DIR/setup.log" 2>&1 || die "Yarn-Installation fehlgeschlagen."
 fi
 
 # --- MongoDB 8.0 Community ----------------------------------------------------
@@ -199,7 +203,7 @@ else
   FRONTEND_ORIGIN=""
   log "Modus: Reverse-Proxy (relative Same-Origin-API '/api'). Optional: PUBLIC_URL=https://domain"
 fi
-CORS_ORIGINS="*"
+CORS_ORIGINS="http://localhost:${FRONTEND_PORT},http://127.0.0.1:${FRONTEND_PORT}"
 [ -n "$FRONTEND_ORIGIN" ] && CORS_ORIGINS="${FRONTEND_ORIGIN},http://localhost:${FRONTEND_PORT},http://127.0.0.1:${FRONTEND_PORT}"
 
 set_kv() { # file key value
@@ -257,6 +261,41 @@ source "$VENV/bin/activate"
 pip install --quiet --upgrade pip
 pip install --quiet -r "$ROOT/backend/requirements.txt"
 
+# Install and build before stopping the currently running version. A failed
+# dependency install or frontend compilation therefore causes no outage.
+log "Installiere Frontend-Abhängigkeiten reproduzierbar..."
+( cd "$ROOT/frontend" && npm ci --no-audit --no-fund )
+
+log "Baue Frontend..."
+( cd "$ROOT/frontend" && npm run build )
+
+log "Installiere Bot-Abhängigkeiten reproduzierbar..."
+( cd "$ROOT" && npm ci --no-audit --no-fund --engine-strict=true --loglevel=error )
+
+log "Prüfe Backend- und Runtime-Syntax vor dem Umschalten..."
+"$VENV/bin/python" -m py_compile "$ROOT/backend/server.py"
+( cd "$ROOT" && npm run test:syntax )
+
+log "Prüfe FastAPI inklusive MongoDB-Verbindung vor dem Umschalten..."
+( cd "$ROOT" && "$VENV/bin/python" -c "import backend.server as app; assert app.db is not None, 'MongoDB nicht erreichbar'" ) \
+  || die "FastAPI-Preflight fehlgeschlagen; laufende Version bleibt aktiv."
+
+log "Prüfe DB-gesteuerte Discord-Konfiguration vor dem Umschalten..."
+set +e
+( cd "$ROOT" && DRY_RUN=1 node src/entrypoints/from-owner-config.mjs >"$LOG_DIR/bot-preflight.log" 2>&1 )
+BOT_PREFLIGHT_STATUS=$?
+set -e
+case "$BOT_PREFLIGHT_STATUS" in
+  0) log "Discord-Konfiguration ist startbereit." ;;
+  78) warn "Noch kein Commander im Owner-Menü konfiguriert; Web/API werden ohne Bot gestartet." ;;
+  *) tail -n 40 "$LOG_DIR/bot-preflight.log" >&2 || true
+     die "Discord-Preflight fehlgeschlagen; laufende Version bleibt aktiv." ;;
+esac
+
+log "Stoppe bestehende OmniFM-Prozesse unmittelbar vor dem Neustart..."
+"$ROOT/stop.sh" || true
+DEPLOY_STARTED=1
+
 log "Starte Backend auf Port $BACKEND_PORT..."
 ( cd "$ROOT/backend" && nohup "$VENV/bin/uvicorn" server:app --host 0.0.0.0 --port "$BACKEND_PORT" --workers 1 \
   >"$LOG_DIR/backend.log" 2>&1 & echo $! > "$RUN_DIR/backend.pid" )
@@ -279,14 +318,8 @@ wait_for_http "FastAPI-Backend" "http://127.0.0.1:${BACKEND_PORT}/api/health" "$
 # =============================================================================
 # 5) FRONTEND (React)
 # =============================================================================
-log "Installiere Frontend-Abhängigkeiten..."
-( cd "$ROOT/frontend" && yarn install --frozen-lockfile 2>/dev/null || yarn install )
-
-log "Baue Frontend..."
-( cd "$ROOT/frontend" && yarn build )
-
 log "Serviere Frontend auf Port $FRONTEND_PORT..."
-( cd "$ROOT/frontend" && nohup npx --yes serve -s build -l "tcp://0.0.0.0:${FRONTEND_PORT}" \
+( cd "$ROOT/frontend" && nohup ./node_modules/.bin/serve -s build -l "tcp://0.0.0.0:${FRONTEND_PORT}" \
   >"$LOG_DIR/frontend.log" 2>&1 & echo $! > "$RUN_DIR/frontend.pid" )
 wait_for_http "React-Frontend" "http://127.0.0.1:${FRONTEND_PORT}/" "$LOG_DIR/frontend.log"
 
@@ -294,9 +327,6 @@ wait_for_http "React-Frontend" "http://127.0.0.1:${FRONTEND_PORT}/" "$LOG_DIR/fr
 # 6) DISCORD-BOT (DB-gesteuert, optional)
 # =============================================================================
 if [ -f "$ROOT/package.json" ]; then
-  log "Installiere Bot-Abhängigkeiten (Node)..."
-  ( cd "$ROOT" && npm install --no-audit --no-fund --engine-strict=false --loglevel=error ) \
-    || warn "Bot-Abhängigkeiten konnten nicht installiert werden."
   log "Starte Discord-Bot aus Owner-Menü-Konfiguration..."
   ( cd "$ROOT" && nohup node src/entrypoints/from-owner-config.mjs >"$LOG_DIR/bot.log" 2>&1 & echo $! > "$RUN_DIR/bot.pid" )
   sleep 3
@@ -316,8 +346,7 @@ fi
 if command -v systemctl >/dev/null 2>&1 && [ "${OMNIFM_SKIP_SYSTEMD:-0}" != "1" ]; then
   UNIT_FILE="/etc/systemd/system/omnifm.service"
   RUN_USER="$(id -un)"
-  if [ ! -f "$UNIT_FILE" ]; then
-    log "Richte systemd-Autostart ein (omnifm.service)..."
+  log "Aktualisiere systemd-Autostart (omnifm.service)..."
     $SUDO tee "$UNIT_FILE" >/dev/null <<UNIT
 [Unit]
 Description=OmniFM Full Stack (Website, API, Discord-Bot)
@@ -341,9 +370,6 @@ UNIT
     $SUDO systemctl enable omnifm.service >>"$LOG_DIR/setup.log" 2>&1 \
       && log "Autostart aktiv: OmniFM startet nach jedem Server-Neustart automatisch." \
       || warn "systemd-Autostart konnte nicht aktiviert werden (siehe logs/setup.log)."
-  else
-    log "systemd-Autostart bereits eingerichtet (omnifm.service)."
-  fi
 fi
 
 
@@ -354,3 +380,4 @@ WEB_INFO="${PUBLIC_URL:-http://${SERVER_IP}:${FRONTEND_PORT}}"
 log "Fertig. Web: ${WEB_INFO}  |  Backend intern: http://127.0.0.1:${BACKEND_PORT}  |  API: ${FRONTEND_API:-/api (relativ)}"
 log "Logs: $LOG_DIR   Stoppen mit: ./stop.sh"
 print_owner_box
+trap - EXIT

@@ -1,24 +1,19 @@
-# Legacy Python Backend
+# FastAPI-Backend
 
-`backend/server.py` is archived as a legacy/reference implementation. It is not
-the production backend, not used by Docker, and not part of the CI release gate.
-The canonical backend/API runtime is the Node.js implementation under `src/`.
+`backend/server.py` ist das produktive HTTP-Backend von OmniFM. Es läuft auf
+Port `8001`, stellt alle Endpunkte unter `/api` bereit und verwendet MongoDB
+über `MONGO_URL`. Das React-Frontend läuft separat auf Port `3000`; der
+Discord-Voice-Runtime unter `src/` ist ein eigener Node.js-Prozess.
 
-The Python dependency file is intentionally minimal and only covers the imports
-used by this legacy folder and its archived contract tests. Its direct pins are
-security-maintained through the `/backend` Dependabot ecosystem entry while this
-reference path remains in the repository.
-
-To run the legacy tests intentionally:
+Lokaler Start:
 
 ```bash
 python -m pip install -r backend/requirements.txt
-OMNIFM_RUN_LEGACY_BACKEND_TESTS=1 REACT_APP_BACKEND_URL=http://127.0.0.1:8081 python -m pytest backend/tests -q
+python -m uvicorn backend.server:app --host 127.0.0.1 --port 8001
 ```
 
-For a dependency-only security check, use a disposable virtual environment and
-run `pip-audit -r backend/requirements.txt`. Do not treat this archived path as
-a production deployment target.
+Die Contract-Tests erwarten einen isolierten laufenden Test-Stack:
 
-Without `OMNIFM_RUN_LEGACY_BACKEND_TESTS=1`, the test suite exits with an
-explicit message instead of silently reporting skipped tests.
+```bash
+OMNIFM_RUN_BACKEND_CONTRACT_TESTS=1 OMNIFM_TEST_BASE_URL=http://127.0.0.1:8001 python -m pytest backend/tests -q
+```

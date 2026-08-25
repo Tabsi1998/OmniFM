@@ -1,7 +1,7 @@
-"""Legacy/reference FastAPI backend for OmniFM.
+"""Production FastAPI backend for the OmniFM website and Owner Console.
 
-This module is feature-frozen. The canonical production backend is the
-Node.js implementation in ``src/api/server.js``.
+The public API is served below ``/api`` on port 8001. The Node.js code in
+``src/`` is the Discord voice runtime and intentionally runs separately.
 """
 
 import os
@@ -13,6 +13,9 @@ import string
 import secrets
 import socket
 import ipaddress
+import smtplib
+import ssl
+from email.message import EmailMessage
 import requests
 from pathlib import Path
 from urllib.parse import urlparse, urlencode
@@ -105,6 +108,17 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization", "X-Admin-Token"],
 )
 
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault("Cache-Control", "no-store" if request.url.path.startswith("/api/admin/") else "no-cache")
+    return response
+
 client = None
 db = None
 if MONGO_URL:
@@ -155,7 +169,7 @@ except Exception:
 # ------------------------------------------------------------------
 OWNER_CONFIG_ID = "global"
 SECRET_MASK = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
-SECRET_CONFIG_FIELDS = {"token", "secretKey", "webhookSecret", "secret"}
+SECRET_CONFIG_FIELDS = {"token", "secretKey", "webhookSecret", "secret", "clientSecret", "password", "apiKey"}
 
 DEFAULT_OWNER_CONFIG = {
     "company": {
@@ -196,6 +210,17 @@ DEFAULT_OWNER_CONFIG = {
     "discord": {
         "commander": {"name": "OmniFM Commander", "token": "", "clientId": "", "inviteUrl": ""},
         "workers": [],
+    },
+    "system": {
+        "discordOAuth": {"clientId": "", "clientSecret": "", "redirectUri": "", "scopes": "identify guilds"},
+        "smtp": {"enabled": False, "host": "", "port": 587, "secure": False, "user": "", "password": "", "from": ""},
+        "audioRecognition": {"enabled": False, "apiKey": ""},
+        "songHistory": {"enabled": True, "maxPerGuild": 100},
+        "botDirectories": {
+            "discordBotList": {"enabled": False, "token": "", "botId": "", "slug": "", "webhookSecret": "", "statsScope": "aggregate"},
+            "botsGG": {"enabled": False, "token": "", "botId": "", "statsScope": "aggregate"},
+            "topGG": {"enabled": False, "token": "", "botId": "", "webhookSecret": "", "statsScope": "aggregate"},
+        },
     },
     "payments": {
         "stripe": {"enabled": False, "mode": "test", "publishableKey": "", "secretKey": "", "webhookSecret": ""},
@@ -301,17 +326,160 @@ def mask_config_secrets(obj):
     return obj
 
 
+def _strip_secret_markers(obj):
+    """Remove API-only `...Set` flags before persisting Owner config."""
+    if isinstance(obj, dict):
+        return {
+            key: _strip_secret_markers(value)
+            for key, value in obj.items()
+            if not (key.endswith("Set") and key[:-3] in SECRET_CONFIG_FIELDS)
+        }
+    if isinstance(obj, list):
+        return [_strip_secret_markers(value) for value in obj]
+    return obj
+
+
 def save_config_section(name, data):
     if db is None:
         return False
     try:
-        current = load_owner_config_raw().get(name)
+        data = _strip_secret_markers(data)
+        # Preserve secrets inherited from legacy env files when the first
+        # Owner save sends their masked placeholders back to the API.
+        if name == "system":
+            current = effective_system_config()
+        elif name == "payments":
+            current = effective_payments_config()
+        else:
+            current = load_owner_config_raw().get(name)
         if isinstance(data, (dict, list)) and current is not None:
+            if isinstance(data, dict) and isinstance(current, dict):
+                merged = json.loads(json.dumps(current))
+                data = _deep_merge(merged, data)
             data = _merge_config_secrets(current, data)
         db.owner_config.update_one({"_id": OWNER_CONFIG_ID}, {"$set": {name: data}}, upsert=True)
         return True
     except Exception:
         return False
+
+
+def system_setting(group, key, env_key=None, default=""):
+    stored_group = (((load_owner_config_raw().get("system") or {}).get(group)) or {})
+    if key in stored_group and stored_group.get(key) not in (None, ""):
+        return stored_group.get(key)
+    if env_key and os.environ.get(env_key) not in (None, ""):
+        return os.environ.get(env_key)
+    return default
+
+
+def directory_setting(directory, key, env_key=None, default=""):
+    stored = (((((load_owner_config_raw().get("system") or {}).get("botDirectories")) or {}).get(directory)) or {})
+    if key in stored and stored.get(key) not in (None, ""):
+        return stored.get(key)
+    if env_key and os.environ.get(env_key) not in (None, ""):
+        return os.environ.get(env_key)
+    return default
+
+
+def config_bool(value, default=False):
+    if isinstance(value, bool):
+        return value
+    if value in (None, ""):
+        return default
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def effective_system_config():
+    """Return Owner settings with legacy environment values migrated in-memory.
+
+    This prevents opening and saving the new System page from disabling values
+    that were configured in backend/.env before this Owner section existed.
+    """
+    config = get_config_section("system")
+    stored = load_owner_config_raw().get("system") or {}
+    mappings = {
+        "discordOAuth": {
+            "clientId": ("DISCORD_CLIENT_ID", str),
+            "clientSecret": ("DISCORD_CLIENT_SECRET", str),
+            "redirectUri": ("DISCORD_REDIRECT_URI", str),
+            "scopes": ("DISCORD_OAUTH_SCOPES", str),
+        },
+        "smtp": {
+            "host": ("SMTP_HOST", str), "port": ("SMTP_PORT", int),
+            "secure": ("SMTP_SECURE", config_bool), "user": ("SMTP_USER", str),
+            "password": ("SMTP_PASS", str), "from": ("SMTP_FROM", str),
+        },
+        "audioRecognition": {
+            "enabled": ("NOW_PLAYING_RECOGNITION_ENABLED", config_bool),
+            "apiKey": ("ACOUSTID_API_KEY", str),
+        },
+        "songHistory": {
+            "enabled": ("SONG_HISTORY_ENABLED", config_bool),
+            "maxPerGuild": ("SONG_HISTORY_MAX_PER_GUILD", int),
+        },
+    }
+    for group, fields in mappings.items():
+        stored_group = stored.get(group) or {}
+        target = config.setdefault(group, {})
+        for key, (env_key, converter) in fields.items():
+            env_value = os.environ.get(env_key)
+            if key in stored_group or env_value in (None, ""):
+                continue
+            try:
+                target[key] = converter(env_value)
+            except (TypeError, ValueError):
+                pass
+    smtp_stored = stored.get("smtp") or {}
+    if "enabled" not in smtp_stored and os.environ.get("SMTP_HOST"):
+        config["smtp"]["enabled"] = True
+
+    directory_mappings = {
+        "discordBotList": {
+            "enabled": ("DISCORDBOTLIST_ENABLED", config_bool), "token": ("DISCORDBOTLIST_TOKEN", str),
+            "botId": ("DISCORDBOTLIST_BOT_ID", str), "slug": ("DISCORDBOTLIST_SLUG", str),
+            "webhookSecret": ("DISCORDBOTLIST_WEBHOOK_SECRET", str), "statsScope": ("DISCORDBOTLIST_STATS_SCOPE", str),
+        },
+        "botsGG": {
+            "enabled": ("BOTSGG_ENABLED", config_bool), "token": ("BOTSGG_TOKEN", str),
+            "botId": ("BOTSGG_BOT_ID", str), "statsScope": ("BOTSGG_STATS_SCOPE", str),
+        },
+        "topGG": {
+            "enabled": ("TOPGG_ENABLED", config_bool), "token": ("TOPGG_TOKEN", str),
+            "botId": ("TOPGG_BOT_ID", str), "webhookSecret": ("TOPGG_WEBHOOK_SECRET", str),
+            "statsScope": ("TOPGG_STATS_SCOPE", str),
+        },
+    }
+    stored_directories = stored.get("botDirectories") or {}
+    target_directories = config.setdefault("botDirectories", {})
+    for directory, fields in directory_mappings.items():
+        stored_directory = stored_directories.get(directory) or {}
+        target = target_directories.setdefault(directory, {})
+        for key, (env_key, converter) in fields.items():
+            env_value = os.environ.get(env_key)
+            if key in stored_directory or env_value in (None, ""):
+                continue
+            try:
+                target[key] = converter(env_value)
+            except (TypeError, ValueError):
+                pass
+    return config
+
+
+def effective_payments_config():
+    config = get_config_section("payments")
+    stored_stripe = ((load_owner_config_raw().get("payments") or {}).get("stripe") or {})
+    stripe = config.setdefault("stripe", {})
+    env_key = str(os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY") or "").strip()
+    env_webhook = str(os.environ.get("STRIPE_WEBHOOK_SECRET") or "").strip()
+    if "secretKey" not in stored_stripe and env_key:
+        stripe["secretKey"] = env_key
+    if "webhookSecret" not in stored_stripe and env_webhook:
+        stripe["webhookSecret"] = env_webhook
+    if "enabled" not in stored_stripe and env_key:
+        stripe["enabled"] = True
+    if "mode" not in stored_stripe and env_key:
+        stripe["mode"] = "live" if env_key.startswith("sk_live_") else "test"
+    return config
 
 
 
@@ -506,7 +674,11 @@ def list_recent_redemptions(limit=100):
 
 
 def is_discord_oauth_configured():
-    return bool(DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET and DISCORD_REDIRECT_URI)
+    return bool(
+        system_setting("discordOAuth", "clientId", "DISCORD_CLIENT_ID")
+        and system_setting("discordOAuth", "clientSecret", "DISCORD_CLIENT_SECRET")
+        and system_setting("discordOAuth", "redirectUri", "DISCORD_REDIRECT_URI")
+    )
 
 
 def get_frontend_base_url(request: Request):
@@ -515,7 +687,7 @@ def get_frontend_base_url(request: Request):
     if parsed_config.scheme in ("http", "https") and parsed_config.netloc:
         return f"{parsed_config.scheme}://{parsed_config.netloc}"
 
-    from_redirect = urlparse(DISCORD_REDIRECT_URI)
+    from_redirect = urlparse(str(system_setting("discordOAuth", "redirectUri", "DISCORD_REDIRECT_URI")))
     if from_redirect.scheme in ("http", "https") and from_redirect.netloc:
         return f"{from_redirect.scheme}://{from_redirect.netloc}"
 
@@ -537,6 +709,11 @@ def clean_expired_oauth_states(now_ts=None):
             expired.append(state_key)
     for state_key in expired:
         DISCORD_OAUTH_STATE_STORE.pop(state_key, None)
+    if db is not None:
+        try:
+            db.oauth_states.delete_many({"expiresAt": {"$lte": now_value}})
+        except Exception:
+            pass
 
 
 def clean_expired_dashboard_sessions(now_ts=None):
@@ -548,6 +725,50 @@ def clean_expired_dashboard_sessions(now_ts=None):
             expired.append(session_key)
     for session_key in expired:
         DASHBOARD_SESSION_STORE.pop(session_key, None)
+    if db is not None:
+        try:
+            db.dashboard_sessions.delete_many({"expiresAt": {"$lte": now_value}})
+        except Exception:
+            pass
+
+
+def store_ephemeral(collection_name, key, payload, memory_store):
+    memory_store[key] = payload
+    if db is not None:
+        try:
+            expires_at = int(payload.get("expiresAt") or 0)
+            document = {"_id": key, **payload, "expiresAtDate": datetime.fromtimestamp(expires_at, timezone.utc)}
+            collection = db[collection_name]
+            collection.create_index("expiresAtDate", expireAfterSeconds=0)
+            collection.replace_one({"_id": key}, document, upsert=True)
+        except Exception:
+            pass
+
+
+def get_ephemeral(collection_name, key, memory_store, consume=False):
+    payload = memory_store.pop(key, None) if consume else memory_store.get(key)
+    if db is not None:
+        try:
+            collection = db[collection_name]
+            document = collection.find_one_and_delete({"_id": key}) if consume else collection.find_one({"_id": key})
+            if document:
+                document.pop("_id", None)
+                document.pop("expiresAtDate", None)
+                payload = document
+        except Exception:
+            pass
+    if not isinstance(payload, dict) or int(payload.get("expiresAt", 0) or 0) <= int(time.time()):
+        return None
+    return payload
+
+
+def delete_ephemeral(collection_name, key, memory_store):
+    memory_store.pop(key, None)
+    if db is not None:
+        try:
+            db[collection_name].delete_one({"_id": key})
+        except Exception:
+            pass
 
 
 def load_dashboard_data():
@@ -741,7 +962,7 @@ def get_dashboard_session(request: Request):
     token = resolve_session_token_from_request(request)
     if not token:
         return None, ""
-    session = DASHBOARD_SESSION_STORE.get(token)
+    session = get_ephemeral("dashboard_sessions", token, DASHBOARD_SESSION_STORE)
     if not isinstance(session, dict):
         return None, token
     return session, token
@@ -785,10 +1006,10 @@ def resolve_session_guild_for_server(session_payload, server_id):
 
 def build_discord_authorize_url(state, prompt="consent"):
     params = {
-        "client_id": DISCORD_CLIENT_ID,
+        "client_id": system_setting("discordOAuth", "clientId", "DISCORD_CLIENT_ID"),
         "response_type": "code",
-        "redirect_uri": DISCORD_REDIRECT_URI,
-        "scope": DISCORD_OAUTH_SCOPES,
+        "redirect_uri": system_setting("discordOAuth", "redirectUri", "DISCORD_REDIRECT_URI"),
+        "scope": system_setting("discordOAuth", "scopes", "DISCORD_OAUTH_SCOPES", "identify guilds"),
         "state": state,
         "prompt": prompt,
     }
@@ -799,11 +1020,11 @@ def exchange_discord_code_for_token(code):
     response = requests.post(
         "https://discord.com/api/oauth2/token",
         data={
-            "client_id": DISCORD_CLIENT_ID,
-            "client_secret": DISCORD_CLIENT_SECRET,
+            "client_id": system_setting("discordOAuth", "clientId", "DISCORD_CLIENT_ID"),
+            "client_secret": system_setting("discordOAuth", "clientSecret", "DISCORD_CLIENT_SECRET"),
             "grant_type": "authorization_code",
             "code": code,
-            "redirect_uri": DISCORD_REDIRECT_URI,
+            "redirect_uri": system_setting("discordOAuth", "redirectUri", "DISCORD_REDIRECT_URI"),
         },
         headers={"Content-Type": "application/x-www-form-urlencoded"},
         timeout=20,
@@ -900,7 +1121,7 @@ def sanitize_offer_code(raw_code):
 
 def build_public_legal_notice():
     public_url = (os.environ.get("PUBLIC_WEB_URL") or "").strip()
-    fallback_email = extract_mailbox(os.environ.get("SMTP_FROM") or "")
+    fallback_email = extract_mailbox(system_setting("smtp", "from", "SMTP_FROM") or "")
     c = get_config_section("company")
 
     def val(field, env_key, default=""):
@@ -961,11 +1182,11 @@ def build_public_privacy_notice():
     legal_notice = build_public_legal_notice()
     legal = legal_notice.get("legal", {})
     c = get_config_section("company")
-    has_stripe = bool(get_stripe_secret_key())
-    has_smtp = bool((os.environ.get("SMTP_HOST") or "").strip())
-    bot_id_candidate = (os.environ.get("DISCORDBOTLIST_BOT_ID") or os.environ.get("BOT_1_CLIENT_ID") or "").strip()
-    has_discordbotlist = (os.environ.get("DISCORDBOTLIST_ENABLED") or "1").strip() != "0" and bool((os.environ.get("DISCORDBOTLIST_TOKEN") or "").strip()) and bool(re.match(r"^\d{17,22}$", bot_id_candidate))
-    has_recognition = (os.environ.get("NOW_PLAYING_RECOGNITION_ENABLED") or "0").strip() == "1" and bool((os.environ.get("ACOUSTID_API_KEY") or "").strip())
+    has_stripe = is_stripe_enabled() and bool(get_stripe_secret_key())
+    has_smtp = bool(system_setting("smtp", "host", "SMTP_HOST"))
+    bot_id_candidate = str(directory_setting("discordBotList", "botId", "DISCORDBOTLIST_BOT_ID") or os.environ.get("BOT_1_CLIENT_ID") or "").strip()
+    has_discordbotlist = config_bool(directory_setting("discordBotList", "enabled", "DISCORDBOTLIST_ENABLED", False)) and bool(str(directory_setting("discordBotList", "token", "DISCORDBOTLIST_TOKEN") or "").strip()) and bool(re.match(r"^\d{17,22}$", bot_id_candidate))
+    has_recognition = config_bool(system_setting("audioRecognition", "enabled", "NOW_PLAYING_RECOGNITION_ENABLED", False)) and bool(system_setting("audioRecognition", "apiKey", "ACOUSTID_API_KEY"))
 
     controller = {
         "name": (os.environ.get("PRIVACY_CONTROLLER_NAME") or "").strip() or legal.get("providerName", ""),
@@ -1023,8 +1244,8 @@ def build_public_privacy_notice():
         },
         "retention": {
             "logDays": parse_int(os.environ.get("LOG_MAX_DAYS"), 14),
-            "songHistoryEnabled": (os.environ.get("SONG_HISTORY_ENABLED") or "1").strip() != "0",
-            "songHistoryMaxPerGuild": parse_int(os.environ.get("SONG_HISTORY_MAX_PER_GUILD"), 100),
+            "songHistoryEnabled": config_bool(system_setting("songHistory", "enabled", "SONG_HISTORY_ENABLED", True), True),
+            "songHistoryMaxPerGuild": parse_int(system_setting("songHistory", "maxPerGuild", "SONG_HISTORY_MAX_PER_GUILD", 100), 100),
             "listeningStatsEnabled": True,
             "scheduledEventsEnabled": True,
         },
@@ -1041,10 +1262,12 @@ def build_public_terms_notice():
     c = get_config_section("company")
     pay = get_config_section("payments")
     public_url = (os.environ.get("PUBLIC_WEB_URL") or "").strip()
-    fallback_email = extract_mailbox(os.environ.get("SMTP_FROM") or "")
-    has_stripe = bool(get_stripe_secret_key())
-    paypal_enabled = bool((pay.get("paypal") or {}).get("enabled"))
-    has_smtp = bool((os.environ.get("SMTP_HOST") or "").strip())
+    fallback_email = extract_mailbox(system_setting("smtp", "from", "SMTP_FROM") or "")
+    has_stripe = is_stripe_enabled() and bool(get_stripe_secret_key())
+    # PayPal settings are reserved for the future; no production checkout
+    # route exists yet, so public legal notices must not advertise it.
+    paypal_enabled = False
+    has_smtp = bool(system_setting("smtp", "host", "SMTP_HOST"))
 
     operator = {
         "providerName": legal.get("providerName", ""),
@@ -1238,6 +1461,70 @@ def get_stripe_secret_key():
     return key
 
 
+def is_stripe_enabled():
+    stored = ((load_owner_config_raw().get("payments") or {}).get("stripe") or {})
+    if "enabled" in stored:
+        return bool(stored.get("enabled"))
+    return bool(get_stripe_secret_key())
+
+
+def get_stripe_webhook_secret():
+    try:
+        value = str(((get_config_section("payments") or {}).get("stripe") or {}).get("webhookSecret") or "").strip()
+        if value:
+            return value
+    except Exception:
+        pass
+    return str(os.environ.get("STRIPE_WEBHOOK_SECRET") or "").strip()
+
+
+def send_license_email_best_effort(email, license_data):
+    host = str(system_setting("smtp", "host", "SMTP_HOST") or "").strip()
+    if not host or not config_bool(system_setting("smtp", "enabled", default=True), True):
+        return {"ok": False, "message": "smtp_not_configured"}
+    port = parse_int(system_setting("smtp", "port", "SMTP_PORT", 587), 587)
+    secure = config_bool(system_setting("smtp", "secure", "SMTP_SECURE", False))
+    user = str(system_setting("smtp", "user", "SMTP_USER") or "").strip()
+    password = str(system_setting("smtp", "password", "SMTP_PASS") or "")
+    sender = str(system_setting("smtp", "from", "SMTP_FROM") or user or "").strip()
+    if not sender:
+        return {"ok": False, "message": "smtp_sender_missing"}
+    message = EmailMessage()
+    message["Subject"] = f"Deine OmniFM {str(license_data.get('tier') or '').title()} Lizenz"
+    message["From"] = sender
+    message["To"] = email
+    message.set_content(
+        "Vielen Dank für deinen Einkauf bei OmniFM.\n\n"
+        f"Lizenz-Key: {license_data.get('licenseKey')}\n"
+        f"Plan: {str(license_data.get('tier') or '').title()}\n"
+        f"Server-Slots: {license_data.get('seats', 1)}\n"
+        f"Gültig bis: {license_data.get('expiresAt')}\n\n"
+        "Bewahre den Lizenz-Key sicher auf."
+    )
+    connection = None
+    try:
+        if secure:
+            connection = smtplib.SMTP_SSL(host, port, timeout=15, context=ssl.create_default_context())
+        else:
+            connection = smtplib.SMTP(host, port, timeout=15)
+            connection.ehlo()
+            if connection.has_extn("STARTTLS"):
+                connection.starttls(context=ssl.create_default_context())
+                connection.ehlo()
+        if user:
+            connection.login(user, password)
+        connection.send_message(message)
+        return {"ok": True, "message": "sent"}
+    except Exception as exc:
+        return {"ok": False, "message": clip_text(exc, 160)}
+    finally:
+        try:
+            if connection:
+                connection.quit()
+        except Exception:
+            pass
+
+
 def validate_stripe_key(key):
     """Prueft ob der Stripe Key gueltig aussieht"""
     if not key:
@@ -1298,10 +1585,10 @@ def load_bots_from_env():
         disc = get_config_section("discord")
         entries = []
         commander = disc.get("commander") or {}
-        if str(commander.get("clientId") or commander.get("name") or "").strip():
+        if str(commander.get("clientId") or "").strip():
             entries.append(("free", commander))
         for w in (disc.get("workers") or []):
-            if isinstance(w, dict) and str(w.get("clientId") or w.get("name") or "").strip():
+            if isinstance(w, dict) and str(w.get("clientId") or "").strip():
                 entries.append((str(w.get("tier") or "free").lower(), w))
         for idx, (tier, b) in enumerate(entries, start=1):
             cid = str(b.get("clientId") or "").strip()
@@ -1319,19 +1606,6 @@ def load_bots_from_env():
                 "ready": False, "userTag": None, "uptimeSec": 0, "guildDetails": [],
             })
 
-    if not bots:
-        for i in range(1, 3):
-            bots.append({
-                "botId": f"bot-{i}", "index": i,
-                "name": f"OmniFM Bot {i}",
-                "clientId": f"0000000000000000{i:02d}",
-                "inviteUrl": "",
-                "requiredTier": "free",
-                "color": BOT_COLORS[(i - 1) % len(BOT_COLORS)],
-                "avatarUrl": BOT_IMAGES[(i - 1) % len(BOT_IMAGES)],
-                "servers": 0, "users": 0, "connections": 0, "listeners": 0,
-                "ready": False, "userTag": None, "uptimeSec": 0, "guildDetails": [],
-            })
     return bots
 
 
@@ -1789,12 +2063,12 @@ def resolve_discount_preview(tier, seats, months, email, coupon_code, language="
 
 
 def get_discordbotlist_status(vote_limit=20):
-    token = (os.environ.get("DISCORDBOTLIST_TOKEN") or "").strip()
-    explicit_bot_id = (os.environ.get("DISCORDBOTLIST_BOT_ID") or "").strip()
+    token = str(directory_setting("discordBotList", "token", "DISCORDBOTLIST_TOKEN") or "").strip()
+    explicit_bot_id = str(directory_setting("discordBotList", "botId", "DISCORDBOTLIST_BOT_ID") or "").strip()
     commander_bot_id = (os.environ.get("BOT_1_CLIENT_ID") or "").strip()
     bot_id = explicit_bot_id or commander_bot_id
-    configured = (os.environ.get("DISCORDBOTLIST_ENABLED") or ("1" if token else "0")).strip() != "0" and bool(token) and bool(re.match(r"^\d{17,22}$", bot_id))
-    stats_scope = "aggregate" if (os.environ.get("DISCORDBOTLIST_STATS_SCOPE") or "commander").strip().lower() == "aggregate" else "commander"
+    configured = config_bool(directory_setting("discordBotList", "enabled", "DISCORDBOTLIST_ENABLED", bool(token))) and bool(token) and bool(re.match(r"^\d{17,22}$", bot_id))
+    stats_scope = "aggregate" if str(directory_setting("discordBotList", "statsScope", "DISCORDBOTLIST_STATS_SCOPE", "aggregate")).strip().lower() == "aggregate" else "commander"
 
     data = load_premium()
     state = data.get("discordBotListState", {}) if isinstance(data.get("discordBotListState"), dict) else {}
@@ -2099,24 +2373,49 @@ def sanitize_license_for_api(license_info, include_sensitive=False):
 
 @app.get("/api/health")
 async def health():
-    return {"ok": True, "status": "online", "brand": "OmniFM", "timestamp": datetime.now(timezone.utc).isoformat()}
+    mongo_ready = db is not None
+    payload = {
+        "ok": mongo_ready,
+        "ready": mongo_ready,
+        "status": "online" if mongo_ready else "degraded",
+        "brand": "OmniFM",
+        "services": {"api": True, "mongo": mongo_ready},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    return JSONResponse(status_code=200 if mongo_ready else 503, content=payload)
 
 
 @app.get("/api/bots")
 async def get_bots():
     bots = []
+    live_doc = read_runtime_health_fresh()
+    live_nodes = live_doc.get("nodes", []) if live_doc else []
+    nodes_by_index = {int(node.get("index") or 0): node for node in live_nodes}
+    nodes_by_id = {str(node.get("botId") or ""): node for node in live_nodes if node.get("botId")}
     for bot in load_bots_from_env():
         item = dict(bot)
+        node = nodes_by_id.get(str(item.get("clientId") or "")) or nodes_by_index.get(int(item.get("index") or 0))
+        if node:
+            item.update({
+                "ready": node.get("status") == "online",
+                "servers": int(node.get("guilds") or 0),
+                "users": int(node.get("users") or 0),
+                "connections": int(node.get("voiceConnections") or 0),
+                "listeners": int(node.get("listeners") or 0),
+                "userTag": node.get("userTag"),
+                "uptimeSec": int((live_doc.get("process") or {}).get("uptimeSec") or 0),
+            })
         if item.get("requiredTier", "free") != "free":
             item["clientId"] = None
             item["inviteUrl"] = None
         bots.append(item)
-    totals = {"servers": 0, "users": 0, "connections": 0, "listeners": 0}
-    for bot in bots:
-        totals["servers"] += bot.get("servers", 0)
-        totals["users"] += bot.get("users", 0)
-        totals["connections"] += bot.get("connections", 0)
-        totals["listeners"] += bot.get("listeners", 0)
+    live = live_runtime_totals()
+    totals = {
+        "servers": live["servers"],
+        "users": live["users"],
+        "connections": live["voiceConnections"],
+        "listeners": live["listeners"],
+    }
     return {"bots": bots, "totals": totals}
 
 
@@ -2289,13 +2588,21 @@ def live_runtime_totals():
     """Echte Live-Zahlen (0, wenn kein Bot laeuft) – EINE Quelle der Wahrheit."""
     doc = read_runtime_health_fresh()
     if not doc:
-        return {"botsOnline": 0, "servers": 0, "voiceConnections": 0, "live": False}
+        return {"botsOnline": 0, "servers": 0, "users": 0, "voiceConnections": 0, "listeners": 0, "live": False}
     nodes = doc.get("nodes") or []
     online = [n for n in nodes if n.get("status") == "online"]
+    guild_ids = {
+        str(guild_id)
+        for node in online
+        for guild_id in (node.get("guildIds") or [])
+        if str(guild_id).strip()
+    }
     return {
         "botsOnline": len(online),
-        "servers": sum(int(n.get("guilds") or 0) for n in online),
+        "servers": len(guild_ids) if guild_ids else sum(int(n.get("guilds") or 0) for n in online),
+        "users": sum(int(n.get("users") or 0) for n in online),
         "voiceConnections": sum(int(n.get("voiceConnections") or 0) for n in online),
+        "listeners": sum(int(n.get("listeners") or 0) for n in online),
         "live": True,
     }
 
@@ -2325,9 +2632,9 @@ async def get_stats():
     live = live_runtime_totals()
     totals = {
         "servers": live["servers"],
-        "users": 0,
+        "users": live["users"],
         "connections": live["voiceConnections"],
-        "listeners": 0,
+        "listeners": live["listeners"],
         "bots": live["botsOnline"],
         "botsConfigured": len(bots),
         "live": live["live"],
@@ -2387,12 +2694,12 @@ async def auth_discord_login(request: Request, nextPage: str = "dashboard"):
 
     clean_expired_oauth_states()
     state_token = secrets.token_urlsafe(24)
-    DISCORD_OAUTH_STATE_STORE[state_token] = {
+    store_ephemeral("oauth_states", state_token, {
         "nextPage": clip_text(nextPage or "dashboard", 40),
         "createdAt": int(time.time()),
         "expiresAt": int(time.time()) + DISCORD_OAUTH_STATE_TTL_SECONDS,
         "origin": get_frontend_base_url(request),
-    }
+    }, DISCORD_OAUTH_STATE_STORE)
     return {
         "oauthConfigured": True,
         "authUrl": build_discord_authorize_url(state_token),
@@ -2412,7 +2719,7 @@ async def auth_discord_callback(request: Request, code: str = "", state: str = "
         return build_error_redirect("oauth_not_configured")
 
     clean_expired_oauth_states()
-    state_payload = DISCORD_OAUTH_STATE_STORE.pop(str(state or "").strip(), None)
+    state_payload = get_ephemeral("oauth_states", str(state or "").strip(), DISCORD_OAUTH_STATE_STORE, consume=True)
     if not state_payload:
         return build_error_redirect("invalid_state")
     if not str(code or "").strip():
@@ -2427,12 +2734,12 @@ async def auth_discord_callback(request: Request, code: str = "", state: str = "
 
     clean_expired_dashboard_sessions()
     session_token = secrets.token_urlsafe(32)
-    DASHBOARD_SESSION_STORE[session_token] = {
+    store_ephemeral("dashboard_sessions", session_token, {
         "user": user_profile,
         "guilds": guilds,
         "createdAt": int(time.time()),
         "expiresAt": int(time.time()) + DASHBOARD_SESSION_TTL_SECONDS,
-    }
+    }, DASHBOARD_SESSION_STORE)
 
     next_page = str(state_payload.get("nextPage") or "dashboard").strip().lower()
     if next_page not in ("dashboard", "home"):
@@ -2484,7 +2791,7 @@ async def auth_logout(request: Request):
 
     _, token = get_dashboard_session(request)
     if token:
-        DASHBOARD_SESSION_STORE.pop(token, None)
+        delete_ephemeral("dashboard_sessions", token, DASHBOARD_SESSION_STORE)
 
     response = JSONResponse(status_code=200, content={"success": True})
     response.delete_cookie(SESSION_COOKIE_NAME, path="/")
@@ -3364,7 +3671,7 @@ async def activate_trial(request: Request, body: dict):
         },
     )
 
-    smtp_configured = bool((os.environ.get("SMTP_HOST") or "").strip())
+    smtp_configured = bool(system_setting("smtp", "host", "SMTP_HOST"))
     email_status = {
         "smtpConfigured": smtp_configured,
         "purchaseSent": False,
@@ -3671,6 +3978,8 @@ async def premium_checkout(request: Request, body: dict):
         return json_error(400, "tier muss 'pro' oder 'ultimate' sein.")
     if not is_valid_email(email):
         return json_error(400, "Bitte eine gueltige E-Mail-Adresse angeben.")
+    if not is_stripe_enabled():
+        return json_error(503, "Stripe-Checkout ist im Owner-Menü deaktiviert.")
 
     stripe_key = get_stripe_secret_key()
     valid, msg = validate_stripe_key(stripe_key)
@@ -3721,6 +4030,53 @@ async def premium_checkout(request: Request, body: dict):
         return {"sessionId": session.id, "url": session.url}
     except Exception as e:
         return json_error(500, f"Checkout fehlgeschlagen: {clip_text(e)}")
+
+
+@app.post("/api/premium/webhook")
+async def premium_webhook(request: Request):
+    """Provision paid Stripe Checkout sessions independently of the browser."""
+    stripe_key = get_stripe_secret_key()
+    webhook_secret = get_stripe_webhook_secret()
+    if not stripe_key or not webhook_secret:
+        return json_error(503, "Stripe Webhook ist nicht vollständig konfiguriert.")
+    try:
+        import stripe
+        stripe.api_key = stripe_key
+        payload = await request.body()
+        signature = request.headers.get("stripe-signature", "")
+        event = stripe.Webhook.construct_event(payload, signature, webhook_secret)
+    except Exception:
+        return json_error(400, "Ungültige Stripe-Webhook-Signatur.")
+
+    if str(event.get("type") or "") != "checkout.session.completed":
+        return {"received": True, "handled": False}
+    session = ((event.get("data") or {}).get("object") or {})
+    session_id = str(session.get("id") or "").strip()
+    if not session_id or str(session.get("payment_status") or "") != "paid":
+        return {"received": True, "handled": False}
+    processed = get_processed_session(session_id)
+    if processed:
+        return {"received": True, "handled": True, "replay": True}
+
+    metadata = session.get("metadata") or {}
+    email = str(metadata.get("email") or session.get("customer_details", {}).get("email") or "").strip().lower()
+    tier = str(metadata.get("tier") or "").strip().lower()
+    seats = max(1, min(5, parse_int(metadata.get("seats", 1), 1)))
+    months = normalize_months(metadata.get("months", 1))
+    if not is_valid_email(email) or tier not in ("pro", "ultimate"):
+        return json_error(400, "Stripe-Session enthält ungültige Lizenzdaten.")
+
+    try:
+        license_data = add_license(email, tier, months, seats, "stripe-webhook", f"Session: {session_id}")
+        mark_processed_session(session_id, {
+            "licenseKey": license_data.get("licenseKey"), "email": email, "tier": tier,
+            "seats": seats, "expiresAt": license_data.get("expiresAt"),
+        })
+        email_status = await run_in_threadpool(send_license_email_best_effort, email, license_data)
+        record_owner_audit("stripe.checkout.completed", target=session_id, detail=f"{tier} · seats={seats} · email={'sent' if email_status.get('ok') else 'pending'}")
+        return {"received": True, "handled": True, "emailSent": bool(email_status.get("ok"))}
+    except Exception:
+        return json_error(500, "Lizenz konnte nicht provisioniert werden.")
 
 
 @app.post("/api/premium/verify")
@@ -3807,6 +4163,8 @@ async def verify_premium(request: Request, body: dict):
                     },
                 )
 
+                email_status = await run_in_threadpool(send_license_email_best_effort, email, license_data)
+
                 license_key = license_data.get("licenseKey", "")
                 tier_name = TIERS[tier]["name"]
                 msg = f"Lizenz {license_key} erstellt! {tier_name} fuer {seats} Server, {duration_months} Monat{'e' if duration_months > 1 else ''}."
@@ -3820,6 +4178,7 @@ async def verify_premium(request: Request, body: dict):
                     "seats": seats,
                     "expiresAt": license_data.get("expiresAt"),
                     "message": msg,
+                    "emailSent": bool(email_status.get("ok")),
                 }
 
         return {"success": False, "message": "Zahlung nicht abgeschlossen."}
@@ -3988,11 +4347,13 @@ async def admin_overview(request: Request):
         "guilds": {"managed": live["servers"], "live": live["live"]},
         "integrations": {
             "mongo": db is not None,
-            "stripe": bool(get_stripe_secret_key()),
+            "stripe": is_stripe_enabled() and bool(get_stripe_secret_key()),
             "discordOAuth": is_discord_oauth_configured(),
-            "smtp": bool((os.environ.get("SMTP_HOST") or "").strip()),
-            "discordBotList": bool((os.environ.get("DISCORDBOTLIST_TOKEN") or "").strip()),
-            "recognition": (os.environ.get("NOW_PLAYING_RECOGNITION_ENABLED") or "").strip() == "1",
+            "smtp": config_bool(system_setting("smtp", "enabled", default=bool(system_setting("smtp", "host", "SMTP_HOST")))) and bool(system_setting("smtp", "host", "SMTP_HOST")),
+            "discordBotList": bool(str(directory_setting("discordBotList", "token", "DISCORDBOTLIST_TOKEN") or "").strip()),
+            "botsGG": bool(str(directory_setting("botsGG", "token", "BOTSGG_TOKEN") or "").strip()),
+            "topGG": bool(str(directory_setting("topGG", "token", "TOPGG_TOKEN") or "").strip()),
+            "recognition": config_bool(system_setting("audioRecognition", "enabled", "NOW_PLAYING_RECOGNITION_ENABLED", False)),
         },
     }
 
@@ -4083,6 +4444,8 @@ async def admin_create_license(request: Request, body: dict = None):
     note = str(body.get("note") or "").strip()
     if tier not in ("pro", "ultimate"):
         return json_error(400, "Tier muss 'pro' oder 'ultimate' sein.")
+    if email and not is_valid_email(email):
+        return json_error(400, "Bitte eine gültige E-Mail-Adresse angeben.")
     try:
         created = add_license(email, tier, months, seats=seats, activated_by="owner", note=note)
     except ValueError as e:
@@ -4134,6 +4497,8 @@ async def admin_patch_license(license_key: str, request: Request, body: dict = N
 
     if "email" in body:
         email = str(body.get("email") or "").strip()
+        if email and not is_valid_email(email):
+            return json_error(400, "Bitte eine gültige E-Mail-Adresse angeben.")
         lic["email"] = email
         lic["contactEmail"] = email
         changes.append("email")
@@ -4281,25 +4646,132 @@ async def admin_integrations(request: Request):
         dbl = get_discordbotlist_status(vote_limit=10)
     except Exception:
         dbl = {"enabled": False}
+    bots_gg = get_bot_directory_config_status("botsGG", "BOTSGG_ENABLED", "BOTSGG_TOKEN", "BOTSGG_BOT_ID")
+    top_gg = get_bot_directory_config_status("topGG", "TOPGG_ENABLED", "TOPGG_TOKEN", "TOPGG_BOT_ID")
     return {
         "discordBotList": dbl,
+        "botDirectories": {"discordBotList": dbl, "botsGG": bots_gg, "topGG": top_gg},
         "config": {
             "mongo": db is not None,
-            "stripe": bool(get_stripe_secret_key()),
+            "stripe": is_stripe_enabled() and bool(get_stripe_secret_key()),
             "discordOAuth": is_discord_oauth_configured(),
-            "smtp": bool((os.environ.get("SMTP_HOST") or "").strip()),
-            "recognition": (os.environ.get("NOW_PLAYING_RECOGNITION_ENABLED") or "").strip() == "1",
-            "songHistory": (os.environ.get("SONG_HISTORY_ENABLED") or "").strip() != "0",
+            "smtp": config_bool(system_setting("smtp", "enabled", default=bool(system_setting("smtp", "host", "SMTP_HOST")))) and bool(system_setting("smtp", "host", "SMTP_HOST")),
+            "recognition": config_bool(system_setting("audioRecognition", "enabled", "NOW_PLAYING_RECOGNITION_ENABLED", False)),
+            "songHistory": config_bool(system_setting("songHistory", "enabled", "SONG_HISTORY_ENABLED", True), True),
+            "discordBotList": config_bool(directory_setting("discordBotList", "enabled", "DISCORDBOTLIST_ENABLED", False)),
+            "botsGG": config_bool(directory_setting("botsGG", "enabled", "BOTSGG_ENABLED", False)),
+            "topGG": config_bool(directory_setting("topGG", "enabled", "TOPGG_ENABLED", False)),
         },
     }
 
 
+def get_bot_directory_config_status(directory, enabled_env, token_env, bot_id_env):
+    enabled = config_bool(directory_setting(directory, "enabled", enabled_env, False))
+    token = str(directory_setting(directory, "token", token_env) or "").strip()
+    bot_id = str(directory_setting(directory, "botId", bot_id_env) or "").strip()
+    return {
+        "enabled": enabled,
+        "configured": enabled and bool(token) and bool(re.match(r"^\d{17,22}$", bot_id)),
+        "botId": bot_id or None,
+    }
+
+
+@app.post("/api/admin/integrations/test")
+async def admin_integrations_test(request: Request, body: dict = None):
+    guard = _admin_guard(request)
+    if guard is not None:
+        return guard
+    requested = str((body or {}).get("integration") or "all").strip().lower()
+    supported = {"mongo", "stripe", "discordoauth", "smtp", "recognition", "songhistory", "discordbotlist", "botsgg", "topgg"}
+    names = supported if requested == "all" else {requested}
+    if not names.issubset(supported):
+        return json_error(400, "Unbekannte Integration.")
+
+    def check_all():
+        results = {}
+        if "mongo" in names:
+            try:
+                if client is None:
+                    raise RuntimeError("MongoDB ist nicht verbunden")
+                client.admin.command("ping")
+                results["mongo"] = {"ok": True, "message": "MongoDB antwortet."}
+            except Exception as exc:
+                results["mongo"] = {"ok": False, "message": clip_text(exc, 160)}
+        if "stripe" in names:
+            key = get_stripe_secret_key()
+            if not key:
+                results["stripe"] = {"ok": False, "message": "Kein Stripe Secret Key konfiguriert."}
+            else:
+                try:
+                    response = requests.get("https://api.stripe.com/v1/balance", auth=(key, ""), timeout=10)
+                    results["stripe"] = {"ok": response.status_code < 400, "message": "Stripe API erreichbar." if response.status_code < 400 else f"Stripe HTTP {response.status_code}"}
+                except Exception as exc:
+                    results["stripe"] = {"ok": False, "message": clip_text(exc, 160)}
+        if "discordoauth" in names:
+            results["discordOAuth"] = {"ok": is_discord_oauth_configured(), "message": "OAuth-Konfiguration vollständig." if is_discord_oauth_configured() else "Client ID, Secret oder Redirect URI fehlt."}
+        if "smtp" in names:
+            host = str(system_setting("smtp", "host", "SMTP_HOST") or "").strip()
+            port = parse_int(system_setting("smtp", "port", "SMTP_PORT", 587), 587)
+            secure = config_bool(system_setting("smtp", "secure", "SMTP_SECURE", False))
+            user = str(system_setting("smtp", "user", "SMTP_USER") or "").strip()
+            password = str(system_setting("smtp", "password", "SMTP_PASS") or "")
+            if not host:
+                results["smtp"] = {"ok": False, "message": "SMTP Host fehlt."}
+            else:
+                connection = None
+                try:
+                    if secure:
+                        connection = smtplib.SMTP_SSL(host, port, timeout=10, context=ssl.create_default_context())
+                    else:
+                        connection = smtplib.SMTP(host, port, timeout=10)
+                        connection.ehlo()
+                        if connection.has_extn("STARTTLS"):
+                            connection.starttls(context=ssl.create_default_context())
+                            connection.ehlo()
+                    if user:
+                        connection.login(user, password)
+                    results["smtp"] = {"ok": True, "message": "SMTP-Verbindung und Anmeldung erfolgreich."}
+                except Exception as exc:
+                    results["smtp"] = {"ok": False, "message": clip_text(exc, 160)}
+                finally:
+                    try:
+                        if connection:
+                            connection.quit()
+                    except Exception:
+                        pass
+        if "recognition" in names:
+            enabled = config_bool(system_setting("audioRecognition", "enabled", "NOW_PLAYING_RECOGNITION_ENABLED", False))
+            has_key = bool(system_setting("audioRecognition", "apiKey", "ACOUSTID_API_KEY"))
+            results["recognition"] = {"ok": enabled and has_key, "message": "Song-Erkennung ist vollständig konfiguriert." if enabled and has_key else "Aktivierung oder API Key fehlt."}
+        if "songhistory" in names:
+            enabled = config_bool(system_setting("songHistory", "enabled", "SONG_HISTORY_ENABLED", True), True)
+            results["songHistory"] = {"ok": enabled and db is not None, "message": "Song-Verlauf und MongoDB sind aktiv." if enabled and db is not None else "Song-Verlauf ist deaktiviert oder MongoDB fehlt."}
+        directory_specs = {
+            "discordbotlist": ("discordBotList", "DISCORDBOTLIST_TOKEN", "DISCORDBOTLIST_BOT_ID", "Discord Bot List"),
+            "botsgg": ("botsGG", "BOTSGG_TOKEN", "BOTSGG_BOT_ID", "Bots.gg"),
+            "topgg": ("topGG", "TOPGG_TOKEN", "TOPGG_BOT_ID", "Top.gg"),
+        }
+        for requested_name, (directory, token_env, bot_id_env, label) in directory_specs.items():
+            if requested_name not in names:
+                continue
+            enabled_env = token_env.replace("TOKEN", "ENABLED")
+            enabled = config_bool(directory_setting(directory, "enabled", enabled_env, False))
+            token = str(directory_setting(directory, "token", token_env) or "").strip()
+            bot_id = str(directory_setting(directory, "botId", bot_id_env) or "").strip()
+            complete = enabled and bool(token) and bool(re.match(r"^\d{17,22}$", bot_id))
+            results[directory] = {"ok": complete, "message": f"{label} ist vollstÃ¤ndig konfiguriert." if complete else f"{label}: Aktivierung, Token oder gÃ¼ltige Bot-ID fehlt."}
+        return results
+
+    results = await run_in_threadpool(check_all)
+    record_owner_audit("integrations.test", target=requested, detail="; ".join(f"{key}={'ok' if value.get('ok') else 'fail'}" for key, value in results.items()), request=request)
+    return {"ok": all(item.get("ok") for item in results.values()), "results": results, "checkedAt": datetime.now(timezone.utc).isoformat()}
+
+
 
 # ------------------------------------------------------------
-# Live monitoring: worker health, incidents and log stream.
-# Values carry a small time-based jitter so the operator sees a
-# live, moving picture while polling. Real bot telemetry (when the
-# Node commander/worker runtime is attached) overrides these.
+# Live monitoring: worker health, incidents and log stream. Production only
+# returns fresh MongoDB telemetry from the Node runtime. Synthetic values are
+# isolated behind the explicit SEED_DEMO_DATA=1 development switch.
 # ------------------------------------------------------------
 OPERATOR_INCIDENTS_FILE = Path(__file__).parent.parent / "data" / "operator-incidents.json"
 RUNTIME_INCIDENTS_FILE = Path(__file__).parent.parent / "data" / "runtime-incidents.json"
@@ -4607,8 +5079,9 @@ async def admin_get_config(request: Request):
         "company": get_config_section("company"),
         "plans": get_config_section("plans"),
         "discord": mask_config_secrets(get_config_section("discord")),
-        "payments": mask_config_secrets(get_config_section("payments")),
+        "payments": mask_config_secrets(effective_payments_config()),
         "marketing": get_config_section("marketing"),
+        "system": mask_config_secrets(effective_system_config()),
         "env": {
             "stripeEnvKey": bool((os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY") or "").strip()),
         },
@@ -4634,8 +5107,8 @@ async def admin_put_config(request: Request, body: dict = None):
         record_owner_audit("config.update", target=section, status="error", request=request)
         return json_error(500, "Speichern fehlgeschlagen.")
     record_owner_audit("config.update", target=section, detail="aktualisiert", request=request)
-    fresh = get_config_section(section)
-    if section in ("discord", "payments"):
+    fresh = effective_system_config() if section == "system" else effective_payments_config() if section == "payments" else get_config_section(section)
+    if section in ("discord", "payments", "system"):
         fresh = mask_config_secrets(fresh)
     return {"ok": True, "section": section, "data": fresh}
 

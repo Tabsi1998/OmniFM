@@ -7,7 +7,7 @@
 
 - [ ] `npm test`
 - [ ] `npm --prefix frontend run build`
-- [ ] relevant Docker or update-flow checks were considered
+- [ ] FastAPI, React, Discord runtime, and update-flow checks were considered
 
 ## Risk Check
 

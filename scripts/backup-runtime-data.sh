@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-# Create and restore recoverable archives of the persistent Docker runtime
-# directory. The restore path intentionally requires stopped OmniFM containers
+# Create and restore recoverable archives of the persistent Node runtime
+# directory. The restore path intentionally requires stopped OmniFM processes
 # and an explicit --force because it replaces live state.
 set -euo pipefail
 umask 077
@@ -21,7 +21,7 @@ require_tar() {
 }
 
 assert_default_runtime_dir() {
-  [[ "$RUNTIME_DIR" == "$APP_DIR/runtime-data" ]] || fatal "OMNIFM_HOST_RUNTIME_DATA_DIR must be $APP_DIR/runtime-data for this Compose deployment."
+  [[ "$RUNTIME_DIR" == "$APP_DIR/runtime-data" ]] || fatal "OMNIFM_HOST_RUNTIME_DATA_DIR must be $APP_DIR/runtime-data for this deployment."
 }
 
 archive_name() {
@@ -41,12 +41,14 @@ validate_archive_layout() {
 }
 
 ensure_omnifm_stopped() {
-  local running_names
-  command -v docker >/dev/null 2>&1 || return 0
-  running_names="$(docker ps --format '{{.Names}}')" || fatal "Could not inspect Docker containers before restore."
-  if printf '%s\n' "$running_names" | grep -Eq '^omnifm($|-)' ; then
-    fatal "Stop OmniFM first (bash ./scripts/compose.sh down) before restoring runtime data."
-  fi
+  local pid_file pid
+  for pid_file in "$APP_DIR/run/backend.pid" "$APP_DIR/run/frontend.pid" "$APP_DIR/run/bot.pid"; do
+    [[ -f "$pid_file" ]] || continue
+    pid="$(cat "$pid_file" 2>/dev/null || true)"
+    if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
+      fatal "Stop OmniFM first with ./stop.sh before restoring runtime data."
+    fi
+  done
 }
 
 create_backup() {
@@ -112,7 +114,7 @@ restore_backup() {
   trap - EXIT
   echo "[OK] Runtime data restored from $archive"
   echo "[INFO] Previous runtime data remains recoverable at $backup_previous"
-  echo "[INFO] Start OmniFM with: bash ./scripts/compose.sh up -d"
+  echo "[INFO] Start OmniFM with: ./start.sh"
 }
 
 case "$MODE" in
@@ -132,7 +134,7 @@ Usage:
   bash ./scripts/backup-runtime-data.sh list
   bash ./scripts/backup-runtime-data.sh restore <archive.tar.gz> --force
 
-Restore intentionally requires stopped OmniFM containers and leaves the prior
+Restore intentionally requires stopped OmniFM processes and leaves the prior
 runtime-data directory next to the restored one for recovery.
 EOF
     ;;

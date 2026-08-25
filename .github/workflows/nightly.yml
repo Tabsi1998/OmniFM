@@ -4,12 +4,6 @@ on:
   schedule:
     - cron: "17 3 * * *"
   workflow_dispatch:
-    inputs:
-      run_docker:
-        description: Build the Docker image during this run
-        required: false
-        default: true
-        type: boolean
 
 concurrency:
   group: nightly-${{ github.ref }}
@@ -148,29 +142,5 @@ jobs:
         with:
           name: nightly-frontend-build-log
           path: test_reports/ci/nightly-frontend-build.log
-          if-no-files-found: error
-          retention-days: 21
-
-  docker-build:
-    name: nightly docker build
-    if: ${{ github.event_name == 'schedule' || inputs.run_docker }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Build container
-        shell: bash
-        run: |
-          set -o pipefail
-          mkdir -p test_reports/ci
-          docker build -t omnifm-nightly . 2>&1 | tee test_reports/ci/nightly-docker-build.log
-
-      - name: Upload nightly docker build log
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: nightly-docker-build-log
-          path: test_reports/ci/nightly-docker-build.log
           if-no-files-found: error
           retention-days: 21

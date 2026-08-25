@@ -4,7 +4,7 @@ import pytest
 import requests
 
 
-BASE_URL = os.environ.get("OMNIFM_TEST_BASE_URL", "http://127.0.0.1:8080").rstrip("/")
+BASE_URL = os.environ.get("OMNIFM_TEST_BASE_URL", "http://127.0.0.1:8001").rstrip("/")
 
 
 @pytest.fixture(scope="module", autouse=True)

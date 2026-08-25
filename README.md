@@ -50,7 +50,7 @@ cd backend && pip install -r requirements.txt
 uvicorn server:app --host 0.0.0.0 --port 8001
 
 # Frontend (React)
-cd frontend && yarn install && yarn start
+cd frontend && npm ci && npm start
 ```
 
 MongoDB muss erreichbar sein (siehe `.env`).
@@ -58,8 +58,8 @@ MongoDB muss erreichbar sein (siehe `.env`).
 ## 🖥️ Deployment auf Ubuntu 24.04 (kompletter Stack inkl. Discord-Bot)
 
 **Keine manuellen Voraussetzungen mehr.** `start.sh` installiert beim ersten Lauf automatisch
-alles Nötige: **Node.js 22 LTS, MongoDB 8.0 Community (lokal), FFmpeg, Python-venv, Build-Tools
-und Yarn**. Außerdem erzeugt es beim ersten Lauf automatisch `backend/.env` + `frontend/.env`.
+alles Nötige: **Node.js 22 LTS, MongoDB 8.0 Community (lokal), FFmpeg, Python-venv und
+Build-Tools**. Außerdem erzeugt es beim ersten Lauf automatisch `backend/.env` + `frontend/.env`.
 
 Klonen → einmalig `./start.sh` → ab dann Updates per `./update.sh`:
 
@@ -69,6 +69,7 @@ chmod +x start.sh stop.sh update.sh
 sudo ./start.sh   # installiert ALLES, erzeugt .env, generiert Owner-Passwort, startet den Stack
 ./stop.sh         # alles stoppen  (./stop.sh --all stoppt auch MongoDB)
 ./update.sh       # git pull + Abhängigkeiten aktualisieren + Neustart (inkl. Bot)
+./update.sh --doctor  # nur Voraussetzungen prüfen, nichts verändern
 ```
 
 > `sudo` wird für die Systeminstallation benötigt (Node/MongoDB/FFmpeg). Läufst du bereits als
@@ -100,7 +101,7 @@ relative Same-Origin-API). Fertig.
 
 > Sonderfälle:
 > - `PUBLIC_URL=https://omnifm.xyz ./start.sh` – erzwingt die absolute Domain (auch Same-Origin).
-> - `DIRECT_IP=1 ./start.sh` – direkter Zugriff OHNE Proxy über `http://<server-ip>:8001`.
+> - `DIRECT_IP=1 ./start.sh` – direkter Website-Zugriff ohne Proxy über `http://<server-ip>:3000`; die SPA nutzt dabei die API auf `:8001`.
 
 Owner-Login danach: Domain → `/admin` → Owner-Token (aus `backend/.env`, wird beim ersten
 `start.sh` erzeugt und angezeigt).
@@ -111,6 +112,12 @@ serviert es und startet den Discord-Bot **aus der Owner-Config**. Ist noch kein 
 im Owner-Menü hinterlegt, wird der Bot sauber übersprungen (der Rest läuft trotzdem). Logs unter
 `logs/`, PIDs unter `run/`. Ports via `BACKEND_PORT` / `FRONTEND_PORT` überschreibbar, öffentliche
 URL via `PUBLIC_URL=https://domain.tld ./start.sh`.
+
+Bei Updates bleiben `backend/.env`, `frontend/.env` und alle MongoDB-Daten unverändert. Vor jedem
+Pull legt `update.sh` zusätzlich eine lokale Sicherung der Env-Dateien unter `.update-backups/` an.
+Abhängigkeiten, Frontend-Build, FastAPI/MongoDB und die DB-gesteuerte Bot-Konfiguration werden vor
+dem Stoppen der laufenden Version geprüft. Frontend und Backend wechseln danach gemeinsam auf den
+neuen Git-Stand.
 
 ### Discord-Bot einrichten (100 % über die Owner-Konsole)
 
@@ -130,7 +137,7 @@ URL via `PUBLIC_URL=https://domain.tld ./start.sh`.
 MONGO_URL=mongodb://localhost:27017
 DB_NAME=omnifm
 API_ADMIN_TOKEN=<geheimer-owner-token>      # Zugang zur Owner-Konsole /admin
-CORS_ALLOWED_ORIGINS=*
+CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 ```
 
 **`frontend/.env`**
@@ -138,8 +145,9 @@ CORS_ALLOWED_ORIGINS=*
 REACT_APP_BACKEND_URL=https://deine-domain.tld
 ```
 
-Optional (aktivieren einzelne Features): `STRIPE_*`, `DISCORD_CLIENT_ID/SECRET` (OAuth),
-`SMTP_*`, `DISCORDBOTLIST_TOKEN`.
+Bestehende `STRIPE_*`, Discord-OAuth-, SMTP-, Song-Erkennungs- und Bot-Verzeichnis-Werte werden
+beim ersten Speichern sicher in die Owner-Konfiguration übernommen; laufende Installationen
+verlieren bei einem Update keine Secrets.
 
 ## 🔑 Owner-Konsole — die zentrale Konfigurationsoberfläche
 
@@ -151,7 +159,10 @@ Optional (aktivieren einzelne Features): `STRIPE_*`, `DISCORD_CLIENT_ID/SECRET` 
 - **Pläne & Preise** — Free/Pro/Ultimate: EUR-Preise, Bot-Anzahl, Stationen, Audio, Features →
   wirkt sofort auf die Preis-Sektion der Website.
 - **Discord & Bots** — Commander-Token/Client-ID, Worker-Bots (**„+ Bot hinzufügen“**), Invite-Links, Bot-Logs.
-- **Zahlungen** — Stripe & PayPal (aktivierbar, Secrets maskiert), erweiterbar für weitere Anbieter.
+- **System-Konfiguration** — Discord OAuth, SMTP, Song-Erkennung, Song-Verlauf sowie Discord Bot
+  List, Bots.gg und Top.gg; inklusive zentralem Konfigurations-/Verbindungstest.
+- **Zahlungen** — Stripe Checkout + signierter Webhook (Secrets maskiert); PayPal ist als spätere
+  Integration vorbereitet und in der Oberfläche eindeutig als noch nicht live markiert.
 - **Global Overview** (Lizenzen, MRR/ARR, Server, Stationen), **Live-Monitoring** (Worker-Health, Incidents, Logs).
 - **Radio-Katalog** verwalten inkl. **Stream-Test**, **Lizenz-Manager**, **Audit-Log**, **Brand-Kit**.
 
@@ -166,9 +177,13 @@ GET  /api/cover?term=                             # keyless Cover-Art (iTunes)
 # Owner (Header: X-Admin-Token)
 POST /api/admin/login
 GET  /api/admin/overview | /workers | /licenses | /stations | /monitoring | /audit | /integrations
-GET/PUT /api/admin/config            # Abschnitte: company, plans, discord, payments
+GET/PUT /api/admin/config            # company, plans, discord, system, payments, marketing
+POST /api/admin/integrations/test
 GET  /api/admin/discord/logs
+POST /api/admin/licenses   PATCH/DELETE /api/admin/licenses/{license_key}
 POST /api/admin/stations   DELETE /api/admin/stations/{key}   POST /api/admin/stations/test
+POST /api/admin/stations/health
+POST /api/premium/webhook             # Stripe checkout.session.completed
 # Server-Dashboard (Discord OAuth Session)
 GET  /api/auth/session   GET/PUT /api/dashboard/perms   GET/POST/DELETE /api/dashboard/custom-stations
 ```

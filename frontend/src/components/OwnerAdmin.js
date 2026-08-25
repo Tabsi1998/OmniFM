@@ -4,7 +4,7 @@ import {
   LogOut, ShieldCheck, TrendingUp, Users, Cpu, RefreshCw, CheckCircle2, XCircle,
   Music2, Globe, CreditCard, Mail, Database, Fingerprint, AlertTriangle,
   Radar, Terminal, Gauge, HeartPulse, Plus, Pencil, Trash2, Save, ScrollText, SignalHigh, X as CloseIcon, Palette,
-  Building2, Tag, Bot, Megaphone,
+  Building2, Tag, Bot, Megaphone, Settings2,
 } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
@@ -19,6 +19,7 @@ const TOKEN_KEY = 'omnifm_admin_token';
 const NAV = [
   { id: 'overview', label: 'Global Overview', icon: LayoutDashboard },
   { id: 'monitoring', label: 'Live-Monitoring', icon: Radar },
+  { id: 'system', label: 'System-Konfiguration', icon: Settings2 },
   { id: 'company', label: 'Unternehmen & Recht', icon: Building2 },
   { id: 'plans', label: 'Pläne & Preise', icon: Tag },
   { id: 'discord', label: 'Discord & Bots', icon: Bot },
@@ -144,8 +145,9 @@ export default function OwnerAdmin() {
   const apiGet = useCallback(async (path, tk) => {
     const res = await fetch(buildApiUrl(path), { headers: { 'X-Admin-Token': tk || token }, cache: 'no-store' });
     if (res.status === 401) throw new Error('unauthorized');
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
   }, [token]);
 
   const apiSend = useCallback(async (path, method, bodyObj) => {
@@ -1139,12 +1141,23 @@ export default function OwnerAdmin() {
             </div>
             <div className="oa-card oa-fade" data-testid="integrations-directory">
               <div className="oa-stat-label" style={{ marginBottom: 12 }}>Bot-Verzeichnisse</div>
-              <div className="oa-integration">
-                <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5 }}><Globe size={16} style={{ color: '#94a3b8' }} /> DiscordBotList</span>
-                <span className={`oa-pill ${integrations?.discordBotList?.enabled ? 'green' : 'slate'}`}>{integrations?.discordBotList?.enabled ? 'Verbunden' : 'Aus'}</span>
-              </div>
+              {[
+                ['discordBotList', 'Discord Bot List'],
+                ['botsGG', 'Bots.gg'],
+                ['topGG', 'Top.gg'],
+              ].map(([key, label]) => {
+                const directory = integrations?.botDirectories?.[key] || {};
+                return (
+                  <div className="oa-integration" key={key}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5 }}><Globe size={16} style={{ color: '#94a3b8' }} /> {label}</span>
+                    <span className={`oa-pill ${directory.configured ? 'green' : directory.enabled ? 'amber' : 'slate'}`}>
+                      {directory.configured ? 'Konfiguriert' : directory.enabled ? 'Unvollständig' : 'Aus'}
+                    </span>
+                  </div>
+                );
+              })}
               <p style={{ color: '#64748b', fontSize: 12.5, marginTop: 14, lineHeight: 1.6 }}>
-                Top.gg, discord.bots.gg und weitere Verzeichnisse werden vom Node-Commander synchronisiert. Aktivierung über die entsprechenden ENV-Variablen.
+                Tokens, Bot-IDs und Sync-Umfang werden unter System-Konfiguration verwaltet und beim nächsten Bot-Neustart übernommen.
               </p>
             </div>
           </div>
@@ -1167,7 +1180,7 @@ export default function OwnerAdmin() {
             ))}
           </div>
         )}
-        {(section === 'company' || section === 'plans' || section === 'discord' || section === 'payments' || section === 'marketing') && (
+        {(section === 'system' || section === 'company' || section === 'plans' || section === 'discord' || section === 'payments' || section === 'marketing') && (
           <OwnerConfig section={section} apiGet={apiGet} apiSend={apiSend} token={token} />
         )}
         {section === 'brand' && (

@@ -2,6 +2,7 @@ import React from 'react';
 import { useI18n } from '../i18n.js';
 import { useShowcaseStations } from '../lib/showcase.js';
 import LivePlaybackBar from './LivePlaybackBar.js';
+import { resolvePrimaryInviteUrl } from '../lib/invite.js';
 import { Volume2, Check, Plus, Sparkles } from 'lucide-react';
 
 const STR = {
@@ -62,12 +63,13 @@ function StepShell({ step, s, children }) {
   );
 }
 
-export default function HowToDiscord() {
+export default function HowToDiscord({ bots = [] }) {
   const { locale } = useI18n();
   const s = STR[locale] || STR.de;
   const showcase = useShowcaseStations(4);
   const demoStation = showcase.length ? showcase[0].name : 'OmniFM Radio Network';
   const streamLabel = locale === 'en' ? 'Live radio stream' : 'Live-Radio-Stream';
+  const inviteUrl = resolvePrimaryInviteUrl(bots);
 
   return (
     <section id="how-to" data-testid="how-to-discord" style={{ padding: '90px 24px', position: 'relative' }}>
@@ -101,7 +103,13 @@ export default function HowToDiscord() {
                 </div>
               ))}
             </div>
-            <div style={{ background: '#3ba55d', color: '#fff', textAlign: 'center', fontWeight: 700, fontSize: 13, borderRadius: 8, padding: '9px 0' }}>{s.addServer}</div>
+            <a
+              href={inviteUrl}
+              target={inviteUrl.startsWith('http') ? '_blank' : undefined}
+              rel={inviteUrl.startsWith('http') ? 'noopener noreferrer' : undefined}
+              data-testid="howto-commander-invite"
+              style={{ display: 'block', background: '#3ba55d', color: '#fff', textAlign: 'center', fontWeight: 700, fontSize: 13, borderRadius: 8, padding: '9px 0', textDecoration: 'none' }}
+            >{s.addServer}</a>
           </StepShell>
 
           {/* Step 2 — add worker */}
