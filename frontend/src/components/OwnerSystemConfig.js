@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { CheckCircle2, KeyRound, Save, Settings2, XCircle } from 'lucide-react';
+import OwnerConfig from './OwnerConfig.js';
 
 function inputType(type) {
   if (type === 'integer') return 'number';
@@ -9,7 +10,7 @@ function inputType(type) {
   return 'text';
 }
 
-export default function OwnerSystemConfig({ apiGet, apiSend, token }) {
+export default function OwnerSystemConfig({ apiGet, apiSend, token, legacySection = 'company' }) {
   const [snapshot, setSnapshot] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [changes, setChanges] = useState({});
@@ -59,13 +60,18 @@ export default function OwnerSystemConfig({ apiGet, apiSend, token }) {
     && Array.isArray(snapshot.groups)
     && snapshot.groups.some((group) => Array.isArray(group?.fields) && group.fields.length > 0);
   if (!hasSchema) {
+    const hasLegacySchema = ['company', 'plans', 'discord', 'payments', 'marketing']
+      .some((key) => snapshot[key] && typeof snapshot[key] === 'object');
+    if (hasLegacySchema) {
+      return <OwnerConfig section={legacySection} apiGet={apiGet} apiSend={apiSend} token={token} />;
+    }
     return (
       <div className="oa-card" style={{ padding: 28 }} data-testid="owner-system-config-schema-error">
-        <div className="oa-section-title"><XCircle size={16} /> Konfigurations-API ist nicht aktuell</div>
+        <div className="oa-section-title"><XCircle size={16} /> Konfigurationsdaten nicht lesbar</div>
         <p style={{ color: '#ffb4c7', fontSize: 13, lineHeight: 1.6, margin: '0 0 16px' }}>
-          Das Web-Frontend und der Server liefern unterschiedliche Versionen der Owner-Konfiguration. Deshalb werden keine leeren Formulare angezeigt. Bitte den Backend-Container auf denselben Git-Stand deployen und neu starten.
+          Die API hat keine verwendbaren Konfigurationsfelder geliefert. Die Owner-Konsole bleibt absichtlich gesperrt, damit keine leeren oder falschen Einstellungen gespeichert werden.
         </p>
-        <button className="oa-btn ghost" onClick={load}>Nach Deployment erneut laden</button>
+        <button className="oa-btn ghost" onClick={load}>Erneut laden</button>
       </div>
     );
   }
@@ -77,7 +83,7 @@ export default function OwnerSystemConfig({ apiGet, apiSend, token }) {
           Alle unterstützten OmniFM-Einstellungen sind hier zentral bearbeitbar. Werte werden validiert, Secrets nie wieder angezeigt und Änderungen im Audit-Log festgehalten.
         </p>
         <div className={`oa-pill ${snapshot.envFile?.writable ? 'green' : 'red'}`}>
-          {snapshot.envFile?.writable ? <CheckCircle2 size={13} /> : <XCircle size={13} />} .env {snapshot.envFile?.writable ? 'schreibbar' : 'nicht schreibbar'}
+          {snapshot.envFile?.writable ? <CheckCircle2 size={13} /> : <XCircle size={13} />} {snapshot.envFile?.storage === 'owner-store' ? 'Owner-Speicher' : '.env'} {snapshot.envFile?.writable ? 'schreibbar' : 'nicht schreibbar'}
         </div>
       </div>
 
@@ -96,7 +102,7 @@ export default function OwnerSystemConfig({ apiGet, apiSend, token }) {
                     {field.type === 'enum' && (field.values || []).map((option) => <option key={option} value={option}>{option}</option>)}
                   </select>
                 ) : <input className="oa-input" type={inputType(field.type)} min={field.min} max={field.max} value={value} placeholder={field.example || ''} onChange={(e) => setChanges((old) => ({ ...old, [field.key]: e.target.value }))} />}
-                <div className="oa-mono" style={{ marginTop: 4, color: '#64748b', fontSize: 10 }}>{field.source === 'process' ? 'aus Prozessumgebung' : field.source === 'env-file' ? 'aus .env' : 'nicht gesetzt'}</div>
+                <div className="oa-mono" style={{ marginTop: 4, color: '#64748b', fontSize: 10 }}>{field.source === 'process' ? 'aus Prozessumgebung' : field.source === 'owner-store' ? 'aus Owner-Speicher' : field.source === 'env-file' ? 'aus .env' : 'nicht gesetzt'}</div>
               </div>;
             })}
           </div>

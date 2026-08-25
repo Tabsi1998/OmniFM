@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { rootDir } from "./logging.js";
+import { resolveRuntimeDataPath } from "./runtime-data-path.js";
 
 const ENV_LINE_RE = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/;
 const MAX_VALUE_LENGTH = 2000;
@@ -212,6 +213,12 @@ function resolveEnvFilePath() {
   return path.join(rootDir, ".env");
 }
 
+function resolveOwnerConfigStorePath() {
+  const explicit = String(process.env.OMNIFM_OWNER_CONFIG_FILE || "").trim();
+  if (explicit) return path.isAbsolute(explicit) ? explicit : path.resolve(rootDir, explicit);
+  return resolveRuntimeDataPath("owner-config.env");
+}
+
 function stripUnsafeValueCharacters(value) {
   return String(value ?? "")
     .replace(/\u001b\[[0-9;]*[A-Za-z]/g, "")
@@ -256,9 +263,27 @@ function getFileWritableState(envFile) {
   }
 }
 
-function readEffectiveValue(values, key) {
-  if (Object.prototype.hasOwnProperty.call(values, key)) {
-    return { value: values[key], source: "env-file" };
+function readConfigSources() {
+  const primary = readEnvFile(resolveEnvFilePath());
+  const ownerStorePath = resolveOwnerConfigStorePath();
+  const ownerStore = ownerStorePath === primary.envFile
+    ? { envFile: ownerStorePath, exists: false, lines: [], values: {} }
+    : readEnvFile(ownerStorePath);
+  return { primary, ownerStore };
+}
+
+function getWritableConfigTarget(sources) {
+  if (sources.ownerStore.exists && getFileWritableState(sources.ownerStore.envFile)) return sources.ownerStore;
+  if (getFileWritableState(sources.primary.envFile)) return sources.primary;
+  return sources.ownerStore;
+}
+
+function readEffectiveValue(sources, key) {
+  if (Object.prototype.hasOwnProperty.call(sources.ownerStore.values, key)) {
+    return { value: sources.ownerStore.values[key], source: "owner-store" };
+  }
+  if (Object.prototype.hasOwnProperty.call(sources.primary.values, key)) {
+    return { value: sources.primary.values[key], source: "env-file" };
   }
   if (process.env[key] != null) {
     return { value: String(process.env[key]), source: "process" };
@@ -411,15 +436,21 @@ function serializeEnvLines(parsed, updates) {
 }
 
 function writeEnvUpdates(updates) {
-  const parsed = readEnvFile();
-  const envFile = parsed.envFile;
+  const sources = readConfigSources();
+  const target = getWritableConfigTarget(sources);
+  const envFile = target.envFile;
+  if (!getFileWritableState(envFile)) {
+    const err = new Error("Weder .env noch der persistente Owner-Speicher sind schreibbar.");
+    err.statusCode = 503;
+    throw err;
+  }
   fs.mkdirSync(path.dirname(envFile), { recursive: true });
 
-  if (parsed.exists) {
+  if (target.exists) {
     fs.copyFileSync(envFile, `${envFile}.bak-owner`);
   }
 
-  const content = serializeEnvLines(parsed, updates);
+  const content = serializeEnvLines(target, updates);
   const tmpFile = `${envFile}.tmp-${process.pid}-${Date.now()}`;
   fs.writeFileSync(tmpFile, content, { encoding: "utf8", mode: 0o600 });
   fs.renameSync(tmpFile, envFile);
@@ -428,18 +459,21 @@ function writeEnvUpdates(updates) {
     process.env[key] = value;
   }
 
-  return readEnvFile(envFile);
+  return readConfigSources();
 }
 
-function buildSnapshot(parsed = readEnvFile(), { updatedKeys = [] } = {}) {
-  const envFile = parsed.envFile;
+function buildSnapshot(sources = readConfigSources(), { updatedKeys = [] } = {}) {
+  const target = getWritableConfigTarget(sources);
+  const usingOwnerStore = target.envFile === sources.ownerStore.envFile;
   return {
     schemaVersion: "owner-config-v1",
     generatedAt: new Date().toISOString(),
     envFile: {
-      path: envFile,
-      exists: parsed.exists,
-      writable: getFileWritableState(envFile),
+      path: target.envFile,
+      exists: target.exists,
+      writable: getFileWritableState(target.envFile),
+      storage: usingOwnerStore ? "owner-store" : "env-file",
+      primaryPath: sources.primary.envFile,
     },
     restartRequired: updatedKeys.length > 0,
     updatedKeys,
@@ -448,7 +482,7 @@ function buildSnapshot(parsed = readEnvFile(), { updatedKeys = [] } = {}) {
       title: group.title,
       description: group.description,
       fields: group.fields.map((field) => {
-        const effective = readEffectiveValue(parsed.values, field.key);
+        const effective = readEffectiveValue(sources, field.key);
         return {
           ...field,
           value: effective.value,
@@ -459,7 +493,7 @@ function buildSnapshot(parsed = readEnvFile(), { updatedKeys = [] } = {}) {
       }),
     })),
     secrets: SECRET_FIELDS.map((field) => {
-      const effective = readEffectiveValue(parsed.values, field.key);
+      const effective = readEffectiveValue(sources, field.key);
       return {
         ...field,
         configured: effective.value.trim().length > 0,
@@ -473,7 +507,7 @@ function buildSnapshot(parsed = readEnvFile(), { updatedKeys = [] } = {}) {
 }
 
 function getOwnerConfigSnapshot() {
-  return buildSnapshot(readEnvFile());
+  return buildSnapshot(readConfigSources());
 }
 
 function patchOwnerConfig(input) {
@@ -542,4 +576,5 @@ export {
   patchOwnerConfig,
   patchOwnerSecrets,
   resolveEnvFilePath,
+  resolveOwnerConfigStorePath,
 };

@@ -1181,10 +1181,10 @@ export default function OwnerAdmin() {
           </div>
         )}
         {section === 'system' && (
-          <OwnerSystemConfig apiGet={apiGet} apiSend={apiSend} token={token} />
+          <OwnerSystemConfig apiGet={apiGet} apiSend={apiSend} token={token} legacySection="company" />
         )}
         {(section === 'company' || section === 'plans' || section === 'discord' || section === 'payments' || section === 'marketing') && (
-          <OwnerSystemConfig apiGet={apiGet} apiSend={apiSend} token={token} />
+          <OwnerSystemConfig apiGet={apiGet} apiSend={apiSend} token={token} legacySection={section} />
         )}
         {section === 'brand' && (
           <div data-testid="owner-brand-kit"><BrandKit embedded /></div>

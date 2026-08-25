@@ -48,7 +48,10 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p test_reports/ci
-          npm run test:syntax 2>&1 | tee test_reports/ci/syntax-node${{ matrix.node-version }}.log
+          {
+            bash -n start.sh stop.sh update.sh scripts/*.sh
+            npm run test:syntax
+          } 2>&1 | tee test_reports/ci/syntax-node${{ matrix.node-version }}.log
 
       - name: Upload syntax logs
         if: always()

@@ -25,11 +25,10 @@ log "Stoppe laufende Dienste..."
 log "Starte Dienste neu (installiert Abhängigkeiten & baut Frontend)..."
 ./start.sh
 
-if [ -f "$ROOT/run/bot.pid" ] && kill -0 "$(cat "$ROOT/run/bot.pid" 2>/dev/null)" 2>/dev/null; then
-  log "Discord-Bot läuft mit diesem Code-Stand. Prüfen: /help in Discord zeigt unten im Footer die Version."
+if [ -f "$ROOT/run/omnifm.pid" ] && kill -0 "$(cat "$ROOT/run/omnifm.pid" 2>/dev/null)" 2>/dev/null; then
+  log "Website, API und Discord-Bot laufen mit diesem Code-Stand."
 else
-  log "ACHTUNG: Discord-Bot läuft NICHT (Commander-Token unter /admin → Discord & Bots eintragen, dann ./start.sh)."
-  log "Ohne laufenden Bot ändern sich Discord-Embeds NICHT — alte Nachrichten bleiben alt."
+  log "ACHTUNG: OmniFM läuft NICHT. Details stehen in logs/omnifm.log."
 fi
 
 log "Update abgeschlossen."

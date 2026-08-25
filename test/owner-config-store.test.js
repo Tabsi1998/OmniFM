@@ -163,3 +163,28 @@ test("owner config stores write-only secrets without exposing values", async () 
     await fs.rm(dir, { recursive: true, force: true });
   }
 });
+
+test("owner config uses the persistent owner store when the primary env file cannot be written", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omnifm-owner-config-store-"));
+  const envFile = path.join(dir, "read-only", ".env");
+  const ownerStore = path.join(dir, "owner-config.env");
+  const restoreEnv = setEnv({
+    OMNIFM_ENV_FILE: envFile,
+    OMNIFM_OWNER_CONFIG_FILE: ownerStore,
+    PUBLIC_WEB_URL: undefined,
+  });
+
+  try {
+    const patched = patchOwnerConfig({ values: { PUBLIC_WEB_URL: "https://omnifm.xyz" } });
+    const content = await fs.readFile(ownerStore, "utf8");
+    const publicUrl = patched.groups.find((group) => group.id === "web").fields.find((field) => field.key === "PUBLIC_WEB_URL");
+
+    assert.equal(patched.envFile.storage, "owner-store");
+    assert.equal(patched.envFile.writable, true);
+    assert.match(content, /PUBLIC_WEB_URL=https:\/\/omnifm\.xyz/);
+    assert.equal(publicUrl.source, "owner-store");
+  } finally {
+    restoreEnv();
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
