@@ -26,6 +26,10 @@ import { BotRuntime } from "./bot/runtime.js";
 import { WorkerManager } from "./bot/worker-manager.js";
 import { startWebServer } from "./api/server.js";
 import { startRuntimeHealthReporter } from "./services/runtime-health-reporter.js";
+import { startStationHealthService, stopStationHealthService } from "./services/station-health.js";
+import { initScheduledEventsStore, stopScheduledEventsStore } from "./scheduled-events-store.js";
+import { initCustomStationsStore, stopCustomStationsStore } from "./custom-stations.js";
+import { initCommandPermissionsStore, stopCommandPermissionsStore } from "./command-permissions-store.js";
 import { loadStations, initStationsStore } from "./stations-store.js";
 import { installOperatorIncidentRecorder, logRecentOperatorIncidentSummary } from "./operator-incidents-store.js";
 import {
@@ -105,6 +109,10 @@ logStoreConcurrencyReport({
 });
 await initPremiumStore();
 await initStationsStore();
+await initCustomStationsStore();
+await initCommandPermissionsStore();
+await initScheduledEventsStore();
+startStationHealthService(loadStations);
 await logRecentOperatorIncidentSummary({
   label: "Owner summary on startup",
 }).catch(() => null);
@@ -578,6 +586,7 @@ async function shutdown(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
   log("INFO", `Shutdown via ${signal}...`);
+  stopStationHealthService();
 
   // Operator-Webhook: Shutdown-Benachrichtigung (nur bei externem Signal, nicht bei uncaughtException)
   if (signal === "SIGINT" || signal === "SIGTERM") {
@@ -593,6 +602,11 @@ async function shutdown(signal) {
 
   webServer?.close();
   await Promise.all(runtimes.map((runtime) => runtime.stop()));
+  await Promise.all([
+    stopScheduledEventsStore(),
+    stopCustomStationsStore(),
+    stopCommandPermissionsStore(),
+  ]);
   try {
     await getLogWriteQueue();
   } catch {

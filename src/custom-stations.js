@@ -3,6 +3,7 @@ import path from "node:path";
 import { log, logStoreLoadError } from "./lib/logging.js";
 import { validateOutboundUrl, validateOutboundUrlWithDns } from "./lib/safe-outbound-http.js";
 import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
+import { getDb, isConnected } from "./lib/db.js";
 
 const DEFAULT_CUSTOM_FILE = resolveRuntimeDataPath("custom-stations.json");
 const CUSTOM_FILE = path.resolve(process.env.OMNIFM_CUSTOM_STATIONS_FILE || DEFAULT_CUSTOM_FILE);
@@ -12,6 +13,71 @@ const MAX_TAGS_PER_STATION = 8;
 const MAX_FOLDER_LENGTH = 40;
 const MAX_TAG_LENGTH = 24;
 const CUSTOM_STATION_PREFIX = "custom:";
+let mongoData = null;
+let mongoRefreshTimer = null;
+let mongoWritesPending = 0;
+let mongoWriteQueue = Promise.resolve();
+
+function cloneData(data) {
+  return JSON.parse(JSON.stringify(data || {}));
+}
+
+function normalizeGuildId(raw) {
+  const guildId = String(raw || "").trim();
+  return /^\d{17,22}$/.test(guildId) ? guildId : "";
+}
+
+function flattenStations(data) {
+  const rows = new Map();
+  for (const [guildId, stations] of Object.entries(data || {})) {
+    for (const [key, station] of Object.entries(stations || {})) {
+      rows.set(`${guildId}:${key}`, { guildId, key, ...normalizeStoredStation(station, key) });
+    }
+  }
+  return rows;
+}
+
+async function readMongoData() {
+  if (!isConnected() || mongoWritesPending > 0) return;
+  const rows = await getDb().collection("custom_stations").find({}, { projection: { _id: 0, _stationId: 0 } }).toArray();
+  const next = {};
+  for (const row of rows) {
+    const guildId = normalizeGuildId(row?.guildId);
+    const key = sanitizeKey(row?.key);
+    if (!guildId || !key) continue;
+    if (!next[guildId]) next[guildId] = {};
+    next[guildId][key] = normalizeStoredStation(row, key);
+  }
+  mongoData = next;
+}
+
+function queueMongoDelta(previousData, nextData) {
+  if (!isConnected()) return;
+  const previous = flattenStations(previousData);
+  const next = flattenStations(nextData);
+  const operations = [];
+  for (const [identity, station] of next.entries()) {
+    if (JSON.stringify(previous.get(identity)) === JSON.stringify(station)) continue;
+    operations.push({
+      replaceOne: {
+        filter: { guildId: station.guildId, key: station.key },
+        replacement: { _stationId: identity, ...station, updatedAt: new Date().toISOString() },
+        upsert: true,
+      },
+    });
+  }
+  for (const [identity, station] of previous.entries()) {
+    if (!next.has(identity)) operations.push({ deleteOne: { filter: { guildId: station.guildId, key: station.key } } });
+  }
+  if (!operations.length) return;
+  mongoWritesPending += 1;
+  mongoWriteQueue = mongoWriteQueue
+    .then(async () => {
+      if (isConnected()) await getDb().collection("custom_stations").bulkWrite(operations, { ordered: false });
+    })
+    .catch((err) => log("ERROR", `[custom-stations] MongoDB-Speichern fehlgeschlagen: ${err?.message || err}`))
+    .finally(() => { mongoWritesPending = Math.max(0, mongoWritesPending - 1); });
+}
 
 function normalizeWhitespace(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
@@ -29,6 +95,7 @@ function readStationsFile(filePath) {
 }
 
 function load() {
+  if (mongoData) return cloneData(mongoData);
   const candidates = [CUSTOM_FILE, CUSTOM_BACKUP_FILE];
   for (const filePath of candidates) {
     try {
@@ -76,6 +143,12 @@ function load() {
 }
 
 function save(data) {
+  if (mongoData) {
+    const previous = mongoData;
+    mongoData = cloneData(data);
+    queueMongoDelta(previous, mongoData);
+    return;
+  }
   const tmpFile = `${CUSTOM_FILE}.tmp-${process.pid}-${Date.now()}`;
   try {
     if (fs.existsSync(CUSTOM_FILE) && fs.statSync(CUSTOM_FILE).isDirectory()) {
@@ -112,6 +185,38 @@ function save(data) {
       // ignore
     }
   }
+}
+
+async function initCustomStationsStore({ refreshMs = 2000 } = {}) {
+  if (!isConnected()) return { backend: "file", count: flattenStations(load()).size };
+  const collection = getDb().collection("custom_stations");
+  const rows = [...flattenStations(load()).entries()];
+  if (rows.length) {
+    const migration = await collection.bulkWrite(rows.map(([identity, station]) => ({
+      updateOne: {
+        filter: { guildId: station.guildId, key: station.key },
+        update: { $setOnInsert: { _stationId: identity, ...station, updatedAt: new Date().toISOString() } },
+        upsert: true,
+      },
+    })), { ordered: false });
+    if (migration.upsertedCount > 0) log("INFO", `[custom-stations] ${migration.upsertedCount} fehlende Datei-Sender nach MongoDB migriert.`);
+  }
+  await readMongoData();
+  if (!mongoRefreshTimer) {
+    mongoRefreshTimer = setInterval(() => {
+      readMongoData().catch((err) => log("WARN", `[custom-stations] MongoDB-Refresh fehlgeschlagen: ${err?.message || err}`));
+    }, Math.max(1000, Number(refreshMs) || 2000));
+    mongoRefreshTimer.unref?.();
+  }
+  const count = flattenStations(mongoData).size;
+  log("INFO", `[custom-stations] MongoDB ist kanonischer Store (${count} Sender).`);
+  return { backend: "mongo", count };
+}
+
+async function stopCustomStationsStore() {
+  if (mongoRefreshTimer) clearInterval(mongoRefreshTimer);
+  mongoRefreshTimer = null;
+  await mongoWriteQueue.catch(() => null);
 }
 
 function sanitizeKey(raw) {
@@ -317,4 +422,5 @@ export {
   updateGuildStation,
   listGuildStations, countGuildStations, clearGuildStations,
   addCustomStation, updateCustomStation, removeCustomStation, listCustomStations,
+  initCustomStationsStore, stopCustomStationsStore,
 };

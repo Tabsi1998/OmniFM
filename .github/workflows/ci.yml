@@ -257,7 +257,7 @@ jobs:
             curl -fsS http://127.0.0.1:8001/api/health >/dev/null && break
             sleep 1
           done
-          curl -fsS http://127.0.0.1:8001/api/health | python -c 'import json,sys; d=json.load(sys.stdin); assert d["ok"] and d["contractVersion"] == "owner-live-v3"'
+          curl -fsS http://127.0.0.1:8001/api/health | python -c 'import json,sys; d=json.load(sys.stdin); assert d["ok"] and d["contractVersion"] == "owner-live-v4"'
           curl -fsS http://127.0.0.1:8001/api/stats | python -m json.tool
           curl -fsS -H 'X-Admin-Token: ci-owner-token' http://127.0.0.1:8001/api/admin/config | python -m json.tool
           curl -fsS -X PUT -H 'X-Admin-Token: ci-owner-token' -H 'Content-Type: application/json' \

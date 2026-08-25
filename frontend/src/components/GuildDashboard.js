@@ -3,6 +3,7 @@ import {
   Radio, LayoutDashboard, ListMusic, ShieldCheck, BarChart3, CreditCard, LogOut,
   Plus, Trash2, Check, Crown, Zap, Music2, Users, Clock, Lock, Server,
   ChevronRight, RefreshCw, AlertTriangle,
+  CalendarDays, Pencil,
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -14,6 +15,7 @@ import { useI18n } from '../i18n.js';
 const NAV = [
   { id: 'overview', icon: LayoutDashboard },
   { id: 'stations', icon: ListMusic },
+  { id: 'events', icon: CalendarDays },
   { id: 'roles', icon: ShieldCheck },
   { id: 'stats', icon: BarChart3 },
   { id: 'subscription', icon: CreditCard },
@@ -27,15 +29,27 @@ const TIER_META = {
 
 const COMMANDS = [
   { id: 'play', label: '/play' },
-  { id: 'skip', label: '/skip' },
+  { id: 'pause', label: '/pause' },
+  { id: 'resume', label: '/resume' },
   { id: 'stop', label: '/stop' },
-  { id: 'station', label: '/station' },
-  { id: 'volume', label: '/volume' },
+  { id: 'setvolume', label: '/setvolume' },
+  { id: 'stations', label: '/stations' },
+  { id: 'list', label: '/list' },
+  { id: 'now', label: '/now' },
+  { id: 'stats', label: '/stats' },
+  { id: 'history', label: '/history' },
+  { id: 'status', label: '/status' },
+  { id: 'health', label: '/health' },
+  { id: 'diag', label: '/diag' },
+  { id: 'addstation', label: '/addstation' },
+  { id: 'removestation', label: '/removestation' },
+  { id: 'mystations', label: '/mystations' },
+  { id: 'event', label: '/event' },
 ];
 
 const EMPTY_DATA = Object.freeze({
-  stations: [], custom: [], roles: [], trend: [], top: [], listeners: 0,
-  uptimePct: null, minutesMonth: 0, activeStreams: 0, currentStation: null,
+  stations: [], custom: [], roles: [], events: [], voiceChannels: [], textChannels: [], trend: [], top: [], listeners: 0,
+  uptimeSec: 0, minutesMonth: 0, activeStreams: 0, liveStreams: [],
   license: null, loading: false,
 });
 
@@ -44,6 +58,23 @@ function fmtMinutes(value) {
   const minutes = Math.max(0, Number(value || 0));
   const hours = Math.floor(minutes / 60);
   return hours >= 1 ? `${fmtInt(hours)} h` : `${fmtInt(minutes)} min`;
+}
+function fmtDuration(value) {
+  const seconds = Math.max(0, Number(value || 0));
+  if (seconds < 60) return `${Math.floor(seconds)} s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  return days > 0 ? `${days} d ${hours % 24} h` : `${hours} h ${minutes % 60} min`;
+}
+function localDateTimeInput(value) {
+  const date = value ? new Date(value) : new Date(Date.now() + 60 * 60 * 1000);
+  const shifted = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return shifted.toISOString().slice(0, 16);
+}
+function emptyEventForm() {
+  return { id: '', title: '', stationKey: '', voiceChannelId: '', textChannelId: '', startsAt: localDateTimeInput(), durationMinutes: 120, repeat: 'none', timezone: 'Europe/Vienna', announceMessage: '', enabled: true };
 }
 
 async function apiRequest(path, options = {}) {
@@ -124,11 +155,13 @@ export default function GuildDashboard() {
   const [store, setStore] = useState({});
   const [perms, setPerms] = useState({});
   const [newStation, setNewStation] = useState({ name: '', url: '' });
+  const [eventForm, setEventForm] = useState(null);
   const [msg, setMsg] = useState(null);
   const { locale } = useI18n();
   const t = useCallback((de, en) => (String(locale || 'de').startsWith('de') ? de : en), [locale]);
   const navLabel = useCallback((id) => ({
     overview: t('Übersicht', 'Overview'), stations: t('Sender', 'Stations'),
+    events: t('Events', 'Events'),
     roles: t('Rollen & Rechte', 'Roles & Permissions'), stats: t('Statistiken', 'Statistics'),
     subscription: t('Abo & Lizenz', 'Subscription & License'),
   }[id] || id), [t]);
@@ -165,21 +198,20 @@ export default function GuildDashboard() {
 
       const safe = (path) => apiRequest(path).catch(() => null);
       const base = `serverId=${encodeURIComponent(selectedGuildId)}`;
-      const [catalog, custom, rolesPayload, stats, detail, permsPayload] = await Promise.all([
+      const [catalog, custom, rolesPayload, stats, detail, permsPayload, eventsPayload, channelsPayload] = await Promise.all([
         safe(`/api/dashboard/stations?${base}`),
         safe(`/api/dashboard/custom-stations?${base}`),
         safe(`/api/dashboard/roles?${base}`),
-        tier === 'free' ? null : safe(`/api/dashboard/stats?${base}`),
+        safe(`/api/dashboard/stats?${base}`),
         tier === 'ultimate' ? safe(`/api/dashboard/stats/detail?${base}&days=30`) : null,
         tier === 'free' ? null : safe(`/api/dashboard/perms?${base}`),
+        tier === 'free' ? null : safe(`/api/dashboard/events?${base}`),
+        tier === 'free' ? null : safe(`/api/dashboard/channels?${base}`),
       ]);
       const stations = [...(catalog?.free || []), ...(catalog?.pro || [])];
       const basic = stats?.basic || {};
       const advanced = stats?.advanced || null;
-      const listeningMs = Number(detail?.listeningStats?.totalListeningMs || 0);
-      const currentStation = Number(basic.activeStreams || 0) > 0 && basic.topStation && basic.topStation.name !== '-'
-        ? basic.topStation
-        : null;
+      const listeningMs = Number(detail?.listeningStats?.totalListeningMs ?? basic.totalListeningMs ?? 0);
       const commandRoleMap = permsPayload?.commandRoleMap || {};
       const nextPerms = {};
       Object.entries(commandRoleMap).forEach(([command, roleIds]) => {
@@ -192,13 +224,16 @@ export default function GuildDashboard() {
           stations,
           custom: custom?.stations || catalog?.custom || [],
           roles: rolesPayload?.roles || [],
+          events: eventsPayload?.events || [],
+          voiceChannels: channelsPayload?.voiceChannels || [],
+          textChannels: channelsPayload?.textChannels || [],
           trend: normalizeTrend(detail, advanced),
           top: normalizeTopStations(detail, advanced),
           listeners: Number(basic.listenersNow || 0),
-          uptimePct: detail?.connectionHealth?.uptimePct ?? null,
+          uptimeSec: Number(basic.runtimeUptimeSec || 0),
           minutesMonth: Math.round(listeningMs / 60000),
           activeStreams: Number(basic.activeStreams || 0),
-          currentStation,
+          liveStreams: Array.isArray(basic.activeStreamDetails) ? basic.activeStreamDetails : [],
           license,
           loading: false,
         },
@@ -212,6 +247,34 @@ export default function GuildDashboard() {
   useEffect(() => {
     if (session.authenticated && guildId) loadGuild(guildId);
   }, [guildId, loadGuild, session.authenticated]);
+
+  useEffect(() => {
+    if (!session.authenticated || !guildId) return undefined;
+    let stopped = false;
+    const refreshLive = async () => {
+      try {
+        const stats = await apiRequest(`/api/dashboard/stats?serverId=${encodeURIComponent(guildId)}`);
+        if (stopped) return;
+        const basic = stats?.basic || {};
+        setStore((current) => {
+          const previous = current[guildId] || EMPTY_DATA;
+          return {
+            ...current,
+            [guildId]: {
+              ...previous,
+              listeners: Number(basic.listenersNow || 0),
+              activeStreams: Number(basic.activeStreams || 0),
+              liveStreams: Array.isArray(basic.activeStreamDetails) ? basic.activeStreamDetails : [],
+              uptimeSec: Number(basic.runtimeUptimeSec || 0),
+              minutesMonth: Math.round(Number(basic.totalListeningMs ?? previous.minutesMonth * 60000) / 60000),
+            },
+          };
+        });
+      } catch { /* keep the latest valid live snapshot */ }
+    };
+    const timer = setInterval(refreshLive, 5000);
+    return () => { stopped = true; clearInterval(timer); };
+  }, [guildId, session.authenticated]);
 
   const guild = useMemo(() => session.guilds.find((item) => item.id === guildId) || null, [session.guilds, guildId]);
   const gdata = store[guildId] || EMPTY_DATA;
@@ -254,6 +317,42 @@ export default function GuildDashboard() {
     } catch (error) { setMsg({ ok: false, text: error.message }); }
   };
 
+  const openEvent = (event = null) => {
+    if (!event) { setEventForm(emptyEventForm()); return; }
+    setEventForm({
+      id: event.id, title: event.title || event.name || '', stationKey: event.stationKey || '',
+      voiceChannelId: event.voiceChannelId || event.channelId || '', textChannelId: event.textChannelId || '',
+      startsAt: localDateTimeInput(event.startsAt || event.runAtMs), durationMinutes: Number(event.durationMinutes || Math.round(Number(event.durationMs || 0) / 60000) || 120),
+      repeat: event.repeat || 'none', timezone: event.timezone || event.timeZone || 'Europe/Vienna', announceMessage: event.announceMessage || '', enabled: event.enabled !== false,
+    });
+  };
+  const saveEvent = async () => {
+    if (!eventForm?.title.trim() || !eventForm.stationKey || !eventForm.voiceChannelId || !eventForm.startsAt) {
+      setMsg({ ok: false, text: t('Name, Sender, Voice-Kanal und Startzeit sind erforderlich.', 'Name, station, voice channel and start time are required.') }); return;
+    }
+    try {
+      const payload = { ...eventForm, title: eventForm.title.trim(), runAtMs: 0, durationMs: Math.max(1, Number(eventForm.durationMinutes || 0)) * 60000 };
+      const path = eventForm.id ? `/api/dashboard/events/${encodeURIComponent(eventForm.id)}?serverId=${encodeURIComponent(guildId)}` : `/api/dashboard/events?serverId=${encodeURIComponent(guildId)}`;
+      const result = await apiRequest(path, { method: eventForm.id ? 'PATCH' : 'POST', body: JSON.stringify(payload) });
+      setStore((current) => {
+        const previous = current[guildId] || EMPTY_DATA;
+        const nextEvents = eventForm.id ? previous.events.map((row) => (row.id === eventForm.id ? result.event : row)) : [...previous.events, result.event];
+        return { ...current, [guildId]: { ...previous, events: nextEvents.sort((a, b) => Number(a.runAtMs || 0) - Number(b.runAtMs || 0)) } };
+      });
+      setEventForm(null);
+      setMsg({ ok: true, text: t('Event wurde im aktiven Scheduler gespeichert.', 'Event saved to the active scheduler.') });
+    } catch (error) { setMsg({ ok: false, text: error.message }); }
+  };
+  const deleteEvent = async (eventId) => {
+    if (typeof window !== 'undefined' && !window.confirm(t('Event wirklich löschen?', 'Delete this event?'))) return;
+    try {
+      await apiRequest(`/api/dashboard/events/${encodeURIComponent(eventId)}?serverId=${encodeURIComponent(guildId)}`, { method: 'DELETE' });
+      setStore((current) => ({ ...current, [guildId]: { ...(current[guildId] || EMPTY_DATA), events: (current[guildId]?.events || []).filter((row) => row.id !== eventId) } }));
+      if (eventForm?.id === eventId) setEventForm(null);
+      setMsg({ ok: true, text: t('Event wurde gelöscht.', 'Event deleted.') });
+    } catch (error) { setMsg({ ok: false, text: error.message }); }
+  };
+
   const logout = async () => {
     try { await apiRequest('/api/auth/logout', { method: 'POST' }); } catch { /* cookie is cleared best-effort */ }
     window.location.assign('/');
@@ -291,8 +390,6 @@ export default function GuildDashboard() {
 
   const trendData = gdata.trend;
   const topData = gdata.top;
-  const currentStationName = gdata.currentStation?.name || t('Kein aktiver Stream', 'No active stream');
-
   return (
     <div className="oa-root" data-testid="guild-dashboard">
       <aside className="oa-sidebar">
@@ -318,7 +415,7 @@ export default function GuildDashboard() {
         {section === 'overview' && <>
           <div className="oa-grid cols-4">
             <StatTile label={t('Aktive Hörer', 'Active listeners')} value={fmtInt(gdata.listeners)} icon={Users} accent="#ff6b00" foot={t('Echtzeit-Telemetrie', 'Real-time telemetry')} />
-            <StatTile label="Uptime" value={gdata.uptimePct == null ? '—' : `${gdata.uptimePct}%`} icon={Clock} accent="#10b981" foot={t('Keine Schätzung', 'No estimate')} />
+            <StatTile label="Uptime" value={gdata.uptimeSec > 0 ? fmtDuration(gdata.uptimeSec) : '—'} icon={Clock} accent="#10b981" foot={t('Bot-Prozess seit letztem Start', 'Bot process since last start')} />
             <StatTile label={t('Gestreamt', 'Streamed')} value={fmtMinutes(gdata.minutesMonth)} icon={Music2} accent="#00e5ff" foot={t('erfasste Wiedergabezeit', 'recorded playback time')} />
             <StatTile label={t('Aktive Streams', 'Active streams')} value={fmtInt(gdata.activeStreams)} icon={Server} accent="#5865f2" foot={`${tm.name} · ${tm.maxBots} ${t('Bots max.', 'bots max.')}`} />
           </div>
@@ -326,9 +423,43 @@ export default function GuildDashboard() {
             <div className="oa-card oa-fade" style={{ gridColumn: 'span 2' }}><div className="oa-stat-label" style={{ marginBottom: 14 }}>{t('Hörer-Trend', 'Listener trend')}</div>
               {trendData.length ? <ResponsiveContainer width="100%" height={200}><AreaChart data={trendData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}><defs><linearGradient id="gdArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#ff6b00" stopOpacity={0.5} /><stop offset="100%" stopColor="#ff6b00" stopOpacity={0} /></linearGradient></defs><CartesianGrid strokeDasharray="3 3" stroke="#1b2133" vertical={false} /><XAxis dataKey="day" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} /><YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} /><Tooltip content={<ChartTip />} /><Area type="monotone" dataKey="listeners" name={t('Hörer', 'Listeners')} stroke="#ff6b00" strokeWidth={2.5} fill="url(#gdArea)" /></AreaChart></ResponsiveContainer> : <div className="oa-sub" style={{ padding: '64px 0', textAlign: 'center' }}>{t('Noch keine Messwerte vorhanden.', 'No measurements available yet.')}</div>}
             </div>
-            <div className="oa-card oa-fade"><div className="oa-stat-label" style={{ marginBottom: 12 }}>{t('Aktueller Stream', 'Current stream')}</div><div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><div style={{ width: 56, height: 56, borderRadius: 12, background: gdata.currentStation ? 'linear-gradient(135deg,#ff6b00,#ff2a5f)' : '#1c2235', display: 'grid', placeItems: 'center' }}><Radio size={24} color="#fff" /></div><div><div style={{ fontWeight: 700, fontSize: 16 }}>{currentStationName}</div>{gdata.currentStation && <div className="oa-pill orange" style={{ marginTop: 6 }}><span className="oa-dot" /> LIVE</div>}</div></div><button className="oa-btn ghost" style={{ width: '100%', marginTop: 16 }} onClick={() => setSection('stations')}><ListMusic size={15} /> {t('Senderkatalog', 'Station catalog')}</button></div>
+            <div className="oa-card oa-fade">
+              <div className="oa-stat-label" style={{ marginBottom: 12 }}>{t('Aktive Streams', 'Active streams')} ({gdata.liveStreams.length})</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 250, overflowY: 'auto', paddingRight: 3 }}>
+                {!gdata.liveStreams.length && <div className="oa-sub" style={{ padding: '22px 0', textAlign: 'center' }}>{t('Kein aktiver Stream', 'No active stream')}</div>}
+                {gdata.liveStreams.map((stream, index) => (
+                  <div key={`${stream.botId || stream.botName}-${stream.channelId || index}`} style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) auto', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 10, border: '1px solid #20283b', background: '#0d111b' }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 9, background: stream.recovering ? 'rgba(245,158,11,.15)' : 'linear-gradient(135deg,rgba(255,107,0,.22),rgba(255,42,95,.18))', display: 'grid', placeItems: 'center' }}><Radio size={17} color={stream.recovering ? '#fbbf24' : '#ff7a2f'} /></div>
+                    <div style={{ minWidth: 0 }}><div style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stream.stationName}</div><div className="oa-mono" style={{ fontSize: 10.5, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stream.botName} · {stream.channelName}</div></div>
+                    <div style={{ textAlign: 'right' }}><span className={`oa-pill ${stream.recovering ? 'amber' : 'orange'}`} style={{ padding: '2px 7px' }}>{stream.recovering ? t('Recovery', 'Recovery') : 'LIVE'}</span><div className="oa-mono" style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>{fmtInt(stream.listeners)} {t('Hörer', 'listeners')} · {fmtInt(stream.volume)}%</div></div>
+                  </div>
+                ))}
+              </div>
+              <button className="oa-btn ghost" style={{ width: '100%', marginTop: 14 }} onClick={() => setSection('stations')}><ListMusic size={15} /> {t('Senderkatalog', 'Station catalog')}</button>
+            </div>
           </div>
         </>}
+
+        {section === 'events' && <>{tier === 'free' ? <div className="oa-card" style={{ display: 'flex', alignItems: 'center', gap: 14 }}><Lock size={22} /><div><b>{t('Automatische Radio-Events sind ab Pro verfügbar.', 'Scheduled radio events are available from Pro.')}</b></div><button className="oa-btn primary" style={{ marginLeft: 'auto' }} onClick={() => setSection('subscription')}>Upgrade</button></div> : <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16 }}><div><div className="oa-section-title" style={{ margin: 0 }}><CalendarDays size={15} /> {t('Geplante Radio-Events', 'Scheduled radio events')} ({gdata.events.length})</div><div className="oa-stat-foot" style={{ marginTop: 6 }}>{t('Events werden direkt im aktiven Commander-Scheduler gespeichert und nach Neustarts aus MongoDB wieder geladen.', 'Events are stored directly in the active Commander scheduler and restored from MongoDB after restarts.')}</div></div><button className="oa-btn primary" onClick={() => openEvent()}><Plus size={15} /> {t('Event anlegen', 'Create event')}</button></div>
+          {eventForm && <div className="oa-card oa-fade" style={{ marginBottom: 18, borderColor: 'rgba(255,107,0,.35)' }} data-testid="guild-event-form">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}><div style={{ fontWeight: 800, fontSize: 17 }}>{eventForm.id ? t('Event bearbeiten', 'Edit event') : t('Neues Event', 'New event')}</div><button className="oa-btn ghost" onClick={() => setEventForm(null)}>×</button></div>
+            <div className="oa-grid cols-2" style={{ gap: 12 }}>
+              <div><label className="oa-stat-label">Name</label><input className="oa-input" style={{ marginTop: 6 }} value={eventForm.title} onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })} placeholder="Friday Night Radio" /></div>
+              <div><label className="oa-stat-label">{t('Sender', 'Station')}</label><select className="oa-input" style={{ marginTop: 6 }} value={eventForm.stationKey} onChange={(e) => setEventForm({ ...eventForm, stationKey: e.target.value })}><option value="">— {t('auswählen', 'select')} —</option>{gdata.stations.map((station) => <option key={station.key} value={station.key}>{station.name}</option>)}{gdata.custom.map((station) => <option key={`custom:${station.key}`} value={`custom:${station.key}`}>{station.name} ({t('Eigener Sender', 'Custom')})</option>)}</select></div>
+              <div><label className="oa-stat-label">Voice-Kanal</label><select className="oa-input" style={{ marginTop: 6 }} value={eventForm.voiceChannelId} onChange={(e) => setEventForm({ ...eventForm, voiceChannelId: e.target.value })}><option value="">— {t('auswählen', 'select')} —</option>{gdata.voiceChannels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}</select></div>
+              <div><label className="oa-stat-label">{t('Ankündigungs-Kanal (optional)', 'Announcement channel (optional)')}</label><select className="oa-input" style={{ marginTop: 6 }} value={eventForm.textChannelId} onChange={(e) => setEventForm({ ...eventForm, textChannelId: e.target.value })}><option value="">—</option>{gdata.textChannels.map((channel) => <option key={channel.id} value={channel.id}>#{channel.name}</option>)}</select></div>
+              <div><label className="oa-stat-label">{t('Start', 'Start')}</label><input type="datetime-local" className="oa-input" style={{ marginTop: 6 }} value={eventForm.startsAt} onChange={(e) => setEventForm({ ...eventForm, startsAt: e.target.value })} /></div>
+              <div><label className="oa-stat-label">{t('Dauer (Minuten)', 'Duration (minutes)')}</label><input type="number" min="1" max="525600" className="oa-input" style={{ marginTop: 6 }} value={eventForm.durationMinutes} onChange={(e) => setEventForm({ ...eventForm, durationMinutes: e.target.value })} /></div>
+              <div><label className="oa-stat-label">{t('Wiederholung', 'Repeat')}</label><select className="oa-input" style={{ marginTop: 6 }} value={eventForm.repeat} onChange={(e) => setEventForm({ ...eventForm, repeat: e.target.value })}><option value="none">{t('Einmalig', 'Once')}</option><option value="daily">{t('Täglich', 'Daily')}</option><option value="weekdays">{t('Werktags', 'Weekdays')}</option><option value="weekly">{t('Wöchentlich', 'Weekly')}</option><option value="biweekly">{t('Alle 2 Wochen', 'Biweekly')}</option><option value="monthly_first_weekday">{t('Monatlich · erster Wochentag', 'Monthly · first weekday')}</option><option value="monthly_last_weekday">{t('Monatlich · letzter Wochentag', 'Monthly · last weekday')}</option><option value="yearly">{t('Jährlich', 'Yearly')}</option></select></div>
+              <div><label className="oa-stat-label">{t('Zeitzone', 'Timezone')}</label><input className="oa-input" style={{ marginTop: 6 }} value={eventForm.timezone} onChange={(e) => setEventForm({ ...eventForm, timezone: e.target.value })} placeholder="Europe/Vienna" /></div>
+              <div style={{ gridColumn: '1 / -1' }}><label className="oa-stat-label">{t('Ankündigung (optional)', 'Announcement (optional)')}</label><input className="oa-input" style={{ marginTop: 6 }} value={eventForm.announceMessage} onChange={(e) => setEventForm({ ...eventForm, announceMessage: e.target.value })} /></div>
+            </div>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 14, color: '#cbd5e1', fontSize: 13 }}><input type="checkbox" checked={eventForm.enabled} onChange={(e) => setEventForm({ ...eventForm, enabled: e.target.checked })} /> {t('Event aktiv', 'Event enabled')}</label>
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}><button className="oa-btn primary" onClick={saveEvent}><Check size={15} /> {t('Im Scheduler speichern', 'Save to scheduler')}</button><button className="oa-btn ghost" onClick={() => setEventForm(null)}>{t('Abbrechen', 'Cancel')}</button></div>
+          </div>}
+          <div className="oa-table-wrap"><table className="oa-table"><thead><tr><th>Event</th><th>{t('Sender & Ziel', 'Station & target')}</th><th>{t('Start', 'Start')}</th><th>{t('Wiederholung', 'Repeat')}</th><th>Status</th><th /></tr></thead><tbody>{!gdata.events.length && <tr><td colSpan={6} style={{ padding: 28, textAlign: 'center', color: '#64748b' }}>{t('Noch keine Events geplant.', 'No events scheduled yet.')}</td></tr>}{gdata.events.map((event) => { const voice = gdata.voiceChannels.find((channel) => channel.id === (event.voiceChannelId || event.channelId)); return <tr key={event.id}><td><b>{event.title || event.name}</b><div className="oa-mono" style={{ fontSize: 10, color: '#64748b' }}>{event.id}</div></td><td>{gdata.stations.concat(gdata.custom).find((station) => event.stationKey === station.key || event.stationKey === `custom:${station.key}`)?.name || event.stationKey}<div className="oa-mono" style={{ fontSize: 10, color: '#64748b' }}>{voice?.name || event.voiceChannelId}</div></td><td>{event.startsAt ? new Date(event.startsAt).toLocaleString() : '—'}<div className="oa-mono" style={{ fontSize: 10, color: '#64748b' }}>{event.durationMinutes || 0} min</div></td><td>{event.repeat === 'none' ? t('Einmalig', 'Once') : event.repeat}</td><td><span className={`oa-pill ${event.enabled === false ? 'slate' : 'green'}`}>{event.enabled === false ? t('Pausiert', 'Paused') : t('Aktiv', 'Active')}</span></td><td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}><button className="oa-btn ghost" onClick={() => openEvent(event)}><Pencil size={14} /></button><button className="oa-btn ghost" style={{ color: '#ff8fab', marginLeft: 6 }} onClick={() => deleteEvent(event.id)}><Trash2 size={14} /></button></td></tr>; })}</tbody></table></div>
+        </>}</>}
 
         {section === 'stations' && <>
           <div className="oa-section-title"><Radio size={15} /> {t('Verfügbare Sender', 'Available stations')} ({gdata.stations.length})</div>

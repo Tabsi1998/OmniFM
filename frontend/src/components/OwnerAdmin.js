@@ -25,7 +25,6 @@ const NAV = [
   { id: 'discord', label: 'Discord & Bots', icon: Bot },
   { id: 'payments', label: 'Zahlungen', icon: CreditCard },
   { id: 'marketing', label: 'Marketing & Listings', icon: Megaphone },
-  { id: 'workers', label: 'Worker Nodes', icon: Server },
   { id: 'licenses', label: 'License Manager', icon: KeyRound },
   { id: 'stations', label: 'Radio Catalog', icon: ListMusic },
   { id: 'integrations', label: 'Integrations', icon: PlugZap },
@@ -120,8 +119,6 @@ export default function OwnerAdmin() {
 
   const [section, setSection] = useState('overview');
   const [overview, setOverview] = useState(null);
-  const [workers, setWorkers] = useState([]);
-  const [workerMeta, setWorkerMeta] = useState({ live: false, generatedAt: null, resourceModel: null });
   const [licenses, setLicenses] = useState([]);
   const [knownGuilds, setKnownGuilds] = useState([]);
   const [stations, setStations] = useState(null);
@@ -137,6 +134,7 @@ export default function OwnerAdmin() {
   const [stBusy, setStBusy] = useState(false);
   const [stMsg, setStMsg] = useState(null);
   const [stHealth, setStHealth] = useState({});
+  const [stHealthSummary, setStHealthSummary] = useState(null);
   const [stHealthBusy, setStHealthBusy] = useState(false);
   const [stHealthProg, setStHealthProg] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -171,7 +169,16 @@ export default function OwnerAdmin() {
         apiGet('/api/admin/stations/list', token),
         apiGet('/api/admin/stations', token),
       ]);
-      setStationList(list.stations || []);
+      const rows = list.stations || [];
+      setStationList(rows);
+      setStHealth((current) => {
+        const next = { ...current };
+        rows.forEach((station) => {
+          if (station.key && station.health && !next[station.key]?.checking) next[station.key] = station.health;
+        });
+        return next;
+      });
+      setStHealthSummary(list.healthSummary || null);
       setStations(summary);
     } catch { /* keep */ }
   }, [apiGet, token]);
@@ -244,9 +251,8 @@ export default function OwnerAdmin() {
   const loadAll = useCallback(async (tk) => {
     setRefreshing(true);
     try {
-      const [ov, wk, lic, guilds, st, integ, act] = await Promise.allSettled([
+      const [ov, lic, guilds, st, integ, act] = await Promise.allSettled([
         apiGet('/api/admin/overview', tk),
-        apiGet('/api/admin/workers', tk),
         apiGet('/api/admin/licenses?full=1', tk),
         apiGet('/api/admin/guilds', tk),
         apiGet('/api/admin/stations', tk),
@@ -254,10 +260,6 @@ export default function OwnerAdmin() {
         apiGet('/api/admin/activity', tk),
       ]);
       if (ov.status === 'fulfilled') setOverview(ov.value);
-      if (wk.status === 'fulfilled') {
-        setWorkers(wk.value.workers || []);
-        setWorkerMeta({ live: wk.value.live === true, generatedAt: wk.value.generatedAt || null, resourceModel: wk.value.resourceModel || null });
-      }
       if (lic.status === 'fulfilled') setLicenses(lic.value.licenses || []);
       if (guilds.status === 'fulfilled') setKnownGuilds(guilds.value.guilds || []);
       if (st.status === 'fulfilled') setStations(st.value);
@@ -300,24 +302,6 @@ export default function OwnerAdmin() {
     };
     tick();
     const iv = setInterval(tick, 4000);
-    return () => { stop = true; clearInterval(iv); };
-  }, [authed, section, apiGet, token]);
-
-  // The Worker page reads the same live runtime source as monitoring.
-  useEffect(() => {
-    if (!authed || section !== 'workers') return undefined;
-    let stop = false;
-    const tick = async () => {
-      try {
-        const data = await apiGet('/api/admin/workers', token);
-        if (!stop) {
-          setWorkers(data.workers || []);
-          setWorkerMeta({ live: data.live === true, generatedAt: data.generatedAt || null, resourceModel: data.resourceModel || null });
-        }
-      } catch { /* keep last snapshot */ }
-    };
-    tick();
-    const iv = setInterval(tick, 5000);
     return () => { stop = true; clearInterval(iv); };
   }, [authed, section, apiGet, token]);
 
@@ -764,7 +748,7 @@ export default function OwnerAdmin() {
                             </div>
                             <div>
                               <div style={{ fontWeight: 700, fontSize: 14 }}>{n.name}</div>
-                              <div className="oa-mono" style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{n.role}</div>
+                              <div className="oa-mono" style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{n.role} · {String(n.requiredTier || 'free').toUpperCase()}</div>
                             </div>
                           </div>
                           <span className={`oa-pill ${n.status === 'online' ? 'green' : n.status === 'offline' ? 'red' : 'amber'}`}>{n.status === 'online' ? 'Online' : n.status === 'offline' ? 'Offline' : 'Degraded'}</span>
@@ -780,6 +764,10 @@ export default function OwnerAdmin() {
                         <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#64748b' }} className="oa-mono">
                           <span>{n.voiceConnections} VOICE · {n.listeners || 0} LISTENERS</span><span>{n.guilds} GUILDS</span>
                         </div>
+                        {(n.guildDetails || []).filter((detail) => detail.playing || detail.voiceConnected).length > 0 && <div style={{ marginTop: 10, paddingTop: 9, borderTop: '1px solid #1b2133', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                          {(n.guildDetails || []).filter((detail) => detail.playing || detail.voiceConnected).slice(0, 4).map((detail) => <div key={`${detail.guildId}-${detail.channelId || ''}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 10.5 }}><span style={{ color: '#cbd5e1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{detail.stationName || detail.stationKey || detail.channelName || detail.guildName}</span><span className="oa-mono" style={{ color: detail.recovering ? '#fbbf24' : '#4ade80', flexShrink: 0 }}>{detail.recovering ? 'RECOVERY' : `${detail.listenerCount || 0} HÖRER`}</span></div>)}
+                          {(n.guildDetails || []).filter((detail) => detail.playing || detail.voiceConnected).length > 4 && <div className="oa-mono" style={{ color: '#64748b', fontSize: 10 }}>+{(n.guildDetails || []).filter((detail) => detail.playing || detail.voiceConnected).length - 4} weitere Streams</div>}
+                        </div>}
                         {monitoring.live && n.resourceScope === 'shared-process' && <div style={{ marginTop: 8, fontSize: 10.5, color: '#64748b' }}>CPU/RAM werden oben einmal für den gemeinsamen Node-Prozess angezeigt.</div>}
                       </div>
                     );
@@ -844,46 +832,6 @@ export default function OwnerAdmin() {
                 </div>
               </div>
             )}
-          </>
-        )}
-
-        {section === 'workers' && (
-          <>
-            <div className="oa-card" style={{ marginBottom: 16, padding: '12px 16px', borderColor: workerMeta.live ? 'rgba(16,185,129,0.4)' : 'rgba(245,158,11,0.4)' }} data-testid="worker-runtime-source">
-              <span className={`oa-pill ${workerMeta.live ? 'green' : 'amber'}`}>{workerMeta.live ? 'LIVE-RUNTIME' : 'KEINE LIVE-DATEN'}</span>
-              <span style={{ marginLeft: 10, color: '#94a3b8', fontSize: 12 }}>{workerMeta.live ? `Echte Discord-Werte · Stand ${workerMeta.generatedAt ? new Date(workerMeta.generatedAt).toLocaleTimeString('de-DE') : 'jetzt'}` : 'Nur konfigurierte Bots sichtbar, bis die Runtime Telemetrie meldet.'}</span>
-            </div>
-            <div className="oa-grid cols-3">
-              {workers.map((w) => (
-                <div className="oa-card hoverable oa-fade" key={w.botId} data-testid={`worker-node-${w.index}`}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                      <div style={{ width: 38, height: 38, borderRadius: 10, background: w.role === 'commander' ? 'rgba(255,107,0,0.15)' : 'rgba(0,229,255,0.12)', color: w.role === 'commander' ? '#ff6b00' : '#00e5ff', display: 'grid', placeItems: 'center' }}>
-                        {w.role === 'commander' ? <Cpu size={18} /> : <Server size={18} />}
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 14.5 }}>{w.name}</div>
-                        <div className="oa-mono" style={{ fontSize: 10.5, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{w.role}</div>
-                      </div>
-                    </div>
-                    <span className={`oa-pill ${w.ready ? 'green' : workerMeta.live ? 'red' : 'amber'}`}>{w.ready ? 'Online' : workerMeta.live ? 'Offline' : 'Unbekannt'}</span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
-                    <div><div className="oa-stat-label">Server</div><div style={{ fontSize: 18, fontWeight: 700, marginTop: 3 }}>{w.servers}</div></div>
-                    <div><div className="oa-stat-label">Listeners</div><div style={{ fontSize: 18, fontWeight: 700, marginTop: 3 }}>{w.listeners}</div></div>
-                    <div><div className="oa-stat-label">Voice</div><div style={{ fontSize: 18, fontWeight: 700, marginTop: 3 }}>{w.connections}</div></div>
-                    <div><div className="oa-stat-label">Discord-Ping</div><div style={{ fontSize: 18, fontWeight: 700, marginTop: 3 }}>{w.pingMs == null ? '—' : `${w.pingMs} ms`}</div></div>
-                  </div>
-                  <div style={{ marginTop: 14 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#64748b', marginBottom: 6 }} className="oa-mono">
-                      <span>BOT-SLOT: {String(w.requiredTier || 'nicht gesetzt').toUpperCase()}</span>
-                      <span>{w.servers || 0} GUILDS</span>
-                    </div>
-                    <div className="oa-progress"><i style={{ width: `${Math.min(100, (w.servers || 0) * 8 + (w.ready ? 12 : 4))}%` }} /></div>
-                  </div>
-                </div>
-              ))}
-            </div>
           </>
         )}
 
@@ -1093,6 +1041,12 @@ export default function OwnerAdmin() {
               <span className="oa-pill red" style={{ padding: '2px 8px' }}>Offline = nicht erreichbar</span>
             </div>
 
+            <div className="oa-card" style={{ margin: '12px 0 16px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }} data-testid="station-auto-health">
+              <span className={`oa-pill ${stHealthSummary?.automatic === false ? 'amber' : 'green'}`}><span className="oa-dot" /> Automatische Prüfung {stHealthSummary?.automatic === false ? 'deaktiviert' : 'aktiv'}</span>
+              <span style={{ color: '#94a3b8', fontSize: 12 }}>{stHealthSummary?.automatic === false ? 'Unter System-Konfiguration aktivierbar' : `Ressourcenschonend gestaffelt · ${stHealthSummary?.batchSize || 2} Sender alle ${Math.round((stHealthSummary?.intervalMs || 5000) / 1000)}s · Alarm nach zwei Fehlern · Recovery im Live-Log`}</span>
+              {stHealthSummary && <span className="oa-mono" style={{ marginLeft: 'auto', color: '#64748b', fontSize: 11 }}>{stHealthSummary.up || 0} UP · {stHealthSummary.down || 0} DOWN · {stHealthSummary.pending || 0} AUSSTEHEND</span>}
+            </div>
+
             {stMsg && (
               <div className={`oa-pill ${stMsg.ok ? 'green' : 'red'}`} style={{ marginBottom: 14 }} data-testid="station-message">
                 {stMsg.ok ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />} {stMsg.text}
@@ -1166,10 +1120,12 @@ export default function OwnerAdmin() {
                         {h && !h.checking && h.reachable && !h.discordOk && !h.ok && <span className="oa-pill amber" style={{ padding: '2px 8px' }}><AlertTriangle size={11} /> Kein Audio</span>}
                         {h && !h.checking && (h.discordOk || h.ok) && (
                           <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
-                            <span className="oa-pill green" style={{ padding: '2px 8px' }} title="Server-seitig streambar – Discord-Bot kann diesen Sender abspielen"><CheckCircle2 size={11} /> Discord{typeof h.latencyMs === 'number' ? ` · ${h.latencyMs}ms` : ''}</span>
-                            {h.browserOk
+                            <span className="oa-pill green" style={{ padding: '2px 8px' }} title="Server-seitig streambar – Discord-Bot kann diesen Sender abspielen"><CheckCircle2 size={11} /> Discord{typeof (h.latencyMs ?? h.responseTimeMs) === 'number' ? ` · ${h.latencyMs ?? h.responseTimeMs}ms` : ''}</span>
+                            {h.browserOk === true
                               ? <span className="oa-pill cyan" style={{ padding: '2px 8px' }} title="Direkt im Website-Player abspielbar"><CheckCircle2 size={11} /> Browser</span>
-                              : <span className="oa-pill amber" style={{ padding: '2px 8px' }} title="Browser-Direktzugriff blockiert (z. B. 403/Hotlink). Im Discord-Bot funktioniert der Sender."><AlertTriangle size={11} /> Nur Discord</span>}
+                              : h.browserOk === false
+                                ? <span className="oa-pill amber" style={{ padding: '2px 8px' }} title="Browser-Direktzugriff blockiert (z. B. 403/Hotlink). Im Discord-Bot funktioniert der Sender."><AlertTriangle size={11} /> Nur Discord</span>
+                                : <span className="oa-pill slate" style={{ padding: '2px 8px' }} title="Der automatische Server-Check prüft Discord-Tauglichkeit. Die Browser-Probe läuft beim manuellen Test.">Browser ungeprüft</span>}
                           </span>
                         )}
                       </td>

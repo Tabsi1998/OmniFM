@@ -3,6 +3,7 @@ import path from "node:path";
 import { buildCustomStationReference, parseCustomStationReference } from "./custom-stations.js";
 import { log } from "./lib/logging.js";
 import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
+import { getDb, isConnected } from "./lib/db.js";
 
 const EVENTS_FILE = resolveRuntimeDataPath("scheduled-events.json");
 const SUPPORTED_REPEAT = new Set([
@@ -24,6 +25,69 @@ const CORRUPT_BACKUP_PREFIX = ".corrupt-";
 let lastLoadErrorSignature = "";
 let lastLoadErrorAt = 0;
 let lastCorruptRecoverySignature = "";
+let mongoState = null;
+let mongoRefreshTimer = null;
+let mongoWritesPending = 0;
+let mongoWriteQueue = Promise.resolve();
+
+function cloneState(state) {
+  return JSON.parse(JSON.stringify(state || emptyState()));
+}
+
+async function readMongoState() {
+  if (!isConnected() || mongoWritesPending > 0) return;
+  const rows = await getDb().collection("scheduled_events").find({}, { projection: { _id: 0, _eventId: 0 } }).toArray();
+  mongoState = normalizeState({ events: rows });
+}
+
+function queueMongoDelta(previousState, nextState) {
+  if (!isConnected()) return;
+  const previous = new Map((previousState?.events || []).map((event) => [event.id, event]));
+  const next = new Map((nextState?.events || []).map((event) => [event.id, event]));
+  const operations = [];
+  for (const [id, event] of next.entries()) {
+    if (JSON.stringify(previous.get(id)) === JSON.stringify(event)) continue;
+    operations.push({ replaceOne: { filter: { _eventId: id }, replacement: { _eventId: id, ...event }, upsert: true } });
+  }
+  for (const id of previous.keys()) {
+    if (!next.has(id)) operations.push({ deleteOne: { filter: { _eventId: id } } });
+  }
+  if (!operations.length) return;
+  mongoWritesPending += 1;
+  mongoWriteQueue = mongoWriteQueue
+    .then(async () => {
+      if (isConnected()) await getDb().collection("scheduled_events").bulkWrite(operations, { ordered: false });
+    })
+    .catch((err) => log("ERROR", `[scheduled-events] MongoDB-Speichern fehlgeschlagen: ${err?.message || err}`))
+    .finally(() => { mongoWritesPending = Math.max(0, mongoWritesPending - 1); });
+}
+
+async function initScheduledEventsStore({ refreshMs = 2000 } = {}) {
+  if (!isConnected()) return { backend: "file", count: loadRawState().events.length };
+  const collection = getDb().collection("scheduled_events");
+  const fileState = loadRawState();
+  if (fileState.events.length) {
+    const migration = await collection.bulkWrite(fileState.events.map((event) => ({
+      updateOne: { filter: { _eventId: event.id }, update: { $setOnInsert: { _eventId: event.id, ...event } }, upsert: true },
+    })), { ordered: false });
+    if (migration.upsertedCount > 0) log("INFO", `[scheduled-events] ${migration.upsertedCount} fehlende Datei-Events nach MongoDB migriert.`);
+  }
+  await readMongoState();
+  if (!mongoRefreshTimer) {
+    mongoRefreshTimer = setInterval(() => {
+      readMongoState().catch((err) => log("WARN", `[scheduled-events] MongoDB-Refresh fehlgeschlagen: ${err?.message || err}`));
+    }, Math.max(1000, Number(refreshMs) || 2000));
+    mongoRefreshTimer.unref?.();
+  }
+  log("INFO", `[scheduled-events] MongoDB ist kanonischer Event-Store (${mongoState?.events?.length || 0} Events).`);
+  return { backend: "mongo", count: mongoState?.events?.length || 0 };
+}
+
+async function stopScheduledEventsStore() {
+  if (mongoRefreshTimer) clearInterval(mongoRefreshTimer);
+  mongoRefreshTimer = null;
+  await mongoWriteQueue.catch(() => null);
+}
 
 function emptyState() {
   return {
@@ -302,6 +366,7 @@ function normalizeState(input) {
 }
 
 function loadRawState() {
+  if (mongoState) return cloneState(mongoState);
   try {
     if (!fs.existsSync(EVENTS_FILE)) return emptyState();
     if (fs.statSync(EVENTS_FILE).isDirectory()) {
@@ -335,6 +400,12 @@ function loadRawState() {
 
 function saveRawState(state) {
   const normalized = normalizeState(state);
+  if (mongoState) {
+    const previous = mongoState;
+    mongoState = cloneState(normalized);
+    queueMongoDelta(previous, normalized);
+    return cloneState(normalized);
+  }
   const serialized = `${JSON.stringify(normalized, null, 2)}\n`;
   const tempPath = `${EVENTS_FILE}.tmp-${process.pid}-${Date.now()}`;
 
@@ -507,4 +578,6 @@ export {
   getScheduledEvent,
   deleteScheduledEventsByFilter,
   normalizeScheduledEventInput,
+  initScheduledEventsStore,
+  stopScheduledEventsStore,
 };

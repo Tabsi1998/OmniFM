@@ -7,10 +7,15 @@ import {
 } from "./config/command-permissions.js";
 import { log, logStoreLoadError } from "./lib/logging.js";
 import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
+import { getDb, isConnected } from "./lib/db.js";
 
 const DEFAULT_STORE_FILE = resolveRuntimeDataPath("command-permissions.json");
 const STORE_FILE = path.resolve(process.env.OMNIFM_COMMAND_PERMISSIONS_FILE || DEFAULT_STORE_FILE);
 const STORE_BACKUP_FILE = STORE_FILE + ".bak";
+let mongoStore = null;
+let mongoRefreshTimer = null;
+let mongoWritesPending = 0;
+let mongoWriteQueue = Promise.resolve();
 
 function emptyStore() {
   return { guilds: {} };
@@ -87,6 +92,51 @@ function normalizeStore(rawStore) {
   return { guilds };
 }
 
+function cloneStore(store) {
+  return JSON.parse(JSON.stringify(store || emptyStore()));
+}
+
+async function readMongoStore() {
+  if (!isConnected() || mongoWritesPending > 0) return;
+  const rows = await getDb().collection("command_permissions").find({}, { projection: { _id: 0, _guildId: 0 } }).toArray();
+  const guilds = {};
+  for (const row of rows) {
+    const guildId = normalizeGuildId(row?.guildId);
+    const commands = normalizeCommandRules(row?.commands);
+    if (guildId && Object.keys(commands).length) guilds[guildId] = { commands };
+  }
+  mongoStore = { guilds };
+}
+
+function queueMongoDelta(previousStore, nextStore) {
+  if (!isConnected()) return;
+  const previous = previousStore?.guilds || {};
+  const next = nextStore?.guilds || {};
+  const operations = [];
+  for (const [guildId, entry] of Object.entries(next)) {
+    const commands = normalizeCommandRules(entry?.commands);
+    if (JSON.stringify(previous[guildId]?.commands || {}) === JSON.stringify(commands)) continue;
+    operations.push({
+      replaceOne: {
+        filter: { _guildId: guildId },
+        replacement: { _guildId: guildId, guildId, commands, updatedAt: new Date().toISOString() },
+        upsert: true,
+      },
+    });
+  }
+  for (const guildId of Object.keys(previous)) {
+    if (!next[guildId]) operations.push({ deleteOne: { filter: { _guildId: guildId } } });
+  }
+  if (!operations.length) return;
+  mongoWritesPending += 1;
+  mongoWriteQueue = mongoWriteQueue
+    .then(async () => {
+      if (isConnected()) await getDb().collection("command_permissions").bulkWrite(operations, { ordered: false });
+    })
+    .catch((err) => log("ERROR", `[command-permissions] MongoDB-Speichern fehlgeschlagen: ${err?.message || err}`))
+    .finally(() => { mongoWritesPending = Math.max(0, mongoWritesPending - 1); });
+}
+
 function readFileSafe(filePath) {
   try {
     if (!fs.existsSync(filePath)) return null;
@@ -101,11 +151,19 @@ function readFileSafe(filePath) {
 }
 
 function load() {
+  if (mongoStore) return cloneStore(mongoStore);
   const data = readFileSafe(STORE_FILE) || readFileSafe(STORE_BACKUP_FILE) || emptyStore();
   return normalizeStore(data);
 }
 
 function save(data) {
+  if (mongoStore) {
+    const normalized = normalizeStore(data);
+    const previous = mongoStore;
+    mongoStore = cloneStore(normalized);
+    queueMongoDelta(previous, normalized);
+    return;
+  }
   const payload = JSON.stringify(normalizeStore(data), null, 2) + "\n";
   const tmpFile = `${STORE_FILE}.tmp-${process.pid}-${Date.now()}`;
 
@@ -137,6 +195,49 @@ function save(data) {
       // ignore cleanup errors
     }
   }
+}
+
+export async function initCommandPermissionsStore({ refreshMs = 2000 } = {}) {
+  if (!isConnected()) return { backend: "file", count: Object.keys(load().guilds).length };
+  const collection = getDb().collection("command_permissions");
+  const fileStore = load();
+  const entries = Object.entries(fileStore.guilds || {});
+  let migratedCommands = 0;
+  for (const [guildId, entry] of entries) {
+    const existing = await collection.findOne({ _guildId: guildId }, { projection: { _id: 0 } });
+    const commands = normalizeCommandRules(existing?.commands);
+    let guildChanged = !existing;
+    for (const [command, rule] of Object.entries(normalizeCommandRules(entry?.commands))) {
+      if (commands[command]) continue;
+      commands[command] = rule;
+      guildChanged = true;
+      migratedCommands += 1;
+    }
+    if (guildChanged) {
+      await collection.replaceOne(
+        { _guildId: guildId },
+        { _guildId: guildId, guildId, commands, updatedAt: existing?.updatedAt || new Date().toISOString() },
+        { upsert: true },
+      );
+    }
+  }
+  if (migratedCommands > 0) log("INFO", `[command-permissions] ${migratedCommands} fehlende Datei-Regeln nach MongoDB migriert.`);
+  await readMongoStore();
+  if (!mongoRefreshTimer) {
+    mongoRefreshTimer = setInterval(() => {
+      readMongoStore().catch((err) => log("WARN", `[command-permissions] MongoDB-Refresh fehlgeschlagen: ${err?.message || err}`));
+    }, Math.max(1000, Number(refreshMs) || 2000));
+    mongoRefreshTimer.unref?.();
+  }
+  const count = Object.keys(mongoStore?.guilds || {}).length;
+  log("INFO", `[command-permissions] MongoDB ist kanonischer Store (${count} Guilds).`);
+  return { backend: "mongo", count };
+}
+
+export async function stopCommandPermissionsStore() {
+  if (mongoRefreshTimer) clearInterval(mongoRefreshTimer);
+  mongoRefreshTimer = null;
+  await mongoWriteQueue.catch(() => null);
 }
 
 function cloneRule(rule) {

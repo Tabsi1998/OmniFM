@@ -132,6 +132,7 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
     const smtp = system.smtp || {};
     const recognition = system.audioRecognition || {};
     const history = system.songHistory || {};
+    const stationHealth = system.stationHealth || {};
     const directories = system.botDirectories || {};
     const setGroup = (group, key, value) => setSystem((p) => ({ ...p, [group]: { ...(p[group] || {}), [key]: value } }));
     const setDirectory = (directory, key, value) => setSystem((p) => ({
@@ -188,6 +189,18 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
             <div className="oa-section-title"><History size={15} /> Song-Verlauf</div>
             <Toggle label="Song-Verlauf aktivieren" checked={history.enabled !== false} onChange={(v) => setGroup('songHistory', 'enabled', v)} testid="cfg-history-enabled" />
             <Field label="Max. Einträge pro Server" value={history.maxPerGuild} onChange={(v) => setGroup('songHistory', 'maxPerGuild', Math.max(10, parseInt(v, 10) || 100))} type="number" testid="cfg-history-max" />
+          </div>
+        </div>
+
+        <div className="oa-card" style={{ marginBottom: 18 }} data-testid="cfg-station-health">
+          <div className="oa-section-title"><Globe2 size={15} /> Automatische Sender-Überwachung</div>
+          <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 14 }}>Die Sender werden in kleinen Round-Robin-Batches geprüft. Zwei aufeinanderfolgende Fehler erzeugen einen Incident; eine Erholung wird ebenfalls protokolliert. Änderungen werden beim nächsten Bot-Neustart aktiv.</div>
+          <Toggle label="Automatische Senderprüfung aktiv" checked={stationHealth.enabled !== false} onChange={(v) => setGroup('stationHealth', 'enabled', v)} testid="cfg-station-health-enabled" />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0 18px' }}>
+            <Field label="Batch-Intervall (ms)" value={stationHealth.intervalMs || 5000} onChange={(v) => setGroup('stationHealth', 'intervalMs', Math.max(2000, parseInt(v, 10) || 5000))} type="number" testid="cfg-station-health-interval" hint="Standard: 5000" />
+            <Field label="Sender pro Batch" value={stationHealth.batchSize || 2} onChange={(v) => setGroup('stationHealth', 'batchSize', Math.max(1, Math.min(10, parseInt(v, 10) || 2)))} type="number" testid="cfg-station-health-batch" hint="Standard: 2" />
+            <Field label="Parallelität" value={stationHealth.concurrency || 2} onChange={(v) => setGroup('stationHealth', 'concurrency', Math.max(1, Math.min(10, parseInt(v, 10) || 2)))} type="number" testid="cfg-station-health-concurrency" hint="Nie höher als Batch-Größe" />
+            <Field label="Timeout (ms)" value={stationHealth.timeoutMs || 8000} onChange={(v) => setGroup('stationHealth', 'timeoutMs', Math.max(3000, parseInt(v, 10) || 8000))} type="number" testid="cfg-station-health-timeout" hint="Standard: 8000" />
           </div>
         </div>
 

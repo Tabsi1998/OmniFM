@@ -20,6 +20,7 @@ import requests
 from pathlib import Path
 from urllib.parse import urlparse, urlencode
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from starlette.concurrency import run_in_threadpool
@@ -34,7 +35,7 @@ app = FastAPI(title="OmniFM API")
 # start.sh verifies this value after launching Uvicorn.  A generic 200 health
 # response is not sufficient because an orphaned, older backend on the same
 # port would otherwise look healthy while serving a different API contract.
-BACKEND_CONTRACT_VERSION = "owner-live-v3"
+BACKEND_CONTRACT_VERSION = "owner-live-v4"
 
 MONGO_URL = os.environ.get("MONGO_URL")
 DB_NAME = os.environ.get("DB_NAME")
@@ -221,6 +222,7 @@ DEFAULT_OWNER_CONFIG = {
         "smtp": {"enabled": False, "host": "", "port": 587, "secure": False, "user": "", "password": "", "from": ""},
         "audioRecognition": {"enabled": False, "apiKey": ""},
         "songHistory": {"enabled": True, "maxPerGuild": 100},
+        "stationHealth": {"enabled": True, "intervalMs": 5000, "batchSize": 2, "concurrency": 2, "timeoutMs": 8000},
         "botDirectories": {
             "discordBotList": {"enabled": False, "token": "", "botId": "", "slug": "", "webhookSecret": "", "statsScope": "aggregate"},
             "botsGG": {"enabled": False, "token": "", "botId": "", "statsScope": "aggregate"},
@@ -421,6 +423,13 @@ def effective_system_config():
         "songHistory": {
             "enabled": ("SONG_HISTORY_ENABLED", config_bool),
             "maxPerGuild": ("SONG_HISTORY_MAX_PER_GUILD", int),
+        },
+        "stationHealth": {
+            "enabled": ("STATION_HEALTH_ENABLED", config_bool),
+            "intervalMs": ("STATION_HEALTH_INTERVAL_MS", int),
+            "batchSize": ("STATION_HEALTH_BATCH_SIZE", int),
+            "concurrency": ("STATION_HEALTH_CONCURRENCY", int),
+            "timeoutMs": ("STATION_HEALTH_TIMEOUT_MS", int),
         },
     }
     for group, fields in mappings.items():
@@ -834,48 +843,154 @@ def save_dashboard_data(payload):
 
 def normalize_dashboard_event(event_payload):
     payload = event_payload if isinstance(event_payload, dict) else {}
-    event_id = str(payload.get("id") or secrets.token_hex(8)).strip()[:64]
-    title = clip_text(payload.get("title") or payload.get("name") or "OmniFM Event", 120)
-    station_key = clip_text(payload.get("stationKey") or payload.get("station") or "", 120)
-    fallback_key = clip_text(payload.get("fallbackStationKey") or payload.get("fallback") or "", 120)
-    starts_at = clip_text(payload.get("startsAt") or payload.get("startAt") or "", 80)
-    timezone_name = clip_text(payload.get("timezone") or "Europe/Vienna", 60)
-    channel_id = clip_text(payload.get("channelId") or "", 60)
+    event_id = re.sub(r"[^a-z0-9_-]", "", str(payload.get("id") or f"evt_{int(time.time() * 1000):x}{secrets.token_hex(3)}").strip().lower())[:40]
+    title = clip_text(payload.get("title") or payload.get("name") or "OmniFM Event", 120).strip()
+    station_key = re.sub(r"[^a-z0-9:_-]", "", str(payload.get("stationKey") or payload.get("station") or "").strip().lower())[:120]
+    timezone_name = clip_text(payload.get("timezone") or payload.get("timeZone") or "Europe/Vienna", 80)
+    channel_id = str(payload.get("voiceChannelId") or payload.get("channelId") or "").strip()
+    text_channel_id = str(payload.get("textChannelId") or "").strip()
     enabled = payload.get("enabled") is not False
     now_iso = datetime.now(timezone.utc).isoformat()
+    run_at_ms = parse_int(payload.get("runAtMs"), 0)
+    if run_at_ms <= 0:
+        starts_at = str(payload.get("startsAt") or payload.get("startAt") or "").strip()
+        if not starts_at:
+            raise ValueError("Startzeit ist erforderlich.")
+        try:
+            parsed_start = datetime.fromisoformat(starts_at.replace("Z", "+00:00"))
+            if parsed_start.tzinfo is None:
+                parsed_start = parsed_start.replace(tzinfo=ZoneInfo(timezone_name))
+            run_at_ms = int(parsed_start.timestamp() * 1000)
+        except Exception as exc:
+            raise ValueError("Startzeit oder Zeitzone ist ungültig.") from exc
+    repeat = str(payload.get("repeat") or "none").strip().lower()
+    supported_repeat = {"none", "daily", "weekdays", "weekly", "biweekly", "yearly", "monthly_first_weekday", "monthly_second_weekday", "monthly_third_weekday", "monthly_fourth_weekday", "monthly_last_weekday"}
+    if repeat not in supported_repeat:
+        repeat = "none"
+    duration_ms = parse_int(payload.get("durationMs"), 0)
+    if duration_ms <= 0:
+        duration_ms = max(0, min(525600, parse_int(payload.get("durationMinutes"), 0))) * 60 * 1000
     return {
         "id": event_id,
-        "title": title,
+        "guildId": str(payload.get("guildId") or "").strip(),
+        "botId": clip_text(payload.get("botId") or "bot-1", 60),
+        "name": title,
         "stationKey": station_key,
-        "fallbackStationKey": fallback_key,
-        "startsAt": starts_at,
-        "timezone": timezone_name,
-        "channelId": channel_id,
+        "voiceChannelId": channel_id,
+        "textChannelId": text_channel_id or None,
+        "announceMessage": clip_text(payload.get("announceMessage") or "", 1200) or None,
+        "description": clip_text(payload.get("description") or "", 1000) or None,
+        "stageTopic": clip_text(payload.get("stageTopic") or "", 120) or None,
+        "timeZone": timezone_name,
+        "createDiscordEvent": payload.get("createDiscordEvent") is True,
+        "discordScheduledEventId": payload.get("discordScheduledEventId") or None,
+        "discordSyncError": payload.get("discordSyncError") or None,
+        "repeat": repeat,
+        "runAtMs": run_at_ms,
+        "durationMs": duration_ms,
+        "activeUntilMs": max(0, parse_int(payload.get("activeUntilMs"), 0)),
         "enabled": enabled,
+        "lastRunAtMs": max(0, parse_int(payload.get("lastRunAtMs"), 0)),
+        "lastStopAtMs": max(0, parse_int(payload.get("lastStopAtMs"), 0)),
+        "deleteAfterStop": payload.get("deleteAfterStop") is True,
+        "createdByUserId": str(payload.get("createdByUserId") or "").strip() or None,
         "updatedAt": now_iso,
         "createdAt": clip_text(payload.get("createdAt") or now_iso, 80),
     }
 
 
+def dashboard_event_response(event):
+    row = event if isinstance(event, dict) else {}
+    run_at_ms = max(0, parse_int(row.get("runAtMs"), 0))
+    starts_at = datetime.fromtimestamp(run_at_ms / 1000, timezone.utc).isoformat() if run_at_ms else None
+    return {
+        **{key: value for key, value in row.items() if key not in ("_id", "_eventId")},
+        "title": row.get("name") or "OmniFM Event",
+        "channelId": row.get("voiceChannelId") or "",
+        "timezone": row.get("timeZone") or "Europe/Vienna",
+        "startsAt": starts_at,
+        "durationMinutes": round(max(0, parse_int(row.get("durationMs"), 0)) / 60000),
+    }
+
+
+def dashboard_event_runtime_id(guild_id):
+    live_doc = read_runtime_health_fresh()
+    nodes = (live_doc or {}).get("nodes") or []
+    candidates = [
+        node for node in nodes
+        if any(str(detail.get("guildId") or detail.get("id") or "") == str(guild_id) for detail in node.get("guildDetails") or [])
+    ]
+    commander = next((node for node in candidates if node.get("role") == "commander"), None)
+    selected = commander or (candidates[0] if candidates else {})
+    return str(selected.get("runtimeId") or "bot-1").strip() or "bot-1"
+
+
+def validate_dashboard_event(guild_id, event):
+    if not event.get("name"):
+        raise ValueError("Event-Name ist erforderlich.")
+    if not event.get("stationKey"):
+        raise ValueError("Sender ist erforderlich.")
+    if not is_valid_server_id(event.get("voiceChannelId")):
+        raise ValueError("Gültiger Voice-Kanal ist erforderlich.")
+    directory = _runtime_guild_directory().get(guild_id) or {}
+    known_voice_ids = {str(row.get("id") or "") for row in directory.get("voiceChannels") or []}
+    if known_voice_ids and event.get("voiceChannelId") not in known_voice_ids:
+        raise ValueError("Voice-Kanal gehört nicht zu diesem Server.")
+    text_channel_id = event.get("textChannelId")
+    known_text_ids = {str(row.get("id") or "") for row in directory.get("textChannels") or []}
+    if text_channel_id and (not is_valid_server_id(text_channel_id) or (known_text_ids and text_channel_id not in known_text_ids)):
+        raise ValueError("Text-Kanal gehört nicht zu diesem Server.")
+    key = str(event.get("stationKey") or "")
+    if key.startswith("custom:"):
+        custom_key = key.split(":", 1)[1]
+        exists = db is not None and db.custom_stations.find_one({"guildId": guild_id, "key": custom_key}, {"_id": 1}) is not None
+    else:
+        exists = db is not None and db.stations.find_one({"key": key}, {"_id": 1}) is not None
+        if not exists:
+            exists = key in (load_stations_from_file().get("stations") or {})
+    if not exists:
+        raise ValueError("Sender wurde nicht gefunden.")
+
+
 def normalize_dashboard_perms(payload):
     body = payload if isinstance(payload, dict) else {}
     incoming = body.get("commandRoleMap") if isinstance(body.get("commandRoleMap"), dict) else {}
+    supported = {"play", "pause", "resume", "stop", "setvolume", "stations", "list", "now", "stats", "history", "status", "health", "diag", "addstation", "removestation", "mystations", "event"}
     normalized = {}
     for raw_command, raw_roles in incoming.items():
         command = clip_text(raw_command, 64).lstrip("/").lower()
-        if not command:
+        if command not in supported:
             continue
         roles = []
         if isinstance(raw_roles, list):
             for role in raw_roles:
-                role_name = clip_text(role, 80)
-                if role_name and role_name not in roles:
-                    roles.append(role_name)
-        normalized[command] = roles
+                role_id = str(role or "").strip()
+                if is_valid_server_id(role_id) and role_id not in roles:
+                    roles.append(role_id)
+        if roles:
+            normalized[command] = roles
     return {
         "commandRoleMap": normalized,
+        "commands": {command: {"allowRoleIds": role_ids, "denyRoleIds": []} for command, role_ids in normalized.items()},
         "updatedAt": datetime.now(timezone.utc).isoformat(),
     }
+
+
+def dashboard_permission_response(document):
+    row = document if isinstance(document, dict) else {}
+    commands = row.get("commands") if isinstance(row.get("commands"), dict) else {}
+    command_role_map = {}
+    for command, rule in commands.items():
+        if not isinstance(rule, dict):
+            continue
+        role_ids = []
+        for role_id in rule.get("allowRoleIds") or []:
+            normalized_id = str(role_id or "").strip()
+            if is_valid_server_id(normalized_id) and normalized_id not in role_ids:
+                role_ids.append(normalized_id)
+        if role_ids:
+            command_role_map[str(command)] = role_ids
+    return {"commandRoleMap": command_role_map, "commands": commands, "updatedAt": row.get("updatedAt")}
 
 
 def normalize_dashboard_telemetry(payload):
@@ -2252,7 +2367,17 @@ def get_dashboard_guild_stats(server_id, tier):
     telemetry_map = dashboard_data.get("telemetry", {}) if isinstance(dashboard_data.get("telemetry"), dict) else {}
 
     guild_events = events_map.get(server_id, []) if isinstance(events_map.get(server_id), list) else []
+    if db is not None:
+        try:
+            guild_events = list(db.scheduled_events.find({"guildId": server_id}, {"_id": 0, "_eventId": 0}).limit(200))
+        except Exception:
+            pass
     guild_perms = perms_map.get(server_id, {}) if isinstance(perms_map.get(server_id), dict) else {}
+    if db is not None:
+        try:
+            guild_perms = dashboard_permission_response(db.command_permissions.find_one({"_guildId": server_id}, {"_id": 0}) or {})
+        except Exception:
+            pass
     telemetry_raw = telemetry_map.get(server_id, {}) if isinstance(telemetry_map.get(server_id), dict) else {}
     telemetry = normalize_dashboard_telemetry(telemetry_raw)
 
@@ -2264,7 +2389,13 @@ def get_dashboard_guild_stats(server_id, tier):
             if detail_id != server_id:
                 continue
             if detail.get("playing") is True or detail.get("voiceConnected") is True:
-                live_rows.append(detail)
+                live_rows.append({
+                    **detail,
+                    "botId": str(node.get("botId") or ""),
+                    "botIndex": parse_int(node.get("index"), 0),
+                    "botName": clip_text(node.get("name") or "OmniFM", 80),
+                    "botRole": str(node.get("role") or "worker"),
+                })
 
     live_listeners = sum(max(0, parse_int(row.get("listenerCount"), 0)) for row in live_rows)
     live_top = None
@@ -2275,6 +2406,36 @@ def get_dashboard_guild_stats(server_id, tier):
             "listeners": max(0, parse_int(live_top_row.get("listenerCount"), 0)),
         }
 
+    live_stream_details = []
+    for row in sorted(live_rows, key=lambda item: (parse_int(item.get("botIndex"), 999), str(item.get("botName") or ""))):
+        live_stream_details.append({
+            "botId": str(row.get("botId") or ""),
+            "botIndex": parse_int(row.get("botIndex"), 0),
+            "botName": clip_text(row.get("botName") or "OmniFM", 80),
+            "botRole": str(row.get("botRole") or "worker"),
+            "stationKey": clip_text(row.get("stationKey") or "", 100),
+            "stationName": clip_text(row.get("stationName") or row.get("stationKey") or "Unbekannter Sender", 120),
+            "channelId": str(row.get("channelId") or ""),
+            "channelName": clip_text(row.get("channelName") or row.get("channelId") or "Voice-Kanal", 120),
+            "listeners": max(0, parse_int(row.get("listenerCount"), 0)),
+            "volume": max(0, min(200, parse_int(row.get("volume"), 100))),
+            "playing": row.get("playing") is True,
+            "voiceConnected": row.get("voiceConnected") is True,
+            "recovering": row.get("recovering") is True,
+            "lastStreamStartAt": row.get("lastStreamStartAt"),
+            "reconnectAttempts": max(0, parse_int(row.get("reconnectAttempts"), 0)),
+            "streamErrorCount": max(0, parse_int(row.get("streamErrorCount"), 0)),
+        })
+
+    process_uptime_sec = max(0, parse_int(((live_doc or {}).get("process") or {}).get("uptimeSec"), 0))
+    total_listening_ms = 0
+    if db is not None:
+        try:
+            guild_stat = db.guild_stats.find_one({"guildId": server_id}, {"_id": 0, "totalListeningMs": 1})
+            total_listening_ms = max(0, parse_int((guild_stat or {}).get("totalListeningMs"), 0))
+        except Exception:
+            total_listening_ms = 0
+
     active_events = len([item for item in guild_events if isinstance(item, dict) and item.get("enabled") is not False])
     basic = {
         "listenersNow": live_listeners if live_doc else telemetry.get("listenersNow", 0),
@@ -2282,6 +2443,9 @@ def get_dashboard_guild_stats(server_id, tier):
         "peakListeners": max(live_listeners, telemetry.get("peakListeners", 0)),
         "peakTime": telemetry.get("peakTime"),
         "topStation": live_top or telemetry.get("topStation", {"name": "-", "listeners": 0}),
+        "activeStreamDetails": live_stream_details,
+        "runtimeUptimeSec": process_uptime_sec if live_doc else 0,
+        "totalListeningMs": total_listening_ms,
         "eventsConfigured": len(guild_events),
         "eventsActive": active_events,
         "permRules": len((guild_perms.get("commandRoleMap") or {}).keys()) if isinstance(guild_perms.get("commandRoleMap"), dict) else 0,
@@ -2906,9 +3070,6 @@ async def dashboard_stats(request: Request, serverId: str = ""):
         return json_error(403, "Kein Zugriff auf diesen Server.")
 
     tier = guild.get("tier", "free")
-    if TIER_RANK.get(tier, 0) < TIER_RANK.get("pro", 1):
-        return json_error(403, "Dashboard ist erst ab Pro verfuegbar.")
-
     stats_payload = get_dashboard_guild_stats(guild.get("id"), tier)
     return {
         "serverId": guild.get("id"),
@@ -3338,10 +3499,10 @@ async def dashboard_events_list(request: Request, serverId: str = ""):
     if TIER_RANK.get(guild.get("tier", "free"), 0) < TIER_RANK.get("pro", 1):
         return json_error(403, "Events sind erst ab Pro verfuegbar.")
 
-    data = load_dashboard_data()
-    events_map = data.get("events", {}) if isinstance(data.get("events"), dict) else {}
-    rows = events_map.get(guild.get("id"), []) if isinstance(events_map.get(guild.get("id")), list) else []
-    return {"serverId": guild.get("id"), "events": rows}
+    if db is None:
+        return json_error(503, "MongoDB nicht verbunden.")
+    rows = list(db.scheduled_events.find({"guildId": guild.get("id")}, {"_id": 0, "_eventId": 0}).sort("runAtMs", 1).limit(200))
+    return {"serverId": guild.get("id"), "events": [dashboard_event_response(row) for row in rows]}
 
 
 @app.post("/api/dashboard/events")
@@ -3359,14 +3520,22 @@ async def dashboard_events_create(request: Request, body: dict, serverId: str = 
     if TIER_RANK.get(guild.get("tier", "free"), 0) < TIER_RANK.get("pro", 1):
         return json_error(403, "Events sind erst ab Pro verfuegbar.")
 
-    event_payload = normalize_dashboard_event(body)
-    data = load_dashboard_data()
-    events_map = data.setdefault("events", {})
-    rows = events_map.setdefault(guild.get("id"), [])
-    rows.insert(0, event_payload)
-    events_map[guild.get("id")] = rows[:200]
-    save_dashboard_data(data)
-    return {"success": True, "event": event_payload}
+    if db is None:
+        return json_error(503, "MongoDB nicht verbunden.")
+    if db.scheduled_events.count_documents({"guildId": guild.get("id")}) >= 200:
+        return json_error(400, "Maximal 200 Events pro Server sind möglich.")
+    try:
+        event_payload = normalize_dashboard_event({
+            **(body if isinstance(body, dict) else {}),
+            "guildId": guild.get("id"),
+            "botId": dashboard_event_runtime_id(guild.get("id")),
+            "createdByUserId": (session.get("user") or {}).get("id"),
+        })
+        validate_dashboard_event(guild.get("id"), event_payload)
+    except ValueError as exc:
+        return json_error(400, str(exc))
+    db.scheduled_events.replace_one({"_eventId": event_payload["id"]}, {"_eventId": event_payload["id"], **event_payload}, upsert=True)
+    return {"success": True, "event": dashboard_event_response(event_payload)}
 
 
 @app.patch("/api/dashboard/events/{event_id}")
@@ -3384,26 +3553,26 @@ async def dashboard_events_update(request: Request, event_id: str, body: dict, s
     if TIER_RANK.get(guild.get("tier", "free"), 0) < TIER_RANK.get("pro", 1):
         return json_error(403, "Events sind erst ab Pro verfuegbar.")
 
-    data = load_dashboard_data()
-    events_map = data.setdefault("events", {})
-    rows = events_map.setdefault(guild.get("id"), [])
-    updated = None
-    for index, row in enumerate(rows):
-        if str(row.get("id")) != str(event_id):
-            continue
-        merged = {**row, **(body if isinstance(body, dict) else {})}
-        merged["id"] = str(row.get("id"))
-        merged["createdAt"] = row.get("createdAt")
-        updated = normalize_dashboard_event(merged)
-        updated["id"] = str(row.get("id"))
-        updated["createdAt"] = row.get("createdAt")
-        rows[index] = updated
-        break
-    if not updated:
+    if db is None:
+        return json_error(503, "MongoDB nicht verbunden.")
+    existing = db.scheduled_events.find_one({"_eventId": str(event_id), "guildId": guild.get("id")}, {"_id": 0})
+    if not existing:
         return json_error(404, "Event nicht gefunden.")
-    events_map[guild.get("id")] = rows
-    save_dashboard_data(data)
-    return {"success": True, "event": updated}
+    try:
+        updated = normalize_dashboard_event({
+            **existing,
+            **(body if isinstance(body, dict) else {}),
+            "id": existing.get("id"),
+            "guildId": guild.get("id"),
+            "botId": existing.get("botId") or dashboard_event_runtime_id(guild.get("id")),
+            "createdAt": existing.get("createdAt"),
+            "createdByUserId": existing.get("createdByUserId"),
+        })
+        validate_dashboard_event(guild.get("id"), updated)
+    except ValueError as exc:
+        return json_error(400, str(exc))
+    db.scheduled_events.replace_one({"_eventId": str(event_id)}, {"_eventId": str(event_id), **updated}, upsert=False)
+    return {"success": True, "event": dashboard_event_response(updated)}
 
 
 @app.delete("/api/dashboard/events/{event_id}")
@@ -3421,14 +3590,11 @@ async def dashboard_events_delete(request: Request, event_id: str, serverId: str
     if TIER_RANK.get(guild.get("tier", "free"), 0) < TIER_RANK.get("pro", 1):
         return json_error(403, "Events sind erst ab Pro verfuegbar.")
 
-    data = load_dashboard_data()
-    events_map = data.setdefault("events", {})
-    rows = events_map.setdefault(guild.get("id"), [])
-    next_rows = [row for row in rows if str(row.get("id")) != str(event_id)]
-    if len(next_rows) == len(rows):
+    if db is None:
+        return json_error(503, "MongoDB nicht verbunden.")
+    removed = db.scheduled_events.delete_one({"_eventId": str(event_id), "guildId": guild.get("id")})
+    if removed.deleted_count == 0:
         return json_error(404, "Event nicht gefunden.")
-    events_map[guild.get("id")] = next_rows
-    save_dashboard_data(data)
     return {"success": True, "eventId": str(event_id)}
 
 
@@ -3447,13 +3613,20 @@ async def dashboard_perms_get(request: Request, serverId: str = ""):
     if TIER_RANK.get(guild.get("tier", "free"), 0) < TIER_RANK.get("pro", 1):
         return json_error(403, "Berechtigungen sind erst ab Pro verfuegbar.")
 
-    data = load_dashboard_data()
-    perms_map = data.get("perms", {}) if isinstance(data.get("perms"), dict) else {}
-    payload = perms_map.get(guild.get("id"), {"commandRoleMap": {}, "updatedAt": None})
-    if not isinstance(payload, dict):
-        payload = {"commandRoleMap": {}, "updatedAt": None}
+    if db is None:
+        return json_error(503, "MongoDB nicht verbunden.")
+    guild_id = guild.get("id")
+    document = db.command_permissions.find_one({"_guildId": guild_id}, {"_id": 0})
+    if not document:
+        data = load_dashboard_data()
+        legacy_map = data.get("perms", {}) if isinstance(data.get("perms"), dict) else {}
+        legacy = normalize_dashboard_perms(legacy_map.get(guild_id) or {})
+        if legacy.get("commands"):
+            document = {"_guildId": guild_id, "guildId": guild_id, "commands": legacy["commands"], "updatedAt": legacy["updatedAt"]}
+            db.command_permissions.replace_one({"_guildId": guild_id}, document, upsert=True)
+    payload = dashboard_permission_response(document or {})
     return {
-        "serverId": guild.get("id"),
+        "serverId": guild_id,
         "tier": guild.get("tier"),
         "commandRoleMap": payload.get("commandRoleMap", {}),
         "updatedAt": payload.get("updatedAt"),
@@ -3476,13 +3649,31 @@ async def dashboard_perms_put(request: Request, body: dict, serverId: str = ""):
         return json_error(403, "Berechtigungen sind erst ab Pro verfuegbar.")
 
     normalized = normalize_dashboard_perms(body)
-    data = load_dashboard_data()
-    perms_map = data.setdefault("perms", {})
-    perms_map[guild.get("id")] = normalized
-    save_dashboard_data(data)
+    if db is None:
+        return json_error(503, "MongoDB nicht verbunden.")
+    guild_id = guild.get("id")
+    directory = _runtime_guild_directory().get(guild_id) or {}
+    known_role_ids = {str(role.get("id") or "") for role in directory.get("roles") or []}
+    requested_role_ids = {
+        role_id
+        for role_ids in normalized.get("commandRoleMap", {}).values()
+        for role_id in role_ids
+    }
+    if known_role_ids and not requested_role_ids.issubset(known_role_ids):
+        return json_error(400, "Mindestens eine Rolle gehört nicht zu diesem Server.")
+    document = {
+        "_guildId": guild_id,
+        "guildId": guild_id,
+        "commands": normalized.get("commands", {}),
+        "updatedAt": normalized.get("updatedAt"),
+    }
+    if document["commands"]:
+        db.command_permissions.replace_one({"_guildId": guild_id}, document, upsert=True)
+    else:
+        db.command_permissions.delete_one({"_guildId": guild_id})
     return {
         "success": True,
-        "serverId": guild.get("id"),
+        "serverId": guild_id,
         "commandRoleMap": normalized.get("commandRoleMap", {}),
         "updatedAt": normalized.get("updatedAt"),
     }
@@ -5094,6 +5285,7 @@ async def admin_monitoring(request: Request):
                 "index": n.get("index"),
                 "name": n.get("name"),
                 "role": n.get("role"),
+                "requiredTier": n.get("requiredTier") or "free",
                 "status": n.get("status"),
                 "pingMs": n.get("pingMs"),
                 "guilds": n.get("guilds", 0),
@@ -5511,15 +5703,37 @@ async def admin_station_list(request: Request):
     rows = []
     if db is not None:
         try:
+            health_by_key = {
+                str(doc.get("key") or ""): doc
+                for doc in db.station_health.find({}, {"_id": 0})
+                if str(doc.get("key") or "")
+            }
             for doc in db.stations.find({"key": {"$not": {"$regex": "^custom:"}}}, {"_id": 0}).sort([("tier", 1), ("name", 1)]):
+                health = health_by_key.get(str(doc.get("key") or ""))
                 rows.append({
                     "key": doc.get("key"), "name": doc.get("name"), "url": doc.get("url"),
                     "tier": doc.get("tier", "free"), "genre": doc.get("genre") or "Radio",
                     "isDefault": bool(doc.get("is_default")), "updatedAt": doc.get("updated_at"),
+                    "health": health,
                 })
         except Exception:
             rows = []
-    return {"stations": rows, "count": len(rows)}
+    health_rows = [row.get("health") for row in rows if isinstance(row.get("health"), dict)]
+    confirmed_down = len([row for row in health_rows if row.get("status") == "down" and parse_int(row.get("consecutiveFailures"), 0) >= 2])
+    station_health_config = (effective_system_config().get("stationHealth") or {})
+    return {
+        "stations": rows,
+        "count": len(rows),
+        "healthSummary": {
+            "automatic": station_health_config.get("enabled") is not False,
+            "intervalMs": max(2000, parse_int(station_health_config.get("intervalMs"), 5000)),
+            "batchSize": max(1, min(10, parse_int(station_health_config.get("batchSize"), 2))),
+            "checked": len(health_rows),
+            "up": len([row for row in health_rows if row.get("status") == "up"]),
+            "down": confirmed_down,
+            "pending": max(0, len(rows) - len(health_rows)),
+        },
+    }
 
 
 def _probe_station_url(url):
@@ -5577,6 +5791,40 @@ async def admin_station_health(request: Request, body: dict = None):
         return out
 
     results = await run_in_threadpool(run_all)
+    now_ms = int(time.time() * 1000)
+    for key, result in results.items():
+        previous = db.station_health.find_one({"key": key}, {"_id": 0}) or {}
+        ok = bool(result.get("discordOk") or result.get("ok"))
+        failures = 0 if ok else parse_int(previous.get("consecutiveFailures"), 0) + 1
+        successes = parse_int(previous.get("consecutiveSuccesses"), 0) + 1 if ok else 0
+        health_doc = {
+            **result,
+            "key": key,
+            "status": "up" if ok else "down",
+            "responseTimeMs": result.get("latencyMs"),
+            "lastCheckedAt": now_ms,
+            "checkedAt": datetime.now(timezone.utc).isoformat(),
+            "updatedAt": datetime.now(timezone.utc).isoformat(),
+            "consecutiveFailures": failures,
+            "consecutiveSuccesses": successes,
+            "error": None if ok else result.get("message") or (f"HTTP {result.get('status')}" if result.get("status") else "nicht erreichbar"),
+        }
+        db.station_health.update_one({"key": key}, {"$set": health_doc}, upsert=True)
+        result.update(health_doc)
+        if failures == 2:
+            db.runtime_incidents.insert_one({
+                "at": datetime.now(timezone.utc).isoformat(),
+                "severity": "warning", "source": "station-health",
+                "message": clip_text(f"Sender {key} ist offline: {health_doc.get('error')}", 240),
+                "resolved": False,
+            })
+        elif ok and previous.get("status") == "down" and parse_int(previous.get("consecutiveFailures"), 0) >= 2:
+            db.runtime_incidents.insert_one({
+                "at": datetime.now(timezone.utc).isoformat(),
+                "severity": "info", "source": "station-health",
+                "message": clip_text(f"Sender {key} ist wieder erreichbar", 240),
+                "resolved": True,
+            })
     truncated = isinstance(keys, list) and len([k for k in keys if str(k).strip()]) > 25
     return {"results": results, "count": len(results), "truncated": truncated}
 

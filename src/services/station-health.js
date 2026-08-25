@@ -12,20 +12,27 @@
 
 import { log } from "../lib/logging.js";
 import { safeFetch } from "../lib/safe-outbound-http.js";
+import { getDb, isConnected } from "../lib/db.js";
+import { recordRuntimeIncident } from "./runtime-health-reporter.js";
 
-const STATION_HEALTH_ENABLED = String(process.env.STATION_HEALTH_ENABLED || "0") === "1";
+const STATION_HEALTH_ENABLED = String(process.env.STATION_HEALTH_ENABLED ?? "1") !== "0";
 const STATION_HEALTH_INTERVAL_MS = Math.max(
-  60_000,
-  Number.parseInt(String(process.env.STATION_HEALTH_INTERVAL_MS || "300000"), 10) || 300_000
+  2_000,
+  Number.parseInt(String(process.env.STATION_HEALTH_INTERVAL_MS || "5000"), 10) || 5_000
 );
 const STATION_HEALTH_TIMEOUT_MS = Math.max(
   3_000,
   Number.parseInt(String(process.env.STATION_HEALTH_TIMEOUT_MS || "8000"), 10) || 8_000
 );
-// Maximale Anzahl gleichzeitiger Checks (verhindert Überlastung bei vielen Stationen)
+// Kleine Round-Robin-Batches verhindern Lastspitzen. Mit den Defaults wird ein
+// Katalog mit 120 Sendern in ungefähr fünf Minuten vollständig geprüft.
+const STATION_HEALTH_BATCH_SIZE = Math.max(
+  1,
+  Math.min(10, Number.parseInt(String(process.env.STATION_HEALTH_BATCH_SIZE || "2"), 10) || 2)
+);
 const STATION_HEALTH_CONCURRENCY = Math.max(
   1,
-  Math.min(20, Number.parseInt(String(process.env.STATION_HEALTH_CONCURRENCY || "5"), 10) || 5)
+  Math.min(STATION_HEALTH_BATCH_SIZE, Number.parseInt(String(process.env.STATION_HEALTH_CONCURRENCY || "2"), 10) || 2)
 );
 const HEAD_FALLBACK_STATUS_CODES = new Set([403, 405, 501]);
 
@@ -33,7 +40,50 @@ const HEAD_FALLBACK_STATUS_CODES = new Set([403, 405, 501]);
 const healthReport = new Map();
 
 let healthCheckTimer = null;
+let initialTimer = null;
 let isRunning = false;
+let tickRunning = false;
+let cursor = 0;
+let completedInCycle = 0;
+
+async function hydrateHealthReport() {
+  if (!isConnected()) return;
+  try {
+    const rows = await getDb().collection("station_health").find({}, { projection: { _id: 0 } }).toArray();
+    for (const row of rows) {
+      const key = String(row?.key || "").trim();
+      if (key) healthReport.set(key, row);
+    }
+  } catch (err) {
+    log("WARN", `[StationHealth] Persistierten Status nicht geladen: ${err?.message || err}`);
+  }
+}
+
+async function persistHealthEntry(entry) {
+  if (!isConnected()) return;
+  try {
+    await getDb().collection("station_health").updateOne(
+      { key: entry.key },
+      { $set: { ...entry, checkedAt: new Date(entry.lastCheckedAt).toISOString(), updatedAt: new Date().toISOString() } },
+      { upsert: true },
+    );
+  } catch (err) {
+    log("WARN", `[StationHealth] Status für ${entry.key} nicht gespeichert: ${err?.message || err}`);
+  }
+}
+
+function reportTransition(previous, entry) {
+  const confirmedDown = entry.status === "down" && entry.consecutiveFailures === 2;
+  const recovered = entry.status === "up" && previous.status === "down" && previous.consecutiveFailures >= 2;
+  if (confirmedDown) {
+    const detail = entry.error || "nicht erreichbar";
+    log("WARN", `[StationHealth] Station "${entry.name}" (${entry.key}) ist DOWN: ${detail} (${entry.responseTimeMs}ms, 2x in Folge)`);
+    recordRuntimeIncident({ severity: "warning", source: "station-health", message: `Sender ${entry.name} (${entry.key}) ist offline: ${detail}` }).catch(() => null);
+  } else if (recovered) {
+    log("INFO", `[StationHealth] Station "${entry.name}" (${entry.key}) ist wieder UP nach ${previous.consecutiveFailures} Fehlern (${entry.responseTimeMs}ms)`);
+    recordRuntimeIncident({ severity: "info", source: "station-health", message: `Sender ${entry.name} (${entry.key}) ist wieder erreichbar`, resolved: true }).catch(() => null);
+  }
+}
 
 /**
  * @typedef {Object} StationHealthEntry
@@ -127,6 +177,9 @@ async function checkStation(key, name, url) {
       name,
       url,
       status: ok ? "up" : "down",
+      ok,
+      reachable: ok,
+      discordOk: ok,
       lastCheckedAt: Date.now(),
       responseTimeMs,
       error: ok ? null : `HTTP ${response.status}`,
@@ -134,12 +187,7 @@ async function checkStation(key, name, url) {
       consecutiveSuccesses: ok ? previous.consecutiveSuccesses + 1 : 0,
     };
 
-    if (!ok && entry.consecutiveFailures >= 2) {
-      log("WARN", `[StationHealth] Station "${name}" (${key}) ist DOWN: HTTP ${response.status} (${responseTimeMs}ms, ${entry.consecutiveFailures}x in Folge)`);
-    } else if (ok && previous.status === "down" && previous.consecutiveFailures >= 2) {
-      log("INFO", `[StationHealth] Station "${name}" (${key}) ist wieder UP nach ${previous.consecutiveFailures} Fehlern (${responseTimeMs}ms)`);
-    }
-
+    reportTransition(previous, entry);
     return entry;
   } catch (err) {
     const responseTimeMs = Date.now() - startMs;
@@ -151,6 +199,9 @@ async function checkStation(key, name, url) {
       name,
       url,
       status: "down",
+      ok: false,
+      reachable: false,
+      discordOk: false,
       lastCheckedAt: Date.now(),
       responseTimeMs,
       error: errorMsg,
@@ -158,10 +209,7 @@ async function checkStation(key, name, url) {
       consecutiveSuccesses: 0,
     };
 
-    if (entry.consecutiveFailures >= 2) {
-      log("WARN", `[StationHealth] Station "${name}" (${key}) nicht erreichbar: ${errorMsg} (${entry.consecutiveFailures}x in Folge)`);
-    }
-
+    reportTransition(previous, entry);
     return entry;
   }
 }
@@ -183,6 +231,7 @@ async function runHealthChecks(stations) {
       try {
         const result = await checkStation(station.key, station.name, station.url);
         healthReport.set(station.key, result);
+        await persistHealthEntry(result);
       } catch (err) {
         log("WARN", `[StationHealth] Unerwarteter Fehler bei "${station.key}": ${err?.message || err}`);
       }
@@ -201,11 +250,16 @@ async function runHealthChecks(stations) {
  * @param {() => {stations: Record<string, {name: string, url: string}>}} getStationsFn
  */
 function startStationHealthService(getStationsFn) {
-  if (!STATION_HEALTH_ENABLED) return;
-  if (isRunning) return;
+  if (!STATION_HEALTH_ENABLED) {
+    log("INFO", "[StationHealth] Automatische Prüfung explizit deaktiviert (STATION_HEALTH_ENABLED=0)." );
+    return stopStationHealthService;
+  }
+  if (isRunning) return stopStationHealthService;
   isRunning = true;
 
   const tick = async () => {
+    if (tickRunning || !isRunning) return;
+    tickRunning = true;
     try {
       const stationsData = getStationsFn?.() || {};
       const stationEntries = Object.entries(stationsData?.stations || {})
@@ -213,25 +267,43 @@ function startStationHealthService(getStationsFn) {
         .map(([key, s]) => ({ key, name: String(s.name || key), url: String(s.url) }));
 
       if (stationEntries.length > 0) {
-        log("INFO", `[StationHealth] Prüfe ${stationEntries.length} Stationen...`);
-        await runHealthChecks(stationEntries);
-        const downCount = [...healthReport.values()].filter((e) => e.status === "down").length;
-        const upCount = [...healthReport.values()].filter((e) => e.status === "up").length;
-        log("INFO", `[StationHealth] Fertig: ${upCount} UP, ${downCount} DOWN von ${stationEntries.length} Stationen.`);
+        const currentKeys = new Set(stationEntries.map((entry) => entry.key));
+        for (const key of healthReport.keys()) {
+          if (!currentKeys.has(key)) healthReport.delete(key);
+        }
+        if (cursor >= stationEntries.length) cursor = 0;
+        const batch = [];
+        for (let offset = 0; offset < Math.min(STATION_HEALTH_BATCH_SIZE, stationEntries.length); offset += 1) {
+          batch.push(stationEntries[(cursor + offset) % stationEntries.length]);
+        }
+        cursor = (cursor + batch.length) % stationEntries.length;
+        await runHealthChecks(batch);
+        completedInCycle += batch.length;
+        if (completedInCycle >= stationEntries.length) {
+          completedInCycle %= stationEntries.length;
+          const downCount = [...healthReport.values()].filter((e) => e.status === "down" && e.consecutiveFailures >= 2).length;
+          const upCount = [...healthReport.values()].filter((e) => e.status === "up").length;
+          log("INFO", `[StationHealth] Katalogrunde fertig: ${upCount} UP, ${downCount} bestätigt DOWN, ${stationEntries.length} gesamt.`);
+        }
       }
     } catch (err) {
       log("WARN", `[StationHealth] Tick-Fehler: ${err?.message || err}`);
+    } finally {
+      tickRunning = false;
     }
   };
 
-  // Erster Check nach 30 Sekunden (Bot-Startup abwarten)
-  setTimeout(() => {
-    tick();
+  hydrateHealthReport().catch(() => null);
+  // Kurze Schonfrist, danach bewusst kleine gestaffelte Batches.
+  initialTimer = setTimeout(() => {
+    tick().catch(() => null);
     healthCheckTimer = setInterval(tick, STATION_HEALTH_INTERVAL_MS);
     healthCheckTimer?.unref?.();
-  }, 30_000);
+  }, 10_000);
+  initialTimer?.unref?.();
 
-  log("INFO", `[StationHealth] Service gestartet (Intervall: ${STATION_HEALTH_INTERVAL_MS / 1000}s, Timeout: ${STATION_HEALTH_TIMEOUT_MS}ms, Parallelität: ${STATION_HEALTH_CONCURRENCY})`);
+  log("INFO", `[StationHealth] Automatische Round-Robin-Prüfung aktiv (alle ${STATION_HEALTH_INTERVAL_MS / 1000}s ${STATION_HEALTH_BATCH_SIZE} Sender, Timeout ${STATION_HEALTH_TIMEOUT_MS}ms, Parallelität ${STATION_HEALTH_CONCURRENCY}).`);
+  return stopStationHealthService;
 }
 
 /**
@@ -239,6 +311,11 @@ function startStationHealthService(getStationsFn) {
  */
 function stopStationHealthService() {
   isRunning = false;
+  tickRunning = false;
+  if (initialTimer) {
+    clearTimeout(initialTimer);
+    initialTimer = null;
+  }
   if (healthCheckTimer) {
     clearInterval(healthCheckTimer);
     healthCheckTimer = null;
@@ -281,4 +358,5 @@ export {
   isStationDown,
   STATION_HEALTH_ENABLED,
   STATION_HEALTH_INTERVAL_MS,
+  STATION_HEALTH_BATCH_SIZE,
 };

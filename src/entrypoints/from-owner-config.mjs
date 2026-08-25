@@ -98,6 +98,7 @@ async function main() {
   const smtp = system.smtp || {};
   const recognition = system.audioRecognition || {};
   const history = system.songHistory || {};
+  const stationHealth = system.stationHealth || {};
   const directories = system.botDirectories || {};
   const setRuntimeEnv = (key, value) => {
     if (value !== undefined && value !== null && String(value).trim() !== "") process.env[key] = String(value).trim();
@@ -116,6 +117,11 @@ async function main() {
   setRuntimeEnv("ACOUSTID_API_KEY", recognition.apiKey);
   setRuntimeEnv("SONG_HISTORY_ENABLED", history.enabled === false ? "0" : "1");
   setRuntimeEnv("SONG_HISTORY_MAX_PER_GUILD", history.maxPerGuild);
+  if (Object.hasOwn(stationHealth, "enabled")) setRuntimeEnv("STATION_HEALTH_ENABLED", stationHealth.enabled ? "1" : "0");
+  setRuntimeEnv("STATION_HEALTH_INTERVAL_MS", stationHealth.intervalMs);
+  setRuntimeEnv("STATION_HEALTH_BATCH_SIZE", stationHealth.batchSize);
+  setRuntimeEnv("STATION_HEALTH_CONCURRENCY", stationHealth.concurrency);
+  setRuntimeEnv("STATION_HEALTH_TIMEOUT_MS", stationHealth.timeoutMs);
 
   const directoryEnv = [
     [directories.discordBotList || {}, "DISCORDBOTLIST", ["slug", "webhookSecret"]],

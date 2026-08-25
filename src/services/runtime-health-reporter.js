@@ -86,6 +86,9 @@ export function buildRuntimeHealthNodes(runtimes) {
             voiceConnected: live.voiceConnected === true,
             playing: live.playing === true,
             recovering: live.recovering === true,
+            lastStreamStartAt: live.lastStreamStartAt || null,
+            reconnectAttempts: Math.max(0, Number(live.reconnectAttempts || 0) || 0),
+            streamErrorCount: Math.max(0, Number(live.streamErrorCount || 0) || 0),
           };
         });
       } catch { guildDetails = []; }
@@ -96,9 +99,11 @@ export function buildRuntimeHealthNodes(runtimes) {
     try { stats = rt?.collectStats?.() || {}; } catch { stats = {}; }
     return {
       botId: String(rt?.config?.clientId || rt?.config?.id || rt?.config?.index || ""),
+      runtimeId: String(rt?.config?.id || ""),
       index: Number(rt?.config?.index || 0),
       name: rt?.config?.name || `Bot ${rt?.config?.index || "?"}`,
       role: rt?.role === "commander" ? "commander" : "worker",
+      requiredTier: rt?.config?.requiredTier || "free",
       status: ready ? "online" : "offline",
       pingMs: ping,
       guilds: Number(stats.servers ?? guilds) || 0,

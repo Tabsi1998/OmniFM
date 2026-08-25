@@ -95,6 +95,11 @@ async function initCollections(database) {
     await database.collection("server_entitlements").createIndex({ _serverId: 1 }, { name: "server_id", unique: true }).catch(() => null);
     await database.collection("processed_sessions").createIndex({ _sessionId: 1 }, { name: "session_id", unique: true }).catch(() => null);
     await database.collection("processed_events").createIndex({ _eventId: 1 }, { name: "event_id", unique: true }).catch(() => null);
+    await database.collection("station_health").createIndex({ key: 1 }, { name: "station_key", unique: true }).catch(() => null);
+    await database.collection("custom_stations").createIndex({ guildId: 1, key: 1 }, { name: "custom_station_guild_key", unique: true }).catch(() => null);
+    await database.collection("command_permissions").createIndex({ _guildId: 1 }, { name: "command_permissions_guild", unique: true, sparse: true }).catch(() => null);
+    await database.collection("scheduled_events").createIndex({ _eventId: 1 }, { name: "scheduled_event_id", unique: true }).catch(() => null);
+    await database.collection("scheduled_events").createIndex({ guildId: 1, runAtMs: 1 }, { name: "scheduled_guild_time" }).catch(() => null);
 
     initialized = true;
     log("INFO", "MongoDB Kollektionen und Indizes initialisiert.");
