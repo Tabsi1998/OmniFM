@@ -26,6 +26,7 @@ import { BotRuntime } from "./bot/runtime.js";
 import { WorkerManager } from "./bot/worker-manager.js";
 import { startWebServer } from "./api/server.js";
 import { startRuntimeHealthReporter } from "./services/runtime-health-reporter.js";
+import { startStationHealthService, stopStationHealthService } from "./services/station-health.js";
 import { loadStations, initStationsStore } from "./stations-store.js";
 import { installOperatorIncidentRecorder, logRecentOperatorIncidentSummary } from "./operator-incidents-store.js";
 import {
@@ -105,6 +106,7 @@ logStoreConcurrencyReport({
 });
 await initPremiumStore();
 await initStationsStore();
+startStationHealthService(loadStations);
 await logRecentOperatorIncidentSummary({
   label: "Owner summary on startup",
 }).catch(() => null);
@@ -586,6 +588,7 @@ async function shutdown(signal) {
   log("INFO", "Bot-State gespeichert.");
 
   webServer.close();
+  stopStationHealthService();
   await Promise.all(runtimes.map((runtime) => runtime.stop()));
   try {
     await getLogWriteQueue();

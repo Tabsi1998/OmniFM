@@ -13,7 +13,10 @@
 import { log } from "../lib/logging.js";
 import { safeFetch } from "../lib/safe-outbound-http.js";
 
-const STATION_HEALTH_ENABLED = String(process.env.STATION_HEALTH_ENABLED || "0") === "1";
+// Der Katalog im Owner-Menue ist ohne aktuellen Status nicht steuerbar. Der
+// Healthcheck ist daher standardmaessig aktiv und kann bewusst mit 0 deaktiviert
+// werden, falls eine Installation keinerlei externe Checks erlauben soll.
+const STATION_HEALTH_ENABLED = String(process.env.STATION_HEALTH_ENABLED || "1") !== "0";
 const STATION_HEALTH_INTERVAL_MS = Math.max(
   60_000,
   Number.parseInt(String(process.env.STATION_HEALTH_INTERVAL_MS || "300000"), 10) || 300_000
@@ -224,12 +227,11 @@ function startStationHealthService(getStationsFn) {
     }
   };
 
-  // Erster Check nach 30 Sekunden (Bot-Startup abwarten)
-  setTimeout(() => {
-    tick();
-    healthCheckTimer = setInterval(tick, STATION_HEALTH_INTERVAL_MS);
-    healthCheckTimer?.unref?.();
-  }, 30_000);
+  // Direkt nach dem Store-Start prüfen, damit der Owner-Katalog nicht bis zum
+  // ersten Intervall nur unbekannte Statuswerte zeigt.
+  void tick();
+  healthCheckTimer = setInterval(tick, STATION_HEALTH_INTERVAL_MS);
+  healthCheckTimer?.unref?.();
 
   log("INFO", `[StationHealth] Service gestartet (Intervall: ${STATION_HEALTH_INTERVAL_MS / 1000}s, Timeout: ${STATION_HEALTH_TIMEOUT_MS}ms, Parallelität: ${STATION_HEALTH_CONCURRENCY})`);
 }

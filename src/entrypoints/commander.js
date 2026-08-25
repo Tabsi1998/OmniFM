@@ -2,6 +2,7 @@ import { BotRuntime } from "../bot/runtime.js";
 import { WorkerManager } from "../bot/worker-manager.js";
 import { RemoteWorkerHandle } from "../bot/remote-worker-handle.js";
 import { startWebServer } from "../api/server.js";
+import { startStationHealthService, stopStationHealthService } from "../services/station-health.js";
 import { listWorkerSnapshots } from "../core/worker-bridge.js";
 import { loadStations } from "../stations-store.js";
 import {
@@ -123,6 +124,7 @@ async function sendWeeklyDigest(runtime, guildId, channelId, language = "de") {
 }
 
 await initializeSharedServices({ requireMongo: true });
+startStationHealthService(loadStations);
 const { commanderConfig, workerConfigs } = resolveBotTopology(process.env);
 
 const remoteWorkers = workerConfigs.map((config) => new RemoteWorkerHandle(config));
@@ -163,6 +165,9 @@ installProcessHandlers({
   extraShutdown: [
     async () => {
       workerManager.stopRemotePolling();
+    },
+    async () => {
+      stopStationHealthService();
     },
   ],
 });

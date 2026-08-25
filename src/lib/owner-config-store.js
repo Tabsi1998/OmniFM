@@ -115,6 +115,8 @@ const GROUPS = [
       { key: "CLEAN_WORKER_GUILD_COMMANDS_ON_BOOT", label: "Worker Guild Commands bereinigen", type: "boolean", example: "0" },
       { key: "STATION_HEALTH_ENABLED", label: "Station-Healthchecks aktiv", type: "boolean", example: "1" },
       { key: "STATION_HEALTH_INTERVAL_MS", label: "Station-Healthcheck Intervall ms", type: "integer", min: 10000, max: 86400000, example: "300000" },
+      { key: "STATION_HEALTH_TIMEOUT_MS", label: "Station-Healthcheck Timeout ms", type: "integer", min: 1000, max: 30000, example: "8000" },
+      { key: "STATION_HEALTH_CONCURRENCY", label: "Station-Healthcheck Parallelitaet", type: "integer", min: 1, max: 20, example: "5" },
     ],
   },
   {

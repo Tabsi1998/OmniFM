@@ -168,6 +168,16 @@ export default function OwnerAdmin() {
       ]);
       setStationList(list.stations || []);
       setStations(summary);
+      const initialHealth = Object.fromEntries((summary.stations || [])
+        .filter((station) => station?.key && station?.health)
+        .map((station) => [station.key, {
+          ...station.health,
+          reachable: station.health.status === 'up',
+          discordOk: station.health.status === 'up',
+          ok: station.health.status === 'up',
+          latencyMs: station.health.responseTimeMs,
+        }]));
+      setStHealth(initialHealth);
     } catch { /* keep */ }
   }, [apiGet, token]);
 
@@ -1072,9 +1082,11 @@ export default function OwnerAdmin() {
                         {h && !h.checking && (h.discordOk || h.ok) && (
                           <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
                             <span className="oa-pill green" style={{ padding: '2px 8px' }} title="Server-seitig streambar – Discord-Bot kann diesen Sender abspielen"><CheckCircle2 size={11} /> Discord{typeof h.latencyMs === 'number' ? ` · ${h.latencyMs}ms` : ''}</span>
-                            {h.browserOk
-                              ? <span className="oa-pill cyan" style={{ padding: '2px 8px' }} title="Direkt im Website-Player abspielbar"><CheckCircle2 size={11} /> Browser</span>
-                              : <span className="oa-pill amber" style={{ padding: '2px 8px' }} title="Browser-Direktzugriff blockiert (z. B. 403/Hotlink). Im Discord-Bot funktioniert der Sender."><AlertTriangle size={11} /> Nur Discord</span>}
+                            {!Object.prototype.hasOwnProperty.call(h, 'browserOk')
+                              ? <span className="oa-pill slate" style={{ padding: '2px 8px' }} title="Browser-Abspielbarkeit wurde noch nicht im Owner-Browser geprüft.">Browser ungeprüft</span>
+                              : h.browserOk
+                                ? <span className="oa-pill cyan" style={{ padding: '2px 8px' }} title="Direkt im Website-Player abspielbar"><CheckCircle2 size={11} /> Browser</span>
+                                : <span className="oa-pill amber" style={{ padding: '2px 8px' }} title="Browser-Direktzugriff blockiert (z. B. 403/Hotlink). Im Discord-Bot funktioniert der Sender."><AlertTriangle size={11} /> Nur Discord</span>}
                           </span>
                         )}
                       </td>
