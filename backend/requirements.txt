@@ -2,7 +2,7 @@
 # and CI install the same versions.
 fastapi==0.141.1
 uvicorn==0.52.3
-python-dotenv==1.2.2
+python-dotenv==1.2.3
 pymongo==4.17.0
 requests==2.34.2
 stripe==15.5.1
