@@ -35,7 +35,7 @@ app = FastAPI(title="OmniFM API")
 # start.sh verifies this value after launching Uvicorn.  A generic 200 health
 # response is not sufficient because an orphaned, older backend on the same
 # port would otherwise look healthy while serving a different API contract.
-BACKEND_CONTRACT_VERSION = "owner-live-v4"
+BACKEND_CONTRACT_VERSION = "owner-live-v5"
 
 MONGO_URL = os.environ.get("MONGO_URL")
 DB_NAME = os.environ.get("DB_NAME")
@@ -3111,17 +3111,28 @@ async def dashboard_stats_reset(request: Request, serverId: str = ""):
         return json_error(400, "Ungueltige Server-ID.")
 
     deleted_counts = {}
+    archive_id = None
     if db is not None:
         try:
-            for coll_name in ["daily_stats", "listening_sessions", "listener_snapshots"]:
-                r = db[coll_name].delete_many({"guildId": gid})
-                deleted_counts[coll_name] = r.deleted_count
-            r = db.guild_stats.delete_many({"guildId": gid})
-            deleted_counts["guild_stats"] = r.deleted_count
+            archived = archive_mongo_records(
+                [
+                    ("daily_stats", {"guildId": gid}),
+                    ("listening_sessions", {"guildId": gid}),
+                    ("listener_snapshots", {"guildId": gid}),
+                    ("guild_stats", {"guildId": gid}),
+                ],
+                operation="dashboard.stats.reset",
+                target=gid,
+                request=request,
+                actor="dashboard",
+                delete=True,
+            )
+            deleted_counts = archived.get("deleted", {})
+            archive_id = archived.get("operationId")
         except Exception as e:
-            return json_error(500, f"Fehler beim Zuruecksetzen: {str(e)}")
+            return json_error(500, f"Fehler beim sicheren Archivieren/Zuruecksetzen: {str(e)}")
 
-    return {"success": True, "serverId": gid, "deleted": deleted_counts}
+    return {"success": True, "serverId": gid, "deleted": deleted_counts, "archiveId": archive_id}
 
 
 @app.get("/api/dashboard/stats/detail")
@@ -3475,8 +3486,19 @@ async def dashboard_custom_stations_delete(request: Request, serverId: str = "",
 
     gid = guild.get("id", "")
     if db is not None:
-        r = db.custom_stations.delete_one({"guildId": gid, "key": key})
-        return {"success": r.deleted_count > 0, "key": key}
+        try:
+            archived = archive_mongo_records(
+                [("custom_stations", {"guildId": gid, "key": key})],
+                operation="dashboard.custom_station.delete",
+                target=f"{gid}:{key}",
+                request=request,
+                actor="dashboard",
+                delete=True,
+            )
+        except Exception as exc:
+            return json_error(500, f"Station konnte nicht sicher archiviert werden: {clip_text(exc)}")
+        deleted = int((archived.get("deleted") or {}).get("custom_stations") or 0)
+        return {"success": deleted > 0, "key": key, "archiveId": archived.get("operationId")}
     return {"success": False, "key": key}
 
 
@@ -3605,10 +3627,21 @@ async def dashboard_events_delete(request: Request, event_id: str, serverId: str
 
     if db is None:
         return json_error(503, "MongoDB nicht verbunden.")
-    removed = db.scheduled_events.delete_one({"_eventId": str(event_id), "guildId": guild.get("id")})
-    if removed.deleted_count == 0:
+    try:
+        archived = archive_mongo_records(
+            [("scheduled_events", {"_eventId": str(event_id), "guildId": guild.get("id")})],
+            operation="dashboard.event.delete",
+            target=f"{guild.get('id')}:{event_id}",
+            request=request,
+            actor="dashboard",
+            delete=True,
+        )
+    except Exception as exc:
+        return json_error(500, f"Event konnte nicht sicher archiviert werden: {clip_text(exc)}")
+    removed_count = int((archived.get("deleted") or {}).get("scheduled_events") or 0)
+    if removed_count == 0:
         return json_error(404, "Event nicht gefunden.")
-    return {"success": True, "eventId": str(event_id)}
+    return {"success": True, "eventId": str(event_id), "archiveId": archived.get("operationId")}
 
 
 @app.get("/api/dashboard/perms")
@@ -3683,7 +3716,17 @@ async def dashboard_perms_put(request: Request, body: dict, serverId: str = ""):
     if document["commands"]:
         db.command_permissions.replace_one({"_guildId": guild_id}, document, upsert=True)
     else:
-        db.command_permissions.delete_one({"_guildId": guild_id})
+        try:
+            archive_mongo_records(
+                [("command_permissions", {"_guildId": guild_id})],
+                operation="dashboard.permissions.reset",
+                target=guild_id,
+                request=request,
+                actor="dashboard",
+                delete=True,
+            )
+        except Exception as exc:
+            return json_error(500, f"Berechtigungen konnten nicht sicher archiviert werden: {clip_text(exc)}")
     return {
         "success": True,
         "serverId": guild_id,
@@ -4985,13 +5028,29 @@ async def admin_delete_license(license_key: str, request: Request):
     licenses = data.setdefault("licenses", {})
     if license_key not in licenses:
         return json_error(404, "Lizenz nicht gefunden.")
+    try:
+        archived = archive_mongo_records(
+            [
+                ("licenses", {"_licenseId": str(license_key)}),
+                ("server_entitlements", {"licenseId": str(license_key)}),
+            ],
+            operation="owner.license.delete",
+            target=license_key,
+            request=request,
+            actor="owner",
+            delete=False,
+        )
+        if int(archived.get("archived") or 0) == 0:
+            return json_error(409, "Lizenz konnte vor dem Löschen nicht archiviert werden.")
+    except Exception as exc:
+        return json_error(500, f"Lizenz konnte nicht sicher archiviert werden: {clip_text(exc)}")
     removed = licenses.pop(license_key)
     for server_id, entitlement in list(data.setdefault("serverEntitlements", {}).items()):
         if str((entitlement or {}).get("licenseId") or "") == str(license_key):
             data["serverEntitlements"].pop(server_id, None)
     save_premium(data)
     record_owner_audit("license.delete", target=license_key, detail=str(removed.get("tier") or removed.get("plan") or ""), request=request)
-    return {"ok": True, "deleted": license_key}
+    return {"ok": True, "deleted": license_key, "archiveId": archived.get("operationId")}
 
 
 @app.get("/api/admin/workers")
@@ -5495,6 +5554,177 @@ def record_owner_audit(action, target=None, detail=None, status="ok", request=No
     return entry
 
 
+# Every user-triggered destructive operation is copied into MongoDB before
+# the active document is removed. Archive rows are immutable and grouped by
+# operationId so even large statistics resets remain below MongoDB's document
+# size limit while still being restorable as one operation.
+ARCHIVABLE_COLLECTIONS = {
+    "licenses",
+    "server_entitlements",
+    "stations",
+    "custom_stations",
+    "scheduled_events",
+    "command_permissions",
+    "daily_stats",
+    "listening_sessions",
+    "listener_snapshots",
+    "guild_stats",
+}
+
+
+def archive_mongo_records(queries, operation, target, request=None, actor="owner", delete=True):
+    if db is None:
+        raise RuntimeError("MongoDB nicht verbunden.")
+
+    operation_id = f"arc_{secrets.token_urlsafe(18)}"
+    archived_at = datetime.now(timezone.utc).isoformat()
+    archive_rows = []
+    source_rows = []
+
+    for collection_name, query in queries:
+        if collection_name not in ARCHIVABLE_COLLECTIONS:
+            raise ValueError(f"Collection ist nicht archivierbar: {collection_name}")
+        collection = db[collection_name]
+        documents = list(collection.find(query))
+        source_rows.append((collection_name, collection, documents))
+        for document in documents:
+            archive_rows.append({
+                "recordId": f"rec_{secrets.token_urlsafe(18)}",
+                "operationId": operation_id,
+                "operation": clip_text(operation, 100),
+                "target": clip_text(target, 200),
+                "collection": collection_name,
+                "originalId": str(document.get("_id") or ""),
+                "payload": document,
+                "archivedAt": archived_at,
+                "archivedBy": clip_text(actor, 120),
+                "ip": _client_ip_safe(request) if request is not None else "-",
+                "restoredAt": None,
+                "restoredBy": None,
+            })
+
+    if not archive_rows:
+        return {"operationId": None, "archived": 0, "deleted": {name: 0 for name, _, _ in source_rows}}
+
+    # Insert must succeed completely before any active record is removed.
+    inserted = db.data_archive.insert_many(archive_rows, ordered=True)
+    if len(inserted.inserted_ids) != len(archive_rows):
+        raise RuntimeError("Archivierung wurde nicht vollständig bestätigt.")
+
+    deleted_counts = {name: 0 for name, _, _ in source_rows}
+    if delete:
+        for collection_name, collection, documents in source_rows:
+            document_ids = [document.get("_id") for document in documents if document.get("_id") is not None]
+            if not document_ids:
+                continue
+            result = collection.delete_many({"_id": {"$in": document_ids}})
+            deleted_counts[collection_name] = result.deleted_count
+
+    return {"operationId": operation_id, "archived": len(archive_rows), "deleted": deleted_counts}
+
+
+def restore_archived_operation(operation_id, request=None):
+    if db is None:
+        raise RuntimeError("MongoDB nicht verbunden.")
+    operation_id = str(operation_id or "").strip()
+    if not re.fullmatch(r"arc_[A-Za-z0-9_-]{12,80}", operation_id):
+        raise ValueError("Ungültige Archiv-ID.")
+
+    rows = list(db.data_archive.find({"operationId": operation_id, "restoredAt": None}).sort("archivedAt", 1))
+    if not rows:
+        existing = db.data_archive.find_one({"operationId": operation_id})
+        if existing:
+            raise ValueError("Dieser Archivvorgang wurde bereits wiederhergestellt.")
+        raise LookupError("Archivvorgang nicht gefunden.")
+
+    conflicts = []
+    restore_rows = []
+    for row in rows:
+        collection_name = str(row.get("collection") or "")
+        payload = row.get("payload")
+        if collection_name not in ARCHIVABLE_COLLECTIONS or not isinstance(payload, dict) or payload.get("_id") is None:
+            raise ValueError("Archiv enthält einen nicht wiederherstellbaren Datensatz.")
+        existing = db[collection_name].find_one({"_id": payload.get("_id")})
+        if existing is not None and existing != payload:
+            conflicts.append(f"{collection_name}:{row.get('originalId') or payload.get('_id')}")
+        restore_rows.append((collection_name, payload))
+
+    if conflicts:
+        raise ValueError(
+            "Wiederherstellung würde neuere aktive Daten überschreiben: " + ", ".join(conflicts[:8])
+        )
+
+    restored = 0
+    for collection_name, payload in restore_rows:
+        db[collection_name].replace_one({"_id": payload.get("_id")}, payload, upsert=True)
+        restored += 1
+
+    restored_at = datetime.now(timezone.utc).isoformat()
+    db.data_archive.update_many(
+        {"operationId": operation_id, "restoredAt": None},
+        {"$set": {"restoredAt": restored_at, "restoredBy": "owner", "restoredIp": _client_ip_safe(request)}},
+    )
+    return {"operationId": operation_id, "restored": restored, "restoredAt": restored_at}
+
+
+@app.get("/api/admin/archive")
+async def admin_archive_list(request: Request, limit: int = 100):
+    guard = _admin_guard(request)
+    if guard is not None:
+        return guard
+    if db is None:
+        return json_error(503, "MongoDB nicht verbunden.")
+    safe_limit = max(1, min(int(limit or 100), 250))
+    pipeline = [
+        {"$sort": {"archivedAt": -1}},
+        {"$group": {
+            "_id": "$operationId",
+            "operation": {"$first": "$operation"},
+            "target": {"$first": "$target"},
+            "archivedAt": {"$first": "$archivedAt"},
+            "archivedBy": {"$first": "$archivedBy"},
+            "collections": {"$addToSet": "$collection"},
+            "recordCount": {"$sum": 1},
+            "restoredCount": {"$sum": {"$cond": [{"$ne": ["$restoredAt", None]}, 1, 0]}},
+            "restoredAt": {"$max": "$restoredAt"},
+        }},
+        {"$sort": {"archivedAt": -1}},
+        {"$limit": safe_limit},
+    ]
+    rows = []
+    for row in db.data_archive.aggregate(pipeline):
+        rows.append({
+            "operationId": str(row.get("_id") or ""),
+            "operation": row.get("operation"),
+            "target": row.get("target"),
+            "archivedAt": row.get("archivedAt"),
+            "archivedBy": row.get("archivedBy"),
+            "collections": sorted(str(value) for value in (row.get("collections") or [])),
+            "recordCount": int(row.get("recordCount") or 0),
+            "restoredCount": int(row.get("restoredCount") or 0),
+            "restoredAt": row.get("restoredAt"),
+        })
+    return {"archive": rows, "count": len(rows)}
+
+
+@app.post("/api/admin/archive/{operation_id}/restore")
+async def admin_archive_restore(operation_id: str, request: Request):
+    guard = _admin_guard(request)
+    if guard is not None:
+        return guard
+    try:
+        result = restore_archived_operation(operation_id, request=request)
+    except LookupError as exc:
+        return json_error(404, str(exc))
+    except ValueError as exc:
+        return json_error(409, str(exc))
+    except Exception as exc:
+        record_owner_audit("archive.restore", target=operation_id, detail=str(exc), status="error", request=request)
+        return json_error(500, f"Wiederherstellung fehlgeschlagen: {clip_text(exc)}")
+    record_owner_audit("archive.restore", target=operation_id, detail=f"{result['restored']} Datensätze", request=request)
+    return {"ok": True, **result}
+
+
 @app.get("/api/admin/audit")
 async def admin_audit(request: Request):
     guard = _admin_guard(request)
@@ -5703,9 +5933,21 @@ async def admin_station_delete(request: Request, key: str):
         return json_error(404, "Station nicht gefunden.")
     if existing.get("is_default"):
         return json_error(400, "Standard-Station kann nicht gelöscht werden. Setze zuerst eine andere Default-Station.")
-    db.stations.delete_one({"key": key})
+    try:
+        archived = archive_mongo_records(
+            [("stations", {"_id": existing.get("_id")})],
+            operation="owner.station.delete",
+            target=key,
+            request=request,
+            actor="owner",
+            delete=True,
+        )
+    except Exception as exc:
+        return json_error(500, f"Station konnte nicht sicher archiviert werden: {clip_text(exc)}")
+    if int((archived.get("deleted") or {}).get("stations") or 0) == 0:
+        return json_error(409, "Station wurde archiviert, aber nicht aus dem aktiven Katalog entfernt.")
     record_owner_audit("station.delete", target=key, detail=existing.get("name"), request=request)
-    return {"ok": True, "deleted": key}
+    return {"ok": True, "deleted": key, "archiveId": archived.get("operationId")}
 
 
 @app.get("/api/admin/stations/list")

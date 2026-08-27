@@ -30,6 +30,7 @@ const NAV = [
   { id: 'integrations', label: 'Integrations', icon: PlugZap },
   { id: 'activity', label: 'Activity Log', icon: ActivityIcon },
   { id: 'audit', label: 'Audit-Log', icon: ScrollText },
+  { id: 'archive', label: 'Datenarchiv', icon: Database },
   { id: 'brand', label: 'Brand Kit', icon: Palette },
 ];
 
@@ -129,6 +130,9 @@ export default function OwnerAdmin() {
   const [monitorLogQuery, setMonitorLogQuery] = useState('');
   const [stationList, setStationList] = useState([]);
   const [auditLog, setAuditLog] = useState([]);
+  const [archiveRows, setArchiveRows] = useState([]);
+  const [archiveBusy, setArchiveBusy] = useState('');
+  const [archiveMsg, setArchiveMsg] = useState(null);
   const [stForm, setStForm] = useState(null); // {key,name,url,tier,genre, _isNew}
   const [stTest, setStTest] = useState(null);
   const [stBusy, setStBusy] = useState(false);
@@ -187,6 +191,10 @@ export default function OwnerAdmin() {
     try { const d = await apiGet('/api/admin/audit', token); setAuditLog(d.audit || []); } catch { /* keep */ }
   }, [apiGet, token]);
 
+  const loadArchive = useCallback(async () => {
+    try { const d = await apiGet('/api/admin/archive?limit=200', token); setArchiveRows(d.archive || []); } catch { /* keep */ }
+  }, [apiGet, token]);
+
   const loadLicenses = useCallback(async () => {
     try {
       const [licenseData, guildData] = await Promise.all([
@@ -242,9 +250,9 @@ export default function OwnerAdmin() {
   };
 
   const deleteLicense = async (key) => {
-    if (typeof window !== 'undefined' && !window.confirm('Diese Lizenz wirklich unwiderruflich löschen?')) return;
+    if (typeof window !== 'undefined' && !window.confirm('Diese Lizenz aus dem aktiven Betrieb entfernen? Sie bleibt im Datenarchiv wiederherstellbar.')) return;
     setLicBusy(true); setLicMsg(null);
-    try { await apiSend(`/api/admin/licenses/${encodeURIComponent(key)}`, 'DELETE'); setLicMsg({ ok: true, text: 'Lizenz gelöscht.' }); setLicForm(null); await Promise.all([loadLicenses(), refreshOverview()]); }
+    try { await apiSend(`/api/admin/licenses/${encodeURIComponent(key)}`, 'DELETE'); setLicMsg({ ok: true, text: 'Lizenz archiviert und aus dem aktiven Betrieb entfernt.' }); setLicForm(null); await Promise.all([loadLicenses(), refreshOverview(), loadArchive()]); }
     catch (e) { setLicMsg({ ok: false, text: e.message }); } finally { setLicBusy(false); }
   };
 
@@ -310,7 +318,8 @@ export default function OwnerAdmin() {
     if (!authed) return;
     if (section === 'stations') loadStations();
     if (section === 'audit') loadAudit();
-  }, [authed, section, loadStations, loadAudit]);
+    if (section === 'archive') loadArchive();
+  }, [authed, section, loadStations, loadAudit, loadArchive]);
 
   const openNewStation = () => { setStTest(null); setStMsg(null); setStForm({ key: '', name: '', url: '', tier: 'free', genre: '', _isNew: true }); };
   const openEditStation = (s) => { setStTest(null); setStMsg(null); setStForm({ key: s.key, name: s.name, url: s.url, tier: s.tier, genre: s.genre || '', _isNew: false }); };
@@ -338,11 +347,25 @@ export default function OwnerAdmin() {
   };
 
   const deleteStation = async (key) => {
-    if (!window.confirm(`Station "${key}" wirklich löschen?`)) return;
+    if (!window.confirm(`Station "${key}" aus dem aktiven Katalog entfernen? Sie bleibt im Datenarchiv wiederherstellbar.`)) return;
     setStBusy(true);
-    try { await apiSend(`/api/admin/stations/${encodeURIComponent(key)}`, 'DELETE'); setStMsg({ ok: true, text: `Station ${key} gelöscht.` }); await loadStations(); }
+    try { await apiSend(`/api/admin/stations/${encodeURIComponent(key)}`, 'DELETE'); setStMsg({ ok: true, text: `Station ${key} archiviert und entfernt.` }); await Promise.all([loadStations(), loadArchive()]); }
     catch (e) { setStMsg({ ok: false, text: e.message }); }
     finally { setStBusy(false); }
+  };
+
+  const restoreArchiveOperation = async (operationId) => {
+    if (!window.confirm('Diesen Archivvorgang wiederherstellen? Aktive neuere Datensätze werden niemals überschrieben.')) return;
+    setArchiveBusy(operationId); setArchiveMsg(null);
+    try {
+      const result = await apiSend(`/api/admin/archive/${encodeURIComponent(operationId)}/restore`, 'POST', {});
+      setArchiveMsg({ ok: true, text: `${result.restored || 0} Datensätze wiederhergestellt.` });
+      await Promise.all([loadArchive(), loadLicenses(), loadStations(), refreshOverview()]);
+    } catch (e) {
+      setArchiveMsg({ ok: false, text: e.message });
+    } finally {
+      setArchiveBusy('');
+    }
   };
 
   // Echte Browser-Abspielbarkeit: Audio-Element laden und auf canplay/error hören.
@@ -1141,6 +1164,40 @@ export default function OwnerAdmin() {
               </table>
             </div>
           </>
+        )}
+
+        {section === 'archive' && (
+          <div className="oa-card oa-fade" data-testid="data-archive">
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', marginBottom: 14 }}>
+              <div>
+                <div className="oa-section-title" style={{ margin: 0 }}><Database size={15} /> Wiederherstellbares Datenarchiv</div>
+                <div style={{ color: '#94a3b8', fontSize: 12.5, lineHeight: 1.6, marginTop: 8 }}>Lizenz-, Sender-, Event-, Berechtigungs- und Statistikdaten werden vor dem Entfernen hier gesichert. Eine Wiederherstellung überschreibt niemals neuere aktive Daten.</div>
+              </div>
+              <button className="oa-btn ghost" style={{ height: 36, flexShrink: 0 }} onClick={loadArchive} disabled={Boolean(archiveBusy)} data-testid="archive-refresh"><RefreshCw size={14} /> Aktualisieren</button>
+            </div>
+            {archiveMsg && <div className={`oa-pill ${archiveMsg.ok ? 'green' : 'red'}`} style={{ marginBottom: 12 }}>{archiveMsg.text}</div>}
+            {archiveRows.length === 0 && <div style={{ color: '#64748b', textAlign: 'center', padding: 28 }}>Noch keine archivierten Lösch- oder Reset-Vorgänge.</div>}
+            {archiveRows.map((row) => {
+              const restored = Number(row.restoredCount || 0) >= Number(row.recordCount || 0) && Number(row.recordCount || 0) > 0;
+              return (
+                <div className="oa-integration" key={row.operationId} data-testid={`archive-row-${row.operationId}`}>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span className="oa-pill orange" style={{ fontFamily: 'JetBrains Mono' }}>{row.operation || 'delete'}</span>
+                      <strong style={{ fontSize: 13.5 }}>{row.target || '—'}</strong>
+                    </span>
+                    <span className="oa-mono" style={{ display: 'block', color: '#64748b', fontSize: 10.5, marginTop: 5, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {row.recordCount || 0} Datensätze · {(row.collections || []).join(', ')} · {relTime(row.archivedAt)} · {row.operationId}
+                    </span>
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 9, flexShrink: 0 }}>
+                    <span className={`oa-pill ${restored ? 'green' : 'amber'}`}>{restored ? 'Wiederhergestellt' : 'Archiviert'}</span>
+                    <button className="oa-btn ghost" style={{ height: 34 }} disabled={restored || Boolean(archiveBusy)} onClick={() => restoreArchiveOperation(row.operationId)} data-testid={`archive-restore-${row.operationId}`}><RefreshCw size={13} style={{ animation: archiveBusy === row.operationId ? 'spin 1s linear infinite' : 'none' }} /> Wiederherstellen</button>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         )}
 
         {section === 'audit' && (

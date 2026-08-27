@@ -342,14 +342,14 @@ wait_for_backend_contract() {
       die "FastAPI-Backend ist beim Start beendet worden."
     fi
     body="$(curl --fail --silent --show-error --max-time 2 "$url" 2>/dev/null || true)"
-    if [ -n "$body" ] && printf '%s' "$body" | "$VENV/bin/python" -c 'import json,sys; data=json.load(sys.stdin); raise SystemExit(0 if data.get("contractVersion") == "owner-live-v4" else 1)' 2>/dev/null; then
-      log "FastAPI-Backend ist bereit und API-Vertrag owner-live-v4 ist aktiv: $url"
+    if [ -n "$body" ] && printf '%s' "$body" | "$VENV/bin/python" -c 'import json,sys; data=json.load(sys.stdin); raise SystemExit(0 if data.get("contractVersion") == "owner-live-v5" else 1)' 2>/dev/null; then
+      log "FastAPI-Backend ist bereit und API-Vertrag owner-live-v5 ist aktiv: $url"
       return 0
     fi
     sleep 1
   done
   tail -n 80 "$LOG_DIR/backend.log" >&2 || true
-  die "FastAPI-Backend liefert nicht den erwarteten API-Vertrag owner-live-v4. Ein alter Prozess oder ein fehlerhaftes Deployment ist aktiv."
+  die "FastAPI-Backend liefert nicht den erwarteten API-Vertrag owner-live-v5. Ein alter Prozess oder ein fehlerhaftes Deployment ist aktiv."
 }
 
 wait_for_backend_contract

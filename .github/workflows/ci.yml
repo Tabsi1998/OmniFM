@@ -250,6 +250,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m py_compile backend/server.py
+          python -m pytest backend/unit_tests -q
           python -m uvicorn backend.server:app --host 127.0.0.1 --port 8001 >fastapi.log 2>&1 &
           api_pid=$!
           trap 'kill "$api_pid" 2>/dev/null || true' EXIT
@@ -257,7 +258,7 @@ jobs:
             curl -fsS http://127.0.0.1:8001/api/health >/dev/null && break
             sleep 1
           done
-          curl -fsS http://127.0.0.1:8001/api/health | python -c 'import json,sys; d=json.load(sys.stdin); assert d["ok"] and d["contractVersion"] == "owner-live-v4"'
+          curl -fsS http://127.0.0.1:8001/api/health | python -c 'import json,sys; d=json.load(sys.stdin); assert d["ok"] and d["contractVersion"] == "owner-live-v5"'
           curl -fsS http://127.0.0.1:8001/api/stats | python -m json.tool
           curl -fsS -H 'X-Admin-Token: ci-owner-token' http://127.0.0.1:8001/api/admin/config | python -m json.tool
           curl -fsS -X PUT -H 'X-Admin-Token: ci-owner-token' -H 'Content-Type: application/json' \
@@ -275,6 +276,12 @@ jobs:
             http://127.0.0.1:8001/api/admin/licenses | python -c 'import json,sys; d=json.load(sys.stdin); assert d["ok"] and d["licenseKey"].startswith("OMNI-")'
           python -c 'from pymongo import MongoClient; d=MongoClient("mongodb://127.0.0.1:27017").omnifm_ci_fastapi; e=d.server_entitlements.find_one({"_serverId":"123456789012345678"}); assert e and e["licenseId"].startswith("OMNI-")'
           curl -fsS -H 'X-Admin-Token: ci-owner-token' 'http://127.0.0.1:8001/api/admin/licenses?full=1' | python -c 'import json,sys; d=json.load(sys.stdin); s=d["licenses"][0]["linkedServers"][0]; assert s["licenseResolved"] and s["effectivePlan"] == "pro"'
+          license_key="$(curl -fsS -H 'X-Admin-Token: ci-owner-token' 'http://127.0.0.1:8001/api/admin/licenses?full=1' | python -c 'import json,sys; print(json.load(sys.stdin)["licenses"][0]["licenseKey"])')"
+          archive_id="$(curl -fsS -X DELETE -H 'X-Admin-Token: ci-owner-token' "http://127.0.0.1:8001/api/admin/licenses/${license_key}" | python -c 'import json,sys; d=json.load(sys.stdin); assert d["ok"] and d["archiveId"].startswith("arc_"); print(d["archiveId"])')"
+          python -c 'from pymongo import MongoClient; d=MongoClient("mongodb://127.0.0.1:27017").omnifm_ci_fastapi; assert d.licenses.count_documents({}) == 0; assert d.data_archive.count_documents({"operationId":"'"$archive_id"'"}) == 2'
+          curl -fsS -H 'X-Admin-Token: ci-owner-token' http://127.0.0.1:8001/api/admin/archive | python -c 'import json,sys; d=json.load(sys.stdin); assert d["count"] == 1 and d["archive"][0]["recordCount"] == 2'
+          curl -fsS -X POST -H 'X-Admin-Token: ci-owner-token' -H 'Content-Type: application/json' --data '{}' "http://127.0.0.1:8001/api/admin/archive/${archive_id}/restore" | python -c 'import json,sys; d=json.load(sys.stdin); assert d["ok"] and d["restored"] == 2'
+          python -c 'from pymongo import MongoClient; d=MongoClient("mongodb://127.0.0.1:27017").omnifm_ci_fastapi; assert d.licenses.find_one({"_licenseId":"'"$license_key"'"}); assert d.server_entitlements.find_one({"_serverId":"123456789012345678"})'
           python -c 'from datetime import datetime,timezone; from pymongo import MongoClient; d=MongoClient("mongodb://127.0.0.1:27017").omnifm_ci_fastapi; d.runtime_health.replace_one({"_id":"latest"},{"_id":"latest","at":datetime.now(timezone.utc).isoformat(),"process":{"cpuPct":7,"ramMb":128,"uptimeSec":60,"resourceModel":"shared-process"},"nodes":[{"botId":"1476192449721274472","index":1,"name":"OmniFM DJ","role":"commander","status":"online","pingMs":23,"guilds":1,"voiceConnections":1,"listeners":4,"guildDetails":[]}]},upsert=True)'
           curl -fsS -H 'X-Admin-Token: ci-owner-token' http://127.0.0.1:8001/api/admin/workers | python -c 'import json,sys; d=json.load(sys.stdin); w=d["workers"][0]; assert d["live"] and w["ready"] and w["servers"] == 1 and w["listeners"] == 4 and w["connections"] == 1'
           curl -fsS -H 'X-Admin-Token: ci-owner-token' http://127.0.0.1:8001/api/admin/monitoring | python -c 'import json,sys; d=json.load(sys.stdin); n=d["nodes"][0]; assert d["live"] and n["resourceScope"] == "shared-process" and n["cpuPct"] is None and n["ramMb"] is None and n["listeners"] == 4'
