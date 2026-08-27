@@ -4247,6 +4247,105 @@ test("restartCurrentStation retries after transient restart failures", async () 
   }
 });
 
+test("restartCurrentStation does not switch to an explicit backup after one failure", async () => {
+  const playedKeys = [];
+  const scheduled = [];
+  const state = {
+    shouldReconnect: true,
+    currentStationKey: "station-a",
+    currentStationName: "Station A",
+    desiredStationKey: "station-a",
+    desiredStationName: "Station A",
+    connection: { joinConfig: { channelId: "voice-1" } },
+    lastChannelId: "voice-1",
+    activeScheduledEventStopAtMs: 0,
+  };
+  const runtime = {
+    config: { name: "OmniFM Test" },
+    isScheduledEventStopDue: () => false,
+    getResolvedCurrentStation: () => ({
+      key: "station-a",
+      station: { name: "Station A" },
+      stations: { stations: { "station-a": { name: "Station A" }, groovesalad: { name: "Groove Salad" } } },
+    }),
+    clearCurrentProcess() {},
+    async playStation(_state, _stations, key) {
+      playedKeys.push(key);
+      throw Object.assign(new Error("request timeout"), { code: "OUTBOUND_TIMEOUT" });
+    },
+    loadGuildSettingsCached: async () => ({ failoverChain: ["groovesalad"] }),
+    resolveStationForGuild() {
+      throw new Error("backup must not be resolved after one failure");
+    },
+    getNetworkRecoveryDelayMs: () => 0,
+    noteNetworkRecoveryFailure() {},
+    scheduleStreamRestart(guildId, passedState, delayMs, reason) {
+      scheduled.push({ guildId, passedState, delayMs, reason });
+    },
+    persistState() {},
+  };
+
+  await restartRuntimeCurrentStation(runtime, state, "guild-1");
+
+  assert.deepEqual(playedKeys, ["station-a"]);
+  assert.equal(state.currentStationKey, "station-a");
+  assert.equal(state.desiredStationKey, "station-a");
+  assert.equal(state.failoverActive, undefined);
+  assert.equal(scheduled.length, 1);
+});
+
+test("restartCurrentStation keeps the desired station when a stable explicit failover activates", async () => {
+  const now = Date.now();
+  const playedKeys = [];
+  const state = {
+    shouldReconnect: true,
+    currentStationKey: "station-a",
+    currentStationName: "Station A",
+    desiredStationKey: "station-a",
+    desiredStationName: "Station A",
+    connection: { joinConfig: { channelId: "voice-1" } },
+    lastChannelId: "voice-1",
+    activeScheduledEventStopAtMs: 0,
+    failoverFailureStationKey: "station-a",
+    failoverFailureCount: 2,
+    failoverFailureStartedAt: now - 61_000,
+    failoverLastFailureAt: now - 1_000,
+  };
+  const stations = {
+    stations: {
+      "station-a": { name: "Station A" },
+      "backup-b": { name: "Backup B" },
+    },
+  };
+  const runtime = {
+    config: { name: "OmniFM Test" },
+    role: "worker",
+    client: { guilds: { cache: new Map() } },
+    isScheduledEventStopDue: () => false,
+    getResolvedCurrentStation: () => ({ key: "station-a", station: stations.stations["station-a"], stations }),
+    clearCurrentProcess() {},
+    async playStation(passedState, _stations, key, _guildId, options) {
+      playedKeys.push({ key, options });
+      if (key === "station-a") throw new Error("Stream konnte nicht geladen werden: 404");
+      passedState.currentStationKey = key;
+      passedState.currentStationName = "Backup B";
+    },
+    loadGuildSettingsCached: async () => ({ failoverChain: ["backup-b"] }),
+    resolveStationForGuild: (_guildId, key) => ({ ok: true, key, station: stations.stations[key], stations }),
+    getCurrentListenerCount: () => 0,
+    persistState() {},
+  };
+
+  await restartRuntimeCurrentStation(runtime, state, "guild-1");
+
+  assert.deepEqual(playedKeys.map((entry) => entry.key), ["station-a", "backup-b"]);
+  assert.equal(playedKeys[1].options.preserveDesiredStation, true);
+  assert.equal(state.currentStationKey, "backup-b");
+  assert.equal(state.desiredStationKey, "station-a");
+  assert.equal(state.failoverActive, true);
+  assert.equal(state.failoverFromStationKey, "station-a");
+});
+
 test("restartCurrentStation backs off every failed outbound stream start", async () => {
   const scheduled = [];
   const notedFailures = [];
@@ -4853,6 +4952,13 @@ test("saveBotState keeps reconnectable targets even without an active voice conn
     ["guild-1", {
       currentStationKey: "station-a",
       currentStationName: "Station A",
+      desiredStationKey: "primary-station",
+      desiredStationName: "Primary Station",
+      failoverActive: true,
+      failoverStartedAt: Date.now() - 30_000,
+      failoverReason: "confirmed source outage",
+      failoverFromStationKey: "primary-station",
+      failoverFromStationName: "Primary Station",
       lastChannelId: "voice-1",
       connection: null,
       volume: 88,
@@ -4869,6 +4975,11 @@ test("saveBotState keeps reconnectable targets even without an active voice conn
   assert.equal(saved["guild-1"]?.channelId, "voice-1");
   assert.equal(saved["guild-1"]?.stationKey, "station-a");
   assert.equal(saved["guild-1"]?.stationName, "Station A");
+  assert.equal(saved["guild-1"]?.desiredStationKey, "primary-station");
+  assert.equal(saved["guild-1"]?.desiredStationName, "Primary Station");
+  assert.equal(saved["guild-1"]?.failoverActive, true);
+  assert.equal(saved["guild-1"]?.failoverReason, "confirmed source outage");
+  assert.equal(saved["guild-1"]?.failoverFromStationKey, "primary-station");
   assert.equal(saved["guild-1"]?.volume, 88);
   assert.equal(saved["guild-1"]?.scheduledEventId, null);
   assert.equal(saved["guild-1"]?.scheduledEventStopAtMs, 0);
@@ -5012,6 +5123,13 @@ test("public bot status omits guild details while dashboard status keeps them", 
     guildName: "Guild One",
     stationKey: "custom:secret-fm",
     stationName: "Secret FM",
+    desiredStationKey: "custom:secret-fm",
+    desiredStationName: "Secret FM",
+    failoverActive: false,
+    failoverStartedAt: 0,
+    failoverReason: null,
+    failoverFromStationKey: null,
+    failoverFromStationName: null,
     channelId: "voice-1",
     channelName: "Radio",
     listenerCount: 7,
@@ -5021,6 +5139,7 @@ test("public bot status omits guild details while dashboard status keeps them", 
     recovering: false,
     reconnectAttempts: 0,
     streamErrorCount: 0,
+    failoverFailureCount: 0,
     shouldReconnect: true,
     meta: { title: "Hidden Track" },
   });

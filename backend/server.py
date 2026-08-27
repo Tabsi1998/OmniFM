@@ -223,6 +223,7 @@ DEFAULT_OWNER_CONFIG = {
         "audioRecognition": {"enabled": False, "apiKey": ""},
         "songHistory": {"enabled": True, "maxPerGuild": 100},
         "stationHealth": {"enabled": True, "intervalMs": 5000, "batchSize": 2, "concurrency": 2, "timeoutMs": 8000},
+        "streamRecovery": {"stableResetMs": 60000, "failoverMinFailures": 3, "failoverMinUnstableMs": 60000},
         "botDirectories": {
             "discordBotList": {"enabled": False, "token": "", "botId": "", "slug": "", "webhookSecret": "", "statsScope": "aggregate"},
             "botsGG": {"enabled": False, "token": "", "botId": "", "statsScope": "aggregate"},
@@ -430,6 +431,11 @@ def effective_system_config():
             "batchSize": ("STATION_HEALTH_BATCH_SIZE", int),
             "concurrency": ("STATION_HEALTH_CONCURRENCY", int),
             "timeoutMs": ("STATION_HEALTH_TIMEOUT_MS", int),
+        },
+        "streamRecovery": {
+            "stableResetMs": ("STREAM_STABLE_RESET_MS", int),
+            "failoverMinFailures": ("STREAM_FAILOVER_MIN_FAILURES", int),
+            "failoverMinUnstableMs": ("STREAM_FAILOVER_MIN_UNSTABLE_MS", int),
         },
     }
     for group, fields in mappings.items():
@@ -2415,6 +2421,13 @@ def get_dashboard_guild_stats(server_id, tier):
             "botRole": str(row.get("botRole") or "worker"),
             "stationKey": clip_text(row.get("stationKey") or "", 100),
             "stationName": clip_text(row.get("stationName") or row.get("stationKey") or "Unbekannter Sender", 120),
+            "desiredStationKey": clip_text(row.get("desiredStationKey") or row.get("stationKey") or "", 100),
+            "desiredStationName": clip_text(row.get("desiredStationName") or row.get("stationName") or row.get("stationKey") or "", 120),
+            "failoverActive": row.get("failoverActive") is True,
+            "failoverStartedAt": max(0, parse_int(row.get("failoverStartedAt"), 0)),
+            "failoverReason": clip_text(row.get("failoverReason") or "", 300),
+            "failoverFromStationKey": clip_text(row.get("failoverFromStationKey") or "", 100),
+            "failoverFromStationName": clip_text(row.get("failoverFromStationName") or "", 120),
             "channelId": str(row.get("channelId") or ""),
             "channelName": clip_text(row.get("channelName") or row.get("channelId") or "Voice-Kanal", 120),
             "listeners": max(0, parse_int(row.get("listenerCount"), 0)),

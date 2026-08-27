@@ -79,6 +79,13 @@ export function buildRuntimeHealthNodes(runtimes) {
             textChannels: channels.filter((channel) => channel.isTextBased?.() && !channel.isThread?.()).map(mapChannel),
             stationKey: live.stationKey || null,
             stationName: live.stationName || null,
+            desiredStationKey: live.desiredStationKey || live.stationKey || null,
+            desiredStationName: live.desiredStationName || live.stationName || null,
+            failoverActive: live.failoverActive === true,
+            failoverStartedAt: Math.max(0, Number(live.failoverStartedAt || 0) || 0),
+            failoverReason: live.failoverReason || null,
+            failoverFromStationKey: live.failoverFromStationKey || null,
+            failoverFromStationName: live.failoverFromStationName || null,
             channelId: live.channelId || null,
             channelName: live.channelName || null,
             listenerCount: Math.max(0, Number(live.listenerCount || 0) || 0),
@@ -89,6 +96,7 @@ export function buildRuntimeHealthNodes(runtimes) {
             lastStreamStartAt: live.lastStreamStartAt || null,
             reconnectAttempts: Math.max(0, Number(live.reconnectAttempts || 0) || 0),
             streamErrorCount: Math.max(0, Number(live.streamErrorCount || 0) || 0),
+            failoverFailureCount: Math.max(0, Number(live.failoverFailureCount || 0) || 0),
           };
         });
       } catch { guildDetails = []; }

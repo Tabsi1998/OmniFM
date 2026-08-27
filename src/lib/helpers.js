@@ -366,7 +366,7 @@ function concatUint8Arrays(left, right) {
 }
 
 // ---- Runtime Constants (parseEnvInt-based) ----
-const STREAM_STABLE_RESET_MS = parseEnvInt("STREAM_STABLE_RESET_MS", 15_000, 1_000, 10 * 60_000);
+const STREAM_STABLE_RESET_MS = parseEnvInt("STREAM_STABLE_RESET_MS", 60_000, 10_000, 10 * 60_000);
 const STREAM_RESTART_BASE_MS = parseEnvInt("STREAM_RESTART_BASE_MS", 1_000, 250, 120_000);
 const STREAM_RESTART_MAX_MS = parseEnvInt("STREAM_RESTART_MAX_MS", 120_000, 1_000, 30 * 60_000);
 const STREAM_PROCESS_FAILURE_WINDOW_MS = parseEnvInt("STREAM_PROCESS_FAILURE_WINDOW_MS", 12_000, 1_000, 300_000);

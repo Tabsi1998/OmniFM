@@ -16,7 +16,6 @@ import { getTier, getServerPlanConfig } from "../core/entitlements.js";
 import {
   loadStations,
   resolveStation,
-  getFallbackKey,
   filterStationsByTier,
   buildScopedStationsData,
 } from "../stations-store.js";
@@ -861,32 +860,6 @@ export async function executeRuntimePlay(runtime, interaction, {
     } catch (err) {
       log("ERROR", `[${runtime.config.name}] Play error: ${err.message}`);
       state.lastStreamErrorAt = new Date().toISOString();
-      const fallbackKey = getFallbackKey(playable.playStations, playable.key);
-      if (fallbackKey && fallbackKey !== playable.key && playable.playStations.stations[fallbackKey]) {
-        try {
-          await runtime.playStation(state, playable.playStations, fallbackKey, guildId, {
-            countAsStart: true,
-            resumeSession: false,
-          });
-          await runtime.respondInteraction(interaction, {
-            embeds: [
-              buildOmniEmbed({
-                tone: "warning",
-                title: t("⚠ Fallback aktiv", "⚠ Fallback active"),
-                description: t(
-                  `Fehler bei **${playable.playStations.stations[playable.key]?.name || playable.key}**. OmniFM nutzt stattdessen **${playable.playStations.stations[fallbackKey].name}**.`,
-                  `There was an error on **${playable.playStations.stations[playable.key]?.name || playable.key}**. OmniFM switched to **${playable.playStations.stations[fallbackKey].name}** instead.`
-                ),
-              }),
-            ],
-          });
-          return;
-        } catch (fallbackErr) {
-          log("ERROR", `[${runtime.config.name}] Fallback error: ${fallbackErr.message}`);
-          state.lastStreamErrorAt = new Date().toISOString();
-        }
-      }
-
       const recovery = runtime.armPlaybackRecovery(
         guildId,
         state,
@@ -923,6 +896,17 @@ export async function executeRuntimePlay(runtime, interaction, {
       }
       state.currentStationKey = null;
       state.currentStationName = null;
+      state.desiredStationKey = null;
+      state.desiredStationName = null;
+      state.failoverActive = false;
+      state.failoverStartedAt = 0;
+      state.failoverReason = null;
+      state.failoverFromStationKey = null;
+      state.failoverFromStationName = null;
+      state.failoverFailureStationKey = null;
+      state.failoverFailureCount = 0;
+      state.failoverFailureStartedAt = 0;
+      state.failoverLastFailureAt = 0;
       state.currentMeta = null;
       state.nowPlayingSignature = null;
       runtime.updatePresence();

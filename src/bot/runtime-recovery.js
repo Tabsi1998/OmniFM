@@ -31,6 +31,7 @@ import {
   recordConnectionEvent,
 } from "../listening-stats-store.js";
 import { isRuntimeVoiceConnected } from "./runtime-live-state.js";
+import { clearActiveFailover, clearFailoverFailureWindow } from "../lib/stream-failover-policy.js";
 
 function toPositiveInt(rawValue, fallbackValue) {
   const parsed = Number.parseInt(String(rawValue ?? fallbackValue), 10);
@@ -722,6 +723,10 @@ export function resetRuntimeVoiceSession(
   if (!preservePlaybackTarget) {
     state.currentStationKey = null;
     state.currentStationName = null;
+    state.desiredStationKey = null;
+    state.desiredStationName = null;
+    clearActiveFailover(state);
+    clearFailoverFailureWindow(state);
     state.currentMeta = null;
     state.nowPlayingSignature = null;
     state.nowPlayingMessageId = null;
@@ -1786,6 +1791,18 @@ export async function restoreRuntimeGuildEntry(runtime, guildId, data, stations,
   state.lastChannelId = data.channelId;
   state.currentStationKey = restoredStation.key;
   state.currentStationName = restoredStation.station.name || restoredStation.key;
+  state.desiredStationKey = String(data.desiredStationKey || restoredStation.key).trim() || restoredStation.key;
+  state.desiredStationName = String(data.desiredStationName || restoredStation.station.name || state.desiredStationKey).trim()
+    || state.desiredStationKey;
+  state.failoverActive = data.failoverActive === true && state.desiredStationKey !== restoredStation.key;
+  state.failoverStartedAt = parseStoredTimestampMs(data.failoverStartedAt);
+  state.failoverReason = String(data.failoverReason || "").trim() || null;
+  state.failoverFromStationKey = String(data.failoverFromStationKey || "").trim() || null;
+  state.failoverFromStationName = String(data.failoverFromStationName || "").trim() || null;
+  state.failoverFailureStationKey = String(data.failoverFailureStationKey || "").trim() || null;
+  state.failoverFailureCount = Math.max(0, Number.parseInt(String(data.failoverFailureCount || 0), 10) || 0);
+  state.failoverFailureStartedAt = parseStoredTimestampMs(data.failoverFailureStartedAt);
+  state.failoverLastFailureAt = parseStoredTimestampMs(data.failoverLastFailureAt);
   runtime.markScheduledEventPlayback(
     state,
     data.scheduledEventId || null,
@@ -1814,6 +1831,7 @@ export async function restoreRuntimeGuildEntry(runtime, guildId, data, stations,
   await runtime.playStation(state, restoredStation.stations, restoredStation.key, guildId, {
     countAsStart: false,
     resumeSession: true,
+    preserveDesiredStation: state.failoverActive === true,
   });
   clearRuntimeRestoreRetry(runtime, guildId);
   log("INFO", `[${runtime.config.name}] Wiederhergestellt: ${guild.name} -> ${restoredStation.station.name}`);

@@ -158,6 +158,17 @@ function normalizeStoredBotStateEntry(rawEntry = {}) {
   const channelId = sanitizeStateIdentifier(input.channelId);
   const stationKey = sanitizeText(input.stationKey, 120);
   const stationName = sanitizeText(input.stationName, 200) || null;
+  const desiredStationKey = sanitizeText(input.desiredStationKey, 120) || stationKey;
+  const desiredStationName = sanitizeText(input.desiredStationName, 200) || stationName;
+  const failoverActive = input.failoverActive === true && Boolean(desiredStationKey && stationKey && desiredStationKey !== stationKey);
+  const failoverStartedAt = normalizeStoredTimestampMs(input.failoverStartedAt);
+  const failoverReason = sanitizeText(input.failoverReason, 500) || null;
+  const failoverFromStationKey = sanitizeText(input.failoverFromStationKey, 120) || null;
+  const failoverFromStationName = sanitizeText(input.failoverFromStationName, 200) || null;
+  const failoverFailureStationKey = sanitizeText(input.failoverFailureStationKey, 120) || null;
+  const failoverFailureCount = Math.max(0, Number.parseInt(String(input.failoverFailureCount || 0), 10) || 0);
+  const failoverFailureStartedAt = normalizeStoredTimestampMs(input.failoverFailureStartedAt);
+  const failoverLastFailureAt = normalizeStoredTimestampMs(input.failoverLastFailureAt);
   const scheduledEventId = sanitizeSnowflake(input.scheduledEventId) || null;
   const scheduledEventStopAtMs = normalizeStoredTimestampMs(input.scheduledEventStopAtMs);
   const restoreBlockedUntil = normalizeStoredTimestampMs(input.restoreBlockedUntil);
@@ -180,6 +191,21 @@ function normalizeStoredBotStateEntry(rawEntry = {}) {
     normalized.channelId = channelId;
     normalized.stationKey = stationKey;
     normalized.stationName = stationName;
+    normalized.desiredStationKey = desiredStationKey;
+    normalized.desiredStationName = desiredStationName;
+    if (failoverActive) {
+      normalized.failoverActive = true;
+      if (failoverStartedAt > 0) normalized.failoverStartedAt = failoverStartedAt;
+      if (failoverReason) normalized.failoverReason = failoverReason;
+      if (failoverFromStationKey) normalized.failoverFromStationKey = failoverFromStationKey;
+      if (failoverFromStationName) normalized.failoverFromStationName = failoverFromStationName;
+    }
+    if (failoverFailureStationKey && failoverFailureCount > 0 && failoverFailureStartedAt > 0) {
+      normalized.failoverFailureStationKey = failoverFailureStationKey;
+      normalized.failoverFailureCount = failoverFailureCount;
+      normalized.failoverFailureStartedAt = failoverFailureStartedAt;
+      if (failoverLastFailureAt > 0) normalized.failoverLastFailureAt = failoverLastFailureAt;
+    }
     normalized.scheduledEventId = scheduledEventId;
     normalized.scheduledEventStopAtMs = scheduledEventStopAtMs > 0 ? scheduledEventStopAtMs : 0;
     if (restoreBlockedUntil > 0) normalized.restoreBlockedUntil = restoreBlockedUntil;
@@ -341,6 +367,24 @@ function saveBotState(botId, guildStates) {
       entry.channelId = state.lastChannelId;
       entry.stationKey = state.currentStationKey;
       entry.stationName = state.currentStationName || null;
+      entry.desiredStationKey = state.desiredStationKey || state.currentStationKey;
+      entry.desiredStationName = state.desiredStationName || state.currentStationName || null;
+      if (state.failoverActive === true && entry.desiredStationKey !== entry.stationKey) {
+        entry.failoverActive = true;
+        entry.failoverStartedAt = normalizeStoredTimestampMs(state.failoverStartedAt);
+        entry.failoverReason = sanitizeText(state.failoverReason, 500) || null;
+        entry.failoverFromStationKey = sanitizeText(state.failoverFromStationKey, 120) || null;
+        entry.failoverFromStationName = sanitizeText(state.failoverFromStationName, 200) || null;
+      }
+      const failoverFailureStartedAt = normalizeStoredTimestampMs(state.failoverFailureStartedAt);
+      const failoverFailureCount = Math.max(0, Number.parseInt(String(state.failoverFailureCount || 0), 10) || 0);
+      const failoverFailureStationKey = sanitizeText(state.failoverFailureStationKey, 120);
+      if (failoverFailureStartedAt > 0 && failoverFailureCount > 0 && failoverFailureStationKey) {
+        entry.failoverFailureStationKey = failoverFailureStationKey;
+        entry.failoverFailureCount = failoverFailureCount;
+        entry.failoverFailureStartedAt = failoverFailureStartedAt;
+        entry.failoverLastFailureAt = normalizeStoredTimestampMs(state.failoverLastFailureAt);
+      }
       entry.scheduledEventId = state.activeScheduledEventId || null;
       entry.scheduledEventStopAtMs = Number.isFinite(scheduledEventStopAtMs) && scheduledEventStopAtMs > 0
         ? scheduledEventStopAtMs

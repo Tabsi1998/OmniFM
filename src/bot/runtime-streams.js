@@ -14,8 +14,13 @@ import { networkRecoveryCoordinator } from "../core/network-recovery.js";
 import { createResource } from "../services/stream.js";
 import { fetchStreamInfo } from "../services/now-playing.js";
 import { getServerPlanConfig } from "../core/entitlements.js";
-import { getFallbackKey } from "../stations-store.js";
 import { normalizeFailoverChain, buildFailoverCandidateChain } from "../lib/failover-chain.js";
+import {
+  clearActiveFailover,
+  clearFailoverFailureWindow,
+  evaluateFailoverEligibility,
+  recordFailoverFailure,
+} from "../lib/stream-failover-policy.js";
 import { recordStationStart } from "../listening-stats-store.js";
 import { dispatchRuntimeReliabilityWebhook } from "../lib/runtime-alerts.js";
 import { dispatchRuntimeIncidentAlert } from "../lib/runtime-discord-alerts.js";
@@ -230,7 +235,7 @@ function isPermanentStreamRestartError(err) {
   return status === 404 || status === 410;
 }
 
-function recordRuntimeStreamStartFailure(state, reason = "restart-error") {
+function recordRuntimeStreamStartFailure(state, reason = "restart-error", stationKey = "") {
   const previousErrorCount = Math.max(0, Number(state?.streamErrorCount || 0) || 0);
   const errorCount = Math.min(10_000, previousErrorCount + 1);
   state.streamErrorCount = errorCount;
@@ -238,6 +243,7 @@ function recordRuntimeStreamStartFailure(state, reason = "restart-error") {
   state.lastStreamEndReason = String(reason || "restart-error");
   state.idleRestartStreak = 0;
   state.lastIdleRestartAt = 0;
+  recordFailoverFailure(state, stationKey || state.currentStationKey);
   return errorCount;
 }
 
@@ -480,6 +486,7 @@ export function armRuntimeStreamStabilityReset(runtime, guildId, state) {
     state.lastProcessExitDetail = null;
     state.lastProcessExitAt = 0;
     state.lastNetworkFailureAt = 0;
+    clearFailoverFailureWindow(state);
     noteRuntimeRecoverySuccess(runtime, guildId, `${runtime.config.name} stable-stream guild=${guildId}`);
   }, STREAM_STABLE_RESET_MS);
 }
@@ -682,7 +689,15 @@ export function armRuntimePlaybackRecovery(
   const recoverableStartError = isRecoverableStreamRestartError(err);
   const permanentStartError = isPermanentStreamRestartError(err);
 
-  const errorCount = recordRuntimeStreamStartFailure(state, reason);
+  const desiredChanged = String(state.desiredStationKey || "").trim().toLowerCase()
+    !== String(key || "").trim().toLowerCase();
+  if (desiredChanged) {
+    clearActiveFailover(state);
+    clearFailoverFailureWindow(state);
+  }
+  state.desiredStationKey = key;
+  state.desiredStationName = stationName;
+  const errorCount = recordRuntimeStreamStartFailure(state, reason, key);
   state.shouldReconnect = true;
   state.currentStationKey = key;
   state.currentStationName = stationName;
@@ -775,6 +790,11 @@ export async function playRuntimeStation(runtime, state, stations, key, guildId,
   state.player.play(resource);
   state.currentStationKey = key;
   state.currentStationName = station.name || key;
+  if (options?.preserveDesiredStation !== true || !state.desiredStationKey) {
+    state.desiredStationKey = key;
+    state.desiredStationName = station.name || key;
+    clearActiveFailover(state);
+  }
   state.currentMeta = null;
   state.nowPlayingSignature = null;
   state.lastStreamEndReason = null;
@@ -881,6 +901,7 @@ async function restartRuntimeCurrentStationAttempt(runtime, state, guildId) {
     await runtime.playStation(state, resolvedStation.stations, resolvedStation.key, guildId, {
       countAsStart: false,
       resumeSession: true,
+      preserveDesiredStation: state.failoverActive === true,
     });
     log("INFO", `[${runtime.config.name}] Stream restarted: ${resolvedStation.key}`);
     if (shouldEmitRecoveredAlert({
@@ -902,36 +923,51 @@ async function restartRuntimeCurrentStationAttempt(runtime, state, guildId) {
   } catch (err) {
     const errorMessage = getStreamRestartErrorMessage(err);
     const recoverableRestartError = isRecoverableStreamRestartError(err);
-    const errorCount = recordRuntimeStreamStartFailure(state, "restart-error");
+    const errorCount = recordRuntimeStreamStartFailure(state, "restart-error", resolvedStation.key);
     if (recoverableRestartError) {
       noteRuntimeRecoveryFailure(runtime, guildId, `${runtime.config.name} auto-restart`, `guild=${guildId} station=${key}: ${errorMessage}`);
     }
     log(recoverableRestartError ? "WARN" : "ERROR", `[${runtime.config.name}] Auto-restart error for ${key}: ${errorMessage}`);
 
-    const isCustomStation = runtime.normalizeStationReference(key).isCustom;
-    const automaticFallbackKey = !isCustomStation ? getFallbackKey(resolvedStation.stations, resolvedStation.key) : null;
     let configuredFailoverChain = [];
     let legacyFallbackStation = "";
     try {
-      const { getDb: getDatabase, isConnected: isDbConn } = await import("../lib/db.js");
-      if (isDbConn() && getDatabase()) {
-        const settings = await getDatabase().collection("guild_settings").findOne(
-          { guildId },
-          { projection: { failoverChain: 1, fallbackStation: 1 } }
-        );
-        configuredFailoverChain = normalizeFailoverChain(settings?.failoverChain || []);
-        legacyFallbackStation = String(settings?.fallbackStation || "").trim().toLowerCase();
+      let settings = null;
+      if (typeof runtime?.loadGuildSettingsCached === "function") {
+        settings = await runtime.loadGuildSettingsCached(guildId);
+      } else {
+        const { getDb: getDatabase, isConnected: isDbConn } = await import("../lib/db.js");
+        if (isDbConn() && getDatabase()) {
+          settings = await getDatabase().collection("guild_settings").findOne(
+            { guildId },
+            { projection: { failoverChain: 1, fallbackStation: 1 } }
+          );
+        }
       }
+      configuredFailoverChain = normalizeFailoverChain(settings?.failoverChain || []);
+      legacyFallbackStation = String(settings?.fallbackStation || "").trim().toLowerCase();
     } catch {}
 
     const fallbackCandidates = buildFailoverCandidateChain({
       currentStationKey: resolvedStation.key,
       configuredChain: configuredFailoverChain,
       fallbackStation: legacyFallbackStation,
-      automaticFallbackKey,
+    });
+    const failoverDecision = evaluateFailoverEligibility(state, {
+      stationKey: resolvedStation.key,
+      candidateCount: fallbackCandidates.length,
     });
 
-    for (const fallbackCandidate of fallbackCandidates) {
+    if (fallbackCandidates.length > 0 && !failoverDecision.eligible) {
+      log(
+        "INFO",
+        `[${runtime.config.name}] Failover fuer ${resolvedStation.key} bleibt gesperrt ` +
+        `(Grund=${failoverDecision.reason}, Fehler=${failoverDecision.failureCount}/${failoverDecision.requiredFailures}, ` +
+        `instabil=${Math.round(failoverDecision.unstableForMs / 1000)}s/${Math.round(failoverDecision.requiredUnstableMs / 1000)}s).`
+      );
+    }
+
+    for (const fallbackCandidate of failoverDecision.eligible ? fallbackCandidates : []) {
       const fallbackStation = runtime.resolveStationForGuild(guildId, fallbackCandidate);
       if (!fallbackStation?.ok || !fallbackStation?.stations || !fallbackStation?.station) {
         log("WARN", `[${runtime.config.name}] Skip unavailable failover candidate ${fallbackCandidate}`);
@@ -939,10 +975,22 @@ async function restartRuntimeCurrentStationAttempt(runtime, state, guildId) {
       }
 
       try {
+        if (!state.desiredStationKey) {
+          state.desiredStationKey = resolvedStation.key;
+          state.desiredStationName = resolvedStation.station.name || resolvedStation.key;
+        }
         await runtime.playStation(state, fallbackStation.stations, fallbackStation.key, guildId, {
           countAsStart: false,
           resumeSession: false,
+          preserveDesiredStation: true,
         });
+        state.failoverActive = true;
+        state.failoverStartedAt = Date.now();
+        state.failoverReason = errorMessage;
+        state.failoverFromStationKey = resolvedStation.key;
+        state.failoverFromStationName = resolvedStation.station.name || resolvedStation.key;
+        clearFailoverFailureWindow(state);
+        runtime.persistState?.();
         log("INFO", `[${runtime.config.name}] Failover to ${fallbackStation.key} after restart failure`);
         void emitRuntimeReliabilityAlert(runtime, guildId, "stream_failover_activated", {
           previousStationKey: resolvedStation.key,
@@ -974,7 +1022,7 @@ async function restartRuntimeCurrentStationAttempt(runtime, state, guildId) {
       }
     }
 
-    if (fallbackCandidates.length > 0) {
+    if (failoverDecision.eligible && fallbackCandidates.length > 0) {
       log(recoverableRestartError ? "WARN" : "ERROR", `[${runtime.config.name}] Exhausted failover chain after restart failure`);
       void emitRuntimeReliabilityAlert(runtime, guildId, "stream_failover_exhausted", {
         previousStationKey: resolvedStation.key,
@@ -987,7 +1035,7 @@ async function restartRuntimeCurrentStationAttempt(runtime, state, guildId) {
       }).catch(() => null);
     }
 
-    if (isPermanentStreamRestartError(err)) {
+    if (isPermanentStreamRestartError(err) && fallbackCandidates.length === 0) {
       log(
         "ERROR",
         `[${runtime.config.name}] Permanenter Stream-Restartfehler fuer ${resolvedStation.key}; Wiedergabe wird beendet: ${errorMessage}`

@@ -133,6 +133,7 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
     const recognition = system.audioRecognition || {};
     const history = system.songHistory || {};
     const stationHealth = system.stationHealth || {};
+    const streamRecovery = system.streamRecovery || {};
     const directories = system.botDirectories || {};
     const setGroup = (group, key, value) => setSystem((p) => ({ ...p, [group]: { ...(p[group] || {}), [key]: value } }));
     const setDirectory = (directory, key, value) => setSystem((p) => ({
@@ -201,6 +202,18 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
             <Field label="Sender pro Batch" value={stationHealth.batchSize || 2} onChange={(v) => setGroup('stationHealth', 'batchSize', Math.max(1, Math.min(10, parseInt(v, 10) || 2)))} type="number" testid="cfg-station-health-batch" hint="Standard: 2" />
             <Field label="Parallelität" value={stationHealth.concurrency || 2} onChange={(v) => setGroup('stationHealth', 'concurrency', Math.max(1, Math.min(10, parseInt(v, 10) || 2)))} type="number" testid="cfg-station-health-concurrency" hint="Nie höher als Batch-Größe" />
             <Field label="Timeout (ms)" value={stationHealth.timeoutMs || 8000} onChange={(v) => setGroup('stationHealth', 'timeoutMs', Math.max(3000, parseInt(v, 10) || 8000))} type="number" testid="cfg-station-health-timeout" hint="Standard: 8000" />
+          </div>
+        </div>
+
+        <div className="oa-card" style={{ marginBottom: 18 }} data-testid="cfg-stream-recovery">
+          <div className="oa-section-title"><ShieldCheck size={15} /> Stream-Stabilität &amp; Failover</div>
+          <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 14 }}>
+            Ein Backup-Sender wird nur aus der ausdrücklich im Server-Dashboard hinterlegten Failover-Kette gewählt. Standard- oder zufällige Katalogsender werden niemals automatisch eingesetzt. Änderungen werden beim nächsten Bot-Neustart aktiv.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0 18px' }}>
+            <Field label="Stabil nach (ms)" value={streamRecovery.stableResetMs || 60000} onChange={(v) => setGroup('streamRecovery', 'stableResetMs', Math.max(10000, Math.min(600000, parseInt(v, 10) || 60000)))} type="number" testid="cfg-stream-stable-reset" hint="Fehlerreihe erst nach stabiler Wiedergabe zurücksetzen. Standard: 60000" />
+            <Field label="Fehler vor Failover" value={streamRecovery.failoverMinFailures || 3} onChange={(v) => setGroup('streamRecovery', 'failoverMinFailures', Math.max(2, Math.min(100, parseInt(v, 10) || 3)))} type="number" testid="cfg-failover-min-failures" hint="Mindestens so viele bestätigte Startfehler. Standard: 3" />
+            <Field label="Mindest-Störungsdauer (ms)" value={streamRecovery.failoverMinUnstableMs || 60000} onChange={(v) => setGroup('streamRecovery', 'failoverMinUnstableMs', Math.max(10000, Math.min(1800000, parseInt(v, 10) || 60000)))} type="number" testid="cfg-failover-min-window" hint="Verhindert den Wechsel nach kurzen Timeouts. Standard: 60000" />
           </div>
         </div>
 

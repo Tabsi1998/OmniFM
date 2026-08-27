@@ -100,7 +100,7 @@ import {
   setNowPlayingQueue,
   normalizeTrackSearchText,
 } from "../services/now-playing.js";
-import { loadStations, normalizeKey, resolveStation, getFallbackKey, filterStationsByTier, buildScopedStationsData } from "../stations-store.js";
+import { loadStations, normalizeKey, resolveStation, filterStationsByTier, buildScopedStationsData } from "../stations-store.js";
 import {
   saveBotState,
   clearBotGuild,
@@ -470,6 +470,17 @@ class BotRuntime {
         connection: null,
         currentStationKey: null,
         currentStationName: null,
+        desiredStationKey: null,
+        desiredStationName: null,
+        failoverActive: false,
+        failoverStartedAt: 0,
+        failoverReason: null,
+        failoverFromStationKey: null,
+        failoverFromStationName: null,
+        failoverFailureStationKey: null,
+        failoverFailureCount: 0,
+        failoverFailureStartedAt: 0,
+        failoverLastFailureAt: 0,
         currentMeta: null,
         lastChannelId: null,
         volume: savedVolume ?? 100,
@@ -4023,6 +4034,13 @@ class BotRuntime {
         guildName: guild.name,
         stationKey: state.currentStationKey || null,
         stationName: state.currentStationName || null,
+        desiredStationKey: state.desiredStationKey || state.currentStationKey || null,
+        desiredStationName: state.desiredStationName || state.currentStationName || null,
+        failoverActive: state.failoverActive === true,
+        failoverStartedAt: Number(state.failoverStartedAt || 0) || 0,
+        failoverReason: state.failoverReason || null,
+        failoverFromStationKey: state.failoverFromStationKey || null,
+        failoverFromStationName: state.failoverFromStationName || null,
         channelId: connectedChannelId,
         channelName: connectedChannelId ? guild.channels.cache.get(connectedChannelId)?.name || null : null,
         listenerCount: this.getCurrentListenerCount(guildId, state),
@@ -4042,6 +4060,7 @@ class BotRuntime {
         ),
         reconnectAttempts: Number(state.reconnectAttempts || 0) || 0,
         streamErrorCount: Number(state.streamErrorCount || 0) || 0,
+        failoverFailureCount: Number(state.failoverFailureCount || 0) || 0,
         shouldReconnect: state.shouldReconnect === true,
         meta: state.currentMeta || null,
       };
