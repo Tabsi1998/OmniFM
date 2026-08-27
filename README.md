@@ -114,13 +114,27 @@ im Owner-Menü hinterlegt, wird der Bot sauber übersprungen (der Rest läuft tr
 URL via `PUBLIC_URL=https://domain.tld ./start.sh`.
 
 Bei Updates bleiben `backend/.env`, `frontend/.env` und alle MongoDB-Daten unverändert. Vor jedem
-Pull legt `update.sh` zusätzlich eine lokale Sicherung der Env-Dateien unter `.update-backups/` an.
+Pull legt `update.sh` zusätzlich Sicherungen der Env-Dateien, der dateibasierten Runtime-Daten und
+der vollständigen OmniFM-MongoDB unter `.update-backups/` an. Kann der Mongo-Snapshot nicht erstellt
+und als komprimiertes Archiv geprüft werden, bricht das Update vor dem Pull ab und die laufende
+Version bleibt unangetastet. Backups werden nie automatisch gelöscht.
 Von älteren Deployments automatisch veränderte `package-lock.json`-Dateien werden dort als Patch
 gesichert und auf den letzten Git-Stand zurückgeführt, damit sie den Fast-Forward-Pull nicht blockieren.
 Andere lokale Quellcodeänderungen bleiben unangetastet und stoppen das Update mit einer klaren Meldung.
 Abhängigkeiten, Frontend-Build, FastAPI/MongoDB und die DB-gesteuerte Bot-Konfiguration werden vor
 dem Stoppen der laufenden Version geprüft. Frontend und Backend wechseln danach gemeinsam auf den
 neuen Git-Stand.
+
+Mongo-Backups können unabhängig vom Update geprüft und – nur bei gestopptem OmniFM, mit ausdrücklichem
+`--force` und einem zusätzlichen Sicherheits-Snapshot des aktuellen Stands – wiederhergestellt werden:
+
+```bash
+bash ./scripts/backup-mongodb.sh list
+bash ./scripts/backup-mongodb.sh verify .update-backups/mongodb/<backup>.archive.gz
+./stop.sh
+bash ./scripts/backup-mongodb.sh restore .update-backups/mongodb/<backup>.archive.gz --force
+./start.sh
+```
 
 ### Discord-Bot einrichten (100 % über die Owner-Konsole)
 

@@ -162,6 +162,16 @@ if ! command -v mongod >/dev/null 2>&1; then
   log "MongoDB installiert."
 fi
 
+# The server itself and the backup/restore tools are separate packages on
+# some existing installations. Updates require verified backups, therefore
+# make the tools an explicit deployment dependency as well.
+if ! command -v mongodump >/dev/null 2>&1 || ! command -v mongorestore >/dev/null 2>&1; then
+  log "Installiere MongoDB Database Tools für Backup und Restore..."
+  apt_update_once
+  $SUDO apt-get install -y mongodb-database-tools >>"$LOG_DIR/setup.log" 2>&1 \
+    || die "MongoDB Database Tools konnten nicht installiert werden (siehe logs/setup.log)."
+fi
+
 # --- MongoDB starten ---------------------------------------------------------
 if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files 2>/dev/null | grep -q '^mongod\.service'; then
   log "Starte MongoDB (systemd)..."

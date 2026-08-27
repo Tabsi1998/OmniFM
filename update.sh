@@ -21,6 +21,10 @@ doctor() {
   command -v node >/dev/null 2>&1 || { log "FEHLT: node"; failed=1; }
   command -v npm >/dev/null 2>&1 || { log "FEHLT: npm"; failed=1; }
   command -v curl >/dev/null 2>&1 || { log "FEHLT: curl"; failed=1; }
+  command -v tar >/dev/null 2>&1 || { log "FEHLT: tar"; failed=1; }
+  command -v gzip >/dev/null 2>&1 || { log "FEHLT: gzip"; failed=1; }
+  command -v mongodump >/dev/null 2>&1 || { log "FEHLT: mongodump (mongodb-database-tools)"; failed=1; }
+  command -v mongorestore >/dev/null 2>&1 || { log "FEHLT: mongorestore (mongodb-database-tools)"; failed=1; }
   if command -v node >/dev/null 2>&1; then
     node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major === 22 && minor >= 12 ? 0 : 1)' \
       >/dev/null 2>&1 \
@@ -51,6 +55,25 @@ for config_file in backend/.env frontend/.env; do
   fi
 done
 log "Konfigurations-Backup: $BACKUP_DIR"
+
+# Runtime fallback files and MongoDB are production data. Create both
+# snapshots before touching Git or dependencies. A failed database backup is a
+# hard stop: the still-running version remains online and no pull has happened.
+if [ -d "$ROOT/runtime-data" ]; then
+  log "Sichere Runtime-Daten vor dem Update..."
+  bash "$ROOT/scripts/backup-runtime-data.sh" create \
+    || die "Runtime-Daten konnten nicht gesichert werden. Update wurde vor dem Pull abgebrochen."
+else
+  log "Keine Runtime-Daten vorhanden; Datei-Backup wird übersprungen."
+fi
+
+if [ -f "$ROOT/backend/.env" ]; then
+  log "Sichere MongoDB vor dem Update..."
+  bash "$ROOT/scripts/backup-mongodb.sh" create \
+    || die "MongoDB konnte nicht gesichert werden. Update wurde vor dem Pull abgebrochen."
+else
+  die "backend/.env fehlt; MongoDB-Backup und Update wurden abgebrochen."
+fi
 
 if [ -d .git ]; then
   # Releases before f38b631 used `npm install` during deployment. Depending on
