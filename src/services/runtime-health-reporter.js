@@ -5,9 +5,9 @@
 // Dashboard liest daraus. Ohne laufenden Bot bleibt das Dokument leer
 // und das Dashboard zeigt ehrlich "keine Live-Daten".
 //
-// Wichtig / ehrlich: Commander + alle Worker laufen in EINEM Node-
-// Prozess auf EINEM Server. CPU/RAM sind daher prozessweit (geteilt).
-// Getrennt pro Bot sind nur: Discord-Ping, Guild-Anzahl, Voice-Verbindungen.
+// Im produktiven Split-Modus laufen Commander und Worker in getrennten
+// Prozessen. Worker liefern eigene Ressourcen über die MongoDB-Bridge.
+// Im expliziten Legacy-Monolith bleiben CPU/RAM ehrlich prozessweit.
 // ============================================================
 
 import os from "node:os";
@@ -29,7 +29,30 @@ function processCpuPct() {
   return Math.max(0, Math.min(100, Math.round(pct)));
 }
 
-export function buildRuntimeHealthNodes(runtimes) {
+function collectLocalProcessMetrics() {
+  const memory = process.memoryUsage();
+  return {
+    pid: process.pid,
+    host: os.hostname(),
+    cpuPct: processCpuPct(),
+    memoryRssMb: Math.round((memory.rss / (1024 * 1024)) * 10) / 10,
+    memoryHeapUsedMb: Math.round((memory.heapUsed / (1024 * 1024)) * 10) / 10,
+    uptimeSec: Math.max(0, Math.round(process.uptime())),
+    cores: (os.cpus() || []).length || 1,
+    nodeVersion: process.version,
+  };
+}
+
+function finiteMetric(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function buildRuntimeHealthNodes(runtimes, {
+  resourceModel = "shared-process",
+  localProcessMetrics = {},
+} = {}) {
   return runtimes.map((rt) => {
     const client = rt?.client;
     const ready = !!client?.isReady?.();
@@ -105,6 +128,14 @@ export function buildRuntimeHealthNodes(runtimes) {
     try { ping = ready ? Math.max(0, Math.round(client.ws.ping)) : null; } catch { ping = null; }
     let stats = {};
     try { stats = rt?.collectStats?.() || {}; } catch { stats = {}; }
+    let runtimeMetrics = {};
+    if (resourceModel === "split-processes") {
+      if (rt?.remote === true) {
+        try { runtimeMetrics = rt?.getRuntimeMetrics?.() || {}; } catch { runtimeMetrics = {}; }
+      } else {
+        runtimeMetrics = localProcessMetrics;
+      }
+    }
     return {
       botId: String(rt?.config?.clientId || rt?.config?.id || rt?.config?.index || ""),
       runtimeId: String(rt?.config?.id || ""),
@@ -121,29 +152,53 @@ export function buildRuntimeHealthNodes(runtimes) {
       voiceConnections: Number(stats.connections ?? voice) || 0,
       listeners: Number(stats.listeners || 0) || 0,
       userTag: ready ? (client.user?.tag || client.user?.username || null) : null,
+      cpuPct: resourceModel === "split-processes" ? finiteMetric(runtimeMetrics.cpuPct) : null,
+      ramMb: resourceModel === "split-processes" ? finiteMetric(runtimeMetrics.memoryRssMb ?? runtimeMetrics.ramMb) : null,
+      heapUsedMb: resourceModel === "split-processes" ? finiteMetric(runtimeMetrics.memoryHeapUsedMb) : null,
+      uptimeSec: resourceModel === "split-processes" ? finiteMetric(runtimeMetrics.uptimeSec) : null,
+      pid: resourceModel === "split-processes" ? finiteMetric(runtimeMetrics.pid) : null,
+      host: resourceModel === "split-processes" ? (runtimeMetrics.host || null) : null,
+      nodeVersion: resourceModel === "split-processes" ? (runtimeMetrics.nodeVersion || null) : null,
+      resourceScope: resourceModel === "split-processes" ? "node-process" : "shared-process",
     };
   });
 }
 
-export function startRuntimeHealthReporter(runtimes, { intervalMs = 5000 } = {}) {
+export function startRuntimeHealthReporter(runtimes, {
+  intervalMs = 5000,
+  resourceModel = String(process.env.OMNIFM_DEPLOYMENT_MODE || "").toLowerCase() === "split"
+    ? "split-processes"
+    : "shared-process",
+} = {}) {
   processCpuPct(); // prime CPU delta
 
   const write = async () => {
     if (!isConnected()) return;
     try {
-      const nodes = buildRuntimeHealthNodes(runtimes);
+      const localMetrics = collectLocalProcessMetrics();
+      const nodes = buildRuntimeHealthNodes(runtimes, {
+        resourceModel,
+        localProcessMetrics: localMetrics,
+      });
+      const reportedNodes = nodes.filter((node) => node.pid != null);
+      const aggregateCpuPct = reportedNodes.reduce((sum, node) => sum + (finiteMetric(node.cpuPct) || 0), 0);
+      const aggregateRamMb = reportedNodes.reduce((sum, node) => sum + (finiteMetric(node.ramMb) || 0), 0);
+      const splitProcesses = resourceModel === "split-processes";
       const doc = {
         _id: "latest",
         at: new Date().toISOString(),
         pid: process.pid,
         host: os.hostname(),
         process: {
-          cpuPct: processCpuPct(),
-          ramMb: Math.round(process.memoryUsage().rss / (1024 * 1024)),
-          uptimeSec: Math.round(process.uptime()),
-          cores: (os.cpus() || []).length || 1,
-          nodeVersion: process.version,
-          resourceModel: "shared-process",
+          cpuPct: splitProcesses ? Math.round(aggregateCpuPct * 10) / 10 : localMetrics.cpuPct,
+          ramMb: splitProcesses ? Math.round(aggregateRamMb * 10) / 10 : localMetrics.memoryRssMb,
+          totalCpuPct: splitProcesses ? Math.round(aggregateCpuPct * 10) / 10 : localMetrics.cpuPct,
+          totalRamMb: splitProcesses ? Math.round(aggregateRamMb * 10) / 10 : localMetrics.memoryRssMb,
+          uptimeSec: localMetrics.uptimeSec,
+          cores: localMetrics.cores,
+          nodeVersion: localMetrics.nodeVersion,
+          processCount: splitProcesses ? reportedNodes.length : 1,
+          resourceModel,
         },
         nodes,
         logs: getRecentLogs(500),

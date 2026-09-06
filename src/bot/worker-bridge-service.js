@@ -11,6 +11,19 @@ import { log } from "../lib/logging.js";
 
 const REMOTE_WORKER_HEARTBEAT_MS = Math.max(2_000, Number.parseInt(String(process.env.REMOTE_WORKER_HEARTBEAT_MS || "5000"), 10) || 5_000);
 const REMOTE_WORKER_COMMAND_POLL_MS = Math.max(250, Number.parseInt(String(process.env.REMOTE_WORKER_COMMAND_POLL_MS || "1000"), 10) || 1_000);
+let lastCpuUsage = process.cpuUsage();
+let lastCpuSampleAt = Date.now();
+
+function sampleProcessCpuPct() {
+  const now = Date.now();
+  const current = process.cpuUsage();
+  const elapsedMs = Math.max(1, now - lastCpuSampleAt);
+  const usedMicros = (current.user - lastCpuUsage.user) + (current.system - lastCpuUsage.system);
+  lastCpuUsage = current;
+  lastCpuSampleAt = now;
+  const cores = Math.max(1, (os.cpus() || []).length || 1);
+  return Math.max(0, Math.min(100, Math.round((((usedMicros / 1000) / (elapsedMs * cores)) * 100) * 10) / 10));
+}
 
 function buildWorkerGuildSummaries(runtime) {
   const rows = [];
@@ -32,6 +45,11 @@ function buildWorkerRuntimeMetrics(runtime) {
     memoryRssMb: Math.round((process.memoryUsage().rss / (1024 * 1024)) * 10) / 10,
     memoryHeapUsedMb: Math.round((process.memoryUsage().heapUsed / (1024 * 1024)) * 10) / 10,
     loadAvg: Array.isArray(os.loadavg?.()) ? os.loadavg().map((value) => Number(value.toFixed(2))) : [],
+    cpuPct: sampleProcessCpuPct(),
+    host: os.hostname(),
+    cores: (os.cpus() || []).length || 1,
+    nodeVersion: process.version,
+    resourceScope: "node-process",
   };
 }
 
@@ -169,4 +187,4 @@ class WorkerBridgeService {
   }
 }
 
-export { WorkerBridgeService, buildWorkerSnapshot };
+export { WorkerBridgeService, buildWorkerRuntimeMetrics, buildWorkerSnapshot };

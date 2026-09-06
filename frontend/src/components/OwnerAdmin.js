@@ -723,7 +723,12 @@ export default function OwnerAdmin() {
                   return (
                     <div data-testid="monitoring-banner" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: bg, border: `1px solid ${bd}`, color: col, fontSize: 12.5, fontWeight: 700, marginBottom: 16, fontFamily: "'JetBrains Mono',monospace" }}>
                       <span className="oa-dot" style={{ background: col }} /> {label}
-                      {monitoring.process && <span style={{ marginLeft: 'auto', color: '#64748b', fontWeight: 500 }}>Prozess: 1 Node · CPU/RAM geteilt · {monitoring.process.cores} Cores · Node {monitoring.process.nodeVersion || ''}</span>}
+                      {monitoring.process && <span style={{ marginLeft: 'auto', color: '#64748b', fontWeight: 500 }}>
+                        {monitoring.process.resourceModel === 'split-processes'
+                          ? `${monitoring.process.processCount || 0} getrennte Bot-Prozesse · echte Werte je Node`
+                          : 'Prozess: 1 Node · CPU/RAM geteilt'}
+                        {' · '}{monitoring.process.cores} Cores · Node {monitoring.process.nodeVersion || ''}
+                      </span>}
                     </div>
                   );
                 })()}
@@ -731,16 +736,16 @@ export default function OwnerAdmin() {
                   <StatTile testid="mon-nodes" label="Healthy Nodes" value={`${monitoring.health.healthyNodes}/${monitoring.health.totalNodes}`} icon={HeartPulse} accent="#10b981"
                     foot={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span className="oa-dot" style={{ background: '#10b981' }} /> Echtzeit · alle 5s</span>} />
                   <StatTile testid="mon-uptime" label={monitoring.live ? 'Prozess-Uptime' : 'Uptime'} value={monitoring.live ? fmtUptime(monitoring.health.uptimeSec) : `${monitoring.health.uptimePct}%`} icon={TrendingUp} accent="#00e5ff" foot={<span>{monitoring.live ? 'seit letztem Start' : '30-Tage rollierend'}</span>} />
-                  <StatTile testid="mon-latency" label={monitoring.live ? 'RAM (Prozess)' : 'API-Latenz'} value={monitoring.live ? `${monitoring.process?.ramMb || 0} MB` : `${monitoring.health.apiLatencyMs} ms`} icon={Gauge} accent="#ff6b00" foot={<span>{monitoring.live ? 'geteilt für alle Bots' : 'Commander → API'}</span>} />
+                  <StatTile testid="mon-latency" label={monitoring.live ? (monitoring.process?.resourceModel === 'split-processes' ? 'RAM (alle Bots)' : 'RAM (Prozess)') : 'API-Latenz'} value={monitoring.live ? `${monitoring.process?.totalRamMb ?? monitoring.process?.ramMb ?? 0} MB` : `${monitoring.health.apiLatencyMs} ms`} icon={Gauge} accent="#ff6b00" foot={<span>{monitoring.live ? (monitoring.process?.resourceModel === 'split-processes' ? `${monitoring.process?.processCount || 0} getrennte Prozesse` : 'geteilt für alle Bots') : 'Commander → API'}</span>} />
                   <StatTile testid="mon-incidents" label="Offene Incidents" value={monitoring.health.openIncidents} icon={AlertTriangle} accent={monitoring.health.openIncidents ? '#ff2a5f' : '#10b981'} foot={<span>{monitoring.incidents.length} in Historie</span>} />
                 </div>
 
                 {monitoring.live && monitoring.process && (
-                  <div className="oa-card oa-fade" style={{ marginTop: 18 }} data-testid="monitoring-shared-process">
+                  <div className="oa-card oa-fade" style={{ marginTop: 18 }} data-testid="monitoring-process-model">
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
                       <div>
-                        <div className="oa-section-title" style={{ margin: 0 }}><Cpu size={15} /> Gemeinsamer Node.js-Prozess</div>
-                        <div className="oa-stat-foot" style={{ marginTop: 7 }}>Commander und Worker laufen in diesem Stack in einem Prozess. Nur diese Ressourcen sind deshalb gemeinsam.</div>
+                        <div className="oa-section-title" style={{ margin: 0 }}><Cpu size={15} /> {monitoring.process.resourceModel === 'split-processes' ? 'Getrennte Bot-Prozesse' : 'Gemeinsamer Node.js-Prozess'}</div>
+                        <div className="oa-stat-foot" style={{ marginTop: 7 }}>{monitoring.process.resourceModel === 'split-processes' ? 'Commander und Worker laufen getrennt. CPU, RAM, PID und Uptime stammen direkt vom jeweiligen Bot-Prozess.' : 'Commander und Worker laufen im expliziten Legacy-Modus in einem Prozess. Diese Ressourcen sind deshalb gemeinsam.'}</div>
                       </div>
                       <div className="oa-mono" style={{ color: '#94a3b8', fontSize: 11 }}>CPU {monitoring.process.cpuPct ?? '—'}% · RAM {monitoring.process.ramMb ?? '—'} MB · {monitoring.process.cores ?? '—'} Cores · {monitoring.process.nodeVersion || 'Node'}</div>
                     </div>
@@ -758,8 +763,8 @@ export default function OwnerAdmin() {
                         { label: 'SERVER-AUSLASTUNG', val: `${n.guilds || 0} Guilds`, pct: Math.min(100, (n.guilds || 0) * 2), color: '#10b981' },
                       ]
                       : [
-                        { label: 'CPU', val: `${n.cpuPct || 0}%`, pct: n.cpuPct || 0, color: cpuColor },
-                        { label: 'RAM', val: `${n.ramMb || 0} MB`, pct: Math.min(100, (n.ramMb || 0) / 6), color: '#00e5ff' },
+                        { label: 'CPU', val: n.cpuPct == null ? '—' : `${n.cpuPct}%`, pct: n.cpuPct || 0, color: cpuColor },
+                        { label: 'RAM', val: n.ramMb == null ? '—' : `${n.ramMb} MB`, pct: Math.min(100, (n.ramMb || 0) / 6), color: '#00e5ff' },
                         { label: 'PING', val: n.pingMs == null ? '—' : `${n.pingMs} ms`, pct: Math.min(100, n.pingMs || 0), color: '#ff6b00' },
                       ];
                     return (

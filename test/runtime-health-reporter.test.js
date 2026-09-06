@@ -56,3 +56,39 @@ test("guild directory survives a temporary dashboard status failure", () => {
   assert.equal(node.guildDetails[0].name, "OmniFM");
   assert.equal(node.guildDetails[0].playing, false);
 });
+
+test("split runtime health keeps real resources separate per bot process", () => {
+  const commander = fakeRuntime();
+  const worker = {
+    ...fakeRuntime(),
+    remote: true,
+    role: "worker",
+    config: { clientId: "1476192449721274473", id: "worker-1", index: 2, name: "OmniFM 1" },
+    getRuntimeMetrics: () => ({
+      pid: 222,
+      host: "omnifm",
+      cpuPct: 7.5,
+      memoryRssMb: 144.2,
+      memoryHeapUsedMb: 80.1,
+      uptimeSec: 900,
+      nodeVersion: "v22.23.2",
+    }),
+  };
+  const nodes = buildRuntimeHealthNodes([commander, worker], {
+    resourceModel: "split-processes",
+    localProcessMetrics: {
+      pid: 111,
+      host: "omnifm",
+      cpuPct: 2.5,
+      memoryRssMb: 120.4,
+      memoryHeapUsedMb: 60.2,
+      uptimeSec: 1_000,
+      nodeVersion: "v22.23.2",
+    },
+  });
+
+  assert.deepEqual(nodes.map((node) => node.pid), [111, 222]);
+  assert.deepEqual(nodes.map((node) => node.ramMb), [120.4, 144.2]);
+  assert.deepEqual(nodes.map((node) => node.cpuPct), [2.5, 7.5]);
+  assert.deepEqual(nodes.map((node) => node.resourceScope), ["node-process", "node-process"]);
+});

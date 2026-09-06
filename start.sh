@@ -285,6 +285,7 @@ log "Installiere Bot-Abhängigkeiten reproduzierbar..."
 log "Prüfe Backend- und Runtime-Syntax vor dem Umschalten..."
 "$VENV/bin/python" -m py_compile "$ROOT/backend/server.py"
 ( cd "$ROOT" && npm run test:syntax )
+( cd "$ROOT" && npm run test:split-syntax )
 
 log "Prüfe FastAPI inklusive MongoDB-Verbindung vor dem Umschalten..."
 ( cd "$ROOT" && "$VENV/bin/python" -c "import backend.server as app; assert app.db is not None, 'MongoDB nicht erreichbar'" ) \

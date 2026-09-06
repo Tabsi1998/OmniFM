@@ -1,6 +1,7 @@
 import { BotRuntime } from "../bot/runtime.js";
 import { WorkerBridgeService } from "../bot/worker-bridge-service.js";
 import { loadStations } from "../stations-store.js";
+import { initCustomStationsStore, stopCustomStationsStore } from "../custom-stations.js";
 import { log } from "../lib/logging.js";
 import {
   initializeSharedServices,
@@ -11,6 +12,7 @@ import {
 import { startWorkerAutohealMonitor } from "./worker-autoheal.js";
 
 await initializeSharedServices({ requireMongo: true });
+await initCustomStationsStore();
 
 const topology = resolveBotTopology(process.env);
 const workerIndex = Number.parseInt(String(process.env.BOT_PROCESS_INDEX || ""), 10);
@@ -36,6 +38,7 @@ const { shutdown } = installProcessHandlers({
     async () => {
       autohealMonitor?.stop?.();
       await bridgeService.stop();
+      await stopCustomStationsStore();
     },
   ],
 });

@@ -19,8 +19,15 @@ kill_pid() {
     if kill -0 "$pid" 2>/dev/null; then
       log "Stoppe $name (PID $pid)..."
       kill "$pid" 2>/dev/null || true
-      sleep 1
-      kill -9 "$pid" 2>/dev/null || true
+      local attempt
+      for attempt in $(seq 1 30); do
+        kill -0 "$pid" 2>/dev/null || break
+        sleep 0.5
+      done
+      if kill -0 "$pid" 2>/dev/null; then
+        log "$name reagiert nach 15s nicht; erzwinge das Beenden (PID $pid)."
+        kill -9 "$pid" 2>/dev/null || true
+      fi
     fi
     rm -f "$file"
   else
@@ -46,7 +53,7 @@ kill_orphaned_omnifm_processes() {
     service=""
     if [ "$cwd" = "$root_real" ]; then
       case "$command" in
-        *src/entrypoints/from-owner-config.mjs*|*src/index.js*) service="Bot-Runtime" ;;
+        *src/entrypoints/from-owner-config.mjs*|*src/entrypoints/commander.js*|*src/entrypoints/worker.js*|*src/index.js*) service="Bot-Runtime" ;;
       esac
     elif [ "$cwd" = "$backend_real" ]; then
       case "$command" in
@@ -64,14 +71,14 @@ kill_orphaned_omnifm_processes() {
 
   # Give all matched processes one grace period, then reclaim only survivors
   # that still match the exact checkout on the second pass.
-  sleep 1
+  sleep 3
   for proc in /proc/[0-9]*; do
     [ -r "$proc/cmdline" ] || continue
     pid="${proc##*/}"
     cwd="$(readlink -f "$proc/cwd" 2>/dev/null || true)"
     command="$(tr '\0' ' ' < "$proc/cmdline" 2>/dev/null || true)"
     case "$cwd:$command" in
-      "$root_real":*src/entrypoints/from-owner-config.mjs*|"$root_real":*src/index.js*|"$backend_real":*uvicorn*server:app*|"$frontend_real":*node_modules/.bin/serve*-s*build*|"$frontend_real":*serve/build/main.js*-s*build*)
+      "$root_real":*src/entrypoints/from-owner-config.mjs*|"$root_real":*src/entrypoints/commander.js*|"$root_real":*src/entrypoints/worker.js*|"$root_real":*src/index.js*|"$backend_real":*uvicorn*server:app*|"$frontend_real":*node_modules/.bin/serve*-s*build*|"$frontend_real":*serve/build/main.js*-s*build*)
         kill -9 "$pid" 2>/dev/null || true
         ;;
     esac

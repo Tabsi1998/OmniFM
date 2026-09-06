@@ -2,8 +2,13 @@ import { BotRuntime } from "../bot/runtime.js";
 import { WorkerManager } from "../bot/worker-manager.js";
 import { RemoteWorkerHandle } from "../bot/remote-worker-handle.js";
 import { startWebServer } from "../api/server.js";
+import { startRuntimeHealthReporter } from "../services/runtime-health-reporter.js";
+import { startStationHealthService, stopStationHealthService } from "../services/station-health.js";
 import { listWorkerSnapshots } from "../core/worker-bridge.js";
 import { loadStations } from "../stations-store.js";
+import { initCustomStationsStore, stopCustomStationsStore } from "../custom-stations.js";
+import { initCommandPermissionsStore, stopCommandPermissionsStore } from "../command-permissions-store.js";
+import { initScheduledEventsStore, stopScheduledEventsStore } from "../scheduled-events-store.js";
 import {
   listLicenses,
   patchLicenseById,
@@ -123,6 +128,10 @@ async function sendWeeklyDigest(runtime, guildId, channelId, language = "de") {
 }
 
 await initializeSharedServices({ requireMongo: true });
+await initCustomStationsStore();
+await initCommandPermissionsStore();
+await initScheduledEventsStore();
+startStationHealthService(loadStations);
 const { commanderConfig, workerConfigs } = resolveBotTopology(process.env);
 
 const remoteWorkers = workerConfigs.map((config) => new RemoteWorkerHandle(config));
@@ -155,7 +164,15 @@ if (!started) {
   process.exit(1);
 }
 
-const webServer = startWebServer(runtimes);
+const webServerEnabled = String(process.env.WEB_SERVER_ENABLED ?? "0").trim() !== "0";
+const webServer = webServerEnabled ? startWebServer(runtimes) : null;
+if (!webServerEnabled) {
+  log("INFO", "Node-Webserver deaktiviert; FastAPI :8001 bleibt das produktive Backend.");
+}
+const stopRuntimeHealthReporter = startRuntimeHealthReporter(runtimes, {
+  intervalMs: Number.parseInt(String(process.env.RUNTIME_HEALTH_INTERVAL_MS || "5000"), 10),
+  resourceModel: "split-processes",
+});
 
 installProcessHandlers({
   localRuntimes,
@@ -163,6 +180,15 @@ installProcessHandlers({
   extraShutdown: [
     async () => {
       workerManager.stopRemotePolling();
+    },
+    async () => {
+      stopRuntimeHealthReporter();
+      stopStationHealthService();
+      await Promise.all([
+        stopScheduledEventsStore(),
+        stopCustomStationsStore(),
+        stopCommandPermissionsStore(),
+      ]);
     },
   ],
 });

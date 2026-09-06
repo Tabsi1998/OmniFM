@@ -48,6 +48,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p test_reports/ci
+          npm run test:split-syntax 2>&1 | tee test_reports/ci/split-syntax-node${{ matrix.node-version }}.log
           npm run test:syntax 2>&1 | tee test_reports/ci/syntax-node${{ matrix.node-version }}.log
 
       - name: Validate deployment shell scripts
@@ -58,7 +59,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: syntax-node${{ matrix.node-version }}-logs
-          path: test_reports/ci/syntax-node${{ matrix.node-version }}.log
+          path: |
+            test_reports/ci/split-syntax-node${{ matrix.node-version }}.log
+            test_reports/ci/syntax-node${{ matrix.node-version }}.log
           if-no-files-found: error
           retention-days: 14
 

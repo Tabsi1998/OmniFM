@@ -149,7 +149,22 @@ async function main() {
     process.exit(0);
   }
 
-  await import("../index.js");
+  const requestedMode = String(process.env.OMNIFM_DEPLOYMENT_MODE || "auto").trim().toLowerCase();
+  const monolithRequested = ["monolith", "single", "legacy"].includes(requestedMode);
+  const useSplitRuntime = requestedMode === "split" || (!monolithRequested && entries.length > 1);
+  if (!useSplitRuntime) {
+    console.log("[OmniFM] Bot-Laufzeit: Monolith (explizit oder nur ein Bot konfiguriert).");
+    await import("../index.js");
+    return;
+  }
+
+  process.env.OMNIFM_DEPLOYMENT_MODE = "split";
+  console.log(`[OmniFM] Bot-Laufzeit: echter Prozess-Split (Commander + ${entries.length - 1} Worker).`);
+  const { superviseSplitRuntime } = await import("./split-supervisor.js");
+  await superviseSplitRuntime({
+    botIndexes: entries.map((_, index) => index + 1),
+    commanderIndex: 1,
+  });
 }
 
 main().catch((err) => {

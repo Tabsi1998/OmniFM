@@ -76,6 +76,11 @@ import {
 } from "./runtime-panels.js";
 import { buildOmniEmbed } from "./discord-ui.js";
 
+async function deferRuntimeReply(interaction) {
+  if (interaction?.deferred || interaction?.replied || typeof interaction?.deferReply !== "function") return;
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+}
+
 function getTierConfig(guildId) {
   const config = getServerPlanConfig(guildId);
   return { ...config, tier: config.plan };
@@ -466,10 +471,6 @@ export async function handleRuntimeInteraction(runtime, interaction) {
     }
   }
 
-  if (runtime.role === "commander" && runtime.workerManager?.refreshRemoteStates) {
-    await runtime.workerManager.refreshRemoteStates().catch(() => null);
-  }
-
   if (interaction.commandName === "help") {
     recordCommandUsage(interaction.guildId, interaction.commandName);
     const payload = runtime.buildHelpMessage(interaction);
@@ -510,6 +511,14 @@ export async function handleRuntimeInteraction(runtime, interaction) {
   }
 
   recordCommandUsage(interaction.guildId, interaction.commandName);
+
+  if (["play", "pause", "resume", "stop", "setvolume"].includes(interaction.commandName)) {
+    await deferRuntimeReply(interaction);
+  }
+
+  if (runtime.role === "commander" && runtime.workerManager?.refreshRemoteStates) {
+    await runtime.workerManager.refreshRemoteStates().catch(() => null);
+  }
 
   if (interaction.commandName === "event") {
     await runtime.handleEventCommand(interaction);
@@ -911,7 +920,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
         ? [runtime.workerManager.getWorkerByIndex(requestedBot, { prefer: "slot", strict: true })].filter(Boolean)
         : runtime.workerManager.getStreamingWorkers(interaction.guildId);
       if (workers.length === 0) {
-        await interaction.reply(buildNoticePayload({
+        await runtime.respondInteraction(interaction, buildNoticePayload({
           t,
           language,
           tone: "info",
@@ -923,14 +932,17 @@ export async function handleRuntimeInteraction(runtime, interaction) {
       }
       const failures = [];
       const pausedWorkers = [];
-      for (const w of workers) {
-        const result = await w.pauseInGuild(interaction.guildId);
+      const results = await Promise.all(workers.map(async (w) => ({
+        worker: w,
+        result: await w.pauseInGuild(interaction.guildId).catch((err) => ({ ok: false, error: err?.message || "pause_failed" })),
+      })));
+      for (const { worker: w, result } of results) {
         if (!result?.ok) failures.push(`${w.config?.name || "Worker"}: ${result?.error || "pause_failed"}`);
         else pausedWorkers.push(w);
       }
       await runtime.workerManager.refreshRemoteStates?.({ force: true })?.catch?.(() => null);
       if (failures.length === workers.length) {
-        await interaction.reply(buildNoticePayload({
+        await runtime.respondInteraction(interaction, buildNoticePayload({
           t,
           language,
           tone: "danger",
@@ -939,7 +951,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
         }));
         return;
       }
-      await interaction.reply(buildNoticePayload({
+      await runtime.respondInteraction(interaction, buildNoticePayload({
         t,
         language,
         tone: failures.length > 0 ? "warning" : "success",
@@ -954,7 +966,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
       return;
     }
     if (!state.currentStationKey) {
-      await interaction.reply(buildNoticePayload({
+      await runtime.respondInteraction(interaction, buildNoticePayload({
         t,
         language,
         tone: "info",
@@ -965,7 +977,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
       return;
     }
     await runtime.pauseInGuild(interaction.guildId);
-    await interaction.reply(buildNoticePayload({
+    await runtime.respondInteraction(interaction, buildNoticePayload({
       t,
       language,
       tone: "success",
@@ -983,7 +995,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
         ? [runtime.workerManager.getWorkerByIndex(requestedBot, { prefer: "slot", strict: true })].filter(Boolean)
         : runtime.workerManager.getStreamingWorkers(interaction.guildId);
       if (workers.length === 0) {
-        await interaction.reply(buildNoticePayload({
+        await runtime.respondInteraction(interaction, buildNoticePayload({
           t,
           language,
           tone: "info",
@@ -995,14 +1007,17 @@ export async function handleRuntimeInteraction(runtime, interaction) {
       }
       const failures = [];
       const resumedWorkers = [];
-      for (const w of workers) {
-        const result = await w.resumeInGuild(interaction.guildId);
+      const results = await Promise.all(workers.map(async (w) => ({
+        worker: w,
+        result: await w.resumeInGuild(interaction.guildId).catch((err) => ({ ok: false, error: err?.message || "resume_failed" })),
+      })));
+      for (const { worker: w, result } of results) {
         if (!result?.ok) failures.push(`${w.config?.name || "Worker"}: ${result?.error || "resume_failed"}`);
         else resumedWorkers.push(w);
       }
       await runtime.workerManager.refreshRemoteStates?.({ force: true })?.catch?.(() => null);
       if (failures.length === workers.length) {
-        await interaction.reply(buildNoticePayload({
+        await runtime.respondInteraction(interaction, buildNoticePayload({
           t,
           language,
           tone: "danger",
@@ -1011,7 +1026,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
         }));
         return;
       }
-      await interaction.reply(buildNoticePayload({
+      await runtime.respondInteraction(interaction, buildNoticePayload({
         t,
         language,
         tone: failures.length > 0 ? "warning" : "success",
@@ -1025,7 +1040,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
       return;
     }
     if (!state.currentStationKey) {
-      await interaction.reply(buildNoticePayload({
+      await runtime.respondInteraction(interaction, buildNoticePayload({
         t,
         language,
         tone: "info",
@@ -1036,7 +1051,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
       return;
     }
     await runtime.resumeInGuild(interaction.guildId);
-    await interaction.reply(buildNoticePayload({
+    await runtime.respondInteraction(interaction, buildNoticePayload({
       t,
       language,
       tone: "success",
@@ -1059,7 +1074,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
         const worker = runtime.workerManager.getWorkerByIndex(requestedBot, { prefer: "slot", strict: true });
         if (!worker) {
           // Worker-Index nicht gefunden / nicht konfiguriert
-          await interaction.reply(buildNoticePayload({
+          await runtime.respondInteraction(interaction, buildNoticePayload({
             t,
             language,
             tone: "warning",
@@ -1081,7 +1096,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
         }
         const streamingWorkers = runtime.workerManager.getStreamingWorkers(guildId);
         if (!streamingWorkers.includes(worker)) {
-          await interaction.reply(buildNoticePayload({
+          await runtime.respondInteraction(interaction, buildNoticePayload({
             t,
             language,
             tone: "info",
@@ -1123,7 +1138,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
           if (matchingWorkers.length > 0) {
             workers = matchingWorkers;
           } else {
-            await interaction.reply(buildNoticePayload({
+            await runtime.respondInteraction(interaction, buildNoticePayload({
               t,
               language,
               tone: "info",
@@ -1145,7 +1160,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
           }
         } else {
           // User nicht im Channel â†’ Error
-          await interaction.reply(buildNoticePayload({
+          await runtime.respondInteraction(interaction, buildNoticePayload({
             t,
             language,
             tone: "info",
@@ -1168,7 +1183,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
       }
       
       if (workers.length === 0) {
-        await interaction.reply(buildNoticePayload({
+        await runtime.respondInteraction(interaction, buildNoticePayload({
           t,
           language,
           tone: "info",
@@ -1180,14 +1195,17 @@ export async function handleRuntimeInteraction(runtime, interaction) {
       }
       const failures = [];
       const stoppedWorkers = [];
-      for (const w of workers) {
-        const result = await w.stopInGuild(guildId);
+      const results = await Promise.all(workers.map(async (w) => ({
+        worker: w,
+        result: await w.stopInGuild(guildId).catch((err) => ({ ok: false, error: err?.message || "stop_failed" })),
+      })));
+      for (const { worker: w, result } of results) {
         if (!result?.ok) failures.push(`${w.config?.name || "Worker"}: ${result?.error || "stop_failed"}`);
         else stoppedWorkers.push(w);
       }
       await runtime.workerManager.refreshRemoteStates?.({ force: true })?.catch?.(() => null);
       if (failures.length === workers.length) {
-        await interaction.reply(buildNoticePayload({
+        await runtime.respondInteraction(interaction, buildNoticePayload({
           t,
           language,
           tone: "danger",
@@ -1196,7 +1214,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
         }));
         return;
       }
-      await interaction.reply(buildNoticePayload({
+      await runtime.respondInteraction(interaction, buildNoticePayload({
         t,
         language,
         tone: failures.length > 0 ? "warning" : "success",
@@ -1214,7 +1232,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
     // Worker/Legacy Mode: lokaler Stop
     await runtime.stopInGuild(interaction.guildId);
 
-    await interaction.reply(buildNoticePayload({
+    await runtime.respondInteraction(interaction, buildNoticePayload({
       t,
       language,
       tone: "success",
@@ -1228,7 +1246,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
   if (interaction.commandName === "setvolume") {
     const value = interaction.options.getInteger("value", true);
     if (value < 0 || value > 100) {
-      await interaction.reply(buildNoticePayload({
+      await runtime.respondInteraction(interaction, buildNoticePayload({
         t,
         language,
         tone: "warning",
@@ -1251,7 +1269,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
             offline: t(`Worker ${requestedBot} ist offline.`, `Worker ${requestedBot} is offline.`),
             not_invited: t(`Worker ${requestedBot} ist nicht auf diesem Server eingeladen.`, `Worker ${requestedBot} is not invited on this server.`),
           };
-          await interaction.reply(buildNoticePayload({
+          await runtime.respondInteraction(interaction, buildNoticePayload({
             t,
             language,
             tone: "warning",
@@ -1268,7 +1286,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
           if (invitedWorkers.length === 1) {
             targetWorkers = invitedWorkers;
           } else if (invitedWorkers.length === 0) {
-            await interaction.reply(buildNoticePayload({
+            await runtime.respondInteraction(interaction, buildNoticePayload({
               t,
               language,
               tone: "warning",
@@ -1278,7 +1296,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
             }));
             return;
           } else {
-            await interaction.reply(buildNoticePayload({
+            await runtime.respondInteraction(interaction, buildNoticePayload({
               t,
               language,
               tone: "info",
@@ -1318,7 +1336,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
             targetWorkers = workers;
           }
           if (targetWorkers.length === 0 && workers.length > 1) {
-            await interaction.reply(buildNoticePayload({
+            await runtime.respondInteraction(interaction, buildNoticePayload({
               t,
               language,
               tone: "info",
@@ -1342,7 +1360,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
       }
 
       if (targetWorkers.length === 0) {
-        await interaction.reply(buildNoticePayload({
+        await runtime.respondInteraction(interaction, buildNoticePayload({
           t,
           language,
           tone: "warning",
@@ -1354,8 +1372,11 @@ export async function handleRuntimeInteraction(runtime, interaction) {
       const failures = [];
       const appliedWorkers = [];
       const savedWorkers = [];
-      for (const worker of targetWorkers) {
-        const result = await worker.setVolumeInGuild(interaction.guildId, value);
+      const results = await Promise.all(targetWorkers.map(async (worker) => ({
+        worker,
+        result: await worker.setVolumeInGuild(interaction.guildId, value).catch((err) => ({ ok: false, error: err?.message || "setvolume_failed" })),
+      })));
+      for (const { worker, result } of results) {
         if (!result?.ok) {
           failures.push(`${worker.config?.name || "Worker"}: ${result?.error || "setvolume_failed"}`);
           continue;
@@ -1367,7 +1388,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
         }
       }
       if (failures.length === targetWorkers.length) {
-        await interaction.reply(buildNoticePayload({
+        await runtime.respondInteraction(interaction, buildNoticePayload({
           t,
           language,
           tone: "danger",
@@ -1376,7 +1397,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
         }));
         return;
       }
-      await interaction.reply(buildNoticePayload({
+      await runtime.respondInteraction(interaction, buildNoticePayload({
         t,
         language,
         tone: failures.length > 0 ? "warning" : "success",
@@ -1404,7 +1425,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
     }
     const result = await runtime.setVolumeInGuild(interaction.guildId, value);
     if (!result?.ok) {
-      await interaction.reply(buildNoticePayload({
+      await runtime.respondInteraction(interaction, buildNoticePayload({
         t,
         language,
         tone: "danger",
@@ -1413,7 +1434,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
       }));
       return;
     }
-    await interaction.reply(buildNoticePayload({
+    await runtime.respondInteraction(interaction, buildNoticePayload({
       t,
       language,
       tone: "success",

@@ -5061,6 +5061,7 @@ async def admin_workers(request: Request):
     bots = load_bots_from_env()
     live_doc = read_runtime_health_fresh()
     live_nodes = (live_doc or {}).get("nodes") or []
+    live_process = (live_doc or {}).get("process") or {}
     nodes_by_id = {str(node.get("botId") or ""): node for node in live_nodes if node.get("botId")}
     nodes_by_index = {parse_int(node.get("index"), 0): node for node in live_nodes if parse_int(node.get("index"), 0) > 0}
     commander_index = parse_int(os.environ.get("COMMANDER_BOT_INDEX", "1"), 1)
@@ -5084,7 +5085,14 @@ async def admin_workers(request: Request):
             "connections": parse_int((node or {}).get("voiceConnections", b.get("connections", 0)), 0),
             "pingMs": (node or {}).get("pingMs"),
             "guildDetails": (node or {}).get("guildDetails") or [],
-            "uptimeSec": parse_int(((live_doc or {}).get("process") or {}).get("uptimeSec", 0), 0),
+            "uptimeSec": parse_int((node or {}).get("uptimeSec", live_process.get("uptimeSec", 0)), 0),
+            "cpuPct": (node or {}).get("cpuPct"),
+            "ramMb": (node or {}).get("ramMb"),
+            "heapUsedMb": (node or {}).get("heapUsedMb"),
+            "pid": (node or {}).get("pid"),
+            "host": (node or {}).get("host"),
+            "nodeVersion": (node or {}).get("nodeVersion"),
+            "resourceScope": (node or {}).get("resourceScope") or "shared-process",
             "color": b.get("color"),
         })
 
@@ -5108,7 +5116,14 @@ async def admin_workers(request: Request):
             "connections": parse_int(node.get("voiceConnections"), 0),
             "pingMs": node.get("pingMs"),
             "guildDetails": node.get("guildDetails") or [],
-            "uptimeSec": parse_int(((live_doc or {}).get("process") or {}).get("uptimeSec"), 0),
+            "uptimeSec": parse_int(node.get("uptimeSec", live_process.get("uptimeSec")), 0),
+            "cpuPct": node.get("cpuPct"),
+            "ramMb": node.get("ramMb"),
+            "heapUsedMb": node.get("heapUsedMb"),
+            "pid": node.get("pid"),
+            "host": node.get("host"),
+            "nodeVersion": node.get("nodeVersion"),
+            "resourceScope": node.get("resourceScope") or "shared-process",
             "color": None,
         })
     workers.sort(key=lambda item: parse_int(item.get("index"), 999))
@@ -5350,6 +5365,8 @@ async def admin_monitoring(request: Request):
 
     if fresh:
         proc = live_doc.get("process") or {}
+        resource_model = str(proc.get("resourceModel") or "shared-process")
+        split_processes = resource_model == "split-processes"
         live_nodes = []
         for n in (live_doc.get("nodes") or []):
             live_nodes.append({
@@ -5364,11 +5381,16 @@ async def admin_monitoring(request: Request):
                 "guildDetails": n.get("guildDetails") or [],
                 "voiceConnections": n.get("voiceConnections", 0),
                 "listeners": n.get("listeners", 0),
-                # CPU/RAM are process-wide in monolith mode. Never present the
-                # same host values as fake per-bot measurements.
-                "cpuPct": None,
-                "ramMb": None,
-                "resourceScope": "shared-process",
+                # In split mode every Worker reports its own OS process. In the
+                # optional legacy monolith, shared values remain hidden here.
+                "cpuPct": n.get("cpuPct") if split_processes else None,
+                "ramMb": n.get("ramMb") if split_processes else None,
+                "heapUsedMb": n.get("heapUsedMb") if split_processes else None,
+                "uptimeSec": n.get("uptimeSec") if split_processes else None,
+                "pid": n.get("pid") if split_processes else None,
+                "host": n.get("host") if split_processes else None,
+                "nodeVersion": n.get("nodeVersion") if split_processes else None,
+                "resourceScope": "node-process" if split_processes else "shared-process",
             })
         real_incidents = []
         if db is not None:

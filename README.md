@@ -142,10 +142,13 @@ bash ./scripts/backup-mongodb.sh restore .update-backups/mongodb/<backup>.archiv
 2. `/admin` → **Discord & Bots**: Commander-Token + Client-ID eintragen, beliebig viele Worker
    („+ Bot hinzufügen") mit Token/Client-ID/Tier anlegen. Speichern.
 3. `./update.sh` (oder `./start.sh`) erneut ausführen → der Bot bootet automatisch mit genau diesen
-   Bots. Commander nimmt Slash-Commands entgegen und verteilt Voice-Streams an die Worker.
+   Bots. Commander und jeder Worker laufen als getrennte, automatisch überwachte Node.js-Prozesse.
+   Commander nimmt Slash-Commands entgegen und verteilt Voice-Streams über MongoDB an die Worker.
 
 > Der Bot liest **ausschließlich** aus der MongoDB-Owner-Config (`src/entrypoints/from-owner-config.mjs`).
 > Änderungen an Bots/Tokens erfordern nur ein erneutes `./update.sh` – keine Datei- oder Env-Bearbeitung.
+> Für eine gezielte Legacy-Diagnose kann `OMNIFM_DEPLOYMENT_MODE=monolith` gesetzt werden; Produktion
+> verwendet bei mehreren konfigurierten Bots automatisch den echten Prozess-Split.
 
 ## ⚙️ Konfiguration
 

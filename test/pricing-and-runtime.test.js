@@ -82,6 +82,7 @@ import {
   openRuntimePlayWizard,
   openRuntimeStationsBrowser,
 } from "../src/bot/runtime-panels.js";
+import { handleRuntimeInteraction } from "../src/bot/runtime-interactions.js";
 
 test("worker runtimes handle component interactions created by their own Discord application", async (t) => {
   const runtime = new BotRuntime({
@@ -127,6 +128,54 @@ test("now-playing controls acknowledge Discord before running voice operations",
   const handled = await BotRuntime.prototype.handleNowPlayingControl.call(runtime, interaction);
   assert.equal(handled, true);
   assert.deepEqual(calls, ["defer", "pause", "refresh", "reply"]);
+});
+
+test("remote slash controls acknowledge Discord before refreshing worker state", async () => {
+  const statsFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "listening-stats.json");
+  const statsBefore = fs.existsSync(statsFile) ? fs.readFileSync(statsFile, "utf8") : null;
+  const calls = [];
+  const runtime = {
+    config: { name: "Commander" },
+    role: "commander",
+    createInteractionTranslator: () => ({ language: "de", t: (de) => de }),
+    getGuildAccess: () => ({ allowed: true }),
+    getState: () => ({}),
+    checkCommandRolePermission: () => ({ ok: true }),
+    workerManager: {
+      async refreshRemoteStates() { calls.push("refresh"); },
+      getStreamingWorkers() { return []; },
+    },
+    async respondInteraction(interaction) {
+      assert.equal(interaction.deferred, true);
+      calls.push("response");
+    },
+  };
+  const interaction = {
+    commandName: "pause",
+    guildId: "guild-1",
+    deferred: false,
+    replied: false,
+    isAutocomplete: () => false,
+    isButton: () => false,
+    isStringSelectMenu: () => false,
+    isChatInputCommand: () => true,
+    options: { getInteger: () => null },
+    async deferReply() {
+      this.deferred = true;
+      calls.push("defer");
+    },
+  };
+
+  try {
+    await handleRuntimeInteraction(runtime, interaction);
+    assert.deepEqual(calls, ["defer", "refresh", "response"]);
+  } finally {
+    if (statsBefore === null) {
+      if (fs.existsSync(statsFile)) fs.unlinkSync(statsFile);
+    } else {
+      fs.writeFileSync(statsFile, statsBefore, "utf8");
+    }
+  }
 });
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
