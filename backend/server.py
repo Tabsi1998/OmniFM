@@ -15,6 +15,7 @@ import socket
 import ipaddress
 import smtplib
 import ssl
+import calendar
 from email.message import EmailMessage
 import requests
 from pathlib import Path
@@ -853,19 +854,20 @@ def normalize_dashboard_event(event_payload):
     title = clip_text(payload.get("title") or payload.get("name") or "OmniFM Event", 120).strip()
     station_key = re.sub(r"[^a-z0-9:_-]", "", str(payload.get("stationKey") or payload.get("station") or "").strip().lower())[:120]
     timezone_name = clip_text(payload.get("timezone") or payload.get("timeZone") or "Europe/Vienna", 80)
+    event_timezone = dashboard_event_zone(timezone_name)
     channel_id = str(payload.get("voiceChannelId") or payload.get("channelId") or "").strip()
     text_channel_id = str(payload.get("textChannelId") or "").strip()
     enabled = payload.get("enabled") is not False
     now_iso = datetime.now(timezone.utc).isoformat()
     run_at_ms = parse_int(payload.get("runAtMs"), 0)
     if run_at_ms <= 0:
-        starts_at = str(payload.get("startsAt") or payload.get("startAt") or "").strip()
+        starts_at = str(payload.get("startsAtLocal") or payload.get("startsAt") or payload.get("startAt") or "").strip()
         if not starts_at:
             raise ValueError("Startzeit ist erforderlich.")
         try:
             parsed_start = datetime.fromisoformat(starts_at.replace("Z", "+00:00"))
             if parsed_start.tzinfo is None:
-                parsed_start = parsed_start.replace(tzinfo=ZoneInfo(timezone_name))
+                parsed_start = parsed_start.replace(tzinfo=event_timezone)
             run_at_ms = int(parsed_start.timestamp() * 1000)
         except Exception as exc:
             raise ValueError("Startzeit oder Zeitzone ist ungültig.") from exc
@@ -909,14 +911,202 @@ def dashboard_event_response(event):
     row = event if isinstance(event, dict) else {}
     run_at_ms = max(0, parse_int(row.get("runAtMs"), 0))
     starts_at = datetime.fromtimestamp(run_at_ms / 1000, timezone.utc).isoformat() if run_at_ms else None
+    timezone_name = row.get("timeZone") or "Europe/Vienna"
+    discord_scheduled_event_id = str(row.get("discordScheduledEventId") or "").strip() or None
+    discord_sync_error = clip_text(row.get("discordSyncError") or "", 300) or None
     return {
         **{key: value for key, value in row.items() if key not in ("_id", "_eventId")},
         "title": row.get("name") or "OmniFM Event",
         "channelId": row.get("voiceChannelId") or "",
-        "timezone": row.get("timeZone") or "Europe/Vienna",
+        "timezone": timezone_name,
         "startsAt": starts_at,
+        "startsAtLocal": format_dashboard_event_local(run_at_ms, timezone_name),
+        "repeatLabelDe": dashboard_event_repeat_label(row.get("repeat"), "de", run_at_ms, timezone_name),
+        "repeatLabelEn": dashboard_event_repeat_label(row.get("repeat"), "en", run_at_ms, timezone_name),
         "durationMinutes": round(max(0, parse_int(row.get("durationMs"), 0)) / 60000),
+        "announceMessage": row.get("announceMessage") or "",
+        "description": row.get("description") or "",
+        "stageTopic": row.get("stageTopic") or "",
+        "discordScheduledEventId": discord_scheduled_event_id,
+        "discordEventSynced": row.get("createDiscordEvent") is True and bool(discord_scheduled_event_id) and not discord_sync_error,
+        "discordSyncError": discord_sync_error,
     }
+
+
+MONTHLY_EVENT_REPEAT_NTH = {
+    "monthly_first_weekday": 1,
+    "monthly_second_weekday": 2,
+    "monthly_third_weekday": 3,
+    "monthly_fourth_weekday": 4,
+    "monthly_last_weekday": -1,
+}
+
+
+def dashboard_event_zone(timezone_name):
+    try:
+        return ZoneInfo(str(timezone_name or "Europe/Vienna"))
+    except Exception as exc:
+        raise ValueError("Startzeit oder Zeitzone ist ungültig.") from exc
+
+
+def format_dashboard_event_local(run_at_ms, timezone_name):
+    value = max(0, parse_int(run_at_ms, 0))
+    if not value:
+        return ""
+    return datetime.fromtimestamp(value / 1000, timezone.utc).astimezone(dashboard_event_zone(timezone_name)).strftime("%Y-%m-%dT%H:%M")
+
+
+def dashboard_event_repeat_label(repeat, language, run_at_ms=0, timezone_name="Europe/Vienna"):
+    mode = str(repeat or "none").strip().lower()
+    is_de = normalize_language(language, "de") == "de"
+    local_start = None
+    if parse_int(run_at_ms, 0) > 0:
+        local_start = datetime.fromtimestamp(parse_int(run_at_ms, 0) / 1000, timezone.utc).astimezone(dashboard_event_zone(timezone_name))
+    weekday_de = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+    weekday_en = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    weekday = (weekday_de if is_de else weekday_en)[local_start.weekday()] if local_start else ("Wochentag" if is_de else "weekday")
+    if mode == "daily":
+        return "Jeden Tag" if is_de else "Every day"
+    if mode == "weekdays":
+        return "Werktäglich (Montag bis Freitag)" if is_de else "Weekdays (Monday to Friday)"
+    if mode == "weekly":
+        return f"Jeden {weekday}" if is_de else f"Every {weekday}"
+    if mode == "biweekly":
+        return f"Alle 2 Wochen ({weekday})" if is_de else f"Every 2 weeks ({weekday})"
+    if mode in MONTHLY_EVENT_REPEAT_NTH:
+        nth = MONTHLY_EVENT_REPEAT_NTH[mode]
+        if nth == -1:
+            return f"Jeden letzten {weekday} im Monat" if is_de else f"Every last {weekday} of the month"
+        ordinal_en = {1: "1st", 2: "2nd", 3: "3rd", 4: "4th"}.get(nth, f"{nth}th")
+        return f"Jeden {nth}. {weekday} im Monat" if is_de else f"Every {ordinal_en} {weekday} of the month"
+    if mode == "yearly":
+        if not local_start:
+            return "Jährlich" if is_de else "Yearly"
+        if is_de:
+            return f"Jährlich am {local_start.day:02d}.{local_start.month:02d}."
+        return f"Yearly on {local_start.strftime('%B')} {local_start.day}"
+    return "Einmalig" if is_de else "Once"
+
+
+def next_dashboard_event_run_ms(run_at_ms, repeat, timezone_name="Europe/Vienna"):
+    value = max(0, parse_int(run_at_ms, 0))
+    mode = str(repeat or "none").strip().lower()
+    if not value or mode == "none":
+        return 0
+    tz = dashboard_event_zone(timezone_name)
+    local_start = datetime.fromtimestamp(value / 1000, timezone.utc).astimezone(tz)
+    if mode in {"daily", "weekdays", "weekly", "biweekly"}:
+        step_days = 7 if mode == "weekly" else 14 if mode == "biweekly" else 1
+        candidate = local_start + timedelta(days=step_days)
+        while mode == "weekdays" and candidate.weekday() >= 5:
+            candidate += timedelta(days=1)
+        return int(candidate.timestamp() * 1000)
+    if mode == "yearly":
+        year = local_start.year + 1
+        while year < local_start.year + 401:
+            try:
+                return int(local_start.replace(year=year).timestamp() * 1000)
+            except ValueError:
+                year += 1
+        return 0
+    nth = MONTHLY_EVENT_REPEAT_NTH.get(mode)
+    if nth is None:
+        return 0
+    month = 1 if local_start.month == 12 else local_start.month + 1
+    year = local_start.year + 1 if local_start.month == 12 else local_start.year
+    _, last_day = calendar.monthrange(year, month)
+    if nth == -1:
+        day = last_day
+        while datetime(year, month, day).weekday() != local_start.weekday():
+            day -= 1
+    else:
+        first_weekday = datetime(year, month, 1).weekday()
+        day = 1 + ((local_start.weekday() - first_weekday) % 7) + ((nth - 1) * 7)
+        if day > last_day:
+            return next_dashboard_event_run_ms(
+                int(local_start.replace(year=year, month=month, day=last_day).timestamp() * 1000),
+                repeat,
+                timezone_name,
+            )
+    candidate = datetime(year, month, day, local_start.hour, local_start.minute, tzinfo=tz)
+    return int(candidate.timestamp() * 1000)
+
+
+def build_dashboard_event_preview_rows(event, limit=5):
+    row = event if isinstance(event, dict) else {}
+    safe_limit = max(1, min(10, parse_int(limit, 5)))
+    run_at_ms = max(0, parse_int(row.get("runAtMs"), 0))
+    duration_ms = max(0, parse_int(row.get("durationMs"), 0))
+    timezone_name = row.get("timeZone") or row.get("timezone") or "Europe/Vienna"
+    repeat = row.get("repeat") or "none"
+    result = []
+    for _ in range(safe_limit):
+        if not run_at_ms:
+            break
+        end_at_ms = run_at_ms + duration_ms if duration_ms > 0 else 0
+        result.append({
+            "runAtMs": run_at_ms,
+            "durationMs": duration_ms,
+            "startsAt": datetime.fromtimestamp(run_at_ms / 1000, timezone.utc).isoformat(),
+            "startsAtLocal": format_dashboard_event_local(run_at_ms, timezone_name),
+            "endsAt": datetime.fromtimestamp(end_at_ms / 1000, timezone.utc).isoformat() if end_at_ms else "",
+            "endsAtLocal": format_dashboard_event_local(end_at_ms, timezone_name) if end_at_ms else "",
+        })
+        run_at_ms = next_dashboard_event_run_ms(run_at_ms, repeat, timezone_name)
+    return result
+
+
+def build_dashboard_event_conflicts(candidate, existing_events, language="de", ignore_event_id=""):
+    candidate_rows = build_dashboard_event_preview_rows(candidate, 5)
+    candidate_duration = max(0, parse_int(candidate.get("durationMs"), 0))
+    conflicts = []
+    seen = set()
+    for existing in existing_events if isinstance(existing_events, list) else []:
+        if not isinstance(existing, dict) or existing.get("enabled") is False:
+            continue
+        if str(existing.get("id") or "") == str(ignore_event_id or ""):
+            continue
+        if str(existing.get("voiceChannelId") or "") != str(candidate.get("voiceChannelId") or ""):
+            continue
+        existing_rows = build_dashboard_event_preview_rows(existing, 5)
+        existing_duration = max(0, parse_int(existing.get("durationMs"), 0))
+        for candidate_row in candidate_rows:
+            for existing_row in existing_rows:
+                severity = ""
+                if candidate_duration > 0 and existing_duration > 0:
+                    overlaps = candidate_row["runAtMs"] < existing_row["runAtMs"] + existing_duration and existing_row["runAtMs"] < candidate_row["runAtMs"] + candidate_duration
+                    if not overlaps:
+                        continue
+                    severity = "error"
+                    message = f'Überschneidet sich mit „{existing.get("name") or "Event"}“ im selben Voice-Kanal.' if language == "de" else f'Overlaps with "{existing.get("name") or "Event"}" in the same voice channel.'
+                elif candidate_duration <= 0 and existing_row["runAtMs"] >= candidate_row["runAtMs"]:
+                    severity = "warning"
+                    message = f'Dieses Event hat keine Endzeit und könnte „{existing.get("name") or "Event"}“ blockieren.' if language == "de" else f'This event has no end time and may block "{existing.get("name") or "Event"}."'
+                elif existing_duration <= 0 and existing_row["runAtMs"] <= candidate_row["runAtMs"]:
+                    severity = "warning"
+                    message = f'„{existing.get("name") or "Event"}“ hat keine Endzeit und könnte dieses Event blockieren.' if language == "de" else f'"{existing.get("name") or "Event"}" has no end time and may block this event.'
+                else:
+                    continue
+                key = (str(existing.get("id") or ""), candidate_row["runAtMs"], existing_row["runAtMs"], severity)
+                if key in seen:
+                    continue
+                seen.add(key)
+                existing_response = dashboard_event_response(existing)
+                conflicts.append({
+                    "severity": severity,
+                    "message": message,
+                    "eventId": existing_response.get("id"),
+                    "title": existing_response.get("title"),
+                    "repeat": existing_response.get("repeat"),
+                    "repeatLabelDe": existing_response.get("repeatLabelDe"),
+                    "repeatLabelEn": existing_response.get("repeatLabelEn"),
+                    "startsAt": existing_row.get("startsAt"),
+                    "startsAtLocal": existing_row.get("startsAtLocal"),
+                    "endsAt": existing_row.get("endsAt"),
+                    "endsAtLocal": existing_row.get("endsAtLocal"),
+                    "channelId": existing_response.get("channelId"),
+                })
+    return sorted(conflicts, key=lambda item: (0 if item.get("severity") == "error" else 1, item.get("startsAt") or ""))
 
 
 def dashboard_event_runtime_id(guild_id):
@@ -956,6 +1146,23 @@ def validate_dashboard_event(guild_id, event):
             exists = key in (load_stations_from_file().get("stations") or {})
     if not exists:
         raise ValueError("Sender wurde nicht gefunden.")
+
+
+def dashboard_event_station_name(guild_id, station_key):
+    key = str(station_key or "").strip()
+    if key.startswith("custom:"):
+        custom_key = key.split(":", 1)[1]
+        if db is not None:
+            row = db.custom_stations.find_one({"guildId": str(guild_id), "key": custom_key}, {"_id": 0, "name": 1})
+            if isinstance(row, dict) and row.get("name"):
+                return str(row.get("name"))
+        return custom_key
+    if db is not None:
+        row = db.stations.find_one({"key": key}, {"_id": 0, "name": 1})
+        if isinstance(row, dict) and row.get("name"):
+            return str(row.get("name"))
+    file_row = (load_stations_from_file().get("stations") or {}).get(key) or {}
+    return str(file_row.get("name") or key)
 
 
 def normalize_dashboard_perms(payload):
@@ -3331,7 +3538,7 @@ async def dashboard_stations_all(request: Request, serverId: str = ""):
         if key.startswith("custom:"):
             continue
         st_tier = (val.get("tier", "free") or "free").lower()
-        entry = {"key": key, "name": val.get("name", key), "url": val.get("url", ""), "genre": val.get("genre", ""), "country": val.get("country", "")}
+        entry = {"key": key, "name": val.get("name", key), "url": val.get("url", ""), "genre": val.get("genre", ""), "country": val.get("country", ""), "tier": st_tier}
         if st_tier == "free":
             free_list.append(entry)
         elif st_tier == "pro" and tier in ("pro", "ultimate"):
@@ -3517,6 +3724,72 @@ async def dashboard_upsert_telemetry(request: Request, body: dict, serverId: str
     telemetry_map[serverId] = normalize_dashboard_telemetry(body)
     save_dashboard_data(data)
     return {"success": True, "serverId": serverId, "telemetry": telemetry_map[serverId]}
+
+
+@app.post("/api/dashboard/events/preview")
+async def dashboard_events_preview(request: Request, body: dict, serverId: str = ""):
+    rate_limited = enforce_api_rate_limit(request, "write")
+    if rate_limited is not None:
+        return rate_limited
+    session, _ = get_dashboard_session(request)
+    if not session:
+        return json_error(401, "Nicht eingeloggt.")
+
+    guild = resolve_session_guild_for_server(session, serverId)
+    if not guild:
+        return json_error(403, "Kein Zugriff auf diesen Server.")
+    if TIER_RANK.get(guild.get("tier", "free"), 0) < TIER_RANK.get("pro", 1):
+        return json_error(403, "Events sind erst ab Pro verfuegbar.")
+    if db is None:
+        return json_error(503, "MongoDB nicht verbunden.")
+
+    language = normalize_language(
+        request.headers.get("X-OmniFM-Language"),
+        resolve_language_from_accept_language(request.headers.get("accept-language"), "de"),
+    )
+    guild_id = str(guild.get("id") or "")
+    incoming = body if isinstance(body, dict) else {}
+    event_id = str(incoming.get("eventId") or incoming.get("id") or "").strip()
+    existing = None
+    if event_id:
+        existing = db.scheduled_events.find_one({"_eventId": event_id, "guildId": guild_id}, {"_id": 0})
+        if not existing:
+            return json_error(404, "Event nicht gefunden." if language == "de" else "Event not found.")
+    try:
+        event_payload = normalize_dashboard_event({
+            **(existing or {}),
+            **incoming,
+            "id": (existing or {}).get("id") or event_id or None,
+            "guildId": guild_id,
+            "botId": (existing or {}).get("botId") or dashboard_event_runtime_id(guild_id),
+            "createdAt": (existing or {}).get("createdAt"),
+            "createdByUserId": (existing or {}).get("createdByUserId") or (session.get("user") or {}).get("id"),
+        })
+        validate_dashboard_event(guild_id, event_payload)
+    except ValueError as exc:
+        return json_error(400, str(exc))
+
+    existing_events = list(db.scheduled_events.find({"guildId": guild_id}, {"_id": 0, "_eventId": 0}).limit(200))
+    conflicts = build_dashboard_event_conflicts(
+        event_payload,
+        existing_events,
+        language=language,
+        ignore_event_id=(existing or {}).get("id") or event_id,
+    )
+    event_response = dashboard_event_response(event_payload)
+    event_response["stationName"] = dashboard_event_station_name(guild_id, event_payload.get("stationKey"))
+    return {
+        "success": True,
+        "serverId": guild_id,
+        "event": event_response,
+        "schedule": {
+            "nextRuns": build_dashboard_event_preview_rows(event_payload, 5),
+            "repeatLabelDe": dashboard_event_repeat_label(event_payload.get("repeat"), "de", event_payload.get("runAtMs"), event_payload.get("timeZone")),
+            "repeatLabelEn": dashboard_event_repeat_label(event_payload.get("repeat"), "en", event_payload.get("runAtMs"), event_payload.get("timeZone")),
+            "hasConflicts": bool(conflicts),
+        },
+        "conflicts": conflicts,
+    }
 
 
 @app.get("/api/dashboard/events")

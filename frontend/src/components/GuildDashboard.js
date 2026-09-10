@@ -3,7 +3,7 @@ import {
   Radio, LayoutDashboard, ListMusic, ShieldCheck, BarChart3, CreditCard, LogOut,
   Plus, Trash2, Check, Crown, Zap, Music2, Users, Clock, Lock, Server,
   ChevronRight, RefreshCw, AlertTriangle,
-  CalendarDays, Pencil,
+  CalendarDays,
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 import { buildApiUrl } from '../lib/api.js';
 import { useI18n } from '../i18n.js';
+import DashboardEvents from './DashboardEvents.js';
 
 const NAV = [
   { id: 'overview', icon: LayoutDashboard },
@@ -50,7 +51,7 @@ const COMMANDS = [
 const EMPTY_DATA = Object.freeze({
   stations: [], custom: [], roles: [], events: [], voiceChannels: [], textChannels: [], trend: [], top: [], listeners: 0,
   uptimeSec: 0, minutesMonth: 0, activeStreams: 0, liveStreams: [],
-  license: null, loading: false,
+  license: null, setupStatus: null, loading: false,
 });
 
 function fmtInt(value) { return Number(value || 0).toLocaleString(); }
@@ -74,7 +75,30 @@ function localDateTimeInput(value) {
   return shifted.toISOString().slice(0, 16);
 }
 function emptyEventForm() {
-  return { id: '', title: '', stationKey: '', voiceChannelId: '', textChannelId: '', startsAt: localDateTimeInput(), durationMinutes: 120, repeat: 'none', timezone: 'Europe/Vienna', announceMessage: '', enabled: true };
+  return {
+    title: '', stationKey: '', channelId: '', textChannelId: '',
+    startsAt: localDateTimeInput(), durationMinutes: '120', repeat: 'none', timezone: 'Europe/Vienna',
+    announceMessage: '', description: '', stageTopic: '', createDiscordEvent: false, enabled: true,
+  };
+}
+function eventFormFromRow(event) {
+  return {
+    title: event?.title || event?.name || '',
+    stationKey: event?.stationKey || '',
+    channelId: event?.channelId || event?.voiceChannelId || '',
+    textChannelId: event?.textChannelId || '',
+    startsAt: event?.startsAtLocal || localDateTimeInput(event?.startsAt || event?.runAtMs),
+    durationMinutes: Number(event?.durationMs || 0) > 0
+      ? String(Math.round(Number(event.durationMs) / 60000))
+      : '',
+    repeat: event?.repeat || 'none',
+    timezone: event?.timezone || event?.timeZone || 'Europe/Vienna',
+    announceMessage: event?.announceMessage || '',
+    description: event?.description || '',
+    stageTopic: event?.stageTopic || '',
+    createDiscordEvent: event?.createDiscordEvent === true,
+    enabled: event?.enabled !== false,
+  };
 }
 
 async function apiRequest(path, options = {}) {
@@ -155,9 +179,10 @@ export default function GuildDashboard() {
   const [store, setStore] = useState({});
   const [perms, setPerms] = useState({});
   const [newStation, setNewStation] = useState({ name: '', url: '' });
-  const [eventForm, setEventForm] = useState(null);
+  const [eventForm, setEventForm] = useState(() => emptyEventForm());
+  const [editingEventId, setEditingEventId] = useState('');
   const [msg, setMsg] = useState(null);
-  const { locale } = useI18n();
+  const { locale, formatDate } = useI18n();
   const t = useCallback((de, en) => (String(locale || 'de').startsWith('de') ? de : en), [locale]);
   const navLabel = useCallback((id) => ({
     overview: t('Übersicht', 'Overview'), stations: t('Sender', 'Stations'),
@@ -234,6 +259,7 @@ export default function GuildDashboard() {
           minutesMonth: Math.round(listeningMs / 60000),
           activeStreams: Number(basic.activeStreams || 0),
           liveStreams: Array.isArray(basic.activeStreamDetails) ? basic.activeStreamDetails : [],
+          setupStatus: basic.setupStatus || null,
           license,
           loading: false,
         },
@@ -267,6 +293,7 @@ export default function GuildDashboard() {
               liveStreams: Array.isArray(basic.activeStreamDetails) ? basic.activeStreamDetails : [],
               uptimeSec: Number(basic.runtimeUptimeSec || 0),
               minutesMonth: Math.round(Number(basic.totalListeningMs ?? previous.minutesMonth * 60000) / 60000),
+              setupStatus: basic.setupStatus || previous.setupStatus || null,
             },
           };
         });
@@ -280,6 +307,16 @@ export default function GuildDashboard() {
   const gdata = store[guildId] || EMPTY_DATA;
   const tier = gdata.license?.tier || guild?.tier || 'free';
   const tm = TIER_META[tier] || TIER_META.free;
+  const eventDependencies = useMemo(() => ({
+    voiceChannels: gdata.voiceChannels,
+    textChannels: gdata.textChannels,
+    stations: {
+      free: gdata.stations.filter((station) => String(station?.tier || 'free').toLowerCase() === 'free'),
+      pro: gdata.stations.filter((station) => String(station?.tier || 'free').toLowerCase() !== 'free'),
+      ultimate: [],
+      custom: gdata.custom,
+    },
+  }), [gdata.custom, gdata.stations, gdata.textChannels, gdata.voiceChannels]);
 
   const addCustom = async () => {
     const name = newStation.name.trim();
@@ -317,41 +354,64 @@ export default function GuildDashboard() {
     } catch (error) { setMsg({ ok: false, text: error.message }); }
   };
 
-  const openEvent = (event = null) => {
-    if (!event) { setEventForm(emptyEventForm()); return; }
-    setEventForm({
-      id: event.id, title: event.title || event.name || '', stationKey: event.stationKey || '',
-      voiceChannelId: event.voiceChannelId || event.channelId || '', textChannelId: event.textChannelId || '',
-      startsAt: localDateTimeInput(event.startsAt || event.runAtMs), durationMinutes: Number(event.durationMinutes || Math.round(Number(event.durationMs || 0) / 60000) || 120),
-      repeat: event.repeat || 'none', timezone: event.timezone || event.timeZone || 'Europe/Vienna', announceMessage: event.announceMessage || '', enabled: event.enabled !== false,
-    });
-  };
-  const saveEvent = async () => {
-    if (!eventForm?.title.trim() || !eventForm.stationKey || !eventForm.voiceChannelId || !eventForm.startsAt) {
-      setMsg({ ok: false, text: t('Name, Sender, Voice-Kanal und Startzeit sind erforderlich.', 'Name, station, voice channel and start time are required.') }); return;
+  const resetEventEditor = useCallback(() => {
+    setEditingEventId('');
+    setEventForm(emptyEventForm());
+  }, []);
+  const startEditingEvent = useCallback((event) => {
+    setEditingEventId(event?.id || '');
+    setEventForm(eventFormFromRow(event));
+  }, []);
+  const saveEvent = useCallback(async () => {
+    if (!eventForm?.title.trim() || !eventForm.stationKey || !eventForm.channelId || !eventForm.startsAt) {
+      setMsg({ ok: false, text: t('Name, Sender, Voice-Kanal und Startzeit sind erforderlich.', 'Name, station, voice channel and start time are required.') });
+      return { ok: false };
     }
     try {
-      const payload = { ...eventForm, title: eventForm.title.trim(), runAtMs: 0, durationMs: Math.max(1, Number(eventForm.durationMinutes || 0)) * 60000 };
-      const path = eventForm.id ? `/api/dashboard/events/${encodeURIComponent(eventForm.id)}?serverId=${encodeURIComponent(guildId)}` : `/api/dashboard/events?serverId=${encodeURIComponent(guildId)}`;
-      const result = await apiRequest(path, { method: eventForm.id ? 'PATCH' : 'POST', body: JSON.stringify(payload) });
+      const durationMinutes = Math.max(0, Math.min(525600, Number(eventForm.durationMinutes || 0) || 0));
+      const payload = {
+        ...eventForm,
+        title: eventForm.title.trim(),
+        startsAtLocal: eventForm.startsAt,
+        durationMs: durationMinutes * 60000,
+      };
+      const path = editingEventId ? `/api/dashboard/events/${encodeURIComponent(editingEventId)}?serverId=${encodeURIComponent(guildId)}` : `/api/dashboard/events?serverId=${encodeURIComponent(guildId)}`;
+      const result = await apiRequest(path, { method: editingEventId ? 'PATCH' : 'POST', body: JSON.stringify(payload) });
       setStore((current) => {
         const previous = current[guildId] || EMPTY_DATA;
-        const nextEvents = eventForm.id ? previous.events.map((row) => (row.id === eventForm.id ? result.event : row)) : [...previous.events, result.event];
-        return { ...current, [guildId]: { ...previous, events: nextEvents.sort((a, b) => Number(a.runAtMs || 0) - Number(b.runAtMs || 0)) } };
+        const nextEvents = [...previous.events.filter((row) => row.id !== result.event?.id), result.event]
+          .filter(Boolean)
+          .sort((a, b) => Number(a.runAtMs || 0) - Number(b.runAtMs || 0));
+        return { ...current, [guildId]: { ...previous, events: nextEvents } };
       });
-      setEventForm(null);
-      setMsg({ ok: true, text: t('Event wurde im aktiven Scheduler gespeichert.', 'Event saved to the active scheduler.') });
+      resetEventEditor();
+      setMsg({ ok: true, text: editingEventId ? t('Event wurde aktualisiert.', 'Event updated.') : t('Event wurde im aktiven Scheduler gespeichert.', 'Event saved to the active scheduler.') });
+      return { ok: true, event: result.event };
+    } catch (error) {
+      setMsg({ ok: false, text: error.message });
+      return { ok: false, error };
+    }
+  }, [editingEventId, eventForm, guildId, resetEventEditor, t]);
+  const toggleEvent = useCallback(async (eventId, enabled) => {
+    try {
+      const result = await apiRequest(`/api/dashboard/events/${encodeURIComponent(eventId)}?serverId=${encodeURIComponent(guildId)}`, { method: 'PATCH', body: JSON.stringify({ enabled }) });
+      setStore((current) => {
+        const previous = current[guildId] || EMPTY_DATA;
+        return { ...current, [guildId]: { ...previous, events: previous.events.map((row) => (row.id === eventId ? result.event : row)) } };
+      });
+      if (editingEventId === eventId && result.event) setEventForm(eventFormFromRow(result.event));
+      setMsg({ ok: true, text: enabled ? t('Event aktiviert.', 'Event enabled.') : t('Event pausiert.', 'Event paused.') });
     } catch (error) { setMsg({ ok: false, text: error.message }); }
-  };
-  const deleteEvent = async (eventId) => {
+  }, [editingEventId, guildId, t]);
+  const deleteEvent = useCallback(async (eventId) => {
     if (typeof window !== 'undefined' && !window.confirm(t('Event wirklich löschen?', 'Delete this event?'))) return;
     try {
       await apiRequest(`/api/dashboard/events/${encodeURIComponent(eventId)}?serverId=${encodeURIComponent(guildId)}`, { method: 'DELETE' });
       setStore((current) => ({ ...current, [guildId]: { ...(current[guildId] || EMPTY_DATA), events: (current[guildId]?.events || []).filter((row) => row.id !== eventId) } }));
-      if (eventForm?.id === eventId) setEventForm(null);
+      if (editingEventId === eventId) resetEventEditor();
       setMsg({ ok: true, text: t('Event wurde gelöscht.', 'Event deleted.') });
     } catch (error) { setMsg({ ok: false, text: error.message }); }
-  };
+  }, [editingEventId, guildId, resetEventEditor, t]);
 
   const logout = async () => {
     try { await apiRequest('/api/auth/logout', { method: 'POST' }); } catch { /* cookie is cleared best-effort */ }
@@ -441,24 +501,23 @@ export default function GuildDashboard() {
         </>}
 
         {section === 'events' && <>{tier === 'free' ? <div className="oa-card" style={{ display: 'flex', alignItems: 'center', gap: 14 }}><Lock size={22} /><div><b>{t('Automatische Radio-Events sind ab Pro verfügbar.', 'Scheduled radio events are available from Pro.')}</b></div><button className="oa-btn primary" style={{ marginLeft: 'auto' }} onClick={() => setSection('subscription')}>Upgrade</button></div> : <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16 }}><div><div className="oa-section-title" style={{ margin: 0 }}><CalendarDays size={15} /> {t('Geplante Radio-Events', 'Scheduled radio events')} ({gdata.events.length})</div><div className="oa-stat-foot" style={{ marginTop: 6 }}>{t('Events werden direkt im aktiven Commander-Scheduler gespeichert und nach Neustarts aus MongoDB wieder geladen.', 'Events are stored directly in the active Commander scheduler and restored from MongoDB after restarts.')}</div></div><button className="oa-btn primary" onClick={() => openEvent()}><Plus size={15} /> {t('Event anlegen', 'Create event')}</button></div>
-          {eventForm && <div className="oa-card oa-fade" style={{ marginBottom: 18, borderColor: 'rgba(255,107,0,.35)' }} data-testid="guild-event-form">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}><div style={{ fontWeight: 800, fontSize: 17 }}>{eventForm.id ? t('Event bearbeiten', 'Edit event') : t('Neues Event', 'New event')}</div><button className="oa-btn ghost" onClick={() => setEventForm(null)}>×</button></div>
-            <div className="oa-grid cols-2" style={{ gap: 12 }}>
-              <div><label className="oa-stat-label">Name</label><input className="oa-input" style={{ marginTop: 6 }} value={eventForm.title} onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })} placeholder="Friday Night Radio" /></div>
-              <div><label className="oa-stat-label">{t('Sender', 'Station')}</label><select className="oa-input" style={{ marginTop: 6 }} value={eventForm.stationKey} onChange={(e) => setEventForm({ ...eventForm, stationKey: e.target.value })}><option value="">— {t('auswählen', 'select')} —</option>{gdata.stations.map((station) => <option key={station.key} value={station.key}>{station.name}</option>)}{gdata.custom.map((station) => <option key={`custom:${station.key}`} value={`custom:${station.key}`}>{station.name} ({t('Eigener Sender', 'Custom')})</option>)}</select></div>
-              <div><label className="oa-stat-label">Voice-Kanal</label><select className="oa-input" style={{ marginTop: 6 }} value={eventForm.voiceChannelId} onChange={(e) => setEventForm({ ...eventForm, voiceChannelId: e.target.value })}><option value="">— {t('auswählen', 'select')} —</option>{gdata.voiceChannels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}</select></div>
-              <div><label className="oa-stat-label">{t('Ankündigungs-Kanal (optional)', 'Announcement channel (optional)')}</label><select className="oa-input" style={{ marginTop: 6 }} value={eventForm.textChannelId} onChange={(e) => setEventForm({ ...eventForm, textChannelId: e.target.value })}><option value="">—</option>{gdata.textChannels.map((channel) => <option key={channel.id} value={channel.id}>#{channel.name}</option>)}</select></div>
-              <div><label className="oa-stat-label">{t('Start', 'Start')}</label><input type="datetime-local" className="oa-input" style={{ marginTop: 6 }} value={eventForm.startsAt} onChange={(e) => setEventForm({ ...eventForm, startsAt: e.target.value })} /></div>
-              <div><label className="oa-stat-label">{t('Dauer (Minuten)', 'Duration (minutes)')}</label><input type="number" min="1" max="525600" className="oa-input" style={{ marginTop: 6 }} value={eventForm.durationMinutes} onChange={(e) => setEventForm({ ...eventForm, durationMinutes: e.target.value })} /></div>
-              <div><label className="oa-stat-label">{t('Wiederholung', 'Repeat')}</label><select className="oa-input" style={{ marginTop: 6 }} value={eventForm.repeat} onChange={(e) => setEventForm({ ...eventForm, repeat: e.target.value })}><option value="none">{t('Einmalig', 'Once')}</option><option value="daily">{t('Täglich', 'Daily')}</option><option value="weekdays">{t('Werktags', 'Weekdays')}</option><option value="weekly">{t('Wöchentlich', 'Weekly')}</option><option value="biweekly">{t('Alle 2 Wochen', 'Biweekly')}</option><option value="monthly_first_weekday">{t('Monatlich · erster Wochentag', 'Monthly · first weekday')}</option><option value="monthly_last_weekday">{t('Monatlich · letzter Wochentag', 'Monthly · last weekday')}</option><option value="yearly">{t('Jährlich', 'Yearly')}</option></select></div>
-              <div><label className="oa-stat-label">{t('Zeitzone', 'Timezone')}</label><input className="oa-input" style={{ marginTop: 6 }} value={eventForm.timezone} onChange={(e) => setEventForm({ ...eventForm, timezone: e.target.value })} placeholder="Europe/Vienna" /></div>
-              <div style={{ gridColumn: '1 / -1' }}><label className="oa-stat-label">{t('Ankündigung (optional)', 'Announcement (optional)')}</label><input className="oa-input" style={{ marginTop: 6 }} value={eventForm.announceMessage} onChange={(e) => setEventForm({ ...eventForm, announceMessage: e.target.value })} /></div>
-            </div>
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 14, color: '#cbd5e1', fontSize: 13 }}><input type="checkbox" checked={eventForm.enabled} onChange={(e) => setEventForm({ ...eventForm, enabled: e.target.checked })} /> {t('Event aktiv', 'Event enabled')}</label>
-            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}><button className="oa-btn primary" onClick={saveEvent}><Check size={15} /> {t('Im Scheduler speichern', 'Save to scheduler')}</button><button className="oa-btn ghost" onClick={() => setEventForm(null)}>{t('Abbrechen', 'Cancel')}</button></div>
-          </div>}
-          <div className="oa-table-wrap"><table className="oa-table"><thead><tr><th>Event</th><th>{t('Sender & Ziel', 'Station & target')}</th><th>{t('Start', 'Start')}</th><th>{t('Wiederholung', 'Repeat')}</th><th>Status</th><th /></tr></thead><tbody>{!gdata.events.length && <tr><td colSpan={6} style={{ padding: 28, textAlign: 'center', color: '#64748b' }}>{t('Noch keine Events geplant.', 'No events scheduled yet.')}</td></tr>}{gdata.events.map((event) => { const voice = gdata.voiceChannels.find((channel) => channel.id === (event.voiceChannelId || event.channelId)); return <tr key={event.id}><td><b>{event.title || event.name}</b><div className="oa-mono" style={{ fontSize: 10, color: '#64748b' }}>{event.id}</div></td><td>{gdata.stations.concat(gdata.custom).find((station) => event.stationKey === station.key || event.stationKey === `custom:${station.key}`)?.name || event.stationKey}<div className="oa-mono" style={{ fontSize: 10, color: '#64748b' }}>{voice?.name || event.voiceChannelId}</div></td><td>{event.startsAt ? new Date(event.startsAt).toLocaleString() : '—'}<div className="oa-mono" style={{ fontSize: 10, color: '#64748b' }}>{event.durationMinutes || 0} min</div></td><td>{event.repeat === 'none' ? t('Einmalig', 'Once') : event.repeat}</td><td><span className={`oa-pill ${event.enabled === false ? 'slate' : 'green'}`}>{event.enabled === false ? t('Pausiert', 'Paused') : t('Aktiv', 'Active')}</span></td><td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}><button className="oa-btn ghost" onClick={() => openEvent(event)}><Pencil size={14} /></button><button className="oa-btn ghost" style={{ color: '#ff8fab', marginLeft: 6 }} onClick={() => deleteEvent(event.id)}><Trash2 size={14} /></button></td></tr>; })}</tbody></table></div>
+          <DashboardEvents
+            events={gdata.events}
+            eventForm={eventForm}
+            setEventForm={setEventForm}
+            editingEventId={editingEventId}
+            onSaveEvent={saveEvent}
+            onToggleEvent={toggleEvent}
+            onDeleteEvent={deleteEvent}
+            onStartEditEvent={startEditingEvent}
+            onCancelEditEvent={resetEventEditor}
+            t={t}
+            formatDate={formatDate}
+            apiRequest={apiRequest}
+            selectedGuildId={guildId}
+            setupStatus={gdata.setupStatus}
+            prefetchedDependencies={eventDependencies}
+          />
         </>}</>}
 
         {section === 'stations' && <>

@@ -255,6 +255,7 @@ export default function DashboardEvents({
   selectedGuildId,
   setupStatus = null,
   inviteLinks = null,
+  prefetchedDependencies = null,
 }) {
   const [showForm, setShowForm] = useState(false);
   const [voiceChannels, setVoiceChannels] = useState([]);
@@ -283,9 +284,18 @@ export default function DashboardEvents({
     setServerEmojis([]);
     setLoadingDependencies(true);
     try {
+      const prefetchedChannels = prefetchedDependencies && Array.isArray(prefetchedDependencies.voiceChannels)
+        ? {
+          voiceChannels: prefetchedDependencies.voiceChannels,
+          textChannels: Array.isArray(prefetchedDependencies.textChannels) ? prefetchedDependencies.textChannels : [],
+        }
+        : null;
+      const prefetchedStations = prefetchedDependencies?.stations && typeof prefetchedDependencies.stations === 'object'
+        ? prefetchedDependencies.stations
+        : null;
       const [channelResult, stationResult, emojiResult] = await Promise.all([
-        apiRequest(`/api/dashboard/channels?serverId=${encodeURIComponent(selectedGuildId)}`),
-        apiRequest(`/api/dashboard/stations?serverId=${encodeURIComponent(selectedGuildId)}`),
+        prefetchedChannels || apiRequest(`/api/dashboard/channels?serverId=${encodeURIComponent(selectedGuildId)}`),
+        prefetchedStations || apiRequest(`/api/dashboard/stations?serverId=${encodeURIComponent(selectedGuildId)}`),
         apiRequest(`/api/dashboard/emojis?serverId=${encodeURIComponent(selectedGuildId)}`),
       ]);
       if (loadToken !== loadTokenRef.current) return;
@@ -308,7 +318,7 @@ export default function DashboardEvents({
       if (loadToken !== loadTokenRef.current) return;
       setLoadingDependencies(false);
     }
-  }, [selectedGuildId, apiRequest]);
+  }, [selectedGuildId, apiRequest, prefetchedDependencies]);
 
   useEffect(() => { loadChannelsAndStations(); }, [loadChannelsAndStations]);
   useEffect(() => { if (editingEventId) setShowForm(true); }, [editingEventId]);
@@ -501,7 +511,7 @@ export default function DashboardEvents({
                 {isEditing ? t('Event bearbeiten', 'Edit event') : t('Neues Event anlegen', 'Create new event')}
               </div>
               <div style={{ color: '#52525B', fontSize: 12 }}>
-                {t('Das Discord-Server-Event wird jetzt direkt beim Speichern synchronisiert.', 'The Discord server event is now synced directly on save.')}
+                {t('Der Synchronisationsstatus zeigt, ob das Discord-Server-Event vom Commander bestätigt wurde.', 'The sync status shows whether the Discord server event was confirmed by the Commander.')}
               </div>
             </div>
 
