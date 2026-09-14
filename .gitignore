@@ -66,3 +66,7 @@ credentials.json
 *.pem
 *.key
 .credentials
+
+# Local VS Code test environments and generated results
+/.local-testing/
+/*.code-workspace
