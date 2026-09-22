@@ -65,6 +65,7 @@ function normalizeSeverity(value, eventKey = "") {
   if (["success", "warning", "critical"].includes(severity)) return severity;
   switch (String(eventKey || "").trim().toLowerCase()) {
     case "stream_recovered":
+    case "stream_failback_completed":
       return "success";
     case "stream_failover_exhausted":
       return "critical";

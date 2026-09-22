@@ -19,7 +19,8 @@ import {
 import { networkRecoveryCoordinator } from "../core/network-recovery.js";
 import { safeFetch } from "../lib/safe-outbound-http.js";
 
-async function createResource(url, volume, qualityPreset, botName, bitrateOverride, networkScope = null) {
+async function createResource(url, volume, qualityPreset, botName, bitrateOverride, networkScope = null, options = {}) {
+  const metadata = options?.metadata && typeof options.metadata === "object" ? options.metadata : null;
   const streamResponse = await safeFetch(url, {
     method: "GET",
     redirect: "follow",
@@ -138,6 +139,7 @@ async function createResource(url, volume, qualityPreset, botName, bitrateOverri
     const resource = createAudioResource(ffmpeg.stdout, {
       inputType,
       inlineVolume: true,
+      metadata,
     });
     applyVolumeTransformerLevel(resource.volume, volume);
 
@@ -160,7 +162,7 @@ async function createResource(url, volume, qualityPreset, botName, bitrateOverri
     ),
   ]);
 
-  const resource = createAudioResource(probe.stream, { inputType: probe.type, inlineVolume: true });
+  const resource = createAudioResource(probe.stream, { inputType: probe.type, inlineVolume: true, metadata });
   applyVolumeTransformerLevel(resource.volume, volume);
 
   return { resource, process: null };

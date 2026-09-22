@@ -14,7 +14,7 @@ import { networkRecoveryCoordinator } from "../core/network-recovery.js";
 import { createResource } from "../services/stream.js";
 import { fetchStreamInfo } from "../services/now-playing.js";
 import { getServerPlanConfig } from "../core/entitlements.js";
-import { normalizeFailoverChain, buildFailoverCandidateChain } from "../lib/failover-chain.js";
+import { normalizeFailoverChain, buildFailoverCandidateChain, normalizeFailoverKey } from "../lib/failover-chain.js";
 import {
   clearActiveFailover,
   clearFailoverFailureWindow,
@@ -26,6 +26,8 @@ import { dispatchRuntimeReliabilityWebhook } from "../lib/runtime-alerts.js";
 import { dispatchRuntimeIncidentAlert } from "../lib/runtime-discord-alerts.js";
 import { recordRuntimeIncident } from "../runtime-incidents-store.js";
 import { isRuntimeVoiceConnected } from "./runtime-live-state.js";
+import { AudioPlayerStatus } from "@discordjs/voice";
+import { safeFetch } from "../lib/safe-outbound-http.js";
 
 function toPositiveInt(rawValue, fallbackValue) {
   const parsed = Number.parseInt(String(rawValue ?? fallbackValue), 10);
@@ -44,6 +46,14 @@ const STREAM_HEALTHCHECK_STALL_MS = Math.max(
 );
 const STREAM_HEALTHCHECK_RESTART_MS = Math.max(750, toPositiveInt(process.env.STREAM_HEALTHCHECK_RESTART_MS, 1_250));
 const STREAM_RESTART_RESCHEDULE_SLACK_MS = 1_000;
+// Failback: while a failover is active the preferred station is probed and
+// restored automatically once it delivers audio again (#187).
+const STREAM_FAILBACK_ENABLED = String(process.env.STREAM_FAILBACK_ENABLED ?? "1") !== "0";
+const STREAM_FAILBACK_CHECK_MS = Math.max(30_000, toPositiveInt(process.env.STREAM_FAILBACK_CHECK_MS, 120_000));
+const STREAM_FAILBACK_MAX_MS = Math.max(STREAM_FAILBACK_CHECK_MS, toPositiveInt(process.env.STREAM_FAILBACK_MAX_MS, 15 * 60_000));
+const STREAM_FAILBACK_CONFIRMATIONS = Math.max(1, Math.min(10, toPositiveInt(process.env.STREAM_FAILBACK_CONFIRMATIONS, 2)));
+const STREAM_FAILBACK_PROBE_TIMEOUT_MS = Math.max(1_000, Math.min(20_000, toPositiveInt(process.env.STREAM_FAILBACK_PROBE_TIMEOUT_MS, 5_000)));
+const STREAM_FAILBACK_PROBE_BYTES = 4_096;
 
 function getTierConfig(guildId) {
   const config = getServerPlanConfig(guildId);
@@ -304,6 +314,15 @@ export async function evaluateRuntimeStreamHealth(runtime, guildId, state, proce
     return { ok: false, skipped: "recovery" };
   }
 
+  // A paused player stops pulling from ffmpeg, so no audio arrives by design.
+  // Paused time must not count as a stall, otherwise /pause would cancel
+  // itself after STREAM_HEALTHCHECK_STALL_MS (#189).
+  const playerStatus = String(state.player?.state?.status || "").trim().toLowerCase();
+  if (playerStatus === String(AudioPlayerStatus.Paused) || playerStatus === String(AudioPlayerStatus.AutoPaused)) {
+    state.lastAudioPacketAt = nowMs;
+    return { ok: true, skipped: "paused" };
+  }
+
   const startedAt = Number(state.streamHealthStartedAt || state.lastStreamStartAt || 0) || nowMs;
   if ((nowMs - startedAt) < Math.max(0, Number(graceMs) || 0)) {
     return { ok: true, skipped: "grace" };
@@ -493,11 +512,17 @@ export function armRuntimeStreamStabilityReset(runtime, guildId, state) {
 
 export function trackRuntimeProcessLifecycle(runtime, guildId, state, process) {
   if (!process) return;
+  // Every stream start bumps state.streamGeneration. A process that belongs to
+  // an older generation was replaced by a newer stream; its late stderr, exit
+  // and error events must not touch the bookkeeping of the current stream.
+  const generation = Number(state.streamGeneration || 0) || 0;
+  const isCurrentGeneration = () => (Number(state.streamGeneration || 0) || 0) === generation;
   let stderrBuffer = "";
   armRuntimeStreamHealthMonitor(runtime, guildId, state, process);
 
   if (process.stderr?.on) {
     process.stderr.on("data", (chunk) => {
+      if (!isCurrentGeneration()) return;
       stderrBuffer += chunk.toString();
       const lines = stderrBuffer.split("\n");
       stderrBuffer = lines.pop() || "";
@@ -523,10 +548,11 @@ export function trackRuntimeProcessLifecycle(runtime, guildId, state, process) {
   }
 
   process.on("close", (code) => {
-    clearRuntimeStreamHealthTimer(state);
     if (state.currentProcess === process) {
+      clearRuntimeStreamHealthTimer(state);
       state.currentProcess = null;
     }
+    if (!isCurrentGeneration()) return;
     state.lastProcessExitAt = Date.now();
     state.lastProcessExitCode = Number.isFinite(code) ? Number(code) : null;
     if (code && code !== 0) {
@@ -536,12 +562,13 @@ export function trackRuntimeProcessLifecycle(runtime, guildId, state, process) {
     }
   });
   process.on("error", (err) => {
-    log("ERROR", `[${runtime.config.name}] ffmpeg process error: ${err?.message || err}`);
-    state.lastStreamErrorAt = new Date().toISOString();
-    clearRuntimeStreamHealthTimer(state);
     if (state.currentProcess === process) {
+      clearRuntimeStreamHealthTimer(state);
       state.currentProcess = null;
     }
+    if (!isCurrentGeneration()) return;
+    log("ERROR", `[${runtime.config.name}] ffmpeg process error: ${err?.message || err}`);
+    state.lastStreamErrorAt = new Date().toISOString();
   });
 }
 
@@ -767,27 +794,59 @@ export async function playRuntimeStation(runtime, state, stations, key, guildId,
   const station = stations.stations[key];
   if (!station) throw new Error("Station nicht gefunden.");
 
-  runtime.clearCurrentProcess(state);
-
+  // The running stream keeps playing until the new source is actually ready.
+  // Only then is it swapped and the old process killed. This makes a station
+  // switch gapless and, more importantly, the replaced resource never reaches
+  // the player as an Idle event that would schedule a second restart (#188).
   let bitrateOverride = null;
   if (guildId) {
     const tierConfig = getTierConfig(guildId);
     bitrateOverride = tierConfig.bitrate;
   }
 
-  const { resource, process } = await createResource(
+  const nextGeneration = (Number(state.streamGeneration || 0) || 0) + 1;
+  const resourceMetadata = { generation: nextGeneration, stationKey: key };
+  const createStreamResource = typeof runtime.createStreamResource === "function"
+    ? runtime.createStreamResource.bind(runtime)
+    : createResource;
+  const { resource, process } = await createStreamResource(
     station.url,
     state.volume,
     stations.qualityPreset,
     runtime.config.name,
     bitrateOverride,
-    getRuntimeRecoveryScope(runtime, guildId)
+    getRuntimeRecoveryScope(runtime, guildId),
+    { metadata: resourceMetadata }
   );
+  if (resource && (resource.metadata === null || resource.metadata === undefined)) {
+    resource.metadata = resourceMetadata;
+  }
 
+  const staleProcess = state.currentProcess;
+  state.streamGeneration = nextGeneration;
+  clearRuntimeFailbackTimer(state);
+  clearRuntimeStreamHealthTimer(state);
   state.currentProcess = process;
   runtime.trackProcessLifecycle(guildId, state, process);
 
   state.player.play(resource);
+  if (staleProcess && staleProcess !== process) {
+    try {
+      staleProcess.kill("SIGKILL");
+    } catch {
+      // process may already be dead
+    }
+  }
+
+  // A restart that was still pending for the replaced stream is obsolete.
+  if (state.streamRestartTimer) {
+    clearTimeout(state.streamRestartTimer);
+    state.streamRestartTimer = null;
+  }
+  state.streamRestartScheduledAt = 0;
+  state.streamRestartScheduledReason = null;
+  state.streamRestartScheduledDelayMs = 0;
+
   state.currentStationKey = key;
   state.currentStationName = station.name || key;
   if (options?.preserveDesiredStation !== true || !state.desiredStationKey) {
@@ -821,8 +880,12 @@ export async function playRuntimeStation(runtime, state, stations, key, guildId,
     countAsStart: options?.countAsStart !== false,
     resumeSession: options?.resumeSession === true,
   });
+  armRuntimeFailbackProbe(runtime, guildId, state);
 
-  fetchStreamInfo(station.url)
+  const fetchInfo = typeof runtime.fetchStreamInfo === "function"
+    ? runtime.fetchStreamInfo.bind(runtime)
+    : fetchStreamInfo;
+  fetchInfo(station.url)
     .then((meta) => {
       if (state.currentStationKey === key) {
         const prevMeta = state.currentMeta || {};
@@ -990,6 +1053,9 @@ async function restartRuntimeCurrentStationAttempt(runtime, state, guildId) {
         state.failoverFromStationKey = resolvedStation.key;
         state.failoverFromStationName = resolvedStation.station.name || resolvedStation.key;
         clearFailoverFailureWindow(state);
+        state.failbackAttempts = 0;
+        state.failbackSuccessCount = 0;
+        armRuntimeFailbackProbe(runtime, guildId, state);
         runtime.persistState?.();
         log("INFO", `[${runtime.config.name}] Failover to ${fallbackStation.key} after restart failure`);
         void emitRuntimeReliabilityAlert(runtime, guildId, "stream_failover_activated", {
@@ -1100,4 +1166,292 @@ export async function restartRuntimeCurrentStation(runtime, state, guildId) {
   } finally {
     state.streamRestartInFlight = false;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Idle guard and failback (#187, #188)
+// ---------------------------------------------------------------------------
+
+/**
+ * Decides whether an AudioPlayer Idle event belongs to the stream that is
+ * currently expected to play. Idle events of a resource that was already
+ * replaced by a newer generation are ignored, otherwise every station switch
+ * would schedule a restart for a stream that nobody wants anymore.
+ */
+export function shouldHandleRuntimeIdleEvent(state, oldState = null) {
+  if (!state) return false;
+  if (state.ignoreNextIdleEvent === true) {
+    state.ignoreNextIdleEvent = false;
+    return false;
+  }
+  const resourceGeneration = Number(oldState?.resource?.metadata?.generation);
+  const currentGeneration = Number(state.streamGeneration || 0) || 0;
+  if (
+    Number.isFinite(resourceGeneration)
+    && resourceGeneration > 0
+    && currentGeneration > 0
+    && resourceGeneration !== currentGeneration
+  ) {
+    return false;
+  }
+  return true;
+}
+
+export function clearRuntimeFailbackTimer(state) {
+  if (!state) return;
+  if (state.failbackTimer) {
+    clearTimeout(state.failbackTimer);
+    state.failbackTimer = null;
+  }
+  state.failbackNextProbeAt = 0;
+}
+
+export function getRuntimeFailbackDelayMs(attempts = 0, {
+  checkMs = STREAM_FAILBACK_CHECK_MS,
+  maxMs = STREAM_FAILBACK_MAX_MS,
+} = {}) {
+  const exponent = Math.min(6, Math.max(0, Number.parseInt(String(attempts || 0), 10) || 0));
+  return Math.min(Math.max(checkMs, maxMs), checkMs * Math.pow(2, exponent));
+}
+
+export function isRuntimeFailbackPending(state) {
+  if (!state || state.failoverActive !== true) return false;
+  const desired = normalizeFailoverKey(state.desiredStationKey);
+  const current = normalizeFailoverKey(state.currentStationKey);
+  return Boolean(desired && current && desired !== current);
+}
+
+/**
+ * Schedules the next check of the preferred station while a failover is
+ * active. The delay grows with every failed probe up to STREAM_FAILBACK_MAX_MS
+ * so a station that stays dead is not hammered.
+ */
+export function armRuntimeFailbackProbe(runtime, guildId, state, { delayMs = null } = {}) {
+  clearRuntimeFailbackTimer(state);
+  if (!STREAM_FAILBACK_ENABLED) return false;
+  if (!isRuntimeFailbackPending(state)) return false;
+
+  const baseDelay = Number.isFinite(Number(delayMs)) && Number(delayMs) > 0
+    ? Number(delayMs)
+    : getRuntimeFailbackDelayMs(state.failbackAttempts || 0);
+  const delay = Math.max(1_000, applyJitter(baseDelay, 0.15));
+  state.failbackNextProbeAt = Date.now() + delay;
+  state.failbackTimer = setTimeout(() => {
+    state.failbackTimer = null;
+    state.failbackNextProbeAt = 0;
+    runRuntimeFailbackProbe(runtime, guildId, state).catch((err) => {
+      log("WARN", `[${runtime.config.name}] Failback-Pruefung fehlgeschlagen guild=${guildId}: ${err?.message || err}`);
+      state.failbackAttempts = (Number(state.failbackAttempts || 0) || 0) + 1;
+      armRuntimeFailbackProbe(runtime, guildId, state);
+    });
+  }, delay);
+  state.failbackTimer?.unref?.();
+
+  const attempts = Number(state.failbackAttempts || 0) || 0;
+  if (attempts === 0 || attempts % 5 === 0) {
+    log(
+      "INFO",
+      `[${runtime.config.name}] Failback-Pruefung geplant guild=${guildId} wunsch=${state.desiredStationKey} aktuell=${state.currentStationKey} in ${Math.round(delay / 1000)}s (versuch ${attempts + 1})`
+    );
+  }
+  return true;
+}
+
+/**
+ * Opens the preferred station briefly and checks that audio bytes arrive.
+ * A plain HTTP 200 is not enough: many providers answer 200 and then stall.
+ */
+export async function probeRuntimeStreamUrl(url, { timeoutMs = STREAM_FAILBACK_PROBE_TIMEOUT_MS } = {}) {
+  const response = await safeFetch(url, {
+    method: "GET",
+    redirect: "follow",
+    headers: { "User-Agent": "OmniFM/3.0 failback-probe" },
+    timeoutMs,
+  });
+  if (!response?.ok || !response.body) {
+    try {
+      await response?.body?.cancel?.();
+    } catch {
+      // ignore
+    }
+    return { ok: false, reason: `http-${Number(response?.status || 0) || "unknown"}` };
+  }
+
+  const reader = response.body.getReader();
+  const deadline = Date.now() + Math.max(1_000, Number(timeoutMs) || STREAM_FAILBACK_PROBE_TIMEOUT_MS);
+  let bytes = 0;
+  try {
+    while (bytes < STREAM_FAILBACK_PROBE_BYTES && Date.now() < deadline) {
+      let timer = null;
+      const chunk = await Promise.race([
+        reader.read(),
+        new Promise((resolve) => {
+          timer = setTimeout(() => resolve({ done: true, timedOut: true }), Math.max(100, deadline - Date.now()));
+        }),
+      ]);
+      if (timer) clearTimeout(timer);
+      if (!chunk || chunk.done) break;
+      bytes += Number(chunk.value?.length || 0) || 0;
+    }
+  } finally {
+    try {
+      await reader.cancel();
+    } catch {
+      // ignore
+    }
+  }
+  return bytes > 0 ? { ok: true, bytes } : { ok: false, reason: "no-audio-data" };
+}
+
+/**
+ * One failback attempt: probe the preferred station; after
+ * STREAM_FAILBACK_CONFIRMATIONS successful probes in a row switch back.
+ */
+export async function runRuntimeFailbackProbe(runtime, guildId, state, { nowMs = Date.now() } = {}) {
+  if (!isRuntimeFailbackPending(state) || !state.shouldReconnect || !state.currentStationKey) {
+    return { ok: false, skipped: "inactive" };
+  }
+  if (
+    state.streamRestartInFlight
+    || state.streamRestartTimer
+    || state.reconnectTimer
+    || state.reconnectInFlight
+    || state.voiceConnectInFlight
+  ) {
+    armRuntimeFailbackProbe(runtime, guildId, state, { delayMs: STREAM_FAILBACK_CHECK_MS });
+    return { ok: false, skipped: "recovery" };
+  }
+  if (!isRuntimeVoiceConnected(runtime, guildId, state, { includeObserved: true })) {
+    armRuntimeFailbackProbe(runtime, guildId, state, { delayMs: STREAM_FAILBACK_CHECK_MS });
+    return { ok: false, skipped: "voice" };
+  }
+  const playerStatus = String(state.player?.state?.status || "").trim().toLowerCase();
+  if (playerStatus === String(AudioPlayerStatus.Paused) || playerStatus === String(AudioPlayerStatus.AutoPaused)) {
+    // Switching stations would unpause the player; wait until playback resumed.
+    armRuntimeFailbackProbe(runtime, guildId, state, { delayMs: STREAM_FAILBACK_CHECK_MS });
+    return { ok: false, skipped: "paused" };
+  }
+
+  const desiredKey = state.desiredStationKey;
+  const currentKey = state.currentStationKey;
+  const resolved = runtime.resolveStationForGuild(
+    guildId,
+    desiredKey,
+    typeof runtime.resolveGuildLanguage === "function" ? runtime.resolveGuildLanguage(guildId) : "de"
+  );
+  if (!resolved?.ok || !resolved?.station?.url || !resolved?.stations) {
+    // The preferred station is gone from the catalog or the plan: there is
+    // nothing to return to, so the current station becomes the wanted one.
+    log(
+      "WARN",
+      `[${runtime.config.name}] Failback aufgegeben guild=${guildId}: Wunschsender ${desiredKey} ist nicht mehr verfuegbar (${resolved?.message || "unbekannt"}). ${currentKey} bleibt aktiv.`
+    );
+    clearActiveFailover(state);
+    state.desiredStationKey = currentKey;
+    state.desiredStationName = state.currentStationName || currentKey;
+    state.failbackAttempts = 0;
+    state.failbackSuccessCount = 0;
+    state.failbackLastProbeAt = nowMs;
+    state.failbackLastResult = "abandoned";
+    try {
+      await recordRuntimeIncident({
+        guildId,
+        guildName: runtime?.client?.guilds?.cache?.get?.(guildId)?.name || guildId,
+        tier: getTierConfig(guildId).tier,
+        eventKey: "stream_failback_abandoned",
+        severity: "warning",
+        runtime: {
+          id: String(runtime?.config?.id || "").trim(),
+          name: String(runtime?.config?.name || "").trim(),
+          role: String(runtime?.role || "").trim(),
+        },
+        payload: {
+          previousStationKey: desiredKey,
+          previousStationName: state.failoverFromStationName || desiredKey,
+          failoverStationKey: currentKey,
+          failoverStationName: state.currentStationName || currentKey,
+          triggerError: resolved?.message || "station unavailable",
+        },
+      });
+    } catch {}
+    runtime.persistState?.();
+    return { ok: false, abandoned: true };
+  }
+
+  const probe = typeof runtime.probeStreamUrl === "function"
+    ? runtime.probeStreamUrl.bind(runtime)
+    : probeRuntimeStreamUrl;
+  let result;
+  try {
+    result = await probe(resolved.station.url);
+  } catch (err) {
+    result = { ok: false, reason: getStreamRestartErrorMessage(err) };
+  }
+  state.failbackLastProbeAt = nowMs;
+  state.failbackLastResult = result?.ok ? "ok" : String(result?.reason || "failed");
+
+  if (!result?.ok) {
+    state.failbackSuccessCount = 0;
+    state.failbackAttempts = (Number(state.failbackAttempts || 0) || 0) + 1;
+    const attempts = state.failbackAttempts;
+    if (attempts <= 3 || attempts % 5 === 0) {
+      log(
+        "INFO",
+        `[${runtime.config.name}] Wunschsender ${desiredKey} weiterhin nicht erreichbar guild=${guildId} (${state.failbackLastResult}, versuch ${attempts}); ${currentKey} bleibt aktiv.`
+      );
+    }
+    armRuntimeFailbackProbe(runtime, guildId, state);
+    return { ok: false, probe: result };
+  }
+
+  state.failbackSuccessCount = (Number(state.failbackSuccessCount || 0) || 0) + 1;
+  if (state.failbackSuccessCount < STREAM_FAILBACK_CONFIRMATIONS) {
+    armRuntimeFailbackProbe(runtime, guildId, state, {
+      delayMs: Math.max(15_000, Math.round(STREAM_FAILBACK_CHECK_MS / 4)),
+    });
+    return { ok: true, confirmed: false, successCount: state.failbackSuccessCount };
+  }
+
+  const previousStationKey = currentKey;
+  const previousStationName = state.currentStationName || currentKey;
+  const failoverStartedAt = Number(state.failoverStartedAt || 0) || 0;
+  state.streamRestartInFlight = true;
+  try {
+    await runtime.playStation(state, resolved.stations, resolved.key, guildId, {
+      countAsStart: false,
+      resumeSession: false,
+      preserveDesiredStation: false,
+    });
+  } catch (err) {
+    const message = getStreamRestartErrorMessage(err);
+    state.failbackSuccessCount = 0;
+    state.failbackAttempts = (Number(state.failbackAttempts || 0) || 0) + 1;
+    state.failbackLastResult = `switch-failed: ${message}`;
+    log("WARN", `[${runtime.config.name}] Failback zu ${desiredKey} fehlgeschlagen guild=${guildId}: ${message}. ${currentKey} laeuft weiter.`);
+    armRuntimeFailbackProbe(runtime, guildId, state);
+    return { ok: false, switchError: message };
+  } finally {
+    state.streamRestartInFlight = false;
+  }
+
+  clearFailoverFailureWindow(state);
+  clearRuntimeFailbackTimer(state);
+  state.failbackAttempts = 0;
+  state.failbackSuccessCount = 0;
+  log(
+    "INFO",
+    `[${runtime.config.name}] Failback abgeschlossen guild=${guildId}: ${previousStationKey} -> ${resolved.key} nach ${failoverStartedAt > 0 ? Math.round((nowMs - failoverStartedAt) / 1000) : "?"}s`
+  );
+  void emitRuntimeReliabilityAlert(runtime, guildId, "stream_failback_completed", {
+    previousStationKey,
+    previousStationName,
+    restoredStationKey: resolved.key,
+    restoredStationName: resolved.station.name || resolved.key,
+    failoverDurationMs: failoverStartedAt > 0 ? Math.max(0, nowMs - failoverStartedAt) : 0,
+    listenerCount: typeof runtime.getCurrentListenerCount === "function"
+      ? runtime.getCurrentListenerCount(guildId, state)
+      : 0,
+  }).catch(() => null);
+  runtime.persistState?.();
+  return { ok: true, confirmed: true, switched: true, stationKey: resolved.key };
 }
