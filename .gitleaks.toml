@@ -1,0 +1,44 @@
+title = "OmniFM secret scan"
+
+# Every rule Gitleaks ships stays on. What follows are the findings that were
+# looked at one by one and are not credentials. Each entry binds a path to the
+# exact value it may contain, so the same file cannot quietly start carrying a
+# real secret: a different value in the same file still fails the scan.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "The owner token the CI workflow sends to its own throwaway server. It authenticates nothing outside that job."
+condition = "AND"
+paths = ['''^\.github/workflows/ci\.yml$''']
+regexTarget = "secret"
+regexes = ['''^ci-owner-token$''']
+
+[[allowlists]]
+description = "Stripe's documented test placeholder, asserted by the test that the secret never reaches the answer."
+condition = "AND"
+paths = ['''^backend/tests/test_owner_config_iter5\.py$''']
+regexTarget = "secret"
+regexes = ['''^sk_test_TESTSECRET$''']
+
+[[allowlists]]
+description = "The google-site-verification token. It is served to every visitor in the homepage head, so it is public by design; the check asserts the meta tag still carries it."
+condition = "AND"
+paths = ['''^(scripts/check-search-console-readiness\.mjs|docs/search-console\.md)$''']
+regexTarget = "secret"
+regexes = ['''^2ZCoKiPvrZJ_fKLyyE4SDbATwbL6yDX-iwI82ghmpSM$''']
+
+[[allowlists]]
+description = "Fixture values in the unit tests. They are compared against, never used to reach anything."
+condition = "AND"
+paths = ['''^test/(operator-incidents|owner-log-files)\.test\.js$''']
+regexTarget = "secret"
+regexes = ['''^operator-incident-secret-123456$''', '''^abc123456789012345$''']
+
+[[allowlists]]
+description = "Made-up Discord snowflakes in the tests. Real ids are not sequential digit runs."
+condition = "AND"
+paths = ['''^test/(web-server-dashboard|start-config-migration)\.test\.js$''']
+regexTarget = "secret"
+regexes = ['''^9(23456789012345678|87654321098765432)$''']
