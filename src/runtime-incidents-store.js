@@ -66,6 +66,7 @@ function normalizeSeverity(value, eventKey = "") {
   switch (String(eventKey || "").trim().toLowerCase()) {
     case "stream_recovered":
     case "stream_failback_completed":
+    case "voice_unparked":
       return "success";
     case "stream_failover_exhausted":
       return "critical";

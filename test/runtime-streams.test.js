@@ -25,6 +25,9 @@ const {
   getRuntimeFailbackDelayMs,
   clearRuntimeFailbackTimer,
   clearRuntimeCurrentProcess,
+  resolveReplacementStationForGuild,
+  handleRuntimeStationUnavailable,
+  restartRuntimeCurrentStation,
 } = streams;
 
 const STATIONS = {
@@ -520,4 +523,85 @@ test("armRuntimeFailbackProbe only arms while a failover is active", () => {
   clearRuntimeFailbackTimer(active);
   assert.equal(active.failbackTimer, null);
   assert.equal(active.failbackNextProbeAt, 0);
+});
+
+function createUnavailableRuntime({ chain = [], defaultKey = null } = {}) {
+  const sent = [];
+  let stopped = 0;
+  const runtime = createFakeRuntime({
+    resolveStationForGuild(guildId, key) {
+      const station = STATIONS.stations[key];
+      if (!station) return { ok: false, message: `Station ${key} ist in deinem Plan nicht verfuegbar.` };
+      return { ok: true, key, station, stations: STATIONS, isCustom: false };
+    },
+    async loadGuildSettingsCached() {
+      return { failoverChain: chain, fallbackStation: chain[0] || "" };
+    },
+    getCatalogDefaultStationKey() {
+      return defaultKey;
+    },
+    async resolveNowPlayingChannel() {
+      return {
+        id: "444444444444444444",
+        async send(payload) {
+          sent.push(payload);
+          return { id: "m1" };
+        },
+      };
+    },
+    async stopInGuild() {
+      stopped += 1;
+      return { ok: true };
+    },
+    getResolvedCurrentStation() {
+      return null;
+    },
+  });
+  return { runtime, sent, stopped: () => stopped };
+}
+
+test("a station that left the plan is replaced by the failover chain and the server is told", async () => {
+  const { runtime, sent } = createUnavailableRuntime({ chain: ["beta"], defaultKey: "alpha" });
+  const guildId = "123456789012345678";
+  const state = createState({ currentStationKey: "gone", currentStationName: "Gone FM", desiredStationKey: "gone" });
+
+  const replacement = await resolveReplacementStationForGuild(runtime, guildId, "gone");
+  assert.equal(replacement.ok, true);
+  assert.equal(replacement.key, "beta");
+  assert.equal(replacement.source, "failover-chain");
+
+  const result = await handleRuntimeStationUnavailable(runtime, guildId, state, { source: "test" });
+  assert.equal(result.replaced, true);
+  assert.equal(state.currentStationKey, "beta");
+  assert.equal(state.desiredStationKey, "beta");
+  assert.equal(state.failoverActive, false);
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].content, /Gone FM/);
+  assert.match(sent[0].content, /Beta FM/);
+  assert.match(sent[0].content, /nicht mehr verf/);
+  cleanup(state);
+});
+
+test("without a chain the catalog default replaces the unavailable station, otherwise playback stops with a notice", async () => {
+  const guildId = "123456789012345678";
+
+  const viaDefault = createUnavailableRuntime({ chain: [], defaultKey: "alpha" });
+  const stateDefault = createState({ currentStationKey: "gone", currentStationName: "Gone FM" });
+  const resultDefault = await restartRuntimeCurrentStation(viaDefault.runtime, stateDefault, guildId);
+  assert.equal(resultDefault, undefined);
+  assert.equal(stateDefault.currentStationKey, "alpha");
+  assert.equal(viaDefault.sent.length, 1);
+  assert.match(viaDefault.sent[0].content, /Alpha FM/);
+  assert.equal(viaDefault.stopped(), 0);
+  cleanup(stateDefault);
+
+  const noReplacement = createUnavailableRuntime({ chain: [], defaultKey: null });
+  const stateStop = createState({ currentStationKey: "gone", currentStationName: "Gone FM" });
+  const resultStop = await handleRuntimeStationUnavailable(noReplacement.runtime, guildId, stateStop);
+  assert.equal(resultStop.stopped, true);
+  assert.equal(noReplacement.stopped(), 1, "the bot leaves instead of sitting silently in voice");
+  assert.equal(noReplacement.sent.length, 1);
+  assert.match(noReplacement.sent[0].content, /\/play/);
+  assert.match(noReplacement.sent[0].content, /beendet/);
+  cleanup(stateStop);
 });

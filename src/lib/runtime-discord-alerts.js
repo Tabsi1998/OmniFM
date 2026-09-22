@@ -13,6 +13,7 @@ const CUSTOMER_VISIBLE_RUNTIME_INCIDENT_EVENT_KEYS = new Set([
   "stream_failover_activated",
   "stream_failover_exhausted",
   "stream_failback_completed",
+  "station_unavailable",
 ]);
 
 function clipText(value, maxLen = 240) {
@@ -94,7 +95,22 @@ function buildRuntimeIncidentAlertCopy(eventKey, payload, t) {
   const previousStation = payload?.previousStationName || payload?.previousStationKey || t("dem letzten Stream", "the previous stream");
   const failoverStation = payload?.failoverStationName || payload?.failoverStationKey || t("der Failover-Station", "the failover station");
   const restoredStation = payload?.restoredStationName || payload?.restoredStationKey || t("dem Wunschsender", "the preferred station");
+  const replacementStation = payload?.replacementStationName || payload?.replacementStationKey || "";
   switch (String(eventKey || "").trim().toLowerCase()) {
+    case "station_unavailable":
+      return {
+        title: t("Sender nicht mehr verfuegbar", "Station no longer available"),
+        color: 0xF59E0B,
+        description: replacementStation && payload?.stopped !== true
+          ? t(
+            `${previousStation} ist auf diesem Server nicht mehr verfuegbar. OmniFM spielt stattdessen ${replacementStation}.`,
+            `${previousStation} is no longer available on this server. OmniFM is playing ${replacementStation} instead.`
+          )
+          : t(
+            `${previousStation} ist auf diesem Server nicht mehr verfuegbar. OmniFM hat die Wiedergabe beendet; /play startet einen anderen Sender.`,
+            `${previousStation} is no longer available on this server. OmniFM stopped playback; /play starts another station.`
+          ),
+      };
     case "stream_failback_completed":
       return {
         title: t("Wunschsender wieder aktiv", "Preferred station restored"),

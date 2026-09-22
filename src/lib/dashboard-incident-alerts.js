@@ -3,6 +3,7 @@ const DASHBOARD_INCIDENT_ALERT_EVENT_KEYS = Object.freeze([
   "stream_failover_activated",
   "stream_failover_exhausted",
   "stream_failback_completed",
+  "station_unavailable",
 ]);
 
 const DEFAULT_DASHBOARD_INCIDENT_ALERTS_CONFIG = Object.freeze({

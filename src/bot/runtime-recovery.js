@@ -7,6 +7,8 @@ import {
 } from "@discordjs/voice";
 
 import { log, logError } from "../lib/logging.js";
+import { recordRuntimeIncident } from "../runtime-incidents-store.js";
+import { resolveReplacementStationForGuild, notifyRuntimeStationUnavailable } from "./runtime-streams.js";
 import {
   applyJitter,
   isLikelyNetworkFailureLine,
@@ -69,6 +71,8 @@ const RESTORE_RETRY_MAX_MS = Math.max(30_000, toPositiveInt(process.env.RESTORE_
 const VOICE_NETWORK_ERROR_RETRY_MIN_MS = 15_000;
 const VOICE_NETWORK_ERROR_RETRY_JITTER = 0.6;
 const VOICE_RECONNECT_RESCHEDULE_SLACK_MS = 1_000;
+// Retry cadence for a parked reconnect target (#190).
+const VOICE_PARKED_RETRY_MS = Math.max(60_000, toPositiveInt(process.env.VOICE_PARKED_RETRY_MS, 15 * 60_000));
 
 const PERMANENT_RESTORE_GUILD_ERROR_CODES = new Set([10004, 50001]);
 const PERMANENT_RESTORE_CHANNEL_ERROR_CODES = new Set([10003]);
@@ -399,19 +403,115 @@ function noteTransientVoiceIssue(state, code, detail = "") {
   return next;
 }
 
-function abortRuntimeReconnectTarget(runtime, guildId, state, reason, { logLevel = "WARN" } = {}) {
-  const channelId = String(state?.lastChannelId || "").trim();
-  const detail = String(reason || "unknown").trim().slice(0, 200) || "unknown";
-  logRuntimeRecoveryState(runtime, logLevel, `Auto-Reconnect gestoppt: ${detail}`, guildId, state, {
-    reason: "reconnect-abort",
-  });
+export function clearRuntimeParkedState(state) {
+  if (!state || (!state.parkedReason && !state.parkedAt && !state.parkedDetail)) return false;
+  state.parkedReason = null;
+  state.parkedAt = 0;
+  state.parkedDetail = null;
+  return true;
+}
+
+/**
+ * Parks a reconnect target instead of deleting it (#190). The channel and the
+ * station stay persisted, attempts and circuit counters reset, and the worker
+ * keeps retrying at the slow VOICE_PARKED_RETRY_MS cadence until the join
+ * succeeds or /play replaces the target. Nothing a 24/7 server configured is
+ * thrown away because Discord or the permissions were broken for a few hours.
+ */
+export function parkRuntimeReconnectTarget(runtime, guildId, state, reason, detail = "", {
+  logLevel = "WARN",
+  schedule = true,
+} = {}) {
+  const code = String(reason || "unknown").trim().toLowerCase() || "unknown";
+  const text = String(detail || "").trim().slice(0, 200);
+  const nowMs = Date.now();
+  const alreadyParked = Boolean(state.parkedReason);
+  if (!alreadyParked) state.parkedAt = nowMs;
+  state.parkedReason = code;
+  state.parkedDetail = text || null;
+  state.reconnectAttempts = 0;
+  state.reconnectCircuitTripCount = 0;
+  state.reconnectCircuitOpenUntil = 0;
+  clearTransientVoiceIssues(state);
+  if (state.connection) {
+    try { state.connection.destroy(); } catch {}
+    state.connection = null;
+  }
+
+  logRuntimeRecoveryState(
+    runtime,
+    logLevel,
+    `Reconnect geparkt (${code}): ${text || "-"} - Ziel bleibt gespeichert, naechster Versuch in ${Math.round(VOICE_PARKED_RETRY_MS / 1000)}s`,
+    guildId,
+    state,
+    { reason: `parked-${code}` }
+  );
   recordConnectionEvent(guildId, {
     botId: runtime.config.id || "",
-    eventType: "error",
-    channelId,
-    details: `Auto reconnect stopped: ${detail}`.slice(0, 200),
+    eventType: "retry",
+    channelId: String(state?.lastChannelId || "").trim(),
+    details: `Auto reconnect parked (${code}): ${text}`.slice(0, 200),
   });
-  runtime.resetVoiceSession(guildId, state, { preservePlaybackTarget: false, clearLastChannel: true });
+  if (!alreadyParked) {
+    recordRuntimeIncident({
+      guildId,
+      guildName: runtime?.client?.guilds?.cache?.get?.(guildId)?.name || guildId,
+      tier: getTierConfig(guildId).tier,
+      eventKey: "voice_parked",
+      severity: "warning",
+      runtime: {
+        id: String(runtime?.config?.id || "").trim(),
+        name: String(runtime?.config?.name || "").trim(),
+        role: String(runtime?.role || "").trim(),
+      },
+      payload: {
+        reason: code,
+        detail: text,
+        channelId: String(state?.lastChannelId || "").trim(),
+        stationKey: state?.currentStationKey || null,
+        stationName: state?.currentStationName || null,
+      },
+    }).catch(() => null);
+  }
+
+  if (schedule) {
+    scheduleRuntimeReconnect(runtime, guildId, {
+      countAttempt: false,
+      minDelayMs: VOICE_PARKED_RETRY_MS,
+      reason: `parked-${code}`,
+    });
+  }
+  runtime.persistState?.();
+}
+
+function unparkRuntimeReconnectTarget(runtime, guildId, state, channelId) {
+  const parkedReason = state?.parkedReason || null;
+  const parkedForMs = Number(state?.parkedAt || 0) > 0 ? Math.max(0, Date.now() - Number(state.parkedAt)) : 0;
+  if (!clearRuntimeParkedState(state)) return false;
+  log(
+    "INFO",
+    `[${runtime.config.name}] Reconnect nach Parken erfolgreich guild=${guildId} channel=${channelId || "-"} (grund=${parkedReason}, geparkt=${Math.round(parkedForMs / 1000)}s)`
+  );
+  recordRuntimeIncident({
+    guildId,
+    guildName: runtime?.client?.guilds?.cache?.get?.(guildId)?.name || guildId,
+    tier: getTierConfig(guildId).tier,
+    eventKey: "voice_unparked",
+    severity: "success",
+    runtime: {
+      id: String(runtime?.config?.id || "").trim(),
+      name: String(runtime?.config?.name || "").trim(),
+      role: String(runtime?.role || "").trim(),
+    },
+    payload: {
+      reason: parkedReason,
+      parkedForMs,
+      channelId: String(channelId || "").trim(),
+      stationKey: state?.currentStationKey || null,
+      stationName: state?.currentStationName || null,
+    },
+  }).catch(() => null);
+  return true;
 }
 
 function getDiscordErrorCode(err) {
@@ -725,6 +825,7 @@ export function resetRuntimeVoiceSession(
     state.currentStationName = null;
     state.desiredStationKey = null;
     state.desiredStationName = null;
+    clearRuntimeParkedState(state);
     clearActiveFailover(state);
     clearFailoverFailureWindow(state);
     state.currentMeta = null;
@@ -1324,13 +1425,15 @@ export async function tryRuntimeReconnect(runtime, guildId) {
         `${guildId}:${channel.id}:${missingBits.join(",") || "unknown"}`
       );
       if (issue.count >= VOICE_RECONNECT_PERMISSION_CONFIRMATIONS) {
-        abortRuntimeReconnectTarget(
+        parkRuntimeReconnectTarget(
           runtime,
           guildId,
           state,
-          `permissions still missing after ${issue.count} checks (channel=${channel.id}, detail=${missingBits.join(",") || "unknown"})`
+          "permissions",
+          `permissions still missing after ${issue.count} checks (channel=${channel.id}, detail=${missingBits.join(",") || "unknown"})`,
+          { schedule: false }
         );
-        return { attempted: false, retryRecommended: false, reason: "permissions-missing-confirmed" };
+        return { attempted: false, retryRecommended: true, minDelayMs: VOICE_PARKED_RETRY_MS, reason: "permissions-parked" };
       }
       if (shouldLogRecurringTransientIssue(issue)) {
         log(
@@ -1406,13 +1509,15 @@ export async function tryRuntimeReconnect(runtime, guildId) {
         `${guildId}:${channel.id}:${connection.state?.status || "unknown"}`
       );
       if (issue.count >= VOICE_RECONNECT_READY_FAILURE_CONFIRMATIONS) {
-        abortRuntimeReconnectTarget(
+        parkRuntimeReconnectTarget(
           runtime,
           guildId,
           state,
+          "voice-ready",
           `voice ready timeout repeated ${issue.count}x (channel=${channel.id}, state=${connection.state?.status || "unknown"})`,
-          { logLevel: "ERROR" }
+          { logLevel: "ERROR", schedule: false }
         );
+        return { attempted: false, retryRecommended: true, minDelayMs: VOICE_PARKED_RETRY_MS, reason: "voice-ready-parked" };
       }
       return { attempted: true, success: false, retryRecommended: true, reason: "voice-ready-timeout" };
     }
@@ -1434,13 +1539,15 @@ export async function tryRuntimeReconnect(runtime, guildId) {
         `${guildId}:${channel.id}`
       );
       if (issue.count >= VOICE_RECONNECT_READY_FAILURE_CONFIRMATIONS) {
-        abortRuntimeReconnectTarget(
+        parkRuntimeReconnectTarget(
           runtime,
           guildId,
           state,
+          "voice-confirmation",
           `voice state confirmation failed ${issue.count}x (channel=${channel.id})`,
-          { logLevel: "ERROR" }
+          { logLevel: "ERROR", schedule: false }
         );
+        return { attempted: false, retryRecommended: true, minDelayMs: VOICE_PARKED_RETRY_MS, reason: "voice-confirmation-parked" };
       }
       return { attempted: true, success: false, retryRecommended: true, reason: "voice-confirmation-failed" };
     }
@@ -1458,6 +1565,7 @@ export async function tryRuntimeReconnect(runtime, guildId) {
     state.reconnectAttempts = 0;
     state.reconnectCircuitTripCount = 0;
     state.reconnectCircuitOpenUntil = 0;
+    unparkRuntimeReconnectTarget(runtime, guildId, state, channel.id);
     state.reconnectCount = (Number(state.reconnectCount || 0) || 0) + 1;
     state.lastReconnectAt = new Date().toISOString();
     state.voiceDisconnectObservedAt = 0;
@@ -1625,10 +1733,11 @@ export function scheduleRuntimeReconnect(runtime, guildId, options = {}) {
   state.reconnectCircuitOpenUntil = nextCircuitOpenUntil;
 
   if (shouldAbortReconnect) {
-    abortRuntimeReconnectTarget(
+    parkRuntimeReconnectTarget(
       runtime,
       guildId,
       state,
+      "circuit",
       `reconnect circuit exhausted after ${nextCircuitTripCount} trips (reason=${reason})`,
       { logLevel: "ERROR" }
     );
@@ -1679,6 +1788,12 @@ export function scheduleRuntimeReconnect(runtime, guildId, options = {}) {
         if (Number.isFinite(Number(result?.minDelayMs)) && Number(result.minDelayMs) > 0) {
           nextOptions.minDelayMs = Number(result.minDelayMs);
         }
+      }
+      if (state.parkedReason && !(Number(nextOptions.minDelayMs) > 0)) {
+        // A parked target keeps the slow cadence until a join succeeds.
+        nextOptions.countAttempt = false;
+        nextOptions.minDelayMs = VOICE_PARKED_RETRY_MS;
+        nextOptions.reason = `parked-${state.parkedReason}`;
       }
       runtime.scheduleReconnect(guildId, nextOptions);
     }
@@ -1762,12 +1877,41 @@ export async function restoreRuntimeGuildEntry(runtime, guildId, data, stations,
     return { ok: false, permanent: true, resource: "channel-type" };
   }
 
-  const restoredStation = runtime.resolveStationForGuild(guildId, data.stationKey, runtime.resolveGuildLanguage(guildId));
+  let restoredStation = runtime.resolveStationForGuild(guildId, data.stationKey, runtime.resolveGuildLanguage(guildId));
+  let replacedStation = null;
   if (!restoredStation.ok) {
-    clearRuntimeRestoreRetry(runtime, guildId);
-    log("INFO", `[${runtime.config.name}] Station ${data.stationKey} nicht mehr vorhanden: ${restoredStation.message}`);
-    clearBotGuild(runtime.config.id, guildId);
-    return { ok: false, permanent: true, resource: "station" };
+    const unavailableMessage = restoredStation.message || "station unavailable";
+    const replacement = await resolveReplacementStationForGuild(runtime, guildId, data.stationKey);
+    if (!replacement.ok) {
+      clearRuntimeRestoreRetry(runtime, guildId);
+      log("INFO", `[${runtime.config.name}] Station ${data.stationKey} nicht mehr vorhanden und kein Ersatz verfuegbar: ${unavailableMessage}`);
+      void notifyRuntimeStationUnavailable(runtime, guildId, null, {
+        previousStationKey: data.stationKey,
+        previousStationName: data.stationName || data.stationKey,
+        reason: unavailableMessage,
+        stopped: true,
+        channelId: data.channelId,
+      }).catch(() => null);
+      clearBotGuild(runtime.config.id, guildId);
+      return { ok: false, permanent: true, resource: "station" };
+    }
+    log(
+      "WARN",
+      `[${runtime.config.name}] Station ${data.stationKey} nicht mehr verfuegbar (${unavailableMessage}); Restore nutzt ${replacement.key} (${replacement.source}).`
+    );
+    replacedStation = {
+      previousStationKey: data.stationKey,
+      previousStationName: data.stationName || data.stationKey,
+      reason: unavailableMessage,
+      source: replacement.source,
+    };
+    restoredStation = replacement;
+    data = {
+      ...data,
+      desiredStationKey: replacement.key,
+      desiredStationName: replacement.station?.name || replacement.key,
+      failoverActive: false,
+    };
   }
 
   log("INFO", `[${runtime.config.name}] Reconnect: ${guild.name} / #${channel.name} / ${restoredStation.station.name}`);
@@ -1803,6 +1947,9 @@ export async function restoreRuntimeGuildEntry(runtime, guildId, data, stations,
   state.failoverFailureCount = Math.max(0, Number.parseInt(String(data.failoverFailureCount || 0), 10) || 0);
   state.failoverFailureStartedAt = parseStoredTimestampMs(data.failoverFailureStartedAt);
   state.failoverLastFailureAt = parseStoredTimestampMs(data.failoverLastFailureAt);
+  state.parkedReason = String(data.parkedReason || "").trim() || null;
+  state.parkedAt = parseStoredTimestampMs(data.parkedAt);
+  state.parkedDetail = String(data.parkedDetail || "").trim() || null;
   runtime.markScheduledEventPlayback(
     state,
     data.scheduledEventId || null,
@@ -1835,6 +1982,13 @@ export async function restoreRuntimeGuildEntry(runtime, guildId, data, stations,
   });
   clearRuntimeRestoreRetry(runtime, guildId);
   log("INFO", `[${runtime.config.name}] Wiederhergestellt: ${guild.name} -> ${restoredStation.station.name}`);
+  if (replacedStation) {
+    void notifyRuntimeStationUnavailable(runtime, guildId, state, {
+      ...replacedStation,
+      replacementStationKey: restoredStation.key,
+      replacementStationName: restoredStation.station?.name || restoredStation.key,
+    }).catch(() => null);
+  }
 
   await waitMs(2000);
   return { ok: true };

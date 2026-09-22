@@ -4,6 +4,7 @@ export const DASHBOARD_INCIDENT_ALERT_EVENTS = Object.freeze([
   { key: 'stream_failover_activated', de: 'Failover aktiviert', en: 'Failover activated' },
   { key: 'stream_failover_exhausted', de: 'Failover ausgeschoepft', en: 'Failover exhausted' },
   { key: 'stream_failback_completed', de: 'Wunschsender wieder aktiv', en: 'Preferred station restored' },
+  { key: 'station_unavailable', de: 'Sender nicht mehr verfuegbar', en: 'Station no longer available' },
 ]);
 
 export const DASHBOARD_INCIDENT_ALERTS_DEFAULTS = Object.freeze({

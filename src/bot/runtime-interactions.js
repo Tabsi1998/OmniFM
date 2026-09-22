@@ -1637,6 +1637,9 @@ export async function handleRuntimeInteraction(runtime, interaction) {
             `${t("Restart geplant", "Restart pending")}: ${restartPending}`,
             `${t("Reconnect geplant", "Reconnect pending")}: ${reconnectPending}`,
             `${t("Netz-Cooldown", "Network cooldown")}: ${networkHoldMs > 0 ? `${Math.round(networkHoldMs)}ms` : "0ms"}`,
+            `${t("Geparkt", "Parked")}: ${activeState.parkedReason
+              ? `${activeState.parkedReason}${Number(activeState.parkedAt || 0) > 0 ? ` (${t("seit", "since")} <t:${Math.floor(Number(activeState.parkedAt) / 1000)}:R>)` : ""}`
+              : t("nein", "no")}`,
           ].join("\n"),
           inline: false,
         }
@@ -1690,6 +1693,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
         ? Number(activeRuntime.getCurrentListenerCount(interaction.guildId, activeState) || 0) || 0
         : 0,
       voiceGuardLastAction: activeState.voiceGuardLastAction || null,
+      parkedReason: activeState.parkedReason || null,
     }, { t });
 
     const statusEmbed = new EmbedBuilder()

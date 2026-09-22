@@ -20,6 +20,7 @@ function normalizeRuntimeStatusInput(source = {}) {
     stationName: String(input.stationName || input.stationKey || "").trim() || null,
     channelLabel: String(input.channelLabel || "").trim() || null,
     voiceGuardLastAction: String(input.voiceGuardLastAction || "").trim().toLowerCase() || null,
+    parkedReason: String(input.parkedReason || "").trim().toLowerCase() || null,
   };
 }
 
@@ -57,6 +58,31 @@ function buildUserFacingRuntimeStatus(source = {}, { t = (de, en) => de } = {}) 
       ),
       playback: playbackBits.join(" | ") || t("Wiedergabe wird abgesichert", "Playback is being protected"),
       nextStep: t("Kein Eingreifen noetig.", "No action is needed."),
+    };
+  }
+
+  if (status.parkedReason && !status.connected) {
+    const permissionsMissing = status.parkedReason === "permissions";
+    return {
+      code: "parked",
+      label: t("Wartet auf Rueckkehr", "Waiting to return"),
+      accent: 0xF97316,
+      summary: permissionsMissing
+        ? t(
+          "OmniFM darf den Sprachkanal gerade nicht betreten (Verbinden oder Sprechen fehlt). Sender und Kanal bleiben gemerkt.",
+          "OmniFM is not allowed to join the voice channel right now (Connect or Speak is missing). Station and channel stay saved."
+        )
+        : t(
+          "Der Sprachkanal war laengere Zeit nicht erreichbar. OmniFM probiert es alle paar Minuten weiter, Sender und Kanal bleiben gemerkt.",
+          "The voice channel was unreachable for a longer time. OmniFM keeps trying every few minutes, station and channel stay saved."
+        ),
+      playback: playbackBits.join(" | ") || t("Wiedergabe pausiert bis zur Rueckkehr", "Playback paused until the return"),
+      nextStep: permissionsMissing
+        ? t(
+          "Gib OmniFM im Kanal 'Verbinden' und 'Sprechen', dann kehrt der Bot von selbst zurueck. /play startet sofort.",
+          "Grant OmniFM 'Connect' and 'Speak' in the channel and the bot returns on its own. /play starts right away."
+        )
+        : t("Kein Eingreifen noetig. /play startet die Wiedergabe sofort neu.", "No action is needed. /play restarts playback right away."),
     };
   }
 

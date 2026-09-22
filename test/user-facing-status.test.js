@@ -39,3 +39,36 @@ test("user-facing runtime status hides technical recovery counters during live p
   assert.match(status.playback, /6 listeners/i);
   assert.doesNotMatch(status.summary, /error|reconnect|counter/i);
 });
+
+test("user-facing runtime status explains a parked target in plain words", () => {
+  const t = (de) => de;
+  const permissions = buildUserFacingRuntimeStatus({
+    ready: true,
+    connected: false,
+    shouldReconnect: true,
+    reconnectPending: true,
+    parkedReason: "permissions",
+    stationName: "Groove Salad",
+    channelLabel: "#radio",
+  }, { t });
+  assert.equal(permissions.code, "parked");
+  assert.match(permissions.summary, /Verbinden oder Sprechen/);
+  assert.match(permissions.nextStep, /kehrt der Bot von selbst zurueck/);
+  assert.match(permissions.playback, /Groove Salad/);
+
+  const circuit = buildUserFacingRuntimeStatus({
+    ready: true,
+    connected: false,
+    shouldReconnect: true,
+    parkedReason: "circuit",
+  }, { t });
+  assert.equal(circuit.code, "parked");
+  assert.match(circuit.summary, /alle paar Minuten/);
+
+  const backOnline = buildUserFacingRuntimeStatus({
+    ready: true,
+    connected: true,
+    parkedReason: "circuit",
+  }, { t });
+  assert.equal(backOnline.code, "live", "a connected bot is live even if a stale parked flag is still set");
+});

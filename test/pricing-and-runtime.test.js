@@ -2202,7 +2202,7 @@ test("tryReconnect keeps playback target while bot member or permissions are tra
   assert.equal(state.transientVoiceIssues["reconnect-permissions-missing"].count, 3);
 });
 
-test("tryReconnect stops auto-reconnect after repeated permission failures", async () => {
+test("tryReconnect parks the target after repeated permission failures", async () => {
   let resetArgs = null;
   const state = {
     shouldReconnect: true,
@@ -2245,26 +2245,30 @@ test("tryReconnect stops auto-reconnect after repeated permission failures", asy
     },
   };
 
+  let last = null;
   for (let attempt = 0; attempt < 6; attempt += 1) {
-    await tryRuntimeReconnect(runtime, "guild-1");
+    last = await tryRuntimeReconnect(runtime, "guild-1");
   }
 
-  assert.deepEqual(resetArgs, {
-    guildId: "guild-1",
-    passedState: state,
-    options: {
-      preservePlaybackTarget: false,
-      clearLastChannel: true,
-    },
-  });
+  // Repeated permission failures park the target (#190): nothing is deleted,
+  // the caller keeps retrying at the slow parked cadence.
+  assert.equal(resetArgs, null);
+  assert.equal(last.reason, "permissions-parked");
+  assert.equal(last.retryRecommended, true);
+  assert.ok(last.minDelayMs >= 15 * 60 * 1000);
+  assert.equal(state.parkedReason, "permissions");
+  assert.equal(state.currentStationKey, "station-a");
+  assert.equal(state.lastChannelId, "voice-1");
+  assert.equal(state.shouldReconnect, true);
 });
 
-test("reconnect circuit exhaustion stops auto-reconnect entirely", () => {
+test("reconnect circuit exhaustion parks the target and keeps retrying slowly", () => {
   const originalSetTimeout = global.setTimeout;
-  let scheduled = 0;
-  global.setTimeout = () => {
-    scheduled += 1;
-    return { unref() {} };
+  const scheduled = [];
+  global.setTimeout = (fn, delay) => {
+    const timer = { fn, delay, unref() {} };
+    scheduled.push(timer);
+    return timer;
   };
 
   try {
@@ -2299,15 +2303,19 @@ test("reconnect circuit exhaustion stops auto-reconnect entirely", () => {
 
     scheduleRuntimeReconnect(runtime, "guild-1", { reason: "retry" });
 
-    assert.equal(scheduled, 0);
-    assert.deepEqual(resetArgs, {
-      guildId: "guild-1",
-      passedState: state,
-      options: {
-        preservePlaybackTarget: false,
-        clearLastChannel: true,
-      },
-    });
+    // The target is parked, never deleted: station and channel survive and a
+    // slow retry is scheduled instead of giving up.
+    assert.equal(resetArgs, null);
+    assert.equal(state.parkedReason, "circuit");
+    assert.ok(state.parkedAt > 0);
+    assert.equal(state.currentStationKey, "station-a");
+    assert.equal(state.lastChannelId, "voice-1");
+    assert.equal(state.shouldReconnect, true);
+    assert.equal(state.reconnectAttempts, 0);
+    assert.equal(state.reconnectCircuitTripCount, 0);
+    assert.equal(scheduled.length, 1);
+    assert.ok(scheduled[0].delay >= 15 * 60 * 1000);
+    assert.equal(state.reconnectTimer, scheduled[0]);
   } finally {
     global.setTimeout = originalSetTimeout;
   }
@@ -6476,7 +6484,8 @@ test("worker autoheal blocks stuck recovery targets before a restart", () => {
 
     const state = runtime.guildState.get("guild-1");
     assert.equal(applied.length, 1);
-    assert.equal(applied[0].delayMs, 30 * 60_000);
+    // One fixed pause per block, no doubling (#190).
+    assert.equal(applied[0].delayMs, 15 * 60_000);
     assert.equal(state.shouldReconnect, false);
     assert.equal(state.reconnectTimer, null);
     assert.equal(state.streamRestartTimer, null);
@@ -6485,7 +6494,7 @@ test("worker autoheal blocks stuck recovery targets before a restart", () => {
     assert.equal(state.restoreBlockCount, 2);
     assert.equal(state.restoreBlockReason, "worker-autoheal");
     assert.equal(state.restoreBlockedAt, now);
-    assert.equal(state.restoreBlockedUntil, now + (30 * 60_000));
+    assert.equal(state.restoreBlockedUntil, now + (15 * 60_000));
   } finally {
     clearTimeout(reconnectTimer);
     clearTimeout(streamRestartTimer);
