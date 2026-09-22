@@ -126,6 +126,7 @@ async function main() {
   setRuntimeEnv("STREAM_STABLE_RESET_MS", streamRecovery.stableResetMs);
   setRuntimeEnv("STREAM_FAILOVER_MIN_FAILURES", streamRecovery.failoverMinFailures);
   setRuntimeEnv("STREAM_FAILOVER_MIN_UNSTABLE_MS", streamRecovery.failoverMinUnstableMs);
+  setRuntimeEnv("STREAM_FAILOVER_STABLE_AUDIO_MS", streamRecovery.failoverStableAudioMs);
 
   const directoryEnv = [
     [directories.discordBotList || {}, "DISCORDBOTLIST", ["slug", "webhookSecret"]],

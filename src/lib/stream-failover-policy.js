@@ -19,6 +19,15 @@ const STREAM_FAILOVER_MIN_UNSTABLE_MS = toBoundedInt(
   10_000,
   30 * 60_000
 );
+// Audio for this long in one piece counts as "the station is fine again" and
+// resets the failover failure window (#192).
+const DEFAULT_FAILOVER_STABLE_AUDIO_MS = 25_000;
+const STREAM_FAILOVER_STABLE_AUDIO_MS = toBoundedInt(
+  process.env.STREAM_FAILOVER_STABLE_AUDIO_MS,
+  DEFAULT_FAILOVER_STABLE_AUDIO_MS,
+  5_000,
+  5 * 60_000
+);
 
 function normalizeStationKey(value) {
   return String(value || "").trim().toLowerCase();
@@ -62,6 +71,7 @@ function evaluateFailoverEligibility(state, {
   nowMs = Date.now(),
   minFailures = STREAM_FAILOVER_MIN_FAILURES,
   minUnstableMs = STREAM_FAILOVER_MIN_UNSTABLE_MS,
+  lastAudioAt = 0,
 } = {}) {
   const expectedKey = normalizeStationKey(stationKey);
   const failureKey = normalizeStationKey(state?.failoverFailureStationKey);
@@ -71,12 +81,17 @@ function evaluateFailoverEligibility(state, {
   const unstableForMs = startedAt > 0 ? Math.max(0, now - startedAt) : 0;
   const requiredFailures = toBoundedInt(minFailures, STREAM_FAILOVER_MIN_FAILURES, 2, 100);
   const requiredUnstableMs = toBoundedInt(minUnstableMs, STREAM_FAILOVER_MIN_UNSTABLE_MS, 0, 30 * 60_000);
+  // Time without any audio from the station. A station that produced audio a
+  // moment ago is hiccupping, not down: failover must not switch on that.
+  const audioAt = Math.max(0, Number(lastAudioAt) || 0);
+  const silentForMs = audioAt > 0 ? Math.max(0, now - audioAt) : unstableForMs;
 
   let reason = "eligible";
   if (!(Number(candidateCount) > 0)) reason = "no-explicit-candidates";
   else if (!expectedKey || failureKey !== expectedKey) reason = "station-mismatch";
   else if (count < requiredFailures) reason = "failure-threshold";
   else if (unstableForMs < requiredUnstableMs) reason = "stability-window";
+  else if (silentForMs < requiredUnstableMs) reason = "audio-recent";
 
   return {
     eligible: reason === "eligible",
@@ -85,6 +100,7 @@ function evaluateFailoverEligibility(state, {
     requiredFailures,
     unstableForMs,
     requiredUnstableMs,
+    silentForMs,
   };
 }
 
@@ -102,8 +118,10 @@ function clearActiveFailover(state) {
 export {
   DEFAULT_FAILOVER_MIN_FAILURES,
   DEFAULT_FAILOVER_MIN_UNSTABLE_MS,
+  DEFAULT_FAILOVER_STABLE_AUDIO_MS,
   STREAM_FAILOVER_MIN_FAILURES,
   STREAM_FAILOVER_MIN_UNSTABLE_MS,
+  STREAM_FAILOVER_STABLE_AUDIO_MS,
   clearActiveFailover,
   clearFailoverFailureWindow,
   evaluateFailoverEligibility,

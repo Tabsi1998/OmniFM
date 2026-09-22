@@ -531,6 +531,8 @@ class BotRuntime {
         lastStreamEndReason: null,
         streamHealthStartedAt: 0,
         lastAudioPacketAt: 0,
+        lastAudioHeardAt: 0,
+        failoverWindowClearedForStream: false,
         ignoreNextIdleEvent: false,
         nowPlayingRefreshTimer: null,
         nowPlayingMessageId: null,

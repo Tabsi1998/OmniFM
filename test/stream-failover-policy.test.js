@@ -109,3 +109,42 @@ test("stability clears only failure evidence while active failover is explicit",
   assert.equal(state.failoverActive, false);
   assert.equal(state.failoverReason, null);
 });
+
+test("recent audio blocks failover even when the failure quorum is met", () => {
+  const state = {};
+  recordFailoverFailure(state, "rock", { nowMs: 1_000 });
+  recordFailoverFailure(state, "rock", { nowMs: 20_000 });
+  recordFailoverFailure(state, "rock", { nowMs: 40_000 });
+
+  const hiccup = evaluateFailoverEligibility(state, {
+    stationKey: "rock",
+    candidateCount: 1,
+    nowMs: 90_000,
+    minFailures: 3,
+    minUnstableMs: 60_000,
+    lastAudioAt: 85_000,
+  });
+  assert.equal(hiccup.eligible, false);
+  assert.equal(hiccup.reason, "audio-recent");
+  assert.equal(hiccup.silentForMs, 5_000);
+
+  const outage = evaluateFailoverEligibility(state, {
+    stationKey: "rock",
+    candidateCount: 1,
+    nowMs: 90_000,
+    minFailures: 3,
+    minUnstableMs: 60_000,
+    lastAudioAt: 20_000,
+  });
+  assert.equal(outage.eligible, true);
+  assert.equal(outage.silentForMs, 70_000);
+
+  const unknownAudio = evaluateFailoverEligibility(state, {
+    stationKey: "rock",
+    candidateCount: 1,
+    nowMs: 90_000,
+    minFailures: 3,
+    minUnstableMs: 60_000,
+  });
+  assert.equal(unknownAudio.eligible, true, "without audio information the time window decides as before");
+});
