@@ -15,7 +15,10 @@ test("React public folder does not ship legacy standalone frontend assets", () =
   );
 
   assert.equal(frontendPackage.devDependencies["react-scripts"], undefined);
-  assert.equal(frontendPackage.devDependencies.vite, "8.2.2");
+  // Vite must stay pinned to one exact version so every deployment builds
+  // with the same toolchain; the version itself moves with dependency updates.
+  assert.match(frontendPackage.devDependencies.vite, /^\d+\.\d+\.\d+$/);
+  assert.ok(Number(frontendPackage.devDependencies.vite.split(".")[0]) >= 8);
   assert.equal(frontendPackage.scripts.build, "vite build");
 
   assert.equal(
