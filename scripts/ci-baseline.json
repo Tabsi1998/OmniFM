@@ -134,18 +134,13 @@
   ],
   "line-endings": [],
   "npm-audit": [
-    "frontend: fast-uri (high)",
-    "root: nodemailer (high)"
+    "frontend: fast-uri (high)"
   ],
   "osv": [
     "frontend/package-lock.json: fast-uri 3.1.5 GHSA-5jgf-p345-68v8",
     "frontend/package-lock.json: fast-uri 3.1.5 GHSA-f65p-4m7j-42xc",
     "frontend/package-lock.json: fast-uri 3.1.5 GHSA-fph4-wmhf-6fwf",
-    "frontend/package-lock.json: fast-uri 3.1.5 GHSA-jqff-g426-hqxp",
-    "package-lock.json: nodemailer 9.0.5 GHSA-2x7j-588g-ccc2",
-    "package-lock.json: nodemailer 9.0.5 GHSA-8m3c-c648-2xjj",
-    "package-lock.json: nodemailer 9.0.5 GHSA-cc9r-2j5m-2m83",
-    "package-lock.json: nodemailer 9.0.5 GHSA-wmmp-3585-3rmp"
+    "frontend/package-lock.json: fast-uri 3.1.5 GHSA-jqff-g426-hqxp"
   ],
   "shellcheck": [
     "scripts/compose.sh: SC2005 (style)",
