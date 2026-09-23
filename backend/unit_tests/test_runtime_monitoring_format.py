@@ -154,3 +154,37 @@ def test_affected_servers_list_parked_backup_and_muted_longest_first():
     assert rows[1]["desiredStationName"] == "Alpha FM" and rows[1]["failbackNextProbeAt"] == now + 60_000
     assert rows[1]["botName"] == "Worker 2" and rows[2]["botName"] == "Worker 3"
     assert rows[3]["durationSec"] is None
+
+
+def test_recovery_settings_come_from_the_shared_list():
+    keys = [entry["key"] for entry in server.RECOVERY_SETTINGS]
+    assert "failoverMinFailures" in keys and "voiceParkedRetryMs" in keys and len(keys) >= 13
+    defaults = server.DEFAULT_OWNER_CONFIG["system"]["streamRecovery"]
+    assert defaults["failbackCheckMs"] == 120000
+
+
+def test_stream_recovery_values_are_clamped_and_cleaned():
+    cleaned = server.normalize_stream_recovery({
+        "failoverMinFailures": "1",
+        "failbackCheckMs": 999999999,
+        "failbackConfirmations": 3,
+        "healthcheckStallMs": "abc",
+        "voiceParkedRetryMs": True,
+        "unknownKey": 5,
+    })
+    assert cleaned == {"failoverMinFailures": 2, "failbackCheckMs": 3600000, "failbackConfirmations": 3}
+
+
+def test_failover_history_rows_read_all_switch_kinds():
+    base = {"guildId": "1", "guildName": "Guild One", "runtime": {"name": "OmniFM 2"},
+            "timestamp": datetime(2026, 9, 24, 10, 0, 0)}
+    switch = server.format_failover_history_row({**base, "eventKey": "stream_failover_activated", "payload": {
+        "previousStationName": "Alpha FM", "failoverStationName": "Beta FM", "triggerError": "503"}})
+    back = server.format_failover_history_row({**base, "eventKey": "stream_failback_completed", "payload": {
+        "previousStationName": "Beta FM", "restoredStationName": "Alpha FM", "failoverDurationMs": 754000}})
+    exhausted = server.format_failover_history_row({**base, "eventKey": "stream_failover_exhausted", "payload": {
+        "previousStationName": "Alpha FM"}})
+    assert (switch["kind"], switch["from"], switch["to"], switch["reason"]) == ("switch", "Alpha FM", "Beta FM", "503")
+    assert (back["kind"], back["from"], back["to"], back["durationSec"]) == ("back", "Beta FM", "Alpha FM", 754)
+    assert (exhausted["kind"], exhausted["to"]) == ("exhausted", "")
+    assert switch["at"] == "2026-09-24T10:00:00+00:00" and switch["runtime"] == "OmniFM 2"

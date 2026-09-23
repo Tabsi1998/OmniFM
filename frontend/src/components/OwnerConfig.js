@@ -81,6 +81,7 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
   const [payments, setPayments] = useState(null);
   const [marketing, setMarketing] = useState(null);
   const [system, setSystem] = useState(null);
+  const [recoverySettings, setRecoverySettings] = useState([]);
   const [env, setEnv] = useState({});
   const [logs, setLogs] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -92,7 +93,7 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
     setLoadError('');
     try {
       const d = await apiGet('/api/admin/config', token);
-      setCompany(d.company); setPlans(d.plans); setDiscord(d.discord); setPayments(d.payments); setMarketing(d.marketing); setSystem(d.system); setEnv(d.env || {});
+      setCompany(d.company); setPlans(d.plans); setDiscord(d.discord); setPayments(d.payments); setMarketing(d.marketing); setSystem(d.system); setRecoverySettings(Array.isArray(d.recoverySettings) ? d.recoverySettings : []); setEnv(d.env || {});
     } catch (error) { setLoadError(error?.message || 'Konfiguration konnte nicht geladen werden.'); }
   }, [apiGet, token]);
 
@@ -206,16 +207,61 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
         </div>
 
         <div className="oa-card" style={{ marginBottom: 18 }} data-testid="cfg-stream-recovery">
-          <div className="oa-section-title"><ShieldCheck size={15} /> Stream-Stabilität &amp; Failover</div>
-          <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 14 }}>
-            Ein Backup-Sender wird nur aus der ausdrücklich im Server-Dashboard hinterlegten Failover-Kette gewählt. Standard- oder zufällige Katalogsender werden niemals automatisch eingesetzt. Änderungen werden beim nächsten Bot-Neustart aktiv.
+          <div className="oa-section-title"><ShieldCheck size={15} /> Recovery &amp; Stabilität</div>
+          <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 10 }}>
+            Ein Ersatzsender kommt nur aus der Failover-Kette, die im Server-Dashboard hinterlegt ist. Zeiten stehen in Sekunden. Änderungen gelten nach dem nächsten Bot-Neustart, zum Beispiel über <code>./update.sh</code>.
           </div>
+          {(() => {
+            const value = (entry) => {
+              const raw = Number(streamRecovery[entry.key]);
+              return Number.isFinite(raw) && raw > 0 ? raw : entry.default;
+            };
+            const byKey = Object.fromEntries(recoverySettings.map((entry) => [entry.key, value(entry)]));
+            const sec = (ms) => Math.round(Number(ms || 0) / 1000);
+            const minutes = (ms) => Math.round(Number(ms || 0) / 60000);
+            return recoverySettings.length > 0 && (
+              <div className="oa-sub" style={{ marginBottom: 14, fontSize: 12.5, color: '#cbd5e1' }} data-testid="cfg-recovery-preview">
+                Bei {byKey.failoverMinFailures} Fehlern in Folge und {sec(byKey.failoverMinUnstableMs)} s ohne Ton wechselt der Bot auf den Ersatzsender.
+                {' '}Den Wunschsender prüft er dann alle {minutes(byKey.failbackCheckMs)} min und wechselt nach {byKey.failbackConfirmations} erfolgreichen Prüfungen zurück.
+              </div>
+            );
+          })()}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0 18px' }}>
-            <Field label="Stabil nach (ms)" value={streamRecovery.stableResetMs || 60000} onChange={(v) => setGroup('streamRecovery', 'stableResetMs', Math.max(10000, Math.min(600000, parseInt(v, 10) || 60000)))} type="number" testid="cfg-stream-stable-reset" hint="Fehlerreihe erst nach stabiler Wiedergabe zurücksetzen. Standard: 60000" />
-            <Field label="Fehler vor Failover" value={streamRecovery.failoverMinFailures || 3} onChange={(v) => setGroup('streamRecovery', 'failoverMinFailures', Math.max(2, Math.min(100, parseInt(v, 10) || 3)))} type="number" testid="cfg-failover-min-failures" hint="Mindestens so viele bestätigte Startfehler. Standard: 3" />
-            <Field label="Mindest-Störungsdauer (ms)" value={streamRecovery.failoverMinUnstableMs || 60000} onChange={(v) => setGroup('streamRecovery', 'failoverMinUnstableMs', Math.max(10000, Math.min(1800000, parseInt(v, 10) || 60000)))} type="number" testid="cfg-failover-min-window" hint="Verhindert den Wechsel nach kurzen Timeouts. Standard: 60000" />
-            <Field label="Stabile Audio-Zeit (ms)" value={streamRecovery.failoverStableAudioMs || 25000} onChange={(v) => setGroup('streamRecovery', 'failoverStableAudioMs', Math.max(5000, Math.min(300000, parseInt(v, 10) || 25000)))} type="number" testid="cfg-failover-stable-audio" hint="Liefert ein Sender so lange am Stück Audio, gelten frühere Fehler als Aussetzer und der Failover-Zähler startet neu. Ohne Audio für die Mindest-Störungsdauer wird gewechselt. Standard: 25000" />
+            {recoverySettings.map((entry) => {
+              const isMs = entry.unit === 'ms';
+              const stored = Number(streamRecovery[entry.key]);
+              const current = Number.isFinite(stored) && stored > 0 ? stored : entry.default;
+              const shown = isMs ? Math.round(current / 1000) : current;
+              const toStored = (raw) => {
+                const parsed = parseInt(raw, 10);
+                if (!Number.isFinite(parsed)) return entry.default;
+                const next = isMs ? parsed * 1000 : parsed;
+                return Math.max(entry.min, Math.min(entry.max, next));
+              };
+              const fmt = (ms) => (isMs ? `${Math.round(ms / 1000)} s` : ms);
+              return (
+                <Field
+                  key={entry.key}
+                  label={`${entry.label}${isMs ? ' (s)' : ''}`}
+                  value={shown}
+                  onChange={(v) => setGroup('streamRecovery', entry.key, toStored(v))}
+                  type="number"
+                  testid={`cfg-recovery-${entry.key}`}
+                  hint={`${entry.help} Standard: ${fmt(entry.default)}, erlaubt ${fmt(entry.min)} bis ${fmt(entry.max)}.`}
+                />
+              );
+            })}
           </div>
+          {recoverySettings.length > 0 && (
+            <button
+              className="oa-btn ghost"
+              style={{ marginTop: 8 }}
+              data-testid="cfg-recovery-defaults"
+              onClick={() => setSystem((p) => ({ ...p, streamRecovery: Object.fromEntries(recoverySettings.map((entry) => [entry.key, entry.default])) }))}
+            >
+              Standardwerte einsetzen
+            </button>
+          )}
         </div>
 
         <div className="oa-card" style={{ marginBottom: 18 }}>

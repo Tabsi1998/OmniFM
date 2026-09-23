@@ -46,6 +46,37 @@ STATIONS_FILE = Path(__file__).parent.parent / "stations.json"
 PREMIUM_FILE = Path(__file__).parent.parent / "premium.json"
 COUPONS_FILE = Path(__file__).parent.parent / "coupons.json"
 DASHBOARD_FILE = Path(__file__).parent.parent / "dashboard.json"
+# The recovery values of the owner console, shared with the bot (#217).
+RECOVERY_SETTINGS_FILE = Path(__file__).parent.parent / "src" / "config" / "recovery-settings.json"
+
+
+def load_recovery_settings():
+    try:
+        entries = json.loads(RECOVERY_SETTINGS_FILE.read_text(encoding="utf-8"))
+        return [entry for entry in entries if isinstance(entry, dict) and entry.get("key") and entry.get("env")]
+    except Exception:
+        return []
+
+
+RECOVERY_SETTINGS = load_recovery_settings()
+
+
+def normalize_stream_recovery(values):
+    """Owner values of system.streamRecovery, clamped to the bounds the bot
+    applies itself. Unknown keys and values that are not numbers are dropped."""
+    if not isinstance(values, dict):
+        return {}
+    normalized = {}
+    for entry in RECOVERY_SETTINGS:
+        raw = values.get(entry["key"])
+        if raw in (None, "") or isinstance(raw, bool):
+            continue
+        try:
+            number = int(float(raw))
+        except (TypeError, ValueError):
+            continue
+        normalized[entry["key"]] = max(int(entry["min"]), min(int(entry["max"]), number))
+    return normalized
 
 BOT_IMAGES = ["/img/bot-1.png", "/img/bot-2.png", "/img/bot-3.png", "/img/bot-4.png"]
 BOT_COLORS = ["cyan", "green", "pink", "amber", "purple", "red"]
@@ -252,7 +283,8 @@ DEFAULT_OWNER_CONFIG = {
         "audioRecognition": {"enabled": False, "apiKey": ""},
         "songHistory": {"enabled": True, "maxPerGuild": 100},
         "stationHealth": {"enabled": True, "intervalMs": 5000, "batchSize": 2, "concurrency": 2, "timeoutMs": 8000},
-        "streamRecovery": {"stableResetMs": 60000, "failoverMinFailures": 3, "failoverMinUnstableMs": 60000, "failoverStableAudioMs": 25000},
+        "streamRecovery": {entry["key"]: entry["default"] for entry in RECOVERY_SETTINGS}
+        or {"stableResetMs": 60000, "failoverMinFailures": 3, "failoverMinUnstableMs": 60000, "failoverStableAudioMs": 25000},
         "botDirectories": {
             "discordBotList": {"enabled": False, "token": "", "botId": "", "slug": "", "webhookSecret": "", "statsScope": "aggregate"},
             "botsGG": {"enabled": False, "token": "", "botId": "", "statsScope": "aggregate"},
@@ -394,6 +426,8 @@ def save_config_section(name, data):
                 merged = json.loads(json.dumps(current))
                 data = _deep_merge(merged, data)
             data = _merge_config_secrets(current, data)
+        if name == "system" and isinstance(data, dict) and "streamRecovery" in data:
+            data["streamRecovery"] = normalize_stream_recovery(data["streamRecovery"])
         db.owner_config.update_one({"_id": OWNER_CONFIG_ID}, {"$set": {name: data}}, upsert=True)
         return True
     except Exception:
@@ -461,12 +495,7 @@ def effective_system_config():
             "concurrency": ("STATION_HEALTH_CONCURRENCY", int),
             "timeoutMs": ("STATION_HEALTH_TIMEOUT_MS", int),
         },
-        "streamRecovery": {
-            "stableResetMs": ("STREAM_STABLE_RESET_MS", int),
-            "failoverMinFailures": ("STREAM_FAILOVER_MIN_FAILURES", int),
-            "failoverMinUnstableMs": ("STREAM_FAILOVER_MIN_UNSTABLE_MS", int),
-            "failoverStableAudioMs": ("STREAM_FAILOVER_STABLE_AUDIO_MS", int),
-        },
+        "streamRecovery": {entry["key"]: (entry["env"], int) for entry in RECOVERY_SETTINGS},
     }
     for group, fields in mappings.items():
         stored_group = stored.get(group) or {}
@@ -3126,6 +3155,50 @@ def build_affected_servers(nodes, now_ms=None):
     return rows
 
 
+FAILOVER_HISTORY_EVENTS = (
+    "stream_failover_activated",
+    "stream_failover_exhausted",
+    "stream_failback_completed",
+    "stream_failback_abandoned",
+)
+
+
+def format_failover_history_row(doc):
+    """One switch of the failover history: which server, from which station to
+    which, why and how long the backup station played (#217)."""
+    doc = doc or {}
+    payload = doc.get("payload") if isinstance(doc.get("payload"), dict) else {}
+    event = str(doc.get("eventKey") or "")
+    previous = payload.get("previousStationName") or payload.get("previousStationKey") or ""
+    backup = payload.get("failoverStationName") or payload.get("failoverStationKey") or ""
+    restored = payload.get("restoredStationName") or payload.get("restoredStationKey") or ""
+    if event == "stream_failback_completed":
+        kind, from_name, to_name = "back", previous, restored
+    elif event == "stream_failback_abandoned":
+        kind, from_name, to_name = "stay", previous, backup
+    elif event == "stream_failover_exhausted":
+        kind, from_name, to_name = "exhausted", previous, ""
+    else:
+        kind, from_name, to_name = "switch", previous, backup
+    at = doc.get("timestamp") or doc.get("at")
+    if isinstance(at, datetime):
+        at = (at if at.tzinfo else at.replace(tzinfo=timezone.utc)).astimezone(timezone.utc).isoformat()
+    duration_ms = parse_int(payload.get("failoverDurationMs"), 0)
+    runtime = doc.get("runtime") if isinstance(doc.get("runtime"), dict) else {}
+    return {
+        "at": at,
+        "guildId": str(doc.get("guildId") or ""),
+        "guildName": clip_text(doc.get("guildName") or doc.get("guildId") or "", 120),
+        "event": event,
+        "kind": kind,
+        "from": clip_text(from_name, 120),
+        "to": clip_text(to_name, 120),
+        "reason": clip_text(payload.get("triggerError") or payload.get("reason") or "", 240),
+        "durationSec": duration_ms // 1000 if duration_ms > 0 else None,
+        "runtime": clip_text(runtime.get("name") or doc.get("source") or "", 80),
+    }
+
+
 def read_runtime_logs(limit=500):
     """Newest log lines of every bot process (capped collection runtime_logs)."""
     if db is None:
@@ -5777,6 +5850,24 @@ def _read_json_list(path, key=None):
     return []
 
 
+@app.get("/api/admin/failover-history")
+async def admin_failover_history(request: Request, limit: int = 100):
+    guard = _admin_guard(request)
+    if guard is not None:
+        return guard
+    limit = max(1, min(500, parse_int(limit, 100)))
+    rows = []
+    if db is not None:
+        try:
+            cursor = db.runtime_incidents.find(
+                {"eventKey": {"$in": list(FAILOVER_HISTORY_EVENTS)}}, {"_id": 0}
+            ).sort("timestamp", -1).limit(limit)
+            rows = [format_failover_history_row(doc) for doc in cursor]
+        except Exception:
+            rows = []
+    return {"history": rows, "count": len(rows)}
+
+
 @app.get("/api/admin/monitoring")
 async def admin_monitoring(request: Request):
     guard = _admin_guard(request)
@@ -6234,6 +6325,7 @@ async def admin_get_config(request: Request):
         "payments": mask_config_secrets(effective_payments_config()),
         "marketing": get_config_section("marketing"),
         "system": mask_config_secrets(effective_system_config()),
+        "recoverySettings": RECOVERY_SETTINGS,
         "env": {
             "stripeEnvKey": bool((os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY") or "").strip()),
         },

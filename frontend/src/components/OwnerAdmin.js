@@ -298,6 +298,18 @@ export default function OwnerAdmin() {
     return () => { cancelled = true; };
   }, []);
 
+  // Failover history (#217): loaded when the monitoring tab opens and on demand.
+  const [failoverHistory, setFailoverHistory] = useState(null);
+  const loadFailoverHistory = useCallback(async () => {
+    try {
+      const data = await apiGet('/api/admin/failover-history?limit=100', token);
+      setFailoverHistory(data.history || []);
+    } catch { /* keep the last list */ }
+  }, [apiGet, token]);
+  useEffect(() => {
+    if (authed && section === 'monitoring') loadFailoverHistory();
+  }, [authed, section, loadFailoverHistory]);
+
   // Live monitoring poller — active only while authed AND on the monitoring tab.
   useEffect(() => {
     if (!authed || section !== 'monitoring') return undefined;
@@ -825,6 +837,36 @@ export default function OwnerAdmin() {
                     </div>
                   </div>
                 )}
+
+                <div className="oa-card oa-fade" style={{ marginTop: 18 }} data-testid="mon-failover-history">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <div className="oa-stat-label">Failover-Historie (letzte 100 Umschaltungen)</div>
+                    <button className="oa-btn ghost" style={{ padding: '4px 10px' }} onClick={loadFailoverHistory}>Aktualisieren</button>
+                  </div>
+                  {failoverHistory === null && <div className="oa-sub">Lade…</div>}
+                  {failoverHistory && failoverHistory.length === 0 && <div style={{ color: '#64748b', fontSize: 13, padding: 12 }}>Noch keine Umschaltung aufgezeichnet.</div>}
+                  {failoverHistory && failoverHistory.length > 0 && (
+                    <div className="oa-table-wrap" style={{ maxHeight: 360, overflowY: 'auto' }}>
+                      <table className="oa-table">
+                        <thead>
+                          <tr><th>Wann</th><th>Server</th><th>Was</th><th>Von → Nach</th><th>Dauer</th><th>Grund</th></tr>
+                        </thead>
+                        <tbody>
+                          {failoverHistory.map((row, i) => (
+                            <tr key={`${row.at}-${row.guildId}-${i}`}>
+                              <td className="oa-mono" title={row.at}>{relTime(row.at)}</td>
+                              <td>{row.guildName || row.guildId}</td>
+                              <td><span className={`oa-pill ${row.kind === 'back' ? 'green' : row.kind === 'exhausted' ? 'red' : 'amber'}`}>{{ switch: 'Ersatzsender', back: 'Zurück', stay: 'Ersatz bleibt', exhausted: 'Kein Sender' }[row.kind] || row.kind}</span></td>
+                              <td style={{ fontSize: 12 }}>{row.from || '—'}{row.to ? ` → ${row.to}` : ''}</td>
+                              <td className="oa-mono">{row.durationSec != null ? fmtUptime(row.durationSec) : '—'}</td>
+                              <td style={{ fontSize: 12, color: '#94a3b8', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.reason}>{row.reason || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
 
                 <div className="oa-grid cols-2" style={{ marginTop: 18 }}>
                   <div className="oa-card oa-fade" data-testid="mon-incidents-list">

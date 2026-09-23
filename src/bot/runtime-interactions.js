@@ -75,6 +75,7 @@ import {
   openRuntimeStationsBrowser,
 } from "./runtime-panels.js";
 import { buildOmniEmbed } from "./discord-ui.js";
+import { describeRecoverySettings } from "../config/recovery-settings.js";
 
 async function deferRuntimeReply(interaction) {
   if (interaction?.deferred || interaction?.replied || typeof interaction?.deferReply !== "function") return;
@@ -1647,6 +1648,13 @@ export async function handleRuntimeInteraction(runtime, interaction) {
               : t("nein", "no")}`,
             `${t("Server-Stummschaltung", "Server mute")}: ${activeState.serverMuted === true ? t("ja", "yes") : t("nein", "no")}`,
           ].join("\n"),
+          inline: false,
+        },
+        {
+          // The values the runtime works with, from the owner console or the
+          // environment (#217), so support can read them.
+          name: t("Recovery-Werte", "Recovery settings"),
+          value: describeRecoverySettings(process.env, t).join("\n").slice(0, 1024),
           inline: false,
         }
       );

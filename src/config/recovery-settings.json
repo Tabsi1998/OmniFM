@@ -1,0 +1,132 @@
+[
+  {
+    "key": "failoverMinFailures",
+    "env": "STREAM_FAILOVER_MIN_FAILURES",
+    "default": 3,
+    "min": 2,
+    "max": 100,
+    "unit": "count",
+    "label": "Fehler bis zum Ersatzsender",
+    "help": "So viele fehlgeschlagene Starts in Folge braucht es, bevor der Bot auf den Ersatzsender wechselt."
+  },
+  {
+    "key": "failoverMinUnstableMs",
+    "env": "STREAM_FAILOVER_MIN_UNSTABLE_MS",
+    "default": 60000,
+    "min": 10000,
+    "max": 1800000,
+    "unit": "ms",
+    "label": "Mindestdauer der Störung",
+    "help": "So lange muss der Sender gestört sein und keinen Ton liefern, bevor gewechselt wird. Kurze Aussetzer lösen so keinen Wechsel aus."
+  },
+  {
+    "key": "failoverStableAudioMs",
+    "env": "STREAM_FAILOVER_STABLE_AUDIO_MS",
+    "default": 25000,
+    "min": 5000,
+    "max": 300000,
+    "unit": "ms",
+    "label": "Ton am Stück bis „wieder gesund“",
+    "help": "Liefert der Sender so lange ohne Unterbrechung Ton, gelten frühere Fehler als Aussetzer und die Zählung beginnt neu."
+  },
+  {
+    "key": "stableResetMs",
+    "env": "STREAM_STABLE_RESET_MS",
+    "default": 60000,
+    "min": 10000,
+    "max": 600000,
+    "unit": "ms",
+    "label": "Fehlerreihe vergessen nach",
+    "help": "Nach so langer stabiler Wiedergabe vergisst der Bot die bisherigen Neustarts."
+  },
+  {
+    "key": "failbackCheckMs",
+    "env": "STREAM_FAILBACK_CHECK_MS",
+    "default": 120000,
+    "min": 30000,
+    "max": 3600000,
+    "unit": "ms",
+    "label": "Wunschsender prüfen alle",
+    "help": "Während der Ersatzsender läuft, prüft der Bot in diesem Abstand, ob der Wunschsender wieder erreichbar ist."
+  },
+  {
+    "key": "failbackMaxMs",
+    "env": "STREAM_FAILBACK_MAX_MS",
+    "default": 900000,
+    "min": 30000,
+    "max": 21600000,
+    "unit": "ms",
+    "label": "Längster Prüfabstand",
+    "help": "Bleibt der Wunschsender aus, wird der Abstand zwischen den Prüfungen bis zu diesem Wert länger."
+  },
+  {
+    "key": "failbackConfirmations",
+    "env": "STREAM_FAILBACK_CONFIRMATIONS",
+    "default": 2,
+    "min": 1,
+    "max": 10,
+    "unit": "count",
+    "label": "Erfolgreiche Prüfungen bis zum Zurückwechseln",
+    "help": "So oft in Folge muss der Wunschsender erreichbar sein, bevor der Bot zurückwechselt."
+  },
+  {
+    "key": "healthcheckStallMs",
+    "env": "STREAM_HEALTHCHECK_STALL_MS",
+    "default": 45000,
+    "min": 30000,
+    "max": 600000,
+    "unit": "ms",
+    "label": "Neustart nach Stille von",
+    "help": "Kommt so lange kein Ton vom Sender, startet der Bot den Stream neu."
+  },
+  {
+    "key": "errorCooldownThreshold",
+    "env": "STREAM_ERROR_COOLDOWN_THRESHOLD",
+    "default": 8,
+    "min": 2,
+    "max": 100,
+    "unit": "count",
+    "label": "Fehler bis zur längeren Pause",
+    "help": "Nach so vielen Fehlern in Folge wartet der Bot länger zwischen den Neustarts."
+  },
+  {
+    "key": "errorCooldownMs",
+    "env": "STREAM_ERROR_COOLDOWN_MS",
+    "default": 60000,
+    "min": 1000,
+    "max": 1800000,
+    "unit": "ms",
+    "label": "Länge der Pause",
+    "help": "So lange wartet der Bot dann mindestens bis zum nächsten Versuch."
+  },
+  {
+    "key": "reconnectCircuitAttempts",
+    "env": "VOICE_RECONNECT_CIRCUIT_BREAKER_ATTEMPTS",
+    "default": 30,
+    "min": 5,
+    "max": 500,
+    "unit": "count",
+    "label": "Verbindungsversuche bis zur Sperre",
+    "help": "Nach so vielen gescheiterten Voice-Verbindungen hintereinander pausiert der Bot die Versuche für eine Weile."
+  },
+  {
+    "key": "reconnectCircuitMs",
+    "env": "VOICE_RECONNECT_CIRCUIT_BREAKER_MS",
+    "default": 900000,
+    "min": 60000,
+    "max": 21600000,
+    "unit": "ms",
+    "label": "Dauer der Verbindungssperre",
+    "help": "So lange pausiert der Bot nach zu vielen gescheiterten Verbindungen."
+  },
+  {
+    "key": "voiceParkedRetryMs",
+    "env": "VOICE_PARKED_RETRY_MS",
+    "default": 900000,
+    "min": 60000,
+    "max": 21600000,
+    "unit": "ms",
+    "label": "Pausiertes Ziel erneut versuchen alle",
+    "help": "Fehlen dauerhaft Rechte oder scheitert die Verbindung immer wieder, versucht es der Bot in diesem Abstand erneut."
+  }
+]
