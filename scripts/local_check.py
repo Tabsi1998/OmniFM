@@ -91,6 +91,7 @@ ENV_PROVIDED = {
     # preflight), node --test, and the backend contract test runner.
     "BOT_PROCESS_INDEX", "BOT_PROCESS_ROLE", "DRY_RUN", "NODE_TEST_CONTEXT",
     "OMNIFM_RUN_BACKEND_CONTRACT_TESTS", "OMNIFM_TEST_BASE_URL", "REACT_APP_BACKEND_URL",
+    "OMNIFM_TEST_ADMIN_TOKEN",
 }
 
 ALLOWED_LICENCES = {
@@ -1085,8 +1086,36 @@ def fastapi_contract(context: Context) -> str:
     start_process(context, "fastapi", [exe, "-m", "uvicorn", "backend.server:app", "--host", "127.0.0.1",
                                        "--port", str(API_PORT)],
                   cwd=ROOT, env=env, url=f"http://127.0.0.1:{API_PORT}/api/health", seconds=90)
+    context.cache["fastapi:env"] = env
     check_owner_contract(in_mongo, run_mongo)
     return "the owner contract holds end to end"
+
+
+def fastapi_contract_suite(context: Context) -> str:
+    """backend/tests: the Owner Console contract tests, against the live server.
+
+    Neither ci.yml nor this runner ran them before (#204): they need a running
+    FastAPI, and the contract step above already has one. Several were written
+    against demo data of an earlier stack, so the failing test ids are debt
+    under the ratchet and every new failure fails the step.
+    """
+    env = context.cache.get("fastapi:env")
+    if not env or not port_open(API_PORT):
+        raise StepSkipped("the live FastAPI of backend/contract is not running")
+    base = f"http://127.0.0.1:{API_PORT}"
+    completed = context.run(
+        venv_python(), "-m", "pytest", BACKEND / "tests", "-q", "-p", "no:cacheprovider", "-rfE",
+        env={**env, "OMNIFM_RUN_BACKEND_CONTRACT_TESTS": "1", "OMNIFM_TEST_BASE_URL": base,
+             "REACT_APP_BACKEND_URL": base, "OMNIFM_TEST_ADMIN_TOKEN": API_TOKEN},
+        check=False, timeout=1800)
+    text = completed.stdout + completed.stderr
+    path = context.log("backend-contract-suite", text)
+    counts = pytest_counts(text)
+    if completed.returncode not in (0, 1) or not counts.get("passed"):
+        raise StepFailed(f"pytest did not run the contract suite. Full output: {path}\n" + tail(completed))
+    failing = set(re.findall(r"^(?:FAILED|ERROR) (\S+)", text, re.M))
+    verdict = ratchet(context, "backend-contract-suite", failing, "failing backend contract tests")
+    return f"{describe_counts(counts)}; {verdict}"
 
 
 def check_owner_contract(in_mongo, run_mongo) -> None:
@@ -1193,6 +1222,8 @@ def backend_steps() -> list:
         Step("backend", "compile", "Every backend module compiles", backend_compile, ("venv",)),
         Step("backend", "unit", "The FastAPI unit tests", backend_unit, ("venv",)),
         Step("backend", "contract", "The owner contract against a live server", fastapi_contract, ("venv",)),
+        Step("backend", "contract-suite", "The backend/tests contract suite against the same server",
+             fastapi_contract_suite, ("contract",)),
     ]
 
 

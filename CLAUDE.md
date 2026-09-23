@@ -25,7 +25,7 @@ ignored by Git.
 | --- | --- | --- |
 | repository | ci.yml `syntax` | `test:repo-hygiene`, every `*.sh` parses, no CRLF in the index, Gitleaks over the history and over uncommitted files |
 | node | ci.yml `syntax`, `unit`, `voice-codec`, `mongo-smoke`; nightly | Node 22 as package.json pins it, `npm ci`, the syntax gates, the Opus codec, the Mongo smoke, `test:unit` against a MongoDB 7.0.39 container |
-| backend | ci.yml `fastapi-smoke` | Python 3.12 venv, compileall, `backend/unit_tests`, the owner contract against a live uvicorn - the ci.yml assertions plus: admin routes refuse requests without the token |
+| backend | ci.yml `fastapi-smoke` | Python 3.12 venv, compileall, `backend/unit_tests`, the owner contract against a live uvicorn - the ci.yml assertions plus: admin routes refuse requests without the token; then the `backend/tests` contract suite against the same server (ratchet on failing test ids) |
 | frontend | ci.yml `frontend-build` | `npm ci`, the Vite build, and proof it produced `build/index.html` and bundles |
 | extra | - | every `src/*.js` in `test:syntax`, npm audit (high and critical), settings read by the code vs `.env.example`, dependency licences, OSV over the lockfiles, ShellCheck |
 

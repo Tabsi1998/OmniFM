@@ -12,7 +12,7 @@ if not base_url:
     raise RuntimeError("REACT_APP_BACKEND_URL missing")
 BASE_URL = base_url.rstrip("/")
 
-TOKEN = "omnifm-owner-dev-token"
+TOKEN = os.environ.get("OMNIFM_TEST_ADMIN_TOKEN", "omnifm-owner-dev-token")
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
