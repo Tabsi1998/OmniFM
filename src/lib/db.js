@@ -65,6 +65,12 @@ async function initCollections(database) {
       { key: { timestamp: 1 }, name: "ttl", expireAfterSeconds: 86400 * 90 },
     ]).catch(() => null);
 
+    // runtime_logs: recent log lines of every bot process for the owner
+    // console. Capped, so it never grows: the oldest lines drop out.
+    if (!names.has("runtime_logs")) {
+      await database.createCollection("runtime_logs", { capped: true, size: 8 * 1024 * 1024, max: 5000 }).catch(() => null);
+    }
+
     // guild_stats: aggregated stats per guild
     if (!names.has("guild_stats")) {
       await database.createCollection("guild_stats");

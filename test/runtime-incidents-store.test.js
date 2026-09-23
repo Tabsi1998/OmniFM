@@ -83,3 +83,21 @@ test("runtime incidents support acknowledgement and status filtering in fallback
     restoreOptionalFile(backupPath, backupSnapshot);
   }
 });
+
+test("server incidents get one readable line for the owner console", async () => {
+  const { describeRuntimeIncident } = await import("../src/runtime-incidents-store.js");
+  assert.equal(
+    describeRuntimeIncident("stream_failover_activated", { previousStationName: "Alpha FM", failoverStationName: "Beta FM" }, "Guild One"),
+    "Guild One: Alpha FM nicht erreichbar, Ersatzsender Beta FM"
+  );
+  assert.equal(
+    describeRuntimeIncident("stream_failback_completed", { previousStationName: "Beta FM", restoredStationName: "Alpha FM" }, "Guild One"),
+    "Guild One: zurück auf Alpha FM (vorher Beta FM)"
+  );
+  assert.equal(
+    describeRuntimeIncident("station_unavailable", { previousStationName: "Pro FM", stopped: true }, "Guild One"),
+    "Guild One: Pro FM nicht mehr im Plan, Wiedergabe beendet"
+  );
+  assert.match(describeRuntimeIncident("voice_parked", { reason: "permissions" }, "Guild One"), /geparkt \(permissions\)/);
+  assert.equal(describeRuntimeIncident("something_new", {}, "Guild One"), "Guild One: something_new");
+});
