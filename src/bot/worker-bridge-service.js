@@ -1,16 +1,18 @@
 import os from "node:os";
 
-import {
-  claimNextWorkerCommand,
-  clearWorkerSnapshot,
-  completeWorkerCommand,
-  failWorkerCommand,
-  publishWorkerSnapshot,
-} from "../core/worker-bridge.js";
+import * as workerBridge from "../core/worker-bridge.js";
+import { isDoorbellConnected, onDoorbell } from "../core/process-doorbell.js";
 import { log } from "../lib/logging.js";
 
 const REMOTE_WORKER_HEARTBEAT_MS = Math.max(2_000, Number.parseInt(String(process.env.REMOTE_WORKER_HEARTBEAT_MS || "5000"), 10) || 5_000);
 const REMOTE_WORKER_COMMAND_POLL_MS = Math.max(250, Number.parseInt(String(process.env.REMOTE_WORKER_COMMAND_POLL_MS || "1000"), 10) || 1_000);
+// With the supervisor's doorbell a new command rings the worker at once; the
+// poll only catches a ring that got lost (#213).
+const REMOTE_WORKER_COMMAND_FALLBACK_POLL_MS = Math.max(
+  REMOTE_WORKER_COMMAND_POLL_MS,
+  Number.parseInt(String(process.env.REMOTE_WORKER_COMMAND_FALLBACK_POLL_MS || "5000"), 10) || 5_000
+);
+const REMOTE_WORKER_MAX_COMMANDS_PER_TICK = 25;
 let lastCpuUsage = process.cpuUsage();
 let lastCpuSampleAt = Date.now();
 
@@ -62,15 +64,19 @@ function buildWorkerSnapshot(runtime) {
 }
 
 class WorkerBridgeService {
-  constructor(runtime) {
+  constructor(runtime, { bridge = workerBridge, doorbell = { isDoorbellConnected, onDoorbell } } = {}) {
     this.runtime = runtime;
+    this.bridge = bridge;
+    this.doorbell = doorbell;
     this.heartbeatTimer = null;
     this.commandTimer = null;
     this.commandLoopInFlight = false;
+    this.tickRequested = false;
+    this.stopDoorbell = null;
   }
 
   async publishSnapshot() {
-    await publishWorkerSnapshot(this.runtime.config.id, buildWorkerSnapshot(this.runtime));
+    await this.bridge.publishWorkerSnapshot(this.runtime.config.id, buildWorkerSnapshot(this.runtime));
   }
 
   async executeCommand(command) {
@@ -132,28 +138,74 @@ class WorkerBridgeService {
     }
   }
 
+  async runClaimedCommand(command) {
+    try {
+      const result = await this.executeCommand(command);
+      await this.publishSnapshot().catch((err) => {
+        log("WARN", `[${this.runtime.config.name}] Worker-Bridge Snapshot nach Command fehlgeschlagen: ${err?.message || err}`);
+      });
+      await this.bridge.completeWorkerCommand(command.commandId, result || { ok: true });
+    } catch (err) {
+      await this.bridge.failWorkerCommand(command.commandId, err).catch(() => null);
+      log("ERROR", `[${this.runtime.config.name}] Worker-Bridge command failed (${command?.type || "-"}) guild=${command?.payload?.guildId || "-"}: ${err?.message || err}`);
+    }
+  }
+
+  /**
+   * Claims every pending command, not one per tick: `/stop` on many servers
+   * or an event burst no longer drains at one command per second (#213).
+   * Commands of one server run in the order they were sent, different
+   * servers run in parallel.
+   */
   async tickCommands() {
-    if (this.commandLoopInFlight) return;
+    if (this.commandLoopInFlight) {
+      this.tickRequested = true;
+      return;
+    }
     this.commandLoopInFlight = true;
     try {
-      const command = await claimNextWorkerCommand(this.runtime.config.id);
-      if (!command) return;
+      let claimedAny = false;
+      do {
+        this.tickRequested = false;
+        const claimed = [];
+        while (claimed.length < REMOTE_WORKER_MAX_COMMANDS_PER_TICK) {
+          // Claims are atomic one by one; the batch runs in parallel below.
+          // eslint-disable-next-line no-await-in-loop
+          const command = await this.bridge.claimNextWorkerCommand(this.runtime.config.id);
+          if (!command) break;
+          claimed.push(command);
+        }
+        // A ring during an empty claim may belong to a command inserted just
+        // after it: look once more instead of waiting for the fallback poll.
+        if (!claimed.length) {
+          if (this.tickRequested) continue;
+          break;
+        }
+        claimedAny = true;
 
-      try {
-        const result = await this.executeCommand(command);
-        await this.publishSnapshot().catch((err) => {
-          log("WARN", `[${this.runtime.config.name}] Worker-Bridge Snapshot nach Command fehlgeschlagen: ${err?.message || err}`);
-        });
-        await completeWorkerCommand(command.commandId, result || { ok: true });
-      } catch (err) {
-        await failWorkerCommand(command.commandId, err);
-        log("ERROR", `[${this.runtime.config.name}] Worker-Bridge command failed (${command?.type || "-"}) guild=${command?.payload?.guildId || "-"}: ${err?.message || err}`);
-      } finally {
-        await this.publishSnapshot().catch(() => null);
-      }
+        const byGuild = new Map();
+        for (const command of claimed) {
+          const guildKey = String(command?.payload?.guildId || command?.commandId || "");
+          if (!byGuild.has(guildKey)) byGuild.set(guildKey, []);
+          byGuild.get(guildKey).push(command);
+        }
+        // eslint-disable-next-line no-await-in-loop
+        await Promise.all([...byGuild.values()].map(async (commands) => {
+          for (const command of commands) {
+            // eslint-disable-next-line no-await-in-loop
+            await this.runClaimedCommand(command);
+          }
+        }));
+        if (claimed.length >= REMOTE_WORKER_MAX_COMMANDS_PER_TICK) this.tickRequested = true;
+      } while (this.tickRequested);
+      if (claimedAny) await this.publishSnapshot().catch(() => null);
     } finally {
       this.commandLoopInFlight = false;
     }
+  }
+
+  getCommandPollMs() {
+    return this.doorbell.isDoorbellConnected() ? REMOTE_WORKER_COMMAND_FALLBACK_POLL_MS : REMOTE_WORKER_COMMAND_POLL_MS;
   }
 
   async start() {
@@ -166,11 +218,19 @@ class WorkerBridgeService {
     }, REMOTE_WORKER_HEARTBEAT_MS);
     this.heartbeatTimer?.unref?.();
 
+    const workerId = this.runtime.config.id;
+    this.stopDoorbell = this.doorbell.onDoorbell(workerBridge.WORKER_COMMAND_TOPIC, (detail) => {
+      if (detail?.workerId && detail.workerId !== workerId) return;
+      this.tickCommands().catch((err) => {
+        log("WARN", `[${this.runtime.config.name}] Worker-Bridge Klingel fehlgeschlagen: ${err?.message || err}`);
+      });
+    });
+
     this.commandTimer = setInterval(() => {
       this.tickCommands().catch((err) => {
         log("WARN", `[${this.runtime.config.name}] Worker-Bridge poll fehlgeschlagen: ${err?.message || err}`);
       });
-    }, REMOTE_WORKER_COMMAND_POLL_MS);
+    }, this.getCommandPollMs());
     this.commandTimer?.unref?.();
   }
 
@@ -183,7 +243,9 @@ class WorkerBridgeService {
       clearInterval(this.commandTimer);
       this.commandTimer = null;
     }
-    await clearWorkerSnapshot(this.runtime.config.id).catch(() => null);
+    this.stopDoorbell?.();
+    this.stopDoorbell = null;
+    await this.bridge.clearWorkerSnapshot(this.runtime.config.id).catch(() => null);
   }
 }
 

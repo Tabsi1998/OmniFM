@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { log } from "../lib/logging.js";
+import { relayDoorbellMessage } from "../core/process-doorbell.js";
 
 const entryDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(entryDir, "..", "..");
@@ -71,7 +72,9 @@ async function superviseSplitRuntime({
           OMNIFM_DEPLOYMENT_MODE: "split",
           WEB_SERVER_ENABLED: "0",
         },
-        stdio: "inherit",
+        // The fourth stream is the IPC channel for the doorbell between the
+        // commander and the workers (#213).
+        stdio: ["inherit", "inherit", "inherit", "ipc"],
         windowsHide: true,
       });
     } catch (err) {
@@ -85,6 +88,9 @@ async function superviseSplitRuntime({
 
     children.set(spec.id, child);
     log("INFO", `[Supervisor] ${spec.label} gestartet (PID ${child.pid || "?"}).`);
+    child.on?.("message", (message) => {
+      relayDoorbellMessage(children.values(), child, message);
+    });
 
     child.once("error", (err) => {
       log("ERROR", `[Supervisor] ${spec.label} Prozessfehler: ${err?.message || err}`);
