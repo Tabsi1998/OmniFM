@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 
 import { connect, getDb, isConnected } from "../lib/db.js";
 import { log } from "../lib/logging.js";
+import { ringDoorbell, waitForDoorbell } from "./process-doorbell.js";
 
 const WORKER_STATUS_COLLECTION = "worker_bridge_status";
 const WORKER_COMMAND_COLLECTION = "worker_bridge_commands";
@@ -9,6 +10,8 @@ const WORKER_STATUS_TTL_MS = Math.max(30_000, Number.parseInt(String(process.env
 const WORKER_COMMAND_TTL_MS = Math.max(60_000, Number.parseInt(String(process.env.REMOTE_WORKER_COMMAND_TTL_MS || "300000"), 10) || 300_000);
 const WORKER_COMMAND_WAIT_POLL_MS = Math.max(100, Number.parseInt(String(process.env.REMOTE_WORKER_COMMAND_POLL_MS || "500"), 10) || 500);
 const WORKER_COMMAND_MIN_DEADLINE_MS = 5_000;
+const WORKER_COMMAND_TOPIC = "worker-command";
+const WORKER_COMMAND_DONE_TOPIC = "worker-command-done";
 const WORKER_COMMAND_MIN_WAIT_MS = 2_000;
 
 let bridgeIndexesPromise = null;
@@ -188,6 +191,8 @@ async function createWorkerCommand(workerId, type, payload = {}, options = {}) {
   };
 
   await db.collection(WORKER_COMMAND_COLLECTION).insertOne(doc);
+  // The worker claims it now instead of at its next poll (#213).
+  ringDoorbell(WORKER_COMMAND_TOPIC, { workerId: doc.workerId, commandId: doc.commandId });
   return doc;
 }
 
@@ -257,6 +262,7 @@ async function completeWorkerCommand(commandId, result = {}) {
       },
     }
   );
+  ringDoorbell(WORKER_COMMAND_DONE_TOPIC, { commandId: normalizedCommandId });
 }
 
 async function failWorkerCommand(commandId, error) {
@@ -279,6 +285,7 @@ async function failWorkerCommand(commandId, error) {
       },
     }
   );
+  ringDoorbell(WORKER_COMMAND_DONE_TOPIC, { commandId: normalizedCommandId });
 }
 
 async function cancelWorkerCommand(commandId, reason = "Worker-Command Timeout.") {
@@ -338,8 +345,10 @@ async function waitForWorkerCommandResult(commandId, options = {}) {
     if (doc.status === "cancelled") {
       throw new Error(String(doc.error || "Worker-Command abgebrochen."));
     }
-    await new Promise((resolve) => {
-      setTimeout(resolve, pollMs);
+    // Polling stays the fallback; the worker's ring ends the wait early.
+    await waitForDoorbell(WORKER_COMMAND_DONE_TOPIC, {
+      timeoutMs: Math.min(pollMs, Math.max(0, deadline - Date.now())),
+      match: (detail) => detail?.commandId === normalizedCommandId,
     });
   }
 
@@ -375,6 +384,8 @@ async function sendWorkerCommandAndWait(workerId, type, payload = {}, options = 
 export {
   WORKER_STATUS_TTL_MS,
   WORKER_COMMAND_TTL_MS,
+  WORKER_COMMAND_TOPIC,
+  WORKER_COMMAND_DONE_TOPIC,
   ensureWorkerBridgeCollections,
   publishWorkerSnapshot,
   clearWorkerSnapshot,
