@@ -2,6 +2,7 @@ import { BotRuntime } from "../bot/runtime.js";
 import { WorkerBridgeService } from "../bot/worker-bridge-service.js";
 import { loadStations } from "../stations-store.js";
 import { initCustomStationsStore, stopCustomStationsStore } from "../custom-stations.js";
+import { initCommandPermissionsStore, stopCommandPermissionsStore } from "../command-permissions-store.js";
 import { log } from "../lib/logging.js";
 import {
   initializeSharedServices,
@@ -13,6 +14,9 @@ import { startWorkerAutohealMonitor } from "./worker-autoheal.js";
 
 await initializeSharedServices({ requireMongo: true });
 await initCustomStationsStore();
+// Buttons on a worker's now-playing message are delivered to the worker, so it
+// needs the /perm role rules as well (#232).
+await initCommandPermissionsStore();
 
 const topology = resolveBotTopology(process.env);
 const workerIndex = Number.parseInt(String(process.env.BOT_PROCESS_INDEX || ""), 10);
@@ -39,6 +43,7 @@ const { shutdown } = installProcessHandlers({
       autohealMonitor?.stop?.();
       await bridgeService.stop();
       await stopCustomStationsStore();
+      await stopCommandPermissionsStore();
     },
   ],
 });

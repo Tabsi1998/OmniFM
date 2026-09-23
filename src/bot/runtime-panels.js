@@ -1019,6 +1019,18 @@ export async function handleRuntimePanelInteraction(runtime, interaction) {
     }
 
     if (playAction.action === "start") {
+      // The quick start is reachable from buttons without /play, so it checks
+      // the /perm rule of /play itself (#232).
+      if (typeof runtime.checkCommandRolePermission === "function") {
+        const permission = runtime.checkCommandRolePermission(interaction, "play");
+        if (!permission?.ok) {
+          await interaction.reply({
+            content: permission?.message || t("Dafür fehlen dir die Rechte.", "You are not allowed to do that."),
+            flags: MessageFlags.Ephemeral,
+          });
+          return true;
+        }
+      }
       await interaction.deferUpdate();
       await executeRuntimePlay(runtime, interaction, {
         station: session.data.stationKey,
