@@ -21,6 +21,10 @@ function normalizeRuntimeStatusInput(source = {}) {
     channelLabel: String(input.channelLabel || "").trim() || null,
     voiceGuardLastAction: String(input.voiceGuardLastAction || "").trim().toLowerCase() || null,
     parkedReason: String(input.parkedReason || "").trim().toLowerCase() || null,
+    serverMuted: input.serverMuted === true,
+    failoverActive: input.failoverActive === true,
+    desiredStationName: String(input.desiredStationName || "").trim() || null,
+    failbackNextProbeAt: Math.max(0, clampNumber(input.failbackNextProbeAt)),
   };
 }
 
@@ -44,6 +48,23 @@ function buildUserFacingRuntimeStatus(source = {}, { t = (de, en) => de } = {}) 
       ),
       playback: playbackBits.join(" | ") || t("Keine aktive Wiedergabe", "No active playback"),
       nextStep: t("Es ist gerade keine Aktion auf dem Server noetig.", "No action is needed on the server right now."),
+    };
+  }
+
+  if (status.serverMuted && status.connected) {
+    return {
+      code: "muted",
+      label: t("Stummgeschaltet", "Server-muted"),
+      accent: 0xEF4444,
+      summary: t(
+        "OmniFM ist im Sprachkanal, aber auf diesem Server stummgeschaltet. Niemand hoert den Stream.",
+        "OmniFM is in the voice channel but server-muted, so nobody hears the stream."
+      ),
+      playback: playbackBits.join(" | ") || t("Wiedergabe laeuft stumm", "Playback runs muted"),
+      nextStep: t(
+        "Rechtsklick auf OmniFM im Sprachkanal und die Server-Stummschaltung aufheben.",
+        "Right-click OmniFM in the voice channel and remove the server mute."
+      ),
     };
   }
 
@@ -83,6 +104,29 @@ function buildUserFacingRuntimeStatus(source = {}, { t = (de, en) => de } = {}) 
           "Grant OmniFM 'Connect' and 'Speak' in the channel and the bot returns on its own. /play starts right away."
         )
         : t("Kein Eingreifen noetig. /play startet die Wiedergabe sofort neu.", "No action is needed. /play restarts playback right away."),
+    };
+  }
+
+  if (status.failoverActive && status.connected && status.desiredStationName) {
+    const nextCheck = status.failbackNextProbeAt > 0
+      ? t(
+        ` Naechste Pruefung <t:${Math.floor(status.failbackNextProbeAt / 1000)}:R>.`,
+        ` Next check <t:${Math.floor(status.failbackNextProbeAt / 1000)}:R>.`
+      )
+      : "";
+    return {
+      code: "failover",
+      label: t("Ersatzsender aktiv", "Backup station active"),
+      accent: 0xF59E0B,
+      summary: t(
+        `${status.desiredStationName} ist gerade nicht erreichbar. OmniFM spielt ${status.stationName || "einen Ersatzsender"} und wechselt automatisch zurueck, sobald ${status.desiredStationName} wieder laeuft.${nextCheck}`,
+        `${status.desiredStationName} is unreachable right now. OmniFM plays ${status.stationName || "a backup station"} and switches back automatically once ${status.desiredStationName} plays again.${nextCheck}`
+      ),
+      playback: playbackBits.join(" | ") || t("Ersatzsender laeuft", "Backup station playing"),
+      nextStep: t(
+        "Kein Eingreifen noetig. Die Buttons unter der Now-Playing-Nachricht wechseln sofort zurueck oder behalten den Ersatzsender.",
+        "No action needed. The buttons below the now-playing message switch back right away or keep the backup station."
+      ),
     };
   }
 

@@ -1640,6 +1640,12 @@ export async function handleRuntimeInteraction(runtime, interaction) {
             `${t("Geparkt", "Parked")}: ${activeState.parkedReason
               ? `${activeState.parkedReason}${Number(activeState.parkedAt || 0) > 0 ? ` (${t("seit", "since")} <t:${Math.floor(Number(activeState.parkedAt) / 1000)}:R>)` : ""}`
               : t("nein", "no")}`,
+            `Failover: ${activeState.failoverActive === true
+              ? `${t("aktiv", "active")} (${t("Wunschsender", "preferred")}: ${activeState.desiredStationName || activeState.desiredStationKey || "-"}${Number(activeState.failbackNextProbeAt || 0) > 0
+                ? `, ${t("naechste Pruefung", "next check")} <t:${Math.floor(Number(activeState.failbackNextProbeAt) / 1000)}:R>`
+                : ""})`
+              : t("nein", "no")}`,
+            `${t("Server-Stummschaltung", "Server mute")}: ${activeState.serverMuted === true ? t("ja", "yes") : t("nein", "no")}`,
           ].join("\n"),
           inline: false,
         }
@@ -1694,6 +1700,10 @@ export async function handleRuntimeInteraction(runtime, interaction) {
         : 0,
       voiceGuardLastAction: activeState.voiceGuardLastAction || null,
       parkedReason: activeState.parkedReason || null,
+      serverMuted: activeState.serverMuted === true,
+      failoverActive: activeState.failoverActive === true,
+      desiredStationName: activeState.desiredStationName || activeState.desiredStationKey || null,
+      failbackNextProbeAt: Number(activeState.failbackNextProbeAt || 0) || 0,
     }, { t });
 
     const statusEmbed = new EmbedBuilder()

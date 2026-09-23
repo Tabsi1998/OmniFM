@@ -27,6 +27,9 @@ function buildNowPlayingSignature(stationKey, meta = {}, state = {}, targetChann
     meta?.musicBrainzReleaseId || "",
     state?.connection?.joinConfig?.channelId || state?.lastChannelId || "",
     normalizeChannelId(targetChannelId),
+    // The embed shows a hint and buttons for these, so a change must re-render it.
+    state?.failoverActive === true ? `failover:${state?.desiredStationKey || ""}` : "",
+    state?.serverMuted === true ? "server-muted" : "",
   ].join("|").toLowerCase();
 }
 

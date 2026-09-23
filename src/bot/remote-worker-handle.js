@@ -81,6 +81,13 @@ function buildRemoteGuildState(detail = {}) {
     voiceGuardLastActionReason: detail?.voiceGuardLastActionReason || null,
     voiceGuardLastExpectedChannelId: detail?.voiceGuardLastExpectedChannelId || null,
     voiceGuardLastActualChannelId: detail?.voiceGuardLastActualChannelId || null,
+    desiredStationKey: detail?.desiredStationKey || detail?.stationKey || null,
+    desiredStationName: detail?.desiredStationName || detail?.stationName || null,
+    failoverActive: detail?.failoverActive === true,
+    failbackNextProbeAt: Number(detail?.failbackNextProbeAt || 0) || 0,
+    parkedReason: detail?.parkedReason || null,
+    parkedAt: Number(detail?.parkedAt || 0) || 0,
+    serverMuted: detail?.serverMuted === true,
   };
 }
 
