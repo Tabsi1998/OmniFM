@@ -130,10 +130,9 @@ async function main() {
   setRuntimeEnv("STATION_HEALTH_BATCH_SIZE", stationHealth.batchSize);
   setRuntimeEnv("STATION_HEALTH_CONCURRENCY", stationHealth.concurrency);
   setRuntimeEnv("STATION_HEALTH_TIMEOUT_MS", stationHealth.timeoutMs);
-  setRuntimeEnv("STREAM_STABLE_RESET_MS", streamRecovery.stableResetMs);
-  setRuntimeEnv("STREAM_FAILOVER_MIN_FAILURES", streamRecovery.failoverMinFailures);
-  setRuntimeEnv("STREAM_FAILOVER_MIN_UNSTABLE_MS", streamRecovery.failoverMinUnstableMs);
-  setRuntimeEnv("STREAM_FAILOVER_STABLE_AUDIO_MS", streamRecovery.failoverStableAudioMs);
+  // Every recovery value of the owner console (#217), clamped like the runtime does.
+  const { applyRecoverySettingsToEnv } = await import("../config/recovery-settings.js");
+  applyRecoverySettingsToEnv(streamRecovery, process.env);
 
   const directoryEnv = [
     [directories.discordBotList || {}, "DISCORDBOTLIST", ["slug", "webhookSecret"]],

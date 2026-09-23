@@ -132,6 +132,29 @@ class TestAffectedServers:
         assert admin.get(f"{BASE_URL}/api/admin/monitoring").json()["affectedServers"] == []
 
 
+class TestFailoverHistory:
+    def test_history_lists_the_newest_switches_first(self, admin, no_runtime, contract_db):
+        now = datetime.now(timezone.utc)
+        contract_db.runtime_incidents.insert_many([
+            {"guildId": "123456789012345671", "guildName": "CI Guild", "eventKey": "stream_failover_activated",
+             "timestamp": now - timedelta(minutes=10), "severity": "warning",
+             "payload": {"previousStationName": "Alpha FM", "failoverStationName": "Beta FM", "triggerError": "503"}},
+            {"guildId": "123456789012345671", "guildName": "CI Guild", "eventKey": "stream_failback_completed",
+             "timestamp": now - timedelta(minutes=2), "severity": "success",
+             "payload": {"previousStationName": "Beta FM", "restoredStationName": "Alpha FM", "failoverDurationMs": 480000}},
+            {"guildId": "123456789012345671", "guildName": "CI Guild", "eventKey": "stream_recovered",
+             "timestamp": now - timedelta(minutes=1), "severity": "success", "payload": {}},
+        ])
+        d = admin.get(f"{BASE_URL}/api/admin/failover-history").json()
+        assert d["count"] == 2, "only switches, not other incidents"
+        assert [row["kind"] for row in d["history"]] == ["back", "switch"]
+        assert d["history"][0]["durationSec"] == 480
+        assert d["history"][1]["reason"] == "503"
+
+    def test_history_needs_the_owner_token(self, client):
+        assert client.get(f"{BASE_URL}/api/admin/failover-history").status_code == 401
+
+
 # --- module: the monitoring follows what the bot writes ---
 class TestMonitoringLive:
     def test_values_follow_the_bot_writes(self, admin, live_runtime, contract_db):

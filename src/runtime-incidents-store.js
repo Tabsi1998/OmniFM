@@ -172,6 +172,7 @@ function normalizeRuntimeIncident(rawIncident, guildId = "") {
       replacementStationName: sanitizeText(payloadInput.replacementStationName, 120),
       reason: sanitizeText(payloadInput.reason, 80),
       detail: sanitizeText(payloadInput.detail, 240),
+      failoverDurationMs: normalizeCount(payloadInput.failoverDurationMs),
     },
   };
 }

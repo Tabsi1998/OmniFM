@@ -62,6 +62,8 @@ async function initCollections(database) {
     await database.collection("runtime_incidents").createIndexes([
       { key: { guildId: 1, timestamp: -1 }, name: "guild_time" },
       { key: { guildId: 1, id: 1 }, name: "guild_incident_id" },
+      // The owner console's failover history (#217).
+      { key: { eventKey: 1, timestamp: -1 }, name: "event_time" },
       { key: { timestamp: 1 }, name: "ttl", expireAfterSeconds: 86400 * 90 },
     ]).catch(() => null);
 
