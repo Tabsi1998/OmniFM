@@ -3118,6 +3118,25 @@ class BotRuntime {
     const action = String(interaction.customId || "").slice(NP_PREFIX.length);
     const state = this.guildState.get(guildId);
 
+    // A button does what its slash command does, so it follows the same /perm
+    // role rules; before, anyone who saw the message could stop the stream (#232).
+    const statusBefore = state?.player?.state?.status;
+    const buttonCommand = {
+      toggle: statusBefore === "paused" || statusBefore === "autopaused" ? "resume" : "pause",
+      stop: "stop",
+      volup: "setvolume",
+      voldown: "setvolume",
+      failback: "play",
+      keepstation: "play",
+    }[action];
+    if (buttonCommand && typeof this.checkCommandRolePermission === "function") {
+      const permission = this.checkCommandRolePermission(interaction, buttonCommand);
+      if (!permission?.ok) {
+        await interaction.editReply({ content: permission?.message || t("Dafür fehlen dir die Rechte.", "You are not allowed to do that.") });
+        return true;
+      }
+    }
+
     let result = { ok: false, error: t("Es laeuft gerade nichts.", "Nothing is playing right now.") };
     let msg = "";
 

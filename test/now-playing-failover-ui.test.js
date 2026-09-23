@@ -195,3 +195,35 @@ test("the failback button switches back after a single successful probe", async 
   assert.match(replies.at(-1), /Zurück auf Alpha FM/);
   clearRuntimeFailbackTimer(state);
 });
+
+test("now-playing buttons follow the /perm rule of their slash command", async () => {
+  const calls = [];
+  const replies = [];
+  const runtime = createRuntime(new Map([["guild-1", { player: { state: { status: "playing" } }, volume: 50 }]]));
+  runtime.createInteractionTranslator = () => ({ t: (de) => de });
+  runtime.checkCommandRolePermission = (interaction, command) => {
+    calls.push(command);
+    return command === "stop"
+      ? { ok: false, message: "Du darfst `/stop` nicht nutzen." }
+      : { ok: true };
+  };
+  runtime.stopInGuild = async () => { calls.push("stopped"); return { ok: true }; };
+  runtime.pauseInGuild = async () => { calls.push("paused"); return { ok: true }; };
+  runtime.setVolumeInGuild = async () => { calls.push("volume"); return { ok: true }; };
+  runtime.updateNowPlayingEmbed = async () => {};
+
+  const press = (customId) => BotRuntime.prototype.handleNowPlayingControl.call(runtime, {
+    guildId: "guild-1",
+    customId,
+    deferReply: async () => {},
+    editReply: async (payload) => { replies.push(payload.content); },
+  });
+
+  await press("np:stop");
+  assert.deepEqual(calls, ["stop"], "a denied stop never reaches stopInGuild");
+  assert.match(replies.at(-1), /nicht nutzen/);
+
+  await press("np:toggle");
+  await press("np:volup");
+  assert.deepEqual(calls, ["stop", "pause", "paused", "setvolume", "volume"]);
+});
