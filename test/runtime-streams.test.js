@@ -13,8 +13,12 @@ process.env.LOGS_DIR = path.join(scratchDir, "logs");
 process.env.STREAM_FAILBACK_CHECK_MS = "30000";
 process.env.STREAM_FAILBACK_MAX_MS = "600000";
 process.env.STREAM_FAILBACK_CONFIRMATIONS = "2";
+process.env.STREAM_FAILOVER_MIN_FAILURES = "2";
+process.env.STREAM_FAILOVER_MIN_UNSTABLE_MS = "10000";
+process.env.STREAM_FAILOVER_STABLE_AUDIO_MS = "5000";
 
 const streams = await import("../src/bot/runtime-streams.js");
+const { recordFailoverFailure } = await import("../src/lib/stream-failover-policy.js");
 const {
   playRuntimeStation,
   evaluateRuntimeStreamHealth,
@@ -604,4 +608,60 @@ test("without a chain the catalog default replaces the unavailable station, othe
   assert.match(noReplacement.sent[0].content, /\/play/);
   assert.match(noReplacement.sent[0].content, /beendet/);
   cleanup(stateStop);
+});
+
+test("audio in one piece resets the failover failure window", () => {
+  const runtime = createFakeRuntime();
+  const state = createState({ currentStationKey: "alpha", lastStreamStartAt: Date.now() - 6_000 });
+  recordFailoverFailure(state, "alpha", { nowMs: Date.now() - 30_000 });
+  recordFailoverFailure(state, "alpha", { nowMs: Date.now() - 20_000 });
+  assert.equal(state.failoverFailureCount, 2);
+
+  const process = createFakeProcess("audio");
+  state.currentProcess = process;
+  streams.trackRuntimeProcessLifecycle(runtime, "123456789012345678", state, process);
+  process.stdout.emit("data", Buffer.alloc(320));
+
+  assert.ok(state.lastAudioHeardAt > 0);
+  assert.equal(state.failoverFailureCount, 0, "two hiccups followed by stable audio are forgotten");
+  assert.equal(state.failoverWindowClearedForStream, true);
+  cleanup(state);
+});
+
+test("failover waits while the station still delivered audio recently and switches once it is silent", async () => {
+  const guildId = "123456789012345678";
+  const runtime = createFakeRuntime({
+    async createStreamResource(url, volume, preset, botName, bitrate, scope, options = {}) {
+      if (url === STATIONS.stations.alpha.url) {
+        throw new Error("Stream konnte nicht geladen werden: 503");
+      }
+      return { resource: { url, metadata: options?.metadata || null }, process: createFakeProcess("fallback") };
+    },
+    async loadGuildSettingsCached() {
+      return { failoverChain: ["beta"], fallbackStation: "beta" };
+    },
+    getResolvedCurrentStation(gid, state) {
+      return this.resolveStationForGuild(gid, state.currentStationKey);
+    },
+  });
+  const state = createState({ currentStationKey: "alpha", currentStationName: "Alpha FM", desiredStationKey: "alpha" });
+  const now = Date.now();
+  recordFailoverFailure(state, "alpha", { nowMs: now - 30_000 });
+  recordFailoverFailure(state, "alpha", { nowMs: now - 20_000 });
+
+  // The station played two seconds ago: this is a hiccup, no failover.
+  state.lastAudioHeardAt = now - 2_000;
+  await streams.restartRuntimeCurrentStation(runtime, state, guildId);
+  assert.equal(state.currentStationKey, "alpha");
+  assert.equal(state.failoverActive, false);
+  assert.equal(runtime.calls.scheduleStreamRestart.at(-1)?.reason, "restart-error");
+
+  // No audio for half a minute while the failure quorum is met: switch.
+  state.lastAudioHeardAt = now - 30_000;
+  await streams.restartRuntimeCurrentStation(runtime, state, guildId);
+  assert.equal(state.currentStationKey, "beta");
+  assert.equal(state.failoverActive, true);
+  assert.equal(state.desiredStationKey, "alpha");
+  assert.equal(state.failoverFromStationKey, "alpha");
+  cleanup(state);
 });

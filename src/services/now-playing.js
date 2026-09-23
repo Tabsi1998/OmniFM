@@ -4,6 +4,7 @@
 import {
   clipText,
   concatUint8Arrays,
+  parseEnvInt,
   NOW_PLAYING_COVER_ENABLED,
   NOW_PLAYING_COVER_TIMEOUT_MS,
   NOW_PLAYING_COVER_CACHE_TTL_MS,
@@ -13,8 +14,30 @@ import {
 import { safeFetch } from "../lib/safe-outbound-http.js";
 import { recognizeTrackFromStream } from "./audio-recognition.js";
 
+// Every guild polls its station every NOW_PLAYING_POLL_MS. Guilds on the same
+// station share one metadata request per cache window instead of each opening
+// its own connection to the provider (#194).
+const NOW_PLAYING_SNAPSHOT_CACHE_MS = parseEnvInt("NOW_PLAYING_SNAPSHOT_CACHE_MS", 36_000, 5_000, 10 * 60_000);
+const NOW_PLAYING_SNAPSHOT_ERROR_CACHE_MS = parseEnvInt("NOW_PLAYING_SNAPSHOT_ERROR_CACHE_MS", 10_000, 1_000, 5 * 60_000);
+
 const nowPlayingCoverCache = new Map();
 const nowPlayingCoverInFlight = new Map();
+const nowPlayingSnapshotCache = new Map();
+const nowPlayingSnapshotInFlight = new Map();
+let streamFetchImplementation = safeFetch;
+
+function setNowPlayingFetchImplementationForTests(fn) {
+  streamFetchImplementation = typeof fn === "function" ? fn : safeFetch;
+}
+
+function clearNowPlayingSnapshotCache() {
+  nowPlayingSnapshotCache.clear();
+  nowPlayingSnapshotInFlight.clear();
+}
+
+function getNowPlayingSnapshotCacheStats() {
+  return { cached: nowPlayingSnapshotCache.size, inFlight: nowPlayingSnapshotInFlight.size };
+}
 let globalNowPlayingQueue = null; // Will be set by runtime.js
 const BLOCKED_TRACK_VALUES = new Set(["-", "--", "n/a", "na", "none", "null", "undefined", "unknown"]);
 const TRACK_PREFIX_PATTERNS = [
@@ -385,7 +408,7 @@ async function fetchCoverArtForTrack(artist, title) {
   return request;
 }
 
-async function fetchStreamSnapshot(url, { includeCover = false, allowRecognition = true } = {}) {
+async function fetchStreamSnapshotUncached(url, { allowRecognition = true } = {}) {
   const empty = {
     name: null,
     description: null,
@@ -407,7 +430,7 @@ async function fetchStreamSnapshot(url, { includeCover = false, allowRecognition
   let reader = null;
 
   try {
-    res = await safeFetch(url, {
+    res = await streamFetchImplementation(url, {
       method: "GET",
       headers: {
         "Icy-MetaData": "1",
@@ -508,10 +531,6 @@ async function fetchStreamSnapshot(url, { includeCover = false, allowRecognition
     snapshot.album = snapshot.album || track?.album || null;
     snapshot.displayTitle = track?.displayTitle || null;
 
-    if (!snapshot.artworkUrl && includeCover && (track?.displayTitle || track?.title)) {
-      snapshot.artworkUrl = await fetchCoverArtForTrack(track?.artist, track?.title || track?.displayTitle);
-    }
-
     return snapshot;
   } catch {
     return empty;
@@ -527,6 +546,64 @@ async function fetchStreamSnapshot(url, { includeCover = false, allowRecognition
       // ignore
     }
   }
+}
+
+function snapshotHasTrack(snapshot) {
+  return Boolean(snapshot?.displayTitle || snapshot?.artist || snapshot?.title);
+}
+
+async function fetchStreamSnapshot(url, {
+  includeCover = false,
+  allowRecognition = true,
+  maxAgeMs = NOW_PLAYING_SNAPSHOT_CACHE_MS,
+} = {}) {
+  const key = String(url || "").trim();
+  const now = Date.now();
+  const cached = nowPlayingSnapshotCache.get(key);
+  const cacheUsable = Boolean(
+    cached
+    && Number(maxAgeMs) > 0
+    && (now - cached.fetchedAt) <= Number(maxAgeMs)
+    && cached.expiresAt > now
+    // A cached miss that was fetched without recognition must not block a
+    // caller that is allowed to recognize the track.
+    && !(allowRecognition && !cached.allowRecognition && !snapshotHasTrack(cached.snapshot))
+  );
+
+  let snapshot;
+  if (cacheUsable) {
+    snapshot = cached.snapshot;
+  } else {
+    let pending = nowPlayingSnapshotInFlight.get(key);
+    if (!pending) {
+      pending = fetchStreamSnapshotUncached(key, { allowRecognition })
+        .then((result) => {
+          const fetchedAt = Date.now();
+          const failed = !result || result.metadataStatus === "unavailable";
+          nowPlayingSnapshotCache.set(key, {
+            snapshot: result,
+            fetchedAt,
+            expiresAt: fetchedAt + (failed ? NOW_PLAYING_SNAPSHOT_ERROR_CACHE_MS : NOW_PLAYING_SNAPSHOT_CACHE_MS),
+            allowRecognition: allowRecognition === true,
+          });
+          return result;
+        })
+        .finally(() => {
+          if (nowPlayingSnapshotInFlight.get(key) === pending) {
+            nowPlayingSnapshotInFlight.delete(key);
+          }
+        });
+      nowPlayingSnapshotInFlight.set(key, pending);
+    }
+    snapshot = await pending;
+  }
+
+  // Callers get their own copy; the cached object is never mutated.
+  const result = { ...snapshot };
+  if (!result.artworkUrl && includeCover && (result.displayTitle || result.title)) {
+    result.artworkUrl = await fetchCoverArtForTrack(result.artist, result.title || result.displayTitle);
+  }
+  return result;
 }
 
 async function fetchStreamInfo(url) {
@@ -560,7 +637,13 @@ export {
   parseTrackFromStreamTitle,
   fetchCoverArtForTrack,
   fetchStreamSnapshot,
+  fetchStreamSnapshotUncached,
   fetchStreamInfo,
   nowPlayingCoverCache,
   setNowPlayingQueue,
+  setNowPlayingFetchImplementationForTests,
+  clearNowPlayingSnapshotCache,
+  getNowPlayingSnapshotCacheStats,
+  NOW_PLAYING_SNAPSHOT_CACHE_MS,
+  NOW_PLAYING_SNAPSHOT_ERROR_CACHE_MS,
 };

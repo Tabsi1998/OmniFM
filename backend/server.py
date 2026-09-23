@@ -224,7 +224,7 @@ DEFAULT_OWNER_CONFIG = {
         "audioRecognition": {"enabled": False, "apiKey": ""},
         "songHistory": {"enabled": True, "maxPerGuild": 100},
         "stationHealth": {"enabled": True, "intervalMs": 5000, "batchSize": 2, "concurrency": 2, "timeoutMs": 8000},
-        "streamRecovery": {"stableResetMs": 60000, "failoverMinFailures": 3, "failoverMinUnstableMs": 60000},
+        "streamRecovery": {"stableResetMs": 60000, "failoverMinFailures": 3, "failoverMinUnstableMs": 60000, "failoverStableAudioMs": 25000},
         "botDirectories": {
             "discordBotList": {"enabled": False, "token": "", "botId": "", "slug": "", "webhookSecret": "", "statsScope": "aggregate"},
             "botsGG": {"enabled": False, "token": "", "botId": "", "statsScope": "aggregate"},
@@ -437,6 +437,7 @@ def effective_system_config():
             "stableResetMs": ("STREAM_STABLE_RESET_MS", int),
             "failoverMinFailures": ("STREAM_FAILOVER_MIN_FAILURES", int),
             "failoverMinUnstableMs": ("STREAM_FAILOVER_MIN_UNSTABLE_MS", int),
+            "failoverStableAudioMs": ("STREAM_FAILOVER_STABLE_AUDIO_MS", int),
         },
     }
     for group, fields in mappings.items():

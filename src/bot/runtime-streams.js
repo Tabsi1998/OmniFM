@@ -16,6 +16,7 @@ import { fetchStreamInfo } from "../services/now-playing.js";
 import { getServerPlanConfig } from "../core/entitlements.js";
 import { normalizeFailoverChain, buildFailoverCandidateChain, normalizeFailoverKey } from "../lib/failover-chain.js";
 import {
+  STREAM_FAILOVER_STABLE_AUDIO_MS,
   clearActiveFailover,
   clearFailoverFailureWindow,
   evaluateFailoverEligibility,
@@ -543,8 +544,22 @@ export function trackRuntimeProcessLifecycle(runtime, guildId, state, process) {
   if (process.stdout?.on) {
     process.stdout.on("data", (chunk) => {
       if (state.currentProcess !== process) return;
-      if (chunk?.length > 0) {
-        state.lastAudioPacketAt = Date.now();
+      if (!(chunk?.length > 0)) return;
+      const nowMs = Date.now();
+      state.lastAudioPacketAt = nowMs;
+      // Survives clearCurrentProcess: the failover decision needs to know when
+      // the station last delivered audio, not when the health clock was reset.
+      state.lastAudioHeardAt = nowMs;
+      const startedAt = Number(state.lastStreamStartAt || 0) || 0;
+      if (
+        state.failoverWindowClearedForStream !== true
+        && startedAt > 0
+        && (nowMs - startedAt) >= STREAM_FAILOVER_STABLE_AUDIO_MS
+      ) {
+        // The station played long enough in one piece: earlier failures were
+        // hiccups, not an outage, so the failover window starts from zero (#192).
+        state.failoverWindowClearedForStream = true;
+        clearFailoverFailureWindow(state);
       }
     });
   }
@@ -866,6 +881,7 @@ export async function playRuntimeStation(runtime, state, stations, key, guildId,
   state.lastHealthcheckFailureAt = null;
   state.streamHealthStartedAt = state.lastStreamStartAt;
   state.lastAudioPacketAt = state.lastStreamStartAt;
+  state.failoverWindowClearedForStream = false;
   state.ignoreNextIdleEvent = false;
   runtime.armStreamStabilityReset(guildId, state);
   runtime.updatePresence();
@@ -1014,6 +1030,7 @@ async function restartRuntimeCurrentStationAttempt(runtime, state, guildId) {
     const failoverDecision = evaluateFailoverEligibility(state, {
       stationKey: resolvedStation.key,
       candidateCount: fallbackCandidates.length,
+      lastAudioAt: Number(state.lastAudioHeardAt || 0) || 0,
     });
 
     if (fallbackCandidates.length > 0 && !failoverDecision.eligible) {
@@ -1021,7 +1038,8 @@ async function restartRuntimeCurrentStationAttempt(runtime, state, guildId) {
         "INFO",
         `[${runtime.config.name}] Failover fuer ${resolvedStation.key} bleibt gesperrt ` +
         `(Grund=${failoverDecision.reason}, Fehler=${failoverDecision.failureCount}/${failoverDecision.requiredFailures}, ` +
-        `instabil=${Math.round(failoverDecision.unstableForMs / 1000)}s/${Math.round(failoverDecision.requiredUnstableMs / 1000)}s).`
+        `instabil=${Math.round(failoverDecision.unstableForMs / 1000)}s/${Math.round(failoverDecision.requiredUnstableMs / 1000)}s, ` +
+        `ohneAudio=${Math.round(failoverDecision.silentForMs / 1000)}s).`
       );
     }
 
