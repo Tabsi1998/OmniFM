@@ -87,7 +87,7 @@ jobs:
         run: npm ci
         working-directory: frontend
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         if: steps.support.outputs.supported == 'true'
         with:
           python-version: "3.12"
