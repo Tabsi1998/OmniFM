@@ -492,6 +492,9 @@ class BotRuntime {
         failbackNextProbeAt: 0,
         failbackLastProbeAt: 0,
         failbackLastResult: null,
+        parkedReason: null,
+        parkedAt: 0,
+        parkedDetail: null,
         currentMeta: null,
         lastChannelId: null,
         volume: savedVolume ?? 100,
@@ -3654,6 +3657,12 @@ class BotRuntime {
     state.restoreBlockCount = 0;
     state.restoreBlockReason = null;
     this.clearReconnectTimer(state);
+    if (state.parkedReason) {
+      log("INFO", `[${this.config.name}] Geparktes Ziel durch /play ersetzt guild=${guildId} (grund=${state.parkedReason})`);
+      state.parkedReason = null;
+      state.parkedAt = 0;
+      state.parkedDetail = null;
+    }
     this.noteNetworkRecoverySuccess(guildId, `${this.config.name} voice-ready guild=${guildId}`);
     recordConnectionEvent(guildId, {
       botId: this.config.id || "",
@@ -4086,6 +4095,11 @@ class BotRuntime {
         detail.failbackNextProbeAt = Number(state.failbackNextProbeAt || 0) || 0;
         detail.failbackAttempts = Number(state.failbackAttempts || 0) || 0;
         detail.failbackLastResult = state.failbackLastResult || null;
+      }
+      if (state.parkedReason) {
+        detail.parkedReason = state.parkedReason;
+        detail.parkedAt = Number(state.parkedAt || 0) || 0;
+        detail.parkedDetail = state.parkedDetail || null;
       }
 
       const reconnectCount = Number(state.reconnectCount || 0) || 0;

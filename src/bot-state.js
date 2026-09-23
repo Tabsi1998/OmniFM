@@ -175,6 +175,9 @@ function normalizeStoredBotStateEntry(rawEntry = {}) {
   const restoreBlockedAt = normalizeStoredTimestampMs(input.restoreBlockedAt);
   const restoreBlockCount = Math.max(0, Number.parseInt(String(input.restoreBlockCount || 0), 10) || 0);
   const restoreBlockReason = sanitizeText(input.restoreBlockReason, 200) || null;
+  const parkedReason = sanitizeText(input.parkedReason, 40).toLowerCase() || null;
+  const parkedAt = normalizeStoredTimestampMs(input.parkedAt);
+  const parkedDetail = sanitizeText(input.parkedDetail, 200) || null;
   const savedAt = (() => {
     const normalized = normalizeStoredTimestampMs(input.savedAt);
     return normalized > 0 ? new Date(normalized).toISOString() : new Date().toISOString();
@@ -212,6 +215,11 @@ function normalizeStoredBotStateEntry(rawEntry = {}) {
     if (restoreBlockedAt > 0) normalized.restoreBlockedAt = restoreBlockedAt;
     if (restoreBlockCount > 0) normalized.restoreBlockCount = restoreBlockCount;
     if (restoreBlockReason) normalized.restoreBlockReason = restoreBlockReason;
+    if (parkedReason) {
+      normalized.parkedReason = parkedReason;
+      if (parkedAt > 0) normalized.parkedAt = parkedAt;
+      if (parkedDetail) normalized.parkedDetail = parkedDetail;
+    }
   }
 
   if (hasVolumePreference) {
@@ -394,6 +402,14 @@ function saveBotState(botId, guildStates) {
         if (restoreBlockedAt > 0) entry.restoreBlockedAt = restoreBlockedAt;
         if (restoreBlockCount > 0) entry.restoreBlockCount = restoreBlockCount;
         if (restoreBlockReason) entry.restoreBlockReason = restoreBlockReason;
+      }
+      const parkedReason = sanitizeText(state?.parkedReason, 40).toLowerCase();
+      if (parkedReason) {
+        entry.parkedReason = parkedReason;
+        const parkedAt = normalizeStoredTimestampMs(state?.parkedAt);
+        if (parkedAt > 0) entry.parkedAt = parkedAt;
+        const parkedDetail = sanitizeText(state?.parkedDetail, 200);
+        if (parkedDetail) entry.parkedDetail = parkedDetail;
       }
     }
 

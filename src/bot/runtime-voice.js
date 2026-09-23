@@ -247,6 +247,12 @@ export async function ensureRuntimeVoiceConnectionForChannel(runtime, guildId, c
   state.shouldReconnect = true;
   state.voiceDisconnectObservedAt = 0;
   clearRestoreBlockState(state);
+  if (state.parkedReason) {
+    log("INFO", `[${runtime.config.name}] Geparktes Ziel wieder aktiv guild=${guildId} channel=${channel.id} (grund=${state.parkedReason})`);
+    state.parkedReason = null;
+    state.parkedAt = 0;
+    state.parkedDetail = null;
+  }
   runtime.clearReconnectTimer(state);
   runtime.attachConnectionHandlers(guildId, connection);
   runtime.noteNetworkRecoverySuccess(guildId, `${runtime.config.name} voice-ready guild=${guildId}`);

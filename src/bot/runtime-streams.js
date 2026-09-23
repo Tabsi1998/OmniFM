@@ -28,6 +28,8 @@ import { recordRuntimeIncident } from "../runtime-incidents-store.js";
 import { isRuntimeVoiceConnected } from "./runtime-live-state.js";
 import { AudioPlayerStatus } from "@discordjs/voice";
 import { safeFetch } from "../lib/safe-outbound-http.js";
+import { loadStations } from "../stations-store.js";
+import { languagePick } from "../lib/language.js";
 
 function toPositiveInt(rawValue, fallbackValue) {
   const parsed = Number.parseInt(String(rawValue ?? fallbackValue), 10);
@@ -938,14 +940,7 @@ async function restartRuntimeCurrentStationAttempt(runtime, state, guildId) {
   const previousRestartReason = String(state.lastStreamEndReason || "").trim().toLowerCase();
   const previousLastStreamErrorAt = state.lastStreamErrorAt || null;
   if (!resolvedStation?.stations || !resolvedStation?.station) {
-    runtime.clearNowPlayingTimer(state);
-    state.currentStationKey = null;
-    state.currentStationName = null;
-    state.currentMeta = null;
-    state.nowPlayingSignature = null;
-    runtime.clearScheduledEventPlayback(state);
-    runtime.updatePresence();
-    runtime.persistState();
+    await handleRuntimeStationUnavailable(runtime, guildId, state, { source: "restart" });
     return;
   }
 
@@ -1454,4 +1449,165 @@ export async function runRuntimeFailbackProbe(runtime, guildId, state, { nowMs =
   }).catch(() => null);
   runtime.persistState?.();
   return { ok: true, confirmed: true, switched: true, stationKey: resolved.key };
+}
+
+// ---------------------------------------------------------------------------
+// Station no longer available for this server (#191)
+// ---------------------------------------------------------------------------
+
+/**
+ * Finds a station the server may play when its current one left the catalog
+ * or the plan: first the configured failover chain, then the catalog default.
+ */
+export async function resolveReplacementStationForGuild(runtime, guildId, unavailableKey) {
+  const language = typeof runtime.resolveGuildLanguage === "function" ? runtime.resolveGuildLanguage(guildId) : "de";
+  const candidates = [];
+  try {
+    const settings = typeof runtime.loadGuildSettingsCached === "function"
+      ? await runtime.loadGuildSettingsCached(guildId)
+      : null;
+    const chain = buildFailoverCandidateChain({
+      currentStationKey: unavailableKey,
+      configuredChain: normalizeFailoverChain(settings?.failoverChain || []),
+      fallbackStation: String(settings?.fallbackStation || "").trim().toLowerCase(),
+    });
+    for (const key of chain) candidates.push({ key, source: "failover-chain" });
+  } catch {}
+
+  let defaultKey = null;
+  try {
+    defaultKey = typeof runtime.getCatalogDefaultStationKey === "function"
+      ? runtime.getCatalogDefaultStationKey()
+      : loadStations()?.defaultStationKey;
+  } catch {
+    defaultKey = null;
+  }
+  if (defaultKey) candidates.push({ key: String(defaultKey), source: "catalog-default" });
+
+  const seen = new Set([normalizeFailoverKey(unavailableKey)]);
+  for (const candidate of candidates) {
+    const key = normalizeFailoverKey(candidate.key);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    const resolved = runtime.resolveStationForGuild(guildId, candidate.key, language);
+    if (resolved?.ok && resolved?.station?.url && resolved?.stations) {
+      return { ...resolved, source: candidate.source };
+    }
+  }
+  return { ok: false };
+}
+
+/**
+ * Tells the server what happened (incident, alert channel, now-playing text
+ * channel) when its station became unavailable. Never throws.
+ */
+export async function notifyRuntimeStationUnavailable(runtime, guildId, state, payload = {}) {
+  const language = typeof runtime.resolveGuildLanguage === "function" ? runtime.resolveGuildLanguage(guildId) : "de";
+  const t = (de, en) => languagePick(language, de, en);
+  const previous = clipText(payload.previousStationName || payload.previousStationKey || "-", 80);
+  const replacement = clipText(payload.replacementStationName || payload.replacementStationKey || "", 80);
+  const reason = payload.reason ? ` (${clipText(payload.reason, 140)})` : "";
+  const text = payload.stopped === true || !replacement
+    ? t(
+      `\u26a0\ufe0f Sender **${previous}** ist auf diesem Server nicht mehr verf\u00fcgbar${reason}. OmniFM hat die Wiedergabe beendet. Starte mit /play einen anderen Sender.`,
+      `\u26a0\ufe0f Station **${previous}** is no longer available on this server${reason}. OmniFM stopped playback. Use /play to start another station.`
+    )
+    : t(
+      `\u26a0\ufe0f Sender **${previous}** ist auf diesem Server nicht mehr verf\u00fcgbar${reason}. OmniFM spielt stattdessen **${replacement}**. Mit /play kannst du jederzeit einen anderen Sender w\u00e4hlen.`,
+      `\u26a0\ufe0f Station **${previous}** is no longer available on this server${reason}. OmniFM is playing **${replacement}** instead. Use /play any time to pick another station.`
+    );
+
+  void emitRuntimeReliabilityAlert(runtime, guildId, "station_unavailable", {
+    previousStationKey: payload.previousStationKey || null,
+    previousStationName: payload.previousStationName || payload.previousStationKey || null,
+    replacementStationKey: payload.replacementStationKey || null,
+    replacementStationName: payload.replacementStationName || null,
+    triggerError: payload.reason || null,
+    stopped: payload.stopped === true,
+    listenerCount: typeof runtime.getCurrentListenerCount === "function" && state
+      ? runtime.getCurrentListenerCount(guildId, state)
+      : 0,
+  }).catch(() => null);
+
+  if (typeof runtime.resolveNowPlayingChannel !== "function") return false;
+  const channelState = state || { nowPlayingChannelId: null, lastChannelId: payload.channelId || null };
+  const channel = await runtime.resolveNowPlayingChannel(guildId, channelState).catch(() => null);
+  if (!channel || typeof channel.send !== "function") return false;
+  await channel.send({ content: clipText(text, 1900), allowedMentions: { parse: [] } }).catch(() => null);
+  return true;
+}
+
+/**
+ * The current station can no longer be played for this server (plan changed
+ * or the station was removed). Instead of sitting silently in the voice
+ * channel, switch to a replacement or stop and say why.
+ */
+export async function handleRuntimeStationUnavailable(runtime, guildId, state, { source = "restart" } = {}) {
+  const previousStationKey = state.currentStationKey;
+  const previousStationName = state.currentStationName || previousStationKey;
+  const language = typeof runtime.resolveGuildLanguage === "function" ? runtime.resolveGuildLanguage(guildId) : "de";
+  const unavailable = typeof runtime.resolveStationForGuild === "function"
+    ? runtime.resolveStationForGuild(guildId, previousStationKey, language)
+    : null;
+  const reason = unavailable?.message || "station unavailable";
+
+  const replacement = await resolveReplacementStationForGuild(runtime, guildId, previousStationKey);
+  if (replacement.ok) {
+    try {
+      await runtime.playStation(state, replacement.stations, replacement.key, guildId, {
+        countAsStart: false,
+        resumeSession: false,
+        preserveDesiredStation: false,
+      });
+      log(
+        "WARN",
+        `[${runtime.config.name}] Sender ${previousStationKey} nicht mehr verfuegbar guild=${guildId} (${reason}); wechsle auf ${replacement.key} (${replacement.source}, source=${source}).`
+      );
+      await notifyRuntimeStationUnavailable(runtime, guildId, state, {
+        previousStationKey,
+        previousStationName,
+        replacementStationKey: replacement.key,
+        replacementStationName: replacement.station?.name || replacement.key,
+        reason,
+      });
+      runtime.persistState?.();
+      return { ok: true, replaced: true, stationKey: replacement.key, source: replacement.source };
+    } catch (err) {
+      log(
+        "WARN",
+        `[${runtime.config.name}] Ersatzsender ${replacement.key} konnte nicht gestartet werden guild=${guildId}: ${getStreamRestartErrorMessage(err)}`
+      );
+    }
+  }
+
+  log(
+    "WARN",
+    `[${runtime.config.name}] Sender ${previousStationKey} nicht mehr verfuegbar guild=${guildId} (${reason}) und kein Ersatz spielbar; Wiedergabe wird beendet (source=${source}).`
+  );
+  await notifyRuntimeStationUnavailable(runtime, guildId, state, {
+    previousStationKey,
+    previousStationName,
+    reason,
+    stopped: true,
+  });
+  if (typeof runtime.stopInGuild === "function") {
+    try {
+      await runtime.stopInGuild(guildId);
+      return { ok: true, stopped: true };
+    } catch (stopErr) {
+      log("WARN", `[${runtime.config.name}] Wiedergabe konnte nach Senderverlust nicht sauber beendet werden: ${getStreamRestartErrorMessage(stopErr)}`);
+    }
+  }
+  runtime.clearNowPlayingTimer?.(state);
+  state.shouldReconnect = false;
+  state.currentStationKey = null;
+  state.currentStationName = null;
+  state.desiredStationKey = null;
+  state.desiredStationName = null;
+  state.currentMeta = null;
+  state.nowPlayingSignature = null;
+  runtime.clearScheduledEventPlayback?.(state);
+  runtime.updatePresence?.();
+  runtime.persistState?.();
+  return { ok: true, stopped: true };
 }

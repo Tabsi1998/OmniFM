@@ -109,8 +109,11 @@ function formatRecoveringGuildLog(row, nowMs) {
 }
 
 function resolveWorkerAutohealBlockOptions(env = process.env) {
-  const baseMs = Math.max(5 * 60_000, toPositiveInt(env.WORKER_AUTOHEAL_BLOCK_MS, 30 * 60_000));
-  const maxMs = Math.max(baseMs, toPositiveInt(env.WORKER_AUTOHEAL_BLOCK_MAX_MS, 6 * 60 * 60_000));
+  // A blocked target is retried after one fixed pause. The pause used to start
+  // at 30 minutes and double up to six hours, which kept 24/7 servers silent
+  // far longer than the worker restart itself needed (#190).
+  const baseMs = Math.max(5 * 60_000, toPositiveInt(env.WORKER_AUTOHEAL_BLOCK_MS, 15 * 60_000));
+  const maxMs = Math.max(baseMs, toPositiveInt(env.WORKER_AUTOHEAL_BLOCK_MAX_MS, baseMs));
   return { baseMs, maxMs };
 }
 
@@ -125,7 +128,7 @@ function applyWorkerAutohealRecoveryBlock(runtime, stuckGuilds = [], env = proce
     if (!hasRecoverablePlaybackTarget(state)) continue;
 
     const nextCount = Math.max(1, (Number(state?.restoreBlockCount || 0) || 0) + 1);
-    const delayMs = Math.min(options.maxMs, options.baseMs * Math.pow(2, Math.max(0, nextCount - 1)));
+    const delayMs = Math.min(options.maxMs, options.baseMs);
     state.restoreBlockedAt = nowMs;
     state.restoreBlockedUntil = nowMs + delayMs;
     state.restoreBlockCount = nextCount;
