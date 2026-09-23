@@ -27,9 +27,7 @@ test("owner job runner exposes only allowlisted actions and captures output", as
   assert.equal(snapshot.actions.find((action) => action.id === "status-quick")?.requiresConfirmation, false);
   assert.match(snapshot.actions.find((action) => action.id === "status-quick")?.command || "", /update\.sh --status quick/);
   for (const [actionId, statusArg] of [
-    ["status-containers", "containers"],
     ["status-health", "health"],
-    ["status-docker-logs", "docker-logs"],
     ["status-local-logs", "local-logs"],
     ["status-mongo", "mongo"],
     ["status-storage", "storage"],

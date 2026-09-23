@@ -85,6 +85,22 @@ kill_orphaned_omnifm_processes() {
   done
 }
 
+stop_systemd_units() {
+  # Units written by start.sh. The legacy oneshot omnifm.service is left alone:
+  # its ExecStop is this script, so stopping it from here would deadlock.
+  command -v systemctl >/dev/null 2>&1 || return 0
+  [ -d /run/systemd/system ] || return 0
+  local sudo_cmd="" unit
+  [ "$(id -u)" -eq 0 ] || sudo_cmd="sudo"
+  for unit in omnifm-bot omnifm-frontend omnifm-backend; do
+    if systemctl list-unit-files "$unit.service" 2>/dev/null | grep -q "^$unit.service"; then
+      log "Stoppe $unit (systemd)..."
+      $sudo_cmd systemctl stop "$unit" 2>/dev/null || true
+    fi
+  done
+}
+
+stop_systemd_units
 kill_pid frontend
 kill_pid backend
 kill_pid bot

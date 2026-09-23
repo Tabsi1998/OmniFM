@@ -256,7 +256,7 @@ function saveState(state) {
     // (schlaegt fehl mit "Device or resource busy")
     if (fs.existsSync(STATE_FILE) && fs.statSync(STATE_FILE).isDirectory()) {
       log("WARN", `[bot-state] ${STATE_FILE} ist ein Verzeichnis - State wird nur im Speicher gehalten.`);
-      log("WARN", "[bot-state] Fix: bash ./init-data.sh && bash ./scripts/compose.sh up -d");
+      log("WARN", "[bot-state] Fix: das Verzeichnis entfernen oder OMNIFM_RUNTIME_DATA_DIR auf ein beschreibbares Verzeichnis setzen.");
       return;
     }
 

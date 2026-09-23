@@ -5,6 +5,7 @@ The public API is served below ``/api`` on port 8001. The Node.js code in
 """
 
 import os
+import sys
 import json
 import re
 import hmac
@@ -128,14 +129,41 @@ async def add_security_headers(request: Request, call_next):
 
 client = None
 db = None
-if MONGO_URL:
+if MONGO_URL and DB_NAME:
+    # pymongo reconnects on its own. Keeping the handles when the first ping
+    # fails means the API recovers without a restart once MongoDB is reachable
+    # (typical after a reboot, where mongod is still starting), see #199.
+    client = MongoClient(MONGO_URL, serverSelectionTimeoutMS=2000)
+    db = client[DB_NAME]
     try:
-        client = MongoClient(MONGO_URL, serverSelectionTimeoutMS=2000)
-        db = client[DB_NAME]
         client.admin.command("ping")
+    except Exception as exc:  # pragma: no cover - depends on the environment
+        print(
+            f"[OmniFM] MongoDB beim Start nicht erreichbar ({str(exc)[:120]}); "
+            "die Verbindung wird automatisch nachgeholt.",
+            file=sys.stderr,
+        )
+
+_MONGO_STATUS = {"checkedAt": 0.0, "ok": False}
+
+
+def mongo_is_reachable(max_age_seconds=5.0):
+    """True when MongoDB answers a ping. The answer is cached briefly so health
+    polls do not turn into a ping storm, and a down MongoDB costs at most one
+    server-selection timeout per cache window."""
+    if client is None:
+        return False
+    now = time.monotonic()
+    if (now - _MONGO_STATUS["checkedAt"]) < max_age_seconds:
+        return _MONGO_STATUS["ok"]
+    try:
+        client.admin.command("ping")
+        ok = True
     except Exception:
-        client = None
-        db = None
+        ok = False
+    _MONGO_STATUS["checkedAt"] = now
+    _MONGO_STATUS["ok"] = ok
+    return ok
 
 # OmniFM v3 Tier-Konfiguration (identisch mit config/plans.js)
 TIERS = {
@@ -2833,7 +2861,7 @@ def sanitize_license_for_api(license_info, include_sensitive=False):
 
 @app.get("/api/health")
 async def health():
-    mongo_ready = db is not None
+    mongo_ready = mongo_is_reachable()
     payload = {
         "ok": mongo_ready,
         "ready": mongo_ready,
@@ -4956,7 +4984,7 @@ async def admin_overview(request: Request):
         # Echte verwaltete Server aus der laufenden Runtime (0, wenn kein Bot laeuft).
         "guilds": {"managed": live["servers"], "live": live["live"]},
         "integrations": {
-            "mongo": db is not None,
+            "mongo": mongo_is_reachable(),
             "stripe": is_stripe_enabled() and bool(get_stripe_secret_key()),
             "discordOAuth": is_discord_oauth_configured(),
             "smtp": config_bool(system_setting("smtp", "enabled", default=bool(system_setting("smtp", "host", "SMTP_HOST")))) and bool(system_setting("smtp", "host", "SMTP_HOST")),
@@ -5464,7 +5492,7 @@ async def admin_integrations(request: Request):
         "discordBotList": dbl,
         "botDirectories": {"discordBotList": dbl, "botsGG": bots_gg, "topGG": top_gg},
         "config": {
-            "mongo": db is not None,
+            "mongo": mongo_is_reachable(),
             "stripe": is_stripe_enabled() and bool(get_stripe_secret_key()),
             "discordOAuth": is_discord_oauth_configured(),
             "smtp": config_bool(system_setting("smtp", "enabled", default=bool(system_setting("smtp", "host", "SMTP_HOST")))) and bool(system_setting("smtp", "host", "SMTP_HOST")),
@@ -5690,7 +5718,7 @@ async def admin_monitoring(request: Request):
                 "totalNodes": len(live_nodes),
                 "uptimeSec": proc.get("uptimeSec", 0),
                 "apiLatencyMs": None,
-                "mongo": db is not None,
+                "mongo": mongo_is_reachable(),
                 "openIncidents": sum(1 for i in real_incidents if not i.get("resolved")),
             },
             "nodes": live_nodes,
@@ -5706,7 +5734,7 @@ async def admin_monitoring(request: Request):
             "live": False,
             "waiting": True,
             "process": None,
-            "health": {"healthyNodes": 0, "totalNodes": 0, "uptimeSec": 0, "apiLatencyMs": None, "mongo": db is not None, "openIncidents": 0},
+            "health": {"healthyNodes": 0, "totalNodes": 0, "uptimeSec": 0, "apiLatencyMs": None, "mongo": mongo_is_reachable(), "openIncidents": 0},
             "nodes": [],
             "incidents": [],
             "logs": [],
@@ -5796,7 +5824,7 @@ async def admin_monitoring(request: Request):
             "totalNodes": len(nodes),
             "uptimePct": round(96 + (int(now // 5) % 40) / 10.0, 2),
             "apiLatencyMs": 8 + int(now) % 22,
-            "mongo": db is not None,
+            "mongo": mongo_is_reachable(),
             "openIncidents": sum(1 for i in incidents if not i.get("resolved")),
         },
         "nodes": nodes,

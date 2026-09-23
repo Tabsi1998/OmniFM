@@ -16,10 +16,7 @@ const execFileAsync = promisify(execFile);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 function analyze(text, options = {}) {
-  return analyzeSplitRequirements(parseEnvText(text), {
-    hasSplitCompose: true,
-    ...options,
-  });
+  return analyzeSplitRequirements(parseEnvText(text), options);
 }
 
 test("split mode requires MongoDB configuration before startup", () => {

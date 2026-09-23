@@ -79,11 +79,13 @@ function resolveCommanderIndex(env = {}, botCount = countConfiguredBots(env)) {
   };
 }
 
-function determineDeploymentMode(env = {}, { hasSplitCompose = true } = {}) {
+function determineDeploymentMode(env = {}) {
+  // Mirrors src/entrypoints/from-owner-config.mjs: more than one bot means the
+  // real process split, unless a monolith is requested explicitly.
   const requested = String(env.OMNIFM_DEPLOYMENT_MODE || "auto").trim().toLowerCase();
   if (requested === "split") return "split";
   if (["monolith", "single", "legacy"].includes(requested)) return "monolith";
-  return countConfiguredBots(env) > 1 && hasSplitCompose ? "split" : "monolith";
+  return countConfiguredBots(env) > 1 ? "split" : "monolith";
 }
 
 function isMongoConfigured(env = {}) {
@@ -98,7 +100,8 @@ function addMessage(messages, severity, code, message) {
 function analyzeSplitRequirements(env = {}, options = {}) {
   const messages = [];
   const botCount = countConfiguredBots(env);
-  const mode = determineDeploymentMode(env, options);
+  void options;
+  const mode = determineDeploymentMode(env);
   const commander = resolveCommanderIndex(env, botCount);
   const mongoConfigured = isMongoConfigured(env);
 
@@ -186,9 +189,7 @@ async function main() {
 
   const envFile = path.resolve(String(args["env-file"] || path.join(repoRoot, ".env")));
   const env = loadEnvFile(envFile);
-  const hasSplitCompose = fs.existsSync(path.join(path.dirname(envFile), "docker-compose.split.yml"))
-    || fs.existsSync(path.join(repoRoot, "docker-compose.split.yml"));
-  const result = analyzeSplitRequirements(env, { hasSplitCompose });
+  const result = analyzeSplitRequirements(env);
 
   if (env.__loadError) {
     result.ok = false;

@@ -287,8 +287,25 @@ log "Prüfe Backend- und Runtime-Syntax vor dem Umschalten..."
 ( cd "$ROOT" && npm run test:syntax )
 ( cd "$ROOT" && npm run test:split-syntax )
 
-log "Prüfe FastAPI inklusive MongoDB-Verbindung vor dem Umschalten..."
-( cd "$ROOT" && "$VENV/bin/python" -c "import backend.server as app; assert app.db is not None, 'MongoDB nicht erreichbar'" ) \
+# MongoDB is often still starting after a reboot. Wait for it instead of
+# failing the whole deployment on the first ping (#199).
+MONGO_WAIT_SECONDS="${MONGO_WAIT_SECONDS:-60}"
+BACKEND_MONGO_URL="$(grep -E '^MONGO_URL=' "$BACKEND_ENV" 2>/dev/null | head -n1 | cut -d '=' -f2- | sed -e 's/^"//' -e 's/"$//' || true)"
+BACKEND_MONGO_URL="${BACKEND_MONGO_URL:-mongodb://127.0.0.1:27017}"
+log "Warte auf MongoDB (max ${MONGO_WAIT_SECONDS}s)..."
+MONGO_READY=0
+for _ in $(seq 1 "$MONGO_WAIT_SECONDS"); do
+  if MONGO_URL="$BACKEND_MONGO_URL" "$VENV/bin/python" -c 'import os; from pymongo import MongoClient; MongoClient(os.environ["MONGO_URL"], serverSelectionTimeoutMS=1500).admin.command("ping")' >/dev/null 2>&1; then
+    MONGO_READY=1
+    break
+  fi
+  sleep 1
+done
+[ "$MONGO_READY" -eq 1 ] || die "MongoDB ist nach ${MONGO_WAIT_SECONDS}s nicht erreichbar (MONGO_URL aus backend/.env); laufende Version bleibt aktiv."
+log "MongoDB antwortet."
+
+log "Prüfe FastAPI-Import vor dem Umschalten..."
+( cd "$ROOT" && "$VENV/bin/python" -c "import backend.server as app; assert app.mongo_is_reachable(), 'MongoDB nicht erreichbar'" ) \
   || die "FastAPI-Preflight fehlgeschlagen; laufende Version bleibt aktiv."
 
 log "Prüfe DB-gesteuerte Discord-Konfiguration vor dem Umschalten..."
@@ -302,6 +319,57 @@ case "$BOT_PREFLIGHT_STATUS" in
   *) tail -n 40 "$LOG_DIR/bot-preflight.log" >&2 || true
      die "Discord-Preflight fehlgeschlagen; laufende Version bleibt aktiv." ;;
 esac
+
+# =============================================================================
+# 4b) PROZESS-MODELL: systemd-Units (Standard) oder nohup (Fallback)
+# =============================================================================
+# With systemd every component is its own unit with Restart=always: a crashed
+# API, website or bot is back within seconds and a reboot brings the stack up
+# without rebuilding anything (#201). Without systemd (WSL, containers, dev
+# boxes) the previous nohup model stays as the fallback.
+USE_SYSTEMD=0
+if [ "${OMNIFM_SKIP_SYSTEMD:-0}" != "1" ] && command -v systemctl >/dev/null 2>&1 \
+  && [ -d /run/systemd/system ] && [ -d /etc/systemd/system ]; then
+  USE_SYSTEMD=1
+fi
+RUN_USER="$(id -un)"
+NODE_BIN="$(command -v node)"
+NODE_DIR="$(dirname "$NODE_BIN")"
+UNIT_DIR="/etc/systemd/system"
+UNIT_TEMPLATE_DIR="$ROOT/deploy/systemd"
+OMNIFM_UNITS="omnifm-backend omnifm-frontend omnifm-bot"
+
+render_unit() { # unit name without .service
+  sed -e "s|__ROOT__|$ROOT|g" \
+      -e "s|__USER__|$RUN_USER|g" \
+      -e "s|__BACKEND_PORT__|$BACKEND_PORT|g" \
+      -e "s|__FRONTEND_PORT__|$FRONTEND_PORT|g" \
+      -e "s|__NODE__|$NODE_BIN|g" \
+      -e "s|__NODE_DIR__|$NODE_DIR|g" \
+      "$UNIT_TEMPLATE_DIR/$1.service" | $SUDO tee "$UNIT_DIR/$1.service" >/dev/null
+}
+
+install_units() {
+  log "Schreibe systemd-Units ($OMNIFM_UNITS)..."
+  if [ -f "$UNIT_DIR/omnifm.service" ]; then
+    # Oneshot unit of earlier releases: it re-ran start.sh on every boot and
+    # supervised nothing. Its ExecStop is never invoked here on purpose.
+    $SUDO systemctl disable omnifm.service >>"$LOG_DIR/setup.log" 2>&1 || true
+    $SUDO rm -f "$UNIT_DIR/omnifm.service"
+  fi
+  local unit
+  for unit in $OMNIFM_UNITS; do
+    render_unit "$unit"
+  done
+  $SUDO systemctl daemon-reload
+  # shellcheck disable=SC2086
+  $SUDO systemctl enable $OMNIFM_UNITS >>"$LOG_DIR/setup.log" 2>&1 \
+    || warn "systemd enable meldete Warnungen (siehe logs/setup.log)."
+}
+
+unit_active() {
+  systemctl is-active --quiet "$1" 2>/dev/null
+}
 
 log "Stoppe bestehende OmniFM-Prozesse unmittelbar vor dem Neustart..."
 "$ROOT/stop.sh" || true
@@ -317,13 +385,9 @@ for port in "$BACKEND_PORT" "$FRONTEND_PORT"; do
   fi
 done
 
-log "Starte Backend auf Port $BACKEND_PORT..."
-( cd "$ROOT/backend" && nohup "$VENV/bin/uvicorn" server:app --host 0.0.0.0 --port "$BACKEND_PORT" --workers 1 \
-  >"$LOG_DIR/backend.log" 2>&1 & echo $! > "$RUN_DIR/backend.pid" )
-
 wait_for_http() {
   local name="$1" url="$2" log_file="$3"
-  for _ in {1..20}; do
+  for _ in {1..30}; do
     if curl --fail --silent --show-error --max-time 2 "$url" >/dev/null 2>&1; then
       log "$name ist bereit: $url"
       return 0
@@ -334,11 +398,20 @@ wait_for_http() {
   die "$name wurde nicht bereit. Details: $log_file"
 }
 
+backend_alive() {
+  if [ "$USE_SYSTEMD" -eq 1 ]; then
+    unit_active omnifm-backend
+    return $?
+  fi
+  local pid
+  pid="$(cat "$RUN_DIR/backend.pid" 2>/dev/null || true)"
+  [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null
+}
+
 wait_for_backend_contract() {
-  local url="http://127.0.0.1:${BACKEND_PORT}/api/health" body backend_pid
-  backend_pid="$(cat "$RUN_DIR/backend.pid" 2>/dev/null || true)"
-  for _ in {1..20}; do
-    if [ -n "$backend_pid" ] && ! kill -0 "$backend_pid" 2>/dev/null; then
+  local url="http://127.0.0.1:${BACKEND_PORT}/api/health" body
+  for _ in {1..30}; do
+    if ! backend_alive; then
       tail -n 80 "$LOG_DIR/backend.log" >&2 || true
       die "FastAPI-Backend ist beim Start beendet worden."
     fi
@@ -353,63 +426,68 @@ wait_for_backend_contract() {
   die "FastAPI-Backend liefert nicht den erwarteten API-Vertrag owner-live-v5. Ein alter Prozess oder ein fehlerhaftes Deployment ist aktiv."
 }
 
-wait_for_backend_contract
+if [ "$USE_SYSTEMD" -eq 1 ]; then
+  # ===========================================================================
+  # 5) DIENSTE UNTER SYSTEMD
+  # ===========================================================================
+  install_units
 
-# =============================================================================
-# 5) FRONTEND (React)
-# =============================================================================
-log "Serviere Frontend auf Port $FRONTEND_PORT..."
-( cd "$ROOT/frontend" && nohup ./node_modules/.bin/serve -s build -l "tcp://0.0.0.0:${FRONTEND_PORT}" \
-  >"$LOG_DIR/frontend.log" 2>&1 & echo $! > "$RUN_DIR/frontend.pid" )
-wait_for_http "React-Frontend" "http://127.0.0.1:${FRONTEND_PORT}/" "$LOG_DIR/frontend.log"
+  log "Starte Backend (omnifm-backend) auf Port $BACKEND_PORT..."
+  $SUDO systemctl restart omnifm-backend
+  wait_for_backend_contract
 
-# =============================================================================
-# 6) DISCORD-BOT (DB-gesteuert, optional)
-# =============================================================================
-if [ -f "$ROOT/package.json" ]; then
-  log "Starte Discord-Bot aus Owner-Menü-Konfiguration..."
-  ( cd "$ROOT" && nohup node src/entrypoints/from-owner-config.mjs >"$LOG_DIR/bot.log" 2>&1 & echo $! > "$RUN_DIR/bot.pid" )
-  sleep 3
-  BOT_PID="$(cat "$RUN_DIR/bot.pid" 2>/dev/null)"
-  if [ -n "$BOT_PID" ] && kill -0 "$BOT_PID" 2>/dev/null; then
-    log "Discord-Bot läuft (PID $BOT_PID)."
+  log "Starte Frontend (omnifm-frontend) auf Port $FRONTEND_PORT..."
+  $SUDO systemctl restart omnifm-frontend
+  wait_for_http "React-Frontend" "http://127.0.0.1:${FRONTEND_PORT}/" "$LOG_DIR/frontend.log"
+
+  if [ "$BOT_PREFLIGHT_STATUS" -eq 0 ]; then
+    log "Starte Discord-Bot (omnifm-bot) aus Owner-Menü-Konfiguration..."
+    $SUDO systemctl restart omnifm-bot
+    sleep 3
+    if unit_active omnifm-bot; then
+      log "Discord-Bot läuft (systemd: omnifm-bot)."
+    else
+      tail -n 40 "$LOG_DIR/bot-console.log" >&2 || true
+      warn "Discord-Bot ist nach dem Start nicht aktiv. Details: journalctl -u omnifm-bot -n 50 und logs/bot-console.log"
+    fi
   else
-    rm -f "$RUN_DIR/bot.pid"
-    warn "Discord-Bot nicht gestartet – vermutlich noch kein Commander-Token hinterlegt."
+    $SUDO systemctl stop omnifm-bot >/dev/null 2>&1 || true
+    warn "Discord-Bot nicht gestartet – noch kein Commander-Token hinterlegt."
     warn "Trage Tokens unter /admin → 'Discord & Bots' ein und führe ./update.sh (oder ./start.sh) erneut aus."
   fi
-fi
+  log "Dienste werden von systemd überwacht: systemctl status $OMNIFM_UNITS"
+else
+  # ===========================================================================
+  # 5) PROZESSE OHNE SYSTEMD (nohup, PIDs unter run/)
+  # ===========================================================================
+  warn "Kein systemd verfügbar (oder OMNIFM_SKIP_SYSTEMD=1): Prozesse laufen ohne Neustart-Überwachung."
 
-# =============================================================================
-# 7) SYSTEMD-AUTOSTART (nach Server-Neustart automatisch hochfahren)
-# =============================================================================
-if command -v systemctl >/dev/null 2>&1 && [ "${OMNIFM_SKIP_SYSTEMD:-0}" != "1" ]; then
-  UNIT_FILE="/etc/systemd/system/omnifm.service"
-  RUN_USER="$(id -un)"
-  log "Aktualisiere systemd-Autostart (omnifm.service)..."
-    $SUDO tee "$UNIT_FILE" >/dev/null <<UNIT
-[Unit]
-Description=OmniFM Full Stack (Website, API, Discord-Bot)
-After=network-online.target mongod.service
-Wants=network-online.target
+  log "Starte Backend auf Port $BACKEND_PORT..."
+  ( cd "$ROOT/backend" && nohup "$VENV/bin/uvicorn" server:app --host 0.0.0.0 --port "$BACKEND_PORT" --workers 1 \
+    >"$LOG_DIR/backend.log" 2>&1 & echo $! > "$RUN_DIR/backend.pid" )
+  wait_for_backend_contract
 
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-WorkingDirectory=${ROOT}
-Environment=OMNIFM_SKIP_SYSTEMD=1
-ExecStart=${ROOT}/start.sh
-ExecStop=${ROOT}/stop.sh
-User=${RUN_USER}
-TimeoutStartSec=900
+  log "Serviere Frontend auf Port $FRONTEND_PORT..."
+  ( cd "$ROOT/frontend" && nohup ./node_modules/.bin/serve -s build -l "tcp://0.0.0.0:${FRONTEND_PORT}" \
+    >"$LOG_DIR/frontend.log" 2>&1 & echo $! > "$RUN_DIR/frontend.pid" )
+  wait_for_http "React-Frontend" "http://127.0.0.1:${FRONTEND_PORT}/" "$LOG_DIR/frontend.log"
 
-[Install]
-WantedBy=multi-user.target
-UNIT
-    $SUDO systemctl daemon-reload >>"$LOG_DIR/setup.log" 2>&1 || true
-    $SUDO systemctl enable omnifm.service >>"$LOG_DIR/setup.log" 2>&1 \
-      && log "Autostart aktiv: OmniFM startet nach jedem Server-Neustart automatisch." \
-      || warn "systemd-Autostart konnte nicht aktiviert werden (siehe logs/setup.log)."
+  if [ "$BOT_PREFLIGHT_STATUS" -eq 0 ]; then
+    log "Starte Discord-Bot aus Owner-Menü-Konfiguration..."
+    ( cd "$ROOT" && nohup node src/entrypoints/from-owner-config.mjs >"$LOG_DIR/bot-console.log" 2>&1 & echo $! > "$RUN_DIR/bot.pid" )
+    sleep 3
+    BOT_PID="$(cat "$RUN_DIR/bot.pid" 2>/dev/null)"
+    if [ -n "$BOT_PID" ] && kill -0 "$BOT_PID" 2>/dev/null; then
+      log "Discord-Bot läuft (PID $BOT_PID)."
+    else
+      rm -f "$RUN_DIR/bot.pid"
+      tail -n 40 "$LOG_DIR/bot-console.log" >&2 || true
+      warn "Discord-Bot ist nach dem Start nicht aktiv. Details: logs/bot-console.log"
+    fi
+  else
+    warn "Discord-Bot nicht gestartet – noch kein Commander-Token hinterlegt."
+    warn "Trage Tokens unter /admin → 'Discord & Bots' ein und führe ./update.sh (oder ./start.sh) erneut aus."
+  fi
 fi
 
 
@@ -418,6 +496,10 @@ fi
 # =============================================================================
 WEB_INFO="${PUBLIC_URL:-http://${SERVER_IP}:${FRONTEND_PORT}}"
 log "Fertig. Web: ${WEB_INFO}  |  Backend intern: http://127.0.0.1:${BACKEND_PORT}  |  API: ${FRONTEND_API:-/api (relativ)}"
-log "Logs: $LOG_DIR   Stoppen mit: ./stop.sh"
+if [ "$USE_SYSTEMD" -eq 1 ]; then
+  log "Logs: $LOG_DIR (und journalctl -u omnifm-bot)   Status: ./update.sh --status quick   Stoppen: ./stop.sh"
+else
+  log "Logs: $LOG_DIR   Stoppen mit: ./stop.sh"
+fi
 print_owner_box
 trap - EXIT

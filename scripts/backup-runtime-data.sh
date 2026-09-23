@@ -55,7 +55,7 @@ create_backup() {
   local archive temp_archive checksum_file
   assert_default_runtime_dir
   require_tar
-  [[ -d "$RUNTIME_DIR" ]] || fatal "Runtime data directory is missing: $RUNTIME_DIR. Run bash ./init-data.sh first."
+  [[ -d "$RUNTIME_DIR" ]] || fatal "Runtime data directory is missing: $RUNTIME_DIR. Set OMNIFM_RUNTIME_DATA_DIR to the directory the runtime writes to."
 
   mkdir -p "$BACKUP_DIR"
   chmod 700 "$BACKUP_DIR"

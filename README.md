@@ -109,8 +109,24 @@ Owner-Login danach: Domain → `/admin` → Owner-Token (aus `backend/.env`, wir
 `start.sh` ist idempotent: es installiert Systempakete nur, wenn sie fehlen, erstellt bei Bedarf
 ein Python-venv, installiert Backend-, Frontend- und Bot-Abhängigkeiten, baut das Frontend,
 serviert es und startet den Discord-Bot **aus der Owner-Config**. Ist noch kein Commander-Token
-im Owner-Menü hinterlegt, wird der Bot sauber übersprungen (der Rest läuft trotzdem). Logs unter
-`logs/`, PIDs unter `run/`. Ports via `BACKEND_PORT` / `FRONTEND_PORT` überschreibbar, öffentliche
+im Owner-Menü hinterlegt, wird der Bot sauber übersprungen (der Rest läuft trotzdem).
+
+Auf Servern mit systemd laufen die drei Teile als eigene Dienste `omnifm-backend`, `omnifm-frontend`
+und `omnifm-bot` (`Restart=always`, Autostart nach dem Reboot, `start.sh` wartet vorher bis zu 60 s auf
+MongoDB). Die Vorlagen liegen unter `deploy/systemd/`. Status und Logs:
+
+```bash
+systemctl status omnifm-backend omnifm-frontend omnifm-bot
+journalctl -u omnifm-bot -n 100 -f
+./update.sh --status quick          # Dienste, MongoDB, API-Health, Speicherplatz
+./update.sh --status local-logs     # letzte Zeilen aus logs/
+./update.sh --show-bots             # Commander/Worker aus dem Owner-Menü (ohne Tokens)
+./update.sh --cleanup dry-run       # rotierte Logs älter als 14 Tage (run löscht sie)
+```
+
+Dateilogs liegen weiterhin unter `logs/` (`backend.log`, `frontend.log`, `bot.log`, `bot-console.log`).
+Ohne systemd (WSL, Container) startet `start.sh` die Prozesse wie bisher per `nohup` mit PIDs unter
+`run/`. Ports via `BACKEND_PORT` / `FRONTEND_PORT` überschreibbar, öffentliche
 URL via `PUBLIC_URL=https://domain.tld ./start.sh`.
 
 Bei Updates bleiben `backend/.env`, `frontend/.env` und alle MongoDB-Daten unverändert. Vor jedem
