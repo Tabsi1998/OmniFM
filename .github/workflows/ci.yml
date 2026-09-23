@@ -43,6 +43,10 @@ jobs:
       - name: Run repo hygiene check
         run: npm run test:repo-hygiene
 
+      - name: Run the ESLint ratchet
+        # Known findings are debt in scripts/ci-baseline.json ("eslint"); new ones fail.
+        run: npm run lint
+
       - name: Run syntax checks
         shell: bash
         run: |

@@ -265,8 +265,7 @@ export default function DashboardCustomStations({
       if (loadToken !== loadTokenRef.current) return;
       setError(err.message);
     } finally {
-      if (loadToken !== loadTokenRef.current) return;
-      setLoading(false);
+      if (loadToken === loadTokenRef.current) setLoading(false);
     }
   }, [selectedGuildId, apiRequest]);
 

@@ -24,10 +24,10 @@ ignored by Git.
 | Group | Mirrors | Runs |
 | --- | --- | --- |
 | repository | ci.yml `syntax` | `test:repo-hygiene`, every `*.sh` parses, no CRLF in the index, Gitleaks over the history and over uncommitted files |
-| node | ci.yml `syntax`, `unit`, `voice-codec`, `mongo-smoke`; nightly | Node 22 as package.json pins it, `npm ci`, the syntax gates, the Opus codec, the Mongo smoke, `test:unit` against a MongoDB 7.0.39 container |
+| node | ci.yml `syntax`, `unit`, `voice-codec`, `mongo-smoke`; nightly | Node 22 as package.json pins it, `npm ci`, the syntax gates (`scripts/check-syntax.mjs` parses every module under `src/` and `scripts/`), the ESLint ratchet (`npm run lint`), the Opus codec, the Mongo smoke, `test:unit` against a MongoDB 7.0.39 container |
 | backend | ci.yml `fastapi-smoke` | Python 3.12 venv, compileall, `backend/unit_tests`, the owner contract against a live uvicorn - the ci.yml assertions plus: admin routes refuse requests without the token; then the `backend/tests` contract suite against the same server (ratchet on failing test ids) |
 | frontend | ci.yml `frontend-build` | `npm ci`, the Vite build, and proof it produced `build/index.html` and bundles |
-| extra | - | every `src/*.js` in `test:syntax`, npm audit (high and critical), settings read by the code vs `.env.example`, dependency licences, OSV over the lockfiles, ShellCheck |
+| extra | - | npm audit (high and critical), settings read by the code vs `.env.example`, dependency licences, OSV over the lockfiles, ShellCheck |
 
 Not mirrored locally: CodeQL, the live smoke against omnifm.xyz.
 
@@ -37,13 +37,17 @@ tool skips its steps with a hint instead of failing.
 
 ## Ratchet
 
-The extra group compares against `scripts/ci-baseline.json`: known findings
-are debt, new ones fail. After paying debt down, run
+The extra group and ESLint compare against `scripts/ci-baseline.json`: known
+findings are debt, new ones fail. ESLint keys a finding by file, rule and its
+number within that pair; `npm run lint -- --record` rewrites only its list, and
+ci.yml runs the same `npm run lint`. After paying debt down, run
 `python scripts/local_check.py --all --record` and commit the baseline. Gates
 that ci.yml already enforces are never ratcheted.
 
-Debt on 2026-09-24: fast-uri in the frontend (high), five dependencies outside the
-allowed licences, four OSV findings in the lockfiles, two ShellCheck findings.
+Debt on 2026-09-24: fast-uri in the frontend (high), six dependencies outside the
+allowed licences (caniuse-lite of the ESLint tooling only in development), four OSV findings in the lockfiles, two ShellCheck findings,
+and the ESLint findings from the day the linter came in (mostly unused
+variables and awaits in loops).
 Every setting the code reads is documented in `.env.example` (active line for a
 default, `# NAME=` for an optional override); values OmniFM sets itself are
 listed in `ENV_PROVIDED` in `scripts/local_check.py`.

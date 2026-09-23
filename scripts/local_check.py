@@ -10,15 +10,14 @@ Groups:
                 CRLF stored, Gitleaks over the history and over uncommitted
                 and new files
     node        Node 22 as package.json pins it, a locked install, the syntax
-                gates, the native Opus codec, the Mongo connection smoke and
-                the unit suite against a MongoDB of its own
+                gates, the ESLint ratchet, the native Opus codec, the Mongo
+                connection smoke and the unit suite against a MongoDB of its own
     backend     the CI's Python 3.12 in an environment of its own, every module
                 compiles, the FastAPI unit tests, and the owner contract driven
                 end to end through a live server
     frontend    a locked install and the production build, checked for content
-    extra       what GitHub does not run: every source file in the syntax gate,
-                npm audit, the settings contract, dependency licences, OSV over
-                the lockfiles and ShellCheck
+    extra       what GitHub does not run: npm audit, the settings contract,
+                dependency licences, OSV over the lockfiles and ShellCheck
 
 Usage:
     python scripts/local_check.py                  everything but extra
@@ -935,7 +934,22 @@ def syntax_checks(context: Context) -> str:
     for script in ("test:split-syntax", "test:syntax"):
         completed = npm(context, "run", "--silent", script, check=False, timeout=1200)
         npm_step_result(context, script.replace(":", "-"), completed, f"npm run {script} failed")
-    return "the split entrypoints and the module list parse"
+    return "the split entrypoints and every module under src/ and scripts/ parse"
+
+
+def eslint_ratchet(context: Context) -> str:
+    """ESLint over the bot, the scripts, the tests and the frontend (#209).
+
+    scripts/check-lint.mjs keeps its findings in the "eslint" list of the same
+    baseline file, so ci.yml runs the identical ratchet with `npm run lint`.
+    """
+    arguments = ["run", "--silent", "lint"] + (["--", "--record"] if context.record else [])
+    completed = npm(context, *arguments, check=False, timeout=1200)
+    text = (completed.stdout + completed.stderr).strip()
+    path = context.log("eslint", text)
+    if completed.returncode != 0:
+        raise StepFailed(f"ESLint found new problems. Full output: {path}\n" + tail(completed, 30))
+    return text.splitlines()[-1] if text else "ESLint ran"
 
 
 def voice_codec(context: Context) -> str:
@@ -976,6 +990,7 @@ def node_steps() -> list:
         Step("node", "node-version", f"Node {NODE_MAJOR}, the version package.json pins", node_version),
         Step("node", "npm-ci", "Locked install from package-lock.json", node_install, ("node-version",)),
         Step("node", "syntax", "The syntax gates of the CI", syntax_checks, ("npm-ci",)),
+        Step("node", "eslint", "ESLint, new findings fail", eslint_ratchet, ("npm-ci",)),
         Step("node", "voice-codec", "Native Opus encode and decode", voice_codec, ("npm-ci",)),
         Step("node", "mongo-smoke", "The app connects to MongoDB", mongo_smoke, ("npm-ci",)),
         Step("node", "unit", "The unit suite against a real MongoDB", unit_tests, ("npm-ci",)),
@@ -1282,23 +1297,6 @@ def frontend_steps() -> list:
 
 # --------------------------------------------------------------------- extra
 
-def syntax_list_complete(context: Context) -> str:
-    """Every source file is in the syntax gate, not only the ones remembered.
-
-    test:syntax names each file by hand. A module nobody adds is never parsed
-    by that gate, and GitHub does not notice.
-    """
-    package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
-    listed = set(re.findall(r"--check\s+(\S+)", package["scripts"]["test:syntax"]))
-    listed |= set(re.findall(r"--check\s+(\S+)", package["scripts"]["test:split-syntax"]))
-    sources = {name for name in tracked(context, "src/*.js", "src/*.mjs") if not name.endswith(".test.js")}
-    missing = sorted(sources - listed)
-    if missing:
-        shown = "\n  ".join(missing[:20]) + ("\n  ..." if len(missing) > 20 else "")
-        raise StepFailed(f"{len(missing)} source files are never parsed by test:syntax:\n  {shown}")
-    return f"all {len(sources)} sources are covered"
-
-
 def audit_tree(context: Context, where: Path, label: str) -> set:
     completed = npm(context, "audit", "--json", "--audit-level=low", cwd=where, check=False, timeout=1200)
     context.log(f"npm-audit-{label}", completed.stdout + completed.stderr)
@@ -1380,7 +1378,6 @@ def licence_inventory(context: Context) -> str:
 
 def extra_steps() -> list:
     return [
-        Step("extra", "syntax-list", "Every source file is in the syntax gate", syntax_list_complete),
         Step("extra", "npm-audit", "High and critical advisories in both trees", npm_audit),
         Step("extra", "env-contract", "Every setting the code reads is documented", env_contract),
         Step("extra", "licences", "Dependency licences are known and allowed", licence_inventory,
