@@ -278,6 +278,10 @@ import {
   handleRuntimeStreamEnd,
   playRuntimeStation,
   restartRuntimeCurrentStation,
+  shouldHandleRuntimeIdleEvent,
+  armRuntimeFailbackProbe,
+  runRuntimeFailbackProbe,
+  clearRuntimeFailbackTimer,
 } from "./runtime-streams.js";
 import {
   resolveRuntimeGuildVoiceChannel,
@@ -481,6 +485,13 @@ class BotRuntime {
         failoverFailureCount: 0,
         failoverFailureStartedAt: 0,
         failoverLastFailureAt: 0,
+        streamGeneration: 0,
+        failbackTimer: null,
+        failbackAttempts: 0,
+        failbackSuccessCount: 0,
+        failbackNextProbeAt: 0,
+        failbackLastProbeAt: 0,
+        failbackLastResult: null,
         currentMeta: null,
         lastChannelId: null,
         volume: savedVolume ?? 100,
@@ -562,12 +573,9 @@ class BotRuntime {
         voiceGuardLastActualChannelId: null,
       };
 
-      player.on(AudioPlayerStatus.Idle, () => {
+      player.on(AudioPlayerStatus.Idle, (oldState) => {
         if (this.shuttingDown) return;
-        if (state.ignoreNextIdleEvent === true) {
-          state.ignoreNextIdleEvent = false;
-          return;
-        }
+        if (!shouldHandleRuntimeIdleEvent(state, oldState)) return;
         this.handleStreamEnd(guildId, state, "idle").catch((err) => {
           log("ERROR", `[${this.config.name}] handleStreamEnd idle failed: ${err?.message || err}`);
         });
@@ -1224,6 +1232,7 @@ class BotRuntime {
     state.streamRestartScheduledReason = null;
     state.streamRestartScheduledDelayMs = 0;
     this.clearStreamStabilityTimer(state);
+    clearRuntimeFailbackTimer(state);
   }
 
   clearStreamStabilityTimer(state) {
@@ -2169,6 +2178,14 @@ class BotRuntime {
 
   armStreamStabilityReset(guildId, state) {
     return armRuntimeStreamStabilityReset(this, guildId, state);
+  }
+
+  armFailbackProbe(guildId, state, options = {}) {
+    return armRuntimeFailbackProbe(this, guildId, state, options);
+  }
+
+  runFailbackProbe(guildId, state) {
+    return runRuntimeFailbackProbe(this, guildId, state);
   }
 
   trackProcessLifecycle(guildId, state, process) {
@@ -4064,6 +4081,12 @@ class BotRuntime {
         shouldReconnect: state.shouldReconnect === true,
         meta: state.currentMeta || null,
       };
+
+      if (state.failoverActive === true) {
+        detail.failbackNextProbeAt = Number(state.failbackNextProbeAt || 0) || 0;
+        detail.failbackAttempts = Number(state.failbackAttempts || 0) || 0;
+        detail.failbackLastResult = state.failbackLastResult || null;
+      }
 
       const reconnectCount = Number(state.reconnectCount || 0) || 0;
       if (reconnectCount > 0) detail.reconnectCount = reconnectCount;

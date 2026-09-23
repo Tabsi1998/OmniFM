@@ -12,6 +12,7 @@ const CUSTOMER_VISIBLE_RUNTIME_INCIDENT_EVENT_KEYS = new Set([
   "stream_healthcheck_stalled",
   "stream_failover_activated",
   "stream_failover_exhausted",
+  "stream_failback_completed",
 ]);
 
 function clipText(value, maxLen = 240) {
@@ -92,7 +93,17 @@ function canSendRuntimeIncidentAlert(channel, me) {
 function buildRuntimeIncidentAlertCopy(eventKey, payload, t) {
   const previousStation = payload?.previousStationName || payload?.previousStationKey || t("dem letzten Stream", "the previous stream");
   const failoverStation = payload?.failoverStationName || payload?.failoverStationKey || t("der Failover-Station", "the failover station");
+  const restoredStation = payload?.restoredStationName || payload?.restoredStationKey || t("dem Wunschsender", "the preferred station");
   switch (String(eventKey || "").trim().toLowerCase()) {
+    case "stream_failback_completed":
+      return {
+        title: t("Wunschsender wieder aktiv", "Preferred station restored"),
+        color: 0x22C55E,
+        description: t(
+          `${restoredStation} ist wieder erreichbar. OmniFM spielt ihn statt ${previousStation}.`,
+          `${restoredStation} is reachable again. OmniFM is playing it instead of ${previousStation}.`
+        ),
+      };
     case "stream_failover_activated":
       return {
         title: t("Failover aktiviert", "Failover activated"),

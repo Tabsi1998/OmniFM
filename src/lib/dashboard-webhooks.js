@@ -7,6 +7,7 @@ const DASHBOARD_EXPORT_WEBHOOK_EVENT_KEYS = Object.freeze([
   "stream_recovered",
   "stream_failover_activated",
   "stream_failover_exhausted",
+  "stream_failback_completed",
 ]);
 
 const DEFAULT_DASHBOARD_EXPORTS_WEBHOOK_CONFIG = Object.freeze({
@@ -111,6 +112,7 @@ function sanitizeDashboardWebhookPayload(eventKey, payload) {
     "stream_recovered",
     "stream_failover_activated",
     "stream_failover_exhausted",
+    "stream_failback_completed",
   ].includes(normalizedEventKey)) {
     return input;
   }
@@ -122,6 +124,9 @@ function sanitizeDashboardWebhookPayload(eventKey, payload) {
     recoveredStationName: String(input.recoveredStationName || "").trim(),
     failoverStationKey: String(input.failoverStationKey || "").trim(),
     failoverStationName: String(input.failoverStationName || "").trim(),
+    restoredStationKey: String(input.restoredStationKey || "").trim(),
+    restoredStationName: String(input.restoredStationName || "").trim(),
+    failoverDurationMs: Math.max(0, Number(input.failoverDurationMs || 0) || 0),
     silenceMs: Math.max(0, Number(input.silenceMs || 0) || 0),
     listenerCount: Math.max(0, Number(input.listenerCount || 0) || 0),
   };

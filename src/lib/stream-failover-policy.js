@@ -95,6 +95,8 @@ function clearActiveFailover(state) {
   state.failoverReason = null;
   state.failoverFromStationKey = null;
   state.failoverFromStationName = null;
+  state.failbackAttempts = 0;
+  state.failbackSuccessCount = 0;
 }
 
 export {
