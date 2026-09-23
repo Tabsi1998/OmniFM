@@ -14,7 +14,9 @@ test("split supervisor creates one commander and one process per worker", () => 
   assert.deepEqual(specs.map((spec) => spec.id), ["commander", "worker-2", "worker-3"]);
   assert.equal(path.basename(specs[0].entry), "commander.js");
   assert.equal(path.basename(specs[1].entry), "worker.js");
-  assert.deepEqual(specs[1].env, { BOT_PROCESS_INDEX: "2" });
+  assert.deepEqual(specs[0].env, { BOT_PROCESS_ROLE: "commander" });
+  assert.deepEqual(specs[1].env, { BOT_PROCESS_INDEX: "2", BOT_PROCESS_ROLE: "worker" });
+  assert.deepEqual(specs[2].env, { BOT_PROCESS_INDEX: "3", BOT_PROCESS_ROLE: "worker" });
 });
 
 test("split supervisor rejects an unconfigured commander", () => {

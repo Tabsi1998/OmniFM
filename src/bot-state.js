@@ -333,7 +333,9 @@ function loadSplitBotState(botId) {
   const backupFilePath = getSplitBotBackupFile(botId);
   if (!filePath) return {};
   const splitState = readStateFile(filePath) || readStateFile(backupFilePath) || {};
-  if (hasStateEntries(splitState)) {
+  // Once this bot has its own file, the shared legacy file is history. Reading
+  // it again for an emptied file would revive a target that was stopped (#226).
+  if (hasStateEntries(splitState) || fs.existsSync(filePath)) {
     return splitState;
   }
 
@@ -473,15 +475,9 @@ function saveResolvedBotState(botId, state) {
     const filePath = getSplitBotStateFile(botId);
     const backupFilePath = getSplitBotBackupFile(botId);
     if (!filePath) return;
-    if (!hasStateEntries(state)) {
-      try {
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-      } catch {
-        // ignore
-      }
-      return;
-    }
-    saveStateToFile(filePath, backupFilePath, state);
+    // An empty object is written instead of deleting the file, so a later
+    // start does not fall back to the backup or the shared legacy file.
+    saveStateToFile(filePath, backupFilePath, hasStateEntries(state) ? state : {});
     return;
   }
 
@@ -549,14 +545,6 @@ function clearBotGuild(botId, guildId) {
     const filePath = getSplitBotStateFile(botId);
     const backupFilePath = getSplitBotBackupFile(botId);
     if (!filePath) return;
-    if (Object.keys(botState).length === 0) {
-      try {
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-      } catch {
-        // ignore
-      }
-      return;
-    }
     saveStateToFile(filePath, backupFilePath, botState);
     return;
   }

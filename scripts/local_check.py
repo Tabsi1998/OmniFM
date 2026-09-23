@@ -86,6 +86,11 @@ ENV_USE = re.compile(r"process\.env\.([A-Z][A-Z0-9_]*)|process\.env\[['\"]([A-Z]
 # should not promise them.
 ENV_PROVIDED = {
     "NODE_ENV", "CI", "PATH", "HOME", "PWD", "TZ", "PORT", "HOSTNAME", "LANG",
+    # Set by OmniFM itself or its test harness, never by an operator:
+    # the split supervisor (process index and role), start.sh (DRY_RUN
+    # preflight), node --test, and the backend contract test runner.
+    "BOT_PROCESS_INDEX", "BOT_PROCESS_ROLE", "DRY_RUN", "NODE_TEST_CONTEXT",
+    "OMNIFM_RUN_BACKEND_CONTRACT_TESTS", "OMNIFM_TEST_BASE_URL", "REACT_APP_BACKEND_URL",
 }
 
 ALLOWED_LICENCES = {
@@ -1300,6 +1305,12 @@ def env_contract(context: Context) -> str:
         stripped = line.strip()
         if stripped and not stripped.startswith("#") and "=" in stripped:
             documented.add(stripped.split("=", 1)[0].strip())
+            continue
+        # "# NAME=value" documents an optional override: setting it changes the
+        # automatic behaviour, so .env.example must not set it by default.
+        commented = re.match(r"#\s*([A-Z][A-Z0-9_]*)=", stripped)
+        if commented:
+            documented.add(commented.group(1))
     used: set = set()
     for name in tracked(context, "src/*.js", "src/*.mjs", "scripts/*.mjs", "backend/*.py"):
         text = (ROOT / name).read_text(encoding="utf-8", errors="replace")

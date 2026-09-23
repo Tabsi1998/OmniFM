@@ -81,3 +81,46 @@ test("split bot state lazily migrates legacy monolith state on first access", as
   const remainingMonolithPayload = JSON.parse(fs.readFileSync(monolithStatePath, "utf8"));
   assert.deepEqual(remainingMonolithPayload, {});
 });
+
+test("an emptied split state never revives a stopped target from the shared legacy file", async (t) => {
+  const botId = "bot-8";
+  const stateDirName = `bot-state-revive-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const stateDirPath = path.join(repoRoot, stateDirName);
+  const monolithStatePath = path.join(stateDirPath, "bot-state.json");
+  const splitDirPath = path.join(stateDirPath, "split");
+  const splitStatePath = path.join(splitDirPath, `${botId}.json`);
+  const restoreEnv = setEnv({
+    BOT_PROCESS_ROLE: "worker",
+    BOT_STATE_SPLIT_DIR: splitDirPath,
+    OMNIFM_BOT_STATE_FILE: monolithStatePath,
+  });
+
+  t.after(() => {
+    restoreEnv();
+    fs.rmSync(stateDirPath, { recursive: true, force: true });
+  });
+
+  fs.rmSync(stateDirPath, { recursive: true, force: true });
+  fs.mkdirSync(stateDirPath, { recursive: true });
+  const staleEntry = {
+    channelId: "voice-9",
+    stationKey: "groovesalad",
+    stationName: "Groove Salad",
+    savedAt: "2026-09-01T12:00:00.000Z",
+  };
+  fs.writeFileSync(monolithStatePath, JSON.stringify({ [botId]: { "guild-9": staleEntry } }, null, 2), "utf8");
+
+  const botStateModule = await importFreshBotStateModule();
+  assert.equal(botStateModule.getBotState(botId)["guild-9"]?.stationKey, "groovesalad", "first access migrates");
+
+  // /stop clears the only target: the split file stays as an empty object.
+  botStateModule.clearBotGuild(botId, "guild-9");
+  assert.equal(fs.existsSync(splitStatePath), true);
+  assert.deepEqual(JSON.parse(fs.readFileSync(splitStatePath, "utf8")), {});
+
+  // A concurrent process that raced the migration writes the old entry back
+  // into the shared file. The next start must not restore it.
+  fs.writeFileSync(monolithStatePath, JSON.stringify({ [botId]: { "guild-9": staleEntry } }, null, 2), "utf8");
+  const reloaded = await importFreshBotStateModule();
+  assert.deepEqual(reloaded.getBotState(botId), {});
+});

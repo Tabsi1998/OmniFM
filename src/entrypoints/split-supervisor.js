@@ -22,7 +22,9 @@ function buildSplitProcessSpecs(botIndexes = [], commanderIndex = 1) {
       id: "commander",
       label: `Commander BOT_${resolvedCommander}`,
       entry: path.join(entryDir, "commander.js"),
-      env: {},
+      // The role switches bot-state and song history to one file per bot.
+      // Without it every process rewrote the same shared files (#226).
+      env: { BOT_PROCESS_ROLE: "commander" },
     },
     ...indexes
       .filter((index) => index !== resolvedCommander)
@@ -30,7 +32,7 @@ function buildSplitProcessSpecs(botIndexes = [], commanderIndex = 1) {
         id: `worker-${index}`,
         label: `Worker BOT_${index}`,
         entry: path.join(entryDir, "worker.js"),
-        env: { BOT_PROCESS_INDEX: String(index) },
+        env: { BOT_PROCESS_INDEX: String(index), BOT_PROCESS_ROLE: "worker" },
       })),
   ];
 }

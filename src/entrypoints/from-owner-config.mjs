@@ -29,6 +29,13 @@ function readEnvFile(file) {
 
 // MONGO_URL / DB_NAME come from the SAME source the Owner Console writes to.
 const backendEnv = readEnvFile(path.resolve(here, "..", "..", "backend", ".env"));
+// backend/.env is the one place for runtime tuning on a server (VOICE_*,
+// STREAM_*, LOG_*, see .env.example). Values already present in the
+// environment (systemd EnvironmentFile, shell) win; owner console settings are
+// applied further down and win over both (#203).
+for (const [key, value] of Object.entries(backendEnv)) {
+  if (process.env[key] === undefined) process.env[key] = value;
+}
 const MONGO_URL = process.env.MONGO_URL || backendEnv.MONGO_URL || "mongodb://localhost:27017";
 const DB_NAME = process.env.DB_NAME || backendEnv.DB_NAME || "omnifm";
 
