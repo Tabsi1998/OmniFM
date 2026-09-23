@@ -1320,7 +1320,12 @@ export async function probeRuntimeStreamUrl(url, { timeoutMs = STREAM_FAILBACK_P
  * One failback attempt: probe the preferred station; after
  * STREAM_FAILBACK_CONFIRMATIONS successful probes in a row switch back.
  */
-export async function runRuntimeFailbackProbe(runtime, guildId, state, { nowMs = Date.now() } = {}) {
+export async function runRuntimeFailbackProbe(runtime, guildId, state, {
+  nowMs = Date.now(),
+  // A listener pressing "back to the preferred station" wants it now: one
+  // successful probe is enough. The timer keeps the stricter default.
+  requiredConfirmations = STREAM_FAILBACK_CONFIRMATIONS,
+} = {}) {
   if (!isRuntimeFailbackPending(state) || !state.shouldReconnect || !state.currentStationKey) {
     return { ok: false, skipped: "inactive" };
   }
@@ -1418,7 +1423,7 @@ export async function runRuntimeFailbackProbe(runtime, guildId, state, { nowMs =
   }
 
   state.failbackSuccessCount = (Number(state.failbackSuccessCount || 0) || 0) + 1;
-  if (state.failbackSuccessCount < STREAM_FAILBACK_CONFIRMATIONS) {
+  if (state.failbackSuccessCount < Math.max(1, Number(requiredConfirmations) || STREAM_FAILBACK_CONFIRMATIONS)) {
     armRuntimeFailbackProbe(runtime, guildId, state, {
       delayMs: Math.max(15_000, Math.round(STREAM_FAILBACK_CHECK_MS / 4)),
     });
@@ -1628,4 +1633,23 @@ export async function handleRuntimeStationUnavailable(runtime, guildId, state, {
   runtime.updatePresence?.();
   runtime.persistState?.();
   return { ok: true, stopped: true };
+}
+
+/**
+ * The listeners decide to stay on the backup station: it becomes the preferred
+ * station and the failback probes stop (#216).
+ */
+export function keepRuntimeFailoverStation(runtime, guildId, state) {
+  if (!isRuntimeFailbackPending(state)) return { ok: false, reason: "no-failover" };
+  const previousDesiredStationKey = state.desiredStationKey;
+  state.desiredStationKey = state.currentStationKey;
+  state.desiredStationName = state.currentStationName || state.currentStationKey;
+  clearActiveFailover(state);
+  clearRuntimeFailbackTimer(state);
+  log(
+    "INFO",
+    `[${runtime.config.name}] Ersatzsender uebernommen guild=${guildId}: ${state.currentStationKey} ersetzt ${previousDesiredStationKey} als Wunschsender.`
+  );
+  runtime.persistState?.();
+  return { ok: true, previousDesiredStationKey, stationKey: state.currentStationKey };
 }

@@ -694,12 +694,67 @@ function confirmTransientVoiceIssue(runtime, guildId, state, code, detail, {
   return { ...issue, confirmed, threshold: needed };
 }
 
+/**
+ * Server mute and stage suppression keep the bot in the channel while nobody
+ * hears it. Record the flag, tell the listeners in the now-playing embed and
+ * ask to speak again on a stage (#193).
+ */
+function noteRuntimeBotVoiceFlags(runtime, guildId, state, newState) {
+  if (!state || !newState?.channelId) return;
+  const muted = newState.serverMute === true;
+  if (Boolean(state.serverMuted) !== muted) {
+    state.serverMuted = muted;
+    state.serverMutedAt = muted ? Date.now() : 0;
+    log(
+      muted ? "WARN" : "INFO",
+      `[${runtime.config?.name || "OmniFM"}] ${muted ? "Server-Stummschaltung erkannt" : "Server-Stummschaltung aufgehoben"} guild=${guildId} channel=${newState.channelId}`
+    );
+    recordRuntimeIncident({
+      guildId,
+      guildName: runtime?.client?.guilds?.cache?.get?.(guildId)?.name || guildId,
+      tier: getTierConfig(guildId).tier,
+      eventKey: muted ? "voice_server_muted" : "voice_server_unmuted",
+      severity: muted ? "warning" : "success",
+      runtime: {
+        id: String(runtime?.config?.id || "").trim(),
+        name: String(runtime?.config?.name || "").trim(),
+        role: String(runtime?.role || "").trim(),
+      },
+      payload: {
+        channelId: String(newState.channelId || "").trim(),
+        stationKey: state.currentStationKey || null,
+        stationName: state.currentStationName || null,
+      },
+    }).catch(() => null);
+    if (state.currentStationKey && typeof runtime.updateNowPlayingEmbed === "function") {
+      Promise.resolve(runtime.updateNowPlayingEmbed(guildId, state, { force: true })).catch(() => null);
+    }
+  }
+
+  const channel = newState.channel || null;
+  if (
+    newState.suppress === true
+    && state.currentStationKey
+    && channel?.type === ChannelType.GuildStageVoice
+    && typeof runtime.ensureStageChannelReady === "function"
+  ) {
+    const nowMs = Date.now();
+    if (!state.lastStageSpeakerFixAt || (nowMs - state.lastStageSpeakerFixAt) > 30_000) {
+      state.lastStageSpeakerFixAt = nowMs;
+      log("INFO", `[${runtime.config?.name || "OmniFM"}] Stage-Sprecherrolle entzogen guild=${guildId} - fordere sie erneut an.`);
+      Promise.resolve(runtime.ensureStageChannelReady(newState.guild, channel, { createInstance: false, ensureSpeaker: true }))
+        .catch(() => null);
+    }
+  }
+}
+
 export function handleRuntimeBotVoiceStateUpdate(runtime, oldState, newState) {
   if (!runtime.client.user) return;
   if (newState.id !== runtime.client.user.id) return;
 
   const guildId = newState.guild.id;
   const state = runtime.getState(guildId);
+  noteRuntimeBotVoiceFlags(runtime, guildId, state, newState);
   const oldChannelId = oldState.channelId;
   const newChannelId = newState.channelId;
   const expectedChannelId = getExpectedRuntimeChannelId(state);

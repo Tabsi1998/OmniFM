@@ -282,6 +282,7 @@ import {
   armRuntimeFailbackProbe,
   runRuntimeFailbackProbe,
   clearRuntimeFailbackTimer,
+  keepRuntimeFailoverStation,
 } from "./runtime-streams.js";
 import {
   resolveRuntimeGuildVoiceChannel,
@@ -495,6 +496,9 @@ class BotRuntime {
         parkedReason: null,
         parkedAt: 0,
         parkedDetail: null,
+        serverMuted: false,
+        serverMutedAt: 0,
+        lastStageSpeakerFixAt: 0,
         currentMeta: null,
         lastChannelId: null,
         volume: savedVolume ?? 100,
@@ -1476,6 +1480,29 @@ class BotRuntime {
     );
     rows.push(controlRow);
 
+    // Backup station active: one click brings the preferred station back or
+    // keeps the backup for good (#216).
+    if (
+      state?.failoverActive === true
+      && state.desiredStationKey
+      && state.desiredStationKey !== state.currentStationKey
+    ) {
+      const desiredName = clipText(state.desiredStationName || state.desiredStationKey, 50);
+      const currentName = clipText(state.currentStationName || state.currentStationKey, 50);
+      rows.push(new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`${NP_PREFIX}failback`)
+          .setStyle(ButtonStyle.Primary)
+          .setEmoji("\u21a9")
+          .setLabel(clipText(isDe ? `Zurück zu ${desiredName}` : `Back to ${desiredName}`, 80)),
+        new ButtonBuilder()
+          .setCustomId(`${NP_PREFIX}keepstation`)
+          .setStyle(ButtonStyle.Secondary)
+          .setEmoji("\u2714")
+          .setLabel(clipText(isDe ? `${currentName} behalten` : `Keep ${currentName}`, 80)),
+      ));
+    }
+
     // Link-Row (nur wenn ein Track erkannt wurde): YouTube / Spotify / MusicBrainz.
     const query = this.buildTrackSearchQuery(station, meta);
     if (query) {
@@ -1894,6 +1921,18 @@ class BotRuntime {
       descriptionLines.push(`> ⚠️ ${sourceSummary.metadataHint}`);
     }
 
+    if (context?.serverMuted === true) {
+      descriptionLines.push(isDe
+        ? "> \u{1f507} OmniFM ist auf diesem Server stummgeschaltet, niemand hört den Stream. Rechtsklick auf OmniFM im Sprachkanal → Server-Stummschaltung aufheben."
+        : "> \u{1f507} OmniFM is server-muted here, nobody hears the stream. Right-click OmniFM in the voice channel → remove the server mute.");
+    }
+    const failoverDesiredName = clipText(String(context?.failover?.desiredName || "").trim(), 80);
+    if (context?.failover?.active === true && failoverDesiredName) {
+      descriptionLines.push(isDe
+        ? `> \u21aa Ersatzsender aktiv: **${failoverDesiredName}** ist gerade nicht erreichbar. OmniFM prüft ihn automatisch und wechselt zurück, sobald er wieder läuft.`
+        : `> \u21aa Backup station active: **${failoverDesiredName}** is unreachable right now. OmniFM keeps checking and switches back once it plays again.`);
+    }
+
     const stationDetails = [stationGenre, stationTier !== "FREE" ? stationTier : null].filter(Boolean).join(" · ");
     const stableFields = [
       {
@@ -2136,6 +2175,10 @@ class BotRuntime {
         listenerCount,
         volume: state.volume,
         workerName: this.config.name,
+        serverMuted: state.serverMuted === true,
+        failover: state.failoverActive === true
+          ? { active: true, desiredName: state.desiredStationName || state.desiredStationKey || "" }
+          : null,
       });
       const sent = await this.upsertNowPlayingMessage(guildId, state, payload, channel);
       if (sent) {
@@ -3091,6 +3134,55 @@ class BotRuntime {
       const next = Math.max(0, Math.min(100, cur + (action === "volup" ? 10 : -10)));
       result = await this.setVolumeInGuild(guildId, next);
       msg = `\u{1f50a} ${t("Lautstaerke", "Volume")}: ${next}%`;
+    } else if (action === "failback") {
+      const desiredName = state?.desiredStationName || state?.desiredStationKey || "-";
+      if (!state || state.failoverActive !== true) {
+        result = { ok: false, error: t("Es ist gerade kein Ersatzsender aktiv.", "No backup station is active right now.") };
+      } else {
+        const probe = await runRuntimeFailbackProbe(this, guildId, state, { requiredConfirmations: 1 });
+        if (probe?.switched) {
+          result = { ok: true };
+          msg = t(`\u21a9 Zurück auf ${desiredName}.`, `\u21a9 Back on ${desiredName}.`);
+        } else if (probe?.abandoned) {
+          result = {
+            ok: false,
+            error: t(
+              `${desiredName} ist auf diesem Server nicht mehr verfügbar. OmniFM bleibt beim aktuellen Sender.`,
+              `${desiredName} is no longer available on this server. OmniFM stays on the current station.`
+            ),
+          };
+        } else if (probe?.skipped === "paused") {
+          result = {
+            ok: false,
+            error: t("Die Wiedergabe ist pausiert. Setze sie fort und versuche es erneut.", "Playback is paused. Resume it and try again."),
+          };
+        } else if (probe?.skipped) {
+          result = {
+            ok: false,
+            error: t(
+              "OmniFM stellt die Verbindung gerade wieder her. Versuche es in einer Minute erneut.",
+              "OmniFM is restoring the connection right now. Try again in a minute."
+            ),
+          };
+        } else {
+          result = {
+            ok: false,
+            error: t(
+              `${desiredName} ist noch nicht erreichbar. OmniFM prüft automatisch weiter und wechselt zurück, sobald der Sender wieder läuft.`,
+              `${desiredName} is not reachable yet. OmniFM keeps checking and switches back once the station plays again.`
+            ),
+          };
+        }
+      }
+    } else if (action === "keepstation") {
+      const kept = state ? keepRuntimeFailoverStation(this, guildId, state) : { ok: false };
+      result = kept.ok
+        ? { ok: true }
+        : { ok: false, error: t("Es ist gerade kein Ersatzsender aktiv.", "No backup station is active right now.") };
+      msg = t(
+        `\u2714 ${state?.currentStationName || state?.currentStationKey || "-"} bleibt der Sender für diesen Server.`,
+        `\u2714 ${state?.currentStationName || state?.currentStationKey || "-"} stays the station for this server.`
+      );
     } else {
       await interaction.editReply({ content: t("Unbekannte Aktion.", "Unknown action.") });
       return true;
@@ -4102,6 +4194,10 @@ class BotRuntime {
         detail.parkedReason = state.parkedReason;
         detail.parkedAt = Number(state.parkedAt || 0) || 0;
         detail.parkedDetail = state.parkedDetail || null;
+      }
+      if (state.serverMuted === true) {
+        detail.serverMuted = true;
+        detail.serverMutedAt = Number(state.serverMutedAt || 0) || 0;
       }
 
       const reconnectCount = Number(state.reconnectCount || 0) || 0;
