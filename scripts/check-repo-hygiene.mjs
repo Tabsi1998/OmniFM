@@ -95,6 +95,41 @@ function assertNoTrackedRuntimeArtifacts() {
   );
 }
 
+// UTF-8 text that was decoded as Windows-1252 and saved again: an umlaut turns
+// into two Latin-1 characters, an emoji into four. Users see it in bot replies and on the
+// dashboard (#208). Written with escapes so this file does not match itself.
+const CP1252_CONTINUATION = "\u0080-\u00BF\u20AC\u201A\u0192\u201E\u2026\u2020\u2021\u02C6\u2030"
+  + "\u0160\u2039\u0152\u017D\u2018\u2019\u201C\u201D\u2022\u2013\u2014\u02DC\u2122\u0161"
+  + "\u203A\u0153\u017E\u0178";
+const MOJIBAKE_PATTERN = new RegExp(
+  `[\u00C2-\u00DF][${CP1252_CONTINUATION}]|[\u00E0-\u00EF][${CP1252_CONTINUATION}]{2}|\u00F0[${CP1252_CONTINUATION}]{3}`
+);
+const TEXT_EXTENSIONS = new Set([".js", ".mjs", ".cjs", ".jsx", ".py", ".md", ".html", ".css", ".sh", ".yml", ".yaml"]);
+
+function assertNoMojibake() {
+  const findings = [];
+  for (const filePath of listTrackedFiles()) {
+    if (!TEXT_EXTENSIONS.has(path.extname(filePath).toLowerCase())) continue;
+    if (filePath.startsWith("frontend/public/")) continue;
+    let text;
+    try {
+      text = fs.readFileSync(path.join(repoRoot, filePath), "utf8");
+    } catch {
+      continue;
+    }
+    const lines = text.split(/\r?\n/);
+    lines.forEach((line, index) => {
+      if (MOJIBAKE_PATTERN.test(line)) findings.push(`${filePath}:${index + 1}`);
+    });
+  }
+  assert.deepEqual(
+    findings,
+    [],
+    `Double-encoded UTF-8 (mojibake) found, save these lines as UTF-8: ${findings.slice(0, 20).join(", ")}`
+  );
+}
+
 assertCleanGitignore();
 assertNoTrackedRuntimeArtifacts();
+assertNoMojibake();
 console.log("Repo hygiene check passed.");

@@ -136,3 +136,63 @@ test("file store lock cleanup keeps ownerless replacement locks for stale recove
 
   assert.equal(await fs.stat(lockDir).then((stat) => stat.isDirectory()), true);
 });
+
+test("a store read retries a briefly locked file and still reports a missing one as null", async (t) => {
+  const { readStoreFileWithRetry } = await import("../src/lib/file-store-lock.js");
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omnifm-store-read-"));
+  t.after(async () => {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  const filePath = path.join(tempDir, "store.json");
+  assert.equal(readStoreFileWithRetry(filePath), null, "missing file");
+
+  fsSync.writeFileSync(filePath, "{\"ok\":true}", "utf8");
+  const originalRead = fsSync.readFileSync;
+  let calls = 0;
+  fsSync.readFileSync = function patchedRead(target, ...rest) {
+    if (String(target) === filePath && calls < 3) {
+      calls += 1;
+      const busy = new Error("EBUSY: resource busy or locked");
+      busy.code = "EBUSY";
+      throw busy;
+    }
+    return originalRead.call(this, target, ...rest);
+  };
+  try {
+    assert.equal(readStoreFileWithRetry(filePath, { retryMs: 1 }), "{\"ok\":true}");
+    assert.equal(calls, 3, "three busy reads were retried, not treated as a missing file");
+  } finally {
+    fsSync.readFileSync = originalRead;
+  }
+});
+
+test("a lock whose directory cannot be inspected is not treated as stale", async (t) => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omnifm-lock-stat-"));
+  t.after(async () => {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+  const filePath = path.join(tempDir, "store.json");
+  const lockDir = getFileStoreLockPath(filePath);
+  fsSync.mkdirSync(lockDir);
+  fsSync.writeFileSync(`${lockDir}/owner`, JSON.stringify({ id: "other", pid: process.pid }), "utf8");
+
+  const originalStat = fsSync.statSync;
+  fsSync.statSync = function patchedStat(target, ...rest) {
+    if (String(target) === lockDir) {
+      const pending = new Error("EPERM: operation not permitted");
+      pending.code = "EPERM";
+      throw pending;
+    }
+    return originalStat.call(this, target, ...rest);
+  };
+  try {
+    assert.throws(
+      () => withFileStoreLock(filePath, () => "acquired", { timeoutMs: 120, retryMs: 10 }),
+      /Timed out waiting for file-store lock/
+    );
+    assert.equal(fsSync.existsSync(lockDir), true, "the other process keeps its lock");
+  } finally {
+    fsSync.statSync = originalStat;
+  }
+});

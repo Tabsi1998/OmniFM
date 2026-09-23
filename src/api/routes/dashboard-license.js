@@ -528,7 +528,7 @@ export function createDashboardLicenseRouteHandler(deps) {
         if (!license) {
           sendJson(res, 404, {
             error: t(
-              "FÃ¼r diesen Server wurde keine aktive oder abgelaufene Lizenz gefunden.",
+              "Für diesen Server wurde keine aktive oder abgelaufene Lizenz gefunden.",
               "No active or expired license was found for this server."
             ),
           });
@@ -541,7 +541,7 @@ export function createDashboardLicenseRouteHandler(deps) {
           if (!isValidEmailAddress(providedBillingEmail)) {
             sendJson(res, 400, {
               error: t(
-                "Bitte eine gÃ¼ltige Abrechnungs-E-Mail eingeben.",
+                "Bitte eine gültige Abrechnungs-E-Mail eingeben.",
                 "Please enter a valid billing email address."
               ),
             });
@@ -555,7 +555,7 @@ export function createDashboardLicenseRouteHandler(deps) {
         if (!isValidEmailAddress(licenseEmail)) {
           sendJson(res, 400, {
             error: t(
-              "FÃ¼r diese Lizenz ist keine gÃ¼ltige Abrechnungs-E-Mail hinterlegt. Bitte gib unten eine E-Mail ein.",
+              "Für diese Lizenz ist keine gültige Abrechnungs-E-Mail hinterlegt. Bitte gib unten eine E-Mail ein.",
               "No valid billing email is stored for this license. Please enter one below."
             ),
           });
@@ -573,7 +573,7 @@ export function createDashboardLicenseRouteHandler(deps) {
         if (!["pro", "ultimate"].includes(currentPlan)) {
           sendJson(res, 400, {
             error: t(
-              "Dieses Dashboard kann nur bestehende Pro- oder Ultimate-Abos verlÃ¤ngern.",
+              "Dieses Dashboard kann nur bestehende Pro- oder Ultimate-Abos verlängern.",
               "This dashboard can only renew existing Pro or Ultimate subscriptions."
             ),
           });
@@ -582,7 +582,7 @@ export function createDashboardLicenseRouteHandler(deps) {
 
         if (!["pro", "ultimate"].includes(requestedTier)) {
           sendJson(res, 400, {
-            error: t("UngÃ¼ltiger Zielplan.", "Invalid target plan."),
+            error: t("Ungültiger Zielplan.", "Invalid target plan."),
           });
           return true;
         }
@@ -598,7 +598,7 @@ export function createDashboardLicenseRouteHandler(deps) {
         if (basePriceInCents <= 0) {
           sendJson(res, 400, {
             error: t(
-              "UngÃ¼ltige Preisberechnung fÃ¼r die gewÃ¤hlte VerlÃ¤ngerung.",
+              "Ungültige Preisberechnung für die gewählte Verlängerung.",
               "Invalid price calculation for the selected renewal."
             ),
           });
@@ -684,7 +684,7 @@ export function createDashboardLicenseRouteHandler(deps) {
 
         if (priceInCents <= 0) {
           sendJson(res, 400, {
-            error: t("Preis ist nach Rabatt ungÃ¼ltig.", "Price is invalid after discount."),
+            error: t("Preis ist nach Rabatt ungültig.", "Price is invalid after discount."),
             discount: offerPreview,
           });
           return true;
@@ -705,10 +705,10 @@ export function createDashboardLicenseRouteHandler(deps) {
         const isUpgrade = currentPlan === "pro" && requestedTier === "ultimate";
         const description = isUpgrade
           ? (isDe
-            ? `${TIERS[requestedTier].name}${seatsLabel} - Upgrade fÃ¼r ${durationMonths} Monat${durationMonths > 1 ? "e" : ""}`
+            ? `${TIERS[requestedTier].name}${seatsLabel} - Upgrade für ${durationMonths} Monat${durationMonths > 1 ? "e" : ""}`
             : `${TIERS[requestedTier].name}${seatsLabel} - upgrade for ${durationMonths} month${durationMonths > 1 ? "s" : ""}`)
           : (isDe
-            ? `${TIERS[requestedTier].name}${seatsLabel} - VerlÃ¤ngerung fÃ¼r ${durationMonths} Monat${durationMonths > 1 ? "e" : ""}`
+            ? `${TIERS[requestedTier].name}${seatsLabel} - Verlängerung für ${durationMonths} Monat${durationMonths > 1 ? "e" : ""}`
             : `${TIERS[requestedTier].name}${seatsLabel} - renewal for ${durationMonths} month${durationMonths > 1 ? "s" : ""}`);
 
         const stripe = await import("stripe");

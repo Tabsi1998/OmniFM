@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { log, logStoreLoadError } from "./lib/logging.js";
 import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
+import { readStoreFileWithRetry } from "./lib/file-store-lock.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
@@ -80,8 +81,9 @@ function readStateFile(filePath) {
       log("WARN", `[bot-state] ${filePath} ist ein Verzeichnis (Docker-Mount Problem). Nutze leeren State.`);
       return null;
     }
-    const raw = fs.readFileSync(filePath, "utf8");
-    if (!raw || raw.trim().length === 0) return {};
+    const raw = readStoreFileWithRetry(filePath);
+    if (raw === null) return null;
+    if (raw.trim().length === 0) return {};
     return JSON.parse(raw);
   } catch (err) {
     logStoreLoadError("bot-state", filePath, err);

@@ -5599,7 +5599,7 @@ async def admin_integrations_test(request: Request, body: dict = None):
             token = str(directory_setting(directory, "token", token_env) or "").strip()
             bot_id = str(directory_setting(directory, "botId", bot_id_env) or "").strip()
             complete = enabled and bool(token) and bool(re.match(r"^\d{17,22}$", bot_id))
-            results[directory] = {"ok": complete, "message": f"{label} ist vollstÃ¤ndig konfiguriert." if complete else f"{label}: Aktivierung, Token oder gÃ¼ltige Bot-ID fehlt."}
+            results[directory] = {"ok": complete, "message": f"{label} ist vollständig konfiguriert." if complete else f"{label}: Aktivierung, Token oder gültige Bot-ID fehlt."}
         return results
 
     results = await run_in_threadpool(check_all)

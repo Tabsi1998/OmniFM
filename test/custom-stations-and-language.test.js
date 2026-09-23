@@ -21,7 +21,7 @@ test("custom station store accepts dashboard payload objects and persists folder
     const customStations = await import(moduleUrl.href);
 
     const result = await customStations.addGuildStation("guild-1", "demo", {
-      name: "MÃ¼nchen FM",
+      name: "München FM",
       url: "https://1.1.1.1/live",
       genre: "Pop",
       folder: "Night Rotation",
@@ -30,7 +30,7 @@ test("custom station store accepts dashboard payload objects and persists folder
 
     assert.equal(result.success, true);
     assert.equal(result.key, "demo");
-    assert.equal(result.station.name, "MÃ¼nchen FM");
+    assert.equal(result.station.name, "München FM");
     assert.equal(result.station.genre, "Pop");
     assert.equal(result.station.folder, "Night Rotation");
     assert.deepEqual(result.station.tags, ["night", "synthwave"]);
