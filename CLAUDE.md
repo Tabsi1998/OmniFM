@@ -42,9 +42,11 @@ are debt, new ones fail. After paying debt down, run
 `python scripts/local_check.py --all --record` and commit the baseline. Gates
 that ci.yml already enforces are never ratcheted.
 
-Debt on 2026-09-15: nodemailer 9.0.5 has high advisories (the fix needs v10),
-fast-uri in the frontend, 124 settings read by the code but missing from
-`.env.example`.
+Debt on 2026-09-24: fast-uri in the frontend (high), five dependencies outside the
+allowed licences, four OSV findings in the lockfiles, two ShellCheck findings.
+Every setting the code reads is documented in `.env.example` (active line for a
+default, `# NAME=` for an optional override); values OmniFM sets itself are
+listed in `ENV_PROVIDED` in `scripts/local_check.py`.
 
 ## Extending the checks
 
