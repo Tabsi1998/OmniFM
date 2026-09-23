@@ -217,7 +217,7 @@ class TestLicenseDelete:
 
 # ---------- Monitoring honesty ----------
 class TestMonitoringHonesty:
-    def test_waiting_state(self, client):
+    def test_waiting_state(self, client, no_runtime):
         r = client.get(f"{BASE_URL}/api/admin/monitoring", timeout=30)
         assert r.status_code == 200, r.text[:400]
         d = r.json()

@@ -27,16 +27,18 @@ def test_health_returns_online_status():
   assert "timestamp" in data
 
 
-def test_stats_returns_expected_shape():
+def test_stats_returns_expected_shape(configured_bot):
   response = requests.get(f"{BASE_URL}/api/stats", timeout=5)
   assert response.status_code == 200
 
   data = response.json()
-  for field in ["servers", "users", "connections", "listeners", "bots", "stations"]:
+  for field in ["servers", "users", "connections", "listeners", "bots", "botsConfigured", "stations"]:
     assert field in data
   assert isinstance(data["bots"], int)
   assert isinstance(data["stations"], int)
-  assert data["bots"] >= 1
+  # "bots" counts bots online, which needs a running bot; configured bots are always listed.
+  assert data["bots"] >= 0
+  assert data["botsConfigured"] >= 1
   assert data["stations"] >= 1
 
 
@@ -68,7 +70,7 @@ def test_commands_include_core_commands():
   assert "/premium" in names
 
 
-def test_bots_return_list_and_totals():
+def test_bots_return_list_and_totals(configured_bot):
   response = requests.get(f"{BASE_URL}/api/bots", timeout=5)
   assert response.status_code == 200
 

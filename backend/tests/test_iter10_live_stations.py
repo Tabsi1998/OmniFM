@@ -23,13 +23,15 @@ def client():
 
 # --- module: public stats -------------------------------------------------
 class TestPublicStats:
-    def test_stats_real_values(self, client):
+    def test_stats_real_values(self, client, no_runtime, configured_bot):
         r = requests.get(f"{BASE_URL}/api/stats", timeout=30)
         assert r.status_code == 200, r.text[:300]
         d = r.json()
         assert d.get("servers") == 0, d
         assert d.get("stations") == 120, d
-        assert d.get("bots") == 1, d
+        # "bots" counts bots online; configured bots are botsConfigured.
+        assert d.get("bots") == 0, d
+        assert d.get("botsConfigured") == 1, d
         assert d.get("listeners") == 0, d
 
     def test_stations_public_no_objectid(self):
@@ -47,7 +49,7 @@ class TestAdminOverview:
         r = requests.get(f"{BASE_URL}/api/admin/overview", timeout=30)
         assert r.status_code in (401, 403), r.status_code
 
-    def test_overview_clean(self, client):
+    def test_overview_clean(self, client, no_runtime, no_licenses):
         r = client.get(f"{BASE_URL}/api/admin/overview", timeout=30)
         assert r.status_code == 200, r.text[:300]
         d = r.json()
@@ -60,7 +62,7 @@ class TestAdminOverview:
         assert d["stations"]["total"] == 120, d["stations"]
         assert d["stations"]["free"] + d["stations"]["pro"] <= d["stations"]["total"]
 
-    def test_licenses_empty(self, client):
+    def test_licenses_empty(self, client, no_licenses):
         r = client.get(f"{BASE_URL}/api/admin/licenses", timeout=30)
         assert r.status_code == 200
         d = r.json()

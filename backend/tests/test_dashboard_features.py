@@ -101,8 +101,8 @@ class TestAuthSessionEndpoint:
 class TestDiscordLoginEndpoint:
     """Discord login endpoint tests"""
 
-    def test_discord_login_returns_auth_url(self):
-        """GET /api/auth/discord/login returns auth URL"""
+    def test_discord_login_returns_auth_url(self, discord_oauth):
+        """GET /api/auth/discord/login returns auth URL once OAuth is configured"""
         response = requests.get(
             f"{BASE_URL}/api/auth/discord/login?nextPage=dashboard",
             timeout=10,
