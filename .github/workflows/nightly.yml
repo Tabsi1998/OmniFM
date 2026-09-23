@@ -102,7 +102,9 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p test_reports/ci
-          node --test test/pricing-and-runtime.test.js test/web-server-dashboard.test.js test/weekly-digest.test.js 2>&1 | tee test_reports/ci/nightly-recovery-focus.log
+          # The stream, failover and reconnect suites of #207 plus the
+          # runtime-heavy dashboard and digest suites.
+          node --test             test/runtime-streams.test.js             test/runtime-stream-restart.test.js             test/runtime-recovery-parked.test.js             test/now-playing-failover-ui.test.js             test/stream-failover-policy.test.js             test/failover-chain.test.js             test/network-recovery.test.js             test/pricing-and-runtime.test.js             test/web-server-dashboard.test.js             test/weekly-digest.test.js             2>&1 | tee test_reports/ci/nightly-recovery-focus.log
 
       - name: Upload recovery-focused logs
         if: always()
