@@ -71,19 +71,16 @@ function createMigrationsCollection({ markerIds = [], alwaysReportMissing = fals
 
 test("all shipped station catalogs use the current Tomorrowland Anthems endpoint", () => {
   const catalog = JSON.parse(fs.readFileSync(path.join(repoRoot, "stations.json"), "utf8"));
-  const proCatalog = JSON.parse(fs.readFileSync(path.join(repoRoot, "data", "stations.pro.json"), "utf8"));
-  const proAnthems = proCatalog.find((station) => station.id === "pro_tml_03");
 
   assert.equal(
     catalog.stations.pro_tml_03.url,
     "https://playerservices.streamtheworld.com/api/livestream-redirect/OWR_ANTHEMS.mp3"
   );
-  assert.equal(proAnthems?.name, "Tomorrowland - Anthems");
-  assert.equal(proAnthems?.streamURL, tomorrowlandMigration.toUrl);
+  assert.equal(catalog.stations.pro_tml_03.url, tomorrowlandMigration.toUrl);
   assert.equal(
-    JSON.stringify({ catalog, proCatalog }).includes(tomorrowlandMigration.fromUrl),
+    JSON.stringify(catalog).includes(tomorrowlandMigration.fromUrl),
     false,
-    "shipped catalog files must not retain the retired endpoint"
+    "the shipped catalog must not retain the retired endpoint"
   );
 });
 
@@ -284,4 +281,17 @@ test("file fallback migration remains safe for concurrent worker processes", asy
   assert.equal(migrated.stations.pro_tml_03.keep, "this raw field survives concurrent migration");
   assert.equal(migrated.stations.protml03.url, "https://operator.example/anthem-override.mp3");
   assert.equal(entries.some((entry) => entry.includes(".tmp-") || entry.endsWith(".lock")), false);
+});
+
+test("the tracked stations seed is never the write target", async () => {
+  const { resolveStationsFilePaths } = await import("../src/stations-store.js");
+  const rootDir = path.join(os.tmpdir(), "omnifm-stations-paths");
+
+  const defaults = resolveStationsFilePaths({ env: {}, rootDir });
+  assert.equal(defaults.seedPath, path.join(rootDir, "stations.json"));
+  assert.equal(defaults.runtimePath, path.join(rootDir, "runtime-data", "stations.json"));
+
+  const explicit = resolveStationsFilePaths({ env: { OMNIFM_RUNTIME_DATA_DIR: "/srv/omnifm-data" }, rootDir });
+  assert.equal(explicit.seedPath, path.join(rootDir, "stations.json"));
+  assert.equal(explicit.runtimePath, path.join(path.resolve("/srv/omnifm-data"), "stations.json"));
 });

@@ -6,9 +6,29 @@ import path from "node:path";
 import { getDb } from "./lib/db.js";
 import { withFileStoreLock } from "./lib/file-store-lock.js";
 import { log, logStoreLoadError } from "./lib/logging.js";
-import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
+import { appRootDir, resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 
-const stationsPath = resolveRuntimeDataPath("stations.json");
+/**
+ * The tracked stations.json in the repository is the shipped seed and is never
+ * written. Writes (stations CLI, file catalog migration) go to a runtime copy
+ * that the loader prefers when it exists. Without OMNIFM_RUNTIME_DATA_DIR the
+ * runtime data directory is the repository itself, so the copy is redirected
+ * to runtime-data/, which is ignored by Git and part of the update backup (#205).
+ */
+export function resolveStationsFilePaths({ env = process.env, rootDir = appRootDir } = {}) {
+  const seedPath = path.join(rootDir, "stations.json");
+  let runtimePath = resolveRuntimeDataPath("stations.json", { env, rootDir });
+  if (path.resolve(runtimePath) === path.resolve(seedPath)) {
+    runtimePath = path.join(rootDir, "runtime-data", "stations.json");
+  }
+  return { seedPath, runtimePath };
+}
+
+const { seedPath: stationsSeedPath, runtimePath: stationsPath } = resolveStationsFilePaths();
+
+function activeStationsFilePath() {
+  return fs.existsSync(stationsPath) ? stationsPath : stationsSeedPath;
+}
 
 const QUALITY_PRESETS = new Set(["low", "medium", "high", "custom"]);
 const COLLECTION = "stations";
@@ -212,13 +232,14 @@ function loadStationsFromFile() {
     log("WARN", `Stations-Dateikatalogmigration fehlgeschlagen: ${err?.message || err}`);
   }
 
-  if (!fs.existsSync(stationsPath)) return emptyStationsData();
+  const sourcePath = activeStationsFilePath();
+  if (!fs.existsSync(sourcePath)) return emptyStationsData();
   try {
-    if (fs.statSync(stationsPath).isDirectory()) return emptyStationsData();
-    const raw = fs.readFileSync(stationsPath, "utf8");
+    if (fs.statSync(sourcePath).isDirectory()) return emptyStationsData();
+    const raw = fs.readFileSync(sourcePath, "utf8");
     return normalizeStationsData(JSON.parse(raw));
   } catch (err) {
-    logStoreLoadError("stations", stationsPath, err);
+    logStoreLoadError("stations", sourcePath, err);
     return emptyStationsData();
   }
 }
@@ -354,8 +375,9 @@ export async function saveStations(data) {
     }
   }
 
-  // Also save to file as backup
+  // Also save to the runtime copy as backup; the tracked seed stays untouched.
   try {
+    fs.mkdirSync(path.dirname(stationsPath), { recursive: true });
     const serialized = JSON.stringify(normalized, null, 2);
     const tempPath = `${stationsPath}.tmp`;
     fs.writeFileSync(tempPath, serialized);
@@ -365,7 +387,9 @@ export async function saveStations(data) {
   return normalized;
 }
 
-export function getStationsPath() { return stationsPath; }
+export function getStationsPath() { return activeStationsFilePath(); }
+export function getStationsSeedPath() { return stationsSeedPath; }
+export function getStationsRuntimePath() { return stationsPath; }
 export function isValidQualityPreset(preset) { return QUALITY_PRESETS.has(String(preset || "").toLowerCase()); }
 export function normalizeKey(rawKey) { return sanitizeKey(rawKey); }
 
@@ -393,16 +417,6 @@ export function resolveStation(stations, key) {
     return stations.stations[stations.defaultStationKey] ? stations.defaultStationKey : Object.keys(stations.stations)[0] || null;
   }
   return stations.stations[key] ? key : null;
-}
-
-export function getFallbackKey(stations, currentKey) {
-  if (Array.isArray(stations.fallbackKeys) && stations.fallbackKeys.length) {
-    const next = stations.fallbackKeys.find((k) => stations.stations[k] && k !== currentKey);
-    if (next) return next;
-  }
-  if (stations.defaultStationKey && stations.defaultStationKey !== currentKey) return stations.defaultStationKey;
-  const keys = Object.keys(stations.stations);
-  return keys.find((k) => k !== currentKey) || null;
 }
 
 const TIER_RANK = { free: 0, pro: 1, ultimate: 2 };
