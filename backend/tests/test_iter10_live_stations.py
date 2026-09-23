@@ -10,7 +10,7 @@ base_url = os.environ.get("REACT_APP_BACKEND_URL") or frontend_env.get("REACT_AP
 if not base_url:
     raise RuntimeError("REACT_APP_BACKEND_URL missing")
 BASE_URL = base_url.rstrip("/")
-TOKEN = "omnifm-owner-dev-token"
+TOKEN = os.environ.get("OMNIFM_TEST_ADMIN_TOKEN", "omnifm-owner-dev-token")
 HDR = {"X-Admin-Token": TOKEN, "Content-Type": "application/json"}
 
 
