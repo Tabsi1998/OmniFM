@@ -122,7 +122,9 @@ export function buildRuntimeHealthNodes(runtimes, {
             failoverFailureCount: Math.max(0, Number(live.failoverFailureCount || 0) || 0),
             failbackNextProbeAt: Math.max(0, Number(live.failbackNextProbeAt || 0) || 0),
             parkedReason: live.parkedReason || null,
+            parkedAt: Math.max(0, Number(live.parkedAt || 0) || 0),
             serverMuted: live.serverMuted === true,
+            serverMutedAt: Math.max(0, Number(live.serverMutedAt || 0) || 0),
           };
         });
       } catch { guildDetails = []; }

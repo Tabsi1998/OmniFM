@@ -92,74 +92,75 @@ function canSendRuntimeIncidentAlert(channel, me) {
 }
 
 function buildRuntimeIncidentAlertCopy(eventKey, payload, t) {
-  const previousStation = payload?.previousStationName || payload?.previousStationKey || t("dem letzten Stream", "the previous stream");
-  const failoverStation = payload?.failoverStationName || payload?.failoverStationKey || t("der Failover-Station", "the failover station");
-  const restoredStation = payload?.restoredStationName || payload?.restoredStationKey || t("dem Wunschsender", "the preferred station");
+  const previousStation = payload?.previousStationName || payload?.previousStationKey || t("der Sender", "the station");
+  const failoverStation = payload?.failoverStationName || payload?.failoverStationKey || t("einen Ersatzsender", "a backup station");
+  const restoredStation = payload?.restoredStationName || payload?.restoredStationKey || t("der Wunschsender", "the preferred station");
   const replacementStation = payload?.replacementStationName || payload?.replacementStationKey || "";
+  // Plain words for server admins, no internal event names (#216).
   switch (String(eventKey || "").trim().toLowerCase()) {
     case "station_unavailable":
       return {
-        title: t("Sender nicht mehr verfuegbar", "Station no longer available"),
+        title: t("Sender nicht mehr verfügbar", "Station no longer available"),
         color: 0xF59E0B,
         description: replacementStation && payload?.stopped !== true
           ? t(
-            `${previousStation} ist auf diesem Server nicht mehr verfuegbar. OmniFM spielt stattdessen ${replacementStation}.`,
+            `${previousStation} ist auf diesem Server nicht mehr verfügbar. OmniFM spielt stattdessen ${replacementStation}.`,
             `${previousStation} is no longer available on this server. OmniFM is playing ${replacementStation} instead.`
           )
           : t(
-            `${previousStation} ist auf diesem Server nicht mehr verfuegbar. OmniFM hat die Wiedergabe beendet; /play startet einen anderen Sender.`,
+            `${previousStation} ist auf diesem Server nicht mehr verfügbar. OmniFM hat die Wiedergabe beendet; /play startet einen anderen Sender.`,
             `${previousStation} is no longer available on this server. OmniFM stopped playback; /play starts another station.`
           ),
       };
     case "stream_failback_completed":
       return {
-        title: t("Wunschsender wieder aktiv", "Preferred station restored"),
+        title: t("Wunschsender läuft wieder", "Preferred station is back"),
         color: 0x22C55E,
         description: t(
-          `${restoredStation} ist wieder erreichbar. OmniFM spielt ihn statt ${previousStation}.`,
-          `${restoredStation} is reachable again. OmniFM is playing it instead of ${previousStation}.`
+          `${restoredStation} ist wieder erreichbar. OmniFM spielt ihn wieder statt ${previousStation}.`,
+          `${restoredStation} is reachable again. OmniFM is playing it again instead of ${previousStation}.`
         ),
       };
     case "stream_failover_activated":
       return {
-        title: t("Failover aktiviert", "Failover activated"),
+        title: t("Ersatzsender läuft", "Backup station playing"),
         color: 0xF59E0B,
         description: t(
-          `OmniFM ist von ${previousStation} auf ${failoverStation} gewechselt.`,
-          `OmniFM switched from ${previousStation} to ${failoverStation}.`
+          `${previousStation} ist gerade nicht erreichbar. OmniFM spielt vorübergehend ${failoverStation} und wechselt von selbst zurück, sobald ${previousStation} wieder läuft.`,
+          `${previousStation} is not reachable right now. OmniFM plays ${failoverStation} for the time being and switches back on its own once ${previousStation} works again.`
         ),
       };
     case "stream_healthcheck_stalled":
       return {
-        title: t("Stream stockt", "Stream stalled"),
+        title: t("Kein Ton mehr", "No audio"),
         color: 0xF59E0B,
         description: t(
-          `OmniFM erkennt gerade keine stabile Wiedergabe mehr bei ${previousStation}.`,
-          `OmniFM is no longer seeing stable playback on ${previousStation}.`
+          `Von ${previousStation} kommt gerade kein Ton mehr. OmniFM startet den Stream neu.`,
+          `${previousStation} stopped sending audio. OmniFM restarts the stream.`
         ),
       };
     case "stream_failover_exhausted":
       return {
-        title: t("Failover ausgeschoepft", "Failover exhausted"),
+        title: t("Kein Sender erreichbar", "No station reachable"),
         color: 0xEF4444,
         description: t(
-          `OmniFM konnte ${previousStation} nicht stabilisieren und hat alle konfigurierten Failover-Schritte verbraucht.`,
-          `OmniFM could not stabilize ${previousStation} and exhausted every configured failover step.`
+          `${previousStation} ist nicht erreichbar, und auch kein Ersatzsender ließ sich starten. OmniFM versucht es weiter.`,
+          `${previousStation} is not reachable, and no backup station could be started either. OmniFM keeps trying.`
         ),
       };
     default:
       return {
-        title: t("Reliability-Vorfall", "Reliability incident"),
+        title: t("Störung bei der Wiedergabe", "Playback problem"),
         color: 0x71717A,
         description: t(
-          "OmniFM hat einen neuen Runtime-Vorfall erkannt.",
-          "OmniFM detected a new runtime incident."
+          "OmniFM hat eine Störung bei der Wiedergabe erkannt.",
+          "OmniFM detected a playback problem."
         ),
       };
   }
 }
 
-function buildRuntimeIncidentAlertMessage(input) {
+export function buildRuntimeIncidentAlertMessage(input) {
   const language = String(input?.language || "de").trim().toLowerCase() === "en" ? "en" : "de";
   const t = (de, en) => (language === "en" ? en : de);
   const payload = input?.payload && typeof input.payload === "object" ? input.payload : {};
@@ -177,7 +178,7 @@ function buildRuntimeIncidentAlertMessage(input) {
   }
   if (payload.previousStationName || payload.previousStationKey) {
     fields.push({
-      name: t("Vorheriger Stream", "Previous stream"),
+      name: t("Betroffener Sender", "Affected station"),
       value: clipText(payload.previousStationName || payload.previousStationKey, 120) || "-",
       inline: true,
     });
@@ -191,14 +192,14 @@ function buildRuntimeIncidentAlertMessage(input) {
   }
   if (payload.failoverStationName || payload.failoverStationKey) {
     fields.push({
-      name: t("Failover", "Failover"),
+      name: t("Ersatzsender", "Backup station"),
       value: clipText(payload.failoverStationName || payload.failoverStationKey, 120) || "-",
       inline: true,
     });
   }
   if (Number.isFinite(Number(payload.listenerCount)) && Number(payload.listenerCount) > 0) {
     fields.push({
-      name: t("Listener", "Listeners"),
+      name: t("Hörer", "Listeners"),
       value: String(Number(payload.listenerCount) || 0),
       inline: true,
     });
