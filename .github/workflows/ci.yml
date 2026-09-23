@@ -291,3 +291,6 @@ jobs:
           test "$(curl -sS -o /tmp/invalid-license.json -w '%{http_code}' -X POST -H 'X-Admin-Token: ci-owner-token' -H 'Content-Type: application/json' --data '{"email":"invalid-guild@example.test","tier":"pro","months":1,"seats":1,"guildId":"1"}' http://127.0.0.1:8001/api/admin/licenses)" = "400"
           curl -sS -D /tmp/oauth-headers.txt -o /dev/null 'http://127.0.0.1:8001/api/auth/discord/login?redirect=1&nextPage=dashboard'
           grep -Eiq '^location: https://discord.com/' /tmp/oauth-headers.txt
+          # The owner contract suite of backend/tests against the same server (#229).
+          # Its fixtures write their own data into this CI database.
+          OMNIFM_RUN_BACKEND_CONTRACT_TESTS=1 OMNIFM_TEST_BASE_URL=http://127.0.0.1:8001             REACT_APP_BACKEND_URL=http://127.0.0.1:8001 OMNIFM_TEST_ADMIN_TOKEN=ci-owner-token             python -m pytest backend/tests -q -rfE -p no:cacheprovider

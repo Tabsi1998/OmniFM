@@ -1,6 +1,6 @@
 """Live-Monitoring API tests (/api/admin/monitoring) + admin regression."""
 import os
-import time
+from datetime import datetime, timedelta, timezone
 
 import pytest
 import requests
@@ -46,94 +46,93 @@ class TestMonitoringAuth:
         assert r.status_code == 200
 
 
-# --- module: monitoring payload shape ---
+# --- module: monitoring payload shape (live bot data) ---
 class TestMonitoringShape:
-    def test_top_level_keys(self, admin):
+    def test_top_level_keys(self, admin, live_runtime):
         r = admin.get(f"{BASE_URL}/api/admin/monitoring")
         assert r.status_code == 200, r.text[:300]
         d = r.json()
-        for k in ("generatedAt", "simulated", "health", "nodes", "incidents", "logs"):
+        for k in ("generatedAt", "simulated", "live", "process", "health", "nodes", "incidents", "logs"):
             assert k in d, f"missing {k}"
-        assert d["simulated"] is True
+        assert d["simulated"] is False
+        assert d["live"] is True
         assert isinstance(d["generatedAt"], str) and "T" in d["generatedAt"]
         assert '"_id"' not in r.text
 
-    def test_health_block(self, admin):
+    def test_health_block(self, admin, live_runtime):
         h = admin.get(f"{BASE_URL}/api/admin/monitoring").json()["health"]
-        for k in ("healthyNodes", "totalNodes", "uptimePct", "apiLatencyMs",
-                  "mongo", "openIncidents"):
+        for k in ("healthyNodes", "totalNodes", "uptimeSec", "apiLatencyMs", "mongo", "openIncidents"):
             assert k in h, f"missing health.{k}"
-        assert isinstance(h["healthyNodes"], int)
-        assert isinstance(h["totalNodes"], int) and h["totalNodes"] >= 1
-        assert 0 <= h["healthyNodes"] <= h["totalNodes"]
-        assert 0 < h["uptimePct"] <= 100
-        assert isinstance(h["apiLatencyMs"], int) and h["apiLatencyMs"] > 0
+        assert h["healthyNodes"] == 2 and h["totalNodes"] == 2
+        assert h["uptimeSec"] == 7200
         assert h["mongo"] is True
-        assert isinstance(h["openIncidents"], int) and h["openIncidents"] >= 0
+        assert h["openIncidents"] == 1, "one open incident, the failback is resolved"
 
-    def test_nodes(self, admin):
+    def test_nodes(self, admin, live_runtime):
         d = admin.get(f"{BASE_URL}/api/admin/monitoring").json()
         nodes = d["nodes"]
-        assert len(nodes) == d["health"]["totalNodes"]
-        assert len(nodes) == 2, f"expected 2 configured bots, got {len(nodes)}"
-        roles = {n["role"] for n in nodes}
-        assert "commander" in roles
-        assert roles <= {"commander", "worker"}
+        assert len(nodes) == d["health"]["totalNodes"] == 2
+        assert {n["role"] for n in nodes} == {"commander", "worker"}
         for n in nodes:
-            for k in ("name", "role", "status", "cpuPct", "ramMb", "pingMs"):
+            for k in ("name", "role", "status", "cpuPct", "ramMb", "pingMs", "resourceScope"):
                 assert k in n, f"missing node.{k}"
             assert n["name"]
-            assert n["status"] in ("online", "degraded", "offline")
+            assert n["status"] == "online"
+            # Split processes: every node reports its own process.
+            assert n["resourceScope"] == "node-process"
             assert 0 <= n["cpuPct"] <= 100
             assert n["ramMb"] > 0
             assert n["pingMs"] > 0
 
-    def test_nodes_match_bots_endpoint(self, admin, client):
+    def test_nodes_match_workers_endpoint(self, admin, live_runtime, configured_bot):
         nodes = admin.get(f"{BASE_URL}/api/admin/monitoring").json()["nodes"]
         workers = admin.get(f"{BASE_URL}/api/admin/workers").json()
+        assert workers["live"] is True
         assert len(nodes) == workers["count"]
 
-    def test_incidents(self, admin):
+    def test_incidents(self, admin, live_runtime):
         incidents = admin.get(f"{BASE_URL}/api/admin/monitoring").json()["incidents"]
-        assert isinstance(incidents, list) and len(incidents) >= 1
-        assert len(incidents) <= 25
+        assert len(incidents) == 2
         for i in incidents:
             for k in ("at", "severity", "source", "message", "resolved"):
                 assert k in i, f"missing incident.{k}"
-            assert i["at"]
-            assert i["severity"] in ("info", "warning", "critical", "error", "warn")
+            assert i["at"] and i["message"]
             assert isinstance(i["resolved"], bool)
-            assert i["message"]
+        assert incidents[0]["message"].startswith("CI Guild: zurück auf Alpha FM"), "newest first"
+        assert incidents[1]["severity"] == "warning" and incidents[1]["resolved"] is False
 
-    def test_logs(self, admin):
-        d = admin.get(f"{BASE_URL}/api/admin/monitoring").json()
-        logs = d["logs"]
-        assert len(logs) == 14, f"expected 14 log rows, got {len(logs)}"
+    def test_logs(self, admin, live_runtime):
+        logs = admin.get(f"{BASE_URL}/api/admin/monitoring").json()["logs"]
+        assert len(logs) == 14, f"expected the 14 shipped log lines, got {len(logs)}"
         for entry in logs:
             for k in ("at", "level", "source", "message"):
                 assert k in entry, f"missing log.{k}"
             assert entry["level"] in ("INFO", "WARN", "ERROR", "DEBUG")
             assert entry["source"]
             assert entry["message"]
-            assert "{" not in entry["message"], f"unsubstituted placeholder: {entry['message']}"
-        # newest first
         ats = [e["at"] for e in logs]
         assert ats == sorted(ats, reverse=True), "logs not newest-first"
 
 
-# --- module: live jitter behaviour ---
+# --- module: the monitoring follows what the bot writes ---
 class TestMonitoringLive:
-    def test_values_change_over_time(self, admin):
+    def test_values_follow_the_bot_writes(self, admin, live_runtime, contract_db):
         first = admin.get(f"{BASE_URL}/api/admin/monitoring").json()
-        time.sleep(5)
+        contract_db.runtime_health.update_one({"_id": "latest"}, {"$set": {
+            "at": datetime.now(timezone.utc).isoformat(),
+            "nodes.0.cpuPct": 33.0,
+        }})
         second = admin.get(f"{BASE_URL}/api/admin/monitoring").json()
-        assert first["generatedAt"] != second["generatedAt"]
-        changed = (
-            first["logs"][0]["at"] != second["logs"][0]["at"]
-            or first["health"]["apiLatencyMs"] != second["health"]["apiLatencyMs"]
-            or first["nodes"][0]["cpuPct"] != second["nodes"][0]["cpuPct"]
-        )
-        assert changed, "no time-based jitter detected between two calls 5s apart"
+        assert first["nodes"][0]["cpuPct"] == 6.5
+        assert second["nodes"][0]["cpuPct"] == 33.0
+        assert first["generatedAt"] <= second["generatedAt"]
+
+    def test_stale_health_document_means_waiting(self, admin, live_runtime, contract_db):
+        stale = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+        contract_db.runtime_health.update_one({"_id": "latest"}, {"$set": {"at": stale}})
+        d = admin.get(f"{BASE_URL}/api/admin/monitoring").json()
+        assert d["live"] is False and d.get("waiting") is True
+        assert d["nodes"] == [] and d["logs"] == []
 
 
 # --- module: admin regression ---

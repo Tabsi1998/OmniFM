@@ -54,7 +54,7 @@ def mongo():
 
 # ---------------------------------------------------------------- honest zeros
 class TestHonestZeros:
-    def test_stats_zeros_without_runtime(self, client):
+    def test_stats_zeros_without_runtime(self, client, no_runtime, configured_bot):
         r = client.get(f"{BASE_URL}/api/stats", timeout=30)
         assert r.status_code == 200, r.text[:300]
         d = r.json()
@@ -66,7 +66,7 @@ class TestHonestZeros:
         assert d["stations"] == 120, d["stations"]
         assert d["botsConfigured"] == 1, d["botsConfigured"]
 
-    def test_overview_zeros_without_runtime(self, admin):
+    def test_overview_zeros_without_runtime(self, admin, no_runtime, configured_bot):
         r = admin.get(f"{BASE_URL}/api/admin/overview", timeout=30)
         assert r.status_code == 200, r.text[:300]
         d = r.json()
@@ -78,7 +78,7 @@ class TestHonestZeros:
         assert d["revenue"]["currency"] == "EUR"
         assert d["stations"]["total"] == 120
 
-    def test_monitoring_waiting_state(self, admin):
+    def test_monitoring_waiting_state(self, admin, no_runtime):
         r = admin.get(f"{BASE_URL}/api/admin/monitoring", timeout=30)
         assert r.status_code == 200, r.text[:300]
         d = r.json()
@@ -100,7 +100,7 @@ class TestHonestZeros:
 
 # ------------------------------------------------------------- live telemetry
 class TestLiveRuntimeTelemetry:
-    def test_seeded_live_doc_is_reflected_everywhere(self, admin, client, mongo):
+    def test_seeded_live_doc_is_reflected_everywhere(self, admin, client, mongo, no_runtime):
         now = datetime.now(timezone.utc).isoformat()
         doc = {
             "_id": "latest",
@@ -139,7 +139,10 @@ class TestLiveRuntimeTelemetry:
             assert m["health"]["totalNodes"] == 3
             assert m["health"]["uptimeSec"] == 7321
             assert m["process"]["cpuPct"] == 17
-            assert m["nodes"][0]["ramMb"] == 412
+            assert m["process"]["ramMb"] == 412
+            # One shared process: its figures belong to the process, not to a node.
+            assert m["nodes"][0]["resourceScope"] == "shared-process"
+            assert m["nodes"][0]["ramMb"] is None
         finally:
             mongo.runtime_health.delete_one({"_id": "latest"})
             if existing:

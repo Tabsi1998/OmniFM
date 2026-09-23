@@ -1094,10 +1094,11 @@ def fastapi_contract(context: Context) -> str:
 def fastapi_contract_suite(context: Context) -> str:
     """backend/tests: the Owner Console contract tests, against the live server.
 
-    Neither ci.yml nor this runner ran them before (#204): they need a running
-    FastAPI, and the contract step above already has one. Several were written
-    against demo data of an earlier stack, so the failing test ids are debt
-    under the ratchet and every new failure fails the step.
+    They need a running FastAPI, and the contract step above already has one.
+    Their fixtures (backend/tests/conftest.py) write the data each test needs
+    into the same database, so the suite does not depend on demo seeds or on
+    what the owner contract left behind (#229). The baseline is empty: any
+    failing test fails the step.
     """
     env = context.cache.get("fastapi:env")
     if not env or not port_open(API_PORT):

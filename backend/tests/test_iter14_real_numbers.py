@@ -37,7 +37,7 @@ def admin(client):
 
 # --- public stats honesty -------------------------------------------------
 class TestPublicStats:
-    def test_stats_live_numbers_are_zero_without_bot(self, client):
+    def test_stats_live_numbers_are_zero_without_bot(self, client, no_runtime, configured_bot):
         r = client.get(f"{BASE_URL}/api/stats", timeout=30)
         assert r.status_code == 200, r.text[:300]
         d = r.json()
@@ -54,7 +54,7 @@ class TestPublicStats:
 
 # --- owner overview -------------------------------------------------------
 class TestAdminOverview:
-    def test_overview_guilds_and_bots_honest(self, admin):
+    def test_overview_guilds_and_bots_honest(self, admin, no_runtime, configured_bot):
         r = admin.get(f"{BASE_URL}/api/admin/overview", timeout=30)
         assert r.status_code == 200, r.text[:300]
         d = r.json()
@@ -72,7 +72,7 @@ class TestAdminOverview:
 
 # --- monitoring -----------------------------------------------------------
 class TestAdminMonitoring:
-    def test_monitoring_waiting_state(self, admin):
+    def test_monitoring_waiting_state(self, admin, no_runtime):
         r = admin.get(f"{BASE_URL}/api/admin/monitoring", timeout=30)
         assert r.status_code == 200, r.text[:300]
         d = r.json()

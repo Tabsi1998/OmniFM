@@ -93,7 +93,10 @@ class TestStationCrud:
         # DELETE
         r3 = client.delete(f"{BASE_URL}/api/admin/stations/{QA_KEY}", timeout=30)
         assert r3.status_code == 200
-        assert r3.json() == {"ok": True, "deleted": QA_KEY}
+        deleted = r3.json()
+        assert deleted["ok"] is True and deleted["deleted"] == QA_KEY, deleted
+        # Deleting moves the station into the owner archive, so it can be restored.
+        assert str(deleted.get("archiveId", "")).startswith("arc_"), deleted
         rows = client.get(f"{BASE_URL}/api/admin/stations/list", timeout=30).json()["stations"]
         assert not [s for s in rows if s["key"] == QA_KEY]
 

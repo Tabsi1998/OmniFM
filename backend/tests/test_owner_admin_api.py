@@ -84,7 +84,7 @@ class TestAdminAuthGuard:
 
 # --- module: /api/admin/overview ---
 class TestOverview:
-    def test_overview_shape(self, admin):
+    def test_overview_shape(self, admin, seeded_licenses):
         r = admin.get(f"{BASE_URL}/api/admin/overview")
         assert r.status_code == 200
         d = r.json()
@@ -108,7 +108,7 @@ class TestOverview:
 
 # --- module: /api/admin/licenses ---
 class TestLicenses:
-    def test_licenses_shape_and_masking(self, admin):
+    def test_licenses_shape_and_masking(self, admin, seeded_licenses):
         r = admin.get(f"{BASE_URL}/api/admin/licenses")
         assert r.status_code == 200
         d = r.json()
@@ -130,17 +130,17 @@ class TestLicenses:
         for raw in ("admin@lofilounge.io", "owner@synthcity.fm"):
             assert raw not in body, f"raw email leaked: {raw}"
 
-    def test_expired_license_not_active(self, admin):
+    def test_expired_license_not_active(self, admin, seeded_licenses):
         licenses = admin.get(f"{BASE_URL}/api/admin/licenses").json()["licenses"]
         expired = [l for l in licenses if l["expired"]]
-        assert expired, "expected at least one expired seeded license"
+        assert expired, "expected the expired licence of the fixture"
         for l in expired:
             assert l["active"] is False
 
 
 # --- module: /api/admin/workers ---
 class TestWorkers:
-    def test_workers(self, admin):
+    def test_workers(self, admin, configured_bot):
         r = admin.get(f"{BASE_URL}/api/admin/workers")
         assert r.status_code == 200
         d = r.json()
@@ -183,7 +183,7 @@ class TestIntegrations:
 
 # --- module: /api/admin/activity ---
 class TestActivity:
-    def test_activity(self, admin):
+    def test_activity(self, admin, seeded_licenses):
         r = admin.get(f"{BASE_URL}/api/admin/activity")
         assert r.status_code == 200
         d = r.json()
