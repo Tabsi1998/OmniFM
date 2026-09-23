@@ -1,0 +1,25 @@
+# OmniFM API (FastAPI). Rendered by start.sh: the double-underscore markers
+# (ROOT, USER, ports, node path) are replaced with the values of this
+# installation before the unit is written to /etc/systemd/system. Do not edit
+# the rendered copy, edit this template.
+[Unit]
+Description=OmniFM API (FastAPI on port __BACKEND_PORT__)
+Documentation=https://github.com/Tabsi1998/OmniFM#readme
+After=network-online.target mongod.service
+Wants=network-online.target mongod.service
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__ROOT__/backend
+EnvironmentFile=-__ROOT__/backend/.env
+Environment=PATH=__NODE_DIR__:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=__ROOT__/.venv/bin/uvicorn server:app --host 0.0.0.0 --port __BACKEND_PORT__ --workers 1
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+StandardOutput=append:__ROOT__/logs/backend.log
+StandardError=append:__ROOT__/logs/backend.log
+
+[Install]
+WantedBy=multi-user.target

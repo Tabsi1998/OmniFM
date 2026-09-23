@@ -39,12 +39,150 @@ doctor() {
   log "Konfiguration ist deploy-fähig. Es wurde nichts verändert."
 }
 
-if [ "${1:-}" = "--doctor" ]; then
-  [ "$#" -eq 1 ] || die "--doctor akzeptiert keine weiteren Argumente."
-  doctor
-  exit 0
-fi
-[ "$#" -eq 0 ] || die "Unbekannte Argumente. Nutzung: ./update.sh oder ./update.sh --doctor"
+BACKEND_PORT_VALUE="${BACKEND_PORT:-8001}"
+VENV_PY="$ROOT/.venv/bin/python"
+
+has_systemd() {
+  command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]
+}
+
+mongo_url_from_env() {
+  grep -E '^MONGO_URL=' "$ROOT/backend/.env" 2>/dev/null | head -n1 | cut -d '=' -f2- | sed -e 's/^"//' -e 's/"$//'
+}
+
+mongo_ping() {
+  local url
+  url="$(mongo_url_from_env)"
+  url="${url:-mongodb://127.0.0.1:27017}"
+  if [ ! -x "$VENV_PY" ]; then
+    printf 'MongoDB-Ping nicht moeglich: Python-venv fehlt (./start.sh ausfuehren).\n'
+    return 1
+  fi
+  MONGO_URL="$url" "$VENV_PY" -c 'import os
+from pymongo import MongoClient
+url = os.environ["MONGO_URL"]
+client = MongoClient(url, serverSelectionTimeoutMS=1500)
+client.admin.command("ping")
+host = url.split("@")[-1]
+print(f"MongoDB antwortet ({host})")
+for name in sorted(client.list_database_names()):
+    if name in ("admin", "config", "local"):
+        continue
+    db = client[name]
+    print(f"  {name}: {len(db.list_collection_names())} Collections")'
+}
+
+service_lines() {
+  if has_systemd; then
+    local unit
+    for unit in omnifm-backend omnifm-frontend omnifm-bot; do
+      printf '%-17s %s\n' "$unit" "$(systemctl is-active "$unit" 2>/dev/null || echo unbekannt)"
+    done
+  else
+    local name pid
+    for name in backend frontend bot; do
+      pid="$(cat "$ROOT/run/$name.pid" 2>/dev/null || true)"
+      if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+        printf '%-17s laeuft (PID %s)\n' "$name" "$pid"
+      else
+        printf '%-17s gestoppt\n' "$name"
+      fi
+    done
+  fi
+}
+
+api_health() {
+  curl --silent --max-time 3 "http://127.0.0.1:${BACKEND_PORT_VALUE}/api/health" || printf 'API antwortet nicht auf Port %s' "$BACKEND_PORT_VALUE"
+  printf '\n'
+}
+
+status_report() {
+  local topic="${1:-quick}" file
+  case "$topic" in
+    quick)
+      echo "== OmniFM Status =="
+      echo "Code-Stand: $(git -C "$ROOT" log -1 --pretty='%h %s' 2>/dev/null | head -c 100 || echo unbekannt)"
+      echo "-- Dienste --"
+      service_lines
+      echo "-- MongoDB --"
+      mongo_ping || true
+      echo "-- API --"
+      api_health
+      echo "-- Speicher --"
+      df -h "$ROOT" | tail -n 1
+      ;;
+    health)
+      api_health
+      ;;
+    local-logs)
+      for file in bot.log error.log bot-console.log backend.log frontend.log; do
+        [ -f "$ROOT/logs/$file" ] || continue
+        echo "== logs/$file (letzte 40 Zeilen) =="
+        tail -n 40 "$ROOT/logs/$file"
+        echo
+      done
+      ;;
+    mongo)
+      mongo_ping
+      ;;
+    storage)
+      echo "== Speicher =="
+      du -sh "$ROOT/logs" "$ROOT/.update-backups" "$ROOT/node_modules" "$ROOT/frontend/node_modules" "$ROOT/frontend/build" 2>/dev/null || true
+      df -h "$ROOT" | tail -n 1
+      ;;
+    *)
+      die "Unbekanntes Status-Thema: $topic (quick, health, local-logs, mongo, storage)"
+      ;;
+  esac
+}
+
+show_bots() {
+  # DRY_RUN prints the resolved commander/worker list with token lengths only.
+  ( cd "$ROOT" && DRY_RUN=1 node src/entrypoints/from-owner-config.mjs ) || true
+}
+
+cleanup_logs() {
+  local mode="${1:-dry-run}" days="${OMNIFM_CLEANUP_LOG_DAYS:-14}" found=0 file
+  case "$mode" in dry-run|run) ;; *) die "Unbekannter Cleanup-Modus: $mode (dry-run, run)" ;; esac
+  echo "== Cleanup ($mode): rotierte Logs aelter als ${days} Tage =="
+  while IFS= read -r file; do
+    found=1
+    if [ "$mode" = "run" ]; then
+      rm -f -- "$file" && echo "geloescht: $file"
+    else
+      echo "wuerde loeschen: $file"
+    fi
+  done < <(find "$ROOT/logs" -type f \( -name 'bot-*.log' -o -name 'error-*.log' \) -mtime "+$days" 2>/dev/null | sort)
+  [ "$found" -eq 1 ] || echo "Nichts zu bereinigen."
+  echo "Backups unter .update-backups werden nie automatisch geloescht:"
+  du -sh "$ROOT/.update-backups" 2>/dev/null || echo "  (keine Backups vorhanden)"
+}
+
+USAGE="Nutzung: ./update.sh | --doctor | --status [quick|health|local-logs|mongo|storage] | --show-bots | --cleanup [dry-run|run]"
+case "${1:-}" in
+  --doctor)
+    [ "$#" -eq 1 ] || die "--doctor akzeptiert keine weiteren Argumente."
+    doctor
+    exit 0
+    ;;
+  --status)
+    status_report "${2:-quick}"
+    exit 0
+    ;;
+  --show-bots|--show-roles)
+    show_bots
+    exit 0
+    ;;
+  --cleanup)
+    cleanup_logs "${2:-dry-run}"
+    exit 0
+    ;;
+  "")
+    ;;
+  *)
+    die "Unbekannte Argumente. $USAGE"
+    ;;
+esac
 
 BACKUP_DIR="$ROOT/.update-backups/config/$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "$BACKUP_DIR"
@@ -107,7 +245,15 @@ fi
 log "Bereite Update vor und starte Frontend, FastAPI und Discord-Runtime gemeinsam neu..."
 ./start.sh
 
-if [ -f "$ROOT/run/bot.pid" ] && kill -0 "$(cat "$ROOT/run/bot.pid" 2>/dev/null)" 2>/dev/null; then
+bot_running() {
+  if has_systemd && systemctl list-unit-files omnifm-bot.service 2>/dev/null | grep -q '^omnifm-bot.service'; then
+    systemctl is-active --quiet omnifm-bot
+    return $?
+  fi
+  [ -f "$ROOT/run/bot.pid" ] && kill -0 "$(cat "$ROOT/run/bot.pid" 2>/dev/null)" 2>/dev/null
+}
+
+if bot_running; then
   log "Discord-Bot läuft mit diesem Code-Stand. Prüfen: /help in Discord zeigt unten im Footer die Version."
 else
   log "ACHTUNG: Discord-Bot läuft NICHT (Commander-Token unter /admin → Discord & Bots eintragen, dann ./start.sh)."

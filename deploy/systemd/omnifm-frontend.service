@@ -1,0 +1,22 @@
+# OmniFM website (static React build served by `serve`). Rendered by start.sh,
+# see omnifm-backend.service for the placeholder rules.
+[Unit]
+Description=OmniFM website (static build on port __FRONTEND_PORT__)
+Documentation=https://github.com/Tabsi1998/OmniFM#readme
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__ROOT__/frontend
+Environment=PATH=__NODE_DIR__:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=__ROOT__/frontend/node_modules/.bin/serve -s build -l tcp://0.0.0.0:__FRONTEND_PORT__
+Restart=always
+RestartSec=5
+TimeoutStopSec=15
+StandardOutput=append:__ROOT__/logs/frontend.log
+StandardError=append:__ROOT__/logs/frontend.log
+
+[Install]
+WantedBy=multi-user.target

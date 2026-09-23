@@ -63,17 +63,7 @@ const OWNER_JOB_ACTIONS = [
     timeoutMs: 60_000,
     command: "bash",
     args: ["./update.sh", "--status", "quick"],
-    description: "Fuehrt den nicht-interaktiven update.sh Status-Check mit Runtime, Logs, MongoDB und Speicheruebersicht aus.",
-  },
-  {
-    id: "status-containers",
-    title: "Container Status",
-    area: "Operations",
-    risk: "low",
-    timeoutMs: 30_000,
-    command: "bash",
-    args: ["./update.sh", "--status", "containers"],
-    description: "Zeigt Runtime-Zusammenfassung und Docker-Compose Container-Status aus update.sh.",
+    description: "Zeigt Dienste (systemd oder PIDs), MongoDB, API-Health und Speicherplatz ueber update.sh --status quick.",
   },
   {
     id: "status-health",
@@ -83,17 +73,7 @@ const OWNER_JOB_ACTIONS = [
     timeoutMs: 30_000,
     command: "bash",
     args: ["./update.sh", "--status", "health"],
-    description: "Ruft den internen Admin-Health-Endpunkt ueber die bestehende update.sh Logik ab.",
-  },
-  {
-    id: "status-docker-logs",
-    title: "Docker Logs Tail",
-    area: "Logs",
-    risk: "low",
-    timeoutMs: 30_000,
-    command: "bash",
-    args: ["./update.sh", "--status", "docker-logs"],
-    description: "Zeigt die letzten Docker-Compose Runtime-Logs aus dem bestehenden Status-Menue.",
+    description: "Ruft /api/health des laufenden Backends ueber update.sh --status health ab.",
   },
   {
     id: "status-local-logs",
@@ -103,7 +83,7 @@ const OWNER_JOB_ACTIONS = [
     timeoutMs: 30_000,
     command: "bash",
     args: ["./update.sh", "--status", "local-logs"],
-    description: "Zeigt die letzten lokalen Bot- und Fehler-Logs aus dem bestehenden Status-Menue.",
+    description: "Zeigt die letzten 40 Zeilen von bot.log, error.log, bot-console.log, backend.log und frontend.log.",
   },
   {
     id: "status-mongo",
@@ -113,7 +93,7 @@ const OWNER_JOB_ACTIONS = [
     timeoutMs: 30_000,
     command: "bash",
     args: ["./update.sh", "--status", "mongo"],
-    description: "Prueft den MongoDB-Containerstatus und zeigt Basisdaten, wenn MongoDB laeuft.",
+    description: "Pingt MongoDB mit der MONGO_URL aus backend/.env und zeigt die Datenbanken mit ihrer Collection-Anzahl.",
   },
   {
     id: "status-storage",
@@ -123,7 +103,7 @@ const OWNER_JOB_ACTIONS = [
     timeoutMs: 30_000,
     command: "bash",
     args: ["./update.sh", "--status", "storage"],
-    description: "Zeigt Groessen von Logs, Backups und Docker-Belegung ueber die bestehende update.sh Funktion.",
+    description: "Zeigt Groessen von Logs, Update-Backups, node_modules und Frontend-Build sowie den freien Speicher.",
   },
   {
     id: "bot-config-show",
@@ -133,7 +113,7 @@ const OWNER_JOB_ACTIONS = [
     timeoutMs: 30_000,
     command: "bash",
     args: ["./update.sh", "--show-bots"],
-    description: "Zeigt die konfigurierten Commander-/Worker-Bots ueber die bestehende update.sh Bot-Ansicht, ohne Tokens auszugeben.",
+    description: "Zeigt die im Owner-Menue konfigurierten Commander-/Worker-Bots (DRY_RUN-Ausgabe, nur Token-Laengen).",
   },
   {
     id: "bot-roles-show",
@@ -143,7 +123,7 @@ const OWNER_JOB_ACTIONS = [
     timeoutMs: 30_000,
     command: "bash",
     args: ["./update.sh", "--show-roles"],
-    description: "Zeigt Commander- und Worker-Rollen aus update.sh read-only, damit Bot-Zuordnung im Owner-Portal pruefbar ist.",
+    description: "Zeigt Commander- und Worker-Zuordnung read-only, gleiche Ausgabe wie die Bot-Konfiguration.",
   },
   {
     id: "cleanup-dry-run",
@@ -153,7 +133,7 @@ const OWNER_JOB_ACTIONS = [
     timeoutMs: 60_000,
     command: "bash",
     args: ["./update.sh", "--cleanup", "dry-run"],
-    description: "Zeigt, welche Logs, Backups und Docker-Caches ein Cleanup betreffen wuerde, ohne etwas zu loeschen.",
+    description: "Zeigt, welche rotierten Logs ein Cleanup loeschen wuerde, ohne etwas zu loeschen. Backups werden nie automatisch geloescht.",
   },
   {
     id: "cleanup-run",

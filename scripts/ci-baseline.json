@@ -143,9 +143,7 @@
     "frontend/package-lock.json: fast-uri 3.1.5 GHSA-jqff-g426-hqxp"
   ],
   "shellcheck": [
-    "scripts/compose.sh: SC2005 (style)",
     "start.sh: SC1091 (info)",
-    "start.sh: SC2015 (info)",
     "stop.sh: SC2034 (warning)"
   ]
 }
