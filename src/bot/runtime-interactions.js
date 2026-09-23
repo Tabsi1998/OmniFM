@@ -736,7 +736,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
 
       const payload = await runtime.buildWorkersStatusPayload(interaction, {
         hint: t(
-          "Dieses Panel bleibt im Channel sichtbar und kann Ã¼ber die Buttons aktualisiert werden.",
+          "Dieses Panel bleibt im Channel sichtbar und kann über die Buttons aktualisiert werden.",
           "This panel stays visible in the channel and can be refreshed with the buttons."
         ),
       });
@@ -1100,7 +1100,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
             t,
             language,
             tone: "info",
-            title: t("ðŸ›‘ Dieser Bot streamt nicht", "ðŸ›‘ This bot is not streaming"),
+            title: t("🛑 Dieser Bot streamt nicht", "🛑 This bot is not streaming"),
             description: t(
               `**${worker.config?.name || `Bot ${requestedBot}`}** streamt aktuell nicht auf diesem Server.`,
               `**${worker.config?.name || `Bot ${requestedBot}`}** is not currently streaming on this server.`
@@ -1118,18 +1118,18 @@ export async function handleRuntimeInteraction(runtime, interaction) {
         }
         workers = [worker];
       }
-      // PrioritÃ¤t 2: all: true Parameter
+      // Priorität 2: all: true Parameter
       else if (stopAll) {
         workers = runtime.workerManager.getStreamingWorkers(guildId);
       }
-      // PrioritÃ¤t 3: User im Voice-Channel â†’ stoppe nur Worker in diesem Channel
+      // Priorität 3: User im Voice-Channel → stoppe nur Worker in diesem Channel
       else {
         const guild = interaction.guild || runtime.client.guilds.cache.get(guildId);
         const member = guild ? await guild.members.fetch(interaction.user.id).catch(() => null) : null;
         const userChannelId = String(member?.voice?.channelId || "").trim();
         
         if (userChannelId) {
-          // User ist in Channel â†’ stoppe nur Worker in diesem Channel
+          // User ist in Channel → stoppe nur Worker in diesem Channel
           const allStreamingWorkers = runtime.workerManager.getStreamingWorkers(guildId);
           const matchingWorkers = allStreamingWorkers.filter((worker) => {
             const info = worker.getGuildInfo(guildId);
@@ -1142,7 +1142,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
               t,
               language,
               tone: "info",
-              title: t("ðŸ›‘ Kein Worker in deinem Channel", "ðŸ›‘ No worker in your channel"),
+              title: t("🛑 Kein Worker in deinem Channel", "🛑 No worker in your channel"),
               description: t(
                 "In deinem Voice-Channel wurde kein aktiver OmniFM-Worker gefunden. Nutze `/stop bot:<botnummer>` oder `/stop all:true`, damit nichts Falsches gestoppt wird.",
                 "No active OmniFM worker was found in your voice channel. Use `/stop bot:<bot number>` or `/stop all:true` so the wrong stream is not stopped."
@@ -1159,7 +1159,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
             return;
           }
         } else {
-          // User nicht im Channel â†’ Error
+          // User nicht im Channel → Error
           await runtime.respondInteraction(interaction, buildNoticePayload({
             t,
             language,

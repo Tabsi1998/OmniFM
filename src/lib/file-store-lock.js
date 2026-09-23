@@ -43,7 +43,11 @@ function isLockStale(lockDir, staleMs) {
     const owner = parseLockOwner(readLockOwner(lockDir));
     return !isProcessAlive(owner.pid);
   } catch {
-    return true;
+    // The lock vanished or is being deleted right now (Windows reports EPERM
+    // for a directory with a pending delete). Neither makes it stale: removing
+    // it here could delete a lock another process has just created (#223).
+    // The caller simply tries mkdir again.
+    return false;
   }
 }
 
@@ -125,6 +129,29 @@ export function withFileStoreLock(filePath, fn, options = {}) {
       // best-effort cleanup; stale-lock handling covers process crashes
     }
   }
+}
+
+const TRANSIENT_READ_ERRORS = new Set(["EBUSY", "EPERM", "EACCES", "EMFILE"]);
+
+/**
+ * Reads a store file. A missing file returns null; a file that is briefly
+ * locked by another process, a virus scanner or the Windows indexer is read
+ * again instead. Treating such a moment as "file missing" made stores fall back
+ * to their older backup and write that back, losing every change since (#223).
+ */
+export function readStoreFileWithRetry(filePath, { attempts = 10, retryMs = 20 } = {}) {
+  let lastError = null;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return fs.readFileSync(filePath, "utf8");
+    } catch (err) {
+      if (err?.code === "ENOENT") return null;
+      lastError = err;
+      if (!TRANSIENT_READ_ERRORS.has(err?.code)) throw err;
+      sleepSync(retryMs * (attempt + 1));
+    }
+  }
+  throw lastError;
 }
 
 export function getFileStoreLockPath(filePath) {

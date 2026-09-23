@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { withFileStoreLock } from "./lib/file-store-lock.js";
+import { readStoreFileWithRetry, withFileStoreLock } from "./lib/file-store-lock.js";
 import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 
 const STORE_FILE = path.resolve(process.env.OMNIFM_DASHBOARD_FILE || resolveRuntimeDataPath("dashboard.json"));
@@ -157,7 +157,9 @@ function readStateFile(filePath) {
   try {
     if (!fs.existsSync(filePath)) return null;
     if (!fs.statSync(filePath).isFile()) return null;
-    const raw = fs.readFileSync(filePath, "utf8").trim();
+    const content = readStoreFileWithRetry(filePath);
+    if (content === null) return null;
+    const raw = content.trim();
     if (!raw) return emptyState();
     return normalizeState(JSON.parse(raw));
   } catch {

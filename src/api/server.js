@@ -2943,7 +2943,7 @@ async function normalizeDashboardEventInput(body, {
     if (!parsedStart?.ok) {
       return {
         ok: false,
-        message: parsedStart?.message || languagePick(language, "Startzeit ist ungÃ¼ltig.", "Start time is invalid."),
+        message: parsedStart?.message || languagePick(language, "Startzeit ist ungültig.", "Start time is invalid."),
       };
     }
 

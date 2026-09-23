@@ -1539,7 +1539,7 @@ export default function DashboardSubscription({ apiRequest, selectedGuildId, t, 
               <div style={{ marginTop: 6, color: '#A1A1AA', fontSize: 13, lineHeight: 1.6 }}>
                 {nextUpgradeLabel
                   ? t(
-                    `NÃ¤chster sinnvoller Schritt fÃ¼r diesen Server: ${nextUpgradeLabel}.`,
+                    `Nächster sinnvoller Schritt für diesen Server: ${nextUpgradeLabel}.`,
                     `Best next step for this server: ${nextUpgradeLabel}.`
                   )
                   : t(
