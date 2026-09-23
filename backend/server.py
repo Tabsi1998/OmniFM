@@ -1143,7 +1143,8 @@ def dashboard_event_runtime_id(guild_id):
     nodes = (live_doc or {}).get("nodes") or []
     candidates = [
         node for node in nodes
-        if any(str(detail.get("guildId") or detail.get("id") or "") == str(guild_id) for detail in node.get("guildDetails") or [])
+        if str(guild_id) in {str(item) for item in node.get("guildIds") or []}
+        or any(str(detail.get("guildId") or detail.get("id") or "") == str(guild_id) for detail in node.get("guildDetails") or [])
     ]
     commander = next((node for node in candidates if node.get("role") == "commander"), None)
     selected = commander or (candidates[0] if candidates else {})
@@ -1157,7 +1158,7 @@ def validate_dashboard_event(guild_id, event):
         raise ValueError("Sender ist erforderlich.")
     if not is_valid_server_id(event.get("voiceChannelId")):
         raise ValueError("Gültiger Voice-Kanal ist erforderlich.")
-    directory = _runtime_guild_directory().get(guild_id) or {}
+    directory = _runtime_guild_directory([guild_id], with_lists=True).get(guild_id) or {}
     known_voice_ids = {str(row.get("id") or "") for row in directory.get("voiceChannels") or []}
     if known_voice_ids and event.get("voiceChannelId") not in known_voice_ids:
         raise ValueError("Voice-Kanal gehört nicht zu diesem Server.")
@@ -1333,7 +1334,9 @@ def get_dashboard_session(request: Request):
 
 def resolve_dashboard_guilds_for_session(session_payload):
     guilds = session_payload.get("guilds") if isinstance(session_payload.get("guilds"), list) else []
-    runtime_guilds = _runtime_guild_directory()
+    runtime_guilds = _runtime_guild_directory(
+        [str(item.get("id") or "").strip() for item in guilds if isinstance(item, dict)]
+    )
     output = []
     for item in guilds:
         if not isinstance(item, dict):
@@ -3055,6 +3058,45 @@ async def discordbotlist_status(request: Request, limit: int = 20):
     return get_discordbotlist_status(vote_limit=max(0, min(200, int(limit))))
 
 
+def format_runtime_incident(doc):
+    """One row of the owner incident list for both schemas in runtime_incidents:
+    process incidents (at, source, message) and server incidents (guildId,
+    eventKey, timestamp, payload)."""
+    doc = doc or {}
+    message = doc.get("message") or doc.get("summary")
+    if not message and doc.get("eventKey"):
+        guild = doc.get("guildName") or doc.get("guildId") or ""
+        message = f"{guild}: {doc.get('eventKey')}" if guild else str(doc.get("eventKey"))
+    at = doc.get("at") or doc.get("timestamp")
+    if isinstance(at, datetime):
+        at = (at if at.tzinfo else at.replace(tzinfo=timezone.utc)).astimezone(timezone.utc).isoformat()
+    runtime = doc.get("runtime") if isinstance(doc.get("runtime"), dict) else {}
+    return {
+        "at": at,
+        "severity": str(doc.get("severity") or doc.get("level") or "info").lower(),
+        "source": doc.get("source") or runtime.get("name") or "runtime",
+        "message": clip_text(message or "Incident", 240),
+        "resolved": bool(doc.get("resolved")) or bool(doc.get("acknowledgedAt")),
+    }
+
+
+def read_runtime_logs(limit=500):
+    """Newest log lines of every bot process (capped collection runtime_logs)."""
+    if db is None:
+        return []
+    try:
+        rows = list(db.runtime_logs.find({}, {"_id": 0}).sort("$natural", -1).limit(max(1, int(limit))))
+    except Exception:
+        return []
+    return [{
+        "at": row.get("at"),
+        "level": row.get("level") or "INFO",
+        "source": row.get("source") or row.get("process") or "runtime",
+        "message": clip_text(row.get("message") or "", 240),
+        "process": row.get("process"),
+    } for row in rows]
+
+
 def read_runtime_health_fresh(max_age_sec=30):
     """Liest die echte Runtime-Telemetrie (vom Node-Bot) aus MongoDB, wenn frisch."""
     if db is None:
@@ -3523,7 +3565,7 @@ async def dashboard_channels(request: Request, serverId: str = ""):
     guild = resolve_session_guild_for_server(session, serverId)
     if not guild:
         return json_error(403, "Kein Zugriff auf diesen Server.")
-    runtime_guild = _runtime_guild_directory().get(guild.get("id")) or {}
+    runtime_guild = _runtime_guild_directory([guild.get("id")], with_lists=True).get(guild.get("id")) or {}
     return {
         "voiceChannels": runtime_guild.get("voiceChannels", []),
         "textChannels": runtime_guild.get("textChannels", []),
@@ -3541,7 +3583,7 @@ async def dashboard_roles(request: Request, serverId: str = ""):
     guild = resolve_session_guild_for_server(session, serverId)
     if not guild:
         return json_error(403, "Kein Zugriff auf diesen Server.")
-    runtime_guild = _runtime_guild_directory().get(guild.get("id")) or {}
+    runtime_guild = _runtime_guild_directory([guild.get("id")], with_lists=True).get(guild.get("id")) or {}
     return {"roles": runtime_guild.get("roles", [])}
 
 
@@ -4000,7 +4042,7 @@ async def dashboard_perms_put(request: Request, body: dict, serverId: str = ""):
     if db is None:
         return json_error(503, "MongoDB nicht verbunden.")
     guild_id = guild.get("id")
-    directory = _runtime_guild_directory().get(guild_id) or {}
+    directory = _runtime_guild_directory([guild_id], with_lists=True).get(guild_id) or {}
     known_role_ids = {str(role.get("id") or "") for role in directory.get("roles") or []}
     requested_role_ids = {
         role_id
@@ -4996,26 +5038,71 @@ async def admin_overview(request: Request):
     }
 
 
-def _runtime_guild_directory():
+def _read_guild_directory_entries(guild_ids, with_lists=False):
+    """Per-server entries the bot writes on change into runtime_guild_directory."""
+    if db is None or not guild_ids:
+        return {}
+    projection = None if with_lists else {"roles": 0, "voiceChannels": 0, "textChannels": 0}
+    try:
+        rows = db.runtime_guild_directory.find({"_id": {"$in": list(guild_ids)}}, projection)
+        return {str(row.get("_id")): row for row in rows}
+    except Exception:
+        return {}
+
+
+def _merge_guild_directory_fields(guild, source):
+    if not guild["name"] and source.get("name"):
+        guild["name"] = source.get("name")
+    guild["memberCount"] = max(parse_int(guild.get("memberCount"), 0), parse_int(source.get("memberCount"), 0))
+    if not guild["iconUrl"] and source.get("iconUrl"):
+        guild["iconUrl"] = source.get("iconUrl")
+    for field in ("roles", "voiceChannels", "textChannels"):
+        if not guild[field] and isinstance(source.get(field), list):
+            guild[field] = source.get(field)
+
+
+def _runtime_guild_directory(guild_ids=None, with_lists=False):
+    """Servers the running bots are in.
+
+    Membership comes from the fresh health document (guildIds per bot). Name,
+    member count and icon, and with with_lists also roles and channels, come
+    from runtime_guild_directory, which the bot writes only on change (#206).
+    An older bot still sends all of it inline in guildDetails; those values
+    are used first.
+    """
+    wanted = None if guild_ids is None else {str(item or "").strip() for item in guild_ids}
     guilds = {}
     live_doc = read_runtime_health_fresh()
     for node in (live_doc or {}).get("nodes", []):
-        for guild in node.get("guildDetails") or []:
-            guild_id = str(guild.get("id") or "").strip()
-            if not is_valid_server_id(guild_id):
+        bot_name = str(node.get("name") or node.get("index") or "Bot")
+        inline = {}
+        for detail in node.get("guildDetails") or []:
+            if isinstance(detail, dict):
+                inline[str(detail.get("guildId") or detail.get("id") or "").strip()] = detail
+        member_ids = [str(item or "").strip() for item in node.get("guildIds") or []] + list(inline.keys())
+        for guild_id in member_ids:
+            if not is_valid_server_id(guild_id) or (wanted is not None and guild_id not in wanted):
                 continue
-            existing = guilds.get(guild_id) or {}
-            guilds[guild_id] = {
+            guild = guilds.get(guild_id) or {
                 "id": guild_id,
-                "name": str(guild.get("name") or existing.get("name") or guild_id)[:120],
-                "memberCount": max(parse_int(guild.get("memberCount", existing.get("memberCount", 0)), 0), parse_int(existing.get("memberCount", 0), 0)),
-                "iconUrl": guild.get("iconUrl") or existing.get("iconUrl"),
-                "roles": guild.get("roles") or existing.get("roles") or [],
-                "voiceChannels": guild.get("voiceChannels") or existing.get("voiceChannels") or [],
-                "textChannels": guild.get("textChannels") or existing.get("textChannels") or [],
-                "bots": sorted(set((existing.get("bots") or []) + [str(node.get("name") or node.get("index") or "Bot")])),
+                "name": None,
+                "memberCount": 0,
+                "iconUrl": None,
+                "roles": [],
+                "voiceChannels": [],
+                "textChannels": [],
+                "bots": [],
                 "discordUrl": f"https://discord.com/channels/{guild_id}",
             }
+            _merge_guild_directory_fields(guild, inline.get(guild_id) or {})
+            if bot_name not in guild["bots"]:
+                guild["bots"].append(bot_name)
+            guilds[guild_id] = guild
+    entries = _read_guild_directory_entries(list(guilds.keys()), with_lists=with_lists)
+    for guild_id, guild in guilds.items():
+        _merge_guild_directory_fields(guild, entries.get(guild_id) or {})
+        guild["name"] = str(guild["name"] or guild_id)[:120]
+        guild["bots"] = sorted(set(guild["bots"]))
     return guilds
 
 
@@ -5698,13 +5785,7 @@ async def admin_monitoring(request: Request):
         if db is not None:
             try:
                 for doc in db.runtime_incidents.find({}, {"_id": 0}).sort("at", -1).limit(25):
-                    real_incidents.append({
-                        "at": doc.get("at") or doc.get("timestamp"),
-                        "severity": str(doc.get("severity") or doc.get("level") or "info").lower(),
-                        "source": doc.get("source") or "runtime",
-                        "message": clip_text(doc.get("message") or doc.get("summary") or "Incident", 240),
-                        "resolved": bool(doc.get("resolved")),
-                    })
+                    real_incidents.append(format_runtime_incident(doc))
             except Exception:
                 real_incidents = []
         healthy = sum(1 for n in live_nodes if n.get("status") == "online")
@@ -5723,7 +5804,7 @@ async def admin_monitoring(request: Request):
             },
             "nodes": live_nodes,
             "incidents": real_incidents,
-            "logs": (live_doc.get("logs") or [])[:500],
+            "logs": read_runtime_logs() or (live_doc.get("logs") or [])[:500],
         }
 
     # 2) Keine frischen Runtime-Daten und kein Demo-Modus -> ehrlich leer.

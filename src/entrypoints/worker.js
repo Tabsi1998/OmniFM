@@ -11,6 +11,7 @@ import {
   resolveWorkerConfig,
 } from "./shared.js";
 import { startWorkerAutohealMonitor } from "./worker-autoheal.js";
+import { startRuntimeLogShipper } from "../services/runtime-health-reporter.js";
 
 await initializeSharedServices({ requireMongo: true });
 await initCustomStationsStore();
@@ -49,6 +50,8 @@ const { shutdown } = installProcessHandlers({
 });
 
 await bridgeService.start();
+// The worker is where streams run; its log lines reach the owner console too (#206).
+startRuntimeLogShipper({ processLabel: `worker-${workerIndex}` });
 autohealMonitor = startWorkerAutohealMonitor({
   runtime,
   shutdown,

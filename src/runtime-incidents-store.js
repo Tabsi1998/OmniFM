@@ -166,8 +166,53 @@ function normalizeRuntimeIncident(rawIncident, guildId = "") {
       lastStreamErrorAt: normalizeIsoDate(payloadInput.lastStreamErrorAt),
       recoverableRestartError: normalizeBoolean(payloadInput.recoverableRestartError),
       attemptedCandidates: normalizeCandidateList(payloadInput.attemptedCandidates),
+      restoredStationKey: sanitizeText(payloadInput.restoredStationKey, 120),
+      restoredStationName: sanitizeText(payloadInput.restoredStationName, 120),
+      replacementStationKey: sanitizeText(payloadInput.replacementStationKey, 120),
+      replacementStationName: sanitizeText(payloadInput.replacementStationName, 120),
+      reason: sanitizeText(payloadInput.reason, 80),
+      detail: sanitizeText(payloadInput.detail, 240),
     },
   };
+}
+
+/**
+ * One German line for the owner console, e.g. "Server X: Alpha FM nicht
+ * erreichbar, Ersatzsender Beta FM". Stored with the incident so the owner
+ * monitoring (FastAPI) can list server incidents next to process incidents.
+ */
+export function describeRuntimeIncident(eventKey, payload = {}, guildLabel = "") {
+  const p = payload && typeof payload === "object" ? payload : {};
+  const previous = p.previousStationName || p.previousStationKey || "Sender";
+  const prefix = guildLabel ? `${guildLabel}: ` : "";
+  switch (String(eventKey || "").trim().toLowerCase()) {
+    case "stream_failover_activated":
+      return `${prefix}${previous} nicht erreichbar, Ersatzsender ${p.failoverStationName || p.failoverStationKey || "aktiv"}`;
+    case "stream_failover_exhausted":
+      return `${prefix}${previous} nicht erreichbar, auch kein Ersatzsender spielbar`;
+    case "stream_failback_completed":
+      return `${prefix}zurück auf ${p.restoredStationName || p.restoredStationKey || "den Wunschsender"} (vorher ${previous})`;
+    case "stream_failback_abandoned":
+      return `${prefix}Wunschsender ${previous} nicht mehr verfügbar, ${p.failoverStationName || p.failoverStationKey || "der Ersatzsender"} bleibt`;
+    case "stream_healthcheck_stalled":
+      return `${prefix}${previous} liefert kein Audio mehr, Neustart`;
+    case "stream_recovered":
+      return `${prefix}${p.recoveredStationName || p.recoveredStationKey || previous} läuft wieder`;
+    case "station_unavailable":
+      return p.stopped === true || !(p.replacementStationName || p.replacementStationKey)
+        ? `${prefix}${previous} nicht mehr im Plan, Wiedergabe beendet`
+        : `${prefix}${previous} nicht mehr im Plan, Ersatz ${p.replacementStationName || p.replacementStationKey}`;
+    case "voice_parked":
+      return `${prefix}Wiedergabeziel geparkt (${p.reason || "unbekannt"}), neuer Versuch alle 15 Minuten`;
+    case "voice_unparked":
+      return `${prefix}geparktes Wiedergabeziel wieder aktiv`;
+    case "voice_server_muted":
+      return `${prefix}Bot auf dem Server stummgeschaltet`;
+    case "voice_server_unmuted":
+      return `${prefix}Server-Stummschaltung aufgehoben`;
+    default:
+      return `${prefix}${String(eventKey || "Vorfall")}`;
+  }
 }
 
 function normalizeState(rawState) {
@@ -256,6 +301,12 @@ export async function recordRuntimeIncident(input) {
     await db.collection("runtime_incidents").insertOne({
       ...incident,
       timestamp: new Date(incident.timestamp),
+      // Fields of the owner monitoring schema, so server incidents show up
+      // there sorted and readable instead of as an unnamed "Incident" (#206).
+      at: incident.timestamp,
+      source: incident.runtime?.name || "runtime",
+      message: describeRuntimeIncident(incident.eventKey, input?.payload || {}, incident.guildName || guildId).slice(0, 240),
+      resolved: incident.severity === "success",
     });
     return incident;
   });

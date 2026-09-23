@@ -364,19 +364,27 @@ function queueLogWrite(lines, { includeErrorLog = false } = {}) {
 
 const _recentLogs = [];
 const _recentLogsMax = 500;
+let _recentLogSeq = 0;
 
 function pushRecentLog(ts, level, message) {
   let source = "runtime";
   let msg = String(message || "");
   const m = msg.match(/^\s*\[([^\]]+)\]\s*(.*)$/);
   if (m) { source = m[1]; msg = m[2]; }
-  _recentLogs.push({ at: ts, level, source, message: msg.slice(0, 240) });
+  _recentLogSeq += 1;
+  _recentLogs.push({ seq: _recentLogSeq, at: ts, level, source, message: msg.slice(0, 240) });
   if (_recentLogs.length > _recentLogsMax) _recentLogs.shift();
 }
 
 function getRecentLogs(limit = 40) {
   const n = Math.max(1, Math.min(_recentLogsMax, limit));
   return _recentLogs.slice(-n).reverse();
+}
+
+/** Lines logged after the given sequence number, oldest first. */
+function getRecentLogsSince(seq = 0) {
+  const after = Number(seq) || 0;
+  return _recentLogs.filter((entry) => entry.seq > after);
 }
 
 function log(level, message) {
@@ -512,6 +520,7 @@ export {
   shouldLogFfmpegStderrLine,
   getLogWriteQueue,
   getRecentLogs,
+  getRecentLogsSince,
   resetLogCooldownStateForTests,
   rootDir,
   webDir,
