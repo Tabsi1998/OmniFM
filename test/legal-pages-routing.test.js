@@ -26,6 +26,14 @@ const frontendBotIconPath = path.join(frontendBotIconDir, "bot-1.png");
 const couponsPath = path.join(repoRoot, "coupons.json");
 const couponsBackupPath = path.join(repoRoot, "coupons.json.bak");
 
+// The end-to-end routing test alone sends about 60 API requests from 127.0.0.1,
+// which is the default per-minute limit shared by every test in this file.
+// Whether it hit 429 depended only on how fast the run was (#223). The limiter
+// reads these values per request, and web-server-dashboard.test.js does the same.
+process.env.API_RATE_LIMIT_MAX = "1000";
+process.env.API_RATE_LIMIT_PREMIUM_MAX = "200";
+process.env.API_RATE_LIMIT_WEBHOOK_MAX = "1000";
+
 async function snapshotFile(filePath) {
   try {
     return {
@@ -412,8 +420,9 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.ok(adminOperations.operations.some((operation) => (
       operation.id === "status"
       && operation.webStatus === "available"
-      && operation.cli.includes("containers")
+      && operation.cli.includes("local-logs")
       && operation.cli.includes("storage")
+      && !operation.cli.includes("containers")
     )));
     assert.ok(adminOperations.operations.some((operation) => (
       operation.id === "bot-roles"
@@ -745,9 +754,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.ok(adminJobs.actions.some((action) => action.id === "rollback-plan"));
     assert.ok(adminJobs.actions.some((action) => action.id === "status-quick" && action.requiresConfirmation === false));
     for (const actionId of [
-      "status-containers",
       "status-health",
-      "status-docker-logs",
       "status-local-logs",
       "status-mongo",
       "status-storage",

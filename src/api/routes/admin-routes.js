@@ -478,7 +478,7 @@ export function createAdminRoutesHandler(deps) {
         id: "status",
         area: "Operations",
         title: "Status & Logs",
-        cli: "./update.sh --status quick|containers|health|docker-logs|local-logs|mongo|storage",
+        cli: "./update.sh --status quick|health|local-logs|mongo|storage",
         webStatus: "available",
         risk: "low",
         description: "Status, Health, Logs und Cockpit-Ansichten.",
