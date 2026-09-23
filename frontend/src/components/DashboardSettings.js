@@ -90,8 +90,8 @@ export default function DashboardSettings({
       if (!silent) setError(err.message);
       return null;
     } finally {
-      if (previewToken !== digestPreviewTokenRef.current) return;
-      setDigestPreviewLoading(false);
+      // No return in finally: it would replace the result of the try block.
+      if (previewToken === digestPreviewTokenRef.current) setDigestPreviewLoading(false);
     }
   }, [selectedGuildId, apiRequest, capabilities.weeklyDigest]);
 
@@ -151,8 +151,7 @@ export default function DashboardSettings({
       if (loadToken !== loadTokenRef.current) return;
       setError(err.message);
     } finally {
-      if (loadToken !== loadTokenRef.current) return;
-      setLoading(false);
+      if (loadToken === loadTokenRef.current) setLoading(false);
     }
   }, [selectedGuildId, apiRequest, capabilities.weeklyDigest, loadDigestPreview]);
 

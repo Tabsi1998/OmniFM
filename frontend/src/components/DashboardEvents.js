@@ -315,8 +315,7 @@ export default function DashboardEvents({
       setStations({ free: [], pro: [], ultimate: [], custom: [] });
       setServerEmojis([]);
     } finally {
-      if (loadToken !== loadTokenRef.current) return;
-      setLoadingDependencies(false);
+      if (loadToken === loadTokenRef.current) setLoadingDependencies(false);
     }
   }, [selectedGuildId, apiRequest, prefetchedDependencies]);
 

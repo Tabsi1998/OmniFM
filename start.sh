@@ -280,7 +280,8 @@ log "Baue Frontend..."
 ( cd "$ROOT/frontend" && npm run build )
 
 log "Installiere Bot-Abhängigkeiten reproduzierbar..."
-( cd "$ROOT" && npm ci --no-audit --no-fund --engine-strict=true --loglevel=error )
+# --omit=dev: the bot runs without ESLint and the other development tools.
+( cd "$ROOT" && npm ci --omit=dev --no-audit --no-fund --engine-strict=true --loglevel=error )
 
 log "Prüfe Backend- und Runtime-Syntax vor dem Umschalten..."
 "$VENV/bin/python" -m py_compile "$ROOT/backend/server.py"
