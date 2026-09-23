@@ -55,6 +55,41 @@ const EMPTY_DATA = Object.freeze({
 });
 
 function fmtInt(value) { return Number(value || 0).toLocaleString(); }
+
+const PARKED_REASON_LABELS = {
+  permissions: ['dem Bot fehlen Rechte im Voice-Kanal', 'the bot lacks permissions in the voice channel'],
+  circuit: ['zu viele Fehlversuche beim Verbinden', 'too many failed connection attempts'],
+  'voice-ready': ['die Voice-Verbindung kommt nicht zustande', 'the voice connection does not come up'],
+  'voice-confirmation': ['Discord bestätigt die Voice-Verbindung nicht', 'Discord does not confirm the voice connection'],
+};
+
+// One line under the station name that says what is going on (#216).
+function streamStateLine(stream, t) {
+  if (stream.parkedReason) {
+    const [de, en] = PARKED_REASON_LABELS[stream.parkedReason] || ['Verbindung scheitert wiederholt', 'connection keeps failing'];
+    return t(`Pausiert: ${de}. Neuer Versuch alle 15 Minuten.`, `Paused: ${en}. Next try every 15 minutes.`);
+  }
+  if (stream.serverMuted) {
+    return t('Der Bot ist auf dem Server stummgeschaltet.', 'The bot is server-muted.');
+  }
+  if (stream.failoverActive) {
+    const desired = stream.desiredStationName || stream.failoverFromStationName || stream.desiredStationKey;
+    const next = Number(stream.failbackNextProbeAt || 0);
+    const nextText = next > Date.now()
+      ? t(` · nächster Versuch ${new Date(next).toLocaleTimeString()}`, ` · next try ${new Date(next).toLocaleTimeString()}`)
+      : '';
+    return t(`Ersatz für ${desired}${nextText}`, `Backup for ${desired}${nextText}`);
+  }
+  return '';
+}
+
+function streamBadge(stream, t) {
+  if (stream.parkedReason) return { label: t('PAUSIERT', 'PAUSED'), tone: 'red' };
+  if (stream.serverMuted) return { label: t('STUMM', 'MUTED'), tone: 'amber' };
+  if (stream.failoverActive) return { label: t('ERSATZ', 'BACKUP'), tone: 'amber' };
+  if (stream.recovering) return { label: t('Recovery', 'Recovery'), tone: 'amber' };
+  return { label: 'LIVE', tone: 'orange' };
+}
 function fmtMinutes(value) {
   const minutes = Math.max(0, Number(value || 0));
   const hours = Math.floor(minutes / 60);
@@ -490,11 +525,12 @@ export default function GuildDashboard() {
                 {gdata.liveStreams.map((stream, index) => (
                   <div key={`${stream.botId || stream.botName}-${stream.channelId || index}`} style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) auto', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 10, border: '1px solid #20283b', background: '#0d111b' }}>
                     <div style={{ width: 36, height: 36, borderRadius: 9, background: stream.recovering ? 'rgba(245,158,11,.15)' : 'linear-gradient(135deg,rgba(255,107,0,.22),rgba(255,42,95,.18))', display: 'grid', placeItems: 'center' }}><Radio size={17} color={stream.recovering ? '#fbbf24' : '#ff7a2f'} /></div>
-                    <div style={{ minWidth: 0 }}><div style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stream.stationName}</div>{stream.failoverActive && <div style={{ fontSize: 10.5, color: '#fbbf24', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t('Backup für', 'Backup for')} {stream.desiredStationName || stream.failoverFromStationName || stream.desiredStationKey}</div>}<div className="oa-mono" style={{ fontSize: 10.5, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stream.botName} · {stream.channelName}</div></div>
-                    <div style={{ textAlign: 'right' }}><span className={`oa-pill ${stream.recovering || stream.failoverActive ? 'amber' : 'orange'}`} style={{ padding: '2px 7px' }}>{stream.failoverActive ? 'BACKUP' : stream.recovering ? t('Recovery', 'Recovery') : 'LIVE'}</span><div className="oa-mono" style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>{fmtInt(stream.listeners)} {t('Hörer', 'listeners')} · {fmtInt(stream.volume)}%</div></div>
+                    <div style={{ minWidth: 0 }}><div style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stream.stationName}</div>{streamStateLine(stream, t) && <div title={streamStateLine(stream, t)} style={{ fontSize: 10.5, color: stream.parkedReason ? '#f87171' : '#fbbf24', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{streamStateLine(stream, t)}</div>}<div className="oa-mono" style={{ fontSize: 10.5, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stream.botName} · {stream.channelName}</div></div>
+                    <div style={{ textAlign: 'right' }}><span className={`oa-pill ${streamBadge(stream, t).tone}`} style={{ padding: '2px 7px' }}>{streamBadge(stream, t).label}</span><div className="oa-mono" style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>{fmtInt(stream.listeners)} {t('Hörer', 'listeners')} · {fmtInt(stream.volume)}%</div></div>
                   </div>
                 ))}
               </div>
+              {gdata.liveStreams.some((stream) => stream.failoverActive) && <div className="oa-sub" style={{ marginTop: 10, fontSize: 11.5 }}>{t('Zurück zum Wunschsender: Button „Zurück zu …“ unter der Now-Playing-Nachricht in Discord.', 'Back to the preferred station: the "Back to …" button below the now-playing message in Discord.')}</div>}
               <button className="oa-btn ghost" style={{ width: '100%', marginTop: 14 }} onClick={() => setSection('stations')}><ListMusic size={15} /> {t('Senderkatalog', 'Station catalog')}</button>
             </div>
           </div>

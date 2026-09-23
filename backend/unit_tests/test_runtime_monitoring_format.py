@@ -130,3 +130,27 @@ def test_guild_directory_keeps_inline_lists_of_an_older_bot(monkeypatch):
     assert guild["roles"] == inline["roles"]
     assert guild["name"] == "Old Name"
     assert guild["memberCount"] == 5
+
+
+def test_affected_servers_list_parked_backup_and_muted_longest_first():
+    now = 1_800_000_000_000
+    nodes = [
+        {"name": "Worker 2", "guildDetails": [
+            {"guildId": "1", "name": "Playing fine", "playing": True},
+            {"guildId": "2", "name": "Backup", "failoverActive": True, "failoverStartedAt": now - 600_000,
+             "stationName": "Beta FM", "desiredStationName": "Alpha FM", "failoverReason": "503",
+             "failbackNextProbeAt": now + 60_000},
+            {"guildId": "3", "name": "Parked", "parkedReason": "permissions", "parkedAt": now - 3_600_000},
+        ]},
+        {"name": "Worker 3", "guildDetails": [
+            {"guildId": "4", "name": "Muted", "serverMuted": True, "serverMutedAt": now - 60_000, "playing": True},
+            {"guildId": "5", "name": "Recovering", "recovering": True},
+        ]},
+    ]
+    rows = server.build_affected_servers(nodes, now_ms=now)
+    assert [row["guildName"] for row in rows] == ["Parked", "Backup", "Muted", "Recovering"]
+    assert [row["state"] for row in rows] == ["parked", "failover", "muted", "recovering"]
+    assert rows[0]["durationSec"] == 3600 and rows[0]["detail"] == "permissions"
+    assert rows[1]["desiredStationName"] == "Alpha FM" and rows[1]["failbackNextProbeAt"] == now + 60_000
+    assert rows[1]["botName"] == "Worker 2" and rows[2]["botName"] == "Worker 3"
+    assert rows[3]["durationSec"] is None

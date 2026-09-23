@@ -802,6 +802,30 @@ export default function OwnerAdmin() {
                   })}
                 </div>
 
+                {(monitoring.affectedServers || []).length > 0 && (
+                  <div className="oa-card oa-fade" style={{ marginTop: 18 }} data-testid="mon-affected-servers">
+                    <div className="oa-stat-label" style={{ marginBottom: 10 }}>Betroffene Server ({monitoring.affectedServers.length})</div>
+                    <div className="oa-table-wrap">
+                      <table className="oa-table">
+                        <thead>
+                          <tr><th>Server</th><th>Bot</th><th>Zustand</th><th>Seit</th><th>Details</th></tr>
+                        </thead>
+                        <tbody>
+                          {monitoring.affectedServers.map((row) => (
+                            <tr key={`${row.guildId}-${row.botName}`}>
+                              <td>{row.guildName || row.guildId}</td>
+                              <td className="oa-mono">{row.botName}</td>
+                              <td><span className={`oa-pill ${row.state === 'parked' ? 'red' : 'amber'}`}>{{ parked: 'Pausiert', failover: 'Ersatzsender', muted: 'Stumm', recovering: 'Recovery' }[row.state] || row.state}</span></td>
+                              <td className="oa-mono">{row.durationSec != null ? fmtUptime(row.durationSec) : '—'}</td>
+                              <td style={{ fontSize: 12, color: '#94a3b8' }}>{row.state === 'failover' ? `${row.stationName} statt ${row.desiredStationName}` : (row.detail || '—')}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
                 <div className="oa-grid cols-2" style={{ marginTop: 18 }}>
                   <div className="oa-card oa-fade" data-testid="mon-incidents-list">
                     <div className="oa-stat-label" style={{ marginBottom: 6 }}>Incidents</div>

@@ -114,6 +114,24 @@ class TestMonitoringShape:
         assert ats == sorted(ats, reverse=True), "logs not newest-first"
 
 
+class TestAffectedServers:
+    def test_parked_and_backup_servers_are_listed(self, admin, live_runtime, contract_db):
+        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        contract_db.runtime_health.update_one({"_id": "latest"}, {"$set": {"nodes.1.guildDetails": [
+            {"guildId": "123456789012345671", "name": "CI Guild", "failoverActive": True,
+             "failoverStartedAt": now_ms - 120_000, "stationName": "Beta FM", "desiredStationName": "Alpha FM"},
+            {"guildId": "123456789012345672", "name": "CI Parked", "parkedReason": "permissions",
+             "parkedAt": now_ms - 900_000},
+        ]}})
+        rows = admin.get(f"{BASE_URL}/api/admin/monitoring").json()["affectedServers"]
+        assert [row["state"] for row in rows] == ["parked", "failover"]
+        assert rows[1]["desiredStationName"] == "Alpha FM"
+        assert rows[0]["botName"] == "CI Worker 2"
+
+    def test_waiting_state_has_no_affected_servers(self, admin, no_runtime):
+        assert admin.get(f"{BASE_URL}/api/admin/monitoring").json()["affectedServers"] == []
+
+
 # --- module: the monitoring follows what the bot writes ---
 class TestMonitoringLive:
     def test_values_follow_the_bot_writes(self, admin, live_runtime, contract_db):

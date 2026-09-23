@@ -51,7 +51,7 @@ test("runtime discord incident alerts deliver selected events to the configured 
   assert.equal(result.channelId, "523456789012345678");
   assert.equal(result.responseId, "message-1");
   assert.equal(sendCalls, 1);
-  assert.match(String(sentPayload?.embeds?.[0]?.data?.title || ""), /Failover exhausted/i);
+  assert.match(String(sentPayload?.embeds?.[0]?.data?.title || ""), /No station reachable/i);
   assert.match(String(sentPayload?.embeds?.[0]?.data?.description || ""), /Nightwave FM/i);
   assert.equal(
     sentPayload?.embeds?.[0]?.data?.fields?.some((field) => /error|reconnect|failover chain/i.test(String(field?.name || ""))) || false,
@@ -104,4 +104,19 @@ test("runtime discord incident alerts respect capability gating before loading c
 
   assert.equal(result.skipped, "capability");
   assert.equal(loadCalls, 0);
+});
+
+test("incident alerts explain a backup station in plain German", async () => {
+  const { buildRuntimeIncidentAlertMessage } = await import("../src/lib/runtime-discord-alerts.js");
+  const message = buildRuntimeIncidentAlertMessage({
+    language: "de",
+    guildName: "Guild One",
+    eventKey: "stream_failover_activated",
+    payload: { previousStationName: "Alpha FM", failoverStationName: "Beta FM", listenerCount: 3 },
+  });
+  const embed = message.embeds[0].data;
+  assert.equal(embed.title, "Ersatzsender läuft");
+  assert.match(embed.description, /Alpha FM ist gerade nicht erreichbar\. OmniFM spielt vorübergehend Beta FM/);
+  assert.doesNotMatch(`${embed.title} ${embed.description}`, /failover|verfuegbar|ausgeschoepft/i);
+  assert.deepEqual(embed.fields.map((field) => field.name), ["Betroffener Sender", "Ersatzsender", "Hörer"]);
 });

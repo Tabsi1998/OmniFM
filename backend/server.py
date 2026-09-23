@@ -2627,20 +2627,26 @@ def get_dashboard_guild_stats(server_id, tier):
     telemetry = normalize_dashboard_telemetry(telemetry_raw)
 
     live_rows = []
+    parked_rows = []
     live_doc = read_runtime_health_fresh()
     for node in (live_doc or {}).get("nodes", []):
         for detail in node.get("guildDetails") or []:
             detail_id = str(detail.get("guildId") or detail.get("id") or "").strip()
             if detail_id != server_id:
                 continue
+            row = {
+                **detail,
+                "botId": str(node.get("botId") or ""),
+                "botIndex": parse_int(node.get("index"), 0),
+                "botName": clip_text(node.get("name") or "OmniFM", 80),
+                "botRole": str(node.get("role") or "worker"),
+            }
             if detail.get("playing") is True or detail.get("voiceConnected") is True:
-                live_rows.append({
-                    **detail,
-                    "botId": str(node.get("botId") or ""),
-                    "botIndex": parse_int(node.get("index"), 0),
-                    "botName": clip_text(node.get("name") or "OmniFM", 80),
-                    "botRole": str(node.get("role") or "worker"),
-                })
+                live_rows.append(row)
+            elif detail.get("parkedReason"):
+                # A parked target plays nothing, but the server admin must see
+                # it and why (#216).
+                parked_rows.append(row)
 
     live_listeners = sum(max(0, parse_int(row.get("listenerCount"), 0)) for row in live_rows)
     live_top = None
@@ -2652,7 +2658,7 @@ def get_dashboard_guild_stats(server_id, tier):
         }
 
     live_stream_details = []
-    for row in sorted(live_rows, key=lambda item: (parse_int(item.get("botIndex"), 999), str(item.get("botName") or ""))):
+    for row in sorted(live_rows + parked_rows, key=lambda item: (parse_int(item.get("botIndex"), 999), str(item.get("botName") or ""))):
         live_stream_details.append({
             "botId": str(row.get("botId") or ""),
             "botIndex": parse_int(row.get("botIndex"), 0),
@@ -2677,6 +2683,10 @@ def get_dashboard_guild_stats(server_id, tier):
             "lastStreamStartAt": row.get("lastStreamStartAt"),
             "reconnectAttempts": max(0, parse_int(row.get("reconnectAttempts"), 0)),
             "streamErrorCount": max(0, parse_int(row.get("streamErrorCount"), 0)),
+            "failbackNextProbeAt": max(0, parse_int(row.get("failbackNextProbeAt"), 0)),
+            "parkedReason": clip_text(row.get("parkedReason") or "", 40) or None,
+            "parkedAt": max(0, parse_int(row.get("parkedAt"), 0)),
+            "serverMuted": row.get("serverMuted") is True,
         })
 
     process_uptime_sec = max(0, parse_int(((live_doc or {}).get("process") or {}).get("uptimeSec"), 0))
@@ -3078,6 +3088,42 @@ def format_runtime_incident(doc):
         "message": clip_text(message or "Incident", 240),
         "resolved": bool(doc.get("resolved")) or bool(doc.get("acknowledgedAt")),
     }
+
+
+def build_affected_servers(nodes, now_ms=None):
+    """Servers the owner should look at: parked target, backup station, muted
+    bot or a running recovery, the longest-lasting first (#216)."""
+    now_ms = int(now_ms if now_ms is not None else time.time() * 1000)
+    rows = []
+    for node in nodes or []:
+        for detail in node.get("guildDetails") or []:
+            if not isinstance(detail, dict):
+                continue
+            if detail.get("parkedReason"):
+                state, since = "parked", detail.get("parkedAt")
+            elif detail.get("failoverActive") is True:
+                state, since = "failover", detail.get("failoverStartedAt")
+            elif detail.get("serverMuted") is True:
+                state, since = "muted", detail.get("serverMutedAt")
+            elif detail.get("recovering") is True:
+                state, since = "recovering", 0
+            else:
+                continue
+            since_ms = max(0, parse_int(since, 0))
+            rows.append({
+                "guildId": str(detail.get("guildId") or detail.get("id") or ""),
+                "guildName": clip_text(detail.get("name") or detail.get("guildName") or detail.get("guildId") or "", 120),
+                "botName": clip_text(node.get("name") or "OmniFM", 80),
+                "state": state,
+                "sinceMs": since_ms,
+                "durationSec": max(0, (now_ms - since_ms) // 1000) if since_ms else None,
+                "stationName": clip_text(detail.get("stationName") or detail.get("stationKey") or "", 120),
+                "desiredStationName": clip_text(detail.get("desiredStationName") or detail.get("desiredStationKey") or "", 120),
+                "detail": clip_text(detail.get("parkedReason") or detail.get("failoverReason") or "", 200),
+                "failbackNextProbeAt": max(0, parse_int(detail.get("failbackNextProbeAt"), 0)),
+            })
+    rows.sort(key=lambda row: row["sinceMs"] or now_ms)
+    return rows
 
 
 def read_runtime_logs(limit=500):
@@ -5803,6 +5849,7 @@ async def admin_monitoring(request: Request):
                 "openIncidents": sum(1 for i in real_incidents if not i.get("resolved")),
             },
             "nodes": live_nodes,
+            "affectedServers": build_affected_servers(live_doc.get("nodes") or []),
             "incidents": real_incidents,
             "logs": read_runtime_logs() or (live_doc.get("logs") or [])[:500],
         }
@@ -5817,6 +5864,7 @@ async def admin_monitoring(request: Request):
             "process": None,
             "health": {"healthyNodes": 0, "totalNodes": 0, "uptimeSec": 0, "apiLatencyMs": None, "mongo": mongo_is_reachable(), "openIncidents": 0},
             "nodes": [],
+            "affectedServers": [],
             "incidents": [],
             "logs": [],
             "message": "Warte auf Live-Daten vom OmniFM-Bot. Sobald der Node-Bot laeuft (echte Tokens im Owner-Menue) und Metriken meldet, erscheinen hier CPU/RAM/Ping, Voice, Guilds, Incidents und Live-Log in Echtzeit.",
