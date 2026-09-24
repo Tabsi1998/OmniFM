@@ -107,6 +107,7 @@ import { permissionMethods } from "./runtime-methods/permissions.js";
 import { statusMethods } from "./runtime-methods/status.js";
 import { voiceMethods } from "./runtime-methods/voice.js";
 import { onboardingMethods } from "./runtime-methods/onboarding.js";
+import { recordPlaybackPhase } from "./playback-phase.js";
 
 class BotRuntime {
   constructor(config, { role = "worker", workerManager = null } = {}) {
@@ -356,6 +357,11 @@ class BotRuntime {
         voiceGuardLastExpectedChannelId: null,
         voiceGuardLastActualChannelId: null,
       };
+
+      // Every player status change is a candidate for a new playback phase (#210).
+      player.on("stateChange", () => {
+        recordPlaybackPhase(this, guildId, state, "player");
+      });
 
       player.on(AudioPlayerStatus.Idle, (oldState) => {
         if (this.shuttingDown) return;
@@ -1220,6 +1226,7 @@ class BotRuntime {
       this.clearRestoreRetry(guildId);
       state.shouldReconnect = false;
       this.resetVoiceSession(guildId, state, { preservePlaybackTarget: false, clearLastChannel: true });
+      recordPlaybackPhase(this, guildId, state, "stop");
 
       return { ok: true };
     });

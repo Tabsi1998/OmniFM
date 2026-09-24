@@ -17,6 +17,8 @@
 //   recovering  a restart or reconnect is scheduled or running
 //   parked      the target is paused after repeated failures, retried slowly
 
+import { log } from "../lib/logging.js";
+
 const PLAYBACK_PHASES = Object.freeze(["idle", "connecting", "starting", "playing", "paused", "recovering", "parked"]);
 
 const EXPECTED_TRANSITIONS = Object.freeze({
@@ -83,6 +85,22 @@ function notePlaybackPhase(state, reason = "", now = Date.now()) {
   return transition;
 }
 
+/**
+ * notePlaybackPhase for the runtime: a transition outside the table is logged
+ * as a warning with the server, so it shows up in the owner console logs.
+ */
+function recordPlaybackPhase(runtime, guildId, state, reason = "") {
+  const transition = notePlaybackPhase(state, reason);
+  if (transition?.unexpected) {
+    log(
+      "WARN",
+      `[${runtime?.config?.name || "OmniFM"}] Unerwarteter Wiedergabe-Übergang guild=${guildId || "-"}: ` +
+      `${transition.from} -> ${transition.to} (${transition.reason || "-"})`
+    );
+  }
+  return transition;
+}
+
 /** One line per recent transition, newest last, for /diag. */
 function describePlaybackPhaseHistory(state, { limit = 5, t = (de) => de } = {}) {
   const history = Array.isArray(state?.playbackPhaseHistory) ? state.playbackPhaseHistory.slice(-limit) : [];
@@ -100,4 +118,5 @@ export {
   describePlaybackPhaseHistory,
   isExpectedTransition,
   notePlaybackPhase,
+  recordPlaybackPhase,
 };

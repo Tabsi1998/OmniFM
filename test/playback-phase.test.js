@@ -74,3 +74,40 @@ test("an unexpected transition is flagged and the history stays short", () => {
   assert.equal(lines.length, 2);
   assert.match(lines[1], /^paused → playing \(toggle-29\) <t:2:R>$/);
 });
+
+test("the runtime records a phase when it plans a stream restart", async () => {
+  const { scheduleRuntimeStreamRestart } = await import("../src/bot/runtime-streams.js");
+  const state = {
+    shouldReconnect: true,
+    currentStationKey: "alpha",
+    connection: {},
+    player: { state: { status: "playing" } },
+    playbackPhase: "playing",
+  };
+  const runtime = {
+    config: { name: "OmniFM Phase" },
+    client: { guilds: { cache: new Map() } },
+    restartCurrentStation: async () => {},
+  };
+  scheduleRuntimeStreamRestart(runtime, "guild-1", state, 60_000, "provider-eof");
+  clearTimeout(state.streamRestartTimer);
+  assert.equal(state.playbackPhase, "recovering");
+  const last = state.playbackPhaseHistory.at(-1);
+  assert.equal(last.reason, "restart:provider-eof");
+  assert.equal(last.unexpected, false);
+});
+
+test("parking records the parked phase", async () => {
+  const { parkRuntimeReconnectTarget } = await import("../src/bot/runtime-recovery.js");
+  const state = { shouldReconnect: true, currentStationKey: "alpha", lastChannelId: "voice-1", playbackPhase: "recovering" };
+  const runtime = {
+    config: { id: "bot-phase", name: "OmniFM Phase" },
+    client: { guilds: { cache: new Map() } },
+    persistState() {},
+    scheduleReconnect() {},
+    getState: () => state,
+  };
+  parkRuntimeReconnectTarget(runtime, "guild-1", state, "permissions", "missing connect", { schedule: false });
+  assert.equal(state.playbackPhase, "parked");
+  assert.equal(state.playbackPhaseHistory.at(-1).reason, "parked:permissions");
+});

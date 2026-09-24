@@ -9,6 +9,7 @@ import { log } from "../lib/logging.js";
 import { clipText, waitMs } from "../lib/helpers.js";
 import { BRAND } from "../config/plans.js";
 import { recordConnectionEvent } from "../listening-stats-store.js";
+import { recordPlaybackPhase } from "./playback-phase.js";
 
 function clearRestoreBlockState(state) {
   if (!state || (
@@ -128,6 +129,7 @@ export async function ensureRuntimeVoiceConnectionForChannel(runtime, guildId, c
   }
 
   state.voiceConnectInFlight = true;
+  recordPlaybackPhase(runtime, guildId, state, "voice-connect");
   try {
   const { guild, channel } = await runtime.resolveGuildVoiceChannel(guildId, channelId);
   if (!guild) throw new Error("Guild nicht gefunden.");
@@ -272,5 +274,6 @@ export async function ensureRuntimeVoiceConnectionForChannel(runtime, guildId, c
   return { connection, guild, channel };
   } finally {
     state.voiceConnectInFlight = false;
+    recordPlaybackPhase(runtime, guildId, state, "voice-connect-done");
   }
 }

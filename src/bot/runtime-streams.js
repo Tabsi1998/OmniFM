@@ -33,6 +33,7 @@ import {
   clearRuntimeFailbackTimer,
   handleRuntimeStationUnavailable,
 } from "./runtime-failback.js";
+import { recordPlaybackPhase } from "./playback-phase.js";
 // Moved to runtime-failback.js (#210); re-exported for existing importers.
 export {
   shouldHandleRuntimeIdleEvent,
@@ -630,6 +631,7 @@ export function scheduleRuntimeStreamRestart(runtime, guildId, state, delayMs, r
       log("ERROR", `[${runtime.config.name}] Stream restart failed (${reason}): ${err?.message || err}`);
     });
   }, delay);
+  recordPlaybackPhase(runtime, guildId, state, `restart:${String(reason || "restart")}`);
 }
 
 export async function handleRuntimeStreamEnd(runtime, guildId, state, reason) {
@@ -1186,5 +1188,6 @@ export async function restartRuntimeCurrentStation(runtime, state, guildId) {
     return await restartRuntimeCurrentStationAttempt(runtime, state, guildId);
   } finally {
     state.streamRestartInFlight = false;
+    recordPlaybackPhase(runtime, guildId, state, "restart-done");
   }
 }
