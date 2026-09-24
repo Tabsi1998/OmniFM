@@ -326,6 +326,14 @@
     "root: caniuse-lite (CC-BY-4.0)"
   ],
   "line-endings": [],
+  "live-smoke": [
+    "legacy asset /app.js",
+    "legacy asset /styles.css",
+    "security api legal",
+    "security home",
+    "security robots",
+    "seo favicon.ico"
+  ],
   "npm-audit": [
     "frontend: fast-uri (high)"
   ],
@@ -334,6 +342,16 @@
     "frontend/package-lock.json: fast-uri 3.1.5 GHSA-f65p-4m7j-42xc",
     "frontend/package-lock.json: fast-uri 3.1.5 GHSA-fph4-wmhf-6fwf",
     "frontend/package-lock.json: fast-uri 3.1.5 GHSA-jqff-g426-hqxp"
+  ],
+  "semgrep": [
+    "backend/routers/admin_stations.py: ssrf-requests: lambda: requests.get(url, stream=True, timeout=6, headers={\"Range\": \"bytes=0-2047\", \"User-Agent\": \"OmniFM-StreamTest/1.0\", \"Icy-MetaData\": \"",
+    "backend/routers/dashboard.py: ssrf-requests: resp = requests.get( f\"https://discord.com/api/v10/guilds/{guild.get('id')}/emojis\", headers={\"Authorization\": f\"Bot {bot_token}\"}, timeout=",
+    "backend/server.py: wildcard-cors: allow_origins=[\"*\"] if CORS_HAS_WILDCARD else ALLOWED_ORIGINS,",
+    "backend/services/dashboard_auth.py: directly-returned-format-string: return f\"{parsed_origin.scheme}://{parsed_origin.netloc}\"",
+    "frontend/src/components/DashboardEvents.js: react-dangerouslysetinnerhtml: <div dangerouslySetInnerHTML={{ __html: renderDiscordMarkdown(announcementPreview, { serverEmojis }) }} />",
+    "frontend/src/components/DashboardEvents.js: react-dangerouslysetinnerhtml: <div dangerouslySetInnerHTML={{ __html: renderDiscordMarkdown(descriptionPreview, { serverEmojis }) }} />",
+    "frontend/src/components/RichMessageEditor.js: react-dangerouslysetinnerhtml: <div dangerouslySetInnerHTML={{ __html: renderDiscordMarkdown(resolvedPreviewText, { serverEmojis: resolvedServerEmojis }) }} />",
+    "src/lib/api-helpers.js: cors-misconfiguration: res.setHeader(\"Access-Control-Allow-Origin\", normalizedOrigin);"
   ],
   "shellcheck": [
     "start.sh: SC1091 (info)",

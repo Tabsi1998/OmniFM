@@ -40,6 +40,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 import urllib.error
@@ -118,6 +119,8 @@ MONGO_IMAGE = "mongo:7.0.39-jammy"
 # updates itself between two runs would change the findings on its own.
 OSV_IMAGE = "ghcr.io/google/osv-scanner@sha256:afd838850ac1a0fcc15ff4a041dc9ba11123c3f0d2666217a5f0fcf9222b55fa"
 SHELLCHECK_IMAGE = "koalaman/shellcheck@sha256:bb596a0d169b85ddd81d8b6d3a2ff6d5baf5fca10b97f575ebc647c3dff62b3d"
+# Semgrep 1.177.0 (the open-source engine), pinned by digest like the others.
+SEMGREP_IMAGE = "semgrep/semgrep@sha256:acaac22ffc7b7cc5926de0751b223bce0b2491c33d18422fa72f632c78d81198"
 
 # Git's well-known id of the empty tree. A diff against it covers every line.
 EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
@@ -1465,6 +1468,84 @@ def licence_inventory(context: Context) -> str:
     return ratchet(context, "licences", found, "dependencies outside the allowed licences")
 
 
+# The rule sets of the Semgrep registry that fit OmniFM's code, and the folders
+# they read. The registry needs no account; its rules can gain new checks over
+# time, which then show up as new findings like any other.
+SEMGREP_RULESETS = ("p/javascript", "p/nodejs", "p/python", "p/react", "p/secrets")
+SEMGREP_TARGETS = ("src", "backend", "scripts", "frontend/src")
+LIVE_URL = "https://omnifm.xyz"
+
+
+def semgrep_scan(context: Context) -> str:
+    """Static security analysis of the code, in place of CodeQL (#257).
+
+    CodeQL never ran for this private repository: code scanning is not
+    available, so the workflow skips itself, and the CodeQL licence does not
+    cover private code on a local machine. Semgrep's open-source engine does.
+    The files go into the container as one archive; reading them through a
+    Windows bind mount takes minutes, the archive seconds.
+    """
+    binary = docker(context)
+    files = tracked(context, *SEMGREP_TARGETS, new=True)
+    STATE.mkdir(parents=True, exist_ok=True)
+    archive = STATE / "semgrep-source.tar"
+    with tarfile.open(archive, "w") as bundle:
+        for name in files:
+            bundle.add(ROOT / name, arcname=name)
+    rules = " ".join(f"--config {ruleset}" for ruleset in SEMGREP_RULESETS)
+    script = ("mkdir -p /tmp/source && tar -xf /in/source.tar -C /tmp/source && cd /tmp/source && "
+              f"semgrep scan --metrics=off {rules} --json --quiet {' '.join(SEMGREP_TARGETS)}")
+    completed = context.run(binary, "run", "--rm", "--mount",
+                            f"type=bind,source={archive},target=/in/source.tar,readonly",
+                            SEMGREP_IMAGE, "sh", "-c", script, check=False, timeout=1800)
+    archive.unlink(missing_ok=True)
+    context.log("semgrep", completed.stdout + completed.stderr)
+    try:
+        report = json.loads(completed.stdout or "{}")
+    except ValueError as error:
+        raise StepFailed("Semgrep produced no JSON report:\n" + tail(completed)) from error
+    if completed.returncode not in (0, 1) or "results" not in report:
+        raise StepFailed("Semgrep could not scan the code:\n" + tail(completed))
+    found = set()
+    for result in report["results"]:
+        path = result["path"]
+        try:
+            lines = (ROOT / path).read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            lines = []
+        # The code of the finding, not its line number, identifies it: moving
+        # code around does not turn a known finding into a new one.
+        snippet = " ".join(" ".join(lines[result["start"]["line"] - 1:result["end"]["line"]]).split())
+        found.add(f"{path}: {result['check_id'].rsplit('.', 1)[-1]}: {snippet[:140]}")
+    return ratchet(context, "semgrep", found, "Semgrep findings")
+
+
+def live_smoke(context: Context) -> str:
+    """The live smoke check of omnifm.xyz, which GitHub was meant to run (#257).
+
+    It only sends GET requests. With OMNIFM_LIVE_ADMIN_TOKEN in the environment
+    it checks the owner API too; the token is passed on explicitly because the
+    checks otherwise never see secrets.
+    """
+    node = node_of(context, NODE_MAJOR)
+    arguments = [node, ROOT / "scripts" / "phase6-live-check.mjs", "--base-url", LIVE_URL, "--skip-logs"]
+    token = (os.environ.get("OMNIFM_LIVE_ADMIN_TOKEN") or "").strip()
+    if not token:
+        arguments.append("--skip-api")
+    completed = context.run(*arguments, env={"OMNIFM_LIVE_ADMIN_TOKEN": token} if token else None,
+                            check=False, timeout=600)
+    text = completed.stdout + completed.stderr
+    context.log("live-smoke", text)
+    failed = set()
+    for line in text.splitlines():
+        if line.startswith("[FAIL] ") and "live acceptance failed" not in line:
+            failed.add(line[len("[FAIL] "):].split(":", 1)[0].strip())
+    if completed.returncode != 0 and not failed:
+        raise StepFailed("the live smoke check did not run:\n" + tail(completed))
+    note = ratchet(context, "live-smoke", failed, f"failing live checks on {LIVE_URL}")
+    return note if token else note + " (public checks only; set OMNIFM_LIVE_ADMIN_TOKEN for the owner API)"
+
+
 def extra_steps() -> list:
     return [
         Step("extra", "npm-audit", "High and critical advisories in both trees", npm_audit),
@@ -1473,6 +1554,8 @@ def extra_steps() -> list:
              ("node/npm-ci", "frontend/npm-ci")),
         Step("extra", "osv", "Known vulnerabilities in the lockfiles", osv_scan),
         Step("extra", "shellcheck", "ShellCheck over the deployment scripts", shellcheck),
+        Step("extra", "semgrep", "Semgrep security analysis, in place of CodeQL", semgrep_scan),
+        Step("extra", "live-smoke", "The live smoke check of omnifm.xyz", live_smoke),
     ]
 
 
