@@ -24,7 +24,7 @@
     "release:rollback-plan": "node scripts/release-gate.mjs --rollback-plan",
     "seo:search-console": "node scripts/check-search-console-readiness.mjs",
     "test": "npm run test:repo-hygiene && npm run test:split-syntax && npm run test:syntax && npm run test:voice-codec && npm run test:unit",
-    "test:repo-hygiene": "node scripts/check-repo-hygiene.mjs && node scripts/check-search-console-readiness.mjs",
+    "test:repo-hygiene": "node scripts/check-repo-hygiene.mjs && node scripts/check-search-console-readiness.mjs && node scripts/check-api-routes.mjs",
     "test:split-syntax": "node --check src/entrypoints/from-owner-config.mjs && node --check src/entrypoints/split-supervisor.js",
     "test:syntax": "node scripts/check-syntax.mjs",
     "lint": "node scripts/check-lint.mjs",

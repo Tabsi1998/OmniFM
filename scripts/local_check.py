@@ -76,6 +76,8 @@ BACKEND_PYTHON = "3.12"
 MONGO_PORT = 27019
 MONGO_CONTAINER = "omnifm-local-check-mongo"
 API_PORT = 18001
+NODE_API_PORT = 18002
+PROXY_API_PORT = 18003
 API_TOKEN = "ci-owner-token"
 MASK = "•" * 8
 
@@ -1232,6 +1234,80 @@ def check_owner_contract(in_mongo, run_mongo) -> None:
            f"the OAuth login does not redirect to Discord: {location!r}")
 
 
+def node_dashboard_proxy(context: Context) -> str:
+    """#195: FastAPI forwards /api/auth and /api/dashboard to the Node API.
+
+    Production runs it that way (OMNIFM_DASHBOARD_BACKEND=node). This starts the
+    Node API alone (scripts/serve-node-api.mjs) and a second FastAPI in that
+    mode, then checks what the dashboard relies on: routes FastAPI never had
+    answer, the Node API's CSRF guard and origin check still hold, the owner
+    console stays in FastAPI, and a stopped Node API gives a clear 503.
+    """
+    env = context.cache.get("fastapi:env")
+    if not env:
+        raise StepSkipped("the FastAPI environment of backend/contract is missing")
+    for port in (NODE_API_PORT, PROXY_API_PORT):
+        if port_open(port):
+            raise StepSkipped(f"port {port} is taken; stop what uses it and run again")
+    node = node_of(context, NODE_MAJOR)
+    scratch = Path(tempfile.mkdtemp(prefix="omnifm-node-api-"))
+    proxy_base = f"http://127.0.0.1:{PROXY_API_PORT}"
+    node_env = dict(node_path_env(context, node), **{
+        "MONGO_URL": env["MONGO_URL"], "DB_NAME": env["DB_NAME"],
+        "WEB_SERVER_ENABLED": "1", "WEB_BIND": "127.0.0.1", "WEB_INTERNAL_PORT": str(NODE_API_PORT),
+        "TRUST_PROXY_HEADERS": "1", "TRUSTED_PROXY_IPS": "127.0.0.1,::1", "PUBLIC_WEB_URL": proxy_base,
+        "OMNIFM_RUNTIME_DATA_DIR": str(scratch), "LOGS_DIR": str(scratch / "logs"),
+    })
+    start_process(context, "node-api", [node, "scripts/serve-node-api.mjs"], cwd=ROOT, env=node_env,
+                  url=f"http://127.0.0.1:{NODE_API_PORT}/api/auth/session", seconds=90)
+    node_process = context.processes[-1][0]
+    proxy_env = dict(env, OMNIFM_DASHBOARD_BACKEND="node", OMNIFM_NODE_API_URL=f"http://127.0.0.1:{NODE_API_PORT}")
+    start_process(context, "fastapi-node-proxy", [venv_python(), "-m", "uvicorn", "backend.server:app", "--host",
+                                                  "127.0.0.1", "--port", str(PROXY_API_PORT)],
+                  cwd=ROOT, env=proxy_env, url=f"{proxy_base}/api/health", seconds=90)
+
+    def call(method: str, path: str, headers: dict | None = None, body: dict | None = None) -> tuple:
+        data = json.dumps(body).encode() if body is not None else None
+        prepared = urllib.request.Request(f"{proxy_base}{path}", data=data, method=method)
+        for key, value in (headers or {}).items():
+            prepared.add_header(key, value)
+        if data is not None:
+            prepared.add_header("Content-Type", "application/json")
+        try:
+            with urllib.request.build_opener(NoRedirect).open(prepared, timeout=30) as answer:
+                return answer.status, dict(answer.headers), parse_json(answer.read().decode("utf-8", "replace"))
+        except urllib.error.HTTPError as error:
+            return error.code, dict(error.headers), parse_json(error.read().decode("utf-8", "replace"))
+
+    server = "123456789012345678"
+    _, _, health = call("GET", "/api/health")
+    services = health.get("services", {})
+    expect(services.get("dashboardBackend") == "node" and services.get("dashboardApi") is True,
+           f"the proxy FastAPI does not report the Node API: {services}")
+    status, _, session = call("GET", "/api/auth/session")
+    expect(status == 200 and session.get("authenticated") is False,
+           f"/api/auth/session did not come from the Node API: {status} {session}")
+    status, _, answer = call("GET", f"/api/dashboard/capabilities?serverId={server}")
+    expect(status == 401, f"/api/dashboard/capabilities, which FastAPI never had, answered {status} {answer}")
+    status, _, answer = call("PUT", f"/api/dashboard/settings?serverId={server}",
+                             headers={"Origin": proxy_base}, body={"failoverChain": ["alpha"]})
+    expect(status == 403 and "CSRF" in str(answer.get("error", "")),
+           f"a dashboard change without the CSRF header was not refused by the Node API: {status} {answer}")
+    status, _, answer = call("GET", f"/api/dashboard/stats?serverId={server}", headers={"Origin": "https://evil.example"})
+    expect(status == 403, f"a foreign origin reached the dashboard: {status} {answer}")
+    status, _, _ = call("GET", "/api/admin/config", headers={"X-Admin-Token": API_TOKEN})
+    expect(status == 200, f"the owner console no longer answers from FastAPI: {status}")
+
+    node_process.terminate()
+    node_process.wait(timeout=20)
+    status, headers, answer = call("GET", "/api/auth/session")
+    retry_after = {key.lower(): value for key, value in headers.items()}.get("retry-after")
+    expect(status == 503 and answer.get("retryable") is True and retry_after == "5",
+           f"a stopped Node API did not give a clear 503: {status} {answer}")
+    shutil.rmtree(scratch, ignore_errors=True)
+    return "FastAPI forwards the dashboard to the Node API end to end"
+
+
 def backend_steps() -> list:
     return [
         Step("backend", "venv", f"Python {BACKEND_PYTHON} with backend/requirements.txt", backend_environment),
@@ -1240,6 +1316,8 @@ def backend_steps() -> list:
         Step("backend", "contract", "The owner contract against a live server", fastapi_contract, ("venv",)),
         Step("backend", "contract-suite", "The backend/tests contract suite against the same server",
              fastapi_contract_suite, ("contract",)),
+        Step("backend", "node-dashboard", "FastAPI forwards the dashboard to the Node API",
+             node_dashboard_proxy, ("contract", "node/npm-ci")),
     ]
 
 

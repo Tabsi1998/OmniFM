@@ -236,6 +236,7 @@ CORS_ALLOWED_ORIGINS=${CORS_ORIGINS}
 CHECKOUT_RETURN_ORIGINS=${CORS_ORIGINS}
 DEFAULT_LANGUAGE=en
 SEED_DEMO_DATA=0
+OMNIFM_DASHBOARD_BACKEND=node
 EOF
 else
   # Fehlenden/Platzhalter-Token nachtragen, damit Owner-Login funktioniert
@@ -249,6 +250,9 @@ else
   grep -qE '^CORS_ALLOWED_ORIGINS=' "$BACKEND_ENV" || set_kv "$BACKEND_ENV" CORS_ALLOWED_ORIGINS "$CORS_ORIGINS"
   grep -qE '^CHECKOUT_RETURN_ORIGINS=' "$BACKEND_ENV" || set_kv "$BACKEND_ENV" CHECKOUT_RETURN_ORIGINS "$CORS_ORIGINS"
   grep -qE '^SEED_DEMO_DATA=' "$BACKEND_ENV" || set_kv "$BACKEND_ENV" SEED_DEMO_DATA 0
+  # #195: the dashboard is answered by the Node API behind FastAPI. Only added
+  # when missing; OMNIFM_DASHBOARD_BACKEND=fastapi in backend/.env switches back.
+  grep -qE '^OMNIFM_DASHBOARD_BACKEND=' "$BACKEND_ENV" || set_kv "$BACKEND_ENV" OMNIFM_DASHBOARD_BACKEND node
 fi
 
 # The frontend's API target is also configuration. Preserve it unless a

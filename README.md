@@ -30,7 +30,8 @@
 ```
 
 - **Frontend:** React + Vite, Design-System „Broadcast Studio" (Obsidian + Signal-Orange + Cyber-Cyan), `recharts`, `lucide-react`.
-- **Backend:** FastAPI, alle Endpunkte unter `/api`, MongoDB über `MONGO_URL`.
+- **Backend:** FastAPI ist der einzige öffentliche Eingang für `/api` (Port 8001), MongoDB über `MONGO_URL`. Owner-Konsole (`/api/admin/*`) und öffentliche Endpunkte beantwortet FastAPI selbst.
+- **Dashboard-API (Entscheidung #195, 2026-09-24):** `/api/auth/*` und `/api/dashboard/*` leitet FastAPI intern an die Node-API im Commander-Prozess weiter (nur `127.0.0.1:8002`). So gelten für Failover-Kette, Voice Guard, Alerts, Exporte und Digest dieselben Module wie im Bot. Schalter: `OMNIFM_DASHBOARD_BACKEND=node` in `backend/.env` (setzt `start.sh`), `fastapi` schaltet zurück. `scripts/check-api-routes.mjs` prüft, dass jede `/api`-Route des Frontends im zuständigen Backend existiert.
 - **Discord-Voice-Bot:** Node.js / `discord.js` (Commander/Worker-Split) – der eigentliche Streaming-Runtime unter `src/`. **Wird von `start.sh` mitgestartet und liest Commander + Worker vollständig aus dem Owner-Menü (MongoDB `owner_config.discord`) – keine Token-Env-Variablen nötig.** Teilt sich dieselbe MongoDB wie das Backend.
 
 ## 🎨 Marke
