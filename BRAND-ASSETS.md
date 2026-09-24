@@ -17,7 +17,7 @@ Alle Bilder liegen im Repo unter `frontend/public/`. Im Browser erreichbar unter
 | `omnifm-favicon.png` | Favicon |
 | `omnifm-sponsor-badge.png` | Sponsor-Badge |
 
-## 2) Bot-Avatare  (`frontend/public/brand/bots/`)  ← NEU, quadratisch 1024×1024
+## 2) Bot-Avatare  (`docs/brand-assets/bots/`), quadratisch 1024×1024
 Speziell für das **Discord Developer Portal** (Avatare müssen 1:1 sein):
 
 | Datei | Bot | Farbe | Zuweisen an |
@@ -34,6 +34,7 @@ Speziell für das **Discord Developer Portal** (Avatare müssen 1:1 sein):
    - Worker-Apps → `worker-cyan.png` / `worker-orange.png` / `worker-red.png`
 3. Speichern. Der Avatar erscheint dann als Bot-Profilbild in Discord.
 
-> Hinweis: Die alten `frontend/public/img/bot-1..4.png` sind 1536×1024 (Querformat,
-> für die Website), **nicht** ideal als Discord-Avatar. Nutze für Avatare die
-> quadratischen Dateien aus `brand/bots/`.
+> Hinweis: `frontend/public/img/bot-1..4.png` sind kleine Querformat-Vorschauen (384×256)
+> für die Website und **nicht** als Discord-Avatar gedacht. Nutze für Avatare die
+> quadratischen Originale aus `docs/brand-assets/bots/`. Sie liegen bewusst nicht
+> in `frontend/public`, damit die Website sie nicht mit ausliefert (#258).

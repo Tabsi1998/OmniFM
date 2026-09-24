@@ -1,7 +1,9 @@
 import { getCanonicalPagePath, normalizePageId, resolvePageFromUrl } from './pageRouting.js';
 
 const SITE_ORIGIN = 'https://omnifm.xyz';
-const DEFAULT_IMAGE = `${SITE_ORIGIN}/img/bot-1.png`;
+// The same picture as the static og:image in index.html, so a link preview
+// looks the same whether or not the crawler runs JavaScript.
+const DEFAULT_IMAGE = `${SITE_ORIGIN}/brand/omnifm-banner.png`;
 
 const PAGE_SEO = {
   home: {

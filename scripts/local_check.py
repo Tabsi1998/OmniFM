@@ -1380,10 +1380,31 @@ def frontend_build(context: Context) -> str:
     return f"{out.name}/: {len(bundles)} bundles, {size // 1024} KiB"
 
 
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".svg", ".ico"}
+IMAGE_LIMIT_KIB = 300
+
+
+def frontend_images(context: Context) -> str:
+    """No image the website ships is larger than 300 KB (#258).
+
+    The build once carried 13 MB of pictures, four of them 2.4 MB each for a
+    56-pixel avatar. Originals for download or the Discord portal belong in
+    docs/brand-assets, not in frontend/public.
+    """
+    out = build_output()
+    images = [item for item in out.rglob("*") if item.is_file() and item.suffix.lower() in IMAGE_SUFFIXES]
+    found = {item.relative_to(out).as_posix() for item in images
+             if item.stat().st_size > IMAGE_LIMIT_KIB * 1024}
+    note = ratchet(context, "large-images", found, f"images over {IMAGE_LIMIT_KIB} KB in the build")
+    total = sum(item.stat().st_size for item in images)
+    return f"{note}; {len(images)} images, {total // 1024} KiB together"
+
+
 def frontend_steps() -> list:
     return [
         Step("frontend", "npm-ci", "Locked install from frontend/package-lock.json", frontend_install),
         Step("frontend", "build", "The production build, and it is not empty", frontend_build, ("npm-ci",)),
+        Step("frontend", "images", f"No image in the build over {IMAGE_LIMIT_KIB} KB", frontend_images, ("build",)),
     ]
 
 

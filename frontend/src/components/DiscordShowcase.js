@@ -113,7 +113,7 @@ export default function DiscordShowcase() {
           <div data-testid="discord-embed-mock" style={{ background: '#313338', borderRadius: 14, padding: '18px 18px 20px', boxShadow: '0 30px 80px rgba(0,0,0,0.5)', border: '1px solid #23252a' }}>
             <div style={{ display: 'flex', gap: 14 }}>
               <div style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', background: '#08090d' }}>
-                <img src="/brand/omnifm-discord-avatar.png" alt="OmniFM" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img src="/brand/omnifm-discord-avatar-192.png" alt="OmniFM" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               </div>
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>

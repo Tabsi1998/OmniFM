@@ -72,6 +72,8 @@ function BotCard({ bot, index, copy, formatNumber }) {
           <img
             src={botImage}
             alt={bot.name}
+            loading="lazy"
+            decoding="async"
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             onError={(event) => {
               event.currentTarget.style.display = 'none';
