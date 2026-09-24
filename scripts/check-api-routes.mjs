@@ -2,7 +2,7 @@
 // Route contract (#195): every /api path the frontend calls must exist in the
 // backend that answers it in production. /api/auth and /api/dashboard go to
 // the Node API (src/api), FastAPI forwards them there; every other path is a
-// FastAPI route in backend/server.py.
+// FastAPI route in backend/server.py or backend/routers/.
 //
 //   node scripts/check-api-routes.mjs          check, exit 1 on a missing route
 //   node scripts/check-api-routes.mjs --list   also print where each path lives
@@ -47,9 +47,13 @@ function nodeRouteSource() {
 
 /** FastAPI route patterns as regular expressions. */
 function fastapiRoutes() {
-  const text = fs.readFileSync(path.join(root, "backend", "server.py"), "utf8");
+  // server.py and the route modules it includes (backend/routers/, #200).
+  const routerDir = path.join(root, "backend", "routers");
+  const files = [path.join(root, "backend", "server.py")]
+    .concat(fs.existsSync(routerDir) ? walk(routerDir, new Set([".py"])) : []);
+  const text = files.map((file) => fs.readFileSync(file, "utf8")).join("\n");
   const routes = [];
-  for (const match of text.matchAll(/@app\.(?:get|post|put|patch|delete|api_route)\("([^"]+)"/g)) {
+  for (const match of text.matchAll(/@(?:app|router)\.(?:get|post|put|patch|delete|api_route)\("([^"]+)"/g)) {
     const pattern = `^${match[1].replace(/[.]/g, "\\.").replace(/\{[^}]+\}/g, "[^/]+")}$`;
     routes.push({ route: match[1], regex: new RegExp(pattern) });
   }
