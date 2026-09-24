@@ -52,6 +52,8 @@ runtime-data.pre-restore-*/
 .runtime-data-restore.*/
 *.json.bak
 *.json.tmp-*
+# lock directories of the file stores (src/lib/file-store-lock.js)
+*.json.lock/
 *.json.corrupt-*
 *.tmp
 *.lock

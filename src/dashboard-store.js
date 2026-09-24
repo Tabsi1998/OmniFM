@@ -153,14 +153,27 @@ function withFileWriteRetry(operation, { attempts = 8, retryMs = 25 } = {}) {
   throw lastError;
 }
 
-function readStateFile(filePath) {
+/**
+ * Reads a state file. A missing file gives null. With strict (inside the
+ * lock, before a write) a file that exists but cannot be read throws instead
+ * of returning null: the caller would otherwise fall back to the older backup
+ * or an empty state and write that over newer entries (#223). A corrupt file
+ * still gives null, so the backup can take over.
+ */
+function readStateFile(filePath, { strict = false } = {}) {
+  let content;
   try {
-    if (!fs.existsSync(filePath)) return null;
-    if (!fs.statSync(filePath).isFile()) return null;
-    const content = readStoreFileWithRetry(filePath);
-    if (content === null) return null;
-    const raw = content.trim();
-    if (!raw) return emptyState();
+    // No existsSync/statSync first: on Windows both report a file that is
+    // briefly held by another process as missing.
+    content = readStoreFileWithRetry(filePath);
+  } catch (err) {
+    if (strict && err?.code !== "EISDIR") throw err;
+    return null;
+  }
+  if (content === null) return null;
+  const raw = content.trim();
+  if (!raw) return emptyState();
+  try {
     return normalizeState(JSON.parse(raw));
   } catch {
     return null;
@@ -176,7 +189,7 @@ function ensureState() {
 }
 
 function loadLatestState() {
-  stateCache = readStateFile(STORE_FILE) || readStateFile(BACKUP_FILE) || emptyState();
+  stateCache = readStateFile(STORE_FILE, { strict: true }) || readStateFile(BACKUP_FILE) || emptyState();
   return stateCache;
 }
 

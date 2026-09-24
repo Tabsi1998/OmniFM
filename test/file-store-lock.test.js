@@ -196,3 +196,58 @@ test("a lock whose directory cannot be inspected is not treated as stale", async
     fsSync.statSync = originalStat;
   }
 });
+
+test("two processes counting under the lock never lose an increment", async (t) => {
+  const { execFile } = await import("node:child_process");
+  const { promisify } = await import("node:util");
+  const { pathToFileURL } = await import("node:url");
+  const run = promisify(execFile);
+  const { tempDir, filePath } = await makeTempStore();
+  t.after(async () => {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+  await fs.writeFile(filePath, "0", "utf8");
+  const lockUrl = pathToFileURL(path.resolve("src/lib/file-store-lock.js")).href;
+  const counter = `
+    const { withFileStoreLock } = await import(process.env.LOCK_URL);
+    const fs = await import("node:fs");
+    for (let i = 0; i < 100; i += 1) {
+      withFileStoreLock(process.env.STORE, () => {
+        const value = Number(fs.readFileSync(process.env.STORE, "utf8"));
+        fs.writeFileSync(process.env.STORE, String(value + 1));
+      });
+    }
+  `;
+  await Promise.all([1, 2].map(() => run(process.execPath, ["--input-type=module", "-e", counter], {
+    env: { ...process.env, LOCK_URL: lockUrl, STORE: filePath },
+    timeout: 60_000,
+  })));
+  assert.equal(await fs.readFile(filePath, "utf8"), "200");
+  assert.equal(fsSync.existsSync(getFileStoreLockPath(filePath)), false, "the lock is released");
+});
+
+test("a briefly unreadable owner file does not leave the lock behind", async (t) => {
+  const { tempDir, filePath } = await makeTempStore();
+  const lockDir = getFileStoreLockPath(filePath);
+  t.after(async () => {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+  const originalRead = fsSync.readFileSync;
+  let busy = 2;
+  fsSync.readFileSync = function patchedRead(target, ...rest) {
+    if (String(target) === `${lockDir}/owner` && busy > 0) {
+      busy -= 1;
+      const error = new Error("EBUSY: resource busy or locked");
+      error.code = "EBUSY";
+      throw error;
+    }
+    return originalRead.call(this, target, ...rest);
+  };
+  try {
+    assert.equal(withFileStoreLock(filePath, () => "done", { timeoutMs: 500, retryMs: 5 }), "done");
+  } finally {
+    fsSync.readFileSync = originalRead;
+  }
+  assert.equal(busy, 0);
+  assert.equal(fsSync.existsSync(lockDir), false, "released although the first reads failed");
+});

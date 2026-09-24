@@ -51,12 +51,18 @@ function isLockStale(lockDir, staleMs) {
   }
 }
 
-function readLockOwner(lockDir) {
-  try {
-    return fs.readFileSync(`${lockDir}/owner`, "utf8").trim();
-  } catch {
-    return "";
+function readLockOwner(lockDir, { attempts = 1 } = {}) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return fs.readFileSync(`${lockDir}/owner`, "utf8").trim();
+    } catch (err) {
+      // Windows reports a file a scanner or the indexer holds for a moment as
+      // busy; only those are worth another look.
+      if (!["EBUSY", "EPERM", "EACCES"].includes(err?.code) || attempt === attempts - 1) return "";
+      sleepSync(10 * (attempt + 1));
+    }
   }
+  return "";
 }
 
 function isRetryableLockError(err) {
@@ -121,9 +127,11 @@ export function withFileStoreLock(filePath, fn, options = {}) {
     return fn();
   } finally {
     try {
-      const owner = parseLockOwner(readLockOwner(lockDir));
+      // A briefly unreadable owner file must not leave the lock behind: every
+      // other writer would then wait until its timeout (#223).
+      const owner = parseLockOwner(readLockOwner(lockDir, { attempts: 6 }));
       if (owner.id === ownerId) {
-        fs.rmSync(lockDir, { recursive: true, force: true });
+        fs.rmSync(lockDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 });
       }
     } catch {
       // best-effort cleanup; stale-lock handling covers process crashes
