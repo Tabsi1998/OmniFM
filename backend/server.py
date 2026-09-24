@@ -27,7 +27,8 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from starlette.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
+from fastapi.routing import APIRoute
 from pymongo import MongoClient
 
 load_dotenv()
@@ -2901,16 +2902,142 @@ def sanitize_license_for_api(license_info, include_sensitive=False):
 
 # === API Routes ===
 
+# ------------------------------------------------------------
+# Dashboard via the Node API (#195)
+#
+# With OMNIFM_DASHBOARD_BACKEND=node (start.sh sets it) FastAPI stays the only
+# public HTTP entry, but /api/auth and /api/dashboard are answered by the Node
+# API of the commander on 127.0.0.1. Failover chain, voice guard, alerts,
+# exports and digest then use the same modules as the bot. Without the switch
+# the FastAPI routes below answer as before.
+# ------------------------------------------------------------
+DASHBOARD_BACKEND = "node" if (os.environ.get("OMNIFM_DASHBOARD_BACKEND") or "").strip().lower() == "node" else "fastapi"
+NODE_API_URL = (
+    os.environ.get("OMNIFM_NODE_API_URL")
+    or f"http://127.0.0.1:{parse_int(os.environ.get('OMNIFM_NODE_API_PORT'), 8002)}"
+).rstrip("/")
+NODE_PROXY_PREFIXES = ("/api/auth", "/api/dashboard")
+NODE_PROXY_METHODS = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+NODE_PROXY_SKIPPED_HEADERS = {
+    "connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "trailers",
+    "transfer-encoding", "upgrade", "host", "content-length", "content-encoding",
+}
+NODE_PROXY_UNAVAILABLE = (
+    "Das Dashboard startet gerade neu. Bitte in ein paar Sekunden erneut versuchen."
+)
+
+
+def build_node_proxy_headers(headers, client_host="", scheme="http"):
+    """Request headers for the Node API.
+
+    Hop-by-hop headers stay here. The address of the caller is appended to
+    X-Forwarded-For, so the Node API rate-limits the browser and not this
+    proxy. A same-origin Origin header is dropped: the Node API only accepts
+    configured origins, same-origin requests are legitimate by definition, and
+    its CSRF header still guards every dashboard change. A foreign Origin is
+    passed on, so the Node API rejects it.
+    """
+    forwarded = {}
+    for key, value in headers.items():
+        if key.lower() in NODE_PROXY_SKIPPED_HEADERS:
+            continue
+        forwarded[key.lower()] = value
+    host = str(headers.get("host") or "").strip()
+    origin = str(headers.get("origin") or "").strip()
+    if origin and host and urlparse(origin).netloc.lower() == host.lower():
+        forwarded.pop("origin", None)
+    chain = [part.strip() for part in str(headers.get("x-forwarded-for") or "").split(",") if part.strip()]
+    if client_host:
+        chain.append(str(client_host))
+    if chain:
+        forwarded["x-forwarded-for"] = ", ".join(chain)
+    if not forwarded.get("x-forwarded-proto"):
+        forwarded["x-forwarded-proto"] = scheme
+    if host:
+        forwarded["x-forwarded-host"] = host
+    return forwarded
+
+
+def build_node_proxy_response(status_code, header_pairs, body):
+    """The Node API's answer as it is, every Set-Cookie header included."""
+    response = Response(content=body or b"", status_code=int(status_code))
+    for key, value in header_pairs:
+        if key.lower() in NODE_PROXY_SKIPPED_HEADERS:
+            continue
+        response.headers.append(key, value)
+    return response
+
+
+def _forward_to_node_api(method, url, headers, body):
+    upstream = requests.request(
+        method, url, headers=headers, data=body or None, allow_redirects=False, timeout=(3, 60)
+    )
+    raw_headers = upstream.raw.headers
+    pairs = [(key, value) for key in dict.fromkeys(raw_headers.keys()) for value in raw_headers.getlist(key)]
+    return upstream.status_code, pairs, upstream.content
+
+
+async def proxy_to_node_api(request: Request, path: str = ""):
+    target = f"{NODE_API_URL}{request.url.path}"
+    if request.url.query:
+        target = f"{target}?{request.url.query}"
+    headers = build_node_proxy_headers(request.headers, getattr(request.client, "host", ""), request.url.scheme)
+    body = await request.body()
+    try:
+        status_code, pairs, content = await run_in_threadpool(_forward_to_node_api, request.method, target, headers, body)
+    except requests.RequestException:
+        return JSONResponse(
+            status_code=503,
+            content={"error": NODE_PROXY_UNAVAILABLE, "retryable": True},
+            headers={"Retry-After": "5"},
+        )
+    return build_node_proxy_response(status_code, pairs, content)
+
+
+def install_node_dashboard_proxy(target_app):
+    """Put the forwarding routes in front of every FastAPI route of the prefixes."""
+    for prefix in NODE_PROXY_PREFIXES:
+        for route_path in (f"{prefix}/{{path:path}}", prefix):
+            target_app.router.routes.insert(
+                0, APIRoute(route_path, proxy_to_node_api, methods=NODE_PROXY_METHODS, include_in_schema=False)
+            )
+
+
+if DASHBOARD_BACKEND == "node":
+    install_node_dashboard_proxy(app)
+
+
+_NODE_API_REACHABLE = {"at": 0.0, "value": False}
+
+
+def node_api_reachable():
+    """Whether the Node API answers, cached for ten seconds (health only)."""
+    now = time.time()
+    if now - _NODE_API_REACHABLE["at"] < 10:
+        return _NODE_API_REACHABLE["value"]
+    parsed = urlparse(NODE_API_URL)
+    try:
+        with socket.create_connection((parsed.hostname or "127.0.0.1", parsed.port or 80), timeout=1):
+            value = True
+    except OSError:
+        value = False
+    _NODE_API_REACHABLE.update(at=now, value=value)
+    return value
+
+
 @app.get("/api/health")
 async def health():
     mongo_ready = mongo_is_reachable()
+    services = {"api": True, "mongo": mongo_ready, "dashboardBackend": DASHBOARD_BACKEND}
+    if DASHBOARD_BACKEND == "node":
+        services["dashboardApi"] = node_api_reachable()
     payload = {
         "ok": mongo_ready,
         "ready": mongo_ready,
         "status": "online" if mongo_ready else "degraded",
         "brand": "OmniFM",
         "contractVersion": BACKEND_CONTRACT_VERSION,
-        "services": {"api": True, "mongo": mongo_ready},
+        "services": services,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     return JSONResponse(status_code=200 if mongo_ready else 503, content=payload)

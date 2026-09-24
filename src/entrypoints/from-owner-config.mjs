@@ -94,8 +94,10 @@ async function main() {
   process.env.COMMANDER_BOT_INDEX = "1";
   process.env.MONGO_URL = MONGO_URL;
   process.env.DB_NAME = DB_NAME;
-  // FastAPI :8001 is the only production HTTP backend. The Node process is
-  // exclusively the Discord voice runtime in this deployment.
+  // FastAPI :8001 stays the only public HTTP entry. With
+  // OMNIFM_DASHBOARD_BACKEND=node it forwards /api/auth and /api/dashboard to
+  // the Node API of the commander on 127.0.0.1 (#195); configured below, once
+  // the OAuth settings are known.
   process.env.WEB_SERVER_ENABLED = "0";
 
   // Apply the Owner Console system settings to the Discord runtime. Mongo
@@ -130,6 +132,12 @@ async function main() {
   setRuntimeEnv("STATION_HEALTH_BATCH_SIZE", stationHealth.batchSize);
   setRuntimeEnv("STATION_HEALTH_CONCURRENCY", stationHealth.concurrency);
   setRuntimeEnv("STATION_HEALTH_TIMEOUT_MS", stationHealth.timeoutMs);
+  const { configureDashboardBackend } = await import("../lib/dashboard-backend.js");
+  const dashboardBackend = configureDashboardBackend(process.env, { redirectUri: oauth.redirectUri });
+  console.log(dashboardBackend.enabled
+    ? `[OmniFM] Dashboard-API: Node im Commander auf 127.0.0.1:${dashboardBackend.port}, FastAPI leitet /api/auth und /api/dashboard weiter.`
+    : "[OmniFM] Dashboard-API: FastAPI (OMNIFM_DASHBOARD_BACKEND ist nicht \"node\").");
+
   // Every recovery value of the owner console (#217), clamped like the runtime does.
   const { applyRecoverySettingsToEnv } = await import("../config/recovery-settings.js");
   applyRecoverySettingsToEnv(streamRecovery, process.env);

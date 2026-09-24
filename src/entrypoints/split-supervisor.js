@@ -38,6 +38,19 @@ function buildSplitProcessSpecs(botIndexes = [], commanderIndex = 1) {
   ];
 }
 
+/**
+ * The environment of one child. Only the commander may run the Node API for
+ * the dashboard (#195); every worker keeps it off.
+ */
+function buildSplitChildEnv(spec, env = process.env) {
+  return {
+    ...env,
+    ...spec.env,
+    OMNIFM_DEPLOYMENT_MODE: "split",
+    WEB_SERVER_ENABLED: spec.id === "commander" ? String(env.WEB_SERVER_ENABLED ?? "0") : "0",
+  };
+}
+
 function getSplitRestartDelay(crashCount, { baseMs = 1_000, maxMs = 30_000 } = {}) {
   const count = Math.max(1, Number.parseInt(String(crashCount || "1"), 10) || 1);
   return Math.min(Math.max(250, maxMs), Math.max(250, baseMs) * (2 ** Math.min(5, count - 1)));
@@ -66,12 +79,7 @@ async function superviseSplitRuntime({
     try {
       child = spawnImpl(process.execPath, [spec.entry], {
         cwd,
-        env: {
-          ...env,
-          ...spec.env,
-          OMNIFM_DEPLOYMENT_MODE: "split",
-          WEB_SERVER_ENABLED: "0",
-        },
+        env: buildSplitChildEnv(spec, env),
         // The fourth stream is the IPC channel for the doorbell between the
         // commander and the workers (#213).
         stdio: ["inherit", "inherit", "inherit", "ipc"],
@@ -160,4 +168,4 @@ async function superviseSplitRuntime({
   await stopped;
 }
 
-export { buildSplitProcessSpecs, getSplitRestartDelay, superviseSplitRuntime };
+export { buildSplitChildEnv, buildSplitProcessSpecs, getSplitRestartDelay, superviseSplitRuntime };

@@ -3,6 +3,7 @@ import path from "node:path";
 import test from "node:test";
 
 import {
+  buildSplitChildEnv,
   buildSplitProcessSpecs,
   getSplitRestartDelay,
 } from "../src/entrypoints/split-supervisor.js";
@@ -39,4 +40,13 @@ test("worker bridge publishes process-specific resource metrics", () => {
   assert.equal(metrics.uptimeSec >= 0, true);
   assert.equal(typeof metrics.host, "string");
   assert.match(metrics.nodeVersion, /^v\d+/);
+});
+
+test("only the commander may run the Node API for the dashboard", () => {
+  const [commander, worker] = buildSplitProcessSpecs([1, 2], 1);
+  const env = { WEB_SERVER_ENABLED: "1", WEB_BIND: "127.0.0.1", OTHER: "x" };
+  assert.equal(buildSplitChildEnv(commander, env).WEB_SERVER_ENABLED, "1");
+  assert.equal(buildSplitChildEnv(worker, env).WEB_SERVER_ENABLED, "0");
+  assert.equal(buildSplitChildEnv(worker, env).OMNIFM_DEPLOYMENT_MODE, "split");
+  assert.equal(buildSplitChildEnv(commander, {}).WEB_SERVER_ENABLED, "0", "off unless switched on");
 });
