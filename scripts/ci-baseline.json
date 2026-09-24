@@ -326,14 +326,7 @@
     "root: caniuse-lite (CC-BY-4.0)"
   ],
   "line-endings": [],
-  "live-smoke": [
-    "legacy asset /app.js",
-    "legacy asset /styles.css",
-    "security api legal",
-    "security home",
-    "security robots",
-    "seo favicon.ico"
-  ],
+  "live-smoke": [],
   "npm-audit": [
     "frontend: fast-uri (high)"
   ],

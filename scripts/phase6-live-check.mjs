@@ -308,7 +308,9 @@ async function inspectSecurityHeaders(baseUrl) {
     ].filter(Boolean);
 
     if (expectHsts) {
-      failures.push(requireHeader(response.headers, "strict-transport-security", /max-age=\d+/i));
+      // requireHeader returns "" when the header is fine; only a message is a failure.
+      const hsts = requireHeader(response.headers, "strict-transport-security", /max-age=\d+/i);
+      if (hsts) failures.push(hsts);
     }
 
     const csp = response.headers?.get?.("content-security-policy") || "";
