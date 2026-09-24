@@ -259,7 +259,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m py_compile backend/server.py
+          python -m py_compile backend/server.py backend/routers/*.py backend/services/*.py
           python -m pytest backend/unit_tests -q
           python -m uvicorn backend.server:app --host 127.0.0.1 --port 8001 >fastapi.log 2>&1 &
           api_pid=$!
