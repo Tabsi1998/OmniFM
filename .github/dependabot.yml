@@ -49,14 +49,6 @@ updates:
         update-types:
           - minor
           - patch
-    # React 19 is tracked separately (#212). Remove this block with that upgrade.
-    ignore:
-      - dependency-name: "react"
-        update-types:
-          - "version-update:semver-major"
-      - dependency-name: "react-dom"
-        update-types:
-          - "version-update:semver-major"
     labels:
       - dependencies
       - frontend
