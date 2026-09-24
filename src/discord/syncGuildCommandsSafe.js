@@ -1,5 +1,6 @@
 import { once } from "node:events";
 import { runExclusive } from "../utils/commandSyncGuard.js";
+import { commandPayloadHash } from "./commandFingerprints.js";
 
 function toInt(rawValue, fallback) {
   const parsed = Number.parseInt(String(rawValue ?? fallback), 10);
@@ -279,6 +280,8 @@ export async function syncGuildCommandsSafe({
   botLabel,
   source,
   logFn = null,
+  fingerprints = null,
+  force = false,
 }) {
   if (!client || !rest || !routes || typeof routes.applicationGuildCommands !== "function") {
     throw new Error("syncGuildCommandsSafe: client/rest/routes fehlen.");
@@ -295,6 +298,10 @@ export async function syncGuildCommandsSafe({
     && fetchAvailable
     && Boolean(String(botToken || "").trim());
   const payload = Array.isArray(commands) ? commands : [];
+  // Only servers whose last written list differs get a PUT (#215). A server
+  // the bot just joined, or GUILD_COMMAND_SYNC_FORCE=1, always gets one.
+  const commandsHash = commandPayloadHash(payload);
+  const forceSync = force === true || isJoinSync || String(process.env.GUILD_COMMAND_SYNC_FORCE || "0") === "1";
   const syncDelayMs = resolveSyncDelayMs(syncSource);
   const retryDelayMs = Math.max(
     5000,
@@ -415,6 +422,23 @@ export async function syncGuildCommandsSafe({
       return { ok: 0, failed: guildCount, attempts: attempt, skipped: true, reason };
     }
 
+    let known = new Map();
+    if (fingerprints && !forceSync) {
+      try {
+        // The retry attempts run one after the other by design.
+        // eslint-disable-next-line no-await-in-loop
+        known = await fingerprints.load(applicationId, targetGuildIds);
+      } catch {
+        known = new Map();
+      }
+    }
+    const pendingGuildIds = targetGuildIds.filter((guildId) => known.get(guildId) !== commandsHash);
+    const unchanged = guildCount - pendingGuildIds.length;
+    if (pendingGuildIds.length === 0) {
+      emit(logFn, "INFO", `[${label}] Command Sync skipped: commands unchanged in all ${guildCount} guilds (source=${syncSource})`);
+      return { ok: 0, failed: 0, unchanged, attempts: attempt, skipped: true, reason: "unchanged" };
+    }
+
     if (verboseSyncLogs && syncDelayMs > 0) {
       emit(logFn, "INFO", `[${label}] Sync delay before command sync: ${syncDelayMs}ms (source=${syncSource})`);
       await waitMs(syncDelayMs);
@@ -425,10 +449,11 @@ export async function syncGuildCommandsSafe({
     const result = await runExclusive(async () => {
       let ok = 0;
       let failed = 0;
-      emit(logFn, "INFO", `[${label}] Command Sync start: guilds=${guildCount} commands=${payload.length} source=${syncSource}`);
+      const writtenGuildIds = [];
+      emit(logFn, "INFO", `[${label}] Command Sync start: guilds=${pendingGuildIds.length} unchanged=${unchanged} commands=${payload.length} source=${syncSource}`);
 
       try {
-        for (const guildId of targetGuildIds) {
+        for (const guildId of pendingGuildIds) {
           if (verboseSyncLogs) {
             emit(logFn, "INFO", `[${label}] Syncing guild ${guildId}...`);
           }
@@ -452,6 +477,7 @@ export async function syncGuildCommandsSafe({
               });
             }
             ok += 1;
+            writtenGuildIds.push(guildId);
             if (verboseSyncLogs) {
               emit(logFn, "INFO", `[${label}] Guild ${guildId} success`);
             }
@@ -473,8 +499,11 @@ export async function syncGuildCommandsSafe({
         }
       } finally {
         logSyncDone(logFn, label, ok, failed, syncSource);
+        if (fingerprints && writtenGuildIds.length) {
+          await fingerprints.save(applicationId, writtenGuildIds, commandsHash).catch(() => null);
+        }
       }
-      return { ok, failed, attempts: attempt };
+      return { ok, failed, unchanged, attempts: attempt };
     });
 
     lastResult = result;

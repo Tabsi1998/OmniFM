@@ -183,6 +183,7 @@ import { normalizeLanguage, getDefaultLanguage } from "../i18n.js";
 import { buildVoiceChannelAccessMessage } from "../lib/user-facing-setup.js";
 import { premiumStationEmbed, customStationEmbed, botLimitEmbed } from "../ui/upgradeEmbeds.js";
 import { syncGuildCommandsSafe } from "../discord/syncGuildCommandsSafe.js";
+import { EMPTY_COMMANDS_HASH, defaultCommandFingerprintStore } from "../discord/commandFingerprints.js";
 import { buildCommandBuilders } from "../commands.js";
 import { buildInviteUrl } from "../bot-config.js";
 import { loadGuildSettings } from "../lib/guild-settings.js";
@@ -1178,6 +1179,8 @@ class BotRuntime {
       botLabel: `${this.config.name}`,
       source,
       logFn: (level, message) => log(level, message),
+      fingerprints: this.commandFingerprints || defaultCommandFingerprintStore,
+      force: options?.force === true,
     });
   }
 
@@ -1206,17 +1209,29 @@ class BotRuntime {
   async clearGuildCommandsForWorker() {
     if (this.role !== "worker") return;
     if (!this.isWorkerGuildCommandCleanupEnabled()) return;
-    const guildIds = [...this.client.guilds.cache.keys()];
-    if (!guildIds.length) return;
+    const allGuildIds = [...this.client.guilds.cache.keys()];
+    if (!allGuildIds.length) return;
     const applicationId = this.getApplicationId();
     if (!applicationId) return;
+    // Servers already cleared in an earlier start need no PUT again (#215).
+    const fingerprints = this.commandFingerprints || defaultCommandFingerprintStore;
+    const known = await fingerprints.load(applicationId, allGuildIds).catch(() => new Map());
+    const guildIds = allGuildIds.filter((guildId) => known.get(guildId) !== EMPTY_COMMANDS_HASH);
+    if (!guildIds.length) {
+      log("INFO", `[${this.config.name}] Worker-Guild-Commands bereits leer (Guilds: ${allGuildIds.length}).`);
+      return;
+    }
+    const cleared = [];
     for (const guildId of guildIds) {
       // eslint-disable-next-line no-await-in-loop
-      await this.rest.put(Routes.applicationGuildCommands(applicationId, guildId), { body: [] }).catch((err) => {
-        log("WARN", `[${this.config.name}] Worker-Command-Cleanup fehlgeschlagen fuer Guild ${guildId}: ${err?.message || err}`);
-      });
+      await this.rest.put(Routes.applicationGuildCommands(applicationId, guildId), { body: [] })
+        .then(() => cleared.push(guildId))
+        .catch((err) => {
+          log("WARN", `[${this.config.name}] Worker-Command-Cleanup fehlgeschlagen fuer Guild ${guildId}: ${err?.message || err}`);
+        });
     }
-    log("INFO", `[${this.config.name}] Worker-Guild-Commands bereinigt (Guilds: ${guildIds.length}).`);
+    await fingerprints.save(applicationId, cleared, EMPTY_COMMANDS_HASH).catch(() => null);
+    log("INFO", `[${this.config.name}] Worker-Guild-Commands bereinigt (Guilds: ${cleared.length}/${guildIds.length}, schon leer: ${allGuildIds.length - guildIds.length}).`);
   }
 
   async clearCommandsForWorker() {
@@ -2275,10 +2290,13 @@ class BotRuntime {
     let failed = 0;
     log("INFO", `[${this.config.name}] Bereinige Guild-Commands in ${guildIds.length} Servern...`);
 
+    const clearedGuildIds = [];
     for (const guildId of guildIds) {
       try {
+        // eslint-disable-next-line no-await-in-loop
         await this.rest.put(Routes.applicationGuildCommands(applicationId, guildId), { body: [] });
         cleaned += 1;
+        clearedGuildIds.push(guildId);
       } catch (err) {
         failed += 1;
         log(
@@ -2292,6 +2310,9 @@ class BotRuntime {
       "INFO",
       `[${this.config.name}] Guild-Command-Cleanup fertig: ok=${cleaned}, failed=${failed}.`
     );
+    // A later sync must write the list again into these servers (#215).
+    await (this.commandFingerprints || defaultCommandFingerprintStore)
+      .save(applicationId, clearedGuildIds, EMPTY_COMMANDS_HASH).catch(() => null);
   }
 
   async resolveBotMember(guild) {
