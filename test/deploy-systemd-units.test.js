@@ -88,6 +88,29 @@ test("start.sh renders the templates and stop.sh stops the units", () => {
   assert.doesNotMatch(startSh, /Type=oneshot/, "the oneshot stack unit is gone");
 });
 
+test("the nightly backup timer runs the backup script and catches up missed nights (#259)", () => {
+  const service = fs.readFileSync(path.join(unitDir, "omnifm-backup.service"), "utf8");
+  const timer = fs.readFileSync(path.join(unitDir, "omnifm-backup.timer"), "utf8");
+  assert.equal(directive(service, "Type"), "oneshot");
+  assert.equal(directive(service, "User"), "__USER__");
+  assert.equal(directive(service, "ExecStart"), "/bin/bash __ROOT__/scripts/scheduled-backup.sh");
+  assert.equal(directive(service, "EnvironmentFile"), "-__ROOT__/backend/.env");
+  assert.equal(directive(service, "IOSchedulingClass"), "idle", "backups must not slow the radio down");
+  assert.doesNotMatch(withoutComments(render(service)), /__[A-Z_]+__/);
+
+  assert.match(directive(timer, "OnCalendar") || "", /^\*-\*-\* \d{2}:\d{2}:00$/);
+  assert.equal(directive(timer, "Persistent"), "true");
+  assert.equal(directive(timer, "Unit"), "omnifm-backup.service");
+  assert.equal(directive(timer, "WantedBy"), "timers.target");
+
+  const startSh = fs.readFileSync(path.join(repoRoot, "start.sh"), "utf8");
+  const stopSh = fs.readFileSync(path.join(repoRoot, "stop.sh"), "utf8");
+  assert.match(startSh, /render_unit_file omnifm-backup\.service/);
+  assert.match(startSh, /render_unit_file omnifm-backup\.timer/);
+  assert.match(startSh, /enable --now omnifm-backup\.timer/);
+  assert.doesNotMatch(stopSh, /omnifm-backup/, "backups keep running while OmniFM is stopped");
+});
+
 test("bot and backend keep their runtime files in runtime-data and logs in logs", () => {
   for (const unit of ["omnifm-bot.service", "omnifm-backend.service"]) {
     const text = fs.readFileSync(path.join(unitDir, unit), "utf8");

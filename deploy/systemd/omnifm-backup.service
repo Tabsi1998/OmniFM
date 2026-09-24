@@ -1,0 +1,21 @@
+# OmniFM nightly backup (#259), started by omnifm-backup.timer.
+# start.sh renders the __PLACEHOLDERS__ like the other units.
+[Unit]
+Description=OmniFM backup (MongoDB and runtime data)
+Documentation=https://github.com/Tabsi1998/OmniFM#readme
+After=network-online.target mongod.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=__USER__
+WorkingDirectory=__ROOT__
+EnvironmentFile=-__ROOT__/backend/.env
+Environment=PATH=__NODE_DIR__:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=OMNIFM_NODE=__NODE__
+ExecStart=/bin/bash __ROOT__/scripts/scheduled-backup.sh
+# Backups must not slow the radio down.
+Nice=10
+IOSchedulingClass=idle
+StandardOutput=append:__ROOT__/logs/backup.log
+StandardError=append:__ROOT__/logs/backup.log

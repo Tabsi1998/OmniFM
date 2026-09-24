@@ -1,0 +1,13 @@
+# Runs omnifm-backup.service every night (#259). Persistent=true catches up a
+# run the server missed while it was off.
+[Unit]
+Description=Nightly OmniFM backup
+
+[Timer]
+OnCalendar=*-*-* 04:15:00
+RandomizedDelaySec=15min
+Persistent=true
+Unit=omnifm-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -137,10 +137,49 @@ status_report() {
         printf '%s\n' "$leftovers" | sed 's/^/  /'
       fi
       ;;
+    backup)
+      backup_report
+      ;;
     *)
-      die "Unbekanntes Status-Thema: $topic (quick, health, local-logs, mongo, storage)"
+      die "Unbekanntes Status-Thema: $topic (quick, health, local-logs, mongo, storage, backup)"
       ;;
   esac
+}
+
+# Newest archive per kind with age and size, the timer and the last restore
+# check (#259). Older than 36 hours means a night was missed.
+backup_report() {
+  local kind newest age_h count size marker
+  echo "== Backups (.update-backups) =="
+  for kind in mongodb runtime-data; do
+    newest="$(find "$ROOT/.update-backups/$kind" -maxdepth 1 -type f -name '*.gz' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2-)"
+    if [ -z "$newest" ]; then
+      echo "$kind: noch kein Backup"
+      continue
+    fi
+    age_h=$(( ( $(date +%s) - $(stat -c %Y "$newest") ) / 3600 ))
+    count="$(find "$ROOT/.update-backups/$kind" -maxdepth 1 -type f -name '*.gz' | wc -l)"
+    size="$(du -sh "$ROOT/.update-backups/$kind" 2>/dev/null | cut -f1)"
+    echo "$kind: neuestes $(basename "$newest") vor ${age_h} h; ${count} Staende, ${size} insgesamt"
+    if [ "$age_h" -gt 36 ]; then
+      echo "  WARNUNG: aelter als 36 Stunden - laeuft der Backup-Timer?"
+    fi
+  done
+  echo "-- Timer --"
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl list-timers omnifm-backup.timer --no-pager 2>/dev/null | head -n 2 || true
+    systemctl show omnifm-backup.service -p Result -p ExecMainExitTimestamp --no-pager 2>/dev/null || true
+  else
+    echo "systemd nicht verfuegbar"
+  fi
+  echo "-- Letzte Wiederherstellungsprobe --"
+  marker="$ROOT/.update-backups/mongodb/.last-restore-check.json"
+  if [ -f "$marker" ]; then
+    cat "$marker"
+  else
+    echo "noch keine (laeuft beim naechsten naechtlichen Backup)"
+  fi
+  echo "Protokoll: logs/backup.log"
 }
 
 show_bots() {
@@ -161,11 +200,11 @@ cleanup_logs() {
     fi
   done < <(find "$ROOT/logs" -type f \( -name 'bot-*.log' -o -name 'error-*.log' \) -mtime "+$days" 2>/dev/null | sort)
   [ "$found" -eq 1 ] || echo "Nichts zu bereinigen."
-  echo "Backups unter .update-backups werden nie automatisch geloescht:"
+  echo "MongoDB- und Runtime-Backups duennt der naechtliche Backup-Timer aus (14 Tage, 8 Wochen, 6 Monate):"
   du -sh "$ROOT/.update-backups" 2>/dev/null || echo "  (keine Backups vorhanden)"
 }
 
-USAGE="Nutzung: ./update.sh | --doctor | --status [quick|health|local-logs|mongo|storage] | --show-bots | --cleanup [dry-run|run]"
+USAGE="Nutzung: ./update.sh | --doctor | --status [quick|health|local-logs|mongo|storage|backup] | --show-bots | --cleanup [dry-run|run]"
 case "${1:-}" in
   --doctor)
     [ "$#" -eq 1 ] || die "--doctor akzeptiert keine weiteren Argumente."

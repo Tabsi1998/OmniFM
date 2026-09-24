@@ -345,13 +345,17 @@ UNIT_TEMPLATE_DIR="$ROOT/deploy/systemd"
 OMNIFM_UNITS="omnifm-backend omnifm-frontend omnifm-bot"
 
 render_unit() { # unit name without .service
+  render_unit_file "$1.service"
+}
+
+render_unit_file() { # file name in deploy/systemd, e.g. omnifm-backup.timer
   sed -e "s|__ROOT__|$ROOT|g" \
       -e "s|__USER__|$RUN_USER|g" \
       -e "s|__BACKEND_PORT__|$BACKEND_PORT|g" \
       -e "s|__FRONTEND_PORT__|$FRONTEND_PORT|g" \
       -e "s|__NODE__|$NODE_BIN|g" \
       -e "s|__NODE_DIR__|$NODE_DIR|g" \
-      "$UNIT_TEMPLATE_DIR/$1.service" | $SUDO tee "$UNIT_DIR/$1.service" >/dev/null
+      "$UNIT_TEMPLATE_DIR/$1" | $SUDO tee "$UNIT_DIR/$1" >/dev/null
 }
 
 install_units() {
@@ -370,6 +374,16 @@ install_units() {
   # shellcheck disable=SC2086
   $SUDO systemctl enable $OMNIFM_UNITS >>"$LOG_DIR/setup.log" 2>&1 \
     || warn "systemd enable meldete Warnungen (siehe logs/setup.log)."
+}
+
+# The nightly backup (#259) is a timer, not a service to supervise: stop.sh
+# leaves it alone, so backups keep running while OmniFM itself is stopped.
+install_backup_timer() {
+  log "Schreibe Backup-Timer (omnifm-backup.timer, taeglich ca. 04:15)..."
+  render_unit_file omnifm-backup.service
+  render_unit_file omnifm-backup.timer
+  $SUDO systemctl daemon-reload
+  $SUDO systemctl enable --now omnifm-backup.timer >>"$LOG_DIR/setup.log" 2>&1     || warn "Backup-Timer konnte nicht aktiviert werden (siehe logs/setup.log)."
 }
 
 unit_active() {
@@ -449,6 +463,7 @@ if [ "$USE_SYSTEMD" -eq 1 ]; then
   # 5) DIENSTE UNTER SYSTEMD
   # ===========================================================================
   install_units
+  install_backup_timer
 
   log "Starte Backend (omnifm-backend) auf Port $BACKEND_PORT..."
   $SUDO systemctl restart omnifm-backend
