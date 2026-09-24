@@ -288,7 +288,7 @@ log "Installiere Bot-Abhängigkeiten reproduzierbar..."
 ( cd "$ROOT" && npm ci --omit=dev --no-audit --no-fund --engine-strict=true --loglevel=error )
 
 log "Prüfe Backend- und Runtime-Syntax vor dem Umschalten..."
-"$VENV/bin/python" -m py_compile "$ROOT/backend/server.py"
+"$VENV/bin/python" -m py_compile "$ROOT/backend/server.py" "$ROOT"/backend/routers/*.py "$ROOT"/backend/services/*.py
 ( cd "$ROOT" && npm run test:syntax )
 ( cd "$ROOT" && npm run test:split-syntax )
 
