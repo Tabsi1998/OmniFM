@@ -127,8 +127,15 @@ status_report() {
       ;;
     storage)
       echo "== Speicher =="
-      du -sh "$ROOT/logs" "$ROOT/.update-backups" "$ROOT/node_modules" "$ROOT/frontend/node_modules" "$ROOT/frontend/build" 2>/dev/null || true
+      du -sh "$ROOT/runtime-data" "$ROOT/logs" "$ROOT/.update-backups" "$ROOT/node_modules" "$ROOT/frontend/node_modules" "$ROOT/frontend/build" 2>/dev/null || true
       df -h "$ROOT" | tail -n 1
+      leftovers="$(bash "$ROOT/scripts/migrate-runtime-data.sh" --list "$ROOT" 2>/dev/null || true)"
+      if [ -n "$leftovers" ]; then
+        echo
+        echo "WARNUNG: Laufzeitdateien liegen noch im Repo-Wurzelverzeichnis (#227)."
+        echo "Sie sind in keinem Update-Backup. ./start.sh verschiebt sie nach runtime-data/:"
+        printf '%s\n' "$leftovers" | sed 's/^/  /'
+      fi
       ;;
     *)
       die "Unbekanntes Status-Thema: $topic (quick, health, local-logs, mongo, storage)"

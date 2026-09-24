@@ -14,6 +14,10 @@ User=__USER__
 WorkingDirectory=__ROOT__/backend
 EnvironmentFile=-__ROOT__/backend/.env
 Environment=PATH=__NODE_DIR__:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# Runtime files live in runtime-data/ (part of the update backup), logs in
+# logs/, never between the code in the repository root (#227).
+Environment=OMNIFM_RUNTIME_DATA_DIR=__ROOT__/runtime-data
+Environment=LOGS_DIR=__ROOT__/logs
 ExecStart=__ROOT__/.venv/bin/uvicorn server:app --host 0.0.0.0 --port __BACKEND_PORT__ --workers 1
 Restart=always
 RestartSec=5

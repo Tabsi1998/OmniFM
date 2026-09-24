@@ -380,6 +380,19 @@ log "Stoppe bestehende OmniFM-Prozesse unmittelbar vor dem Neustart..."
 "$ROOT/stop.sh" || true
 DEPLOY_STARTED=1
 
+# #227: runtime files belong in runtime-data/ (in the update backup), not
+# between the code. Moved once, while every OmniFM process is stopped; the
+# script archives them to .update-backups/runtime-root/ first.
+export OMNIFM_RUNTIME_DATA_DIR="$ROOT/runtime-data"
+export LOGS_DIR="$LOG_DIR"
+mkdir -p "$OMNIFM_RUNTIME_DATA_DIR"
+MIGRATION_OUTPUT="$(bash "$ROOT/scripts/migrate-runtime-data.sh" "$ROOT")" \
+  || die "Laufzeitdateien konnten nicht nach runtime-data/ umziehen. Nichts wurde verschoben; Details oben."
+if [ -n "$MIGRATION_OUTPUT" ]; then
+  log "Laufzeitdateien ziehen nach runtime-data/ um:"
+  printf '%s\n' "$MIGRATION_OUTPUT" | sed 's/^/  /'
+fi
+
 port_is_open() {
   "$VENV/bin/python" -c 'import socket,sys; s=socket.socket(); s.settimeout(.4); rc=s.connect_ex(("127.0.0.1", int(sys.argv[1]))); s.close(); raise SystemExit(0 if rc == 0 else 1)' "$1"
 }
