@@ -11,7 +11,7 @@ Type=simple
 User=__USER__
 WorkingDirectory=__ROOT__/frontend
 Environment=PATH=__NODE_DIR__:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ExecStart=__ROOT__/frontend/node_modules/.bin/serve -s build -l tcp://0.0.0.0:__FRONTEND_PORT__
+ExecStart=__ROOT__/frontend/node_modules/.bin/serve build --config ../serve.json -l tcp://0.0.0.0:__FRONTEND_PORT__
 Restart=always
 RestartSec=5
 TimeoutStopSec=15

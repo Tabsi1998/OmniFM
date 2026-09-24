@@ -114,6 +114,9 @@ app.add_middleware(
 )
 
 
+API_CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'"
+
+
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
@@ -122,6 +125,13 @@ async def add_security_headers(request: Request, call_next):
     response.headers.setdefault("Referrer-Policy", "no-referrer")
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
     response.headers.setdefault("Cache-Control", "no-store" if request.url.path.startswith("/api/admin/") else "no-cache")
+    if request.url.path.startswith("/api/"):
+        # The API answers with JSON and redirects only; nothing may load or
+        # frame it. Responses forwarded from the Node API keep its own policy.
+        response.headers.setdefault("Content-Security-Policy", API_CONTENT_SECURITY_POLICY)
+    forwarded_proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "").split(",")[0].strip()
+    if forwarded_proto.lower() == "https":
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
     return response
 
 client = None

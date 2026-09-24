@@ -68,7 +68,9 @@ test("backend and bot wait for MongoDB, the bot never restart-loops on a missing
   assert.equal(directive(bot, "KillSignal"), "SIGTERM", "the runtime persists its state on SIGTERM");
 
   const frontend = readUnit("omnifm-frontend");
-  assert.match(directive(frontend, "ExecStart") || "", /serve -s build -l tcp:\/\/0\.0\.0\.0:__FRONTEND_PORT__/);
+  // serve.json holds the security headers and the page-path fallback; -s
+  // would answer every missing file with index.html again.
+  assert.match(directive(frontend, "ExecStart") || "", /serve build --config \.\.\/serve\.json -l tcp:\/\/0\.0\.0\.0:__FRONTEND_PORT__/);
 });
 
 test("start.sh renders the templates and stop.sh stops the units", () => {
