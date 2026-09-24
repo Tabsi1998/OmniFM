@@ -47,6 +47,9 @@ jobs:
         # Known findings are debt in scripts/ci-baseline.json ("eslint"); new ones fail.
         run: npm run lint
 
+      - name: Type-check src/lib and src/core
+        run: npm run typecheck
+
       - name: Run syntax checks
         shell: bash
         run: |

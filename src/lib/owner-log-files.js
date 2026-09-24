@@ -86,6 +86,7 @@ async function getOwnerLogFilesSnapshot() {
 async function getOwnerLogFileSnapshot(fileName, options = {}) {
   const name = path.basename(String(fileName || ""));
   if (!isAllowedLogFileName(name)) {
+    /** @type {import("./types.js").HttpError} */
     const err = new Error("Logdatei ist nicht erlaubt.");
     err.statusCode = 404;
     throw err;
@@ -96,6 +97,7 @@ async function getOwnerLogFileSnapshot(fileName, options = {}) {
   const resolvedPath = path.resolve(filePath);
   const resolvedDir = path.resolve(logsDir);
   if (!resolvedPath.startsWith(`${resolvedDir}${path.sep}`)) {
+    /** @type {import("./types.js").HttpError} */
     const err = new Error("Logdatei ist nicht erlaubt.");
     err.statusCode = 404;
     throw err;
@@ -103,6 +105,7 @@ async function getOwnerLogFileSnapshot(fileName, options = {}) {
 
   const stat = await fs.promises.stat(resolvedPath).catch(() => null);
   if (!stat?.isFile?.()) {
+    /** @type {import("./types.js").HttpError} */
     const err = new Error("Logdatei nicht gefunden.");
     err.statusCode = 404;
     throw err;

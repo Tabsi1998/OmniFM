@@ -6,6 +6,7 @@ const HEAD_FALLBACK_STATUS_CODES = new Set([403, 405, 501]);
 function normalizeStationTestUrl(rawUrl) {
   const value = String(rawUrl || "").trim();
   if (!value) {
+    /** @type {import("./types.js").HttpError} */
     const error = new Error("Station hat keine Stream-URL.");
     error.statusCode = 400;
     throw error;
@@ -14,16 +15,19 @@ function normalizeStationTestUrl(rawUrl) {
   try {
     parsed = new URL(value);
   } catch {
+    /** @type {import("./types.js").HttpError} */
     const error = new Error("Station hat keine gueltige Stream-URL.");
     error.statusCode = 400;
     throw error;
   }
   if (!["http:", "https:"].includes(parsed.protocol)) {
+    /** @type {import("./types.js").HttpError} */
     const error = new Error("Station-Stream muss http:// oder https:// verwenden.");
     error.statusCode = 400;
     throw error;
   }
   if (parsed.username || parsed.password) {
+    /** @type {import("./types.js").HttpError} */
     const error = new Error("Station-Stream darf keine Zugangsdaten in der URL enthalten.");
     error.statusCode = 400;
     throw error;
@@ -51,11 +55,13 @@ function buildFailureResult(station, { url, startedAtMs, method, error, timeoutM
 
 async function testOwnerStationStream(station, { timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl = safeFetch } = {}) {
   if (!station || typeof station !== "object") {
+    /** @type {import("./types.js").HttpError} */
     const error = new Error("Station fehlt.");
     error.statusCode = 400;
     throw error;
   }
   if (typeof fetchImpl !== "function") {
+    /** @type {import("./types.js").HttpError} */
     const error = new Error("Fetch ist in dieser Runtime nicht verfuegbar.");
     error.statusCode = 500;
     throw error;

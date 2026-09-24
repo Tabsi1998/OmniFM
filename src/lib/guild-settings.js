@@ -16,12 +16,14 @@ function normalizeIsoDateString(value) {
   return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : null;
 }
 
+/** @param {Record<string, any>} [rawSettings] */
 function normalizeGuildSettings(rawSettings = {}) {
   const input = rawSettings && typeof rawSettings === "object" ? rawSettings : {};
   const normalizedGuildId = sanitizeGuildId(input.guildId);
   const normalizedFailoverChain = normalizeFailoverChain(input.failoverChain || input.fallbackStation || []);
   const normalizedWeeklyDigestLastSent = normalizeIsoDateString(input.weeklyDigestLastSent);
 
+  /** @type {Record<string, any>} */
   const normalized = {
     ...input,
     weeklyDigest: normalizeWeeklyDigestConfig(input.weeklyDigest || {}, "de"),

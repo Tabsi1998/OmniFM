@@ -357,6 +357,11 @@ function loadSplitBotState(botId) {
   return legacyBotState;
 }
 
+/**
+ * Persists the playback targets of one bot.
+ * @param {string} botId
+ * @param {Map<string, import("./lib/types.js").GuildPlaybackState>} guildStates
+ */
 function saveBotState(botId, guildStates) {
   const botData = {};
 
