@@ -25,6 +25,7 @@ import {
   formatWorkerList,
   buildStreamingRuntimeSelectionPayload,
 } from "./command-helpers.js";
+import { derivePlaybackPhase, describePlaybackPhaseHistory } from "../playback-phase.js";
 
 /** /workers */
 async function handleWorkersCommand({ runtime, interaction, t, language }) {
@@ -821,6 +822,17 @@ async function handleDiagCommand({ runtime, interaction, t, language }) {
               : t("nein", "no")}`,
           `${t("Server-Stummschaltung", "Server mute")}: ${activeState.serverMuted === true ? t("ja", "yes") : t("nein", "no")}`,
         ].join("\n"),
+        inline: false,
+      },
+      {
+        // Where playback stands and how it got there (#210).
+        name: t("Wiedergabe-Phase", "Playback phase"),
+        value: [
+          `${derivePlaybackPhase(activeState)}${Number(activeState.playbackPhaseSince || 0) > 0
+            ? ` (${t("seit", "since")} <t:${Math.floor(Number(activeState.playbackPhaseSince) / 1000)}:R>)`
+            : ""}`,
+          ...describePlaybackPhaseHistory(activeState, { limit: 5, t }),
+        ].join("\n").slice(0, 1024),
         inline: false,
       },
       {

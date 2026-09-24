@@ -36,6 +36,7 @@ import { clearActiveFailover, clearFailoverFailureWindow } from "../lib/stream-f
 import {
   clearRuntimeRestoreRetry,
 } from "./runtime-restore.js";
+import { recordPlaybackPhase } from "./playback-phase.js";
 // Moved to runtime-voice-reconcile.js (#210); re-exported for existing importers.
 export {
   clearQueuedRuntimeVoiceReconcile,
@@ -443,6 +444,7 @@ export function parkRuntimeReconnectTarget(runtime, guildId, state, reason, deta
   if (!alreadyParked) state.parkedAt = nowMs;
   state.parkedReason = code;
   state.parkedDetail = text || null;
+  recordPlaybackPhase(runtime, guildId, state, `parked:${code}`);
   state.reconnectAttempts = 0;
   state.reconnectCircuitTripCount = 0;
   state.reconnectCircuitOpenUntil = 0;
@@ -502,6 +504,7 @@ function unparkRuntimeReconnectTarget(runtime, guildId, state, channelId) {
   const parkedReason = state?.parkedReason || null;
   const parkedForMs = Number(state?.parkedAt || 0) > 0 ? Math.max(0, Date.now() - Number(state.parkedAt)) : 0;
   if (!clearRuntimeParkedState(state)) return false;
+  recordPlaybackPhase(runtime, guildId, state, "unparked");
   log(
     "INFO",
     `[${runtime.config.name}] Reconnect nach Parken erfolgreich guild=${guildId} channel=${channelId || "-"} (grund=${parkedReason}, geparkt=${Math.round(parkedForMs / 1000)}s)`
@@ -796,6 +799,7 @@ export function resetRuntimeVoiceSession(
 
   runtime.updatePresence();
   runtime.persistState();
+  recordPlaybackPhase(runtime, guildId, state, "voice-reset");
 }
 
 export function attachRuntimeConnectionHandlers(runtime, guildId, connection) {
@@ -1151,6 +1155,7 @@ export async function tryRuntimeReconnect(runtime, guildId) {
     return { attempted: true, success: true, retryRecommended: false, reason: "reconnected" };
   } finally {
     state.reconnectInFlight = false;
+    recordPlaybackPhase(runtime, guildId, state, "reconnect-done");
   }
 }
 
@@ -1346,6 +1351,7 @@ export function scheduleRuntimeReconnect(runtime, guildId, options = {}) {
       runtime.scheduleReconnect(guildId, nextOptions);
     }
   }, delay);
+  recordPlaybackPhase(runtime, guildId, state, `reconnect:${reason}`);
 
   runtime.persistState?.();
 }

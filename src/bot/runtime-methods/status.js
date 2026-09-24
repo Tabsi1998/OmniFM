@@ -17,6 +17,7 @@ import {
   getTierConfig,
   LISTENER_STATS_POLL_MS,
 } from "../runtime-shared.js";
+import { derivePlaybackPhase } from "../playback-phase.js";
 
 const statusMethods = {
   buildLocalLivePlaybackSnapshot(guildId) {
@@ -223,6 +224,7 @@ const statusMethods = {
         desiredStationKey: state.desiredStationKey || state.currentStationKey || null,
         desiredStationName: state.desiredStationName || state.currentStationName || null,
         failoverActive: state.failoverActive === true,
+        playbackPhase: derivePlaybackPhase(state),
         failoverStartedAt: Number(state.failoverStartedAt || 0) || 0,
         failoverReason: state.failoverReason || null,
         failoverFromStationKey: state.failoverFromStationKey || null,
