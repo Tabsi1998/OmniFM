@@ -8,15 +8,14 @@ import {
 
 import { log, logError } from "../lib/logging.js";
 import { recordRuntimeIncident } from "../runtime-incidents-store.js";
-import { resolveReplacementStationForGuild, notifyRuntimeStationUnavailable } from "./runtime-streams.js";
+
 import {
   applyJitter,
   isLikelyNetworkFailureLine,
-  waitMs,
   VOICE_RECONNECT_MAX_MS,
   VOICE_RECONNECT_EXP_STEPS,
 } from "../lib/helpers.js";
-import { clearBotGuild, getBotState } from "../bot-state.js";
+
 import { getServerPlanConfig } from "../core/entitlements.js";
 import { networkRecoveryCoordinator } from "../core/network-recovery.js";
 import {
@@ -34,17 +33,34 @@ import {
 } from "../listening-stats-store.js";
 import { isRuntimeVoiceConnected } from "./runtime-live-state.js";
 import { clearActiveFailover, clearFailoverFailureWindow } from "../lib/stream-failover-policy.js";
+import {
+  clearRuntimeRestoreRetry,
+} from "./runtime-restore.js";
+// Moved to runtime-voice-reconcile.js (#210); re-exported for existing importers.
+export {
+  clearQueuedRuntimeVoiceReconcile,
+  queueRuntimeVoiceStateReconcile,
+  confirmRuntimeBotVoiceChannel,
+  fetchRuntimeBotVoiceState,
+  reconcileRuntimeGuildVoiceState,
+  tickRuntimeVoiceStateHealth,
+  startRuntimeVoiceStateReconciler,
+  stopRuntimeVoiceStateReconciler,
+} from "./runtime-voice-reconcile.js";
+// Moved to runtime-restore.js (#210); re-exported for existing importers.
+export {
+  clearRuntimeRestoreRetry,
+  restoreRuntimeGuildEntry,
+  restoreRuntimeState,
+} from "./runtime-restore.js";
 
-function toPositiveInt(rawValue, fallbackValue) {
+export function toPositiveInt(rawValue, fallbackValue) {
   const parsed = Number.parseInt(String(rawValue ?? fallbackValue), 10);
   if (!Number.isFinite(parsed) || parsed <= 0) return fallbackValue;
   return parsed;
 }
 
-const VOICE_STATE_RECONCILE_ENABLED = String(process.env.VOICE_STATE_RECONCILE_ENABLED ?? "1") !== "0";
-const VOICE_STATE_RECONCILE_MS = Math.max(15_000, toPositiveInt(process.env.VOICE_STATE_RECONCILE_MS, 30_000));
-const VOICE_TRANSIENT_RECHECK_MS = Math.max(2_000, toPositiveInt(process.env.VOICE_TRANSIENT_RECHECK_MS, 5_000));
-const VOICE_STATE_MISSING_CONFIRMATIONS = Math.max(2, toPositiveInt(process.env.VOICE_STATE_MISSING_CONFIRMATIONS, 2));
+export const VOICE_TRANSIENT_RECHECK_MS = Math.max(2_000, toPositiveInt(process.env.VOICE_TRANSIENT_RECHECK_MS, 5_000));
 const VOICE_RECONNECT_RESOURCE_CONFIRMATIONS = Math.max(2, toPositiveInt(process.env.VOICE_RECONNECT_RESOURCE_CONFIRMATIONS, 3));
 const VOICE_RECONNECT_PERMISSION_CONFIRMATIONS = Math.max(
   VOICE_RECONNECT_RESOURCE_CONFIRMATIONS,
@@ -66,8 +82,6 @@ const VOICE_RECONNECT_MAX_CIRCUIT_TRIPS = Math.max(
   1,
   toPositiveInt(process.env.VOICE_RECONNECT_MAX_CIRCUIT_TRIPS, 3)
 );
-const RESTORE_RETRY_BASE_MS = Math.max(5_000, toPositiveInt(process.env.RESTORE_RETRY_BASE_MS, 15_000));
-const RESTORE_RETRY_MAX_MS = Math.max(30_000, toPositiveInt(process.env.RESTORE_RETRY_MAX_MS, 5 * 60_000));
 const VOICE_NETWORK_ERROR_RETRY_MIN_MS = 15_000;
 const VOICE_NETWORK_ERROR_RETRY_JITTER = 0.6;
 const VOICE_RECONNECT_RESCHEDULE_SLACK_MS = 1_000;
@@ -88,7 +102,7 @@ function getExpectedRuntimeChannelId(state) {
   return lastChannelId || null;
 }
 
-function getRuntimeVoiceGuardConfig(state) {
+export function getRuntimeVoiceGuardConfig(state) {
   const hasExplicitVoiceGuardState = Boolean(
     state?.voiceGuardAvailable === true
     || state?.voiceGuardPolicy
@@ -128,11 +142,11 @@ function isRuntimeVoiceGuardUnlocked(state, nowMs = Date.now()) {
   return (Number(state?.voiceGuardUnlockUntil || 0) || 0) > nowMs;
 }
 
-function isRuntimeVoiceGuardCooldownActive(state, nowMs = Date.now()) {
+export function isRuntimeVoiceGuardCooldownActive(state, nowMs = Date.now()) {
   return (Number(state?.voiceGuardCooldownUntil || 0) || 0) > nowMs;
 }
 
-function recordRuntimeVoiceGuardAction(state, action, {
+export function recordRuntimeVoiceGuardAction(state, action, {
   reason = null,
   expectedChannelId = null,
   actualChannelId = null,
@@ -146,7 +160,7 @@ function recordRuntimeVoiceGuardAction(state, action, {
   state.voiceGuardLastActualChannelId = String(actualChannelId || "").trim() || null;
 }
 
-function noteRuntimeVoiceGuardMove(state, config, {
+export function noteRuntimeVoiceGuardMove(state, config, {
   expectedChannelId = null,
   actualChannelId = null,
   nowMs = Date.now(),
@@ -174,13 +188,13 @@ function noteRuntimeVoiceGuardMove(state, config, {
   };
 }
 
-function clearRuntimeVoiceGuardWindow(state) {
+export function clearRuntimeVoiceGuardWindow(state) {
   if (!state) return;
   state.voiceGuardWindowStartedAt = 0;
   state.voiceGuardWindowMoveCount = 0;
 }
 
-function shouldProtectRuntimeVoiceChannel(state, expectedChannelId = getExpectedRuntimeChannelId(state), config = getRuntimeVoiceGuardConfig(state)) {
+export function shouldProtectRuntimeVoiceChannel(state, expectedChannelId = getExpectedRuntimeChannelId(state), config = getRuntimeVoiceGuardConfig(state)) {
   const normalizedExpectedChannelId = String(expectedChannelId || "").trim();
   if (!normalizedExpectedChannelId) return false;
   if (config.policy === "allow") return false;
@@ -201,7 +215,7 @@ function shouldProtectRuntimeVoiceChannel(state, expectedChannelId = getExpected
   );
 }
 
-function parseStoredTimestampMs(value) {
+export function parseStoredTimestampMs(value) {
   if (!value) return 0;
   const numeric = Number.parseInt(String(value ?? ""), 10);
   if (Number.isFinite(numeric) && numeric > 0) return numeric;
@@ -209,7 +223,7 @@ function parseStoredTimestampMs(value) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
-function clearRestoreBlockState(state) {
+export function clearRestoreBlockState(state) {
   if (!state || (
     !state.restoreBlockedUntil
     && !state.restoreBlockedAt
@@ -236,7 +250,7 @@ function getRuntimeRecoveryDelayMs(runtime, guildId) {
   return networkRecoveryCoordinator.getRecoveryDelayMs();
 }
 
-function noteRuntimeRecoveryFailure(runtime, guildId, source, detail = "") {
+export function noteRuntimeRecoveryFailure(runtime, guildId, source, detail = "") {
   if (typeof runtime?.noteNetworkRecoveryFailure === "function") {
     runtime.noteNetworkRecoveryFailure(guildId, source, detail);
     return;
@@ -259,7 +273,7 @@ function runtimeRecoveryScopeMatches(runtime, guildId, recoveryEvent = null) {
   return runtime.getNetworkRecoveryScope(guildId) === recoveredScope;
 }
 
-function hasRecoverableRuntimeState(state) {
+export function hasRecoverableRuntimeState(state) {
   return Boolean(
     state?.currentStationKey
     && state?.lastChannelId
@@ -278,7 +292,7 @@ function getRuntimeErrorMessage(err) {
   return String(err?.message || err || "unknown").trim() || "unknown";
 }
 
-function buildRuntimeLogContext(runtime, guildId, state = null, extra = {}) {
+export function buildRuntimeLogContext(runtime, guildId, state = null, extra = {}) {
   return {
     bot: runtime?.config?.name || null,
     botId: runtime?.config?.id || null,
@@ -307,7 +321,7 @@ function getRuntimeConnectionStatus(state) {
   return String(state?.connection?.state?.status || "").trim() || "none";
 }
 
-function getRuntimePlayerStatus(state) {
+export function getRuntimePlayerStatus(state) {
   return String(state?.player?.state?.status || "").trim() || "unknown";
 }
 
@@ -348,7 +362,7 @@ function buildRuntimeRecoverySnapshot(runtime, guildId, state = null, extra = {}
   return detail.join(" ");
 }
 
-function logRuntimeRecoveryState(runtime, level, message, guildId, state = null, extra = {}) {
+export function logRuntimeRecoveryState(runtime, level, message, guildId, state = null, extra = {}) {
   log(level, `[${runtime.config.name}] ${message} ${buildRuntimeRecoverySnapshot(runtime, guildId, state, extra)}`);
 }
 
@@ -356,7 +370,7 @@ function isRecoverableVoiceConnectionError(err) {
   return isLikelyNetworkFailureLine(getRuntimeErrorMessage(err));
 }
 
-function shouldLogRecurringTransientIssue(issue) {
+export function shouldLogRecurringTransientIssue(issue) {
   const count = Number(issue?.count || 0);
   return count === 1 || (count % 5) === 0;
 }
@@ -368,7 +382,7 @@ function getTransientVoiceIssues(state) {
   return state.transientVoiceIssues;
 }
 
-function clearTransientVoiceIssue(state, code) {
+export function clearTransientVoiceIssue(state, code) {
   if (!state?.transientVoiceIssues || !code) return;
   delete state.transientVoiceIssues[code];
 }
@@ -519,7 +533,7 @@ function getDiscordErrorCode(err) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function isPermanentRestoreResourceError(err, resourceType) {
+export function isPermanentRestoreResourceError(err, resourceType) {
   const code = getDiscordErrorCode(err);
   if (!Number.isFinite(code)) return false;
   if (resourceType === "guild") return PERMANENT_RESTORE_GUILD_ERROR_CODES.has(code);
@@ -527,83 +541,7 @@ function isPermanentRestoreResourceError(err, resourceType) {
   return false;
 }
 
-function getRuntimeRestoreTimers(runtime) {
-  if (!(runtime.pendingRestoreTimers instanceof Map)) {
-    runtime.pendingRestoreTimers = new Map();
-  }
-  return runtime.pendingRestoreTimers;
-}
-
-function getRuntimeRestoreRetryCounts(runtime) {
-  if (!(runtime.restoreRetryCounts instanceof Map)) {
-    runtime.restoreRetryCounts = new Map();
-  }
-  return runtime.restoreRetryCounts;
-}
-
-export function clearRuntimeRestoreRetry(runtime, guildId) {
-  const key = String(guildId || "").trim();
-  if (!key) return;
-  const timers = getRuntimeRestoreTimers(runtime);
-  const retryCounts = getRuntimeRestoreRetryCounts(runtime);
-  const timer = timers.get(key);
-  if (timer) {
-    clearTimeout(timer);
-    timers.delete(key);
-  }
-  retryCounts.delete(key);
-}
-
-function getRestoreRetryDelay(runtime, guildId) {
-  const key = String(guildId || "").trim();
-  const retryCounts = getRuntimeRestoreRetryCounts(runtime);
-  const attempt = Number(retryCounts.get(key) || 0) + 1;
-  retryCounts.set(key, attempt);
-  const exp = Math.min(Math.max(0, attempt - 1), 6);
-  const baseDelay = Math.min(RESTORE_RETRY_MAX_MS, RESTORE_RETRY_BASE_MS * Math.pow(2, exp));
-  return {
-    attempt,
-    delay: applyJitter(baseDelay, 0.2),
-  };
-}
-
-function scheduleRuntimeRestoreResume(runtime, guildId, data, stations, delayMs, reason = "blocked") {
-  const key = String(guildId || "").trim();
-  if (!key) return false;
-  const timers = getRuntimeRestoreTimers(runtime);
-  if (timers.has(key)) return false;
-
-  const safeDelayMs = Math.max(1_000, Number(delayMs || 0) || 1_000);
-  log(
-    "WARN",
-    `[${runtime.config.name}] Restore fuer guild=${key} pausiert (${reason}) - retry in ${Math.round(safeDelayMs)}ms.`
-  );
-
-  const timer = setTimeout(() => {
-    timers.delete(key);
-    restoreRuntimeGuildEntry(runtime, key, data, stations, { source: "restore-blocked-resume", reason }).catch((err) => {
-      const state = runtime.guildState?.get?.(key);
-      logError(`[${runtime.config.name}] Restore-Resume fehlgeschlagen`, err, {
-        context: buildRuntimeLogContext(runtime, key, state, {
-          source: "restore-blocked-resume",
-          resumeReason: reason,
-          restoreChannel: data?.channelId || null,
-          restoreStation: data?.stationKey || null,
-        }),
-      });
-      if (state?.shouldReconnect && state?.currentStationKey && state?.lastChannelId) {
-        runtime.scheduleReconnect?.(key, { reason: "restore-resume-error" });
-      }
-    });
-  }, safeDelayMs);
-  if (typeof timer?.unref === "function") {
-    timer.unref();
-  }
-  timers.set(key, timer);
-  return true;
-}
-
-async function fetchRestoreGuild(runtime, guildId) {
+export async function fetchRestoreGuild(runtime, guildId) {
   const cachedGuild = runtime.client.guilds.cache.get(guildId);
   if (cachedGuild) {
     return { guild: cachedGuild, error: null, source: "cache" };
@@ -616,7 +554,7 @@ async function fetchRestoreGuild(runtime, guildId) {
   }
 }
 
-async function fetchRestoreChannel(guild, channelId) {
+export async function fetchRestoreChannel(guild, channelId) {
   const cachedChannel = guild.channels.cache.get(channelId);
   if (cachedChannel) {
     return { channel: cachedChannel, error: null, source: "cache" };
@@ -629,54 +567,7 @@ async function fetchRestoreChannel(guild, channelId) {
   }
 }
 
-function scheduleRuntimeRestoreRetry(runtime, guildId, data, stations, reason = "retry") {
-  const key = String(guildId || "").trim();
-  if (!key) return;
-  const timers = getRuntimeRestoreTimers(runtime);
-  if (timers.has(key)) return;
-
-  const { attempt, delay } = getRestoreRetryDelay(runtime, key);
-  log(
-    "WARN",
-    `[${runtime.config.name}] Restore fuer guild=${key} verschoben (${reason}) - retry in ${Math.round(delay)}ms (attempt ${attempt}).`
-  );
-
-  const timer = setTimeout(() => {
-    timers.delete(key);
-    restoreRuntimeGuildEntry(runtime, key, data, stations, { source: "restore-retry", reason }).catch((err) => {
-      const state = runtime.guildState?.get?.(key);
-      logError(`[${runtime.config.name}] Restore-Retry fehlgeschlagen`, err, {
-        context: buildRuntimeLogContext(runtime, key, state, {
-          source: "restore-retry",
-          retryReason: reason,
-          restoreChannel: data?.channelId || null,
-          restoreStation: data?.stationKey || null,
-        }),
-      });
-      if (state?.shouldReconnect && state?.currentStationKey && state?.lastChannelId) {
-        runtime.scheduleReconnect?.(key, { reason: "restore-retry-error" });
-      }
-    });
-  }, delay);
-  if (typeof timer?.unref === "function") {
-    timer.unref();
-  }
-  timers.set(key, timer);
-}
-
-function syncObservedRuntimeChannel(runtime, state, actualChannelId) {
-  const normalizedActualChannelId = String(actualChannelId || "").trim();
-  if (!normalizedActualChannelId) return false;
-  if (String(state?.lastChannelId || "").trim() === normalizedActualChannelId) {
-    return false;
-  }
-  runtime.markNowPlayingTargetDirty(state, normalizedActualChannelId);
-  state.lastChannelId = normalizedActualChannelId;
-  runtime.persistState();
-  return true;
-}
-
-function confirmTransientVoiceIssue(runtime, guildId, state, code, detail, {
+export function confirmTransientVoiceIssue(runtime, guildId, state, code, detail, {
   threshold,
   recheckReason,
   logMessage,
@@ -905,404 +796,6 @@ export function resetRuntimeVoiceSession(
 
   runtime.updatePresence();
   runtime.persistState();
-}
-
-export function clearQueuedRuntimeVoiceReconcile(runtime, guildId) {
-  const key = String(guildId || "").trim();
-  const timer = runtime.pendingVoiceReconcileTimers.get(key);
-  if (timer) {
-    clearTimeout(timer);
-    runtime.pendingVoiceReconcileTimers.delete(key);
-  }
-}
-
-export function queueRuntimeVoiceStateReconcile(runtime, guildId, reason = "queued", delayMs = 1200) {
-  const key = String(guildId || "").trim();
-  if (!key) return;
-  runtime.clearQueuedVoiceReconcile(key);
-  const timer = setTimeout(() => {
-    runtime.pendingVoiceReconcileTimers.delete(key);
-    runtime.reconcileGuildVoiceState(key, { reason }).catch((err) => {
-      const state = runtime.guildState?.get?.(key);
-      logError(`[${runtime.config.name}] Voice-State-Reconcile (${reason}) fehlgeschlagen`, err, {
-        level: "WARN",
-        context: buildRuntimeLogContext(runtime, key, state, {
-          source: "voice-state-reconcile",
-        }),
-      });
-    });
-  }, Math.max(0, delayMs));
-  if (typeof timer?.unref === "function") {
-    timer.unref();
-  }
-  runtime.pendingVoiceReconcileTimers.set(key, timer);
-}
-
-export async function confirmRuntimeBotVoiceChannel(
-  runtime,
-  guildId,
-  expectedChannelId,
-  { timeoutMs = 10_000, intervalMs = 800 } = {}
-) {
-  const normalizedGuildId = String(guildId || "").trim();
-  const normalizedChannelId = String(expectedChannelId || "").trim();
-  if (!normalizedGuildId || !normalizedChannelId) return false;
-
-  const startedAt = Date.now();
-  while ((Date.now() - startedAt) <= Math.max(intervalMs, timeoutMs)) {
-    const { channelId } = await runtime.fetchBotVoiceState(normalizedGuildId);
-    if (String(channelId || "").trim() === normalizedChannelId) {
-      return true;
-    }
-    await waitMs(intervalMs);
-  }
-  return false;
-}
-
-export async function fetchRuntimeBotVoiceState(runtime, guildId) {
-  const guild = runtime.client.guilds.cache.get(guildId) || await runtime.client.guilds.fetch(guildId).catch(() => null);
-  if (!guild) return { guild: null, voiceState: null, channelId: null };
-
-  try {
-    const voiceState = await guild.voiceStates.fetch("@me", { force: true, cache: true });
-    return { guild, voiceState, channelId: voiceState?.channelId || null };
-  } catch {
-    const cachedMember = guild.members?.me || null;
-    const cachedChannelId = String(cachedMember?.voice?.channelId || "").trim();
-    if (cachedChannelId) {
-      return { guild, voiceState: cachedMember.voice || null, channelId: cachedChannelId };
-    }
-
-    const fetchedMember = await guild.members?.fetchMe?.().catch(() => null);
-    const memberChannelId = String(fetchedMember?.voice?.channelId || "").trim();
-    return {
-      guild,
-      voiceState: fetchedMember?.voice || null,
-      channelId: memberChannelId || null,
-    };
-  }
-}
-
-export async function reconcileRuntimeGuildVoiceState(runtime, guildId, { reason = "periodic" } = {}) {
-  if (!runtime.client.isReady()) return;
-  const state = runtime.guildState.get(guildId);
-  if (!state) return;
-  if (!state.connection && !state.currentStationKey && !state.lastChannelId) return;
-  const voiceGuardConfig = getRuntimeVoiceGuardConfig(state);
-
-  const { channelId: actualChannelId } = await runtime.fetchBotVoiceState(guildId);
-  const connectionChannelId = String(state.connection?.joinConfig?.channelId || "").trim() || null;
-  let expectedChannelId = connectionChannelId || state.lastChannelId || null;
-
-  if (actualChannelId && !expectedChannelId) {
-    syncObservedRuntimeChannel(runtime, state, actualChannelId);
-    expectedChannelId = String(actualChannelId || "").trim() || null;
-  } else if (actualChannelId && connectionChannelId && actualChannelId === connectionChannelId) {
-    if (syncObservedRuntimeChannel(runtime, state, actualChannelId)) {
-      expectedChannelId = String(actualChannelId || "").trim() || null;
-    }
-  }
-
-  const voiceOperationInFlight = Boolean(
-    state.voiceConnectInFlight
-    || state.reconnectInFlight
-    || state.reconnectTimer
-  );
-  const shouldDeferVoiceMismatch = Boolean(
-    state.voiceConnectInFlight
-    || state.reconnectInFlight
-    || (!actualChannelId && state.reconnectTimer)
-  );
-  if (shouldDeferVoiceMismatch && (!actualChannelId || (expectedChannelId && actualChannelId !== expectedChannelId))) {
-    runtime.queueVoiceStateReconcile(guildId, `voice-op-inflight-${reason}`, 1500);
-    return;
-  }
-
-  if (!actualChannelId) {
-    const shouldReconnect = Boolean(state.shouldReconnect && state.currentStationKey && state.lastChannelId);
-    if (!state.connection && !state.currentProcess && !shouldReconnect) return;
-    if (!state.connection && shouldReconnect && voiceOperationInFlight) {
-      return;
-    }
-    const issue = confirmTransientVoiceIssue(
-      runtime,
-      guildId,
-      state,
-      "voice-state-missing",
-      `${expectedChannelId || "-"}:${reason}`,
-      {
-        threshold: VOICE_STATE_MISSING_CONFIRMATIONS,
-        recheckReason: `voice-state-confirm-${reason}`,
-        logMessage: `Voice-State abweichend erkannt (expected=${expectedChannelId || "-"}, reason=${reason})`,
-      }
-    );
-    if (!issue.confirmed) {
-      return;
-    }
-    clearTransientVoiceIssue(state, "voice-state-missing");
-    log(
-      "WARN",
-      `[${runtime.config.name}] Voice-State abweichung bestaetigt (guild=${guildId}, expected=${expectedChannelId || "-"}, reason=${reason}).`
-    );
-    state.voiceDisconnectObservedAt = state.voiceDisconnectObservedAt || Date.now();
-    runtime.resetVoiceSession(guildId, state, {
-      preservePlaybackTarget: shouldReconnect,
-      clearLastChannel: !shouldReconnect,
-    });
-    if (shouldReconnect) {
-      runtime.scheduleReconnect(guildId, { resetAttempts: true, reason: `voice-state-${reason}` });
-    }
-    return;
-  }
-  clearTransientVoiceIssue(state, "voice-state-missing");
-  clearTransientVoiceIssue(state, "voice-state-update-missing");
-  state.voiceDisconnectObservedAt = 0;
-
-  if (expectedChannelId && actualChannelId !== expectedChannelId) {
-    const protectedMove = shouldProtectRuntimeVoiceChannel(state, expectedChannelId, voiceGuardConfig);
-    const issue = confirmTransientVoiceIssue(
-      runtime,
-      guildId,
-      state,
-      "voice-channel-mismatch",
-      `${expectedChannelId}:${actualChannelId}:${reason}`,
-      {
-        threshold: protectedMove ? voiceGuardConfig.moveConfirmations : VOICE_STATE_MISSING_CONFIRMATIONS,
-        recheckReason: `voice-channel-mismatch-confirm-${reason}`,
-        logMessage: `Voice-Channel-Mismatch erkannt (expected=${expectedChannelId}, actual=${actualChannelId}, reason=${reason})`,
-      }
-    );
-    if (!issue.confirmed) {
-      return;
-    }
-    clearTransientVoiceIssue(state, "voice-channel-mismatch");
-    if (protectedMove) {
-      const movePolicy = voiceGuardConfig.policy;
-      const nowMs = Date.now();
-      const remainingGuardCooldownMs = Math.max(0, (Number(state.voiceGuardCooldownUntil || 0) || 0) - nowMs);
-      const moveSummary = noteRuntimeVoiceGuardMove(state, voiceGuardConfig, {
-        expectedChannelId,
-        actualChannelId,
-        nowMs,
-      });
-      log(
-        "WARN",
-        `[${runtime.config.name}] Fremdverschiebung bestaetigt guild=${guildId} expected=${expectedChannelId} actual=${actualChannelId} - Policy=${movePolicy}.`
-      );
-      if (moveSummary.exceededWindow) {
-        state.voiceGuardEscalationCount = (Number(state.voiceGuardEscalationCount || 0) || 0) + 1;
-        if (voiceGuardConfig.escalation === "cooldown") {
-          state.voiceGuardCooldownUntil = nowMs + voiceGuardConfig.escalationCooldownMs;
-          recordRuntimeVoiceGuardAction(state, "cooldown", {
-            reason: "foreign-move-escalated",
-            expectedChannelId,
-            actualChannelId,
-            atMs: nowMs,
-          });
-          runtime.persistState?.();
-          runtime.queueVoiceStateReconcile(guildId, "voice-guard-cooldown", voiceGuardConfig.escalationCooldownMs);
-          return;
-        }
-
-        state.voiceGuardDisconnectCount = (Number(state.voiceGuardDisconnectCount || 0) || 0) + 1;
-        state.shouldReconnect = false;
-        recordRuntimeVoiceGuardAction(state, "disconnect", {
-          reason: "foreign-move-escalated",
-          expectedChannelId,
-          actualChannelId,
-          atMs: nowMs,
-        });
-        runtime.resetVoiceSession(guildId, state, {
-          preservePlaybackTarget: false,
-          clearLastChannel: true,
-        });
-        return;
-      }
-      if (movePolicy === "disconnect") {
-        state.voiceGuardDisconnectCount = (Number(state.voiceGuardDisconnectCount || 0) || 0) + 1;
-        state.shouldReconnect = false;
-        recordRuntimeVoiceGuardAction(state, "disconnect", {
-          reason: "foreign-move-policy",
-          expectedChannelId,
-          actualChannelId,
-          atMs: nowMs,
-        });
-        runtime.resetVoiceSession(guildId, state, {
-          preservePlaybackTarget: false,
-          clearLastChannel: true,
-        });
-        return;
-      }
-
-      state.voiceGuardReturnCount = (Number(state.voiceGuardReturnCount || 0) || 0) + 1;
-      state.voiceGuardCooldownUntil = nowMs + voiceGuardConfig.returnCooldownMs;
-      recordRuntimeVoiceGuardAction(state, "return", {
-        reason: "foreign-move-policy",
-        expectedChannelId,
-        actualChannelId,
-        atMs: nowMs,
-      });
-      if (state.connection) {
-        try { state.connection.destroy(); } catch {}
-      }
-      const reconnectOptions = {
-        resetAttempts: true,
-        reason: "voice-channel-mismatch-guard",
-      };
-      if (remainingGuardCooldownMs > 0) {
-        reconnectOptions.minDelayMs = remainingGuardCooldownMs;
-      }
-      runtime.scheduleReconnect(guildId, reconnectOptions);
-      return;
-    }
-
-    syncObservedRuntimeChannel(runtime, state, actualChannelId);
-    if (!state.currentProcess && state.player.state.status === AudioPlayerStatus.Idle && !state.reconnectTimer) {
-      runtime.scheduleReconnect(guildId, { resetAttempts: true, reason: "voice-channel-mismatch" });
-      return;
-    }
-  } else {
-    clearTransientVoiceIssue(state, "voice-channel-mismatch");
-    if (expectedChannelId && actualChannelId === expectedChannelId) {
-      clearRuntimeVoiceGuardWindow(state);
-      if (isRuntimeVoiceGuardCooldownActive(state)) {
-        state.voiceGuardCooldownUntil = 0;
-      }
-    }
-  }
-
-  if (
-    actualChannelId
-    && !state.connection
-    && state.currentStationKey
-    && state.lastChannelId
-    && actualChannelId === state.lastChannelId
-  ) {
-    const issue = confirmTransientVoiceIssue(
-      runtime,
-      guildId,
-      state,
-      "voice-local-connection-missing",
-      `${actualChannelId}:${reason}:${getRuntimePlayerStatus(state)}:${state.currentProcess ? 1 : 0}`,
-      {
-        threshold: VOICE_STATE_MISSING_CONFIRMATIONS,
-        recheckReason: `voice-local-connection-confirm-${reason}`,
-        logMessage: `Lokaler Voice-Handle fehlt trotz Discord-Voice-State (channel=${actualChannelId}, reason=${reason})`,
-      }
-    );
-    if (!issue.confirmed) {
-      return;
-    }
-
-    if (state.currentProcess || state.player.state.status !== AudioPlayerStatus.Idle) {
-      if (issue.count === issue.threshold || shouldLogRecurringTransientIssue(issue)) {
-        logRuntimeRecoveryState(
-          runtime,
-          "WARN",
-          "Stale local voice state bestaetigt - Discord sieht den Bot noch im Channel, lokaler Handle fehlt",
-          guildId,
-          state,
-          {
-            expectedChannelId,
-            actualChannelId,
-            reason,
-            issue: "voice-local-connection-missing",
-          }
-        );
-      }
-      runtime.queueVoiceStateReconcile(guildId, `voice-local-stale-${reason}`, Math.max(8_000, VOICE_TRANSIENT_RECHECK_MS));
-      return;
-    }
-
-    clearTransientVoiceIssue(state, "voice-local-connection-missing");
-    logRuntimeRecoveryState(
-      runtime,
-      "WARN",
-      "Lokaler Voice-Handle fehlt und Wiedergabe ist nicht aktiv - Reconnect wird erzwungen",
-      guildId,
-      state,
-      {
-        expectedChannelId,
-        actualChannelId,
-        reason,
-        issue: "voice-local-connection-missing",
-      }
-    );
-    runtime.scheduleReconnect(guildId, { resetAttempts: true, reason: `voice-local-stale-${reason}` });
-    return;
-  }
-  clearTransientVoiceIssue(state, "voice-local-connection-missing");
-
-  if (!state.connection && state.currentStationKey && state.lastChannelId) {
-    if (voiceOperationInFlight) return;
-    logRuntimeRecoveryState(
-      runtime,
-      "WARN",
-      "Lokale Voice-Verbindung fehlt - Reconnect wird geplant",
-      guildId,
-      state,
-      {
-        expectedChannelId,
-        actualChannelId,
-        reason: `voice-no-local-connection-${reason}`,
-      }
-    );
-    runtime.scheduleReconnect(guildId, { resetAttempts: true, reason: `voice-no-local-connection-${reason}` });
-    return;
-  }
-
-  if (
-    state.currentStationKey
-    && state.player.state.status === AudioPlayerStatus.Idle
-    && !state.streamRestartTimer
-    && !state.streamRestartInFlight
-    && !state.reconnectTimer
-  ) {
-    runtime.scheduleStreamRestart(guildId, state, 750, `voice-health-${reason}`);
-  }
-  if (state.currentStationKey) {
-    runtime.syncVoiceChannelStatus(guildId, state.currentStationName || state.currentStationKey).catch(() => null);
-  }
-}
-
-export async function tickRuntimeVoiceStateHealth(runtime) {
-  if (!VOICE_STATE_RECONCILE_ENABLED) return;
-  if (!runtime.client.isReady()) return;
-
-  for (const guildId of runtime.guildState.keys()) {
-    // eslint-disable-next-line no-await-in-loop
-    await runtime.reconcileGuildVoiceState(guildId, { reason: "timer" });
-  }
-}
-
-export function startRuntimeVoiceStateReconciler(runtime) {
-  if (!VOICE_STATE_RECONCILE_ENABLED) return;
-  if (runtime.voiceHealthTimer) return;
-
-  const run = () => {
-    runtime.tickVoiceStateHealth().catch((err) => {
-      logError(`[${runtime.config.name}] Voice-State-Reconcile Fehler`, err, {
-        context: {
-          bot: runtime?.config?.name || null,
-          botId: runtime?.config?.id || null,
-          source: "voice-health-timer",
-        },
-      });
-    });
-  };
-
-  run();
-  runtime.voiceHealthTimer = setInterval(run, VOICE_STATE_RECONCILE_MS);
-}
-
-export function stopRuntimeVoiceStateReconciler(runtime) {
-  if (runtime.voiceHealthTimer) {
-    clearInterval(runtime.voiceHealthTimer);
-    runtime.voiceHealthTimer = null;
-  }
-  for (const guildId of runtime.pendingVoiceReconcileTimers.keys()) {
-    runtime.clearQueuedVoiceReconcile(guildId);
-  }
 }
 
 export function attachRuntimeConnectionHandlers(runtime, guildId, connection) {
@@ -1855,231 +1348,4 @@ export function scheduleRuntimeReconnect(runtime, guildId, options = {}) {
   }, delay);
 
   runtime.persistState?.();
-}
-
-export async function restoreRuntimeGuildEntry(runtime, guildId, data, stations, { source = "restore" } = {}) {
-  void stations;
-  const nowMs = Date.now();
-  const restoreBlockedUntil = parseStoredTimestampMs(data?.restoreBlockedUntil);
-  const restoreBlockedAt = parseStoredTimestampMs(data?.restoreBlockedAt);
-  const restoreBlockCount = Math.max(0, Number.parseInt(String(data?.restoreBlockCount || 0), 10) || 0);
-  const restoreBlockReason = String(data?.restoreBlockReason || "").trim() || null;
-  const existingState = runtime.guildState.get(guildId);
-  if (
-    existingState?.currentStationKey === data.stationKey
-    && existingState?.lastChannelId === data.channelId
-    && hasRecoverableRuntimeState(existingState)
-  ) {
-    clearRuntimeRestoreRetry(runtime, guildId);
-    return { ok: true, skipped: true, reason: "already-active" };
-  }
-
-  if (restoreBlockedUntil > nowMs) {
-    clearRuntimeRestoreRetry(runtime, guildId);
-    const remainingMs = Math.max(1_000, restoreBlockedUntil - nowMs);
-    scheduleRuntimeRestoreResume(runtime, guildId, data, stations, remainingMs, "cooldown");
-    return {
-      ok: false,
-      blocked: true,
-      retryScheduled: true,
-      remainingMs,
-      reason: restoreBlockReason || "restore-cooldown",
-    };
-  }
-
-  const { guild, error: guildError } = await fetchRestoreGuild(runtime, guildId);
-  if (!guild) {
-    if (isPermanentRestoreResourceError(guildError, "guild")) {
-      clearRuntimeRestoreRetry(runtime, guildId);
-      log("INFO", `[${runtime.config.name}] Guild ${guildId} ist nicht mehr verfuegbar. Entferne gespeicherten Restore-State.`);
-      clearBotGuild(runtime.config.id, guildId);
-      return { ok: false, permanent: true, resource: "guild" };
-    }
-    log(
-      "WARN",
-      `[${runtime.config.name}] Guild ${guildId} fuer Restore derzeit nicht aufloesbar: ${guildError?.message || "unbekannter Fehler"}`
-    );
-    scheduleRuntimeRestoreRetry(runtime, guildId, data, stations, "guild-unresolved");
-    return { ok: false, transient: true, resource: "guild" };
-  }
-
-  const allowedForRestore = await runtime.enforceGuildAccessForGuild(guild, source);
-  if (!allowedForRestore) {
-    clearRuntimeRestoreRetry(runtime, guildId);
-    return { ok: false, blocked: true };
-  }
-
-  const { channel, error: channelError } = await fetchRestoreChannel(guild, data.channelId);
-  if (!channel) {
-    if (isPermanentRestoreResourceError(channelError, "channel")) {
-      clearRuntimeRestoreRetry(runtime, guildId);
-      log("INFO", `[${runtime.config.name}] Channel ${data.channelId} in ${guild.name} existiert nicht mehr. Entferne gespeicherten Restore-State.`);
-      clearBotGuild(runtime.config.id, guildId);
-      return { ok: false, permanent: true, resource: "channel" };
-    }
-    log(
-      "WARN",
-      `[${runtime.config.name}] Channel ${data.channelId} in ${guild.name} fuer Restore derzeit nicht aufloesbar: ${channelError?.message || "unbekannter Fehler"}`
-    );
-    scheduleRuntimeRestoreRetry(runtime, guildId, data, stations, "channel-unresolved");
-    return { ok: false, transient: true, resource: "channel" };
-  }
-
-  if (!channel.isVoiceBased()) {
-    clearRuntimeRestoreRetry(runtime, guildId);
-    log("INFO", `[${runtime.config.name}] Channel ${data.channelId} in ${guild.name} ist kein Voice-/Stage-Channel mehr.`);
-    clearBotGuild(runtime.config.id, guildId);
-    return { ok: false, permanent: true, resource: "channel-type" };
-  }
-
-  let restoredStation = runtime.resolveStationForGuild(guildId, data.stationKey, runtime.resolveGuildLanguage(guildId));
-  let replacedStation = null;
-  if (!restoredStation.ok) {
-    const unavailableMessage = restoredStation.message || "station unavailable";
-    const replacement = await resolveReplacementStationForGuild(runtime, guildId, data.stationKey);
-    if (!replacement.ok) {
-      clearRuntimeRestoreRetry(runtime, guildId);
-      log("INFO", `[${runtime.config.name}] Station ${data.stationKey} nicht mehr vorhanden und kein Ersatz verfuegbar: ${unavailableMessage}`);
-      void notifyRuntimeStationUnavailable(runtime, guildId, null, {
-        previousStationKey: data.stationKey,
-        previousStationName: data.stationName || data.stationKey,
-        reason: unavailableMessage,
-        stopped: true,
-        channelId: data.channelId,
-      }).catch(() => null);
-      clearBotGuild(runtime.config.id, guildId);
-      return { ok: false, permanent: true, resource: "station" };
-    }
-    log(
-      "WARN",
-      `[${runtime.config.name}] Station ${data.stationKey} nicht mehr verfuegbar (${unavailableMessage}); Restore nutzt ${replacement.key} (${replacement.source}).`
-    );
-    replacedStation = {
-      previousStationKey: data.stationKey,
-      previousStationName: data.stationName || data.stationKey,
-      reason: unavailableMessage,
-      source: replacement.source,
-    };
-    restoredStation = replacement;
-    data = {
-      ...data,
-      desiredStationKey: replacement.key,
-      desiredStationName: replacement.station?.name || replacement.key,
-      failoverActive: false,
-    };
-  }
-
-  log("INFO", `[${runtime.config.name}] Reconnect: ${guild.name} / #${channel.name} / ${restoredStation.station.name}`);
-
-  const state = runtime.getState(guildId);
-  if (typeof runtime.refreshVoiceGuardSettings === "function") {
-    await runtime.refreshVoiceGuardSettings(guildId).catch(() => null);
-  }
-  state.restoreBlockCount = restoreBlockCount;
-  state.restoreBlockedAt = restoreBlockedAt;
-  state.restoreBlockedUntil = restoreBlockedUntil > nowMs ? restoreBlockedUntil : 0;
-  state.restoreBlockReason = restoreBlockReason;
-  const restoredChannelVolume = data?.channelVolumes?.[String(data.channelId || "").trim()];
-  state.volume = restoredChannelVolume ?? data.volume ?? state.volume ?? 100;
-  state.channelVolumes = {
-    ...(state.channelVolumes || {}),
-    ...(data.channelVolumes || {}),
-  };
-  state.volumePreferenceSet = Number.isFinite(Number(state.volume));
-  state.shouldReconnect = true;
-  state.lastChannelId = data.channelId;
-  state.currentStationKey = restoredStation.key;
-  state.currentStationName = restoredStation.station.name || restoredStation.key;
-  state.desiredStationKey = String(data.desiredStationKey || restoredStation.key).trim() || restoredStation.key;
-  state.desiredStationName = String(data.desiredStationName || restoredStation.station.name || state.desiredStationKey).trim()
-    || state.desiredStationKey;
-  state.failoverActive = data.failoverActive === true && state.desiredStationKey !== restoredStation.key;
-  state.failoverStartedAt = parseStoredTimestampMs(data.failoverStartedAt);
-  state.failoverReason = String(data.failoverReason || "").trim() || null;
-  state.failoverFromStationKey = String(data.failoverFromStationKey || "").trim() || null;
-  state.failoverFromStationName = String(data.failoverFromStationName || "").trim() || null;
-  state.failoverFailureStationKey = String(data.failoverFailureStationKey || "").trim() || null;
-  state.failoverFailureCount = Math.max(0, Number.parseInt(String(data.failoverFailureCount || 0), 10) || 0);
-  state.failoverFailureStartedAt = parseStoredTimestampMs(data.failoverFailureStartedAt);
-  state.failoverLastFailureAt = parseStoredTimestampMs(data.failoverLastFailureAt);
-  state.parkedReason = String(data.parkedReason || "").trim() || null;
-  state.parkedAt = parseStoredTimestampMs(data.parkedAt);
-  state.parkedDetail = String(data.parkedDetail || "").trim() || null;
-  runtime.markScheduledEventPlayback(
-    state,
-    data.scheduledEventId || null,
-    data.scheduledEventStopAtMs || 0
-  );
-  runtime.persistState?.();
-
-  try {
-    await runtime.ensureVoiceConnectionForChannel(guildId, channel.id, state, { source });
-  } catch (err) {
-    clearRuntimeRestoreRetry(runtime, guildId);
-    logError(`[${runtime.config.name}] Voice-Verbindung zu ${guild.name} fehlgeschlagen`, err, {
-      context: buildRuntimeLogContext(runtime, guildId, state, {
-        source,
-        guildName: guild.name,
-        channelName: channel.name,
-        voiceChannel: channel.id || null,
-      }),
-    });
-    noteRuntimeRecoveryFailure(runtime, guildId, `${runtime.config.name} restore-voice-timeout`, `guild=${guildId}`);
-    runtime.scheduleReconnect(guildId, { reason: "restore-ready-timeout" });
-    return { ok: false, reconnectScheduled: true };
-  }
-
-  clearRestoreBlockState(state);
-  await runtime.playStation(state, restoredStation.stations, restoredStation.key, guildId, {
-    countAsStart: false,
-    resumeSession: true,
-    preserveDesiredStation: state.failoverActive === true,
-  });
-  clearRuntimeRestoreRetry(runtime, guildId);
-  log("INFO", `[${runtime.config.name}] Wiederhergestellt: ${guild.name} -> ${restoredStation.station.name}`);
-  if (replacedStation) {
-    void notifyRuntimeStationUnavailable(runtime, guildId, state, {
-      ...replacedStation,
-      replacementStationKey: restoredStation.key,
-      replacementStationName: restoredStation.station?.name || restoredStation.key,
-    }).catch(() => null);
-  }
-
-  await waitMs(2000);
-  return { ok: true };
-}
-
-export async function restoreRuntimeState(runtime, stations) {
-  void stations;
-  const saved = getBotState(runtime.config.id);
-  if (!saved || Object.keys(saved).length === 0) {
-    log("INFO", `[${runtime.config.name}] Kein gespeicherter State gefunden (bot-id: ${runtime.config.id}).`);
-    return;
-  }
-
-  const restorableEntries = Object.entries(saved).filter(([_, data]) => data?.stationKey && data?.channelId);
-  if (restorableEntries.length === 0) {
-    log("INFO", `[${runtime.config.name}] Nur gespeicherte Guild-Einstellungen gefunden (kein aktives Restore-Ziel).`);
-    return;
-  }
-
-  log("INFO", `[${runtime.config.name}] Stelle ${restorableEntries.length} Verbindung(en) wieder her...`);
-
-  for (const [guildId, data] of restorableEntries) {
-    try {
-      await restoreRuntimeGuildEntry(runtime, guildId, data, stations, { source: "restore" });
-    } catch (err) {
-      const state = runtime.guildState.get(guildId);
-      logError(`[${runtime.config.name}] Restore fehlgeschlagen`, err, {
-        context: buildRuntimeLogContext(runtime, guildId, state, {
-          source: "restore",
-          restoreChannel: data?.channelId || null,
-          restoreStation: data?.stationKey || null,
-        }),
-      });
-      if (state?.shouldReconnect && state.lastChannelId && state.currentStationKey) {
-        runtime.scheduleReconnect(guildId, { reason: "restore-error" });
-      }
-    }
-  }
 }
