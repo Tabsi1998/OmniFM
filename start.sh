@@ -486,7 +486,7 @@ else
   wait_for_backend_contract
 
   log "Serviere Frontend auf Port $FRONTEND_PORT..."
-  ( cd "$ROOT/frontend" && nohup ./node_modules/.bin/serve -s build -l "tcp://0.0.0.0:${FRONTEND_PORT}" \
+  ( cd "$ROOT/frontend" && nohup ./node_modules/.bin/serve build --config ../serve.json -l "tcp://0.0.0.0:${FRONTEND_PORT}" \
     >"$LOG_DIR/frontend.log" 2>&1 & echo $! > "$RUN_DIR/frontend.pid" )
   wait_for_http "React-Frontend" "http://127.0.0.1:${FRONTEND_PORT}/" "$LOG_DIR/frontend.log"
 
