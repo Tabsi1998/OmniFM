@@ -9,6 +9,7 @@ function normalizeWeeklyDigestLanguage(value, fallback = "de") {
   return normalized === "en" ? "en" : "de";
 }
 
+/** @param {Record<string, any>} [input] */
 function normalizeWeeklyDigestConfig(input = {}, fallbackLanguage = "de") {
   const source = input && typeof input === "object" ? input : {};
   return {
@@ -79,6 +80,10 @@ function formatWeeklyDigestDuration(ms) {
   return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 }
 
+/**
+ * @param {{ guildName?: string, channelId?: string, channelName?: string,
+ *   stats?: Record<string, any>, dailyStats?: any[], language?: string, now?: Date }} [options]
+ */
 function buildWeeklyDigestPreview({
   guildName = "",
   channelId = "",

@@ -9,6 +9,10 @@ import {
   applyJitter,
 } from "../lib/helpers.js";
 
+/**
+ * @param {string | { scope?: string } | null} [options]
+ * @returns {{ scope?: string }}
+ */
 function normalizeOptions(options = {}) {
   if (typeof options === "string") {
     return { scope: options };

@@ -462,6 +462,11 @@ class BotRuntime {
     });
   }
 
+  /**
+   * The playback state of one server, created on first use.
+   * @param {string} guildId
+   * @returns {import("../lib/types.js").GuildPlaybackState}
+   */
   getState(guildId) {
     if (!this.guildState.has(guildId)) {
       const savedVolume = getBotGuildVolume(this.config.id, guildId);

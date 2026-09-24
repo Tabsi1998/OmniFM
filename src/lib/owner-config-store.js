@@ -443,6 +443,7 @@ function patchOwnerConfig(input) {
   }
 
   if (rejected.length) {
+    /** @type {import("./types.js").HttpError} */
     const err = new Error(rejected.join(" "));
     err.statusCode = 400;
     throw err;
@@ -469,11 +470,13 @@ function patchOwnerSecrets(input) {
   }
 
   if (rejected.length) {
+    /** @type {import("./types.js").HttpError} */
     const err = new Error(rejected.join(" "));
     err.statusCode = 400;
     throw err;
   }
   if (Object.keys(updates).length === 0) {
+    /** @type {import("./types.js").HttpError} */
     const err = new Error("Keine Secret-Werte zum Speichern uebergeben.");
     err.statusCode = 400;
     throw err;

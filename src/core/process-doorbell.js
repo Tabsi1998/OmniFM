@@ -63,6 +63,11 @@ function onDoorbell(topic, handler, proc = process) {
  * Resolves after timeoutMs, or earlier when a ring of the topic matches.
  * Returns true when a ring woke it.
  */
+/**
+ * @param {string} topic
+ * @param {{ timeoutMs?: number, match?: (detail: any) => boolean, proc?: any }} [options]
+ * @returns {Promise<boolean>}
+ */
 function waitForDoorbell(topic, { timeoutMs = 500, match = () => true, proc = process } = {}) {
   return new Promise((resolve) => {
     let stop = () => {};

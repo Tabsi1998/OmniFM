@@ -39,8 +39,10 @@ function normalizeOutboundIpAddress(rawValue) {
   if (!value || !ipaddr.isValid(value)) return "";
 
   let parsed = ipaddr.parse(value);
-  if (typeof parsed.isIPv4MappedAddress === "function" && parsed.isIPv4MappedAddress()) {
-    parsed = parsed.toIPv4Address();
+  // Only an IPv6 address has the IPv4-mapped form.
+  const ipv6 = /** @type {any} */ (parsed);
+  if (typeof ipv6.isIPv4MappedAddress === "function" && ipv6.isIPv4MappedAddress()) {
+    parsed = ipv6.toIPv4Address();
   }
   return parsed.toString();
 }
@@ -140,6 +142,10 @@ function waitForDnsRetry(delayMs) {
   return new Promise((resolve) => setTimeout(resolve, delay));
 }
 
+/**
+ * @param {string} hostname
+ * @param {{ resolver?: Function, lookupFn?: Function, retryCount?: number, retryDelayMs?: number }} [options]
+ */
 async function resolveHostnameForOutboundRequest(hostname, {
   resolver = dnsLookup,
   lookupFn,
@@ -238,6 +244,11 @@ function toSafeOutboundTransportError(error) {
   );
 }
 
+/**
+ * @param {any} target
+ * @param {{ method?: string, headers?: Record<string, any>, body?: any, signal?: AbortSignal,
+ *   timeoutMs?: number }} [options]
+ */
 function requestPinnedTarget(target, {
   method = "GET",
   headers = {},
@@ -342,6 +353,12 @@ function stripSensitiveRedirectHeaders(headers) {
   return next;
 }
 
+/**
+ * @param {string | URL} rawUrl
+ * @param {{ method?: string, headers?: Record<string, any>, body?: any, signal?: AbortSignal,
+ *   timeoutMs?: number, redirect?: string, maxRedirects?: number, requestImpl?: Function,
+ *   [policyOption: string]: any }} [options]
+ */
 async function safeFetch(rawUrl, {
   method = "GET",
   headers = {},

@@ -58,6 +58,7 @@ function getOwnerMailStatus() {
 
 async function sendOwnerTestMail(input = {}, { sendMailImpl = sendMail, isConfiguredImpl = isEmailConfigured } = {}) {
   if (!isConfiguredImpl()) {
+    /** @type {import("./types.js").HttpError} */
     const err = new Error("SMTP ist nicht konfiguriert.");
     err.statusCode = 503;
     throw err;
@@ -66,6 +67,7 @@ async function sendOwnerTestMail(input = {}, { sendMailImpl = sendMail, isConfig
   const status = getOwnerMailStatus();
   const to = cleanEmail(input.to || status.defaultRecipient);
   if (!isValidEmail(to)) {
+    /** @type {import("./types.js").HttpError} */
     const err = new Error("Bitte eine gueltige Empfaenger-E-Mail angeben.");
     err.statusCode = 400;
     throw err;
@@ -84,6 +86,7 @@ async function sendOwnerTestMail(input = {}, { sendMailImpl = sendMail, isConfig
   );
 
   if (!result?.success) {
+    /** @type {import("./types.js").HttpError} */
     const err = new Error(result?.error || "SMTP-Testmail konnte nicht gesendet werden.");
     err.statusCode = 502;
     throw err;

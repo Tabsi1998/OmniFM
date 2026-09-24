@@ -23,6 +23,11 @@ function normalizeRemoteVolume(value, fallback = 100) {
   return Math.max(0, Math.min(100, parsed));
 }
 
+/**
+ * The commander's view of a worker's server, rebuilt from its status snapshot.
+ * @param {Record<string, any>} [detail]
+ * @returns {Partial<import("../lib/types.js").GuildPlaybackState>}
+ */
 function buildRemoteGuildState(detail = {}) {
   const channelId = String(detail?.channelId || "").trim();
   const defaultVoiceGuardConfig = buildResolvedVoiceGuardConfig({});

@@ -130,7 +130,7 @@ function calculateUpgradePrice(currentLicense, targetTier) {
   const target = String(targetTier || "").toLowerCase();
   if (!target || sourceTier === target) return null;
 
-  const remaining = Math.max(0, Math.ceil((new Date(currentLicense.expiresAt) - new Date()) / 86400000));
+  const remaining = Math.max(0, Math.ceil((new Date(currentLicense.expiresAt).getTime() - Date.now()) / 86400000));
   if (remaining <= 0) return null;
 
   const seats = normalizeSeats(currentLicense.seats || 1);

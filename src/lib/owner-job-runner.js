@@ -13,6 +13,7 @@ function normalizePublicStreamUrl(value) {
     allowedProtocols: ["http:", "https:"],
   });
   if (!validation.ok) {
+    /** @type {import("./types.js").HttpError} */
     const error = new Error(
       validation.code === "OUTBOUND_ADDRESS_NOT_ALLOWED" || validation.code === "OUTBOUND_HOST_NOT_ALLOWED"
         ? "Stream-URL darf kein lokales oder privates Ziel sein."
@@ -344,16 +345,18 @@ function finishJob(job, patch = {}) {
 function startOwnerJob(actionId, { actor = "owner", onFinish = null, input = {} } = {}) {
   const action = ACTION_BY_ID.get(String(actionId || ""));
   if (!action) {
+    /** @type {import("./types.js").HttpError} */
     const error = new Error("Unbekannte Owner-Aktion.");
     error.statusCode = 404;
     throw error;
   }
   if (hasRunningJob()) {
+    /** @type {import("./types.js").HttpError} */
     const error = new Error("Es laeuft bereits ein Owner-Job.");
     error.statusCode = 409;
     throw error;
   }
-  const args = typeof action.buildArgs === "function" ? action.buildArgs(input) : action.args;
+  const args = typeof action.buildArgs === "function" ? action.buildArgs(input) : /** @type {any} */ (action).args;
 
   const job = {
     id: randomUUID(),

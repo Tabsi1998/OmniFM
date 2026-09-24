@@ -3,6 +3,7 @@ function clampNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+/** @param {Record<string, any>} [source] */
 function normalizeRuntimeStatusInput(source = {}) {
   const input = source && typeof source === "object" ? source : {};
   return {

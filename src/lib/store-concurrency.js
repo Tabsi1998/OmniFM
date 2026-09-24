@@ -159,6 +159,10 @@ export function getStoreConcurrencyReport({
   };
 }
 
+/**
+ * @param {{ log?: Function, env?: Record<string, string | undefined>,
+ *   mongoConnected?: boolean, requireMongo?: boolean }} [options]
+ */
 export function logStoreConcurrencyReport({
   log,
   env = process.env,
