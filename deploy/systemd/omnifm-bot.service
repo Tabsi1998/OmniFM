@@ -15,6 +15,10 @@ WorkingDirectory=__ROOT__
 # tuning (VOICE_*, STREAM_*, LOG_*) on a server, see .env.example.
 EnvironmentFile=-__ROOT__/backend/.env
 Environment=PATH=__NODE_DIR__:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# Runtime files live in runtime-data/ (part of the update backup), logs in
+# logs/, never between the code in the repository root (#227).
+Environment=OMNIFM_RUNTIME_DATA_DIR=__ROOT__/runtime-data
+Environment=LOGS_DIR=__ROOT__/logs
 Environment=NODE_ENV=production
 ExecStart=__NODE__ src/entrypoints/from-owner-config.mjs
 Restart=always

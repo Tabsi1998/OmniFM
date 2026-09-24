@@ -85,3 +85,11 @@ test("start.sh renders the templates and stop.sh stops the units", () => {
   assert.ok(startSh.includes("MONGO_WAIT_SECONDS"), "start.sh waits for MongoDB before the preflight");
   assert.doesNotMatch(startSh, /Type=oneshot/, "the oneshot stack unit is gone");
 });
+
+test("bot and backend keep their runtime files in runtime-data and logs in logs", () => {
+  for (const unit of ["omnifm-bot.service", "omnifm-backend.service"]) {
+    const text = fs.readFileSync(path.join(unitDir, unit), "utf8");
+    assert.match(text, /^Environment=OMNIFM_RUNTIME_DATA_DIR=__ROOT__\/runtime-data$/m, unit);
+    assert.match(text, /^Environment=LOGS_DIR=__ROOT__\/logs$/m, unit);
+  }
+});

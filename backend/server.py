@@ -44,9 +44,16 @@ MONGO_URL = os.environ.get("MONGO_URL")
 DB_NAME = os.environ.get("DB_NAME")
 
 STATIONS_FILE = Path(__file__).parent.parent / "stations.json"
-PREMIUM_FILE = Path(__file__).parent.parent / "premium.json"
-COUPONS_FILE = Path(__file__).parent.parent / "coupons.json"
-DASHBOARD_FILE = Path(__file__).parent.parent / "dashboard.json"
+# The fallback files without MongoDB share the runtime folder of the Node
+# stores (#227): runtime-data/ in production, the repository root otherwise.
+RUNTIME_DATA_DIR = Path(
+    os.environ.get("OMNIFM_RUNTIME_DATA_DIR") or Path(__file__).parent.parent
+)
+if not RUNTIME_DATA_DIR.is_absolute():
+    RUNTIME_DATA_DIR = Path(__file__).parent.parent / RUNTIME_DATA_DIR
+PREMIUM_FILE = RUNTIME_DATA_DIR / "premium.json"
+COUPONS_FILE = RUNTIME_DATA_DIR / "coupons.json"
+DASHBOARD_FILE = RUNTIME_DATA_DIR / "dashboard.json"
 # The recovery values of the owner console, shared with the bot (#217).
 RECOVERY_SETTINGS_FILE = Path(__file__).parent.parent / "src" / "config" / "recovery-settings.json"
 
