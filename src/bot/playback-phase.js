@@ -18,6 +18,7 @@
 //   parked      the target is paused after repeated failures, retried slowly
 
 import { log } from "../lib/logging.js";
+import { recordUnexpectedPlaybackTransition } from "../services/operator-alerts.js";
 
 const PLAYBACK_PHASES = Object.freeze(["idle", "connecting", "starting", "playing", "paused", "recovering", "parked"]);
 
@@ -97,6 +98,8 @@ function recordPlaybackPhase(runtime, guildId, state, reason = "") {
       `[${runtime?.config?.name || "OmniFM"}] Unerwarteter Wiedergabe-Übergang guild=${guildId || "-"}: ` +
       `${transition.from} -> ${transition.to} (${transition.reason || "-"})`
     );
+    // A few of these in a short time mean the playback goes round in circles (#260).
+    recordUnexpectedPlaybackTransition(guildId, transition, { runtimeName: runtime?.config?.name });
   }
   return transition;
 }

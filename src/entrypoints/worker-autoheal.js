@@ -1,4 +1,5 @@
 import { log, logError } from "../lib/logging.js";
+import { alertWorkerAutoheal } from "../services/operator-alerts.js";
 
 function toPositiveInt(rawValue, fallbackValue) {
   const parsed = Number.parseInt(String(rawValue ?? fallbackValue), 10);
@@ -352,6 +353,16 @@ function startWorkerAutohealMonitor({
       );
     });
     log("ERROR", lines.join("\n"));
+    // The operator hears about it, but the restart never waits long for Discord (#260).
+    await Promise.race([
+      alertWorkerAutoheal({
+        workerName: runtime?.config?.name || `Worker ${options.workerIndex}`,
+        stuckGuilds: evaluation.stuckGuilds.length,
+      }).catch(() => false),
+      new Promise((resolve) => {
+        setTimeout(resolve, 3_000).unref?.();
+      }),
+    ]);
 
     try {
       runtime?.persistState?.({ forceLog: true });
