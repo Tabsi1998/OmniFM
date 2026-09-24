@@ -52,6 +52,14 @@ Every setting the code reads is documented in `.env.example` (active line for a
 default, `# NAME=` for an optional override); values OmniFM sets itself are
 listed in `ENV_PROVIDED` in `scripts/local_check.py`.
 
+## Dependency notes
+
+- Voice encryption: Node's native AES-256-GCM plus `sodium-native` as the only
+  fallback binding; `npm run test:voice-codec` fails if a second one appears (#214).
+- `overrides` in package.json pins `tar` for `@discordjs/node-pre-gyp`: its
+  0.4.5 still depends on `tar@^6.1.11`, which has published advisories. Drop the
+  override once a node-pre-gyp release depends on tar 7.
+
 ## Extending the checks
 
 `scripts/local_check.py` has three parts:
