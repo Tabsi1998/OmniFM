@@ -61,7 +61,30 @@ create_backup() {
   chmod 700 "$BACKUP_DIR"
   archive="$BACKUP_DIR/$(archive_name)"
   temp_archive="${archive}.tmp-$$"
-  tar -C "$(dirname "$RUNTIME_DIR")" -czf "$temp_archive" "$(basename "$RUNTIME_DIR")"
+
+  # The bot keeps writing while an update backs its data up. Every store writes
+  # a temp file and renames it over the old one, so tar reads one complete
+  # version of each file, but GNU tar still reports such a file with exit 1
+  # ("file changed as we read it"). Up to three attempts for a quiet copy, then
+  # the last archive counts with a warning. Temp files and lock folders of a
+  # write in progress are left out. Only an exit of 2 or more is an error.
+  local attempt status=0
+  for attempt in 1 2 3; do
+    status=0
+    tar -C "$(dirname "$RUNTIME_DIR")" \
+      --exclude='*.tmp-*' --exclude='*.lock' \
+      --warning=no-file-changed --warning=no-file-removed --ignore-failed-read \
+      -czf "$temp_archive" "$(basename "$RUNTIME_DIR")" || status=$?
+    [[ "$status" -eq 0 ]] && break
+    if [[ "$status" -gt 1 ]]; then
+      rm -f "$temp_archive"
+      fatal "tar failed with exit $status while archiving $RUNTIME_DIR."
+    fi
+    [[ "$attempt" -lt 3 ]] && sleep 1
+  done
+  if [[ "$status" -eq 1 ]]; then
+    echo "[WARN] Runtime data changed while it was archived (the bot is running); the archive holds each file as it was read." >&2
+  fi
   chmod 600 "$temp_archive"
   validate_archive_layout "$temp_archive"
   mv "$temp_archive" "$archive"
