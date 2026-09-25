@@ -5,6 +5,7 @@ export const COMMAND_PERMISSION_COMMANDS = [
   "stop",
   "setvolume",
   "sleep",
+  "poll",
   "stations",
   "list",
   "now",
