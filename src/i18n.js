@@ -32,7 +32,8 @@ export function resolveLanguageFromAcceptLanguage(headerValue, fallback = DEFAUL
     if (token.toLowerCase().startsWith("en")) return "en";
   }
 
-  return normalizeLanguage("", fallback);
+  // A browser in any other language gets English.
+  return tokens.length ? "en" : normalizeLanguage("", fallback);
 }
 
 export function getLocaleForLanguage(language) {
