@@ -66,7 +66,7 @@ function withChannelOption(target, name, english, german, channelTypes, { requir
     .setRequired(required));
 }
 
-function buildRepeatChoices() {
+export function buildRepeatChoices() {
   return [
     choice("One-time", "none", "Einmalig"),
     choice("Daily", "daily", "Täglich"),
@@ -287,9 +287,10 @@ export function buildCommandBuilders() {
     "[Ultimate] Add your own station URL",
     "[Ultimate] Eigene Stations-URL hinzufügen"
   );
-  withStringOption(addstation, "key", "Short key (for example mystation)", "Kurzer Key (z. B. mystation)", { required: true });
-  withStringOption(addstation, "name", "Display name", "Anzeigename", { required: true });
-  withStringOption(addstation, "url", "Stream URL (http/https)", "Stream-URL (http/https)", { required: true });
+  // Without options /addstation opens a form with a stream test (#273).
+  withStringOption(addstation, "key", "Short key (for example mystation) - empty: a form opens", "Kurzer Key (z. B. mystation) – leer: ein Formular öffnet sich");
+  withStringOption(addstation, "name", "Display name", "Anzeigename");
+  withStringOption(addstation, "url", "Stream URL (http/https)", "Stream-URL (http/https)");
 
   const removestation = describe(
     new SlashCommandBuilder().setName("removestation"),
@@ -309,6 +310,11 @@ export function buildCommandBuilders() {
     "[Pro] Schedule automatic radio events",
     "[Pro] Event-Scheduler für automatische Starts"
   )
+    .addSubcommand((sub) => describe(
+      sub.setName("form").setNameLocalizations(de("formular")),
+      "Plan an event with a form",
+      "Event mit einem Formular planen"
+    ))
     .addSubcommand((sub) => {
       describe(sub.setName("create"), "Create a new scheduled event", "Neues Event planen");
       withStringOption(sub, "name", "Event name (for example Morning Show)", "Eventname (z. B. Morning Show)", { required: true });

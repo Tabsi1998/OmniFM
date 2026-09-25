@@ -1019,6 +1019,9 @@ const nowPlayingMethods = {
       return true;
     }
     const action = String(interaction.customId || "").slice(NP_PREFIX.length);
+    // "Report a problem" (#273): the form, then the report for the owner.
+    if (action === "report") return this.showProblemReportForm(interaction);
+    if (action === "reportform" && interaction.isModalSubmit?.()) return this.handleProblemReportSubmit(interaction);
     // A favourite button (#276) switches the station, under the /play rule.
     if (action.startsWith("fav:")) return this.handleFavoriteControl(interaction, action.slice(4));
     // "💾 Save" (#272) is personal: no role rule, its own answer.
