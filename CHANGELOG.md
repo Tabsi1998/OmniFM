@@ -6,6 +6,55 @@ folgt [SemVer](https://semver.org/lang/de/): Die erste Zahl steigt bei
 Funktionen, die dritte bei reinen Fehlerbehebungen. Wie ein Release entsteht,
 steht in `scripts/release.mjs`.
 
+## 3.2.0 – 2026-09-25
+
+Das neue Gesicht in Discord: Alle wichtigen Nachrichten des Bots sind neu
+gestaltet, dazu Funktionen für Hörer und Server-Teams (Milestone M8).
+
+### Neu
+
+- **Neues Now-Playing-Panel:** Cover, Titel, Sender in seiner eigenen Farbe,
+  Hörer, Lautstärke und die Knöpfe in einer Nachricht. Die OmniFM-Symbole
+  sind eigene Emojis des Bots, mit animiertem Equalizer. `/now` zeigt
+  dasselbe Panel. (#322, #323, #324)
+- **Einrichtung in drei Schritten:** Nach dem Einladen kommt eine Begrüßung
+  in den Systemkanal. Mit einem Knopf wählen Server-Verwalter Sprachkanal,
+  Sender und Panel-Kanal, ganz ohne Befehl. Fehlt dem Bot ein Recht, steht
+  genau da, welches. (#330)
+- **Sender-Browser:** `/stations` zeigt alle Sender mit Genre-Auswahl, Suche
+  und Abspielen-Knopf; gesperrte Sender zeigen, ab welchem Plan sie gehen.
+  Jeder Sender hat jetzt Genre, Farbe und, wo vorhanden, ein Logo. (#326, #327)
+- **Hilfe zum Durchklicken:** `/help` ist ein Panel mit Themen (Abspielen,
+  Sender, Events, Einstellungen, Premium, Probleme lösen) und passenden
+  Knöpfen. (#329)
+- **Klare Hinweise:** Jede bekannte Fehlermeldung sagt in einem Satz, was los
+  ist, und hat – wo möglich – einen Knopf, der es behebt. (#328)
+- **Song merken:** „💾 Merken“ im Panel schickt den Song als Karte per
+  Direktnachricht, mit Links zu Spotify, Apple Music, YouTube Music und
+  Deezer. `/merkliste` zeigt die letzten 50 Songs; einzeln oder alle
+  löschbar. (#331)
+- **Sleep-Timer:** `/sleep` schaltet das Radio nach 15 Minuten bis 2 Stunden
+  leise aus. Eine Minute vorher kommt ein Hinweis mit „+30 min“; der Timer
+  übersteht einen Neustart. (#335)
+- **Favoriten-Leiste:** Bis zu fünf Lieblingssender als Knöpfe im Panel
+  (Free drei). Gepflegt mit ⭐ im Sender-Browser oder im Dashboard. (#336)
+- **Sprachkanal-Status nach Wunsch:** Den Text oben im Sprachkanal legt jeder
+  Server im Dashboard selbst fest, mit Platzhaltern für Sender, Titel,
+  Interpret und Hörer und einer Vorschau. (#332)
+- **Neuer Wochenrückblick:** Hörzeit, meiste Hörer gleichzeitig, Spitzenzeit
+  und Top-Sender mit Logo, jeweils im Vergleich zur Vorwoche, dazu die Songs,
+  die am öftesten liefen. Wahlweise fürs Team oder öffentlich. (#333)
+- **Test-Instanz:** Neben dem Live-Betrieb lässt sich eine zweite Instanz zum
+  Ausprobieren einrichten. (#319)
+
+### Behoben
+
+- Der Wochenrückblick zählte „die letzten 7 Tage mit Daten“ statt der
+  letzten Woche und kam im geteilten Betrieb noch im alten Aussehen. (#333)
+- Fünf Sender spielten gar nicht oder etwas anderes (einer war ein
+  Polizeifunk); sie haben jetzt die richtigen Streams. (#326)
+- Seltener Fehler beim Speichern der Senderliste unter Windows. (#334)
+
 ## 3.1.0 – 2026-09-25
 
 Die große Stabilitätsrunde: Wiedergabe, Betrieb und Werkzeuge, umgesetzt in
