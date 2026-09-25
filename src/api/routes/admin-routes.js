@@ -11,9 +11,12 @@
 //   GET  /api/admin/overview     → Bot-Status, Guilds, Lizenzen
 //   GET  /api/admin/diagnostics  → Owner-Diagnose ohne Secret-Werte
 //   GET  /api/admin/operations   → update.sh/Owner-GUI Paritaetskarte
-//   GET  /api/admin/config       → Owner-Einstellungen ohne Secret-Werte
-//   POST /api/admin/config       → Erlaubte Owner-Einstellungen in .env speichern
-//   POST /api/admin/config/secrets → Erlaubte Secrets write-only in .env speichern
+//   POST /api/admin/login        → Owner-Token prüfen (Owner-Konsole, #288)
+//   GET  /api/admin/config       → Owner-Einstellungen aus MongoDB, Secrets maskiert (#288)
+//   PUT  /api/admin/config       → Einen Abschnitt speichern (#288)
+//   GET  /api/admin/env          → .env-Einstellungen ohne Secret-Werte (alte Admin-Seite)
+//   POST /api/admin/env          → Erlaubte Owner-Einstellungen in .env speichern
+//   POST /api/admin/env/secrets  → Erlaubte Secrets write-only in .env speichern
 //   GET  /api/admin/legal        → Legal/Privacy/Terms Readiness und Preview
 //   GET  /api/admin/mail         → SMTP-Status ohne Secret-Werte
 //   POST /api/admin/mail/test    → SMTP-Testmail senden
@@ -42,7 +45,16 @@ import { getOwnerAuditSnapshot, recordOwnerAudit } from "../../lib/owner-audit-s
 import { getOwnerLogFileSnapshot, getOwnerLogFilesSnapshot } from "../../lib/owner-log-files.js";
 import { TEST_CONFIRMATION_VALUE, getOwnerMailStatus, sendOwnerTestMail } from "../../lib/owner-mail-test.js";
 import { testOwnerStationStream } from "../../lib/owner-station-test.js";
-import { getClientIp, getTrustedForwardedProto } from "../../lib/api-helpers.js";
+import { getClientIp, getTrustedForwardedProto, safeTokenEquals } from "../../lib/api-helpers.js";
+import { getDb, isConnected } from "../../lib/db.js";
+import {
+  OWNER_CONFIG_ID,
+  OWNER_CONFIG_SECTIONS,
+  loadOwnerConfigRaw,
+  mergedSectionForSave,
+  ownerConfigResponse,
+  sectionResponse,
+} from "../../lib/owner-config.js";
 
 export function readRequestBody(req, limitBytes = 4096) {
   const maxBytes = Math.max(1, Math.floor(Number(limitBytes) || 4096));
@@ -754,7 +766,7 @@ export function createAdminRoutesHandler(deps) {
 
   function isAdminTokenValue(token) {
     const adminToken = resolveConfiguredAdminToken();
-    return Boolean(adminToken) && String(token || "").trim() === adminToken;
+    return Boolean(adminToken) && safeTokenEquals(String(token || "").trim(), adminToken);
   }
 
   /**
@@ -929,6 +941,28 @@ export function createAdminRoutesHandler(deps) {
         sendAdminJson(res, statusCode, { ok: false, error: err?.message || "Invalid login request" });
         return true;
       }
+    }
+
+    // POST /api/admin/login: the owner console checks its token (#288, like FastAPI).
+    if (pathname === "/api/admin/login") {
+      if (req.method !== "POST") { methodNotAllowed(res, ["POST"]); return true; }
+      if (!resolveConfiguredAdminToken()) {
+        sendAdminJson(res, 503, { error: "Owner-API ist nicht konfiguriert (API_ADMIN_TOKEN fehlt)." });
+        return true;
+      }
+      let bodyToken;
+      try {
+        bodyToken = String(JSON.parse(await readRequestBody(req) || "{}")?.token || "").trim();
+      } catch {
+        bodyToken = "";
+      }
+      const token = bodyToken || getAdminTokenFromRequest(req, requestUrl);
+      if (token && isAdminTokenValue(token)) {
+        sendAdminJson(res, 200, { ok: true, role: "owner" });
+      } else {
+        sendAdminJson(res, 401, { error: "Ungueltiger Owner-Token." });
+      }
+      return true;
     }
 
     if (pathname === "/api/admin/logout") {
@@ -1251,8 +1285,52 @@ export function createAdminRoutesHandler(deps) {
       return true;
     }
 
-    // GET/POST /api/admin/config
+    // GET/PUT /api/admin/config: the owner console's settings (#288, same contract as FastAPI)
     if (pathname === "/api/admin/config") {
+      if (req.method === "GET") {
+        sendJson(res, 200, ownerConfigResponse(await loadOwnerConfigRaw()));
+        return true;
+      }
+      if (req.method !== "PUT") { methodNotAllowed(res, ["GET", "PUT"]); return true; }
+      let body;
+      try {
+        body = JSON.parse(await readRequestBody(req, 256 * 1024) || "null");
+      } catch {
+        body = null;
+      }
+      if (!body || typeof body !== "object" || Array.isArray(body)) {
+        sendJson(res, 400, { error: "Ungueltiger Body." });
+        return true;
+      }
+      const section = String(body.section || "").trim();
+      const data = body.data;
+      if (!OWNER_CONFIG_SECTIONS.includes(section)) {
+        sendJson(res, 400, { error: `Unbekannter Config-Abschnitt: ${section}` });
+        return true;
+      }
+      if (!data || typeof data !== "object") {
+        sendJson(res, 400, { error: "data muss ein Objekt oder eine Liste sein." });
+        return true;
+      }
+      if (!isConnected() || !getDb()) {
+        sendJson(res, 503, { error: "Keine Datenbank verbunden \u2013 Speichern nicht m\u00f6glich." });
+        return true;
+      }
+      try {
+        const raw = await loadOwnerConfigRaw();
+        const next = mergedSectionForSave(raw, section, data);
+        await getDb().collection("owner_config").updateOne({ _id: OWNER_CONFIG_ID }, { $set: { [section]: next } }, { upsert: true });
+        auditOwnerAction(req, { action: "config.update", status: "success", target: section, summary: "aktualisiert" });
+        sendJson(res, 200, { ok: true, section, data: sectionResponse({ ...raw, [section]: next }, section) });
+      } catch (err) {
+        auditOwnerAction(req, { action: "config.update", status: "failed", target: section, summary: err?.message || "Speichern fehlgeschlagen" });
+        sendJson(res, 500, { error: "Speichern fehlgeschlagen." });
+      }
+      return true;
+    }
+
+    // GET/POST /api/admin/env: the .env editor of the old HTML admin page (moved from /api/admin/config, #288)
+    if (pathname === "/api/admin/env") {
       if (req.method === "GET") {
         sendJson(res, 200, getOwnerConfigSnapshot());
         return true;
@@ -1293,8 +1371,8 @@ export function createAdminRoutesHandler(deps) {
       return true;
     }
 
-    // POST /api/admin/config/secrets
-    if (pathname === "/api/admin/config/secrets") {
+    // POST /api/admin/env/secrets: secrets of the old .env editor (moved from /api/admin/config/secrets, #288)
+    if (pathname === "/api/admin/env/secrets") {
       if (req.method !== "POST" && req.method !== "PATCH") { methodNotAllowed(res, ["POST", "PATCH"]); return true; }
       try {
         const payload = JSON.parse(await readRequestBody(req) || "{}");

@@ -1,0 +1,208 @@
+{
+  "company": {
+    "providerName": "",
+    "legalForm": "Einzelunternehmen (Kleinunternehmer)",
+    "representative": "",
+    "streetAddress": "",
+    "postalCode": "",
+    "city": "",
+    "country": "Österreich",
+    "email": "",
+    "phone": "",
+    "website": "",
+    "businessPurpose": "Betrieb eines Discord-Radio-/Musik-Dienstes",
+    "vatId": "",
+    "kleinunternehmer": true,
+    "commercialRegisterNumber": "",
+    "commercialRegisterCourt": "",
+    "supervisoryAuthority": "",
+    "chamber": "",
+    "profession": "",
+    "professionRules": "",
+    "editorialResponsible": "",
+    "mediaOwner": "",
+    "mediaLine": "",
+    "dpoName": "",
+    "dpoEmail": "",
+    "hostingProvider": "",
+    "hostingLocation": "",
+    "effectiveDate": "",
+    "governingLaw": "Österreichisches Recht"
+  },
+  "plans": {
+    "free": {
+      "name": "Free",
+      "pricePerMonth": 0,
+      "startingAt": "0",
+      "maxBots": 2,
+      "stations": "20 Free Stationen",
+      "bitrate": "64k",
+      "reconnectMs": 5000,
+      "features": [
+        "Bis zu 2 Bots",
+        "20 Free Stationen",
+        "Standard Audio (64k)",
+        "Standard Reconnect"
+      ]
+    },
+    "pro": {
+      "name": "Pro",
+      "pricePerMonth": 299,
+      "startingAt": "2,99",
+      "maxBots": 8,
+      "stations": "120 Stationen (Free + Pro)",
+      "bitrate": "128k",
+      "reconnectMs": 1500,
+      "features": [
+        "Bis zu 8 Bots",
+        "120 Stationen (Free + Pro)",
+        "HQ Audio (128k Opus)",
+        "Priority Reconnect",
+        "Rollenbasierte Berechtigungen",
+        "Event-Scheduler"
+      ]
+    },
+    "ultimate": {
+      "name": "Ultimate",
+      "pricePerMonth": 499,
+      "startingAt": "4,99",
+      "maxBots": 16,
+      "stations": "Alle Stationen + Custom URLs",
+      "bitrate": "320k",
+      "reconnectMs": 400,
+      "features": [
+        "Bis zu 16 Bots",
+        "Alle Stationen + Custom URLs",
+        "Ultra HQ Audio (320k)",
+        "Instant Reconnect",
+        "Rollenbasierte Berechtigungen"
+      ]
+    }
+  },
+  "discord": {
+    "commander": {
+      "name": "OmniFM Commander",
+      "token": "",
+      "clientId": "",
+      "inviteUrl": ""
+    },
+    "workers": []
+  },
+  "system": {
+    "discordOAuth": {
+      "clientId": "",
+      "clientSecret": "",
+      "redirectUri": "",
+      "scopes": "identify guilds"
+    },
+    "smtp": {
+      "enabled": false,
+      "host": "",
+      "port": 587,
+      "secure": false,
+      "user": "",
+      "password": "",
+      "from": ""
+    },
+    "operatorAlerts": {
+      "webhookUrl": "",
+      "mention": "",
+      "workerOffline": true,
+      "failoverExhausted": true,
+      "playbackLoops": true,
+      "workerAutoheal": true,
+      "diskSpace": true,
+      "backupFailed": true,
+      "updates": true
+    },
+    "audioRecognition": {
+      "enabled": false,
+      "apiKey": ""
+    },
+    "songHistory": {
+      "enabled": true,
+      "maxPerGuild": 100
+    },
+    "stationHealth": {
+      "enabled": true,
+      "intervalMs": 5000,
+      "batchSize": 2,
+      "concurrency": 2,
+      "timeoutMs": 8000
+    },
+    "botDirectories": {
+      "discordBotList": {
+        "enabled": false,
+        "token": "",
+        "botId": "",
+        "slug": "",
+        "webhookSecret": "",
+        "statsScope": "aggregate"
+      },
+      "botsGG": {
+        "enabled": false,
+        "token": "",
+        "botId": "",
+        "statsScope": "aggregate"
+      },
+      "topGG": {
+        "enabled": false,
+        "token": "",
+        "botId": "",
+        "webhookSecret": "",
+        "statsScope": "aggregate"
+      }
+    }
+  },
+  "payments": {
+    "stripe": {
+      "enabled": false,
+      "mode": "test",
+      "publishableKey": "",
+      "secretKey": "",
+      "webhookSecret": ""
+    },
+    "paypal": {
+      "enabled": false,
+      "mode": "sandbox",
+      "clientId": "",
+      "secret": ""
+    },
+    "providers": []
+  },
+  "marketing": {
+    "sponsors": [],
+    "botListings": [
+      {
+        "name": "top.gg",
+        "url": "",
+        "enabled": true,
+        "note": "Größte Discord-Bot-Liste. Listing anlegen und URL hier einfügen."
+      },
+      {
+        "name": "Discord Bot List",
+        "url": "",
+        "enabled": true,
+        "note": "discordbotlist.com – Bot einreichen und Profil-URL hier eintragen."
+      },
+      {
+        "name": "Discords.com",
+        "url": "",
+        "enabled": false,
+        "note": "discords.com/bots – optionales Listing."
+      },
+      {
+        "name": "Discadia",
+        "url": "",
+        "enabled": false,
+        "note": "discadia.com – Server-/Bot-Verzeichnis."
+      },
+      {
+        "name": "Wumpus.store",
+        "url": "",
+        "enabled": false,
+        "note": "wumpus.store – kuratiertes Verzeichnis."
+      }
+    ]
+  }
+}

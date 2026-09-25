@@ -596,7 +596,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     });
     assert.equal(invalidAdminLogFileResponse.status, 404);
 
-    const adminConfigResponse = await fetch(`http://127.0.0.1:${port}/api/admin/config`, {
+    const adminConfigResponse = await fetch(`http://127.0.0.1:${port}/api/admin/env`, {
       headers: { Cookie: adminCookieHeader },
     });
     assert.equal(adminConfigResponse.status, 200);
@@ -646,14 +646,14 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.equal(unconfirmedMailTest.requiresConfirmation, true);
     assert.equal(unconfirmedMailTest.confirmationValue, "send-test-email");
 
-    const adminConfigPatchResponse = await fetch(`http://127.0.0.1:${port}/api/admin/config`, {
+    const adminConfigPatchResponse = await fetch(`http://127.0.0.1:${port}/api/admin/env`, {
       method: "POST",
       headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
       body: JSON.stringify({ values: { PUBLIC_WEB_URL: "https://omnifm.xyz", DEFAULT_LANGUAGE: "de", API_ADMIN_TOKEN: "must-not-save" } }),
     });
     assert.equal(adminConfigPatchResponse.status, 400);
 
-    const adminConfigSaveResponse = await fetch(`http://127.0.0.1:${port}/api/admin/config`, {
+    const adminConfigSaveResponse = await fetch(`http://127.0.0.1:${port}/api/admin/env`, {
       method: "POST",
       headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
       body: JSON.stringify({ values: { PUBLIC_WEB_URL: "https://omnifm.xyz", DEFAULT_LANGUAGE: "de", LOG_MAX_MB: "9" } }),
@@ -665,14 +665,14 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.ok(adminConfigSave.updatedKeys.includes("DEFAULT_LANGUAGE"));
     assert.match(await fs.readFile(ownerEnvFile, "utf8"), /DEFAULT_LANGUAGE=de/);
 
-    const invalidSecretSaveResponse = await fetch(`http://127.0.0.1:${port}/api/admin/config/secrets`, {
+    const invalidSecretSaveResponse = await fetch(`http://127.0.0.1:${port}/api/admin/env/secrets`, {
       method: "POST",
       headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
       body: JSON.stringify({ values: { API_ADMIN_TOKEN: "must-not-save" } }),
     });
     assert.equal(invalidSecretSaveResponse.status, 400);
 
-    const secretSaveResponse = await fetch(`http://127.0.0.1:${port}/api/admin/config/secrets`, {
+    const secretSaveResponse = await fetch(`http://127.0.0.1:${port}/api/admin/env/secrets`, {
       method: "POST",
       headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
       body: JSON.stringify({ values: { STRIPE_SECRET_KEY: "sk_live_owner_test", SMTP_PASS: "smtp-owner-test", DISCORD_CLIENT_SECRET: "" } }),

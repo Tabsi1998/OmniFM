@@ -4,6 +4,7 @@ The public API is served below ``/api`` on port 8001. The Node.js code in
 ``src/`` is the Discord voice runtime and intentionally runs separately.
 """
 
+import json
 import os
 import sys
 import re
@@ -195,82 +196,12 @@ OWNER_CONFIG_ID = "global"
 SECRET_MASK = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
 SECRET_CONFIG_FIELDS = {"token", "secretKey", "webhookSecret", "secret", "clientSecret", "password", "apiKey", "webhookUrl"}
 
-DEFAULT_OWNER_CONFIG = {
-    "company": {
-        "providerName": "",
-        "legalForm": "Einzelunternehmen (Kleinunternehmer)",
-        "representative": "",
-        "streetAddress": "",
-        "postalCode": "",
-        "city": "",
-        "country": "\u00d6sterreich",
-        "email": "",
-        "phone": "",
-        "website": "",
-        "businessPurpose": "Betrieb eines Discord-Radio-/Musik-Dienstes",
-        "vatId": "",
-        "kleinunternehmer": True,
-        "commercialRegisterNumber": "",
-        "commercialRegisterCourt": "",
-        "supervisoryAuthority": "",
-        "chamber": "",
-        "profession": "",
-        "professionRules": "",
-        "editorialResponsible": "",
-        "mediaOwner": "",
-        "mediaLine": "",
-        "dpoName": "",
-        "dpoEmail": "",
-        "hostingProvider": "",
-        "hostingLocation": "",
-        "effectiveDate": "",
-        "governingLaw": "\u00d6sterreichisches Recht",
-    },
-    "plans": {
-        "free": {"name": "Free", "pricePerMonth": 0, "startingAt": "0", "maxBots": 2, "stations": "20 Free Stationen", "bitrate": "64k", "reconnectMs": 5000, "features": ["Bis zu 2 Bots", "20 Free Stationen", "Standard Audio (64k)", "Standard Reconnect"]},
-        "pro": {"name": "Pro", "pricePerMonth": 299, "startingAt": "2,99", "maxBots": 8, "stations": "120 Stationen (Free + Pro)", "bitrate": "128k", "reconnectMs": 1500, "features": ["Bis zu 8 Bots", "120 Stationen (Free + Pro)", "HQ Audio (128k Opus)", "Priority Reconnect", "Rollenbasierte Berechtigungen", "Event-Scheduler"]},
-        "ultimate": {"name": "Ultimate", "pricePerMonth": 499, "startingAt": "4,99", "maxBots": 16, "stations": "Alle Stationen + Custom URLs", "bitrate": "320k", "reconnectMs": 400, "features": ["Bis zu 16 Bots", "Alle Stationen + Custom URLs", "Ultra HQ Audio (320k)", "Instant Reconnect", "Rollenbasierte Berechtigungen"]},
-    },
-    "discord": {
-        "commander": {"name": "OmniFM Commander", "token": "", "clientId": "", "inviteUrl": ""},
-        "workers": [],
-    },
-    "system": {
-        "discordOAuth": {"clientId": "", "clientSecret": "", "redirectUri": "", "scopes": "identify guilds"},
-        "smtp": {"enabled": False, "host": "", "port": 587, "secure": False, "user": "", "password": "", "from": ""},
-        # Discord webhook for operator alerts (#260). The URL carries a token,
-        # so it is a secret like a password.
-        "operatorAlerts": {
-            "webhookUrl": "", "mention": "",
-            "workerOffline": True, "failoverExhausted": True, "playbackLoops": True,
-            "workerAutoheal": True, "diskSpace": True, "backupFailed": True, "updates": True,
-        },
-        "audioRecognition": {"enabled": False, "apiKey": ""},
-        "songHistory": {"enabled": True, "maxPerGuild": 100},
-        "stationHealth": {"enabled": True, "intervalMs": 5000, "batchSize": 2, "concurrency": 2, "timeoutMs": 8000},
-        "streamRecovery": {entry["key"]: entry["default"] for entry in RECOVERY_SETTINGS}
-        or {"stableResetMs": 60000, "failoverMinFailures": 3, "failoverMinUnstableMs": 60000, "failoverStableAudioMs": 25000},
-        "botDirectories": {
-            "discordBotList": {"enabled": False, "token": "", "botId": "", "slug": "", "webhookSecret": "", "statsScope": "aggregate"},
-            "botsGG": {"enabled": False, "token": "", "botId": "", "statsScope": "aggregate"},
-            "topGG": {"enabled": False, "token": "", "botId": "", "webhookSecret": "", "statsScope": "aggregate"},
-        },
-    },
-    "payments": {
-        "stripe": {"enabled": False, "mode": "test", "publishableKey": "", "secretKey": "", "webhookSecret": ""},
-        "paypal": {"enabled": False, "mode": "sandbox", "clientId": "", "secret": ""},
-        "providers": [],
-    },
-    "marketing": {
-        "sponsors": [],
-        "botListings": [
-            {"name": "top.gg", "url": "", "enabled": True, "note": "Gr\u00f6\u00dfte Discord-Bot-Liste. Listing anlegen und URL hier einf\u00fcgen."},
-            {"name": "Discord Bot List", "url": "", "enabled": True, "note": "discordbotlist.com \u2013 Bot einreichen und Profil-URL hier eintragen."},
-            {"name": "Discords.com", "url": "", "enabled": False, "note": "discords.com/bots \u2013 optionales Listing."},
-            {"name": "Discadia", "url": "", "enabled": False, "note": "discadia.com \u2013 Server-/Bot-Verzeichnis."},
-            {"name": "Wumpus.store", "url": "", "enabled": False, "note": "wumpus.store \u2013 kuratiertes Verzeichnis."},
-        ],
-    },
+# The Owner console's defaults, shared with the Node API (#288): one file,
+# src/config/owner-config-defaults.json. streamRecovery comes from the
+# recovery settings file, like the bot applies them.
+DEFAULT_OWNER_CONFIG = json.loads((Path(__file__).parent.parent / "src" / "config" / "owner-config-defaults.json").read_text(encoding="utf-8"))
+DEFAULT_OWNER_CONFIG["system"]["streamRecovery"] = {entry["key"]: entry["default"] for entry in RECOVERY_SETTINGS} or {
+    "stableResetMs": 60000, "failoverMinFailures": 3, "failoverMinUnstableMs": 60000, "failoverStableAudioMs": 25000,
 }
 
 
