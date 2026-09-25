@@ -389,6 +389,10 @@ function PrivacySection({ legal, privacy }) {
             body={copy.privacy.sections.botBody}
           />
           <PolicyBlock
+            title={copy.privacy.sections.savedSongsTitle}
+            body={copy.privacy.sections.savedSongsBody}
+          />
+          <PolicyBlock
             title={copy.privacy.sections.premiumTitle}
             body={copy.privacy.sections.premiumBody({
               stripeEnabled: features.stripeEnabled,

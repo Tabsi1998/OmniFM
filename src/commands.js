@@ -162,6 +162,12 @@ export function buildCommandBuilders() {
   withIntegerOption(history, "limit", "Number of entries (1-20)", "Anzahl Einträge (1-20)");
   withIntegerOption(history, "bot", "OmniFM worker number (optional)", "OmniFM-Worker-Nummer (optional)");
 
+  const saved = describe(
+    new SlashCommandBuilder().setName("saved").setNameLocalizations(de("merkliste")),
+    "Your saved songs: look at them and delete them",
+    "Deine gemerkten Songs: ansehen und löschen"
+  );
+
   const setvolume = describe(
     new SlashCommandBuilder().setName("setvolume"),
     "Set the playback volume (0-100)",
@@ -451,6 +457,7 @@ export function buildCommandBuilders() {
     now,
     stats,
     history,
+    saved,
     setvolume,
     status,
     list,

@@ -11,6 +11,7 @@ import {
   MessageFlags,
 } from "discord.js";
 import { log } from "../../lib/logging.js";
+import { SAVED_SONGS_PREFIX } from "../saved-songs.js";
 import { clipText } from "../../lib/helpers.js";
 import { getTier } from "../../core/entitlements.js";
 import { BRAND } from "../../config/plans.js";
@@ -604,6 +605,9 @@ const menuMethods = {
         || customId.startsWith(STATIONS_COMPONENT_PREFIX)
       ) {
         return handleRuntimePanelInteraction(this, interaction);
+      }
+      if (customId.startsWith(SAVED_SONGS_PREFIX)) {
+        return this.handleSavedSongsComponent(interaction);
       }
       return false;
     } catch (err) {

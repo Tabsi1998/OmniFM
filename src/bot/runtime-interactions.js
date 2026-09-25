@@ -161,6 +161,8 @@ export async function handleRuntimeAutocomplete(runtime, interaction) {
 // if-chain (#210): before the /perm role check, after it, and with the
 // station catalog and the guild state loaded.
 const PRE_PERMISSION_COMMANDS = {
+  // The person's own list (#272): no role rule and no plan in the way.
+  saved: ({ runtime, interaction }) => runtime.handleSavedSongsCommand(interaction),
   help: INFO_COMMANDS.help,
   setup: INFO_COMMANDS.setup,
   language: INFO_COMMANDS.language,
@@ -227,7 +229,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
   }
 
   const { t, language } = runtime.createInteractionTranslator(interaction);
-  const unrestrictedCommands = new Set(["help", "setup", "premium", "license", "language"]);
+  const unrestrictedCommands = new Set(["help", "setup", "premium", "license", "language", "saved"]);
   if (!unrestrictedCommands.has(interaction.commandName)) {
     const access = runtime.getGuildAccess(interaction.guildId);
     if (!access.allowed) {
