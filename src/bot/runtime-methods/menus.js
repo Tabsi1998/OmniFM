@@ -15,6 +15,7 @@ import { clipText } from "../../lib/helpers.js";
 import { getTier } from "../../core/entitlements.js";
 import { BRAND } from "../../config/plans.js";
 import { brandFooter, brandAuthor } from "../brand-embed.js";
+import { isComponentsV2Message } from "../../discord/ui/index.js";
 import { buildInviteUrl } from "../../bot-config.js";
 import {
   INVITE_COMPONENT_PREFIX,
@@ -543,6 +544,14 @@ const menuMethods = {
         content: t("Dieses Menue funktioniert nur auf Servern.", "This menu only works in servers."),
         flags: MessageFlags.Ephemeral,
       });
+      return true;
+    }
+
+    // A Components V2 message (#264, e.g. /status) cannot be edited into an
+    // embed: the worker overview then comes as its own private message.
+    if (interaction.customId === WORKERS_COMPONENT_ID_OPEN && isComponentsV2Message(interaction.message)) {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      await interaction.editReply(await this.buildWorkersStatusPayload(interaction));
       return true;
     }
 
