@@ -107,6 +107,7 @@ import { permissionMethods } from "./runtime-methods/permissions.js";
 import { statusMethods } from "./runtime-methods/status.js";
 import { voiceMethods } from "./runtime-methods/voice.js";
 import { onboardingMethods } from "./runtime-methods/onboarding.js";
+import { savedSongMethods } from "./runtime-methods/saved-songs.js";
 import { recordPlaybackPhase } from "./playback-phase.js";
 import { syncAppEmojisSafely } from "../discord/ui/app-emojis.js";
 
@@ -1411,6 +1412,7 @@ Object.assign(
   statusMethods,
   voiceMethods,
   onboardingMethods,
+  savedSongMethods,
 );
 
 const MIME_TYPES = {

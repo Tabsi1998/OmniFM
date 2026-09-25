@@ -139,6 +139,8 @@ export function buildNowPlayingPanel(input) {
   if (input.searchQuery) {
     const query = encodeURIComponent(input.searchQuery);
     const links = [
+      // #272: personal, so it sits with the song links, not the controls.
+      button(`${NP_PREFIX}save`, { label: t("Merken", "Save"), emoji: "save", appId }),
       linkButton(`https://open.spotify.com/search/${query}`, "Spotify", null, appId),
       linkButton(`https://www.youtube.com/results?search_query=${query}`, "YouTube", null, appId),
     ];

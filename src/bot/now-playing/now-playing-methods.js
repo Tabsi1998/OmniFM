@@ -247,6 +247,11 @@ const nowPlayingMethods = {
     if (query) {
       const buttons = [
         new ButtonBuilder()
+          .setCustomId(`${NP_PREFIX}save`)
+          .setStyle(ButtonStyle.Secondary)
+          .setEmoji("\u{1f4be}")
+          .setLabel(isDe ? "Merken" : "Save"),
+        new ButtonBuilder()
           .setStyle(ButtonStyle.Link)
           .setLabel(isDe ? "YouTube-Suche" : "YouTube search")
           .setURL(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`)
@@ -1001,10 +1006,12 @@ const nowPlayingMethods = {
       await interaction.reply({ content: t("Nur in Servern verfuegbar.", "Only available in servers."), flags: MessageFlags.Ephemeral });
       return true;
     }
+    const action = String(interaction.customId || "").slice(NP_PREFIX.length);
+    // "💾 Save" (#272) is personal: no role rule, its own answer.
+    if (action === "save") return this.handleSaveSongControl(interaction);
     // Discord requires an acknowledgement within three seconds. Voice/player
     // operations and the embed refresh can take longer, so acknowledge first.
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    const action = String(interaction.customId || "").slice(NP_PREFIX.length);
     const state = this.guildState.get(guildId);
 
     // A button does what its slash command does, so it follows the same /perm

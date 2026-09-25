@@ -74,7 +74,8 @@ test("while playing: cover, title, artist, station line, last songs, controls an
   const controls = buttons(box);
   assert.deepEqual(controls.slice(0, 5).map((control) => control.custom_id), ["np:toggle", "np:stop", "np:voldown", "np:volup", "omnifm:stations:open"]);
   assert.equal(controls[0].label, "Pause");
-  assert.deepEqual(controls.slice(5).map((control) => control.label), ["Spotify", "YouTube"]);
+  assert.deepEqual(controls.slice(5).map((control) => control.label), ["Merken", "Spotify", "YouTube"]);
+  assert.equal(controls[5].custom_id, "np:save", "saving a song (#272) sits with the song links");
   assert.deepEqual(ui.checkDiscordLimits(payload).problems, []);
 });
 
