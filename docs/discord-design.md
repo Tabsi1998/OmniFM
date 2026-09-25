@@ -32,3 +32,12 @@ Aufbau.
   kann nie per `interaction.update()` zu einem Embed werden. Knöpfe darauf
   antworten mit einer neuen Nachricht (`isComponentsV2Message`).
 - **Jede Nachricht hat einen Test**, der `checkDiscordLimits` prüft.
+
+## App-Emojis
+
+Die Icons liegen in `assets/discord-emojis/` (Markenfarben, 128×128, der
+Equalizer animiert). Jeder Bot lädt sie beim Start als **eigene** App-Emojis
+hoch (`omnifm_play_v1` …); bis dahin und wenn das scheitert, steht Unicode da.
+Neu zeichnen: `python scripts/generate-app-emojis.py` (braucht Pillow), dann in
+`manifest.json` die `version` erhöhen – die Bots ersetzen ihre alten Emojis
+beim nächsten Start selbst. Abschalten: `OMNIFM_APP_EMOJIS=0`.
