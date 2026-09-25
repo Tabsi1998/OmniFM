@@ -38,6 +38,10 @@ gestaltet, dazu Funktionen für Hörer und Server-Teams (Milestone M8).
   übersteht einen Neustart. (#335)
 - **Favoriten-Leiste:** Bis zu fünf Lieblingssender als Knöpfe im Panel
   (Free drei). Gepflegt mit ⭐ im Sender-Browser oder im Dashboard. (#336)
+- **Umfrage:** `/umfrage` lässt den Server per Discord-Umfrage abstimmen,
+  welcher Sender als Nächstes läuft; der Gewinner startet danach von selbst.
+  Starten dürfen Server-Verwalter oder eine per `/perm` freigegebene
+  DJ-Rolle. (#338)
 - **Sprachkanal-Status nach Wunsch:** Den Text oben im Sprachkanal legt jeder
   Server im Dashboard selbst fest, mit Platzhaltern für Sender, Titel,
   Interpret und Hörer und einer Vorschau. (#332)
@@ -53,6 +57,8 @@ gestaltet, dazu Funktionen für Hörer und Server-Teams (Milestone M8).
   letzten Woche und kam im geteilten Betrieb noch im alten Aussehen. (#333)
 - Fünf Sender spielten gar nicht oder etwas anderes (einer war ein
   Polizeifunk); sie haben jetzt die richtigen Streams. (#326)
+- Die Suche im Sender-Browser brach nach dem Absenden mit „Interaktion
+  fehlgeschlagen“ ab. (#339)
 - Seltener Fehler beim Speichern der Senderliste unter Windows. (#334)
 
 ## 3.1.0 – 2026-09-25
