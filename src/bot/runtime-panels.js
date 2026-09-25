@@ -22,6 +22,7 @@ import {
   getGuildStations,
   buildCustomStationReference,
   validateCustomStationUrl,
+  customStationLogoUrl,
 } from "../custom-stations.js";
 import { translateCustomStationErrorMessage } from "../lib/language.js";
 import { BRAND } from "../config/plans.js";
@@ -105,6 +106,7 @@ export function buildStationCatalog(guildId) {
         name: customStation?.name || customKey,
         url: validation.url,
         tier: "ultimate",
+        logo: customStationLogoUrl(guildId, customKey, customStation),
       };
       entries.push({
         key: reference,
@@ -374,6 +376,7 @@ export function buildRuntimeStationsBrowserPayload(runtime, interaction, session
         name: customStation?.name || customKey,
         genre: customStation?.genre || "Radio",
         color: customStation?.color || null,
+        logo: customStationLogoUrl(guildId, customKey, customStation),
         tier: "ultimate",
       });
     }
@@ -502,7 +505,7 @@ async function resolvePlayableStation(runtime, interaction, requested) {
     }
     playStations = buildScopedStationsData(stations, {
       ...stationsData.stations,
-      [key]: { name: customStations[customKey].name, url: validation.url, tier: "ultimate" },
+      [key]: { name: customStations[customKey].name, url: validation.url, tier: "ultimate", logo: customStationLogoUrl(guildId, customKey, customStations[customKey]) },
     });
     return { key, playStations, guildTier };
   }

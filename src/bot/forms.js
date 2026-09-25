@@ -8,6 +8,7 @@
 import {
   ChannelSelectMenuBuilder,
   ChannelType,
+  FileUploadBuilder,
   LabelBuilder,
   ModalBuilder,
   StringSelectMenuBuilder,
@@ -16,6 +17,7 @@ import {
 } from "discord.js";
 
 import { NP_PREFIX } from "./runtime-shared.js";
+import { STATION_LOGO_MAX_BYTES } from "../lib/station-logo-image.js";
 
 export const FORM_PREFIX = "omnifm:form:";
 export const STATION_FORM_ID = `${FORM_PREFIX}station`;
@@ -49,6 +51,15 @@ function safeTextValue(fields, id) {
     return String(fields?.getTextInputValue?.(id) ?? "").trim();
   } catch {
     return "";
+  }
+}
+
+function safeUploadedFile(fields, id) {
+  try {
+    const files = fields?.getUploadedFiles?.(id);
+    return files?.first?.() || null;
+  } catch {
+    return null;
   }
 }
 
@@ -88,10 +99,32 @@ export function buildStationFormModal({ t, genres = [] }) {
         .setStringSelectMenuComponent(new StringSelectMenuBuilder().setCustomId("genre").setRequired(false).setMinValues(0).setMaxValues(1).addOptions(options)),
       label(t("Kurzname (optional)", "Short key (optional)"), t("Leer lassen: wird aus dem Namen gebildet", "Leave empty: made from the name"))
         .setTextInputComponent(text("key", { required: false, max: 40, placeholder: "vereinsradio" })),
+      label(t("Logo (optional)", "Logo (optional)"), t("PNG, JPG oder WebP, höchstens 256 KB", "PNG, JPG or WebP, at most 256 KB"))
+        .setFileUploadComponent(new FileUploadBuilder().setCustomId("logo").setRequired(false).setMinValues(0).setMaxValues(1)),
     );
 }
 
-/** { ok, station: { key, name, url, genre } } or { ok: false, error } with error "name" | "url" | "key". */
+const LOGO_CONTENT_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+/**
+ * The uploaded logo from what Discord says about it, before downloading:
+ * { url, size } or { error: "too-large" | "wrong-type" }; null without a logo.
+ */
+function readStationFormLogo(fields) {
+  const file = safeUploadedFile(fields, "logo");
+  if (!file) return null;
+  const size = Number(file.size) || 0;
+  const type = String(file.contentType || "").split(";")[0].trim().toLowerCase();
+  if (size > STATION_LOGO_MAX_BYTES) return { error: "too-large" };
+  if (type && !LOGO_CONTENT_TYPES.has(type)) return { error: "wrong-type" };
+  if (!type && !/\.(png|jpe?g|webp)$/i.test(String(file.name || ""))) return { error: "wrong-type" };
+  return { url: String(file.url || ""), size };
+}
+
+/**
+ * { ok, station: { key, name, url, genre }, logo: { url, size } | null } or
+ * { ok: false, error } with error "name" | "url" | "key" | "logo-too-large" | "logo-wrong-type".
+ */
 export function readStationForm(fields) {
   const name = safeTextValue(fields, "name").replace(/\s+/g, " ").slice(0, 60);
   const url = safeTextValue(fields, "url");
@@ -106,7 +139,9 @@ export function readStationForm(fields) {
   }
   if (!parsed || !["http:", "https:"].includes(parsed.protocol)) return { ok: false, error: "url" };
   if (!key) return { ok: false, error: "key" };
-  return { ok: true, station: { key, name, url: parsed.toString(), genre: genre === "__other__" ? "" : genre } };
+  const logo = readStationFormLogo(fields);
+  if (logo?.error) return { ok: false, error: `logo-${logo.error}` };
+  return { ok: true, station: { key, name, url: parsed.toString(), genre: genre === "__other__" ? "" : genre }, logo };
 }
 
 // ---- plan an event ----

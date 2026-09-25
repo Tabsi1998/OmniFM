@@ -62,7 +62,7 @@ export function createDashboardCustomStationsRouteHandler(deps) {
     if (req.method === "GET") {
       const stations = getCustomStations(guildInfo.id);
       const list = sortCustomStations(
-        Object.entries(stations).map(([key, station]) => mapDashboardCustomStation(key, station))
+        Object.entries(stations).map(([key, station]) => mapDashboardCustomStation(key, station, guildInfo.id))
       );
       sendJson(res, 200, { stations: list, tier: guildInfo.tier });
       return true;
@@ -98,7 +98,7 @@ export function createDashboardCustomStationsRouteHandler(deps) {
           return true;
         }
 
-        sendJson(res, 201, { success: true, station: mapDashboardCustomStation(result.key, result.station) });
+        sendJson(res, 201, { success: true, station: mapDashboardCustomStation(result.key, result.station, guildInfo.id) });
       } catch (err) {
         sendJson(res, 400, {
           error: translateCustomStationErrorMessage(
@@ -158,7 +158,7 @@ export function createDashboardCustomStationsRouteHandler(deps) {
           return true;
         }
 
-        sendJson(res, 200, { success: true, station: mapDashboardCustomStation(result.key, result.station) });
+        sendJson(res, 200, { success: true, station: mapDashboardCustomStation(result.key, result.station, guildInfo.id) });
       } catch (err) {
         sendJson(res, 400, {
           error: translateCustomStationErrorMessage(

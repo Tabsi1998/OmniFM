@@ -32,6 +32,7 @@ import { createPremiumOffersRoutesHandler } from "./routes/premium-offers-routes
 import { createPremiumReadRoutesHandler } from "./routes/premium-read-routes.js";
 import { createPublicRoutesHandler } from "./routes/public-routes.js";
 import { createShareRoutesHandler } from "./routes/share-routes.js";
+import { createStationLogoRoutesHandler } from "./routes/station-logo-routes.js";
 import { WEBSITE_URL } from "../bot/runtime-links.js";
 import { resolveDiscordRedirectUri, startDiscordOauthSync } from "../lib/discord-oauth-settings.js";
 import { validateStageEventSpeakers } from "../bot/stage-moderator.js";
@@ -138,6 +139,7 @@ import {
   addGuildStation as addCustomStation,
   updateGuildStation as updateCustomStation,
   removeGuildStation as removeCustomStation,
+  customStationLogoUrl,
 } from "../custom-stations.js";
 import {
   getTier,
@@ -547,7 +549,7 @@ function buildServerCapabilityPayload(serverId) {
   };
 }
 
-function mapDashboardCustomStation(key, station) {
+function mapDashboardCustomStation(key, station, guildId = null) {
   return {
     key,
     name: station?.name || key,
@@ -555,6 +557,7 @@ function mapDashboardCustomStation(key, station) {
     genre: station?.genre || "",
     folder: station?.folder || "",
     tags: Array.isArray(station?.tags) ? station.tags : [],
+    logoUrl: guildId ? customStationLogoUrl(guildId, key, station) : null,
     custom: true,
   };
 }
@@ -632,6 +635,9 @@ const handleDashboardPermsRoute = createDashboardPermsRouteHandler({
   serverHasCapability,
   setCommandRolePermission,
 });
+
+// Logos of the servers' own stations (#340).
+const handleStationLogoRoutes = createStationLogoRoutesHandler();
 
 // Link previews for Discord (#279); the invite page links to the commander.
 const handleShareRoutes = createShareRoutesHandler({
@@ -3234,6 +3240,9 @@ function startWebServer(runtimes) {
 
     // --- API routes ---
     if (await handleShareRoutes({ req, res, requestUrl, runtimes })) {
+      return;
+    }
+    if (await handleStationLogoRoutes({ req, res, requestUrl })) {
       return;
     }
 

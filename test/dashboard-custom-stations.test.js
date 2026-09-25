@@ -25,7 +25,15 @@ test("dashboard custom station helpers normalize folder and tags", () => {
     genre: "Synthwave",
     folder: "Night",
     tags: ["Night", "Synth"],
+    logoUrl: null,
   });
+});
+
+test("the dashboard keeps a station's stored logo, never a foreign scheme", () => {
+  const link = "https://omnifm.xyz/api/station-logos/123456789012345678/nightwave.png?v=1";
+  assert.equal(normalizeDashboardCustomStation({ key: "nightwave", logoUrl: link }).logoUrl, link);
+  assert.equal(normalizeDashboardCustomStation({ key: "nightwave", logoUrl: "javascript:alert(1)" }).logoUrl, null);
+  assert.equal(normalizeDashboardCustomStation({ key: "nightwave", logoUrl: "http://192.168.2.253:8001/x.png" }).logoUrl, null);
 });
 
 test("dashboard custom station helpers list folders, filter, and group deterministically", () => {

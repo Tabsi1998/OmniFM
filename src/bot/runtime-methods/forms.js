@@ -6,7 +6,9 @@ import { MessageFlags } from "discord.js";
 
 import { log } from "../../lib/logging.js";
 import { getTier } from "../../core/entitlements.js";
-import { addGuildStation, countGuildStations, MAX_STATIONS_PER_GUILD } from "../../custom-stations.js";
+import { addGuildStation, countGuildStations, MAX_STATIONS_PER_GUILD, setGuildStationLogoVersion } from "../../custom-stations.js";
+import { processStationLogo, STATION_LOGO_MAX_BYTES } from "../../lib/station-logo-image.js";
+import { saveStationLogo } from "../../station-logos-store.js";
 import { testOwnerStationStream } from "../../lib/owner-station-test.js";
 import { translateCustomStationErrorMessage } from "../../lib/language.js";
 import { recordRuntimeIncident } from "../../runtime-incidents-store.js";
@@ -34,6 +36,15 @@ function catalogGenres() {
     .sort((a, b) => a.localeCompare(b));
 }
 
+/** Downloads an uploaded file from Discord's CDN, at most the logo limit. */
+async function fetchUploadedLogo(url) {
+  if (!/^https:\/\/(cdn|media)\.discordapp\.(com|net)\//i.test(String(url || ""))) return null;
+  const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+  if (!response.ok) return null;
+  const buffer = Buffer.from(await response.arrayBuffer());
+  return buffer.length > STATION_LOGO_MAX_BYTES + 1 ? buffer.subarray(0, STATION_LOGO_MAX_BYTES + 1) : buffer;
+}
+
 const formMethods = {
   /** /addstation without options: the form (Ultimate). */
   async openStationForm(interaction) {
@@ -45,7 +56,7 @@ const formMethods = {
     await interaction.showModal(buildStationFormModal({ t, genres: catalogGenres() }));
   },
 
-  async handleStationFormSubmit(interaction, { testStream = testOwnerStationStream } = {}) {
+  async handleStationFormSubmit(interaction, { testStream = testOwnerStationStream, fetchLogo = fetchUploadedLogo } = {}) {
     const { t, language } = this.createInteractionTranslator(interaction);
     const guildId = interaction.guildId;
     if (getTier(guildId) !== "ultimate") {
@@ -58,6 +69,8 @@ const formMethods = {
         name: t("Der Name braucht mindestens zwei Zeichen.", "The name needs at least two characters."),
         url: t("Die Stream-URL muss mit http:// oder https:// beginnen.", "The stream URL must start with http:// or https://."),
         key: t("Aus dem Namen lässt sich kein Kurzname bilden. Gib einen Kurznamen an (Buchstaben und Zahlen).", "No short key can be made from the name. Enter one (letters and digits)."),
+        "logo-too-large": t("Das Logo ist größer als 256 KB. Nimm ein kleineres Bild; nichts gespeichert.", "The logo is larger than 256 KB. Use a smaller picture; nothing saved."),
+        "logo-wrong-type": t("Das Logo muss ein PNG-, JPG- oder WebP-Bild sein; nichts gespeichert.", "The logo has to be a PNG, JPG or WebP picture; nothing saved."),
       };
       await interaction.reply(buildNoticePayload({ t, language, tone: "warning", title: t("Bitte prüfen", "Please check"), description: messages[form.error] }));
       return true;
@@ -83,16 +96,45 @@ const formMethods = {
       }));
       return true;
     }
+    const logoNote = form.logo ? await this.storeStationFormLogo(guildId, result.key, form.logo, { t, fetchLogo }) : "";
     await this.respondInteraction(interaction, buildNoticePayload({
       t, language, tone: "success", title: t("Sender gespeichert", "Station saved"),
       description: t(
         `**${result.station?.name || form.station.name}** ist jetzt als \`${result.key}\` da (${countGuildStations(guildId)}/${MAX_STATIONS_PER_GUILD} Plätze). Der Stream-Test war erfolgreich.`,
         `**${result.station?.name || form.station.name}** is now available as \`${result.key}\` (${countGuildStations(guildId)}/${MAX_STATIONS_PER_GUILD} slots). The stream test passed.`
-      ),
+      ) + logoNote,
       quickActions: { includePlay: true, includeStations: true },
     }));
     log("INFO", `[${this.config?.name}] Eigener Sender per Formular guild=${guildId} key=${result.key}`);
     return true;
+  },
+
+  /**
+   * Keeps the uploaded logo (#340): Discord's attachment link expires, so the
+   * picture is fetched once, cut to 256x256 and stored. Returns a line for
+   * the reply; the station is saved either way.
+   */
+  async storeStationFormLogo(guildId, key, logo, { t, fetchLogo = fetchUploadedLogo } = {}) {
+    const buffer = await fetchLogo(logo.url).catch(() => null);
+    const processed = await processStationLogo(buffer);
+    if (!processed.ok) {
+      const reason = processed.error === "too-large"
+        ? t("es ist größer als 256 KB", "it is larger than 256 KB")
+        : processed.error === "wrong-type"
+          ? t("es ist kein PNG-, JPG- oder WebP-Bild", "it is not a PNG, JPG or WebP picture")
+          : t("es ließ sich nicht öffnen", "it could not be opened");
+      return `
+${t(`Das Logo wurde nicht übernommen: ${reason}.`, `The logo was not taken: ${reason}.`)}`;
+    }
+    const saved = await saveStationLogo(guildId, key, processed.png).catch((error) => ({ ok: false, error: error?.message || "save_failed" }));
+    if (!saved.ok) {
+      log("WARN", `[${this.config?.name}] Logo nicht gespeichert guild=${guildId} key=${key}: ${saved.error}`);
+      return `
+${t("Das Logo konnte gerade nicht gespeichert werden.", "The logo could not be saved right now.")}`;
+    }
+    setGuildStationLogoVersion(guildId, key, saved.updatedAt);
+    return `
+${t("Das Logo ist gespeichert und erscheint im Now-Playing-Panel und im Dashboard.", "The logo is saved and shows in the now-playing panel and the dashboard.")}`;
   },
 
   /** The event form's submit runs through /event create's checks. */
