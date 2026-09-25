@@ -141,6 +141,24 @@ async function notifyBotLoginFailed(botName, error) {
 }
 
 /**
+ * Nächtliches Backup fehlgeschlagen (#259).
+ * @param {string[]} failedSteps
+ * @param {string} [hostname]
+ */
+async function notifyBackupFailed(failedSteps, hostname = "") {
+  const steps = (Array.isArray(failedSteps) ? failedSteps : [failedSteps]).filter(Boolean);
+  await notify("backup-failed", {
+    color: COLORS.error,
+    title: "🔴 Nächtliches Backup fehlgeschlagen",
+    description: "Mindestens ein Schritt der Sicherung hat nicht geklappt. Details: `./update.sh --status backup` und logs/backup.log.",
+    fields: [
+      { name: "Fehlgeschlagen", value: (steps.join("\n") || "Unbekannt").slice(0, 1000), inline: false },
+      ...(hostname ? [{ name: "Server", value: String(hostname).slice(0, 100), inline: true }] : []),
+    ],
+  });
+}
+
+/**
  * MongoDB-Verbindung verloren.
  * @param {string} error
  */
@@ -234,6 +252,7 @@ async function notifyStartup(botNames, totalBots) {
 }
 
 export {
+  notifyBackupFailed,
   notifyBotLoginFailed,
   notifyMongoDisconnected,
   notifyMongoReconnected,

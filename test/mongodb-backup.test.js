@@ -58,6 +58,7 @@ for arg in "$@"; do
 done
 grep -q '${secret}' "$config"
 printf 'fake omnifm bson archive' | gzip -c > "$archive"
+printf '2026-09-24T04:15:01.200+0000\\tdone dumping omnifm_test.licenses (3 documents)\\n' >&2
 printf 'mongodump %s\\n' "$*" >> "$OMNIFM_FAKE_TRACE"
 `);
   await writeExecutable(path.join(binDir, "mongorestore"), `#!/usr/bin/env bash
@@ -82,6 +83,8 @@ printf 'mongorestore %s\\n' "$*" >> "$OMNIFM_FAKE_TRACE"
   assert.equal(archives.length, 1);
   const archivePath = path.join(backupDir, archives[0]);
   await fs.access(`${archivePath}.sha256`);
+  // The restore check (#259) compares a restored copy with these counts.
+  assert.match(await fs.readFile(`${archivePath}.log`, "utf8"), /done dumping omnifm_test\.licenses \(3 documents\)/);
   await execFile(bash, [scriptPath, "verify", archivePath], { cwd: sandbox, env });
 
   await execFile(bash, [scriptPath, "restore", archivePath, "--force"], { cwd: sandbox, env });

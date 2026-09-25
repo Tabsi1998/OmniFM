@@ -90,21 +90,29 @@ verify_backup() {
 }
 
 create_backup() {
-  local archive temp_archive checksum_file
+  local archive temp_archive checksum_file dump_log
   load_config
   require_backup_tools
 
   archive="$BACKUP_DIR/$(archive_name)"
   temp_archive="${archive}.tmp"
   checksum_file="${archive}.sha256"
+  # mongodump reports "done dumping <db>.<collection> (<n> documents)" per
+  # collection. The log stays next to the archive: the monthly restore check
+  # (scripts/verify-mongo-backup.mjs) compares a restored copy against it.
+  dump_log="${archive}.log"
   rm -f -- "$temp_archive"
 
-  mongodump \
+  if ! mongodump \
     --config="$TOOLS_CONFIG" \
     --db="$DB_NAME" \
     --archive="$temp_archive" \
-    --gzip
-  chmod 600 "$temp_archive"
+    --gzip 2> "$dump_log"; then
+    cat -- "$dump_log" >&2
+    rm -f -- "$temp_archive" "$dump_log"
+    fatal "mongodump failed."
+  fi
+  chmod 600 "$temp_archive" "$dump_log"
   gzip -t -- "$temp_archive" || fatal "mongodump created an invalid compressed archive."
   mv -- "$temp_archive" "$archive"
   chmod 600 "$archive"
@@ -190,7 +198,8 @@ Usage:
 
 Restore requires stopped OmniFM processes, verifies the selected archive and
 creates a second safety backup of the current database before replacing data.
-No backup is deleted automatically.
+This script deletes no backup; the nightly omnifm-backup.timer thins them out
+(scripts/rotate-backups.mjs: 14 days, 8 weeks, 6 months).
 EOF
     ;;
   *)
