@@ -58,7 +58,18 @@ export function createAuthRoutesHandler(deps) {
         methodNotAllowed(res, ["GET"]);
         return true;
       }
+      // A plain link (<a href="...?redirect=1">) navigates the browser here: it
+      // gets sent on to Discord, not a JSON page. The website's fetch gets JSON.
+      const browserRedirect = requestUrl.searchParams.get("redirect") === "1";
       if (!isDiscordOauthConfigured()) {
+        if (browserRedirect) {
+          res.writeHead(302, {
+            ...getCommonSecurityHeaders(),
+            Location: buildDashboardErrorRedirect(resolveTrustedFrontendOrigin(req, publicUrl), "oauth_not_configured", requestLanguage),
+          });
+          res.end();
+          return true;
+        }
         sendJson(res, 503, {
           error: languagePick(requestLanguage, "Discord OAuth ist noch nicht konfiguriert.", "Discord OAuth is not configured yet."),
           oauthConfigured: false,
@@ -80,9 +91,15 @@ export function createAuthRoutesHandler(deps) {
         expiresAt: nowTs + getDiscordOauthStateTtlSeconds(),
       });
 
+      const authUrl = buildDiscordAuthorizeUrl(stateToken, redirectUri);
+      if (browserRedirect) {
+        res.writeHead(302, { ...getCommonSecurityHeaders(), Location: authUrl });
+        res.end();
+        return true;
+      }
       sendJson(res, 200, {
         oauthConfigured: true,
-        authUrl: buildDiscordAuthorizeUrl(stateToken, redirectUri),
+        authUrl,
         state: stateToken,
       });
       return true;

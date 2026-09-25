@@ -307,6 +307,24 @@ async function inspectOutboundLinks(baseUrl) {
     }
   }
 
+  // The server dashboard's "Continue with Discord" is a plain link: the browser
+  // has to land at Discord, not on the JSON (2026-09-25).
+  try {
+    const linkLogin = await fetch(`${baseUrl}/api/auth/discord/login?redirect=1&nextPage=dashboard`, { redirect: "manual", signal: AbortSignal.timeout(15000) });
+    const location = linkLogin.headers.get("location") || "";
+    if (login.status === 503 && login.body?.oauthConfigured === false) {
+      logLine("OK", "login link: OAuth not configured");
+    } else if (linkLogin.status !== 302 || !location.startsWith("https://discord.com/")) {
+      ok = false;
+      logLine("FAIL", `login link: status ${linkLogin.status}${location ? ` to ${location.slice(0, 80)}` : ""}, expected a redirect to Discord`);
+    } else {
+      logLine("OK", "login link: redirects to Discord");
+    }
+  } catch (error) {
+    ok = false;
+    logLine("FAIL", `login link: ${error?.message || error}`);
+  }
+
   const share = await fetchText(baseUrl, "/api/share/page/premium");
   const ogUrl = /<meta property="og:url" content="([^"]+)"/.exec(share.text || "")?.[1] || "";
   const ogImage = /<meta property="og:image" content="([^"]+)"/.exec(share.text || "")?.[1] || "";
