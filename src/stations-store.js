@@ -7,6 +7,7 @@ import { getDb } from "./lib/db.js";
 import { withFileStoreLock } from "./lib/file-store-lock.js";
 import { log, logStoreLoadError } from "./lib/logging.js";
 import { appRootDir, resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
+import { normalizeStationCatalogFields } from "./lib/station-fields.js";
 
 /**
  * The tracked stations.json in the repository is the shipped seed and is never
@@ -196,9 +197,8 @@ function sanitizeStations(stationsInput) {
       name,
       url,
       tier: ["free", "pro", "ultimate"].includes(tier) ? tier : "free",
-      genre: String(rawValue?.genre || rawValue?.category || "Radio").trim().slice(0, 80) || "Radio",
-      country: String(rawValue?.country || "").trim().slice(0, 60),
-      language: String(rawValue?.language || "").trim().slice(0, 40),
+      // Genre, country, language, colour, logo, homepage (#267).
+      ...normalizeStationCatalogFields(rawValue),
     };
   }
   return out;
@@ -295,9 +295,7 @@ export async function initStationsStore() {
           name: doc.name || key,
           url: doc.url || "",
           tier: doc.tier || "free",
-          genre: doc.genre || doc.category || "Radio",
-          country: doc.country || "",
-          language: doc.language || "",
+          ...normalizeStationCatalogFields(doc),
         };
         if (doc.is_default) defaultKey = key;
       }
@@ -343,8 +341,11 @@ export async function saveStations(data) {
           updateOne: {
             filter: { key },
             update: {
+              // Every field, not only name/url/tier: saving here used to drop
+              // the genre in MongoDB (#267).
               $set: {
-                key, name: station.name, url: station.url, tier: station.tier,
+                key,
+                ...station,
                 is_default: key === normalized.defaultStationKey,
               },
             },

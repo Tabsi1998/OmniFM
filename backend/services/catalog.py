@@ -5,6 +5,7 @@ Moved out of server.py (#200). server.py calls bind() with itself; names
 defined in server.py are read as core.<name> at call time, and server.py
 offers every function here as server.<name> again.
 """
+from urllib.parse import urlparse
 from datetime import datetime
 from datetime import timezone
 import json
@@ -102,27 +103,13 @@ def seed_stations_if_empty():
             file_data = core.load_stations_from_file()
             stations_list = []
             file_stations = file_data.get("stations", {})
-            genre_map = {
-                "oneworldradio": "Electronic / Festival",
-                "tomorrowlandanthems": "Electronic / Festival",
-                "lofi": "Lo-Fi / Chill",
-                "classicrock": "Rock / Classic",
-                "chillout": "Chill / Ambient",
-                "dance": "Dance / EDM",
-                "hiphop": "Hip Hop / Rap",
-                "techno": "Techno / House",
-                "pop": "Pop / Charts",
-                "rock": "Rock / Alternative",
-                "bass": "Bass / Dubstep",
-                "deutschrap": "Deutsch Rap",
-            }
             for key, val in file_stations.items():
                 stations_list.append({
                     "key": key,
                     "name": val.get("name", key),
                     "url": val.get("url", ""),
                     "tier": val.get("tier", "free"),
-                    "genre": genre_map.get(key, "Radio"),
+                    **core.station_catalog_fields(val),
                     "is_default": key == file_data.get("defaultStationKey"),
                     "created_at": datetime.now(timezone.utc).isoformat()
                 })
@@ -131,6 +118,84 @@ def seed_stations_if_empty():
     except Exception:
         # Mongo is optional for this API process.
         return
+
+
+HEX_COLOR = re.compile(r"^#?([0-9a-fA-F]{6})$")
+CATALOG_FIELDS = ("genre", "country", "language", "color", "logo", "homepage")
+
+# Streams the catalog audit of 2026-09-25 found dead or playing something
+# else (#267). Replaced in MongoDB only where the old URL is still stored, so
+# a URL the owner changed on purpose stays.
+REPLACED_STREAMS = {
+    "pro_edm_06": ("https://streams.ilovemusic.de/iloveradio103.mp3", "https://stream.technolovers.fm/edm"),
+    "pro_tech_15": ("http://lw2.mp3.tb-group.fm/tb.mp3", "https://streams.rautemusik.fm/harder/mp3-192/"),
+    "pro_tech_20": ("https://ice4.somafm.com/scanner-128-mp3", "https://stream.technolovers.fm/dark-techno"),
+    "pro_house_06": ("https://ice4.somafm.com/7soul-128-mp3", "https://streams.rautemusik.fm/house/mp3-192/"),
+    "pro_house_12": ("https://radio.edm1.fm/proxy/15_clubhouse?mp=/stream", "http://radio.edm1.fm/proxy/15_clubhouse?mp=/stream"),
+}
+
+
+def _https_url(value, limit=500):
+    text = str(value or "").strip()
+    if not text or len(text) > limit:
+        return ""
+    parsed = urlparse(text)
+    return text if parsed.scheme == "https" and parsed.netloc else ""
+
+
+def station_catalog_fields(raw):
+    """Genre, country, language, colour, logo and homepage of a station (#267),
+    cleaned like src/lib/station-fields.js: only https links and #RRGGBB
+    colours; empty fields are left out."""
+    raw = raw if isinstance(raw, dict) else {}
+    color = HEX_COLOR.match(str(raw.get("color") or "").strip())
+    fields = {
+        "genre": core.clip_text(raw.get("genre") or raw.get("category") or "", 80).strip() or "Radio",
+        "country": core.clip_text(raw.get("country") or "", 60).strip(),
+        "language": core.clip_text(raw.get("language") or "", 40).strip(),
+        "color": f"#{color.group(1).upper()}" if color else "",
+        "logo": _https_url(raw.get("logo")),
+        "homepage": _https_url(raw.get("homepage")),
+    }
+    return {key: value for key, value in fields.items() if value}
+
+
+def catalog_updates_for(doc, file_station):
+    """What a catalog file entry adds to a stored station: only fields the
+    owner has not set (genre "Radio" counts as unset), plus a replaced stream
+    when the stored URL is the broken one."""
+    updates = {}
+    wanted = station_catalog_fields(file_station)
+    for field in CATALOG_FIELDS:
+        current = doc.get(field)
+        if field == "genre" and str(current or "").strip() in ("", "Radio"):
+            current = None
+        if not current and wanted.get(field):
+            updates[field] = wanted[field]
+    replacement = REPLACED_STREAMS.get(str(doc.get("key") or ""))
+    if replacement and str(doc.get("url") or "").strip() == replacement[0]:
+        updates["url"] = replacement[1]
+    return updates
+
+
+def fill_station_catalog_fields():
+    """Adds the catalog fields of stations.json to stations already in
+    MongoDB; runs at every start and changes nothing once filled."""
+    if core.db is None:
+        return 0
+    try:
+        file_stations = (core.load_stations_from_file() or {}).get("stations", {})
+        changed = 0
+        for doc in core.db.stations.find({"key": {"$in": list(file_stations.keys())}}):
+            updates = catalog_updates_for(doc, file_stations.get(doc.get("key")) or {})
+            if updates:
+                updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+                core.db.stations.update_one({"_id": doc["_id"]}, {"$set": updates})
+                changed += 1
+        return changed
+    except Exception:
+        # Mongo is optional for this API process.
+        return 0
 
 
 # Seed premium data to MongoDB
@@ -319,6 +384,9 @@ __all__ = [
     "load_stations_from_file",
     "load_bots_from_env",
     "seed_stations_if_empty",
+    "station_catalog_fields",
+    "catalog_updates_for",
+    "fill_station_catalog_fields",
     "seed_premium_if_needed",
     "seed_demo_enabled",
     "purge_demo_data_if_live",

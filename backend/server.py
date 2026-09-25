@@ -284,6 +284,7 @@ MONTHLY_EVENT_REPEAT_NTH = {
 
 
 seed_stations_if_empty()
+fill_station_catalog_fields()
 
 
 if seed_demo_enabled():

@@ -88,6 +88,11 @@ def build_router(core):
 
         existing = core.db.stations.find_one({"key": key})
         doc = {"key": key, "name": name, "url": url, "tier": tier, "genre": genre}
+        # Country, language, colour, logo, homepage (#267): only https links and
+        # #RRGGBB colours are kept; an emptied field is removed.
+        extra = core.station_catalog_fields({**data, "genre": genre})
+        for field in ("country", "language", "color", "logo", "homepage"):
+            doc[field] = extra.get(field, "")
         if not existing:
             doc["created_at"] = datetime.now(timezone.utc).isoformat()
             doc["is_default"] = False
@@ -143,6 +148,9 @@ def build_router(core):
                     rows.append({
                         "key": doc.get("key"), "name": doc.get("name"), "url": doc.get("url"),
                         "tier": doc.get("tier", "free"), "genre": doc.get("genre") or "Radio",
+                        "country": doc.get("country") or "", "language": doc.get("language") or "",
+                        "color": doc.get("color") or "", "logo": doc.get("logo") or "",
+                        "homepage": doc.get("homepage") or "",
                         "isDefault": bool(doc.get("is_default")), "updatedAt": doc.get("updated_at"),
                         "health": health,
                     })
