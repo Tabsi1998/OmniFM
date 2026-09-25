@@ -16,6 +16,7 @@ import { getTier } from "../../core/entitlements.js";
 import { BRAND } from "../../config/plans.js";
 import { brandFooter, brandAuthor } from "../brand-embed.js";
 import { isComponentsV2Message } from "../../discord/ui/index.js";
+import { buildNoticePayload } from "../commands/command-helpers.js";
 import { buildInviteUrl } from "../../bot-config.js";
 import {
   INVITE_COMPONENT_PREFIX,
@@ -473,16 +474,13 @@ const menuMethods = {
     const { t, language } = this.createInteractionTranslator(interaction);
     if (this.role !== "commander" || !this.workerManager) {
       if (interaction.isRepliable?.()) {
-        await interaction.reply({ content: t("Nur der Commander kann dieses Menue bedienen.", "Only the commander can use this menu."), flags: MessageFlags.Ephemeral });
+        await interaction.reply(buildNoticePayload({ t, language, code: "commander-only" }));
       }
       return true;
     }
 
     if (!interaction.guildId) {
-      await interaction.reply({
-        content: t("Dieses Menue funktioniert nur auf Servern.", "This menu only works in servers."),
-        flags: MessageFlags.Ephemeral,
-      });
+      await interaction.reply(buildNoticePayload({ t, language, code: "guild-only" }));
       return true;
     }
 
@@ -513,10 +511,7 @@ const menuMethods = {
     }
 
     if (interaction.customId.startsWith(INVITE_COMPONENT_PREFIX)) {
-      await interaction.reply({
-        content: t("Diese Aktion ist nicht mehr gültig. Bitte aktualisiere das Menü.", "This action is no longer valid. Please refresh the menu."),
-        flags: MessageFlags.Ephemeral,
-      });
+      await interaction.reply(buildNoticePayload({ t, language, code: "action-expired" }));
       return true;
     }
 
@@ -528,22 +523,16 @@ const menuMethods = {
   },
 
   async handleWorkersComponentInteraction(interaction) {
-    const { t } = this.createInteractionTranslator(interaction);
+    const { t, language } = this.createInteractionTranslator(interaction);
     if (this.role !== "commander" || !this.workerManager) {
       if (interaction.isRepliable?.()) {
-        await interaction.reply({
-          content: t("Nur der Commander kann dieses Menue bedienen.", "Only the commander can use this menu."),
-          flags: MessageFlags.Ephemeral,
-        });
+        await interaction.reply(buildNoticePayload({ t, language, code: "commander-only" }));
       }
       return true;
     }
 
     if (!interaction.guildId) {
-      await interaction.reply({
-        content: t("Dieses Menue funktioniert nur auf Servern.", "This menu only works in servers."),
-        flags: MessageFlags.Ephemeral,
-      });
+      await interaction.reply(buildNoticePayload({ t, language, code: "guild-only" }));
       return true;
     }
 
@@ -566,10 +555,7 @@ const menuMethods = {
       const rawPage = interaction.customId.slice(WORKERS_COMPONENT_ID_PAGE_PREFIX.length);
       const nextPage = Number.parseInt(rawPage, 10);
       if (!Number.isFinite(nextPage) || nextPage < 0) {
-        await interaction.reply({
-          content: t("Diese Aktion ist nicht mehr gueltig. Bitte aktualisiere die Ansicht.", "This action is no longer valid. Please refresh the view."),
-          flags: MessageFlags.Ephemeral,
-        });
+        await interaction.reply(buildNoticePayload({ t, language, code: "action-expired" }));
         return true;
       }
       await interaction.deferUpdate();
@@ -579,10 +565,7 @@ const menuMethods = {
     }
 
     if (interaction.customId.startsWith(WORKERS_COMPONENT_PREFIX)) {
-      await interaction.reply({
-        content: t("Diese Aktion ist nicht mehr gültig. Bitte aktualisiere die Ansicht.", "This action is no longer valid. Please refresh the view."),
-        flags: MessageFlags.Ephemeral,
-      });
+      await interaction.reply(buildNoticePayload({ t, language, code: "action-expired" }));
       return true;
     }
 

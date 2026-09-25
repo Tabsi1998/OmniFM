@@ -112,7 +112,6 @@
     "src/bot/runtime-message-builders.js::no-useless-assignment::1",
     "src/bot/runtime-message-builders.js::no-useless-assignment::2",
     "src/bot/runtime-methods/menus.js::no-await-in-loop::1",
-    "src/bot/runtime-methods/menus.js::no-unused-vars::1",
     "src/bot/runtime-methods/permissions.js::no-await-in-loop::1",
     "src/bot/runtime-panels.js::no-unused-vars::1",
     "src/bot/runtime-restore.js::no-await-in-loop::1",

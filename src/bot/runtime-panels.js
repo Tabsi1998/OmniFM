@@ -37,6 +37,7 @@ import {
 } from "./runtime-links.js";
 import { buildOmniEmbed, buildLinkRow } from "./discord-ui.js";
 import * as ui from "../discord/ui/index.js";
+import { buildNoticePayload } from "./commands/command-helpers.js";
 import {
   buildBrowserEntries,
   buildStationBrowserPayload,
@@ -502,10 +503,7 @@ async function resolvePlayableStation(runtime, interaction, requested) {
   }
 
   return {
-    errorPayload: {
-      content: t("Unbekannte Station.", "Unknown station."),
-      flags: MessageFlags.Ephemeral,
-    },
+    errorPayload: buildNoticePayload({ t, language, code: "station-unknown" }),
   };
 }
 
@@ -534,10 +532,7 @@ export async function executeRuntimePlay(runtime, interaction, {
       !explicitVoiceChannel.isVoiceBased?.()
       || (explicitVoiceChannel.type !== ChannelType.GuildVoice && explicitVoiceChannel.type !== ChannelType.GuildStageVoice)
     ) {
-      await runtime.respondInteraction(interaction, {
-        content: t("Bitte waehle einen Voice- oder Stage-Channel.", "Please choose a voice or stage channel."),
-        flags: MessageFlags.Ephemeral,
-      });
+      await runtime.respondInteraction(interaction, buildNoticePayload({ t, language, code: "not-in-voice" }));
       return;
     }
   }
