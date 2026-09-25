@@ -178,6 +178,7 @@ function normalizeStoredBotStateEntry(rawEntry = {}) {
   const restoreBlockCount = Math.max(0, Number.parseInt(String(input.restoreBlockCount || 0), 10) || 0);
   const restoreBlockReason = sanitizeText(input.restoreBlockReason, 200) || null;
   const parkedReason = sanitizeText(input.parkedReason, 40).toLowerCase() || null;
+  const sleepUntilMs = normalizeStoredTimestampMs(input.sleepUntilMs);
   const parkedAt = normalizeStoredTimestampMs(input.parkedAt);
   const parkedDetail = sanitizeText(input.parkedDetail, 200) || null;
   const savedAt = (() => {
@@ -222,6 +223,7 @@ function normalizeStoredBotStateEntry(rawEntry = {}) {
       if (parkedAt > 0) normalized.parkedAt = parkedAt;
       if (parkedDetail) normalized.parkedDetail = parkedDetail;
     }
+    if (sleepUntilMs > 0) normalized.sleepUntilMs = sleepUntilMs;
   }
 
   if (hasVolumePreference) {
@@ -402,6 +404,8 @@ function saveBotState(botId, guildStates) {
         entry.failoverFailureStartedAt = failoverFailureStartedAt;
         entry.failoverLastFailureAt = normalizeStoredTimestampMs(state.failoverLastFailureAt);
       }
+      const sleepUntilMs = normalizeStoredTimestampMs(state?.sleepUntilMs);
+      if (sleepUntilMs > Date.now()) entry.sleepUntilMs = sleepUntilMs;
       entry.scheduledEventId = state.activeScheduledEventId || null;
       entry.scheduledEventStopAtMs = Number.isFinite(scheduledEventStopAtMs) && scheduledEventStopAtMs > 0
         ? scheduledEventStopAtMs

@@ -27,6 +27,7 @@ import {
 } from "./command-helpers.js";
 import { derivePlaybackPhase, describePlaybackPhaseHistory } from "../playback-phase.js";
 import * as ui from "../../discord/ui/index.js";
+import { normalizeSleepMinutes } from "../runtime-methods/sleep.js";
 
 /** /workers */
 async function handleWorkersCommand({ runtime, interaction, t, language }) {
@@ -846,7 +847,45 @@ async function handleDiagCommand({ runtime, interaction, t, language }) {
   return;
 }
 
+/** /sleep (#275): the streaming workers of the server turn off softly later. */
+async function handleSleepCommand({ runtime, interaction, t, language, state }) {
+  const minutes = normalizeSleepMinutes(interaction.options.getString("duration"));
+  const requestedBot = interaction.options.getInteger("bot");
+  const workers = runtime.role === "commander" && runtime.workerManager
+    ? (requestedBot
+      ? [runtime.workerManager.getWorkerByIndex(requestedBot, { prefer: "slot", strict: true })].filter(Boolean)
+      : runtime.workerManager.getStreamingWorkers(interaction.guildId))
+    : (state?.currentStationKey ? [runtime] : []);
+  if (workers.length === 0) {
+    await runtime.respondInteraction(interaction, buildNoticePayload({ t, language, code: "nothing-playing" }));
+    return;
+  }
+  const results = await Promise.all(workers.map(async (worker) => ({
+    worker,
+    result: await worker.setSleepTimerInGuild(interaction.guildId, minutes).catch((err) => ({ ok: false, error: err?.message || "sleep_failed" })),
+  })));
+  const done = results.filter(({ result }) => result?.ok);
+  if (!done.length) {
+    await runtime.respondInteraction(interaction, buildNoticePayload({
+      t, language, code: "failed", params: { detail: clipText(results.map(({ result }) => result?.error).filter(Boolean).join(", "), 300) },
+    }));
+    return;
+  }
+  const until = Math.max(...done.map(({ result }) => Number(result.sleepUntilMs) || 0));
+  const unix = Math.floor(until / 1000);
+  await runtime.respondInteraction(interaction, ui.reply(ui.notice(minutes ? "success" : "info", {
+    title: minutes ? t("Sleep-Timer an", "Sleep timer on") : t("Sleep-Timer aus", "Sleep timer off"),
+    body: minutes
+      ? t(
+        `😴 ${formatWorkerList(done.map(({ worker }) => worker))} schaltet <t:${unix}:R> leise aus (um <t:${unix}:t>). Eine Minute vorher kommt ein Hinweis mit „+30 min“.`,
+        `😴 ${formatWorkerList(done.map(({ worker }) => worker))} turns off softly <t:${unix}:R> (at <t:${unix}:t>). A minute before, a note with “+30 min” comes.`
+      )
+      : t("OmniFM spielt weiter, bis ihr stoppt.", "OmniFM keeps playing until you stop it."),
+  })));
+}
+
 export const PLAYBACK_COMMANDS = {
+  sleep: handleSleepCommand,
   workers: handleWorkersCommand,
   pause: handlePauseCommand,
   resume: handleResumeCommand,

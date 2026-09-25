@@ -32,6 +32,7 @@ function buildNowPlayingSignature(stationKey, meta = {}, state = {}, targetChann
     // The embed shows a hint and buttons for these, so a change must re-render it.
     state?.failoverActive === true ? `failover:${state?.desiredStationKey || ""}` : "",
     state?.serverMuted === true ? "server-muted" : "",
+    Number(state?.sleepUntilMs) > 0 ? `sleep:${state.sleepUntilMs}` : "",
   ].join("|").toLowerCase();
 }
 

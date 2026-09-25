@@ -162,6 +162,14 @@ async function restoreRuntimeGuildEntry(runtime, guildId, data, stations, { sour
     };
   }
 
+  const sleepUntilMs = parseStoredTimestampMs(data.sleepUntilMs);
+  if (sleepUntilMs > 0 && sleepUntilMs <= nowMs) {
+    clearRuntimeRestoreRetry(runtime, guildId);
+    log("INFO", `[${runtime.config.name}] Sleep-Timer lief waehrend des Neustarts ab (guild=${guildId}); Stream bleibt aus.`);
+    clearBotGuild(runtime.config.id, guildId);
+    return { ok: false, permanent: true, resource: "sleep" };
+  }
+
   const { guild, error: guildError } = await fetchRestoreGuild(runtime, guildId);
   if (!guild) {
     if (isPermanentRestoreResourceError(guildError, "guild")) {
@@ -280,6 +288,7 @@ async function restoreRuntimeGuildEntry(runtime, guildId, data, stations, { sour
   state.parkedReason = String(data.parkedReason || "").trim() || null;
   state.parkedAt = parseStoredTimestampMs(data.parkedAt);
   state.parkedDetail = String(data.parkedDetail || "").trim() || null;
+  state.sleepUntilMs = sleepUntilMs > nowMs ? sleepUntilMs : 0;
   runtime.markScheduledEventPlayback(
     state,
     data.scheduledEventId || null,
@@ -311,6 +320,7 @@ async function restoreRuntimeGuildEntry(runtime, guildId, data, stations, { sour
     preserveDesiredStation: state.failoverActive === true,
   });
   clearRuntimeRestoreRetry(runtime, guildId);
+  runtime.armSleepTimer?.(guildId);
   log("INFO", `[${runtime.config.name}] Wiederhergestellt: ${guild.name} -> ${restoredStation.station.name}`);
   if (replacedStation) {
     void notifyRuntimeStationUnavailable(runtime, guildId, state, {

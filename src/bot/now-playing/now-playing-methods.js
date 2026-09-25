@@ -771,6 +771,7 @@ const nowPlayingMethods = {
         bitrate: tierConfig.bitrate || null,
         volume: Number.isFinite(volume) ? volume : Number.NaN,
         channelId: String(context?.channelId || "").trim() || null,
+        sleepUntilMs: Number(this.guildState?.get?.(guildId)?.sleepUntilMs) || 0,
       },
       notices: { serverMuted: context?.serverMuted === true, failover },
       recent,
@@ -1016,6 +1017,8 @@ const nowPlayingMethods = {
     const action = String(interaction.customId || "").slice(NP_PREFIX.length);
     // "💾 Save" (#272) is personal: no role rule, its own answer.
     if (action === "save") return this.handleSaveSongControl(interaction);
+    // The sleep warning's buttons (#275) change that message in place.
+    if (action === "sleepextend" || action === "sleepoff") return this.handleSleepControl(interaction, action);
     // Discord requires an acknowledgement within three seconds. Voice/player
     // operations and the embed refresh can take longer, so acknowledge first.
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });

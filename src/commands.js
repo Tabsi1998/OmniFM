@@ -168,6 +168,28 @@ export function buildCommandBuilders() {
     "Deine gemerkten Songs: ansehen und löschen"
   );
 
+  const sleep = describe(
+    new SlashCommandBuilder().setName("sleep"),
+    "Turn the radio off after a while, with a soft fade",
+    "Radio nach einer Weile leise ausschalten"
+  );
+  sleep.addStringOption((option) => option
+    .setName("duration")
+    .setNameLocalizations(de("dauer"))
+    .setDescription("When OmniFM turns off")
+    .setDescriptionLocalizations(de("Wann OmniFM ausschaltet"))
+    .setRequired(true)
+    .addChoices(
+      choice("15 min", "15"),
+      choice("30 min", "30"),
+      choice("45 min", "45"),
+      choice("60 min", "60"),
+      choice("90 min", "90"),
+      choice("2 h", "120"),
+      choice("Off", "off", "Aus"),
+    ));
+  withIntegerOption(sleep, "bot", "OmniFM worker number (optional)", "OmniFM-Worker-Nummer (optional)");
+
   const setvolume = describe(
     new SlashCommandBuilder().setName("setvolume"),
     "Set the playback volume (0-100)",
@@ -458,6 +480,7 @@ export function buildCommandBuilders() {
     stats,
     history,
     saved,
+    sleep,
     setvolume,
     status,
     list,
