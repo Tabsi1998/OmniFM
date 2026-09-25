@@ -34,6 +34,7 @@ import { createPublicRoutesHandler } from "./routes/public-routes.js";
 import { createShareRoutesHandler } from "./routes/share-routes.js";
 import { WEBSITE_URL } from "../bot/runtime-links.js";
 import { resolveDiscordRedirectUri, startDiscordOauthSync } from "../lib/discord-oauth-settings.js";
+import { validateStageEventSpeakers } from "../bot/stage-moderator.js";
 import { createAdminRoutesHandler } from "./routes/admin-routes.js";
 import {
   isRuntimePlaybackActive,
@@ -2824,6 +2825,10 @@ async function validateDashboardEventChannels(runtime, guild, event, language = 
         `I do not have Speak permission for ${voiceChannel.toString()}.`
       ),
     };
+  }
+  const stageError = await validateStageEventSpeakers(runtime, guild, voiceChannel, getTier(guild.id), language);
+  if (stageError) {
+    return { ok: false, message: stageError };
   }
   if (event.createDiscordEvent) {
     const eventPermError = runtime.validateDiscordScheduledEventPermissions(guild, voiceChannel, language);
