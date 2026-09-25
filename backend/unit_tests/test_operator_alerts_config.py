@@ -22,4 +22,4 @@ def test_the_operator_webhook_url_is_masked_like_a_password():
 def test_operator_alerts_are_part_of_the_default_system_config():
     defaults = server.DEFAULT_OWNER_CONFIG["system"]["operatorAlerts"]
     assert defaults["webhookUrl"] == ""
-    assert all(defaults[key] is True for key in ("workerOffline", "failoverExhausted", "playbackLoops", "workerAutoheal", "diskSpace"))
+    assert all(defaults[key] is True for key in ("workerOffline", "failoverExhausted", "playbackLoops", "workerAutoheal", "diskSpace", "backupFailed", "updates"))

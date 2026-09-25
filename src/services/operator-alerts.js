@@ -169,6 +169,42 @@ export async function alertWorkerAutoheal({ workerName, stuckGuilds }, env = pro
   return true;
 }
 
+// ---------------------------------------------------------------- updates
+
+/** The alert update.sh sends at its end or when it stops (#316). */
+export function buildUpdateAlert({ ok, from, to, detail, host }) {
+  const fields = [
+    ...(detail ? [{ name: ok ? "Hinweis" : "Letzter Schritt", value: String(detail).slice(0, 1000), inline: false }] : []),
+    ...(host ? [{ name: "Server", value: String(host).slice(0, 100), inline: true }] : []),
+  ];
+  if (ok) {
+    return {
+      key: `update-ok:${to || "-"}`,
+      embed: {
+        color: OPERATOR_COLORS.success,
+        title: "🟢 Update erfolgreich",
+        description: `OmniFM läuft jetzt mit **${to || "?"}** (vorher ${from || "?"}).`,
+        fields,
+      },
+    };
+  }
+  return {
+    key: "update-failed",
+    embed: {
+      color: OPERATOR_COLORS.error,
+      title: "🔴 Update fehlgeschlagen",
+      description: `Das Update von ${from || "?"} ist abgebrochen. ` +
+        "Stand prüfen mit `./update.sh --status quick`, die Ausgabe von update.sh zeigt den Grund.",
+      fields,
+    },
+  };
+}
+
+export async function alertUpdateResult(input, send = notifyOperator) {
+  const { key, embed } = buildUpdateAlert(input);
+  await send(key, embed);
+}
+
 // ---------------------------------------------------------------- disk space
 
 export function describeDiskSpace(stats) {

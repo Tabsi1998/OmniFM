@@ -9,8 +9,11 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
-log() { printf "\033[1;36m[OmniFM]\033[0m %s\n" "$*"; }
-die() { printf "\033[1;31m[error]\033[0m %s\n" "$*" >&2; exit 1; }
+# LAST_STEP names the step an aborted update stopped in; the operator alert
+# (#316) carries it.
+LAST_STEP=""
+log() { LAST_STEP="$*"; printf "\033[1;36m[OmniFM]\033[0m %s\n" "$*"; }
+die() { LAST_STEP="$*"; printf "\033[1;31m[error]\033[0m %s\n" "$*" >&2; exit 1; }
 
 doctor() {
   local failed=0
@@ -230,6 +233,27 @@ case "${1:-}" in
     ;;
 esac
 
+# From here on this is a real update: every way out - die, a failing command
+# under set -e, Ctrl+C - ends in exactly one operator alert (#316).
+OLD_REV="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unbekannt)"
+UPDATE_ALERT_SENT=0
+notify_update() { # ok|failed, detail
+  local new_rev
+  UPDATE_ALERT_SENT=1
+  command -v node >/dev/null 2>&1 || return 0
+  [ -f "$ROOT/scripts/notify-operator.mjs" ] || return 0
+  new_rev="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unbekannt)"
+  timeout 30 node "$ROOT/scripts/notify-operator.mjs" "update-$1" "$OLD_REV" "$new_rev" "${2:-}" \
+    >/dev/null 2>&1 || true
+}
+on_update_exit() {
+  local status=$?
+  if [ "$status" -ne 0 ] && [ "$UPDATE_ALERT_SENT" -eq 0 ]; then
+    notify_update failed "${LAST_STEP:-unbekannt} (Exit-Code $status)"
+  fi
+}
+trap on_update_exit EXIT
+
 BACKUP_DIR="$ROOT/.update-backups/config/$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "$BACKUP_DIR"
 for config_file in backend/.env frontend/.env; do
@@ -301,9 +325,12 @@ bot_running() {
 
 if bot_running; then
   log "Discord-Bot läuft mit diesem Code-Stand. Prüfen: /help in Discord zeigt unten im Footer die Version."
+  UPDATE_NOTE="Discord-Bot läuft."
 else
   log "ACHTUNG: Discord-Bot läuft NICHT (Commander-Token unter /admin → Discord & Bots eintragen, dann ./start.sh)."
   log "Ohne laufenden Bot ändern sich Discord-Embeds NICHT — alte Nachrichten bleiben alt."
+  UPDATE_NOTE="ACHTUNG: Discord-Bot läuft NICHT."
 fi
 
 log "Update abgeschlossen."
+notify_update ok "$UPDATE_NOTE"
