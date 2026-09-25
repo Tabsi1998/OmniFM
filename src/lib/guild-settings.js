@@ -40,6 +40,13 @@ function normalizeGuildSettings(rawSettings = {}) {
     delete normalized.guildId;
   }
 
+  const nowPlayingChannelId = String(input.nowPlayingChannelId || "").trim();
+  if (/^\d{17,22}$/.test(nowPlayingChannelId)) {
+    normalized.nowPlayingChannelId = nowPlayingChannelId;
+  } else {
+    delete normalized.nowPlayingChannelId;
+  }
+
   if (normalizedWeeklyDigestLastSent) {
     normalized.weeklyDigestLastSent = normalizedWeeklyDigestLastSent;
   } else {

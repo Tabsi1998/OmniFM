@@ -22,6 +22,15 @@ export const NOTICE_CATALOG = Object.freeze({
     body: () => ["Das bedient der Commander-Bot von OmniFM, nicht die Worker. Nutze den Befehl beim Commander.", "The OmniFM commander bot handles this, not the workers. Use the command with the commander."],
     fix: null,
   },
+  "manage-server-required": {
+    kind: "warning",
+    title: ["Nur für Server-Verwalter", "Server managers only"],
+    body: () => [
+      "Die Einrichtung braucht das Recht **Server verwalten**. Radio starten kannst du trotzdem mit dem Schnellstart.",
+      "The setup needs the **Manage Server** permission. You can still start the radio with the quick start.",
+    ],
+    fix: "quickstart",
+  },
   "not-in-voice": {
     kind: "info",
     title: ["Kein Sprachkanal", "No voice channel"],

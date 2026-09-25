@@ -2,132 +2,27 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  ChannelType,
   EmbedBuilder,
 } from "discord.js";
 
 import { clipText } from "../lib/helpers.js";
 import { getTier, getServerPlanConfig } from "../core/entitlements.js";
 import { PLANS, BRAND } from "../config/plans.js";
-import { normalizeLanguage, getDefaultLanguage } from "../i18n.js";
-import { buildSetupStatusSummary } from "../lib/user-facing-setup.js";
 import {
   DASHBOARD_URL,
   WEBSITE_URL,
   SUPPORT_URL,
   INVITE_COMPONENT_ID_OPEN,
-  PLAY_COMPONENT_ID_OPEN,
-  STATIONS_COMPONENT_ID_OPEN,
-  WORKERS_COMPONENT_ID_OPEN,
   WORKERS_COMPONENT_ID_PAGE_PREFIX,
   WORKERS_COMPONENT_ID_REFRESH,
   withLanguageParam,
 } from "./runtime-links.js";
-import { buildOmniEmbed, buildLinkRow } from "./discord-ui.js";
 import { brandAuthor, brandFooter } from "./brand-embed.js";
 import { buildHelpPayload } from "./help-panel.js";
 
 function getTierConfig(guildId) {
   const config = getServerPlanConfig(guildId);
   return { ...config, tier: config.plan };
-}
-
-function countVoiceChannels(guild) {
-  const cache = guild?.channels?.cache;
-  if (!cache?.filter) return 0;
-  return cache.filter((channel) =>
-    channel
-    && channel.isVoiceBased?.() === true
-    && (channel.type === ChannelType.GuildVoice || channel.type === ChannelType.GuildStageVoice)
-  ).size || 0;
-}
-
-export function buildRuntimeSetupMessagePayload(
-  runtime,
-  { guild = null, language = null, guildId = null } = {}
-) {
-  const resolvedGuildId = String(guildId || guild?.id || "").trim();
-  const resolvedLanguage = normalizeLanguage(
-    language || (resolvedGuildId ? runtime.resolveGuildLanguage(resolvedGuildId) : getDefaultLanguage()),
-    getDefaultLanguage()
-  );
-  const guildName = guild?.name || (resolvedGuildId ? `Server ${resolvedGuildId}` : null);
-  const isDe = resolvedLanguage === "de";
-  const dashboardUrl = withLanguageParam(DASHBOARD_URL, resolvedLanguage);
-  const websiteUrl = withLanguageParam(WEBSITE_URL, resolvedLanguage);
-  const guildTier = resolvedGuildId ? getTier(resolvedGuildId) : "free";
-  const maxWorkerSlots = runtime.workerManager?.getMaxWorkerIndex?.(guildTier) || getTierConfig(resolvedGuildId).maxBots || 0;
-  const invitedWorkerCount = resolvedGuildId && runtime.workerManager?.getInvitedWorkers
-    ? runtime.workerManager.getInvitedWorkers(resolvedGuildId, guildTier).length
-    : 0;
-  const voiceChannelCount = countVoiceChannels(guild);
-  const setupSummary = buildSetupStatusSummary({
-    commanderReady: Boolean(guild || resolvedGuildId),
-    invitedWorkerCount,
-    maxWorkerSlots,
-    voiceChannelCount,
-    t: (de, en) => (isDe ? de : en),
-  });
-
-  const embed = buildOmniEmbed({
-    tone: "admin",
-    title: isDe ? `🚀 ${BRAND.name}: Erste Schritte` : `🚀 ${BRAND.name}: First steps`,
-    description: isDe
-      ? `Danke für den Invite auf **${guildName || "deinen Server"}**.\n${setupSummary.nextTitle}: ${setupSummary.nextBody}`
-      : `Thanks for inviting me to **${guildName || "your server"}**.\n${setupSummary.nextTitle}: ${setupSummary.nextBody}`,
-    fields: [
-      {
-        name: isDe ? "Aktueller Status" : "Current status",
-        value: setupSummary.checklist.join("\n"),
-      },
-      {
-        name: isDe ? "Nächster Schritt" : "Next step",
-        value: isDe
-          ? `Starte mit **${setupSummary.command}**.\n${setupSummary.nextBody}`
-          : `Start with **${setupSummary.command}**.\n${setupSummary.nextBody}`,
-      },
-      {
-        name: isDe ? "Vor dem ersten /play" : "Before the first /play",
-        value: isDe
-          ? "Der Ziel-Channel braucht für OmniFM mindestens `Connect` und außerhalb von Stage zusätzlich `Speak`."
-          : "The target channel needs at least `Connect` for OmniFM and also `Speak` outside of stage channels.",
-      },
-      {
-        name: isDe ? "Wichtige Commands" : "Important commands",
-        value: isDe
-          ? "`/play` öffnet jetzt einen geführten Schnellstart, `/stations` zeigt den Browser, `/workers` und `/invite` regeln deine Worker."
-          : "`/play` now opens a guided quick-start, `/stations` opens the browser, and `/workers` plus `/invite` handle your workers.",
-      },
-    ],
-    footer: isDe ? "Geführter Start, moderne Panels und schnelle Aktionen direkt in Discord." : "Guided setup, modern panels, and quick actions directly in Discord.",
-  });
-
-  const actionRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(PLAY_COMPONENT_ID_OPEN)
-      .setStyle(ButtonStyle.Primary)
-      .setLabel(isDe ? "Schnellstart" : "Quick start"),
-    new ButtonBuilder()
-      .setCustomId(STATIONS_COMPONENT_ID_OPEN)
-      .setStyle(ButtonStyle.Secondary)
-      .setLabel(isDe ? "Sender" : "Stations"),
-    new ButtonBuilder()
-      .setCustomId(WORKERS_COMPONENT_ID_OPEN)
-      .setStyle(ButtonStyle.Secondary)
-      .setLabel(isDe ? "Worker-Status" : "Worker status"),
-    new ButtonBuilder()
-      .setCustomId(INVITE_COMPONENT_ID_OPEN)
-      .setStyle(ButtonStyle.Secondary)
-      .setLabel(isDe ? "Worker einladen" : "Invite worker")
-  );
-
-  const linkRow = buildLinkRow([
-    { label: "📊 Dashboard", url: dashboardUrl },
-    { label: "🌐 Website", url: websiteUrl },
-    { label: "🛟 Support", url: SUPPORT_URL },
-  ]);
-
-  return { embeds: [embed], components: linkRow ? [actionRow, linkRow] : [actionRow] };
 }
 
 // /help (#269): one panel with a topic menu; see help-panel.js.

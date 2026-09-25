@@ -18,6 +18,7 @@ import { brandFooter, brandAuthor } from "../brand-embed.js";
 import { isComponentsV2Message } from "../../discord/ui/index.js";
 import { buildNoticePayload } from "../commands/command-helpers.js";
 import { buildInviteUrl } from "../../bot-config.js";
+import { SETUP_COMPONENT_PREFIX } from "../setup-wizard.js";
 import {
   INVITE_COMPONENT_PREFIX,
   INVITE_COMPONENT_ID_OPEN,
@@ -585,6 +586,9 @@ const menuMethods = {
     if (!interaction || (!interaction.isButton?.() && !interaction.isStringSelectMenu?.())) return false;
     const customId = String(interaction.customId || "");
     try {
+      if (customId.startsWith(SETUP_COMPONENT_PREFIX)) {
+        return this.handleSetupComponentInteraction(interaction);
+      }
       if (customId.startsWith(INVITE_COMPONENT_PREFIX)) {
         return this.handleInviteComponentInteraction(interaction);
       }

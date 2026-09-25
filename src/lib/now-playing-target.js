@@ -2,8 +2,10 @@ function normalizeChannelId(value) {
   return String(value || "").trim();
 }
 
-function getNowPlayingCandidateIds(state = {}, guild = null) {
+// `configuredChannelId`: the panel channel chosen in the setup (#271).
+function getNowPlayingCandidateIds(state = {}, guild = null, { configuredChannelId = null } = {}) {
   const candidateIds = [
+    configuredChannelId,
     state?.connection?.joinConfig?.channelId,
     state?.lastChannelId,
     state?.nowPlayingChannelId,

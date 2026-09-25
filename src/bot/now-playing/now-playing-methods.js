@@ -544,7 +544,10 @@ const nowPlayingMethods = {
     const me = await this.resolveBotMember(guild);
     if (!me) return null;
 
-    const uniqueCandidateIds = getNowPlayingCandidateIds(state, guild);
+    const settings = await this.loadGuildSettingsCached?.(guildId).catch(() => null);
+    const uniqueCandidateIds = getNowPlayingCandidateIds(state, guild, {
+      configuredChannelId: settings?.nowPlayingChannelId || null,
+    });
 
     for (const candidateId of uniqueCandidateIds) {
       const channel = await this.fetchGuildChannelById(guild, candidateId);
