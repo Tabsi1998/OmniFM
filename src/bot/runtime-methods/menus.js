@@ -20,6 +20,7 @@ import { isComponentsV2Message } from "../../discord/ui/index.js";
 import { buildNoticePayload } from "../commands/command-helpers.js";
 import { buildInviteUrl } from "../../bot-config.js";
 import { SETUP_COMPONENT_PREFIX } from "../setup-wizard.js";
+import { FORM_PREFIX } from "../forms.js";
 import {
   INVITE_COMPONENT_PREFIX,
   INVITE_COMPONENT_ID_OPEN,
@@ -591,6 +592,9 @@ const menuMethods = {
     try {
       if (customId.startsWith(SETUP_COMPONENT_PREFIX)) {
         return this.handleSetupComponentInteraction(interaction);
+      }
+      if (customId.startsWith(FORM_PREFIX)) {
+        return this.handleFormSubmit(interaction);
       }
       if (customId.startsWith(INVITE_COMPONENT_PREFIX)) {
         return this.handleInviteComponentInteraction(interaction);

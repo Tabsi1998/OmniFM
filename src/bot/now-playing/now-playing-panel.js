@@ -154,6 +154,9 @@ export function buildNowPlayingPanel(input) {
       }),
     ));
   }
+  // #273: "Report a problem" is always there, next to the song links when there are some.
+  const reportButton = button(`${NP_PREFIX}report`, { label: t("Problem melden", "Report a problem"), emoji: "warning", appId });
+  if (!input.searchQuery) rows.push(new ActionRowBuilder().addComponents(reportButton));
   if (input.searchQuery) {
     const query = encodeURIComponent(input.searchQuery);
     const links = [
@@ -163,7 +166,7 @@ export function buildNowPlayingPanel(input) {
       linkButton(`https://www.youtube.com/results?search_query=${query}`, "YouTube", null, appId),
     ];
     if (input.musicBrainzUrl) links.push(linkButton(input.musicBrainzUrl, "MusicBrainz", null, appId));
-    rows.push(new ActionRowBuilder().addComponents(...links));
+    rows.push(new ActionRowBuilder().addComponents(...links, reportButton));
   }
 
   const footerParts = [

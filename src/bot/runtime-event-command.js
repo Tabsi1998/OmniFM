@@ -20,8 +20,14 @@ import {
   buildEventActionRows,
   buildEventNoticePayload,
 } from "./runtime-events.js";
+import { buildEventFormModal } from "./forms.js";
+import { buildRepeatChoices } from "../commands.js";
 
-async function handleEventCommand(runtime, interaction) {
+/**
+ * `formInput` (#273): the values of the event form; they run through the
+ * same checks as /event create.
+ */
+async function handleEventCommand(runtime, interaction, { formInput = null } = {}) {
   const guildId = interaction.guildId;
   const { t, language } = runtime.createInteractionTranslator(interaction);
   if (!runtime.hasGuildManagePermissions(interaction)) {
@@ -58,7 +64,11 @@ async function handleEventCommand(runtime, interaction) {
     return;
   }
 
-  const sub = interaction.options.getSubcommand();
+  const sub = formInput ? "create" : interaction.options.getSubcommand();
+  if (sub === "form") {
+    await interaction.showModal(buildEventFormModal({ t, repeatChoices: buildRepeatChoices(), language }));
+    return;
+  }
   const guild = interaction.guild || runtime.client.guilds.cache.get(guildId) || await runtime.client.guilds.fetch(guildId).catch(() => null);
   const me = guild ? await runtime.resolveBotMember(guild) : null;
 
@@ -114,22 +124,26 @@ async function handleEventCommand(runtime, interaction) {
   const parseWindow = (input) => runtime.parseEventWindowInput(input, language);
 
   if (sub === "create") {
-    const name = clipText(interaction.options.getString("name", true).trim(), 120);
-    const stationRaw = interaction.options.getString("station", true);
-    const voiceChannel = interaction.options.getChannel("voice", true);
-    const textChannel = interaction.options.getChannel("text");
-    const startRaw = interaction.options.getString("start");
-    const startDateRaw = interaction.options.getString("startdate");
-    const startTimeRaw = interaction.options.getString("starttime");
-    const endRaw = interaction.options.getString("end");
-    const endDateRaw = interaction.options.getString("enddate");
-    const endTimeRaw = interaction.options.getString("endtime");
-    const requestedTimeZone = interaction.options.getString("timezone") || "";
-    const repeat = normalizeRepeatMode(interaction.options.getString("repeat") || "none");
-    const createDiscordEvent = interaction.options.getBoolean("serverevent") === true;
-    const stageTopicTemplate = runtime.normalizeClearableText(interaction.options.getString("stagetopic"), 120);
-    const message = runtime.normalizeClearableText(interaction.options.getString("message"), 1200);
-    const description = runtime.normalizeClearableText(interaction.options.getString("description"), 800);
+    // The form has the core fields; everything else stays at its default.
+    const option = (name) => (formInput ? null : interaction.options.getString(name));
+    const name = clipText(String(formInput ? formInput.name : interaction.options.getString("name", true)).trim(), 120);
+    const stationRaw = formInput ? formInput.stationRaw : interaction.options.getString("station", true);
+    const voiceChannel = formInput
+      ? (formInput.voiceChannelId ? guild.channels.cache.get(formInput.voiceChannelId) || await guild.channels.fetch(formInput.voiceChannelId).catch(() => null) : null)
+      : interaction.options.getChannel("voice", true);
+    const textChannel = formInput ? null : interaction.options.getChannel("text");
+    const startRaw = formInput ? formInput.startRaw : option("start");
+    const startDateRaw = option("startdate");
+    const startTimeRaw = option("starttime");
+    const endRaw = option("end");
+    const endDateRaw = option("enddate");
+    const endTimeRaw = option("endtime");
+    const requestedTimeZone = option("timezone") || "";
+    const repeat = normalizeRepeatMode((formInput ? formInput.repeat : option("repeat")) || "none");
+    const createDiscordEvent = formInput ? false : interaction.options.getBoolean("serverevent") === true;
+    const stageTopicTemplate = runtime.normalizeClearableText(option("stagetopic"), 120);
+    const message = runtime.normalizeClearableText(option("message"), 1200);
+    const description = runtime.normalizeClearableText(option("description"), 800);
 
     if (!name) {
       await interaction.reply(buildEventNoticePayload(language, {

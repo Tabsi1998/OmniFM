@@ -56,7 +56,7 @@ async function handleEventCommand({ runtime, interaction }) {
 }
 
 /** /addstation */
-async function handleAddstationCommand({ interaction, t, language }) {
+async function handleAddstationCommand({ runtime, interaction, t, language }) {
   const guildId = interaction.guildId;
   const guildTier = getTier(guildId);
   if (guildTier !== "ultimate") {
@@ -66,6 +66,25 @@ async function handleAddstationCommand({ interaction, t, language }) {
   const key = interaction.options.getString("key");
   const name = interaction.options.getString("name");
   const url = interaction.options.getString("url");
+  // Nothing given: the form with genre and stream test (#273).
+  if (!key && !name && !url) {
+    await runtime.openStationForm(interaction);
+    return;
+  }
+  if (!key || !name || !url) {
+    await interaction.reply({
+      embeds: [buildOmniEmbed({
+        tone: "warning",
+        title: t("⚠ Angaben fehlen", "⚠ Details missing"),
+        description: t(
+          "Gib `key`, `name` und `url` an – oder lass alle drei leer, dann öffnet sich ein Formular.",
+          "Give `key`, `name` and `url` – or leave all three empty and a form opens."
+        ),
+      })],
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
   const result = await addGuildStation(guildId, key, name, url);
   if (result.error) {
     await interaction.reply({

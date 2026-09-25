@@ -173,6 +173,8 @@ function normalizeRuntimeIncident(rawIncident, guildId = "") {
       reason: sanitizeText(payloadInput.reason, 80),
       detail: sanitizeText(payloadInput.detail, 240),
       failoverDurationMs: normalizeCount(payloadInput.failoverDurationMs),
+      // A listener's report (#273) carries the last playback phases.
+      phaseHistory: normalizeCandidateList(payloadInput.phaseHistory, 5),
     },
   };
 }
@@ -211,6 +213,11 @@ export function describeRuntimeIncident(eventKey, payload = {}, guildLabel = "")
       return `${prefix}Bot auf dem Server stummgeschaltet`;
     case "voice_server_unmuted":
       return `${prefix}Server-Stummschaltung aufgehoben`;
+    case "listener_report": {
+      const reasons = { no_sound: "kein Ton", wrong_station: "falscher Sender", stuck: "hängt", other: "Problem" };
+      const station = p.previousStationName || p.previousStationKey || "Sender";
+      return `${prefix}Hörer meldet ${reasons[p.reason] || "Problem"} bei ${station}${p.detail ? `: ${p.detail}` : ""}`;
+    }
     default:
       return `${prefix}${String(eventKey || "Vorfall")}`;
   }
