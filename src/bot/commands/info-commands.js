@@ -30,8 +30,8 @@ import {
 /** /help */
 async function handleHelpCommand({ runtime, interaction }) {
   recordCommandUsage(interaction.guildId, interaction.commandName);
-  const payload = runtime.buildHelpMessage(interaction);
-  await runtime.respondInteraction(interaction, { ...payload, flags: MessageFlags.Ephemeral });
+  // The payload carries its flags: private and Components V2 (#269).
+  await runtime.respondInteraction(interaction, runtime.buildHelpMessage(interaction));
   return;
 }
 

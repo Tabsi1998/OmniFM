@@ -35,6 +35,7 @@ import {
 } from "../runtime-links.js";
 import { buildRuntimeHelpMessage, buildRuntimeWorkersStatusPayload } from "../runtime-message-builders.js";
 import { handleRuntimePanelInteraction } from "../runtime-panels.js";
+import { HELP_COMPONENT_PREFIX, HELP_SECTION_SELECT_ID } from "../help-panel.js";
 import {
   NP_PREFIX,
 } from "../runtime-shared.js";
@@ -493,6 +494,14 @@ const menuMethods = {
       return true;
     }
 
+    // From a Components V2 message (#269, /help) the invite menu comes as
+    // its own private message: V2 cannot be edited into embeds.
+    if (interaction.customId === INVITE_COMPONENT_ID_OPEN && isComponentsV2Message(interaction.message)) {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      await interaction.editReply(await this.buildInviteMenuPayload(interaction));
+      return true;
+    }
+
     if (interaction.customId === INVITE_COMPONENT_ID_REFRESH || interaction.customId === INVITE_COMPONENT_ID_OPEN) {
       await interaction.deferUpdate();
       const payload = await this.buildInviteMenuPayload(interaction);
@@ -585,6 +594,9 @@ const menuMethods = {
       if (customId.startsWith(NP_PREFIX)) {
         return this.handleNowPlayingControl(interaction);
       }
+      if (customId.startsWith(HELP_COMPONENT_PREFIX)) {
+        return this.handleHelpComponentInteraction(interaction);
+      }
       if (
         customId === PLAY_COMPONENT_ID_OPEN
         || customId === STATIONS_COMPONENT_ID_OPEN
@@ -622,8 +634,17 @@ const menuMethods = {
     }
   },
 
-  buildHelpMessage(interaction) {
-    return buildRuntimeHelpMessage(this, interaction);
+  buildHelpMessage(interaction, section = "overview") {
+    return buildRuntimeHelpMessage(this, interaction, section);
+  },
+
+  // The topic menu of /help (#269) switches the page in place.
+  async handleHelpComponentInteraction(interaction) {
+    if (interaction.customId === HELP_SECTION_SELECT_ID && interaction.isStringSelectMenu?.()) {
+      await interaction.update(this.buildHelpMessage(interaction, interaction.values?.[0] || "overview"));
+      return true;
+    }
+    return false;
   },
 };
 
