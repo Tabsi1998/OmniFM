@@ -275,14 +275,25 @@ export async function checkVersion({ runningVersion, fetchImpl, repo = "Tabsi199
   return result("version", "ok", `Läuft: ${runningVersion} – aktuell.`);
 }
 
-/** The station catalogue: streams the station check finds down. */
+/** The station catalogue: streams the station check finds down or suddenly named otherwise. */
 export async function checkStations({ report = [] }) {
   if (!report.length) return result("stations", "off", "Die Stream-Prüfung läuft nicht oder hat noch nichts geprüft.");
   const down = report.filter((entry) => entry?.status === "down" && Number(entry.consecutiveFailures) >= 2);
-  if (!down.length) return result("stations", "ok", `Alle ${report.length} geprüften Sender erreichbar.`);
-  const names = down.slice(0, 3).map((entry) => entry.name || entry.key).join(", ");
-  return result("stations", "warn", `${down.length} von ${report.length} Sendern ausgefallen: ${names}${down.length > 3 ? " …" : ""}.`,
-    down.map((entry) => `${entry.name || entry.key}: ${entry.error || "keine Antwort"}`).join("\n"));
+  // #325: a stream that suddenly sends another name may play something else now.
+  const renamed = report.filter((entry) => entry?.streamNameChange?.to);
+  if (!down.length && !renamed.length) return result("stations", "ok", `Alle ${report.length} geprüften Sender erreichbar.`);
+  const label = (entry) => entry.name || entry.key;
+  const listed = (entries) => `${entries.slice(0, 3).map(label).join(", ")}${entries.length > 3 ? " …" : ""}`;
+  const parts = [];
+  if (down.length) parts.push(`${down.length} von ${report.length} Sendern ausgefallen: ${listed(down)}.`);
+  if (renamed.length) {
+    parts.push(`${renamed.length} ${renamed.length === 1 ? "Stream heißt" : "Streams heißen"} jetzt anders: ${listed(renamed)} – prüfen, ob noch das Richtige läuft.`);
+  }
+  const detail = [
+    ...down.map((entry) => `${label(entry)}: ${entry.error || "keine Antwort"}`),
+    ...renamed.map((entry) => `${label(entry)}: "${entry.streamNameChange.from}" → "${entry.streamNameChange.to}"`),
+  ].join("\n");
+  return result("stations", "warn", parts.join(" "), detail);
 }
 
 /** What the cockpit shows, in order, with the one place to fix it. */

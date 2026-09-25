@@ -132,11 +132,11 @@
     },
     "reggaeradio": {
       "name": "Reggae Radio",
-      "url": "http://streams.bigfm.de/bigfm-reggaevibes-128-mp3",
+      "url": "https://ice1.somafm.com/reggae-128-mp3",
       "tier": "free",
       "genre": "Reggae & Dancehall",
       "color": "#16A34A",
-      "country": "DE"
+      "country": "US"
     },
     "chartsradio": {
       "name": "Charts Radio",
@@ -147,7 +147,7 @@
       "country": "DE"
     },
     "technoradio": {
-      "name": "Techno Radio",
+      "name": "Dance Radio",
       "url": "https://streams.ilovemusic.de/iloveradio2.mp3",
       "tier": "free",
       "genre": "EDM & Festival",
@@ -455,11 +455,11 @@
       "country": "DE"
     },
     "pro_tech_16": {
-      "name": "Deep Underground",
+      "name": "Deep Tech House",
       "url": "https://stream.bigfm.de/deeptechhouse/mp3-128/radio-browser",
       "tier": "pro",
-      "genre": "Techno",
-      "color": "#7C3AED",
+      "genre": "House",
+      "color": "#06B6D4",
       "country": "DE"
     },
     "pro_tech_17": {
@@ -478,7 +478,7 @@
       "color": "#7C3AED"
     },
     "pro_tech_19": {
-      "name": "Minimal Grooves",
+      "name": "IDM & Glitch",
       "url": "https://ice4.somafm.com/cliqhop-128-mp3",
       "tier": "pro",
       "genre": "Electronic",
@@ -605,11 +605,10 @@
     },
     "pro_hard_06": {
       "name": "Hard Dance",
-      "url": "http://mp3.stream.tb-group.fm/hb.mp3?",
+      "url": "https://stream.laut.fm/hardstyle",
       "tier": "pro",
       "genre": "Hardstyle & Hardcore",
-      "color": "#EF4444",
-      "country": "DE"
+      "color": "#EF4444"
     },
     "pro_hard_07": {
       "name": "Reverse Bass",
@@ -778,12 +777,10 @@
     },
     "pro_urban_04": {
       "name": "Drill Beats",
-      "url": "http://streams.bigfm.de/bigfm-rapfeature-128-mp3?usid=0-0-H-M-D-60",
+      "url": "https://stream.laut.fm/drill",
       "tier": "pro",
       "genre": "Hip Hop & Rap",
-      "color": "#F59E0B",
-      "country": "DE",
-      "language": "de"
+      "color": "#F59E0B"
     },
     "pro_urban_05": {
       "name": "R&B Smooth",
@@ -858,11 +855,11 @@
       "country": "DE"
     },
     "pro_urban_14": {
-      "name": "Chill R&B",
+      "name": "2000er Hits",
       "url": "https://stream.bigfm.de/slowjamz/mp3-128/radiobrowser",
       "tier": "pro",
-      "genre": "R&B",
-      "color": "#A855F7",
+      "genre": "Pop & Charts",
+      "color": "#EC4899",
       "country": "DE"
     },
     "pro_urban_15": {

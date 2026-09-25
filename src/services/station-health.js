@@ -98,6 +98,32 @@ function reportTransition(previous, entry) {
  * @property {number} consecutiveSuccesses
  */
 
+const STREAM_NAME_CHANGE_KEEP_MS = 24 * 60 * 60_000;
+
+/** The name a stream sends about itself (icy-name), or "". */
+function readStreamName(response) {
+  const value = String(response?.headers?.get?.("icy-name") || "").replace(/\s+/g, " ").trim();
+  return value.slice(0, 120);
+}
+
+/**
+ * #325: a stream that suddenly calls itself something else (the "police
+ * scanner" case) is kept for a day as { from, to, at } for the owner cockpit.
+ */
+function trackStreamName(previous, streamName, url, now = Date.now()) {
+  // A new URL (the owner or the catalog changed the stream) starts over.
+  if (previous?.url && url && previous.url !== url) return { streamName: streamName || null, streamNameChange: null };
+  const known = previous?.streamName || null;
+  if (streamName && known && streamName !== known) {
+    return { streamName, streamNameChange: { from: known, to: streamName, at: now } };
+  }
+  const change = previous?.streamNameChange;
+  return {
+    streamName: streamName || known,
+    streamNameChange: change && now - Number(change.at || 0) < STREAM_NAME_CHANGE_KEEP_MS ? change : null,
+  };
+}
+
 /**
  * Prüft eine einzelne Station per HTTP HEAD (oder GET mit sofortigem Abbruch).
  * @param {string} key
@@ -128,6 +154,7 @@ async function checkStation(key, name, url) {
       headers: {
         "User-Agent": "OmniFM-HealthCheck/1.0",
         "Range": "bytes=0-0",
+        "Icy-MetaData": "1",
       },
       redirect: "follow",
       timeoutMs: STATION_HEALTH_TIMEOUT_MS,
@@ -139,7 +166,7 @@ async function checkStation(key, name, url) {
       response = await safeFetch(url, {
         method: "HEAD",
         signal: controller.signal,
-        headers: { "User-Agent": "OmniFM-HealthCheck/1.0" },
+        headers: { "User-Agent": "OmniFM-HealthCheck/1.0", "Icy-MetaData": "1" },
         redirect: "follow",
         timeoutMs: STATION_HEALTH_TIMEOUT_MS,
       });
@@ -166,6 +193,7 @@ async function checkStation(key, name, url) {
     // HTTP 200, 206 (Partial Content), 301/302 (Redirect) = OK
     // 4xx/5xx = down
     const ok = response.status < 400 || response.status === 401; // 401 = Auth required aber Server läuft
+    const naming = trackStreamName(previous, ok ? readStreamName(response) : "", url);
     try {
       await response.body?.cancel?.();
     } catch {
@@ -185,6 +213,7 @@ async function checkStation(key, name, url) {
       error: ok ? null : `HTTP ${response.status}`,
       consecutiveFailures: ok ? 0 : previous.consecutiveFailures + 1,
       consecutiveSuccesses: ok ? previous.consecutiveSuccesses + 1 : 0,
+      ...naming,
     };
 
     reportTransition(previous, entry);
@@ -207,6 +236,7 @@ async function checkStation(key, name, url) {
       error: errorMsg,
       consecutiveFailures: previous.consecutiveFailures + 1,
       consecutiveSuccesses: 0,
+      ...trackStreamName(previous, "", url),
     };
 
     reportTransition(previous, entry);
@@ -351,6 +381,7 @@ function isStationDown(key) {
 }
 
 export {
+  trackStreamName,
   startStationHealthService,
   stopStationHealthService,
   getStationHealthReport,
