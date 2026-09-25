@@ -9,6 +9,21 @@ import {
   validateVoiceStatusTemplate,
 } from "../../lib/voice-status-template.js";
 import { VOICE_CHANNEL_STATUS_TEMPLATE } from "../../bot/runtime-shared.js";
+import {
+  FAVORITES_MAX,
+  applyFavoriteChange,
+  favoriteLimitForTier,
+  normalizeFavoriteStations,
+} from "../../lib/favorite-stations.js";
+
+// The favourite bar (#276): the stored stations and how many the plan shows.
+export function buildDashboardFavoritesResponse(settings = {}, tier = "free") {
+  return {
+    stations: normalizeFavoriteStations(settings.favoriteStations),
+    limit: favoriteLimitForTier(tier),
+    max: FAVORITES_MAX,
+  };
+}
 
 // The voice channel status text (#277): the server's own template or the
 // default of this installation, and what the dashboard can insert.
@@ -99,6 +114,7 @@ export function createDashboardSettingsRouteHandler(deps) {
         exportsWebhook: buildDashboardExportsWebhookResponse(settings.exportsWebhook || {}),
         voiceGuard,
         voiceStatus: buildDashboardVoiceStatusResponse(settings),
+        favorites: buildDashboardFavoritesResponse(settings, guildInfo.tier),
       });
       return true;
     }
@@ -245,6 +261,24 @@ export function createDashboardSettingsRouteHandler(deps) {
           }
         }
 
+        if (body?.favorites && typeof body.favorites === "object") {
+          const stored = normalizeFavoriteStations((await getCurrentSettings()).favoriteStations);
+          const change = applyFavoriteChange(stored, body.favorites.stations, guildInfo.tier);
+          if (!change.ok) {
+            const limit = favoriteLimitForTier(guildInfo.tier);
+            sendJson(res, 400, {
+              error: languagePick(
+                language,
+                `Mit deinem Plan sind ${limit} Favoriten möglich. Nimm erst einen anderen heraus.`,
+                `Your plan allows ${limit} favourites. Remove another one first.`
+              ),
+            });
+            return true;
+          }
+          if (change.list.length) updates.favoriteStations = change.list;
+          else unsets.push("favoriteStations");
+        }
+
         if (!isConnected() || !getDb()) {
           sendLocalizedError(
             res,
@@ -265,6 +299,18 @@ export function createDashboardSettingsRouteHandler(deps) {
           },
           { upsert: true }
         );
+        const favoritesChanged = Object.prototype.hasOwnProperty.call(updates, "favoriteStations")
+          || unsets.includes("favoriteStations");
+        if (favoritesChanged && Array.isArray(runtimes)) {
+          // Panels that are on air show the new bar right away (in this process).
+          for (const runtime of runtimes) {
+            runtime?.invalidateGuildSettingsCache?.(guildInfo.id);
+            const state = runtime?.guildState?.get?.(guildInfo.id);
+            if (state?.currentStationKey && typeof runtime.updateNowPlayingEmbed === "function") {
+              runtime.updateNowPlayingEmbed(guildInfo.id, state, { force: true }).catch(() => null);
+            }
+          }
+        }
         const voiceStatusChanged = Object.prototype.hasOwnProperty.call(updates, "voiceStatusTemplate")
           || unsets.includes("voiceStatusTemplate");
         if (voiceStatusChanged && Array.isArray(runtimes)) {
@@ -328,6 +374,12 @@ export function createDashboardSettingsRouteHandler(deps) {
             unsets.includes("voiceStatusTemplate")
               ? {}
               : { voiceStatusTemplate: updates.voiceStatusTemplate ?? savedSettings.voiceStatusTemplate }
+          ),
+          favorites: buildDashboardFavoritesResponse(
+            unsets.includes("favoriteStations")
+              ? {}
+              : { favoriteStations: updates.favoriteStations ?? savedSettings.favoriteStations },
+            guildInfo.tier
           ),
         });
       } catch (err) {

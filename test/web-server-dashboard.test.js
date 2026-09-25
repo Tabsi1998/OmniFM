@@ -1542,6 +1542,32 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
     assert.equal(Object.prototype.hasOwnProperty.call(clearedVoiceStatus, "voiceStatusTemplate"), false);
   }
 
+  // #276: the favourite bar
+  assert.deepEqual(settingsAcceptLanguageResponse.payload.favorites.stations, []);
+  assert.equal(settingsAcceptLanguageResponse.payload.favorites.max, 5);
+  assert.ok([3, 5].includes(settingsAcceptLanguageResponse.payload.favorites.limit));
+  const favoritesPut = (stations) => requestJson(
+    baseUrl,
+    `/api/dashboard/settings?serverId=${GUILD_ID}`,
+    {
+      method: "PUT",
+      headers: { ...authHeaders, "X-OmniFM-Language": "en", "Content-Type": "application/json" },
+      body: JSON.stringify({ favorites: { stations } }),
+    }
+  );
+  const tooManyFavorites = await favoritesPut(["a", "b", "c", "d", "e", "f"]);
+  assert.equal(tooManyFavorites.status, 400);
+  assert.match(tooManyFavorites.payload.error, /favourites/);
+  if (mongoAvailable && getDb()) {
+    const savedFavorites = await favoritesPut(["groovesalad", "dronezone"]);
+    assert.equal(savedFavorites.status, 200);
+    assert.deepEqual(savedFavorites.payload.favorites.stations, ["groovesalad", "dronezone"]);
+    const storedFavorites = await getDb().collection("guild_settings").findOne({ guildId: GUILD_ID });
+    assert.deepEqual(storedFavorites.favoriteStations, ["groovesalad", "dronezone"]);
+    const clearedFavorites = await favoritesPut([]);
+    assert.deepEqual(clearedFavorites.payload.favorites.stations, []);
+  }
+
   const invalidDigestSettings = await requestJson(
     baseUrl,
     `/api/dashboard/settings?serverId=${GUILD_ID}`,

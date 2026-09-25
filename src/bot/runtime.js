@@ -107,6 +107,7 @@ import { permissionMethods } from "./runtime-methods/permissions.js";
 import { statusMethods } from "./runtime-methods/status.js";
 import { voiceMethods } from "./runtime-methods/voice.js";
 import { onboardingMethods } from "./runtime-methods/onboarding.js";
+import { favoriteMethods } from "./runtime-methods/favorites.js";
 import { savedSongMethods } from "./runtime-methods/saved-songs.js";
 import { sleepMethods } from "./runtime-methods/sleep.js";
 import { recordPlaybackPhase } from "./playback-phase.js";
@@ -1418,6 +1419,7 @@ Object.assign(
   statusMethods,
   voiceMethods,
   onboardingMethods,
+  favoriteMethods,
   savedSongMethods,
   sleepMethods,
 );

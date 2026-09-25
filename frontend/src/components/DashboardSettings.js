@@ -179,6 +179,7 @@ export default function DashboardSettings({
       if (capabilities.exportsWebhooks === true && settings?.exportsWebhook) body.exportsWebhook = settings.exportsWebhook;
       if (capabilities.voiceGuard === true && settings?.voiceGuard) body.voiceGuard = settings.voiceGuard;
       if (settings?.voiceStatus) body.voiceStatus = { template: settings.voiceStatus.template || '' };
+      if (settings?.favorites) body.favorites = { stations: settings.favorites.stations || [] };
       const result = await apiRequest(`/api/dashboard/settings?serverId=${encodeURIComponent(selectedGuildId)}`, {
         method: 'PUT',
         body: JSON.stringify(body),
@@ -400,6 +401,21 @@ export default function DashboardSettings({
     isCustom: station.isCustom,
   }]));
   const availableFailoverStations = allStations.filter((station) => !configuredFailoverChain.includes(station.value));
+  const favorites = settings?.favorites || null;
+  const favoriteStations = Array.isArray(favorites?.stations) ? favorites.stations : [];
+  const favoriteLimit = Number(favorites?.limit) || 3;
+  const availableFavoriteStations = allStations.filter((station) => !favoriteStations.includes(station.value));
+  const setFavoriteStations = (nextList) => setSettings((current) => ({
+    ...(current || {}),
+    favorites: { ...(current?.favorites || {}), stations: nextList },
+  }));
+  const moveFavorite = (index, delta) => {
+    const next = [...favoriteStations];
+    const target = index + delta;
+    if (target < 0 || target >= next.length) return;
+    [next[index], next[target]] = [next[target], next[index]];
+    setFavoriteStations(next);
+  };
 
   const buildLocalFailoverPreview = (rawValue) => {
     const selectedValue = String(rawValue || '').trim().toLowerCase();
@@ -963,6 +979,50 @@ export default function DashboardSettings({
             <div data-testid="voice-status-preview-no-song" style={{ marginTop: 6, fontSize: 14, color: '#D4D4D8', wordBreak: 'break-word' }}>{voiceStatusPreviewNoSong}</div>
           </div>
         </div>
+      </div>
+      )}
+
+      {favorites && (
+      <div data-testid="settings-favorites" style={{ background: '#0A0A0A', border: '1px solid #1A1A2E', padding: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <Radio size={18} color="#FACC15" />
+          <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20 }}>{t('Favoriten-Leiste', 'Favourite bar')}</h3>
+        </div>
+        <p style={{ color: '#52525B', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
+          {t(
+            `Bis zu ${favoriteLimit} Sender als Schnellknöpfe im Now-Playing-Panel (Free 3, Pro und Ultimate 5). Mit ⭐ im Sender-Browser geht es auch direkt in Discord. Bei einem kleineren Plan werden überzählige ausgeblendet, nicht gelöscht.`,
+            `Up to ${favoriteLimit} stations as quick buttons in the now-playing panel (Free 3, Pro and Ultimate 5). The ⭐ menu in the station browser works in Discord too. On a smaller plan extra ones are hidden, not deleted.`
+          )}
+        </p>
+        <div data-testid="favorites-list" style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
+          {favoriteStations.length === 0 && (
+            <div style={{ color: '#71717A', fontSize: 13 }}>{t('Noch keine Favoriten.', 'No favourites yet.')}</div>
+          )}
+          {favoriteStations.map((stationKey, index) => {
+            const preview = stationPreviewMap.get(String(stationKey).toLowerCase());
+            const hidden = index >= favoriteLimit;
+            return (
+              <div key={stationKey} style={{ display: 'flex', alignItems: 'center', gap: 10, border: '1px solid #1A1A2E', background: '#050505', padding: '8px 12px', opacity: hidden ? 0.55 : 1 }}>
+                <span style={{ color: '#FACC15', fontWeight: 700, width: 18 }}>{index + 1}</span>
+                <span style={{ flex: 1, color: '#E4E4E7', fontSize: 13 }}>{preview?.label || stationKey}</span>
+                {hidden && <span style={{ fontSize: 11, color: '#A1A1AA', border: '1px solid #27272A', padding: '2px 8px' }}>{t('ausgeblendet', 'hidden')}</span>}
+                <button type="button" onClick={() => moveFavorite(index, -1)} disabled={index === 0} style={{ border: 0, background: 'transparent', color: '#A1A1AA', cursor: index === 0 ? 'not-allowed' : 'pointer' }}><ArrowUp size={14} /></button>
+                <button type="button" onClick={() => moveFavorite(index, 1)} disabled={index === favoriteStations.length - 1} style={{ border: 0, background: 'transparent', color: '#A1A1AA', cursor: index === favoriteStations.length - 1 ? 'not-allowed' : 'pointer' }}><ArrowDown size={14} /></button>
+                <button type="button" data-testid={`favorite-remove-${index}`} onClick={() => setFavoriteStations(favoriteStations.filter((key) => key !== stationKey))} style={{ border: 0, background: 'transparent', color: '#FCA5A5', cursor: 'pointer' }}><X size={14} /></button>
+              </div>
+            );
+          })}
+        </div>
+        <select
+          data-testid="favorite-add-select"
+          value=""
+          disabled={favoriteStations.length >= favoriteLimit}
+          onChange={(e) => { if (e.target.value) setFavoriteStations([...favoriteStations, e.target.value]); }}
+          style={{ width: '100%', maxWidth: 420, height: 40, padding: '0 10px', border: '1px solid #1A1A2E', background: '#050505', color: '#fff', boxSizing: 'border-box', fontSize: 13 }}
+        >
+          <option value="">{favoriteStations.length >= favoriteLimit ? t(`Voll – höchstens ${favoriteLimit}`, `Full – at most ${favoriteLimit}`) : t('Sender als Favorit hinzufügen...', 'Add a station as favourite...')}</option>
+          {availableFavoriteStations.map((station) => <option key={station.value} value={station.value}>{station.label}</option>)}
+        </select>
       </div>
       )}
 

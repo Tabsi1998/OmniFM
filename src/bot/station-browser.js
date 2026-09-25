@@ -104,6 +104,9 @@ export function parsePickTarget(sessionPart) {
  * @param {string} input.premiumUrl
  * @param {string|null} [input.applicationId]
  * @param {string} [input.hint]
+ * @param {string[]} [input.favorites]       the server's favourite keys (#276)
+ * @param {boolean} [input.canEditFavorites] shows the star menu
+ * @param {number} [input.favoriteLimit]
  */
 export function buildStationBrowserPayload(input) {
   const { t, prefix, session, entries, applicationId: appId = null } = input;
@@ -167,6 +170,24 @@ export function buildStationBrowserPayload(input) {
       .setLabel(t("Schließen", "Close")),
   );
   const actions = [new ActionRowBuilder().addComponents(genreSelect), navigation];
+  // #276: which stations of this page are favourites; only for server managers.
+  const favoriteCandidates = pageEntries.filter((entry) => !entry.locked && String(entry.key).length <= 100);
+  if (input.canEditFavorites && favoriteCandidates.length) {
+    const favorites = new Set(input.favorites || []);
+    actions.push(new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(`${prefix}fav:${session.id}`)
+        .setPlaceholder(t(`⭐ Favoriten auf dieser Seite (höchstens ${input.favoriteLimit || 3})`, `⭐ Favourites on this page (at most ${input.favoriteLimit || 3})`))
+        .setMinValues(0)
+        .setMaxValues(favoriteCandidates.length)
+        .addOptions(favoriteCandidates.map((entry) => ({
+          label: entry.name.slice(0, 100),
+          value: entry.key,
+          emoji: { name: colorSquare(entry.color) },
+          default: favorites.has(entry.key),
+        }))),
+    ));
+  }
   if (genre || query) {
     actions.push(new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`${prefix}reset:${session.id}`).setStyle(ButtonStyle.Secondary)

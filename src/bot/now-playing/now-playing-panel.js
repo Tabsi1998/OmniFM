@@ -9,6 +9,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import * as ui from "../../discord/ui/index.js";
 import { tierColor } from "../brand-embed.js";
 import { STATIONS_COMPONENT_ID_OPEN } from "../runtime-links.js";
+import { colorSquare } from "../station-browser.js";
 import { NP_PREFIX } from "../runtime-shared.js";
 
 function clip(value, max) {
@@ -51,6 +52,7 @@ function linkButton(url, label, emoji, appId) {
  * @param {object} input.playback  { phase, paused, listeners, bitrate, volume, channelId }
  * @param {object} [input.notices] { serverMuted, failover: { active, desiredName, currentName } }
  * @param {string[]} [input.recent] display titles of the last songs, newest first
+ * @param {object[]} [input.favorites] { key, name, color } of the server's favourites (#276)
  * @param {string|null} [input.searchQuery]
  * @param {string|null} [input.musicBrainzUrl]
  * @param {string|null} [input.fallbackImageUrl] bot avatar when neither cover nor logo exists
@@ -124,6 +126,21 @@ export function buildNowPlayingPanel(input) {
     button(STATIONS_COMPONENT_ID_OPEN, { label: t("Sender", "Stations"), emoji: "radio", style: ButtonStyle.Primary, appId }),
   );
   const rows = [controls];
+  // #276: the server's favourite stations as quick buttons.
+  const favorites = (input.favorites || [])
+    .filter((favorite) => favorite?.key && `${NP_PREFIX}fav:${favorite.key}`.length <= 100)
+    .slice(0, 5);
+  if (favorites.length) {
+    rows.push(new ActionRowBuilder().addComponents(...favorites.map((favorite) => {
+      const onAir = favorite.key === station.key;
+      return new ButtonBuilder()
+        .setCustomId(`${NP_PREFIX}fav:${favorite.key}`)
+        .setStyle(onAir ? ButtonStyle.Success : ButtonStyle.Secondary)
+        .setLabel(clip(favorite.name || favorite.key, 25))
+        .setEmoji({ name: colorSquare(favorite.color) })
+        .setDisabled(onAir);
+    })));
+  }
   if (failover.active && failover.desiredName) {
     rows.push(new ActionRowBuilder().addComponents(
       button(`${NP_PREFIX}failback`, {

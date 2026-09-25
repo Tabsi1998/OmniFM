@@ -37,6 +37,7 @@ import {
 import { buildOmniEmbed, buildLinkRow } from "./discord-ui.js";
 import * as ui from "../discord/ui/index.js";
 import { buildNoticePayload } from "./commands/command-helpers.js";
+import { applyFavoritePageSelection, normalizeFavoriteStations } from "../lib/favorite-stations.js";
 import {
   buildBrowserEntries,
   buildStationBrowserPayload,
@@ -386,6 +387,9 @@ export function buildRuntimeStationsBrowserPayload(runtime, interaction, session
     premiumUrl: withLanguageParam(BRAND.upgradeUrl || WEBSITE_URL, language),
     applicationId: interaction?.applicationId || runtime.client?.application?.id || null,
     hint,
+    favorites: session?.data?.favorites || [],
+    canEditFavorites: session?.data?.canEditFavorites === true,
+    favoriteLimit: runtime.favoriteLimitForGuild?.(guildId) || 3,
   });
 }
 
@@ -419,6 +423,10 @@ export async function openRuntimeStationsBrowser(runtime, interaction, {
   page = 0,
   hint = "",
 } = {}) {
+  // The star menu (#276) needs the stored favourites and the right to edit them.
+  const settings = interaction?.guildId
+    ? await runtime.loadGuildSettingsCached?.(interaction.guildId).catch(() => null)
+    : null;
   const session = runtime.createInteractiveUiSession("stations", {
     guildId: interaction?.guildId,
     userId: interaction?.user?.id,
@@ -428,6 +436,8 @@ export async function openRuntimeStationsBrowser(runtime, interaction, {
       page: Math.max(0, Number.parseInt(String(page || 0), 10) || 0),
       genre: null,
       query: "",
+      favorites: normalizeFavoriteStations(settings?.favoriteStations),
+      canEditFavorites: runtime.canEditFavorites?.(interaction) === true,
     },
   });
   return buildRuntimeStationsBrowserPayload(runtime, interaction, session, { hint });
@@ -1085,6 +1095,33 @@ export async function handleRuntimePanelInteraction(runtime, interaction) {
         hint: t("Geh in einen Sprachkanal oder wähle unten einen aus.", "Join a voice channel or choose one below."),
       });
       await interaction.reply(payload);
+      return true;
+    }
+    if (stationsAction.action === "fav" && interaction.isStringSelectMenu?.()) {
+      if (!runtime.canEditFavorites?.(interaction)) {
+        await interaction.reply(buildNoticePayload({ t, language: runtime.resolveInteractionLanguage(interaction), code: "manage-server-required" }));
+        return true;
+      }
+      const pageKeys = (interaction.component?.options || []).map((option) => option.value);
+      const change = applyFavoritePageSelection(session.data?.favorites || [], {
+        pageKeys: pageKeys.length ? pageKeys : interaction.values || [],
+        selectedKeys: interaction.values || [],
+      }, getTier(interaction.guildId));
+      const saved = await runtime.saveFavoriteStations(interaction.guildId, change.list);
+      const limit = runtime.favoriteLimitForGuild?.(interaction.guildId) || 3;
+      let hint;
+      if (!saved?.ok) {
+        hint = t("Die Favoriten konnte ich gerade nicht speichern. Versuch es gleich noch einmal.", "I could not save the favourites right now. Please try again in a moment.");
+      } else if (change.refused.length) {
+        hint = t(
+          `Mehr als ${limit} Favoriten gehen mit deinem Plan nicht. Nimm erst einen anderen heraus.`,
+          `Your plan allows ${limit} favourites. Remove another one first.`
+        );
+      } else {
+        hint = t(`⭐ Gespeichert: ${change.list.length} Favoriten. Sie erscheinen im Now-Playing-Panel.`, `⭐ Saved: ${change.list.length} favourites. They show up in the now-playing panel.`);
+      }
+      runtime.updateInteractiveUiSession(session.id, { data: { favorites: saved?.ok ? saved.list : session.data?.favorites || [] } });
+      await interaction.update(buildRuntimeStationsBrowserPayload(runtime, interaction, runtime.getInteractiveUiSession(session.id), { hint }));
       return true;
     }
     if (stationsAction.action === "close") {

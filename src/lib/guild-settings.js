@@ -5,6 +5,7 @@ import { normalizeDashboardIncidentAlertsConfig } from "./dashboard-incident-ale
 import { normalizeDashboardExportsWebhookConfig } from "./dashboard-webhooks.js";
 import { normalizeVoiceGuardSettings } from "./voice-guard.js";
 import { normalizeVoiceStatusTemplate } from "./voice-status-template.js";
+import { normalizeFavoriteStations } from "./favorite-stations.js";
 
 function sanitizeGuildId(value) {
   const text = String(value || "").trim();
@@ -52,6 +53,13 @@ function normalizeGuildSettings(rawSettings = {}) {
     normalized.weeklyDigestLastSent = normalizedWeeklyDigestLastSent;
   } else {
     delete normalized.weeklyDigestLastSent;
+  }
+
+  const favoriteStations = normalizeFavoriteStations(input.favoriteStations);
+  if (favoriteStations.length) {
+    normalized.favoriteStations = favoriteStations;
+  } else {
+    delete normalized.favoriteStations;
   }
 
   const voiceStatusTemplate = normalizeVoiceStatusTemplate(input.voiceStatusTemplate);
