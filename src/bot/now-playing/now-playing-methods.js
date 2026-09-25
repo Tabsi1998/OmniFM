@@ -13,6 +13,7 @@ import {
 } from "discord.js";
 import { log } from "../../lib/logging.js";
 import { buildNowPlayingSignature, getNowPlayingCandidateIds } from "../../lib/now-playing-target.js";
+import { recordSongPlay } from "../../song-plays-store.js";
 import {
   clipText,
   applyJitter,
@@ -934,6 +935,10 @@ const nowPlayingMethods = {
       this.recordSongHistory(guildId, state, station, nextMeta);
       // #277: a template with {title}, {artist} or {listeners} follows the song.
       this.syncVoiceChannelStatus?.(guildId, state.currentStationName || station.name || stationKey).catch(() => null);
+      // #278: every new song counts once for the weekly recap's top songs.
+      if (hasFreshTrack && displayTitle && !sameTrackAsPrevious) {
+        recordSongPlay(guildId, { artist, title, displayTitle }).catch(() => null);
+      }
 
       const signature = buildNowPlayingSignature(stationKey, nextMeta, state, channel.id);
 

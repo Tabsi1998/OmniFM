@@ -17,6 +17,7 @@ import { createDashboardLicenseRouteHandler } from "./routes/dashboard-license.j
 import { createDashboardPermsRouteHandler } from "./routes/dashboard-perms.js";
 import { createDashboardRolesRouteHandler } from "./routes/dashboard-roles.js";
 import { createDashboardSettingsDigestRouteHandler } from "./routes/dashboard-settings-digest.js";
+import { buildWeeklyDigestMessage } from "../services/weekly-digest-service.js";
 import { createDashboardSettingsRouteHandler } from "./routes/dashboard-settings.js";
 import { createDashboardStationsRouteHandler } from "./routes/dashboard-stations.js";
 import { createDashboardStatsRouteHandler } from "./routes/dashboard-stats.js";
@@ -952,6 +953,7 @@ const handleDashboardCustomStationsRoute = createDashboardCustomStationsRouteHan
 
 const handleDashboardSettingsDigestRoute = createDashboardSettingsDigestRouteHandler({
   buildDashboardWeeklyDigestPreviewPayload,
+  buildWeeklyDigestMessage,
   getDashboardRequestTranslator,
   getDashboardSession,
   getLocalizedJsonBodyError,

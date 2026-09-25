@@ -18,6 +18,8 @@ function normalizeWeeklyDigestConfig(input = {}, fallbackLanguage = "de") {
     dayOfWeek: clampInt(source.dayOfWeek, 0, 6, 1),
     hour: clampInt(source.hour, 0, 23, 9),
     language: normalizeWeeklyDigestLanguage(source.language, fallbackLanguage),
+    // #278: "team" posts the full report, "public" a community version.
+    audience: source.audience === "public" ? "public" : "team",
   };
 }
 

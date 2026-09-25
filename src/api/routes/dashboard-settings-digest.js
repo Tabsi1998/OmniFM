@@ -3,6 +3,7 @@ import { loadDashboardGuildSettings } from "./dashboard-guild-settings.js";
 export function createDashboardSettingsDigestRouteHandler(deps) {
   const {
     buildDashboardWeeklyDigestPreviewPayload,
+    buildWeeklyDigestMessage,
     getDashboardRequestTranslator,
     getDashboardSession,
     getLocalizedJsonBodyError,
@@ -131,7 +132,12 @@ export function createDashboardSettingsDigestRouteHandler(deps) {
       }
 
       const previewPayload = await buildDashboardWeeklyDigestPreviewPayload(guildInfo, runtimes, digest, language);
-      await channel.send({ embeds: [previewPayload.preview.embed] });
+      // The same Components V2 message the weekly run sends (#278).
+      const { payload } = await buildWeeklyDigestMessage(guildInfo.id, {
+        guildName: guild.name,
+        config: digest,
+      });
+      await channel.send(payload);
       sendJson(res, 200, {
         success: true,
         serverId: guildInfo.id,
