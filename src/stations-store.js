@@ -4,7 +4,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { getDb } from "./lib/db.js";
-import { withFileStoreLock } from "./lib/file-store-lock.js";
+import { withFileStoreLock, withFileWriteRetry } from "./lib/file-store-lock.js";
 import { log, logStoreLoadError } from "./lib/logging.js";
 import { appRootDir, resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 import { normalizeStationCatalogFields } from "./lib/station-fields.js";
@@ -126,7 +126,8 @@ function writeStationsFileAtomically(filePath, data) {
 
   try {
     fs.writeFileSync(tempPath, serialized, "utf8");
-    fs.renameSync(tempPath, filePath);
+    // A reader in another worker may hold the file for a moment on Windows (#223).
+    withFileWriteRetry(() => fs.renameSync(tempPath, filePath));
   } finally {
     try { fs.unlinkSync(tempPath); } catch {}
   }

@@ -162,6 +162,27 @@ export function readStoreFileWithRetry(filePath, { attempts = 10, retryMs = 20 }
   throw lastError;
 }
 
+const RETRYABLE_FILE_WRITE_ERRORS = new Set(["EBUSY", "EPERM", "EACCES", "ENOENT"]);
+
+/**
+ * Runs a file write or rename again when Windows briefly holds the target:
+ * renaming onto a file another process just opened fails with EPERM/EBUSY
+ * there, while Linux replaces it atomically (#223).
+ */
+export function withFileWriteRetry(operation, { attempts = 8, retryMs = 25 } = {}) {
+  let lastError = null;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return operation();
+    } catch (err) {
+      lastError = err;
+      if (!RETRYABLE_FILE_WRITE_ERRORS.has(err?.code) || attempt === attempts - 1) throw err;
+      sleepSync(retryMs * (attempt + 1));
+    }
+  }
+  throw lastError;
+}
+
 export function getFileStoreLockPath(filePath) {
   return getLockDir(filePath);
 }
