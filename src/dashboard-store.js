@@ -86,6 +86,8 @@ function normalizeOauthState(rawState) {
     nextPage: sanitizeText(rawState.nextPage, 40) || "dashboard",
     language: sanitizeText(rawState.language, 12),
     origin: sanitizeText(rawState.origin, 200),
+    // The redirect URI the login named; the token exchange has to repeat it.
+    redirectUri: sanitizeText(rawState.redirectUri, 300),
     createdAt: Number.parseInt(String(rawState.createdAt || 0), 10) || Math.floor(Date.now() / 1000),
     expiresAt,
   };
@@ -257,6 +259,7 @@ export function setDashboardOauthState(token, payload) {
       nextPage: stateRow.nextPage,
       language: stateRow.language,
       origin: stateRow.origin,
+      redirectUri: stateRow.redirectUri,
       createdAt: stateRow.createdAt,
       expiresAt: stateRow.expiresAt,
     };

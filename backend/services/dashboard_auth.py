@@ -9,6 +9,7 @@ from datetime import timezone
 from fastapi import Request
 from urllib.parse import urlencode
 from urllib.parse import urlparse
+import ipaddress
 import os
 import requests
 import time
@@ -21,21 +22,54 @@ def bind(module):
     core = module
 
 
+def _origin_of(value):
+    parsed = urlparse(str(value or "").strip())
+    if parsed.scheme in ("http", "https") and parsed.netloc:
+        return f"{parsed.scheme}://{parsed.netloc}"
+    return ""
+
+
+def is_public_origin(origin):
+    """Can a browser anywhere reach it? Not localhost, *.local or a LAN/loopback
+    address (the values start.sh and .env.example leave behind)."""
+    normalized = _origin_of(origin)
+    if not normalized:
+        return False
+    host = (urlparse(normalized).hostname or "").lower()
+    if not host or host == "localhost" or host.endswith(".localhost") or host.endswith(".local"):
+        return False
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return "." in host
+    return not (address.is_private or address.is_loopback or address.is_link_local or address.is_reserved or address.is_unspecified)
+
+
 def discord_redirect_uri():
-    """<website>/api/auth/discord/callback, made from the website's address;
-    DISCORD_REDIRECT_URI in the environment wins (special setups). An older
-    stored redirect URI only lends its origin."""
+    """<website>/api/auth/discord/callback. Candidates, the first public one
+    wins: DISCORD_REDIRECT_URI, PUBLIC_WEB_URL, WEB_DOMAIN, the redirect URI
+    once stored in the owner console. Local values only count when nothing
+    public is configured (development), like the Node API does it."""
     explicit = (os.environ.get("DISCORD_REDIRECT_URI") or "").strip()
+    if explicit and is_public_origin(explicit):
+        return explicit
+    domain = (os.environ.get("WEB_DOMAIN") or "").strip()
+    domain = domain.split("://", 1)[-1].split("/", 1)[0]
+    stored = str(((core.load_owner_config_raw().get("system") or {}).get("discordOAuth") or {}).get("redirectUri") or "")
+    origins = [
+        origin for origin in (
+            _origin_of(os.environ.get("PUBLIC_WEB_URL")),
+            _origin_of(f"https://{domain}") if domain else "",
+            _origin_of(stored),
+        ) if origin
+    ]
+    public = next((origin for origin in origins if is_public_origin(origin)), "")
+    if public:
+        return f"{public}/api/auth/discord/callback"
     if explicit:
         return explicit
-    for candidate in (
-        (os.environ.get("PUBLIC_WEB_URL") or "").strip(),
-        f"https://{(os.environ.get('WEB_DOMAIN') or '').strip()}" if (os.environ.get("WEB_DOMAIN") or "").strip() else "",
-        str(((core.load_owner_config_raw().get("system") or {}).get("discordOAuth") or {}).get("redirectUri") or ""),
-    ):
-        parsed = urlparse(candidate)
-        if parsed.scheme in ("http", "https") and parsed.netloc:
-            return f"{parsed.scheme}://{parsed.netloc}/api/auth/discord/callback"
+    if origins:
+        return f"{origins[0]}/api/auth/discord/callback"
     return "https://omnifm.xyz/api/auth/discord/callback"
 
 
@@ -47,14 +81,16 @@ def is_discord_oauth_configured():
 
 
 def get_frontend_base_url(request: Request):
-    configured = (os.environ.get("PUBLIC_WEB_URL") or "").strip()
-    parsed_config = urlparse(configured)
-    if parsed_config.scheme in ("http", "https") and parsed_config.netloc:
-        return f"{parsed_config.scheme}://{parsed_config.netloc}"
-
-    from_redirect = urlparse(discord_redirect_uri())
-    if from_redirect.scheme in ("http", "https") and from_redirect.netloc:
-        return f"{from_redirect.scheme}://{from_redirect.netloc}"
+    # A public address wins over the LAN or localhost one of the installation.
+    configured = _origin_of(os.environ.get("PUBLIC_WEB_URL"))
+    from_redirect = _origin_of(discord_redirect_uri())
+    for candidate in (configured, from_redirect):
+        if candidate and is_public_origin(candidate):
+            return candidate
+    if configured:
+        return configured
+    if from_redirect:
+        return from_redirect
 
     origin = (request.headers.get("origin") or "").strip()
     parsed_origin = urlparse(origin)
@@ -291,6 +327,7 @@ def fetch_discord_user_guilds(access_token):
 
 __all__ = [
     "discord_redirect_uri",
+    "is_public_origin",
     "is_discord_oauth_configured",
     "get_frontend_base_url",
     "clean_expired_oauth_states",

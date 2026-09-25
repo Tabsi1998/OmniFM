@@ -282,6 +282,49 @@ async function inspectLegacyAssets(baseUrl) {
   return { ok };
 }
 
+// Links that leave the server must point at the website itself, not at an
+// address of the installation (2026-09-25: the login sent Discord to
+// http://localhost:8081, share cards pointed at http://192.168.x.x:8001).
+async function inspectOutboundLinks(baseUrl) {
+  const expectedOrigin = new URL(baseUrl).origin;
+  let ok = true;
+
+  const login = await fetchJson(baseUrl, "/api/auth/discord/login");
+  const authUrl = typeof login.body?.authUrl === "string" ? login.body.authUrl : "";
+  if (login.status === 503 && login.body?.oauthConfigured === false) {
+    logLine("OK", "discord login: OAuth not configured, no redirect URI to check");
+  } else if (!authUrl) {
+    ok = false;
+    logLine("FAIL", `discord login: no authUrl (status=${login.status}${login.error ? `, ${login.error}` : ""})`);
+  } else {
+    const redirectUri = new URL(authUrl).searchParams.get("redirect_uri") || "";
+    const redirectOrigin = redirectUri ? new URL(redirectUri).origin : "";
+    if (redirectOrigin !== expectedOrigin) {
+      ok = false;
+      logLine("FAIL", `discord login: redirect_uri ${redirectUri || "-"} does not point at ${expectedOrigin}`);
+    } else {
+      logLine("OK", `discord login: redirect_uri ${redirectUri}`);
+    }
+  }
+
+  const share = await fetchText(baseUrl, "/api/share/page/premium");
+  const ogUrl = /<meta property="og:url" content="([^"]+)"/.exec(share.text || "")?.[1] || "";
+  const ogImage = /<meta property="og:image" content="([^"]+)"/.exec(share.text || "")?.[1] || "";
+  if (share.status === 404) {
+    logLine("OK", "share page: not deployed yet");
+  } else if (!ogUrl || !ogImage) {
+    ok = false;
+    logLine("FAIL", `share page: no og:url/og:image (status=${share.status})`);
+  } else if (!ogUrl.startsWith(`${expectedOrigin}/`) || !ogImage.startsWith(`${expectedOrigin}/`)) {
+    ok = false;
+    logLine("FAIL", `share page: links point at ${new URL(ogUrl).origin}, not ${expectedOrigin}`);
+  } else {
+    logLine("OK", `share page: links point at ${expectedOrigin}`);
+  }
+
+  return { ok };
+}
+
 async function inspectSecurityHeaders(baseUrl) {
   const checks = [
     { name: "home", path: "/" },
@@ -554,6 +597,9 @@ async function main() {
 
   const securityResult = await inspectSecurityHeaders(baseUrl);
   if (!securityResult.ok) hadFailure = true;
+
+  const outboundResult = await inspectOutboundLinks(baseUrl);
+  if (!outboundResult.ok) hadFailure = true;
 
   if (!skipApi) {
     if (!adminToken) {

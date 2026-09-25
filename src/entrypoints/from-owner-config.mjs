@@ -137,6 +137,13 @@ async function main() {
   setRuntimeEnv("STATION_HEALTH_BATCH_SIZE", stationHealth.batchSize);
   setRuntimeEnv("STATION_HEALTH_CONCURRENCY", stationHealth.concurrency);
   setRuntimeEnv("STATION_HEALTH_TIMEOUT_MS", stationHealth.timeoutMs);
+  // Links leaving the server (login, share links, dashboard buttons) need the
+  // public address, not the LAN one of the installation.
+  const { preferPublicWebsiteUrl } = await import("../lib/public-origin.js");
+  const publicUrlChange = preferPublicWebsiteUrl(process.env, { storedRedirectUri: oauth.redirectUri });
+  if (publicUrlChange) {
+    console.log(`[OmniFM] PUBLIC_WEB_URL "${publicUrlChange.from || "-"}" ist nur lokal erreichbar; Links nutzen ${publicUrlChange.to}.`);
+  }
   const { configureDashboardBackend } = await import("../lib/dashboard-backend.js");
   const dashboardBackend = configureDashboardBackend(process.env, { redirectUri: oauth.redirectUri });
   console.log(dashboardBackend.enabled

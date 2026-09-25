@@ -24,7 +24,8 @@ function createAuthRouteHandler(overrides = {}) {
       `${origin}/?page=dashboard&authError=${encodeURIComponent(errorCode)}&lang=${encodeURIComponent(language)}`,
     buildDashboardSessionCookie: () => "omnifm_session=test-session",
     buildDashboardSessionCookieDeletion: () => "omnifm_session=; Max-Age=0",
-    buildDiscordAuthorizeUrl: (stateToken) => `https://discord.example/authorize?state=${stateToken}`,
+    buildDiscordAuthorizeUrl: (stateToken, redirectUri) => `https://discord.example/authorize?state=${stateToken}&redirect_uri=${encodeURIComponent(redirectUri || "")}`,
+    getDiscordRedirectUri: () => "https://app.example/api/auth/discord/callback",
     deleteDashboardAuthSession: () => false,
     exchangeDiscordCodeForToken: async () => "discord-access-token",
     fetchDiscordUserGuilds: async () => [],
@@ -87,14 +88,23 @@ test("discord login stores only trusted frontend origins in oauth state", async 
   assert.equal(storedPayload.origin, "https://app.example");
   assert.equal(storedPayload.language, "de");
   assert.equal(storedPayload.nextPage, "settings");
+  // The token exchange later has to name the same redirect URI.
+  assert.equal(storedPayload.redirectUri, "https://app.example/api/auth/discord/callback");
+  assert.match(res.payload.authUrl, /redirect_uri=https%3A%2F%2Fapp\.example%2Fapi%2Fauth%2Fdiscord%2Fcallback/);
 });
 
 test("discord callback falls back to the configured frontend origin and keeps the saved language", async () => {
   let storedSessionToken = "";
   let storedSessionPayload = null;
+  let exchangedWith = null;
   const handler = createAuthRouteHandler({
+    exchangeDiscordCodeForToken: async (code, redirectUri) => {
+      exchangedWith = redirectUri;
+      return "discord-access-token";
+    },
     popDashboardOauthState: () => ({
       origin: "https://evil.example",
+      redirectUri: "https://app.example/api/auth/discord/callback",
       language: "de",
       nextPage: "settings",
       createdAt: 1,
@@ -123,4 +133,5 @@ test("discord callback falls back to the configured frontend origin and keeps th
   assert.ok(storedSessionToken.length > 0);
   assert.deepEqual(storedSessionPayload.user, { id: "123", username: "Tester" });
   assert.deepEqual(storedSessionPayload.guilds, []);
+  assert.equal(exchangedWith, "https://app.example/api/auth/discord/callback");
 });
