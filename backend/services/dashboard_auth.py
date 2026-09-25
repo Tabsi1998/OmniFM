@@ -21,11 +21,28 @@ def bind(module):
     core = module
 
 
+def discord_redirect_uri():
+    """<website>/api/auth/discord/callback, made from the website's address;
+    DISCORD_REDIRECT_URI in the environment wins (special setups). An older
+    stored redirect URI only lends its origin."""
+    explicit = (os.environ.get("DISCORD_REDIRECT_URI") or "").strip()
+    if explicit:
+        return explicit
+    for candidate in (
+        (os.environ.get("PUBLIC_WEB_URL") or "").strip(),
+        f"https://{(os.environ.get('WEB_DOMAIN') or '').strip()}" if (os.environ.get("WEB_DOMAIN") or "").strip() else "",
+        str(((core.load_owner_config_raw().get("system") or {}).get("discordOAuth") or {}).get("redirectUri") or ""),
+    ):
+        parsed = urlparse(candidate)
+        if parsed.scheme in ("http", "https") and parsed.netloc:
+            return f"{parsed.scheme}://{parsed.netloc}/api/auth/discord/callback"
+    return "https://omnifm.xyz/api/auth/discord/callback"
+
+
 def is_discord_oauth_configured():
     return bool(
         core.system_setting("discordOAuth", "clientId", "DISCORD_CLIENT_ID")
         and core.system_setting("discordOAuth", "clientSecret", "DISCORD_CLIENT_SECRET")
-        and core.system_setting("discordOAuth", "redirectUri", "DISCORD_REDIRECT_URI")
     )
 
 
@@ -35,7 +52,7 @@ def get_frontend_base_url(request: Request):
     if parsed_config.scheme in ("http", "https") and parsed_config.netloc:
         return f"{parsed_config.scheme}://{parsed_config.netloc}"
 
-    from_redirect = urlparse(str(core.system_setting("discordOAuth", "redirectUri", "DISCORD_REDIRECT_URI")))
+    from_redirect = urlparse(discord_redirect_uri())
     if from_redirect.scheme in ("http", "https") and from_redirect.netloc:
         return f"{from_redirect.scheme}://{from_redirect.netloc}"
 
@@ -201,7 +218,7 @@ def build_discord_authorize_url(state, prompt="consent"):
     params = {
         "client_id": core.system_setting("discordOAuth", "clientId", "DISCORD_CLIENT_ID"),
         "response_type": "code",
-        "redirect_uri": core.system_setting("discordOAuth", "redirectUri", "DISCORD_REDIRECT_URI"),
+        "redirect_uri": discord_redirect_uri(),
         "scope": core.system_setting("discordOAuth", "scopes", "DISCORD_OAUTH_SCOPES", "identify guilds"),
         "state": state,
         "prompt": prompt,
@@ -217,7 +234,7 @@ def exchange_discord_code_for_token(code):
             "client_secret": core.system_setting("discordOAuth", "clientSecret", "DISCORD_CLIENT_SECRET"),
             "grant_type": "authorization_code",
             "code": code,
-            "redirect_uri": core.system_setting("discordOAuth", "redirectUri", "DISCORD_REDIRECT_URI"),
+            "redirect_uri": discord_redirect_uri(),
         },
         headers={"Content-Type": "application/x-www-form-urlencoded"},
         timeout=20,
@@ -273,6 +290,7 @@ def fetch_discord_user_guilds(access_token):
 
 
 __all__ = [
+    "discord_redirect_uri",
     "is_discord_oauth_configured",
     "get_frontend_base_url",
     "clean_expired_oauth_states",

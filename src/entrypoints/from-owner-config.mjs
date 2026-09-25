@@ -116,7 +116,7 @@ async function main() {
   };
   setRuntimeEnv("DISCORD_CLIENT_ID", oauth.clientId);
   setRuntimeEnv("DISCORD_CLIENT_SECRET", oauth.clientSecret);
-  setRuntimeEnv("DISCORD_REDIRECT_URI", oauth.redirectUri);
+  // DISCORD_REDIRECT_URI is made from the website's address (discord-oauth-settings.js).
   setRuntimeEnv("DISCORD_OAUTH_SCOPES", oauth.scopes);
   setRuntimeEnv("SMTP_HOST", smtp.host);
   setRuntimeEnv("SMTP_PORT", smtp.port);
