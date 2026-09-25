@@ -135,6 +135,21 @@ REPLACED_STREAMS = {
 }
 
 
+# Decisions of #325 on streams that only roughly matched their name: corrected
+# in MongoDB only where the old value is still stored, so an owner's own
+# change stays. key -> {field: (old, new)}
+CATALOG_CORRECTIONS = {
+    "technoradio": {"name": ("Techno Radio", "Dance Radio")},
+    "pro_tech_19": {"name": ("Minimal Grooves", "IDM & Glitch")},
+    "pro_urban_14": {"name": ("Chill R&B", "2000er Hits"), "genre": ("R&B", "Pop & Charts"), "color": ("#A855F7", "#EC4899")},
+    "pro_tech_16": {"name": ("Deep Underground", "Deep Tech House"), "genre": ("Techno", "House"), "color": ("#7C3AED", "#06B6D4")},
+    "reggaeradio": {"url": ("http://streams.bigfm.de/bigfm-reggaevibes-128-mp3", "https://ice1.somafm.com/reggae-128-mp3"), "country": ("DE", "US")},
+    # These two played the stream of another catalog station; now what their name says.
+    "pro_urban_04": {"url": ("http://streams.bigfm.de/bigfm-rapfeature-128-mp3?usid=0-0-H-M-D-60", "https://stream.laut.fm/drill"), "language": ("de", "")},
+    "pro_hard_06": {"url": ("http://mp3.stream.tb-group.fm/hb.mp3?", "https://stream.laut.fm/hardstyle"), "country": ("DE", "")},
+}
+
+
 def _https_url(value, limit=500):
     text = str(value or "").strip()
     if not text or len(text) > limit:
@@ -175,6 +190,9 @@ def catalog_updates_for(doc, file_station):
     replacement = REPLACED_STREAMS.get(str(doc.get("key") or ""))
     if replacement and str(doc.get("url") or "").strip() == replacement[0]:
         updates["url"] = replacement[1]
+    for field, (old, new) in CATALOG_CORRECTIONS.get(str(doc.get("key") or ""), {}).items():
+        if str(doc.get(field) or "").strip() == old:
+            updates[field] = new
     return updates
 
 
