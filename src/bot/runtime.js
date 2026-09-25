@@ -35,6 +35,7 @@ import { buildCommandBuilders } from "../commands.js";
 import { loadGuildSettings } from "../lib/guild-settings.js";
 import { buildResolvedVoiceGuardConfig, formatVoiceGuardDurationMs } from "../lib/voice-guard.js";
 import { isRuntimePlaybackActive, isRuntimeVoiceConnected } from "./runtime-live-state.js";
+import { endOwnedStageInstance } from "./runtime-voice.js";
 import {
   normalizeStationReference,
   resolveStationForGuild,
@@ -1247,6 +1248,8 @@ class BotRuntime {
       // A stop ends a sleep timer too (#275).
       this.clearSleepTimer?.(guildId);
       state.shouldReconnect = false;
+      // A Stage OmniFM opened ends with the stream (and with it its server event).
+      await endOwnedStageInstance(this, guildId, state);
       this.resetVoiceSession(guildId, state, { preservePlaybackTarget: false, clearLastChannel: true });
       recordPlaybackPhase(this, guildId, state, "stop");
 
