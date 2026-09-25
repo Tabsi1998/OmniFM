@@ -38,8 +38,8 @@ async function handleHelpCommand({ runtime, interaction }) {
 /** /setup */
 async function handleSetupCommand({ runtime, interaction }) {
   recordCommandUsage(interaction.guildId, interaction.commandName);
-  const payload = runtime.buildSetupMessage(interaction);
-  await runtime.respondInteraction(interaction, { ...payload, flags: MessageFlags.Ephemeral });
+  // Private and Components V2: the payload carries its flags (#271).
+  await runtime.respondInteraction(interaction, await runtime.openSetupWizard(interaction));
   return;
 }
 

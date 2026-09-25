@@ -5310,64 +5310,6 @@ test("help payload exposes quick actions, dashboard, website, support and premiu
   assert.ok(premium.some((button) => button.label === "See Premium" && button.url));
 });
 
-test("setup payload exposes worker actions and useful links", () => {
-  const fakeRuntime = Object.create(BotRuntime.prototype);
-  fakeRuntime.resolveInteractionLanguage = () => "en";
-  fakeRuntime.workerManager = {
-    getMaxWorkerIndex() {
-      return 8;
-    },
-    getInvitedWorkers() {
-      return [];
-    },
-  };
-
-  const payload = fakeRuntime.buildSetupMessage({
-    guildId: "guild-1",
-    guild: {
-      name: "Guild One",
-      channels: {
-        cache: {
-          filter(callback) {
-            const channels = [
-              { type: 2, isVoiceBased() { return true; } },
-              { type: 0, isVoiceBased() { return false; } },
-            ];
-            return {
-              size: channels.filter(callback).length,
-            };
-          },
-        },
-      },
-    },
-  });
-
-  const firstEmbed = payload.embeds?.[0]?.data || {};
-  const fieldNames = Array.isArray(firstEmbed.fields) ? firstEmbed.fields.map((field) => field.name) : [];
-  assert.ok(fieldNames.includes("Current status"));
-  assert.ok(fieldNames.includes("Next step"));
-  assert.ok(fieldNames.includes("Before the first /play"));
-
-  const actionButtons = payload.components?.[0]?.components?.map((button) => button?.data || {}) || [];
-  assert.equal(actionButtons.length, 4);
-  assert.equal(actionButtons[0].label, "Quick start");
-  assert.equal(actionButtons[0].custom_id, "omnifm:play:open");
-  assert.equal(actionButtons[1].label, "Stations");
-  assert.equal(actionButtons[1].custom_id, "omnifm:stations:open");
-  assert.equal(actionButtons[2].label, "Worker status");
-  assert.equal(actionButtons[2].custom_id, "omnifm:workers:open");
-  assert.equal(actionButtons[3].label, "Invite worker");
-  assert.equal(actionButtons[3].custom_id, "omnifm:invite:open");
-
-  const linkButtons = payload.components?.[1]?.components?.map((button) => button?.data || {}) || [];
-  assert.equal(linkButtons.length, 3);
-  assert.equal(linkButtons[0].label, "📊 Dashboard");
-  assert.match(String(linkButtons[0].url || ""), /\?page=dashboard&lang=en$/);
-  assert.equal(linkButtons[1].label, "🌐 Website");
-  assert.match(String(linkButtons[1].url || ""), /\?lang=en$/);
-  assert.equal(linkButtons[2].label, "🛟 Support");
-});
-
 test("play wizard payload exposes modern quick-start controls", async () => {
   const fakeRuntime = Object.create(BotRuntime.prototype);
   fakeRuntime.interactiveUiSessions = new Map();

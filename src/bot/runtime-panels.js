@@ -3,7 +3,6 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ChannelType,
-  EmbedBuilder,
   MessageFlags,
   StringSelectMenuBuilder,
 } from "discord.js";
@@ -83,7 +82,7 @@ function formatStationTierBadge(entry, language) {
   return language === "de" ? "Free" : "Free";
 }
 
-function buildStationCatalog(guildId) {
+export function buildStationCatalog(guildId) {
   const stations = loadStations();
   const guildTier = getTier(guildId);
   const available = filterStationsByTier(stations.stations, guildTier);
@@ -122,7 +121,7 @@ function buildStationCatalog(guildId) {
   };
 }
 
-function buildStationOptions(entries, language, selectedStationKey = null, { limit = PLAY_STATION_OPTION_LIMIT } = {}) {
+export function buildStationOptions(entries, language, selectedStationKey = null, { limit = PLAY_STATION_OPTION_LIMIT } = {}) {
   const options = [];
   const selectedEntry = entries.find((entry) => entry.key === selectedStationKey) || null;
   if (selectedEntry) {
@@ -141,7 +140,7 @@ function buildStationOptions(entries, language, selectedStationKey = null, { lim
   }));
 }
 
-function buildVoiceChannelOptions(guild, selectedChannelId = null) {
+export function buildVoiceChannelOptions(guild, selectedChannelId = null) {
   const channels = Array.from(guild?.channels?.cache?.values?.() || [])
     .filter((channel) =>
       channel
@@ -507,6 +506,108 @@ async function resolvePlayableStation(runtime, interaction, requested) {
   };
 }
 
+/**
+ * The commander hands a stream to a worker: pick the worker (the requested
+ * one, one already in the channel, or a free one), check its permissions in
+ * the channel and start. Returns { ok: false, message } or { ok: true,
+ * worker, result, reusingExistingWorker, selectedStation }. Shared by /play
+ * and the setup (#271).
+ */
+export async function delegatePlayToWorker(runtime, {
+  guildId,
+  channelId,
+  playable,
+  requestedBotIndex = null,
+  requestedWorkerSelectionMode = "slot",
+  t,
+  language,
+}) {
+  let worker;
+  let reusingExistingWorker = false;
+  if (requestedBotIndex) {
+    const check = runtime.workerManager.canUseWorker(requestedBotIndex, guildId, playable.guildTier, {
+      prefer: requestedWorkerSelectionMode === "botIndex" ? "botIndex" : "slot",
+      strict: requestedWorkerSelectionMode !== "botIndex",
+    });
+    if (!check.ok) {
+      const reasons = {
+        tier: t(`Worker ${requestedBotIndex} erfordert ein hoeheres Abo (max: ${check.maxIndex}).`, `Worker ${requestedBotIndex} requires a higher plan (max: ${check.maxIndex}).`),
+        not_configured: t(`Worker ${requestedBotIndex} ist nicht konfiguriert.`, `Worker ${requestedBotIndex} is not configured.`),
+        offline: t(`Worker ${requestedBotIndex} ist offline.`, `Worker ${requestedBotIndex} is offline.`),
+        not_invited: t(`Worker ${requestedBotIndex} ist nicht auf diesem Server. Nutze \`/invite worker:${requestedBotIndex}\` zum Einladen.`, `Worker ${requestedBotIndex} is not on this server. Use \`/invite worker:${requestedBotIndex}\` to invite.`),
+      };
+      return { ok: false, message: reasons[check.reason] || t("Worker nicht verfuegbar.", "Worker not available.") };
+    }
+    worker = check.worker;
+  } else {
+    const activeWorkerInChannel = runtime.workerManager.findStreamingWorkerByChannel(guildId, channelId);
+    if (activeWorkerInChannel) {
+      worker = activeWorkerInChannel;
+      reusingExistingWorker = true;
+    } else {
+      const connectedWorkerInChannel = await runtime.workerManager.findConnectedWorkerByChannel(guildId, channelId, playable.guildTier);
+      if (connectedWorkerInChannel) {
+        worker = connectedWorkerInChannel;
+        reusingExistingWorker = true;
+      }
+    }
+    if (!worker) {
+      worker = runtime.workerManager.findFreeWorker(guildId, playable.guildTier);
+    }
+  }
+
+  if (!worker) {
+    const invited = runtime.workerManager.getInvitedWorkers(guildId, playable.guildTier);
+    return {
+      ok: false,
+      message: invited.length === 0
+        ? t(
+          "Kein Worker-Bot ist auf diesem Server. Nutze `/invite worker:1` zum Einladen.",
+          "No worker bot is on this server. Use `/invite worker:1` to invite one."
+        )
+        : t(
+          "Alle Worker-Bots auf diesem Server sind belegt. Lade mehr Worker ein oder stoppe einen laufenden Stream.",
+          "All worker bots on this server are busy. Invite more workers or stop a running stream."
+        ),
+    };
+  }
+
+  const selectedStation = playable.playStations.stations[playable.key];
+  let workerAccess = { ok: true };
+  if (worker?.remote !== true) {
+    const workerGuild = worker.client?.guilds?.cache?.get?.(guildId)
+      || await worker.client?.guilds?.fetch?.(guildId).catch(() => null);
+    const workerChannel = workerGuild?.channels?.cache?.get?.(channelId)
+      || await workerGuild?.channels?.fetch?.(channelId).catch(() => null);
+    workerAccess = workerGuild && workerChannel
+      ? await worker.validateVoiceChannelAccess(workerGuild, workerChannel, {
+        language,
+        workerName: worker.config?.name || "Worker",
+      })
+      : {
+        ok: false,
+        message: t(
+          "Der Ziel-Channel konnte fuer den ausgewaehlten Worker gerade nicht geladen werden. Bitte versuche es erneut.",
+          "The target channel could not be loaded for the selected worker right now. Please try again."
+        ),
+      };
+  }
+  if (!workerAccess.ok) {
+    return { ok: false, message: workerAccess.message };
+  }
+
+  log("INFO", `[${runtime.config.name}] /play guild=${guildId} station=${playable.key} -> delegating to ${worker.config.name}`);
+  worker.clearScheduledEventPlaybackInGuild(guildId);
+  const result = await worker.playInGuild(guildId, channelId, playable.key, playable.playStations, undefined);
+  if (!result.ok) {
+    return { ok: false, message: t(`Fehler: ${result.error}`, `Error: ${result.error}`) };
+  }
+  if (typeof runtime.workerManager.refreshRemoteStates === "function") {
+    await runtime.workerManager.refreshRemoteStates({ force: true }).catch(() => null);
+  }
+  return { ok: true, worker, result, reusingExistingWorker, selectedStation };
+}
+
 export async function executeRuntimePlay(runtime, interaction, {
   station = null,
   requestedVoiceChannel = null,
@@ -598,92 +699,20 @@ export async function executeRuntimePlay(runtime, interaction, {
 
     await runtime.respondInteraction(interaction, { content: t("Verbinde Worker...", "Connecting worker..."), flags: MessageFlags.Ephemeral });
 
-    let worker;
-    let reusingExistingWorker = false;
-    if (requestedBotIndex) {
-      const check = runtime.workerManager.canUseWorker(requestedBotIndex, guildId, playable.guildTier, {
-        prefer: requestedWorkerSelectionMode === "botIndex" ? "botIndex" : "slot",
-        strict: requestedWorkerSelectionMode !== "botIndex",
-      });
-      if (!check.ok) {
-        const reasons = {
-          tier: t(`Worker ${requestedBotIndex} erfordert ein hoeheres Abo (max: ${check.maxIndex}).`, `Worker ${requestedBotIndex} requires a higher plan (max: ${check.maxIndex}).`),
-          not_configured: t(`Worker ${requestedBotIndex} ist nicht konfiguriert.`, `Worker ${requestedBotIndex} is not configured.`),
-          offline: t(`Worker ${requestedBotIndex} ist offline.`, `Worker ${requestedBotIndex} is offline.`),
-          not_invited: t(`Worker ${requestedBotIndex} ist nicht auf diesem Server. Nutze \`/invite worker:${requestedBotIndex}\` zum Einladen.`, `Worker ${requestedBotIndex} is not on this server. Use \`/invite worker:${requestedBotIndex}\` to invite.`),
-        };
-        await runtime.respondInteraction(interaction, { content: reasons[check.reason] || t("Worker nicht verfuegbar.", "Worker not available.") });
-        return;
-      }
-      worker = check.worker;
-    } else {
-      const activeWorkerInChannel = runtime.workerManager.findStreamingWorkerByChannel(guildId, channelId);
-      if (activeWorkerInChannel) {
-        worker = activeWorkerInChannel;
-        reusingExistingWorker = true;
-      } else {
-        const connectedWorkerInChannel = await runtime.workerManager.findConnectedWorkerByChannel(guildId, channelId, playable.guildTier);
-        if (connectedWorkerInChannel) {
-          worker = connectedWorkerInChannel;
-          reusingExistingWorker = true;
-        }
-      }
-      if (!worker) {
-        worker = runtime.workerManager.findFreeWorker(guildId, playable.guildTier);
-      }
-    }
-
-    if (!worker) {
-      const invited = runtime.workerManager.getInvitedWorkers(guildId, playable.guildTier);
-      await runtime.respondInteraction(interaction, {
-        content: invited.length === 0
-          ? t(
-            "Kein Worker-Bot ist auf diesem Server. Nutze `/invite worker:1` zum Einladen.",
-            "No worker bot is on this server. Use `/invite worker:1` to invite one."
-          )
-          : t(
-            "Alle Worker-Bots auf diesem Server sind belegt. Lade mehr Worker ein oder stoppe einen laufenden Stream.",
-            "All worker bots on this server are busy. Invite more workers or stop a running stream."
-          ),
-      });
+    const delegated = await delegatePlayToWorker(runtime, {
+      guildId,
+      channelId,
+      playable,
+      requestedBotIndex,
+      requestedWorkerSelectionMode,
+      t,
+      language,
+    });
+    if (!delegated.ok) {
+      await runtime.respondInteraction(interaction, { content: delegated.message });
       return;
     }
-
-    const selectedStation = playable.playStations.stations[playable.key];
-    let workerAccess = { ok: true };
-    if (worker?.remote !== true) {
-      const workerGuild = worker.client?.guilds?.cache?.get?.(guildId)
-        || await worker.client?.guilds?.fetch?.(guildId).catch(() => null);
-      const workerChannel = workerGuild?.channels?.cache?.get?.(channelId)
-        || await workerGuild?.channels?.fetch?.(channelId).catch(() => null);
-      workerAccess = workerGuild && workerChannel
-        ? await worker.validateVoiceChannelAccess(workerGuild, workerChannel, {
-          language,
-          workerName: worker.config?.name || "Worker",
-        })
-        : {
-          ok: false,
-          message: t(
-            "Der Ziel-Channel konnte fuer den ausgewaehlten Worker gerade nicht geladen werden. Bitte versuche es erneut.",
-            "The target channel could not be loaded for the selected worker right now. Please try again."
-          ),
-        };
-    }
-    if (!workerAccess.ok) {
-      await runtime.respondInteraction(interaction, { content: workerAccess.message });
-      return;
-    }
-
-    log("INFO", `[${runtime.config.name}] /play guild=${guildId} station=${playable.key} -> delegating to ${worker.config.name}`);
-    worker.clearScheduledEventPlaybackInGuild(guildId);
-    const result = await worker.playInGuild(guildId, channelId, playable.key, playable.playStations, undefined);
-    if (!result.ok) {
-      await runtime.respondInteraction(interaction, { content: t(`Fehler: ${result.error}`, `Error: ${result.error}`) });
-      return;
-    }
-    if (typeof runtime.workerManager.refreshRemoteStates === "function") {
-      await runtime.workerManager.refreshRemoteStates({ force: true }).catch(() => null);
-    }
+    const { worker, result, reusingExistingWorker, selectedStation } = delegated;
     const tierConfig = getTierConfig(guildId);
     const tierLabel = tierConfig.tier !== "free" ? ` [${tierConfig.name} ${tierConfig.bitrate}]` : "";
     const successEmbed = buildOmniEmbed({
