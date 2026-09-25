@@ -43,7 +43,7 @@ import fs from "node:fs";
 
 import { getOwnerConfigSnapshot, patchOwnerConfig, patchOwnerSecrets } from "../../lib/owner-config-store.js";
 import { getOwnerJob, getOwnerJobsSnapshot, startOwnerJob } from "../../lib/owner-job-runner.js";
-import { getOwnerAuditSnapshot, recordOwnerAudit } from "../../lib/owner-audit-store.js";
+import { recordOwnerAudit } from "../../lib/owner-audit-store.js";
 import { getOwnerLogFileSnapshot, getOwnerLogFilesSnapshot } from "../../lib/owner-log-files.js";
 import { TEST_CONFIRMATION_VALUE, getOwnerMailStatus, sendOwnerTestMail } from "../../lib/owner-mail-test.js";
 import { testOwnerStationStream } from "../../lib/owner-station-test.js";
@@ -52,6 +52,7 @@ import { getDb, isConnected } from "../../lib/db.js";
 import {
   OWNER_CONFIG_ID,
   OWNER_CONFIG_SECTIONS,
+  configSectionFrom,
   loadOwnerConfigRaw,
   mergedSectionForSave,
   ownerConfigResponse,
@@ -69,6 +70,28 @@ import {
   setLicenseServerLinks,
 } from "../../lib/owner-licenses.js";
 import { ArchiveError, archiveMongoRecords, listArchiveOperations, restoreArchivedOperation } from "../../lib/owner-archive.js";
+import {
+  FAILOVER_HISTORY_EVENTS,
+  TIER_PRICE_CENTS,
+  commanderIndex,
+  configBool,
+  directorySetting,
+  formatFailoverHistoryRow,
+  integrationFlags,
+  isDiscordOauthConfigured,
+  liveRuntimeTotals,
+  loadConfiguredBots,
+  monitoringResponse,
+  readReleaseInfo,
+  readRuntimeHealthFresh,
+  runtimeGuildDirectory,
+  stationSummary,
+  stripeSecretKey,
+  systemSetting,
+  workersResponse,
+} from "../../lib/owner-monitoring.js";
+import { isAllowedOperatorWebhookUrl } from "../../services/operator-webhook.js";
+import nodemailer from "nodemailer";
 import { flushPremiumStoreWrites, reloadPremiumStore, savePremiumStore } from "../../premium-store.js";
 import { resolveRuntimeDataPath } from "../../lib/runtime-data-path.js";
 
@@ -180,11 +203,6 @@ export function createAdminRoutesHandler(deps) {
       ? deps.getRuntimes()
       : deps.runtimes;
     return Array.isArray(value) ? value : [];
-  }
-
-  function getStationCatalogCount() {
-    const stationsData = loadStations?.() || {};
-    return Object.keys(stationsData?.stations || {}).length;
   }
 
   function hasEnvValue(name) {
@@ -834,6 +852,124 @@ export function createAdminRoutesHandler(deps) {
     };
   }
 
+  // stations.json for the station summary when MongoDB has no catalog yet.
+  function loadCatalogFileStations() {
+    try {
+      return JSON.parse(fs.readFileSync(new URL("../../../stations.json", import.meta.url), "utf8"))?.stations || {};
+    } catch {
+      return {};
+    }
+  }
+
+  /** The checks of POST /api/admin/integrations/test, like FastAPI's check_all(). */
+  async function runIntegrationTests(names, sendTestAlert) {
+    const raw = await loadOwnerConfigRaw();
+    const db = isConnected() ? getDb() : null;
+    const results = {};
+    const clipMessage = (value) => String(value?.message || value || "").slice(0, 160);
+    if (names.includes("mongo")) {
+      try {
+        if (!db) throw new Error("MongoDB ist nicht verbunden");
+        await db.command({ ping: 1 });
+        results.mongo = { ok: true, message: "MongoDB antwortet." };
+      } catch (err) {
+        results.mongo = { ok: false, message: clipMessage(err) };
+      }
+    }
+    if (names.includes("stripe")) {
+      const key = stripeSecretKey(raw);
+      if (!key) {
+        results.stripe = { ok: false, message: "Kein Stripe Secret Key konfiguriert." };
+      } else {
+        try {
+          const response = await fetch("https://api.stripe.com/v1/balance", { headers: { Authorization: `Basic ${Buffer.from(`${key}:`).toString("base64")}` }, signal: AbortSignal.timeout(10_000) });
+          results.stripe = { ok: response.status < 400, message: response.status < 400 ? "Stripe API erreichbar." : `Stripe HTTP ${response.status}` };
+        } catch (err) {
+          results.stripe = { ok: false, message: clipMessage(err) };
+        }
+      }
+    }
+    if (names.includes("discordoauth")) {
+      const ok = isDiscordOauthConfigured(raw);
+      results.discordOAuth = { ok, message: ok ? "OAuth-Konfiguration vollständig." : "Client ID, Secret oder Redirect URI fehlt." };
+    }
+    if (names.includes("smtp")) {
+      const host = String(systemSetting(raw, "smtp", "host", "SMTP_HOST") || "").trim();
+      if (!host) {
+        results.smtp = { ok: false, message: "SMTP Host fehlt." };
+      } else {
+        const port = parseIntLike(systemSetting(raw, "smtp", "port", "SMTP_PORT", 587), 587);
+        const user = String(systemSetting(raw, "smtp", "user", "SMTP_USER") || "").trim();
+        const pass = String(systemSetting(raw, "smtp", "password", "SMTP_PASS") || "");
+        try {
+          const transport = nodemailer.createTransport({
+            host, port, secure: configBool(systemSetting(raw, "smtp", "secure", "SMTP_SECURE", false)),
+            auth: user ? { user, pass } : undefined, connectionTimeout: 10_000, greetingTimeout: 10_000,
+          });
+          await transport.verify();
+          transport.close?.();
+          results.smtp = { ok: true, message: "SMTP-Verbindung und Anmeldung erfolgreich." };
+        } catch (err) {
+          results.smtp = { ok: false, message: clipMessage(err) };
+        }
+      }
+    }
+    if (names.includes("recognition")) {
+      const enabled = configBool(systemSetting(raw, "audioRecognition", "enabled", "NOW_PLAYING_RECOGNITION_ENABLED", false));
+      const hasKey = Boolean(systemSetting(raw, "audioRecognition", "apiKey", "ACOUSTID_API_KEY"));
+      results.recognition = { ok: enabled && hasKey, message: enabled && hasKey ? "Song-Erkennung ist vollständig konfiguriert." : "Aktivierung oder API Key fehlt." };
+    }
+    if (names.includes("songhistory")) {
+      const enabled = configBool(systemSetting(raw, "songHistory", "enabled", "SONG_HISTORY_ENABLED", true), true);
+      results.songHistory = { ok: enabled && Boolean(db), message: enabled && db ? "Song-Verlauf und MongoDB sind aktiv." : "Song-Verlauf ist deaktiviert oder MongoDB fehlt." };
+    }
+    if (names.includes("operatoralerts")) {
+      // "check all" only looks at the setting; the button sends a real test alert (#260).
+      const url = String(systemSetting(raw, "operatorAlerts", "webhookUrl", "OPERATOR_WEBHOOK_URL") || "").trim();
+      if (!url) {
+        results.operatorAlerts = { ok: false, message: "Keine Webhook-URL für Betreiber-Alarme gesetzt." };
+      } else if (!isAllowedOperatorWebhookUrl(url)) {
+        results.operatorAlerts = { ok: false, message: "Die URL ist kein Discord-Webhook (https://discord.com/api/webhooks/…)." };
+      } else if (!sendTestAlert) {
+        results.operatorAlerts = { ok: true, message: "Webhook-URL ist gesetzt." };
+      } else {
+        const mention = String(systemSetting(raw, "operatorAlerts", "mention", "OPERATOR_WEBHOOK_MENTION") || "").trim();
+        try {
+          const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            redirect: "manual",
+            signal: AbortSignal.timeout(10_000),
+            body: JSON.stringify({
+              username: "OmniFM Operator",
+              content: mention || null,
+              embeds: [{ title: "🧪 Testalarm", description: "So sehen Betreiber-Alarme von OmniFM aus. Die Einrichtung stimmt.", color: 0x00f0ff }],
+            }),
+          });
+          results.operatorAlerts = response.status < 300
+            ? { ok: true, message: "Testalarm gesendet, schau in den Discord-Kanal." }
+            : { ok: false, message: `Discord antwortet mit HTTP ${response.status}.` };
+        } catch (err) {
+          results.operatorAlerts = { ok: false, message: clipMessage(err) };
+        }
+      }
+    }
+    const directories = {
+      discordbotlist: ["discordBotList", "DISCORDBOTLIST_TOKEN", "DISCORDBOTLIST_BOT_ID", "Discord Bot List"],
+      botsgg: ["botsGG", "BOTSGG_TOKEN", "BOTSGG_BOT_ID", "Bots.gg"],
+      topgg: ["topGG", "TOPGG_TOKEN", "TOPGG_BOT_ID", "Top.gg"],
+    };
+    for (const [name, [directory, tokenEnv, botIdEnv, label]] of Object.entries(directories)) {
+      if (!names.includes(name)) continue;
+      const enabled = configBool(directorySetting(raw, directory, "enabled", tokenEnv.replace("TOKEN", "ENABLED"), false));
+      const token = String(directorySetting(raw, directory, "token", tokenEnv) || "").trim();
+      const botId = String(directorySetting(raw, directory, "botId", botIdEnv) || "").trim();
+      const complete = enabled && Boolean(token) && /^\d{17,22}$/.test(botId);
+      results[directory] = { ok: complete, message: complete ? `${label} ist vollständig konfiguriert.` : `${label}: Aktivierung, Token oder gültige Bot-ID fehlt.` };
+    }
+    return results;
+  }
+
   function auditOwnerAction(req, event) {
     try {
       return recordOwnerAudit({
@@ -999,43 +1135,206 @@ export function createAdminRoutesHandler(deps) {
 
     if (!isAuthorized(req, requestUrl)) { unauthorized(res); return true; }
 
+    // ---- Monitoring, overview and logs with FastAPI's contract (#288) ----
+    const monitoringDb = () => (isConnected() ? getDb() : null);
+
     // GET /api/admin/overview
     if (pathname === "/api/admin/overview" || pathname === "/api/admin") {
       if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
-
-      const botStats = getRuntimes().map((r) => {
-        const stats = r.collectStats?.() || {};
-        return {
-          name: r.config?.name || "?",
-          role: r.role || "worker",
-          online: Boolean(r.client?.isReady?.()),
-          guilds: Number(stats.servers || 0),
-          connections: Number(stats.connections || 0),
-          listeners: Number(stats.listeners || 0),
-          uptime: r.startedAt ? Math.floor((Date.now() - r.startedAt) / 1000) : null,
-        };
-      });
-
-      const licenses = listLicenses?.() || {};
-      const licenseList = Object.values(licenses);
-      const activeLicenses = licenseList.filter((l) => l?.active && !l?.expired).length;
-      const expiredLicenses = licenseList.filter((l) => l?.expired || (l?.expiresAt && new Date(l.expiresAt) < new Date())).length;
-
-      const stationHealth = getStationHealthReport?.() || [];
-      const stationCatalogCount = getStationCatalogCount();
-      const stationsUp = stationHealth.filter((s) => s.status === "up").length;
-      const stationsDown = stationHealth.filter((s) => s.status === "down").length;
-
+      const db = monitoringDb();
+      const raw = await loadOwnerConfigRaw();
+      const rows = licenseRows(await reloadPremiumStore());
+      const active = rows.filter((row) => row.active);
+      const byPlan = {};
+      let mrr = 0;
+      let seatsSold = 0;
+      for (const row of active) {
+        byPlan[row.plan] = (byPlan[row.plan] || 0) + 1;
+        seatsSold += row.seats;
+        mrr += ((TIER_PRICE_CENTS[row.plan] || 0) / 100) * row.seats;
+      }
+      const stations = await stationSummary(db, loadCatalogFileStations);
+      const bots = loadConfiguredBots(raw);
+      const live = liveRuntimeTotals(await readRuntimeHealthFresh(db));
+      const commander = bots.find((bot) => bot.index === commanderIndex()) || bots[0] || null;
+      const flags = await integrationFlags(db, raw);
+      const directoryToken = (directory, envKey) => Boolean(String(directorySetting(raw, directory, "token", envKey) || "").trim());
       sendJson(res, 200, {
-        bots: botStats,
-        licenses: { total: licenseList.length, active: activeLicenses, expired: expiredLicenses },
-        stations: { total: Math.max(stationCatalogCount, stationHealth.length), up: stationsUp, down: stationsDown },
-        release: typeof getReleaseInfo === "function" ? getReleaseInfo() : null,
-        serverTime: new Date().toISOString(),
+        generatedAt: new Date().toISOString(),
+        brand: "OmniFM",
+        release: readReleaseInfo(),
+        licenses: { total: rows.length, active: active.length, expired: rows.filter((row) => row.expired).length, byPlan, seatsSold },
+        revenue: { mrr: Math.round(mrr * 100) / 100, arr: Math.round(mrr * 12 * 100) / 100, currency: "EUR" },
+        stations: { free: stations.free, pro: stations.pro, total: stations.total },
+        bots: { configured: bots.length, online: live.botsOnline, commander: commander?.name ?? null },
+        guilds: { managed: live.servers, live: live.live },
+        integrations: {
+          mongo: flags.mongo,
+          stripe: flags.stripe,
+          discordOAuth: flags.discordOAuth,
+          smtp: flags.smtp,
+          discordBotList: directoryToken("discordBotList", "DISCORDBOTLIST_TOKEN"),
+          botsGG: directoryToken("botsGG", "BOTSGG_TOKEN"),
+          topGG: directoryToken("topGG", "TOPGG_TOKEN"),
+          recognition: flags.recognition,
+        },
       });
       return true;
     }
 
+    // GET /api/admin/guilds
+    if (pathname === "/api/admin/guilds") {
+      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
+      const db = monitoringDb();
+      const health = await readRuntimeHealthFresh(db);
+      const guilds = Object.values(await runtimeGuildDirectory(db, health))
+        .sort((a, b) => String(a.name || "").toLowerCase().localeCompare(String(b.name || "").toLowerCase()));
+      sendJson(res, 200, { guilds, count: guilds.length, live: Boolean(health) });
+      return true;
+    }
+
+    // GET /api/admin/workers
+    if (pathname === "/api/admin/workers") {
+      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
+      sendJson(res, 200, await workersResponse(monitoringDb(), await loadOwnerConfigRaw()));
+      return true;
+    }
+
+    // GET /api/admin/monitoring
+    if (pathname === "/api/admin/monitoring") {
+      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
+      sendJson(res, 200, await monitoringResponse(monitoringDb()));
+      return true;
+    }
+
+    // GET /api/admin/failover-history
+    if (pathname === "/api/admin/failover-history") {
+      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
+      const limit = Math.max(1, Math.min(500, parseIntLike(requestUrl.searchParams.get("limit") ?? 100, 100)));
+      let history = [];
+      const db = monitoringDb();
+      if (db) {
+        try {
+          history = (await db.collection("runtime_incidents").find({ eventKey: { $in: [...FAILOVER_HISTORY_EVENTS] } }, { projection: { _id: 0 } })
+            .sort({ timestamp: -1 }).limit(limit).toArray()).map(formatFailoverHistoryRow);
+        } catch {
+          history = [];
+        }
+      }
+      sendJson(res, 200, { history, count: history.length });
+      return true;
+    }
+
+    // GET /api/admin/integrations
+    if (pathname === "/api/admin/integrations") {
+      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
+      const db = monitoringDb();
+      const raw = await loadOwnerConfigRaw();
+      const premium = await reloadPremiumStore();
+      const directoryStatus = (directory, enabledEnv, tokenEnv, botIdEnv) => {
+        const enabled = configBool(directorySetting(raw, directory, "enabled", enabledEnv, false));
+        const token = String(directorySetting(raw, directory, "token", tokenEnv) || "").trim();
+        const botId = String(directorySetting(raw, directory, "botId", botIdEnv) || "").trim();
+        return { enabled, configured: enabled && Boolean(token) && /^\d{17,22}$/.test(botId), botId: botId || null };
+      };
+      const dblToken = String(directorySetting(raw, "discordBotList", "token", "DISCORDBOTLIST_TOKEN") || "").trim();
+      const dblBotId = String(directorySetting(raw, "discordBotList", "botId", "DISCORDBOTLIST_BOT_ID") || "").trim() || String(process.env.BOT_1_CLIENT_ID || "").trim();
+      const dblState = premium.discordBotListState && typeof premium.discordBotListState === "object" ? premium.discordBotListState : {};
+      const dblVotes = dblState.votes && typeof dblState.votes === "object" ? dblState.votes : {};
+      const dbl = {
+        configured: configBool(directorySetting(raw, "discordBotList", "enabled", "DISCORDBOTLIST_ENABLED", Boolean(dblToken))) && Boolean(dblToken) && /^\d{17,22}$/.test(dblBotId),
+        botId: dblBotId || null,
+        statsScope: String(directorySetting(raw, "discordBotList", "statsScope", "DISCORDBOTLIST_STATS_SCOPE", "aggregate")).trim().toLowerCase() === "aggregate" ? "aggregate" : "commander",
+        state: {
+          commands: dblState.commands || {},
+          stats: dblState.stats || {},
+          votes: { totalVotes: parseIntLike(dblVotes.totalVotes, 0), recent: (Array.isArray(dblVotes.recent) ? dblVotes.recent : []).slice(0, 10) },
+        },
+      };
+      const flags = await integrationFlags(db, raw);
+      sendJson(res, 200, {
+        discordBotList: dbl,
+        botDirectories: {
+          discordBotList: dbl,
+          botsGG: directoryStatus("botsGG", "BOTSGG_ENABLED", "BOTSGG_TOKEN", "BOTSGG_BOT_ID"),
+          topGG: directoryStatus("topGG", "TOPGG_ENABLED", "TOPGG_TOKEN", "TOPGG_BOT_ID"),
+        },
+        config: {
+          ...flags,
+          songHistory: configBool(systemSetting(raw, "songHistory", "enabled", "SONG_HISTORY_ENABLED", true), true),
+          discordBotList: configBool(directorySetting(raw, "discordBotList", "enabled", "DISCORDBOTLIST_ENABLED", false)),
+          botsGG: configBool(directorySetting(raw, "botsGG", "enabled", "BOTSGG_ENABLED", false)),
+          topGG: configBool(directorySetting(raw, "topGG", "enabled", "TOPGG_ENABLED", false)),
+        },
+      });
+      return true;
+    }
+
+    // POST /api/admin/integrations/test ("Testalarm senden" among others)
+    if (pathname === "/api/admin/integrations/test") {
+      if (req.method !== "POST") { methodNotAllowed(res, ["POST"]); return true; }
+      let body;
+      try { body = JSON.parse(await readRequestBody(req) || "{}") || {}; } catch { body = {}; }
+      const requested = String(body.integration || "all").trim().toLowerCase();
+      const supported = ["mongo", "stripe", "discordoauth", "smtp", "recognition", "songhistory", "discordbotlist", "botsgg", "topgg", "operatoralerts"];
+      const names = requested === "all" ? supported : [requested];
+      if (!names.every((name) => supported.includes(name))) { sendJson(res, 400, { error: "Unbekannte Integration." }); return true; }
+      const results = await runIntegrationTests(names, requested === "operatoralerts");
+      auditOwnerAction(req, {
+        action: "integrations.test",
+        status: "success",
+        target: requested,
+        summary: Object.entries(results).map(([key, value]) => `${key}=${value.ok ? "ok" : "fail"}`).join("; "),
+      });
+      sendJson(res, 200, { ok: Object.values(results).every((item) => item.ok), results, checkedAt: new Date().toISOString() });
+      return true;
+    }
+
+    // GET /api/admin/audit
+    if (pathname === "/api/admin/audit") {
+      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
+      let audit = [];
+      const db = monitoringDb();
+      if (db) {
+        try {
+          audit = await db.collection("owner_audit").find({}, { projection: { _id: 0 } }).sort({ at: -1 }).limit(200).toArray();
+        } catch {
+          audit = [];
+        }
+      }
+      sendJson(res, 200, { audit, count: audit.length });
+      return true;
+    }
+
+    // GET /api/admin/discord/logs
+    if (pathname === "/api/admin/discord/logs") {
+      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
+      const discord = configSectionFrom(await loadOwnerConfigRaw(), "discord");
+      const commander = discord.commander || {};
+      const workers = Array.isArray(discord.workers) ? discord.workers : [];
+      const connected = Boolean(String(commander.token || "").trim());
+      let logs = [];
+      const db = monitoringDb();
+      if (db) {
+        try {
+          logs = await db.collection("owner_audit").find({ action: { $regex: "^(config|discord|station)" } }, { projection: { _id: 0 } }).sort({ at: -1 }).limit(60).toArray();
+        } catch {
+          logs = [];
+        }
+      }
+      sendJson(res, 200, {
+        connected,
+        commanderConfigured: Boolean(String(commander.clientId || "").trim()),
+        workerCount: workers.length,
+        note: connected
+          ? "Commander-Token gesetzt. Der Node-Bot bootet beim nächsten ./start.sh (oder ./update.sh) automatisch aus dieser Konfiguration – keine .env-Tokens nötig."
+          : "Noch kein Commander-Token gesetzt. Trage Token + Client ID ein; der Bot startet dann automatisch über ./start.sh aus dieser Owner-Konfiguration.",
+        logs,
+      });
+      return true;
+    }
+
+    // GET /api/admin/overview
     // GET /api/admin/diagnostics
     if (pathname === "/api/admin/diagnostics") {
       if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
@@ -1464,13 +1763,6 @@ export function createAdminRoutesHandler(deps) {
     }
 
     // GET /api/admin/audit
-    if (pathname === "/api/admin/audit") {
-      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
-      const limit = Number.parseInt(String(requestUrl?.searchParams?.get("limit") || "100"), 10);
-      sendJson(res, 200, getOwnerAuditSnapshot({ limit }));
-      return true;
-    }
-
     // GET/POST /api/admin/jobs
     if (pathname === "/api/admin/jobs") {
       if (req.method === "GET") {
@@ -1563,18 +1855,10 @@ export function createAdminRoutesHandler(deps) {
       return true;
     }
 
-    // The servers the running bots are in, for the license list (_runtime_guild_directory).
-    const guildDirectory = () => {
-      const directory = {};
-      for (const runtime of getRuntimes()) {
-        if (!runtime.client?.isReady?.()) continue;
-        for (const [guildId, guild] of (runtime.client.guilds?.cache || new Map()).entries()) {
-          const entry = directory[guildId] || { name: guild.name || guildId, memberCount: guild.memberCount || 0, iconUrl: guild.iconURL?.() || null, bots: [] };
-          entry.bots.push(runtime.config?.name || "?");
-          directory[guildId] = entry;
-        }
-      }
-      return directory;
+    // The servers the running bots are in (_runtime_guild_directory), from MongoDB like FastAPI.
+    const guildDirectory = async () => {
+      const db = isConnected() ? getDb() : null;
+      return runtimeGuildDirectory(db, await readRuntimeHealthFresh(db));
     };
     const licenseError = (err) => {
       const status = err instanceof OwnerLicenseError || err instanceof ArchiveError ? err.status : 500;
@@ -1588,7 +1872,7 @@ export function createAdminRoutesHandler(deps) {
     if (pathname === "/api/admin/licenses") {
       if (req.method === "GET") {
         const data = await reloadPremiumStore();
-        const rows = requestUrl.searchParams.get("full") === "1" ? adminLicenseRows(data, guildDirectory()) : licenseRows(data);
+        const rows = requestUrl.searchParams.get("full") === "1" ? adminLicenseRows(data, await guildDirectory()) : licenseRows(data);
         sendJson(res, 200, { licenses: rows, count: rows.length });
         return true;
       }
@@ -1633,7 +1917,7 @@ export function createAdminRoutesHandler(deps) {
           savePremiumStore(data);
           await flushPremiumStoreWrites();
           auditOwnerAction(req, { action: "license.update", status: "success", target: licenseKey, summary: changes.join(", ") || "no-op" });
-          const row = adminLicenseRows(data, guildDirectory()).find((entry) => entry.licenseKey === licenseKey) || null;
+          const row = adminLicenseRows(data, await guildDirectory()).find((entry) => entry.licenseKey === licenseKey) || null;
           sendJson(res, 200, { ok: true, license: row, changes });
           return true;
         }
@@ -1725,30 +2009,6 @@ export function createAdminRoutesHandler(deps) {
         const message = status >= 500 && !(err instanceof ArchiveError) ? `Wiederherstellung fehlgeschlagen: ${String(err?.message || err).slice(0, 300)}` : err.message;
         sendJson(res, status, { error: message });
       }
-      return true;
-    }
-
-    // GET /api/admin/guilds
-    if (pathname === "/api/admin/guilds") {
-      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
-      const guilds = [];
-      for (const runtime of getRuntimes()) {
-        if (!runtime.client?.isReady?.()) continue;
-        for (const [guildId, guild] of (runtime.client.guilds?.cache || new Map()).entries()) {
-          const state = runtime.getState?.(guildId) || {};
-          guilds.push({
-            id: guildId,
-            name: guild.name || "?",
-            memberCount: guild.memberCount || 0,
-            bot: runtime.config?.name || "?",
-            playing: Boolean(state.playing),
-            station: state.currentStationKey || null,
-            volume: state.volume ?? null,
-          });
-        }
-      }
-      guilds.sort((a, b) => (b.memberCount || 0) - (a.memberCount || 0));
-      sendJson(res, 200, { guilds, total: guilds.length });
       return true;
     }
 

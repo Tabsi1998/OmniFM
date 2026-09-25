@@ -46,6 +46,9 @@ def _load_base_url() -> str:
 
 
 BASE_URL = _load_base_url()
+# The dashboard sends this with every change; the Node API refuses changes
+# without it before it looks at the session (CSRF, #195).
+DASHBOARD_INTENT = {"X-OmniFM-CSRF": "dashboard-intent"}
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -70,7 +73,7 @@ class TestDashboardEndpointsAuth:
     
     def test_stats_reset_returns_401_unauthenticated(self):
         """DELETE /api/dashboard/stats/reset returns 401 without auth"""
-        response = requests.delete(f"{BASE_URL}/api/dashboard/stats/reset?serverId=123456789012345678")
+        response = requests.delete(f"{BASE_URL}/api/dashboard/stats/reset?serverId=123456789012345678", headers=DASHBOARD_INTENT)
         assert response.status_code == 401, f"Expected 401, got {response.status_code}"
         data = response.json()
         assert "error" in data or "Nicht eingeloggt" in str(data)
@@ -88,6 +91,7 @@ class TestDashboardEndpointsAuth:
         """PUT /api/dashboard/settings returns 401 without auth"""
         response = requests.put(
             f"{BASE_URL}/api/dashboard/settings?serverId=123456789012345678",
+            headers=DASHBOARD_INTENT,
             json={"weeklyDigest": {"enabled": True}}
         )
         assert response.status_code == 401, f"Expected 401, got {response.status_code}"
@@ -131,6 +135,7 @@ class TestDashboardEndpointsAuth:
         """POST /api/dashboard/custom-stations returns 401 without auth"""
         response = requests.post(
             f"{BASE_URL}/api/dashboard/custom-stations?serverId=123456789012345678",
+            headers=DASHBOARD_INTENT,
             json={"key": "test", "name": "Test", "url": "http://test.com"}
         )
         assert response.status_code == 401, f"Expected 401, got {response.status_code}"
@@ -142,6 +147,7 @@ class TestDashboardEndpointsAuth:
         """PUT /api/dashboard/custom-stations returns 401 without auth"""
         response = requests.put(
             f"{BASE_URL}/api/dashboard/custom-stations?serverId=123456789012345678",
+            headers=DASHBOARD_INTENT,
             json={"key": "test", "name": "Updated"}
         )
         assert response.status_code == 401, f"Expected 401, got {response.status_code}"
@@ -151,7 +157,7 @@ class TestDashboardEndpointsAuth:
     
     def test_custom_stations_delete_returns_401_unauthenticated(self):
         """DELETE /api/dashboard/custom-stations returns 401 without auth"""
-        response = requests.delete(f"{BASE_URL}/api/dashboard/custom-stations?serverId=123456789012345678&key=test")
+        response = requests.delete(f"{BASE_URL}/api/dashboard/custom-stations?serverId=123456789012345678&key=test", headers=DASHBOARD_INTENT)
         assert response.status_code == 401, f"Expected 401, got {response.status_code}"
         data = response.json()
         assert "error" in data or "Nicht eingeloggt" in str(data)
