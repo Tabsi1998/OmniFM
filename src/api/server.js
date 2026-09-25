@@ -673,6 +673,7 @@ const handleAuthRoutes = createAuthRoutesHandler({
   buildDashboardSessionCookie,
   buildDashboardSessionCookieDeletion,
   buildDiscordAuthorizeUrl,
+  getDiscordRedirectUri,
   deleteDashboardAuthSession,
   exchangeDiscordCodeForToken,
   fetchDiscordUserGuilds,
@@ -1537,11 +1538,11 @@ function buildDashboardSessionCookieDeletion(req, targetOrigin) {
   ].join("; ");
 }
 
-function buildDiscordAuthorizeUrl(stateToken) {
+function buildDiscordAuthorizeUrl(stateToken, redirectUri = getDiscordRedirectUri()) {
   const params = new URLSearchParams({
     client_id: getDiscordClientId(),
     response_type: "code",
-    redirect_uri: getDiscordRedirectUri(),
+    redirect_uri: redirectUri,
     scope: getDiscordOauthScopes(),
     state: stateToken,
     prompt: "consent",
@@ -1549,13 +1550,14 @@ function buildDiscordAuthorizeUrl(stateToken) {
   return `https://discord.com/api/oauth2/authorize?${params.toString()}`;
 }
 
-async function exchangeDiscordCodeForToken(code) {
+// The token exchange has to name the same redirect URI as the login did.
+async function exchangeDiscordCodeForToken(code, redirectUri = getDiscordRedirectUri()) {
   const body = new URLSearchParams({
     client_id: getDiscordClientId(),
     client_secret: getDiscordClientSecret(),
     grant_type: "authorization_code",
     code: String(code || "").trim(),
-    redirect_uri: getDiscordRedirectUri(),
+    redirect_uri: redirectUri,
   });
   const response = await fetch("https://discord.com/api/oauth2/token", {
     method: "POST",

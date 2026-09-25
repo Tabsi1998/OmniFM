@@ -6,6 +6,7 @@ export function createAuthRoutesHandler(deps) {
     buildDashboardSessionCookie,
     buildDashboardSessionCookieDeletion,
     buildDiscordAuthorizeUrl,
+    getDiscordRedirectUri,
     deleteDashboardAuthSession,
     exchangeDiscordCodeForToken,
     fetchDiscordUserGuilds,
@@ -68,18 +69,20 @@ export function createAuthRoutesHandler(deps) {
       const nextPage = sanitizeDashboardPage(requestUrl.searchParams.get("nextPage"));
       const stateToken = randomBytes(24).toString("base64url");
       const frontendOrigin = resolveTrustedFrontendOrigin(req, publicUrl);
+      const redirectUri = getDiscordRedirectUri();
       const nowTs = Math.floor(Date.now() / 1000);
       setDashboardOauthState(stateToken, {
         nextPage,
         language: requestLanguage,
         origin: frontendOrigin,
+        redirectUri,
         createdAt: nowTs,
         expiresAt: nowTs + getDiscordOauthStateTtlSeconds(),
       });
 
       sendJson(res, 200, {
         oauthConfigured: true,
-        authUrl: buildDiscordAuthorizeUrl(stateToken),
+        authUrl: buildDiscordAuthorizeUrl(stateToken, redirectUri),
         state: stateToken,
       });
       return true;
@@ -126,7 +129,7 @@ export function createAuthRoutesHandler(deps) {
       }
 
       try {
-        const accessToken = await exchangeDiscordCodeForToken(code);
+        const accessToken = await exchangeDiscordCodeForToken(code, statePayload.redirectUri || undefined);
         const userProfile = await fetchDiscordUserProfile(accessToken);
         const guilds = await fetchDiscordUserGuilds(accessToken);
         const sessionToken = randomBytes(32).toString("base64url");

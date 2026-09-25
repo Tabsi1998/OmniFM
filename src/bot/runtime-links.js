@@ -1,10 +1,12 @@
 import { normalizeLanguage, getDefaultLanguage } from "../i18n.js";
+import { isPublicOrigin, originOf, webDomainOrigin } from "../lib/public-origin.js";
 
 export function resolveWebsiteUrl() {
   const explicit = String(process.env.PUBLIC_WEB_URL || "").trim();
-  if (explicit) return explicit;
-  const domain = String(process.env.WEB_DOMAIN || "").trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
-  if (domain && !/[\s/\\]/.test(domain)) return `https://${domain}`;
+  const domain = webDomainOrigin(process.env.WEB_DOMAIN);
+  // A LAN or localhost PUBLIC_WEB_URL loses against a public WEB_DOMAIN.
+  if (explicit && (isPublicOrigin(originOf(explicit)) || !domain)) return explicit;
+  if (domain) return domain;
   return "https://omnifm.xyz";
 }
 

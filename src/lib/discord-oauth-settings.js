@@ -1,17 +1,23 @@
 // ============================================================
 // OmniFM: the Discord login settings of the dashboard
 // ============================================================
-// The redirect URI is made from the website's address, not typed in: it is
-// always <website>/api/auth/discord/callback and has to be entered exactly
-// so in Discord's developer portal. DISCORD_REDIRECT_URI in the environment
-// still wins, for special setups such as local development.
+// The redirect URI is made from the website's public address, not typed in:
+// it is always <website>/api/auth/discord/callback and has to be entered
+// exactly so in Discord's developer portal. Candidates, the first public one
+// wins (public-origin.js): DISCORD_REDIRECT_URI, PUBLIC_WEB_URL, WEB_DOMAIN,
+// the redirect URI once stored in the owner console. Leftovers of the
+// installation such as http://localhost:8081 or http://192.168.x.x:8001
+// therefore no longer end up at Discord; they only count when nothing public
+// is configured (development).
 //
 // Client ID, secret and scopes are edited in the owner console. The Node API
 // (which answers the login since #195) reads them from there every 30
 // seconds, so a new secret works without a restart.
 import { getDb, isConnected } from "./db.js";
+import { isPublicOrigin, originOf, pickPublicOrigin, webDomainOrigin } from "./public-origin.js";
 
 export const DISCORD_OAUTH_CALLBACK_PATH = "/api/auth/discord/callback";
+const DEFAULT_PUBLIC_ORIGIN = "https://omnifm.xyz";
 const SYNC_INTERVAL_MS = 30_000;
 const OWNER_FIELDS = [
   ["clientId", "DISCORD_CLIENT_ID"],
@@ -20,30 +26,23 @@ const OWNER_FIELDS = [
 ];
 
 let syncTimer = null;
+// The redirect URI stored in the owner console before it became automatic.
+let storedRedirectUri = "";
 
-function originOf(value) {
-  try {
-    const url = new URL(String(value || "").trim());
-    return ["http:", "https:"].includes(url.protocol) ? url.origin : "";
-  } catch {
-    return "";
-  }
-}
-
-/** The website's origin: PUBLIC_WEB_URL, else WEB_DOMAIN, else omnifm.xyz. */
-export function publicWebsiteOrigin(env = process.env) {
-  const fromUrl = originOf(env.PUBLIC_WEB_URL);
-  if (fromUrl) return fromUrl;
-  const domain = String(env.WEB_DOMAIN || "").trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
-  if (domain && !/[\s\\]/.test(domain)) return `https://${domain}`;
-  return "https://omnifm.xyz";
+/** The website's public origin: PUBLIC_WEB_URL, WEB_DOMAIN, the stored redirect URI, else omnifm.xyz. */
+export function publicWebsiteOrigin(env = process.env, { stored = storedRedirectUri } = {}) {
+  const picked = pickPublicOrigin([env.PUBLIC_WEB_URL, webDomainOrigin(env.WEB_DOMAIN), stored]);
+  return picked || DEFAULT_PUBLIC_ORIGIN;
 }
 
 /** The redirect URI Discord sends people back to after the login. */
-export function resolveDiscordRedirectUri(env = process.env) {
+export function resolveDiscordRedirectUri(env = process.env, { stored = storedRedirectUri } = {}) {
   const explicit = String(env.DISCORD_REDIRECT_URI || "").trim();
-  if (explicit) return explicit;
-  return `${publicWebsiteOrigin(env)}${DISCORD_OAUTH_CALLBACK_PATH}`;
+  if (explicit && isPublicOrigin(originOf(explicit))) return explicit;
+  const origin = publicWebsiteOrigin(env, { stored });
+  // Development without any public address: an explicit local URI still counts.
+  if (explicit && !isPublicOrigin(origin)) return explicit;
+  return `${origin}${DISCORD_OAUTH_CALLBACK_PATH}`;
 }
 
 /**
@@ -59,6 +58,7 @@ export async function syncDiscordOauthFromOwnerConfig(env = process.env, { db = 
     const value = typeof oauth[field] === "string" ? oauth[field].trim() : "";
     if (value) env[envKey] = value;
   }
+  storedRedirectUri = typeof oauth.redirectUri === "string" ? oauth.redirectUri.trim() : "";
   return true;
 }
 
