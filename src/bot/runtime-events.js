@@ -38,6 +38,7 @@ import {
   buildCustomStationReference,
   parseCustomStationReference,
   validateCustomStationUrl,
+  customStationLogoUrl,
 } from "../custom-stations.js";
 import { getTier, requireFeature } from "../core/entitlements.js";
 import { listScheduledEvents, deleteScheduledEvent, patchScheduledEvent } from "../scheduled-events-store.js";
@@ -188,7 +189,7 @@ export function resolveStationForGuild(runtime, guildId, rawStationKey, language
         const translated = translateCustomStationErrorMessage(validation.error, language);
         return { ok: false, message: t(`Custom-Station kann nicht genutzt werden: ${translated}`, `Custom station cannot be used: ${translated}`) };
       }
-      const station = { name: custom.name, url: validation.url, tier: "ultimate" };
+      const station = { name: custom.name, url: validation.url, tier: "ultimate", logo: customStationLogoUrl(guildId, stationRef.lookupKey, custom) };
       const resolvedKey = buildCustomStationReference(stationRef.lookupKey) || stationRef.key;
       return {
         ok: true,

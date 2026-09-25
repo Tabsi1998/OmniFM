@@ -4,6 +4,8 @@ import { log, logStoreLoadError } from "./lib/logging.js";
 import { validateOutboundUrl, validateOutboundUrlWithDns } from "./lib/safe-outbound-http.js";
 import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 import { getDb, isConnected } from "./lib/db.js";
+import { deleteGuildStationLogos, deleteStationLogo } from "./station-logos-store.js";
+import { resolveWebsiteUrl } from "./bot/runtime-links.js";
 
 const DEFAULT_CUSTOM_FILE = resolveRuntimeDataPath("custom-stations.json");
 const CUSTOM_FILE = path.resolve(process.env.OMNIFM_CUSTOM_STATIONS_FILE || DEFAULT_CUSTOM_FILE);
@@ -262,7 +264,33 @@ function normalizeStoredStation(station, fallbackKey = "") {
     folder: normalizeCustomStationFolder(raw.folder || raw.group || ""),
     tags: normalizeCustomStationTags(raw.tags),
     addedAt: raw.addedAt || null,
+    // Set when a logo is stored (#340); the version in the logo's link.
+    ...(Number(raw.logoUpdatedAt) > 0 ? { logoUpdatedAt: Number(raw.logoUpdatedAt) } : {}),
   };
+}
+
+/** The public link of the station's own logo, or null when it has none. */
+function customStationLogoUrl(guildId, key, station) {
+  const version = Number(station?.logoUpdatedAt) || 0;
+  const gid = normalizeGuildId(guildId);
+  const sKey = sanitizeKey(key);
+  if (!version || !gid || !sKey) return null;
+  const base = String(resolveWebsiteUrl() || "").replace(/\/+$/, "");
+  return `${base}/api/station-logos/${gid}/${sKey}.png?v=${version}`;
+}
+
+/** Records (or with null forgets) that the station has a stored logo. */
+function setGuildStationLogoVersion(guildId, key, updatedAt) {
+  const data = load();
+  const gid = String(guildId);
+  const sKey = sanitizeKey(key);
+  if (!data[gid]?.[sKey]) return false;
+  const station = { ...data[gid][sKey] };
+  if (Number(updatedAt) > 0) station.logoUpdatedAt = Number(updatedAt);
+  else delete station.logoUpdatedAt;
+  data[gid][sKey] = station;
+  save(data);
+  return true;
 }
 
 function buildCustomStationReference(rawKey) {
@@ -363,6 +391,8 @@ async function saveGuildStation(guildId, key, nameOrStation, url, options = {}) 
     folder: stationInput.folder,
     tags: stationInput.tags,
     addedAt: existingStation?.addedAt || new Date().toISOString(),
+    // An edit keeps the logo.
+    ...(Number(existingStation?.logoUpdatedAt) > 0 ? { logoUpdatedAt: Number(existingStation.logoUpdatedAt) } : {}),
   };
   save(data);
   return { success: true, key: sKey, station: data[gid][sKey] };
@@ -384,6 +414,8 @@ function removeGuildStation(guildId, key) {
   delete data[gid][sKey];
   if (Object.keys(data[gid]).length === 0) delete data[gid];
   save(data);
+  // The logo goes with the station.
+  deleteStationLogo(gid, sKey).catch((err) => log("WARN", `[custom-stations] Logo nicht gelöscht (${gid}/${sKey}): ${err?.message || err}`));
   return true;
 }
 
@@ -399,6 +431,7 @@ function clearGuildStations(guildId) {
   const data = load();
   delete data[String(guildId)];
   save(data);
+  deleteGuildStationLogos(String(guildId)).catch((err) => log("WARN", `[custom-stations] Logos nicht gelöscht (${guildId}): ${err?.message || err}`));
 }
 
 // Legacy aliases used by older runtime code.
@@ -418,6 +451,8 @@ export {
   parseCustomStationReference,
   validateCustomStationUrl,
   validateCustomStationUrlWithDns,
+  customStationLogoUrl,
+  setGuildStationLogoVersion,
   getGuildStations, addGuildStation, removeGuildStation,
   updateGuildStation,
   listGuildStations, countGuildStations, clearGuildStations,

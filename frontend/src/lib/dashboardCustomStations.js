@@ -24,6 +24,8 @@ export function normalizeDashboardCustomStation(rawStation) {
     genre: String(station.genre || '').trim(),
     folder: String(station.folder || '').trim(),
     tags: normalizeStationTags(station.tags),
+    // The stored logo (#340); only an https link or one on this website.
+    logoUrl: /^(https:\/\/|\/api\/station-logos\/)/.test(String(station.logoUrl || '')) ? String(station.logoUrl) : null,
   };
 }
 

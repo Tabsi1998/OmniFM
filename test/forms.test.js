@@ -34,12 +34,13 @@ function texts(node, out = []) {
 const allText = (payload) => (payload.components || []).flatMap((component) => texts(component)).join("\n")
   + (payload.embeds || []).map((embed) => JSON.stringify(embed.toJSON ? embed.toJSON() : embed)).join("\n");
 
-/** What a submitted form hands the bot: text values, select values, channels. */
-function formFields({ text = {}, select = {}, channels = {} } = {}) {
+/** What a submitted form hands the bot: text values, select values, channels, files. */
+function formFields({ text = {}, select = {}, channels = {}, files = {} } = {}) {
   return {
     getTextInputValue: (id) => text[id] ?? "",
     getStringSelectValues: (id) => select[id] ?? [],
     getSelectedChannels: (id) => (channels[id] ? { first: () => channels[id] } : null),
+    getUploadedFiles: (id) => (files[id] ? { first: () => files[id] } : null),
   };
 }
 
@@ -83,7 +84,10 @@ function commander() {
 test("the three forms: fields, choices and Discord's limits", () => {
   const station = forms.buildStationFormModal({ t: de, genres: ["Ambient", "Techno"] }).toJSON();
   assert.equal(station.custom_id, forms.STATION_FORM_ID);
-  assert.deepEqual(station.components.map((block) => block.component.custom_id), ["name", "url", "genre", "key"]);
+  assert.deepEqual(station.components.map((block) => block.component.custom_id), ["name", "url", "genre", "key", "logo"]);
+  assert.equal(station.components.length, 5, "Discord allows five fields");
+  assert.equal(station.components[4].component.type, ComponentType.FileUpload);
+  assert.equal(station.components[4].component.required, false);
   assert.deepEqual(station.components[2].component.options.map((option) => option.value), ["Ambient", "Techno", "__other__"]);
 
   const event = forms.buildEventFormModal({ t: de, repeatChoices: buildRepeatChoices(), language: "de" }).toJSON();
@@ -101,7 +105,7 @@ test("the three forms: fields, choices and Discord's limits", () => {
 
 test("reading the station form: key from the name, broken input named", () => {
   assert.deepEqual(forms.readStationForm(formFields({ text: { name: "Mein Vereinsradio!", url: "https://stream.example.com/live" }, select: { genre: ["Ambient"] } })), {
-    ok: true, station: { key: "mein-vereinsradio", name: "Mein Vereinsradio!", url: "https://stream.example.com/live", genre: "Ambient" },
+    ok: true, station: { key: "mein-vereinsradio", name: "Mein Vereinsradio!", url: "https://stream.example.com/live", genre: "Ambient" }, logo: null,
   });
   assert.equal(forms.readStationForm(formFields({ text: { name: "X", url: "https://a.b" } })).error, "name");
   assert.equal(forms.readStationForm(formFields({ text: { name: "Radio", url: "ftp://a.b/x" } })).error, "url");

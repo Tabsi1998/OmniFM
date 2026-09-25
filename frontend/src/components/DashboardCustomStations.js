@@ -159,7 +159,9 @@ function StationRow({ station, onDelete, onEdit, t, testId }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <Radio size={14} color="#5865F2" />
+                {station.logoUrl
+                  ? <img src={station.logoUrl} alt="" width={28} height={28} loading="lazy" data-testid={`custom-station-logo-${station.key}`} style={{ borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />
+                  : <Radio size={14} color="#5865F2" />}
                 <strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{station.name}</strong>
                 {station.genre && <span style={{ fontSize: 11, color: '#52525B', border: '1px solid #1A1A2E', padding: '1px 6px' }}>{station.genre}</span>}
                 {station.folder && <span style={{ fontSize: 11, color: '#C4B5FD', border: '1px solid rgba(139,92,246,0.35)', padding: '1px 6px' }}>{station.folder}</span>}
