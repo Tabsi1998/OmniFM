@@ -5284,32 +5284,30 @@ test("dashboard status and stats stay live when Discord voice state survives a s
   assert.equal(dashboardStatus.guildDetails[0]?.listenerCount, 3);
 });
 
-test("help payload exposes dashboard, website, support and premium links", () => {
+test("help payload exposes quick actions, dashboard, website, support and premium links", () => {
   const fakeRuntime = {
     resolveInteractionLanguage() {
       return "en";
     },
   };
+  const buttonsOf = (payload) => payload.components[0].toJSON().components
+    .filter((component) => component.type === 1)
+    .flatMap((row) => row.components)
+    .filter((component) => component.type === 2);
 
-  const payload = BotRuntime.prototype.buildHelpMessage.call(fakeRuntime, {
+  // The overview of the help panel (#269): quick actions and links.
+  const overview = buttonsOf(BotRuntime.prototype.buildHelpMessage.call(fakeRuntime, {
     guildId: "guild-1",
     guild: { name: "Guild One" },
-  });
+  }));
+  assert.deepEqual(overview.slice(0, 3).map((button) => button.label), ["Quick start", "Stations", "Worker"]);
+  const links = Object.fromEntries(overview.filter((button) => button.url).map((button) => [button.label, button.url]));
+  assert.match(links.Dashboard, /\?page=dashboard&lang=en$/);
+  assert.match(links.Website, /\?lang=en$/);
+  assert.ok(links.Support);
 
-  const actionButtons = payload.components?.[0]?.components?.map((button) => button?.data || {}) || [];
-  assert.equal(actionButtons.length, 3);
-  assert.equal(actionButtons[0].label, "Quick start");
-  assert.equal(actionButtons[1].label, "Stations");
-  assert.equal(actionButtons[2].label, "Workers");
-
-  const linkButtons = payload.components?.[1]?.components?.map((button) => button?.data || {}) || [];
-  assert.equal(linkButtons.length, 4);
-  assert.equal(linkButtons[0].label, "📊 Dashboard");
-  assert.match(String(linkButtons[0].url || ""), /\?page=dashboard&lang=en$/);
-  assert.equal(linkButtons[1].label, "🌐 Website");
-  assert.match(String(linkButtons[1].url || ""), /\?lang=en$/);
-  assert.equal(linkButtons[2].label, "🛟 Support");
-  assert.equal(linkButtons[3].label, "💎 Premium");
+  const premium = buttonsOf(BotRuntime.prototype.buildHelpMessage.call(fakeRuntime, { guildId: "guild-1" }, "premium"));
+  assert.ok(premium.some((button) => button.label === "See Premium" && button.url));
 });
 
 test("setup payload exposes worker actions and useful links", () => {

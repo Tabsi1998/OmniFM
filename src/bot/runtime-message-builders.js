@@ -24,7 +24,8 @@ import {
   withLanguageParam,
 } from "./runtime-links.js";
 import { buildOmniEmbed, buildLinkRow } from "./discord-ui.js";
-import { brandAuthor, brandFooter, brandIconUrl, OMNI_RULE } from "./brand-embed.js";
+import { brandAuthor, brandFooter } from "./brand-embed.js";
+import { buildHelpPayload } from "./help-panel.js";
 
 function getTierConfig(guildId) {
   const config = getServerPlanConfig(guildId);
@@ -129,152 +130,25 @@ export function buildRuntimeSetupMessagePayload(
   return { embeds: [embed], components: linkRow ? [actionRow, linkRow] : [actionRow] };
 }
 
-export function buildRuntimeHelpMessage(runtime, interaction) {
+// /help (#269): one panel with a topic menu; see help-panel.js.
+export function buildRuntimeHelpMessage(runtime, interaction, section = "overview") {
   const language = runtime.resolveInteractionLanguage(interaction);
-  const isDe = language === "de";
-  const dashboardUrl = withLanguageParam(DASHBOARD_URL, language);
-  const websiteUrl = withLanguageParam(WEBSITE_URL, language);
+  const t = (de, en) => (language === "de" ? de : en);
   const guildId = interaction?.guildId;
   const tierConfig = guildId ? getTierConfig(guildId) : PLANS.free;
-
-  const headerEmbed = buildOmniEmbed({
-    tone: "info",
-    author: isDe ? "OmniFM · Hilfe-Center" : "OmniFM · Help Center",
-    description: [
-      isDe ? "## 📡 Willkommen bei OmniFM" : "## 📡 Welcome to OmniFM",
-      isDe
-        ? "-# Dein 24/7-Radio für Discord — der Commander nimmt Befehle entgegen, Worker halten die Streams."
-        : "-# Your 24/7 radio for Discord — the commander takes commands, workers keep the streams alive.",
-      OMNI_RULE,
-    ].join("\n"),
-    fields: [
-      {
-        name: isDe ? "🖥️ Server" : "🖥️ Server",
-        value: clipText(interaction.guild?.name || guildId || "—", 60),
-        inline: true,
-      },
-      { name: "💠 Plan", value: `**${tierConfig.name}**`, inline: true },
-      { name: "🎚️ Audio", value: String(tierConfig.bitrate || "—"), inline: true },
-      { name: "🤖 Worker-Slots", value: String(tierConfig.maxBots || 0), inline: true },
-      {
-        name: isDe ? "🌍 Sprache" : "🌍 Language",
-        value: "`/language set value:de|en`",
-        inline: true,
-      },
-      {
-        name: "📊 Dashboard",
-        value: isDe ? "Web-Dashboard mit SSO" : "Web dashboard with SSO",
-        inline: true,
-      },
-      {
-        name: isDe ? "🚀 Schnellstart" : "🚀 Quick start",
-        value: isDe
-          ? "> **1.** `/play` — geführter Schnellstart mit Buttons\n> **2.** `/stations` — Sender-Browser öffnen\n> **3.** `/invite` — Worker auf den Server holen\n> **4.** `/setup` — Server-Start Schritt für Schritt"
-          : "> **1.** `/play` — guided quick start with buttons\n> **2.** `/stations` — open the station browser\n> **3.** `/invite` — bring workers to your server\n> **4.** `/setup` — server start step by step",
-        inline: false,
-      },
-    ],
-    thumbnail: brandIconUrl(),
-    withFooter: false,
-    timestamp: false,
+  return buildHelpPayload({
+    t,
+    section,
+    plan: { name: tierConfig.name, bitrate: tierConfig.bitrate, maxBots: tierConfig.maxBots },
+    guildName: clipText(interaction?.guild?.name || "", 60),
+    urls: {
+      dashboard: withLanguageParam(DASHBOARD_URL, language),
+      website: withLanguageParam(WEBSITE_URL, language),
+      support: SUPPORT_URL,
+      premium: withLanguageParam(BRAND.upgradeUrl || WEBSITE_URL, language),
+    },
+    applicationId: interaction?.applicationId || runtime.client?.application?.id || null,
   });
-
-  const playbackEmbed = buildOmniEmbed({
-    tone: "live",
-    withAuthor: false,
-    withFooter: false,
-    timestamp: false,
-    description: [
-      isDe ? "### 🎧 Wiedergabe & Live" : "### 🎧 Playback & Live",
-      "`/play` `/pause` `/resume` `/stop`",
-      isDe
-        ? "-# Streams im Voice- oder Stage-Channel starten, pausieren und beenden — komplett per Buttons & Menüs."
-        : "-# Start, pause, and stop streams in voice or stage channels — fully via buttons & menus.",
-      "",
-      "`/stations` `/list` `/now` `/history` `/stats`",
-      isDe
-        ? "-# Sender-Browser, aktueller Song, Song-History und Server-Statistiken."
-        : "-# Station browser, current song, song history, and server statistics.",
-      "",
-      "`/setvolume` `/status` `/health` `/diag`",
-      isDe
-        ? "-# Lautstärke, Worker-Zustand und Technik-Checks für Admins."
-        : "-# Volume, worker health, and technical checks for admins.",
-    ].join("\n"),
-  });
-
-  const automationEmbed = buildOmniEmbed({
-    tone: "info",
-    withAuthor: false,
-    withFooter: false,
-    timestamp: false,
-    description: [
-      isDe ? "### 🗓️ Events & Automationen" : "### 🗓️ Events & Automation",
-      "`/event create` `/event edit` `/event list` `/event delete`",
-      isDe
-        ? "-# Radio-Events mit Voice-/Stage-Channel, Wiederholung, Server-Event und Ankündigung."
-        : "-# Radio events with voice/stage channel, recurrence, server event, and announcement.",
-      "",
-      isDe
-        ? "**Datumsformate:** `DD.MM.YYYY HH:MM` · `YYYY-MM-DD HH:MM` · `20:00` · `heute` · `morgen`"
-        : "**Date formats:** `DD.MM.YYYY HH:MM` · `YYYY-MM-DD HH:MM` · `20:00` · `today` · `tomorrow`",
-      isDe
-        ? "-# Mit `serverevent` muss der Start mindestens 60 Sekunden in der Zukunft liegen."
-        : "-# With `serverevent`, the start must be at least 60 seconds in the future.",
-    ].join("\n"),
-  });
-
-  const adminEmbed = buildOmniEmbed({
-    tone: "admin",
-    withAuthor: false,
-    description: [
-      isDe ? "### 🛠️ Admin & Premium" : "### 🛠️ Admin & Premium",
-      "`/setup` `/invite` `/workers` `/perm`",
-      isDe
-        ? "-# Geführter Start, Worker-Setup, Einladungen und Rollenrechte für Commands."
-        : "-# Guided start, worker setup, invites, and role permissions for commands.",
-      "",
-      "`/premium` `/license`",
-      isDe
-        ? "-# Lizenzstatus, Upgrades und Seat-Verwaltung für deinen Server."
-        : "-# License status, upgrades, and seat management for your server.",
-      "",
-      "`/addstation` `/removestation` `/mystations`",
-      isDe
-        ? "-# Eigene Sender & private Streams (Ultimate)."
-        : "-# Custom stations & private streams (Ultimate).",
-    ].join("\n"),
-    footer: isDe
-      ? "Commander steuert · Worker streamen"
-      : "Commander controls · workers stream",
-  });
-
-  const actionRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(PLAY_COMPONENT_ID_OPEN)
-      .setStyle(ButtonStyle.Primary)
-      .setLabel(isDe ? "Schnellstart" : "Quick start"),
-    new ButtonBuilder()
-      .setCustomId(STATIONS_COMPONENT_ID_OPEN)
-      .setStyle(ButtonStyle.Secondary)
-      .setLabel(isDe ? "Sender" : "Stations"),
-    new ButtonBuilder()
-      .setCustomId(WORKERS_COMPONENT_ID_OPEN)
-      .setStyle(ButtonStyle.Secondary)
-      .setLabel(isDe ? "Worker" : "Workers")
-  );
-
-  const linkRow = buildLinkRow([
-    { label: "📊 Dashboard", url: dashboardUrl },
-    { label: "🌐 Website", url: websiteUrl },
-    { label: "🛟 Support", url: SUPPORT_URL },
-    { label: "💎 Premium", url: BRAND.upgradeUrl || WEBSITE_URL },
-  ]);
-
-  return {
-    embeds: [headerEmbed, playbackEmbed, automationEmbed, adminEmbed],
-    components: linkRow ? [actionRow, linkRow] : [actionRow],
-  };
 }
 
 export async function buildRuntimeWorkersStatusPayload(runtime, interaction, { hint = "", page = 0 } = {}) {
