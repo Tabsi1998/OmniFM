@@ -81,6 +81,7 @@ def build_router(core):
         return {
             "generatedAt": datetime.now(timezone.utc).isoformat(),
             "brand": "OmniFM",
+            "release": core.read_release_info(),
             "licenses": {
                 "total": len(rows),
                 "active": len(active_rows),

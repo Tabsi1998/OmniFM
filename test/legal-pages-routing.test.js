@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import fs from "node:fs/promises";
@@ -13,6 +14,9 @@ import {
   resolvePageFromUrl,
 } from "../frontend/src/lib/pageRouting.js";
 import { upsertOffer } from "../src/coupon-store.js";
+
+// The version comes from package.json, so a release does not break the tests.
+const PACKAGE_VERSION = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -353,7 +357,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.equal(adminOverview.bots.length, 1);
     assert.equal(adminOverview.bots[0].guilds, 1);
     assert.ok(adminOverview.stations.total > 0);
-    assert.equal(adminOverview.release?.appVersion, "3.0.0");
+    assert.equal(adminOverview.release?.appVersion, PACKAGE_VERSION);
     assert.equal(adminOverview.release?.commit, "abcdef123456");
     assert.equal(adminOverview.release?.branch, "main");
     assert.equal(adminOverview.release?.lastDeployStatus, "success");
@@ -368,7 +372,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.equal(adminDiagnostics.runtime.bots.online, 1);
     assert.equal(adminDiagnostics.infrastructure.adminToken.configured, true);
     assert.equal(typeof adminDiagnostics.infrastructure.mongo.configured, "boolean");
-    assert.equal(adminDiagnostics.release?.appVersion, "3.0.0");
+    assert.equal(adminDiagnostics.release?.appVersion, PACKAGE_VERSION);
     assert.ok(adminDiagnostics.stations.total > 0);
     assert.ok(Array.isArray(adminDiagnostics.alerts));
 

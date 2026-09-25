@@ -1,7 +1,11 @@
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import test from "node:test";
 
 import { buildReleaseInfo, normalizeStatus } from "../src/lib/release-info.js";
+
+// The version comes from package.json, so a release does not break the tests.
+const PACKAGE_VERSION = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 
 function setEnv(overrides) {
   const previous = new Map();
@@ -36,7 +40,7 @@ test("release info prefers explicit deployment metadata", () => {
       webRootSource: "frontend/build",
     });
 
-    assert.equal(info.appVersion, "3.0.0");
+    assert.equal(info.appVersion, PACKAGE_VERSION);
     assert.equal(info.commit, "abcdef123456");
     assert.equal(info.commitFull, "abcdef1234567890");
     assert.equal(info.branch, "main");

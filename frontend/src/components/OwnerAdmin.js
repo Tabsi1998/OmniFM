@@ -595,7 +595,14 @@ export default function OwnerAdmin() {
         <div className="oa-topbar">
           <div>
             <h1 className="oa-h1 oa-display" data-testid="admin-section-title">{NAV.find((n) => n.id === section)?.label}</h1>
-            <div className="oa-sub">Zentrale Steuerung der OmniFM Broadcast-Plattform</div>
+            <div className="oa-sub">
+              Zentrale Steuerung der OmniFM Broadcast-Plattform
+              {ov?.release?.version && (
+                <span data-testid="admin-release" style={{ marginLeft: 8, color: '#64748b' }}>
+                  · Version {ov.release.version}{ov.release.commit && ov.release.commit !== 'unknown' ? ` (${ov.release.commit})` : ''}
+                </span>
+              )}
+            </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span className="oa-onair" data-testid="admin-live-badge" style={ov?.guilds?.live ? {} : { opacity: 0.75 }}>

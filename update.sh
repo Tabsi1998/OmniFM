@@ -187,6 +187,44 @@ show_bots() {
   ( cd "$ROOT" && DRY_RUN=1 node src/entrypoints/from-owner-config.mjs ) || true
 }
 
+# Every update appends "<time> <from> <to>" (#261); --rollback reads it.
+UPDATE_HISTORY="$ROOT/.update-backups/update-history.log"
+
+# Back to the code that ran before the last update of the running version
+# (#261). Rolled back again, it goes one more update back. MongoDB and
+# runtime-data stay as they are; the backups taken before that update are
+# named so they can be restored deliberately.
+rollback_update() {
+  local confirm="${1:-}" current line at from to answer
+  [ -d "$ROOT/.git" ] || die "Kein Git-Repository - ein Rollback ist nicht moeglich."
+  current="$(git -C "$ROOT" rev-parse HEAD)"
+  line="$(awk -v cur="$current" '$3 == cur && $4 != "rollback" { found = $0 } END { print found }' "$UPDATE_HISTORY" 2>/dev/null || true)"
+  [ -n "$line" ] || die "Fuer den laufenden Stand ${current:0:7} steht kein Update in $UPDATE_HISTORY. Ein Rollback geht nur auf einen Stand, den ./update.sh ersetzt hat."
+  read -r at from to _ <<<"$line"
+  [ "$from" != "$to" ] || die "Das letzte Update hat den Code nicht geaendert; es gibt nichts zurueckzurollen."
+  git -C "$ROOT" cat-file -e "${from}^{commit}" 2>/dev/null || die "Der vorige Stand ${from:0:7} ist im Repository nicht mehr vorhanden."
+  git -C "$ROOT" diff --quiet HEAD -- || die "Lokale Git-Aenderungen vorhanden. Erst sichern, dann zurueckrollen."
+
+  echo "== Rollback =="
+  echo "Jetzt:   $(git -C "$ROOT" log -1 --format='%h %s' "$to" | head -c 100)"
+  echo "Zurueck: $(git -C "$ROOT" log -1 --format='%h %s' "$from" | head -c 100)"
+  echo "Update vom $at. MongoDB und runtime-data bleiben unveraendert."
+  echo "Backups von kurz vor diesem Update, falls auch die Daten zurueck sollen:"
+  find "$ROOT/.update-backups/mongodb" "$ROOT/.update-backups/runtime-data" -maxdepth 1 -type f -name '*.gz' \
+    ! -newermt "$at" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 2 | cut -d' ' -f2- | sed 's/^/  /' || true
+  echo "  Einspielen nur bewusst: ./stop.sh, dann bash scripts/backup-mongodb.sh restore <archiv> --force"
+  if [ "$confirm" != "--yes" ]; then
+    read -r -p "Code wirklich auf ${from:0:7} zuruecksetzen und neu starten? [j/N] " answer || answer=""
+    case "$answer" in j|J|ja|Ja|y|Y) ;; *) die "Abgebrochen, nichts veraendert." ;; esac
+  fi
+
+  git -C "$ROOT" reset --hard "$from" >/dev/null
+  printf '%s %s %s rollback\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$to" "$from" >> "$UPDATE_HISTORY"
+  log "Code zurueckgesetzt auf $(git -C "$ROOT" log -1 --format='%h %s' | head -c 100). Starte neu..."
+  ./start.sh
+  log "Rollback abgeschlossen. Das naechste ./update.sh holt wieder den neuesten Stand - erst updaten, wenn der Fehler behoben ist."
+}
+
 cleanup_logs() {
   local mode="${1:-dry-run}" days="${OMNIFM_CLEANUP_LOG_DAYS:-14}" found=0 file
   case "$mode" in dry-run|run) ;; *) die "Unbekannter Cleanup-Modus: $mode (dry-run, run)" ;; esac
@@ -204,7 +242,7 @@ cleanup_logs() {
   du -sh "$ROOT/.update-backups" 2>/dev/null || echo "  (keine Backups vorhanden)"
 }
 
-USAGE="Nutzung: ./update.sh | --doctor | --status [quick|health|local-logs|mongo|storage|backup] | --show-bots | --cleanup [dry-run|run]"
+USAGE="Nutzung: ./update.sh | --doctor | --status [quick|health|local-logs|mongo|storage|backup] | --show-bots | --cleanup [dry-run|run] | --rollback [--yes]"
 case "${1:-}" in
   --doctor)
     [ "$#" -eq 1 ] || die "--doctor akzeptiert keine weiteren Argumente."
@@ -221,6 +259,10 @@ case "${1:-}" in
     ;;
   --cleanup)
     cleanup_logs "${2:-dry-run}"
+    exit 0
+    ;;
+  --rollback)
+    rollback_update "${2:-}"
     exit 0
     ;;
   "")
@@ -281,6 +323,7 @@ if [ -d .git ]; then
     die "Andere lokale Git-Änderungen erkannt. Dienste bleiben unverändert; Änderungen zuerst committen oder sichern."
   fi
 
+  PRE_PULL_REV="$(git rev-parse HEAD)"
   log "Hole neuesten Stand (git pull)..."
   git pull --ff-only || die "git pull fehlgeschlagen. Dienste und Konfiguration wurden nicht verändert."
   log "Code-Stand: $(git log -1 --pretty='%h — %s' 2>/dev/null | head -c 120 || echo 'unbekannt')"
@@ -290,6 +333,10 @@ fi
 
 log "Bereite Update vor und starte Frontend, FastAPI und Discord-Runtime gemeinsam neu..."
 ./start.sh
+if [ -n "${PRE_PULL_REV:-}" ]; then
+  mkdir -p "$(dirname "$UPDATE_HISTORY")"
+  printf '%s %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$PRE_PULL_REV" "$(git rev-parse HEAD)" >> "$UPDATE_HISTORY"
+fi
 
 bot_running() {
   if has_systemd && systemctl list-unit-files omnifm-bot.service 2>/dev/null | grep -q '^omnifm-bot.service'; then

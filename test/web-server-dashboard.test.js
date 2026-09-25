@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
@@ -26,6 +27,9 @@ import {
 import { createScheduledEvent } from "../src/scheduled-events-store.js";
 import { recordRuntimeIncident } from "../src/runtime-incidents-store.js";
 import { setDashboardWebhookFetchForTests } from "../src/lib/dashboard-webhooks.js";
+
+// The version comes from package.json, so a release does not break the tests.
+const PACKAGE_VERSION = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -2330,7 +2334,7 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
   });
   assert.equal(authorizedHealth.status, 200);
   assert.equal(authorizedHealth.payload.discord.readyBots, 1);
-  assert.equal(authorizedHealth.payload.release.appVersion, "3.0.0");
+  assert.equal(authorizedHealth.payload.release.appVersion, PACKAGE_VERSION);
   assert.match(authorizedHealth.payload.release.releaseGate.postDeploy, /release-gate\.mjs --post-deploy/);
   assert.equal(authorizedHealth.payload.stores.commandPermissions.filePresent, true);
   assert.equal(typeof authorizedHealth.payload.binaries.ffmpeg.available, "boolean");
