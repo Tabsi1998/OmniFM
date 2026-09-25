@@ -924,6 +924,8 @@ const nowPlayingMethods = {
       };
       state.currentMeta = nextMeta;
       this.recordSongHistory(guildId, state, station, nextMeta);
+      // #277: a template with {title}, {artist} or {listeners} follows the song.
+      this.syncVoiceChannelStatus?.(guildId, state.currentStationName || station.name || stationKey).catch(() => null);
 
       const signature = buildNowPlayingSignature(stationKey, nextMeta, state, channel.id);
 

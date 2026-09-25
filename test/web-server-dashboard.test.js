@@ -1512,6 +1512,35 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
   assert.equal(settingsAcceptLanguageResponse.status, 200);
   assert.equal(settingsAcceptLanguageResponse.payload.weeklyDigest.language, "en");
 
+  // #277: the voice channel status template
+  assert.equal(settingsAcceptLanguageResponse.payload.voiceStatus.template, "");
+  assert.ok(settingsAcceptLanguageResponse.payload.voiceStatus.defaultTemplate.includes("{station}"));
+  assert.ok(settingsAcceptLanguageResponse.payload.voiceStatus.placeholders.includes("title"));
+  const voiceStatusPut = (template) => requestJson(
+    baseUrl,
+    `/api/dashboard/settings?serverId=${GUILD_ID}`,
+    {
+      method: "PUT",
+      headers: { ...authHeaders, "X-OmniFM-Language": "en", "Content-Type": "application/json" },
+      body: JSON.stringify({ voiceStatus: { template } }),
+    }
+  );
+  const unknownPlaceholder = await voiceStatusPut("{station} {mood}");
+  assert.equal(unknownPlaceholder.status, 400);
+  assert.match(unknownPlaceholder.payload.error, /\{mood\}/);
+  if (mongoAvailable && getDb()) {
+    const savedVoiceStatus = await voiceStatusPut("  {emoji} {station} | {title}  ");
+    assert.equal(savedVoiceStatus.status, 200);
+    assert.equal(savedVoiceStatus.payload.voiceStatus.template, "{emoji} {station} | {title}");
+    const storedVoiceStatus = await getDb().collection("guild_settings").findOne({ guildId: GUILD_ID });
+    assert.equal(storedVoiceStatus.voiceStatusTemplate, "{emoji} {station} | {title}");
+    const resetVoiceStatus = await voiceStatusPut("");
+    assert.equal(resetVoiceStatus.status, 200);
+    assert.equal(resetVoiceStatus.payload.voiceStatus.template, "");
+    const clearedVoiceStatus = await getDb().collection("guild_settings").findOne({ guildId: GUILD_ID });
+    assert.equal(Object.prototype.hasOwnProperty.call(clearedVoiceStatus, "voiceStatusTemplate"), false);
+  }
+
   const invalidDigestSettings = await requestJson(
     baseUrl,
     `/api/dashboard/settings?serverId=${GUILD_ID}`,

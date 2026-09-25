@@ -84,7 +84,6 @@
     "scripts/phase6-live-check.mjs::no-unused-vars::1",
     "src/api/routes/admin-routes.js::no-useless-assignment::1",
     "src/api/routes/admin-routes.js::no-useless-escape::1",
-    "src/api/routes/dashboard-settings.js::no-unused-vars::1",
     "src/api/routes/dashboard-stats.js::no-await-in-loop::1",
     "src/api/routes/dashboard-stats.js::no-useless-assignment::1",
     "src/api/server.js::no-await-in-loop::1",

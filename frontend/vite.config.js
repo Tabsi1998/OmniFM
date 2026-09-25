@@ -1,4 +1,5 @@
-import { defineConfig, transformWithOxc } from 'vite';
+import { fileURLToPath } from 'node:url';
+import { defineConfig, searchForWorkspaceRoot, transformWithOxc } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const jsxInJs = {
@@ -32,6 +33,14 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 3000,
     strictPort: true,
+    fs: {
+      // The voice status preview uses the bot's own renderer (#277); only
+      // that one file outside frontend/ is served.
+      allow: [
+        searchForWorkspaceRoot(process.cwd()),
+        fileURLToPath(new URL('../src/lib/voice-status-template.js', import.meta.url)),
+      ],
+    },
   },
   preview: {
     host: '0.0.0.0',

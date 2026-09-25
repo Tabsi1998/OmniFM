@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Calendar, Shield, Save, Plus, ArrowUp, ArrowDown, X } from 'lucide-react';
+import { Calendar, Shield, Save, Plus, ArrowUp, ArrowDown, X, Radio } from 'lucide-react';
 import { DASHBOARD_CAPABILITY_DEFAULTS } from '../lib/dashboardCapabilities.js';
 import {
   FAILOVER_CHAIN_LIMIT,
@@ -31,6 +31,17 @@ import {
   normalizeDashboardVoiceGuardConfig,
 } from '../lib/dashboardVoiceGuard.js';
 import DashboardOnboardingHint from './DashboardOnboardingHint.js';
+// The same renderer the bot uses, so the preview is exactly the status (#277).
+import { renderVoiceStatusTemplate } from '../../../src/lib/voice-status-template.js';
+
+const VOICE_STATUS_SAMPLE = {
+  station: 'Groove Salad',
+  title: 'Cafe del Mar',
+  artist: 'Energy 52',
+  listeners: 5,
+  genre: 'Ambient',
+  bot: 'OmniFM',
+};
 
 const DAYS = [
   { value: 0, de: 'Sonntag', en: 'Sunday' },
@@ -167,6 +178,7 @@ export default function DashboardSettings({
       if (capabilities.exportsWebhooks === true && settings?.incidentAlerts) body.incidentAlerts = settings.incidentAlerts;
       if (capabilities.exportsWebhooks === true && settings?.exportsWebhook) body.exportsWebhook = settings.exportsWebhook;
       if (capabilities.voiceGuard === true && settings?.voiceGuard) body.voiceGuard = settings.voiceGuard;
+      if (settings?.voiceStatus) body.voiceStatus = { template: settings.voiceStatus.template || '' };
       const result = await apiRequest(`/api/dashboard/settings?serverId=${encodeURIComponent(selectedGuildId)}`, {
         method: 'PUT',
         body: JSON.stringify(body),
@@ -195,6 +207,19 @@ export default function DashboardSettings({
   const webhookSecretInput = Object.prototype.hasOwnProperty.call(exportsWebhook, 'secret')
     ? exportsWebhook.secret
     : '';
+  const voiceStatus = settings?.voiceStatus || null;
+  const voiceStatusTemplate = voiceStatus?.template || '';
+  const voiceStatusRenderOptions = { fallbackTemplate: voiceStatus?.defaultTemplate || '' };
+  const voiceStatusPreview = renderVoiceStatusTemplate(voiceStatusTemplate, VOICE_STATUS_SAMPLE, voiceStatusRenderOptions);
+  const voiceStatusPreviewNoSong = renderVoiceStatusTemplate(
+    voiceStatusTemplate,
+    { ...VOICE_STATUS_SAMPLE, title: '', artist: '', listeners: 0 },
+    voiceStatusRenderOptions
+  );
+  const updateVoiceStatusTemplate = (template) => setSettings((current) => ({
+    ...(current || {}),
+    voiceStatus: { ...(current?.voiceStatus || {}), template },
+  }));
   const voiceGuard = normalizeDashboardVoiceGuardConfig(settings?.voiceGuard);
   const voiceGuardSummary = buildDashboardVoiceGuardSummary(voiceGuard, t);
   const canManageWeeklyDigest = capabilities.weeklyDigest === true;
@@ -871,6 +896,62 @@ export default function DashboardSettings({
         </>
         )}
       </div>
+
+      {voiceStatus && (
+      <div data-testid="settings-voice-status" style={{ background: '#0A0A0A', border: '1px solid #1A1A2E', padding: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <Radio size={18} color="#FF6B00" />
+          <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20 }}>{t('Sprachkanal-Status', 'Voice channel status')}</h3>
+        </div>
+        <p style={{ color: '#52525B', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
+          {t(
+            'Der Text, den OmniFM oben im Sprachkanal anzeigt. Platzhalter werden live ersetzt; fehlt ein Wert (etwa zwischen zwei Songs), verschwindet er samt Trennzeichen. Teile in [eckigen Klammern] erscheinen nur, wenn alle Platzhalter darin einen Wert haben. Leer lassen = Standard.',
+            'The text OmniFM shows at the top of the voice channel. Placeholders are filled live; a missing value (between two songs, say) disappears together with its separator. Parts in [square brackets] only show when every placeholder in them has a value. Leave empty for the default.'
+          )}
+        </p>
+        <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Vorlage', 'Template')}</label>
+        <input
+          data-testid="voice-status-template-input"
+          value={voiceStatusTemplate}
+          maxLength={voiceStatus.maxLength || 120}
+          onChange={(e) => updateVoiceStatusTemplate(e.target.value)}
+          placeholder={voiceStatus.defaultTemplate}
+          style={{ width: '100%', height: 40, padding: '0 10px', border: '1px solid #1A1A2E', background: '#050505', color: '#fff', boxSizing: 'border-box', fontSize: 13 }}
+        />
+        <div data-testid="voice-status-placeholders" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '8px 0 14px' }}>
+          {(voiceStatus.placeholders || []).map((name) => (
+            <button
+              key={name}
+              type="button"
+              onClick={() => updateVoiceStatusTemplate(`${voiceStatusTemplate}${voiceStatusTemplate && !voiceStatusTemplate.endsWith(' ') ? ' ' : ''}{${name}}`)}
+              style={{ height: 28, padding: '0 10px', border: '1px solid rgba(255,107,0,0.3)', background: 'rgba(255,107,0,0.08)', color: '#FDBA74', cursor: 'pointer', fontSize: 12, fontFamily: 'monospace' }}
+            >
+              {`{${name}}`}
+            </button>
+          ))}
+          {voiceStatusTemplate && (
+            <button
+              type="button"
+              data-testid="voice-status-reset"
+              onClick={() => updateVoiceStatusTemplate('')}
+              style={{ height: 28, padding: '0 10px', border: '1px solid #1A1A2E', background: 'transparent', color: '#A1A1AA', cursor: 'pointer', fontSize: 12 }}
+            >
+              {t('Standard verwenden', 'Use the default')}
+            </button>
+          )}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+          <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
+            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>{t('Vorschau mit Song', 'Preview with a song')}</div>
+            <div data-testid="voice-status-preview" style={{ marginTop: 6, fontSize: 14, color: '#fff', wordBreak: 'break-word' }}>{voiceStatusPreview}</div>
+          </div>
+          <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
+            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>{t('Zwischen zwei Songs', 'Between two songs')}</div>
+            <div data-testid="voice-status-preview-no-song" style={{ marginTop: 6, fontSize: 14, color: '#D4D4D8', wordBreak: 'break-word' }}>{voiceStatusPreviewNoSong}</div>
+          </div>
+        </div>
+      </div>
+      )}
 
       <div data-testid="settings-exports-webhooks" style={{ background: '#0A0A0A', border: '1px solid #1A1A2E', padding: 16, opacity: canManageExports ? 1 : 0.5 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
