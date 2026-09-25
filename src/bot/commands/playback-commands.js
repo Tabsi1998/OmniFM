@@ -728,7 +728,7 @@ async function handleStatusCommand({ runtime, interaction, t, language }) {
         ui.field(t("Wiedergabe", "Playback"), userStatus.playback),
       ].join("\n\n")),
       ui.separator({ divider: false }),
-      ui.text(`${ui.icon("info")} ${userStatus.nextStep}`),
+      ui.text(`${ui.icon("info", interaction.applicationId)} ${userStatus.nextStep}`),
     ],
     actions: [
       buildQuickActionRow(t, {

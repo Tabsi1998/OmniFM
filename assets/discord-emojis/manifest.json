@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "prefix": "omnifm",
+  "emojis": [
+    {
+      "name": "dashboard",
+      "file": "dashboard.png"
+    },
+    {
+      "name": "equalizer",
+      "file": "equalizer.gif",
+      "animated": true
+    },
+    {
+      "name": "error",
+      "file": "error.png"
+    },
+    {
+      "name": "help",
+      "file": "help.png"
+    },
+    {
+      "name": "history",
+      "file": "history.png"
+    },
+    {
+      "name": "info",
+      "file": "info.png"
+    },
+    {
+      "name": "link",
+      "file": "link.png"
+    },
+    {
+      "name": "listeners",
+      "file": "listeners.png"
+    },
+    {
+      "name": "live",
+      "file": "live.png"
+    },
+    {
+      "name": "next",
+      "file": "next.png"
+    },
+    {
+      "name": "pause",
+      "file": "pause.png"
+    },
+    {
+      "name": "play",
+      "file": "play.png"
+    },
+    {
+      "name": "premium",
+      "file": "premium.png"
+    },
+    {
+      "name": "quality",
+      "file": "quality.png"
+    },
+    {
+      "name": "radio",
+      "file": "radio.png"
+    },
+    {
+      "name": "save",
+      "file": "save.png"
+    },
+    {
+      "name": "settings",
+      "file": "settings.png"
+    },
+    {
+      "name": "stop",
+      "file": "stop.png"
+    },
+    {
+      "name": "success",
+      "file": "success.png"
+    },
+    {
+      "name": "warning",
+      "file": "warning.png"
+    }
+  ]
+}

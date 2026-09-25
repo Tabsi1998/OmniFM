@@ -108,6 +108,7 @@ import { statusMethods } from "./runtime-methods/status.js";
 import { voiceMethods } from "./runtime-methods/voice.js";
 import { onboardingMethods } from "./runtime-methods/onboarding.js";
 import { recordPlaybackPhase } from "./playback-phase.js";
+import { syncAppEmojisSafely } from "../discord/ui/app-emojis.js";
 
 class BotRuntime {
   constructor(config, { role = "worker", workerManager = null } = {}) {
@@ -153,6 +154,9 @@ class BotRuntime {
       }
       this.updatePresence();
       this.startPresenceRotation();
+      // The OmniFM icons as this application's own emojis (#265); until they
+      // are there, messages use the Unicode fallback.
+      void syncAppEmojisSafely(this.client, this.config.name);
       if (this.role === "commander") {
         this.enforcePremiumGuildScope("startup").catch((err) => {
           log("ERROR", `[${this.config.name}] Premium-Guild-Scope Pruefung fehlgeschlagen: ${err?.message || err}`);
