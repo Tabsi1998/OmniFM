@@ -9,6 +9,8 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUN_DIR="$ROOT/run"
+# A second installation such as staging stops only its own units (#262).
+. "$ROOT/scripts/instance-env.sh"
 
 log() { printf "\033[1;36m[OmniFM]\033[0m %s\n" "$*"; }
 
@@ -61,7 +63,8 @@ kill_orphaned_omnifm_processes() {
       esac
     elif [ "$cwd" = "$frontend_real" ]; then
       case "$command" in
-        *node_modules/.bin/serve*-s*build*|*serve/build/main.js*-s*build*) service="React-Frontend" ;;
+        # serve runs with --config ../serve.json since #311, earlier with -s.
+        *node_modules/.bin/serve*build*|*serve/build/main.js*build*) service="React-Frontend" ;;
       esac
     fi
     [ -n "$service" ] || continue
@@ -92,7 +95,7 @@ stop_systemd_units() {
   [ -d /run/systemd/system ] || return 0
   local sudo_cmd="" unit
   [ "$(id -u)" -eq 0 ] || sudo_cmd="sudo"
-  for unit in omnifm-bot omnifm-frontend omnifm-backend; do
+  for unit in "$UNIT_PREFIX-bot" "$UNIT_PREFIX-frontend" "$UNIT_PREFIX-backend"; do
     if systemctl list-unit-files "$unit.service" 2>/dev/null | grep -q "^$unit.service"; then
       log "Stoppe $unit (systemd)..."
       $sudo_cmd systemctl stop "$unit" 2>/dev/null || true

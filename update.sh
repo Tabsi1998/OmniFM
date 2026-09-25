@@ -8,6 +8,12 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
+# Ports and unit names of a second installation such as staging (#262).
+if [ -f "$ROOT/scripts/instance-env.sh" ]; then
+  . "$ROOT/scripts/instance-env.sh"
+else
+  OMNIFM_INSTANCE="" UNIT_PREFIX="omnifm"
+fi
 
 # LAST_STEP names the step an aborted update stopped in; the operator alert
 # (#316) carries it.
@@ -78,7 +84,7 @@ for name in sorted(client.list_database_names()):
 service_lines() {
   if has_systemd; then
     local unit
-    for unit in omnifm-backend omnifm-frontend omnifm-bot; do
+    for unit in "$UNIT_PREFIX-backend" "$UNIT_PREFIX-frontend" "$UNIT_PREFIX-bot"; do
       printf '%-17s %s\n' "$unit" "$(systemctl is-active "$unit" 2>/dev/null || echo unbekannt)"
     done
   else
@@ -363,8 +369,8 @@ if [ -n "${PRE_PULL_REV:-}" ]; then
 fi
 
 bot_running() {
-  if has_systemd && systemctl list-unit-files omnifm-bot.service 2>/dev/null | grep -q '^omnifm-bot.service'; then
-    systemctl is-active --quiet omnifm-bot
+  if has_systemd && systemctl list-unit-files "$UNIT_PREFIX-bot.service" 2>/dev/null | grep -q "^$UNIT_PREFIX-bot.service"; then
+    systemctl is-active --quiet "$UNIT_PREFIX-bot"
     return $?
   fi
   [ -f "$ROOT/run/bot.pid" ] && kill -0 "$(cat "$ROOT/run/bot.pid" 2>/dev/null)" 2>/dev/null

@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -73,19 +75,64 @@ test("backend and bot wait for MongoDB, the bot never restart-loops on a missing
   assert.match(directive(frontend, "ExecStart") || "", /serve build --config \.\.\/serve\.json -l tcp:\/\/0\.0\.0\.0:__FRONTEND_PORT__/);
 });
 
-test("start.sh renders the templates and stop.sh stops the units", () => {
+function bash() {
+  if (process.platform === "win32") return process.env.OMNIFM_TEST_BASH || "C:\\Program Files\\Git\\bin\\bash.exe";
+  return process.env.OMNIFM_TEST_BASH || "bash";
+}
+
+// The real render script, as start.sh calls it (#262).
+function renderWithScript(file, prefix) {
+  return execFileSync(bash(), [path.join(repoRoot, "scripts", "render-systemd-unit.sh"), path.join(unitDir, file)], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      UNIT_PREFIX: prefix,
+      ROOT: "/opt/omnifm",
+      RUN_USER: "omnifm",
+      BACKEND_PORT: "8001",
+      FRONTEND_PORT: "3000",
+      NODE_BIN: "/usr/bin/node",
+      NODE_DIR: "/usr/bin",
+    },
+  });
+}
+
+test("start.sh renders every template through the render script, stop.sh stops the units", () => {
+  for (const file of [...UNITS.map((name) => `${name}.service`), "omnifm-backup.service", "omnifm-backup.timer"]) {
+    assert.doesNotMatch(withoutComments(renderWithScript(file, "omnifm")), /__[A-Z_]+__/, `${file}: every placeholder filled`);
+  }
+  assert.match(renderWithScript("omnifm-bot.service", "omnifm"), /^After=.*omnifm-backend\.service/m);
+
   const startSh = fs.readFileSync(path.join(repoRoot, "start.sh"), "utf8");
   const stopSh = fs.readFileSync(path.join(repoRoot, "stop.sh"), "utf8");
-  for (const name of UNITS) {
-    assert.ok(startSh.includes(name), `start.sh knows ${name}`);
-    assert.ok(stopSh.includes(name), `stop.sh stops ${name}`);
-  }
-  assert.ok(startSh.includes("deploy/systemd"), "start.sh reads the templates from deploy/systemd");
-  for (const placeholder of Object.keys(PLACEHOLDERS)) {
-    assert.ok(startSh.includes(placeholder), `start.sh substitutes ${placeholder}`);
-  }
+  assert.match(startSh, /for part in backend frontend bot; do\s+render_unit_file "omnifm-\$part\.service"/);
+  assert.match(startSh, /scripts\/render-systemd-unit\.sh/);
+  assert.match(stopSh, /for unit in "\$UNIT_PREFIX-bot" "\$UNIT_PREFIX-frontend" "\$UNIT_PREFIX-backend"/);
   assert.ok(startSh.includes("MONGO_WAIT_SECONDS"), "start.sh waits for MongoDB before the preflight");
   assert.doesNotMatch(startSh, /Type=oneshot/, "the oneshot stack unit is gone");
+});
+
+test("a staging instance gets its own unit names everywhere, production keeps its own (#262)", () => {
+  const bot = renderWithScript("omnifm-bot.service", "omnifm-staging");
+  assert.match(bot, /^After=.*omnifm-staging-backend\.service/m);
+  assert.doesNotMatch(bot, /omnifm-backend\.service/, "staging never waits for the production backend");
+  assert.equal(directive(renderWithScript("omnifm-backup.timer", "omnifm-staging"), "Unit"), "omnifm-staging-backup.service");
+
+  for (const script of ["start.sh", "stop.sh", "update.sh"]) {
+    assert.match(fs.readFileSync(path.join(repoRoot, script), "utf8"), /\. "\$ROOT\/scripts\/instance-env\.sh"/, `${script} loads instance.env`);
+  }
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "omnifm-instance-"));
+  try {
+    const prefixOf = () => execFileSync(bash(), ["-c", `ROOT="$1"; . "$2"; printf '%s' "$UNIT_PREFIX"`, "_", root,
+      path.join(repoRoot, "scripts", "instance-env.sh")], { encoding: "utf8" });
+    assert.equal(prefixOf(), "omnifm", "production has no instance.env");
+    fs.writeFileSync(path.join(root, "instance.env"), "OMNIFM_INSTANCE=staging\n");
+    assert.equal(prefixOf(), "omnifm-staging");
+    fs.writeFileSync(path.join(root, "instance.env"), "OMNIFM_INSTANCE=../../etc\n");
+    assert.throws(prefixOf, "an instance name can never leave the unit name");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("the nightly backup timer runs the backup script and catches up missed nights (#259)", () => {
