@@ -285,17 +285,17 @@ export async function checkStations({ report = [] }) {
     down.map((entry) => `${entry.name || entry.key}: ${entry.error || "keine Antwort"}`).join("\n"));
 }
 
-/** What the cockpit shows, in order, with the one place to fix it. */
+/** What the cockpit shows, in order, with the one page to fix it (frontend/src/lib/ownerNavigation.js). */
 export const OWNER_STATUS_CHECKS = Object.freeze([
-  { key: "bots", label: "Bots", area: "discord" },
-  { key: "discordLogin", label: "Discord-Login", area: "system" },
-  { key: "website", label: "Website", area: "system" },
+  { key: "bots", label: "Bots", area: "monitoring" },
+  { key: "discordLogin", label: "Discord-Login", area: "cfg-login" },
+  { key: "website", label: "Website", area: "cfg-login" },
   { key: "mongo", label: "Datenbank", area: null },
   { key: "stripe", label: "Zahlungen (Stripe)", area: "payments" },
-  { key: "smtp", label: "E-Mail (SMTP)", area: "system" },
-  { key: "recognition", label: "Song-Erkennung", area: "system" },
-  { key: "operatorWebhook", label: "Alarm-Kanal", area: "system" },
-  { key: "botLists", label: "Bot-Listen", area: "marketing" },
+  { key: "smtp", label: "E-Mail (SMTP)", area: "cfg-email" },
+  { key: "recognition", label: "Song-Erkennung", area: "cfg-recognition" },
+  { key: "operatorWebhook", label: "Alarm-Kanal", area: "cfg-alerts" },
+  { key: "botLists", label: "Bot-Listen", area: "cfg-directories" },
   { key: "stations", label: "Sender", area: "stations" },
   { key: "version", label: "Version", area: null },
 ]);

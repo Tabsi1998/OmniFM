@@ -8,7 +8,7 @@ import { cockpitHeadline, historyCells, sortCockpitChecks, stateMeta } from '../
 function StateBadge({ state }) {
   const meta = stateMeta(state);
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: '#e2e8f0', whiteSpace: 'nowrap' }}>
       <span aria-hidden="true" style={{ width: 18, height: 18, borderRadius: 9, background: meta.color, color: '#0b1120', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>{meta.icon}</span>
       {meta.label}
     </span>
@@ -32,7 +32,7 @@ function CheckTile({ check, busy, onCheck, onOpen }) {
   const meta = stateMeta(check.state);
   return (
     <div data-testid={`cockpit-${check.key}`} style={{ background: '#0f172a', border: '1px solid #1e293b', borderLeft: `4px solid ${meta.color}`, borderRadius: 8, padding: '12px 14px', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', rowGap: 4 }}>
         <div style={{ color: '#f8fafc', fontWeight: 700, fontSize: 14 }}>{check.label}</div>
         <StateBadge state={check.state} />
       </div>
