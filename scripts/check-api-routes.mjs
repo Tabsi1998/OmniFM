@@ -73,6 +73,18 @@ function existsInFastapi(apiPath, routes) {
   return routes.some((entry) => entry.regex.test(concrete));
 }
 
+// #287: every FastAPI route the Node API does not have yet, the gap list of M10.
+if (process.argv.includes("--node-gaps")) {
+  const source = nodeRouteSource();
+  const gaps = [...new Set(fastapiRoutes().map((entry) => entry.route))]
+    .filter((route) => route.startsWith("/api/"))
+    .filter((route) => !existsInNode(route.replace(/\{[^}]+\}.*$/, "").replace(/\/+$/, ""), source))
+    .sort();
+  console.log(`${gaps.length} FastAPI routes the Node API does not have yet:`);
+  for (const route of gaps) console.log(`  ${route}`);
+  process.exit(0);
+}
+
 const list = process.argv.includes("--list");
 const nodeSource = nodeRouteSource();
 const routes = fastapiRoutes();
