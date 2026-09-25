@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { ActivityType, ChannelType } from "discord.js";
+import { ActivityType, ChannelType, MessageFlags } from "discord.js";
 
 import {
   calculatePrice,
@@ -5428,7 +5428,7 @@ test("play wizard payload exposes modern quick-start controls", async () => {
   assert.equal(Boolean(actionRow), true);
 });
 
-test("stations browser payload exposes paging and quick-start actions", async () => {
+test("stations browser payload exposes genres, paging, search and play buttons", async () => {
   const fakeRuntime = Object.create(BotRuntime.prototype);
   fakeRuntime.interactiveUiSessions = new Map();
   fakeRuntime.client = {
@@ -5457,11 +5457,17 @@ test("stations browser payload exposes paging and quick-start actions", async ()
     user: { id: "user-1" },
   });
 
-  assert.equal(payload.embeds?.[0]?.data?.title, "📻 Station browser");
-  assert.equal(payload.components?.[0]?.components?.[0]?.data?.custom_id.startsWith("omnifm:stations:station:"), true);
-  const actionLabels = payload.components?.[1]?.components?.map((component) => component?.data?.label) || [];
-  assert.ok(actionLabels.includes("🎛 Quick start"));
-  assert.ok(actionLabels.includes("🔄 Refresh"));
+  // Components V2 since #268: one container with sections and action rows.
+  assert.equal(payload.flags & MessageFlags.IsComponentsV2, MessageFlags.IsComponentsV2);
+  const box = payload.components[0].toJSON();
+  assert.match(box.components[0].content, /^## .*Stations/);
+  const rowComponents = box.components.filter((component) => component.type === 1).flatMap((row) => row.components);
+  assert.ok(rowComponents.some((component) => String(component.custom_id || "").startsWith("omnifm:stations:genre:")));
+  const labels = rowComponents.map((component) => component.label).filter(Boolean);
+  assert.ok(labels.includes("Search"));
+  assert.ok(labels.includes("Close"));
+  const playButtons = box.components.filter((component) => component.type === 9).map((section) => section.accessory);
+  assert.ok(playButtons.some((button) => String(button.custom_id || "").startsWith("omnifm:stations:pick:")));
 });
 
 test("executeRuntimePlay does not block explicit remote workers on a synthetic channel precheck", async () => {

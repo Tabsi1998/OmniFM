@@ -36,11 +36,17 @@ import {
   WEBSITE_URL,
 } from "./runtime-links.js";
 import { buildOmniEmbed, buildLinkRow } from "./discord-ui.js";
+import * as ui from "../discord/ui/index.js";
+import {
+  buildBrowserEntries,
+  buildStationBrowserPayload,
+  buildStationSearchModal,
+  parsePickTarget,
+} from "./station-browser.js";
 
 const PANEL_TTL_MS = 15 * 60_000;
 const PLAY_STATION_OPTION_LIMIT = 25;
 const CHANNEL_OPTION_LIMIT = 25;
-const STATIONS_PAGE_SIZE = 8;
 
 function getTierConfig(guildId) {
   const config = getServerPlanConfig(guildId);
@@ -352,112 +358,40 @@ export function buildRuntimePlayWizardPayload(runtime, interaction, session, { h
   };
 }
 
+// The station browser (#268): Components V2, genre filter, play buttons,
+// locked stations with a link to Premium; see station-browser.js.
 export function buildRuntimeStationsBrowserPayload(runtime, interaction, session, { hint = "" } = {}) {
   const { t, language } = runtime.createInteractionTranslator(interaction);
   const guildId = String(interaction?.guildId || session?.guildId || "").trim();
-  const { entries } = buildStationCatalog(guildId);
-  const resolvedPage = Math.max(0, Number.parseInt(String(session?.data?.page ?? 0), 10) || 0);
-  const totalPages = Math.max(1, Math.ceil(entries.length / STATIONS_PAGE_SIZE));
-  const page = Math.min(resolvedPage, totalPages - 1);
-  const pageEntries = entries.slice(page * STATIONS_PAGE_SIZE, (page + 1) * STATIONS_PAGE_SIZE);
-  const selectedStationKey = String(session?.data?.stationKey || "").trim() || null;
-  const selectedEntry = entries.find((entry) => entry.key === selectedStationKey) || null;
-  const tierConfig = getTierConfig(guildId);
-
-  const overview = pageEntries.map((entry, index) => {
-    const marker = entry.key === selectedStationKey ? "▶" : `${page * STATIONS_PAGE_SIZE + index + 1}.`;
-    return `${marker} **${entry.name}**\n\`${entry.key}\` • ${formatStationTierBadge(entry, language)}`;
-  }).join("\n\n") || "-";
-
-  const embed = buildOmniEmbed({
-    tone: "info",
-    title: t("📻 Sender-Browser", "📻 Station browser"),
-    description: t(
-      `Alle für deinen Server sichtbaren Sender in einer kompakten Auswahl. Wähle einen Sender und öffne danach den Schnellstart.`,
-      `All stations visible for your server in one compact browser. Pick a station and then open quick start.`
-    ),
-    fields: [
-      {
-        name: t("Aktuelle Seite", "Current page"),
-        value: overview,
-        inline: false,
-      },
-      {
-        name: t("Ausgewählt", "Selected"),
-        value: selectedEntry
-          ? `**${selectedEntry.name}**\n\`${selectedEntry.key}\``
-          : t("Noch nichts ausgewählt", "Nothing selected yet"),
-        inline: true,
-      },
-      {
-        name: t("Server", "Server"),
-        value: `${clipText(interaction?.guild?.name || guildId, 120)}\n${t("Plan", "Plan")}: **${tierConfig.name}**`,
-        inline: true,
-      },
-    ],
-    footer: t(`Seite ${page + 1}/${totalPages}`, `Page ${page + 1}/${totalPages}`),
-  });
-
-  if (hint) {
-    embed.addFields({
-      name: t("Hinweis", "Hint"),
-      value: clipText(hint, 500),
-      inline: false,
-    });
+  const guildTier = getTier(guildId);
+  const customStations = [];
+  if (guildTier === "ultimate") {
+    for (const [customKey, customStation] of Object.entries(getGuildStations(guildId))) {
+      if (!validateCustomStationUrl(customStation?.url).ok) continue;
+      customStations.push({
+        key: buildCustomStationReference(customKey),
+        name: customStation?.name || customKey,
+        genre: customStation?.genre || "Radio",
+        color: customStation?.color || null,
+        tier: "ultimate",
+      });
+    }
   }
+  return buildStationBrowserPayload({
+    t,
+    prefix: STATIONS_COMPONENT_PREFIX,
+    session,
+    entries: buildBrowserEntries({ stations: loadStations().stations, guildTier, customStations }),
+    planName: getTierConfig(guildId).name,
+    premiumUrl: withLanguageParam(BRAND.upgradeUrl || WEBSITE_URL, language),
+    applicationId: interaction?.applicationId || runtime.client?.application?.id || null,
+    hint,
+  });
+}
 
-  const stationPageOptions = pageEntries.map((entry) => ({
-    label: clipText(entry.name, 90),
-    value: entry.key,
-    description: clipText(`${formatStationTierBadge(entry, language)} | ${entry.key}`, 90),
-    default: entry.key === selectedStationKey,
-  }));
-
-  const stationSelect = new StringSelectMenuBuilder()
-    .setCustomId(`${STATIONS_COMPONENT_PREFIX}station:${session.id}`)
-    .setPlaceholder(t("📻 Sender auswählen", "📻 Select a station"))
-    .addOptions(stationPageOptions.length ? stationPageOptions : [{
-      label: t("Keine Sender verfügbar", "No stations available"),
-      value: "__none__",
-      description: t("Zurzeit ist keine Auswahl möglich", "No selection is available right now"),
-      default: true,
-    }])
-    .setDisabled(!stationPageOptions.length);
-
-  const components = [
-    new ActionRowBuilder().addComponents(stationSelect),
-    new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`${STATIONS_COMPONENT_PREFIX}page-prev:${session.id}`)
-        .setStyle(ButtonStyle.Secondary)
-        .setLabel(t("⬅ Zurück", "⬅ Back"))
-        .setDisabled(page <= 0),
-      new ButtonBuilder()
-        .setCustomId(`${STATIONS_COMPONENT_PREFIX}page-next:${session.id}`)
-        .setStyle(ButtonStyle.Secondary)
-        .setLabel(t("Weiter ➡", "Next ➡"))
-        .setDisabled(page >= (totalPages - 1)),
-      new ButtonBuilder()
-        .setCustomId(`${STATIONS_COMPONENT_PREFIX}play:${session.id}`)
-        .setStyle(ButtonStyle.Primary)
-        .setLabel(t("🎛 Schnellstart", "🎛 Quick start"))
-        .setDisabled(!selectedEntry),
-      new ButtonBuilder()
-        .setCustomId(`${STATIONS_COMPONENT_PREFIX}refresh:${session.id}`)
-        .setStyle(ButtonStyle.Secondary)
-        .setLabel(t("🔄 Aktualisieren", "🔄 Refresh")),
-      new ButtonBuilder()
-        .setCustomId(`${STATIONS_COMPONENT_PREFIX}close:${session.id}`)
-        .setStyle(ButtonStyle.Secondary)
-        .setLabel(t("✖ Schließen", "✖ Close"))
-    ),
-  ];
-
-  return {
-    embeds: [embed],
-    components,
-    flags: MessageFlags.Ephemeral,
-  };
+// Answer on a Components V2 message: it cannot become an embed again.
+function buildBrowserNotice(t, kind, title, body) {
+  return ui.reply(ui.notice(kind, { title, body }));
 }
 
 export async function openRuntimePlayWizard(runtime, interaction, {
@@ -492,6 +426,8 @@ export async function openRuntimeStationsBrowser(runtime, interaction, {
     data: {
       stationKey: stationKey || null,
       page: Math.max(0, Number.parseInt(String(page || 0), 10) || 0),
+      genre: null,
+      query: "",
     },
   });
   return buildRuntimeStationsBrowserPayload(runtime, interaction, session, { hint });
@@ -946,9 +882,10 @@ export async function handleRuntimePanelInteraction(runtime, interaction) {
     return true;
   }
   if (customId === STATIONS_COMPONENT_ID_OPEN) {
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    // Built from memory in milliseconds: answered directly, so the Components
+    // V2 browser is the reply itself (#268).
     const payload = await openRuntimeStationsBrowser(runtime, interaction);
-    await respondWithPayload(runtime, interaction, payload);
+    await interaction.reply(payload);
     return true;
   }
 
@@ -1045,61 +982,93 @@ export async function handleRuntimePanelInteraction(runtime, interaction) {
 
   const stationsAction = parsePanelCustomId(customId, STATIONS_COMPONENT_PREFIX);
   if (stationsAction?.action) {
-    const session = runtime.getInteractiveUiSession(stationsAction.sessionId, {
+    const pick = stationsAction.action === "pick" ? parsePickTarget(stationsAction.sessionId) : null;
+    const sessionId = pick ? pick.sessionId : stationsAction.sessionId;
+    const session = runtime.getInteractiveUiSession(sessionId, {
       type: "stations",
       guildId: interaction.guildId,
       userId: interaction.user?.id,
     });
+    const onV2Message = ui.isComponentsV2Message(interaction.message);
     if (!session) {
-      const payload = buildPanelClosedPayload(
-        runtime.resolveInteractionLanguage(interaction),
-        t("Sitzung abgelaufen", "Session expired"),
-        t("Dieser Sender-Browser ist nicht mehr gültig. Öffne ihn bitte erneut.", "This station browser is no longer valid. Please open it again.")
-      );
-      await respondWithPayload(runtime, interaction, payload, { update: true });
+      const title = t("Sitzung abgelaufen", "Session expired");
+      const body = t("Dieser Sender-Browser ist nicht mehr gültig. Öffne ihn mit `/stations` neu.", "This station browser is no longer valid. Open it again with `/stations`.");
+      if (onV2Message && typeof interaction.update === "function") {
+        await interaction.update(buildBrowserNotice(t, "info", title, body));
+      } else {
+        await respondWithPayload(runtime, interaction, buildPanelClosedPayload(runtime.resolveInteractionLanguage(interaction), title, body), { update: true });
+      }
       return true;
     }
 
-    if (stationsAction.action === "station" && interaction.isStringSelectMenu?.()) {
-      runtime.updateInteractiveUiSession(session.id, {
-        data: { stationKey: interaction.values?.[0] === "__none__" ? null : (interaction.values?.[0] || null) },
-      });
-      const nextSession = runtime.getInteractiveUiSession(session.id);
-      await interaction.update(buildRuntimeStationsBrowserPayload(runtime, interaction, nextSession));
+    const rerender = async (patch = null) => {
+      if (patch) runtime.updateInteractiveUiSession(session.id, { data: patch });
+      await interaction.update(buildRuntimeStationsBrowserPayload(runtime, interaction, runtime.getInteractiveUiSession(session.id)));
+    };
+
+    if (stationsAction.action === "genre" && interaction.isStringSelectMenu?.()) {
+      const value = interaction.values?.[0] || "__all__";
+      await rerender({ genre: value === "__all__" ? null : value, page: 0 });
       return true;
     }
-
     if (stationsAction.action === "page-prev" || stationsAction.action === "page-next") {
       const delta = stationsAction.action === "page-prev" ? -1 : 1;
-      runtime.updateInteractiveUiSession(session.id, {
-        data: { page: Math.max(0, Number.parseInt(String(session.data?.page ?? 0), 10) + delta) },
-      });
-      const nextSession = runtime.getInteractiveUiSession(session.id);
-      await interaction.update(buildRuntimeStationsBrowserPayload(runtime, interaction, nextSession));
+      await rerender({ page: Math.max(0, (Number.parseInt(String(session.data?.page ?? 0), 10) || 0) + delta) });
       return true;
     }
-
+    if (stationsAction.action === "reset") {
+      await rerender({ genre: null, query: "", page: 0 });
+      return true;
+    }
     if (stationsAction.action === "refresh") {
-      await interaction.update(buildRuntimeStationsBrowserPayload(runtime, interaction, session));
+      await rerender();
       return true;
     }
-
-    if (stationsAction.action === "play") {
+    if (stationsAction.action === "search") {
+      await interaction.showModal(buildStationSearchModal({
+        t,
+        prefix: STATIONS_COMPONENT_PREFIX,
+        sessionId: session.id,
+        query: session.data?.query || "",
+      }));
+      return true;
+    }
+    if (stationsAction.action === "searchform" && interaction.isModalSubmit?.()) {
+      const query = String(interaction.fields?.getTextInputValue?.("query") || "").trim().slice(0, 60);
+      await rerender({ query, page: 0 });
+      return true;
+    }
+    if (stationsAction.action === "pick") {
+      const stationKey = pick?.stationKey;
+      const memberChannelId = interaction.member?.voice?.channelId || null;
+      if (!stationKey) {
+        await interaction.reply(buildBrowserNotice(t, "error", t("Sender nicht gefunden", "Station not found"), t("Öffne den Browser neu.", "Open the browser again.")));
+        return true;
+      }
+      if (memberChannelId) {
+        // In a voice channel: play right there, like /play does.
+        await executeRuntimePlay(runtime, interaction, {
+          station: stationKey,
+          requestedVoiceChannelId: memberChannelId,
+          openWizardWhenIncomplete: true,
+        });
+        return true;
+      }
+      // Not in a voice channel: the quick start with the station chosen, as
+      // its own private message.
       const payload = await openRuntimePlayWizard(runtime, interaction, {
-        stationKey: session.data.stationKey || null,
-        hint: t("Sender übernommen. Jetzt noch Channel prüfen und starten.", "Station copied over. Now confirm the channel and start."),
+        stationKey,
+        hint: t("Geh in einen Sprachkanal oder wähle unten einen aus.", "Join a voice channel or choose one below."),
       });
-      await interaction.update(payload);
+      await interaction.reply(payload);
       return true;
     }
-
     if (stationsAction.action === "close") {
       runtime.deleteInteractiveUiSession(session.id);
-      await interaction.update(buildPanelClosedPayload(
-        runtime.resolveInteractionLanguage(interaction),
-        t("Sender-Browser geschlossen", "Station browser closed"),
-        t("Nutze `/stations` oder `/play`, um ihn erneut zu öffnen.", "Use `/stations` or `/play` to open it again.")
-      ));
+      const title = t("Sender-Browser geschlossen", "Station browser closed");
+      const body = t("Mit `/stations` öffnest du ihn wieder.", "Use `/stations` to open it again.");
+      if (onV2Message) await interaction.update(buildBrowserNotice(t, "info", title, body));
+      else await interaction.update(buildPanelClosedPayload(runtime.resolveInteractionLanguage(interaction), title, body));
       return true;
     }
   }

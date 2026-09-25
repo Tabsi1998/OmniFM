@@ -206,7 +206,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
     return;
   }
 
-  if (interaction.isButton?.() || interaction.isStringSelectMenu?.()) {
+  if (interaction.isButton?.() || interaction.isStringSelectMenu?.() || interaction.isModalSubmit?.()) {
     const handled = await runtime.handleComponentInteraction(interaction);
     if (handled) return;
   }
