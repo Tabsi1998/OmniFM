@@ -264,3 +264,7 @@ export {
   isAllowedOperatorWebhookUrl,
   postOperatorWebhook,
 };
+
+// Generic operator alerts beyond the fixed events above (#260), see
+// src/services/operator-alerts.js.
+export { notify as notifyOperator, COLORS as OPERATOR_COLORS };

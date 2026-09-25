@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Save, Plus, Trash2, CheckCircle2, XCircle, Bot, CreditCard, Building2,
-  Tag, Terminal, ShieldCheck, Info, Star, Heart, Settings2, Mail, Music2, History, Fingerprint, Globe2,
+  Tag, Terminal, ShieldCheck, Info, Star, Heart, Settings2, Mail, Music2, History, Fingerprint, Globe2, BellRing,
 } from 'lucide-react';
 
 const labelStyle = {
@@ -87,6 +87,7 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
   const [systemTest, setSystemTest] = useState(null);
+  const [alertTest, setAlertTest] = useState(null);
   const [loadError, setLoadError] = useState('');
 
   const load = useCallback(async () => {
@@ -136,6 +137,7 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
     const stationHealth = system.stationHealth || {};
     const streamRecovery = system.streamRecovery || {};
     const directories = system.botDirectories || {};
+    const alerts = system.operatorAlerts || {};
     const setGroup = (group, key, value) => setSystem((p) => ({ ...p, [group]: { ...(p[group] || {}), [key]: value } }));
     const setDirectory = (directory, key, value) => setSystem((p) => ({
       ...p,
@@ -192,6 +194,47 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
             <Toggle label="Song-Verlauf aktivieren" checked={history.enabled !== false} onChange={(v) => setGroup('songHistory', 'enabled', v)} testid="cfg-history-enabled" />
             <Field label="Max. Einträge pro Server" value={history.maxPerGuild} onChange={(v) => setGroup('songHistory', 'maxPerGuild', Math.max(10, parseInt(v, 10) || 100))} type="number" testid="cfg-history-max" />
           </div>
+        </div>
+
+        <div className="oa-card" style={{ marginBottom: 18 }} data-testid="cfg-operator-alerts">
+          <div className="oa-section-title"><BellRing size={15} /> Betreiber-Alarme (Discord)</div>
+          <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 14 }}>
+            OmniFM meldet Probleme per Webhook in einen Discord-Kanal, den nur du siehst: Abstürze, Worker ohne Lebenszeichen, erschöpfte Failover-Ketten, Wiedergabe im Kreis, Autoheal-Neustarts, wenig Speicherplatz und fehlgeschlagene Backups. Änderungen gelten nach dem nächsten Bot-Neustart.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 18px' }}>
+            <Field label="Webhook-URL" value={secretValue(alerts, 'webhookUrl')} onChange={(v) => setGroup('operatorAlerts', 'webhookUrl', v)} type="password" placeholder="https://discord.com/api/webhooks/…" hint={secretHint(alerts, 'webhookUrl')} testid="cfg-alerts-webhook" />
+            <Field label="Erwähnung (optional)" value={alerts.mention} onChange={(v) => setGroup('operatorAlerts', 'mention', v)} placeholder="<@123456789012345678>" hint="Wen der Alarm anpingen soll." testid="cfg-alerts-mention" />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 18px' }}>
+            <Toggle label="Worker ohne Lebenszeichen" checked={alerts.workerOffline !== false} onChange={(v) => setGroup('operatorAlerts', 'workerOffline', v)} testid="cfg-alerts-worker-offline" />
+            <Toggle label="Failover-Kette erschöpft" checked={alerts.failoverExhausted !== false} onChange={(v) => setGroup('operatorAlerts', 'failoverExhausted', v)} testid="cfg-alerts-failover" />
+            <Toggle label="Wiedergabe dreht sich im Kreis" checked={alerts.playbackLoops !== false} onChange={(v) => setGroup('operatorAlerts', 'playbackLoops', v)} testid="cfg-alerts-loops" />
+            <Toggle label="Autoheal-Neustart eines Workers" checked={alerts.workerAutoheal !== false} onChange={(v) => setGroup('operatorAlerts', 'workerAutoheal', v)} testid="cfg-alerts-autoheal" />
+            <Toggle label="Wenig Speicherplatz" checked={alerts.diskSpace !== false} onChange={(v) => setGroup('operatorAlerts', 'diskSpace', v)} testid="cfg-alerts-disk" />
+          </div>
+          <button
+            className="oa-btn ghost"
+            style={{ marginTop: 8 }}
+            disabled={alertTest?.loading}
+            data-testid="cfg-alerts-test"
+            onClick={async () => {
+              setAlertTest({ loading: true });
+              try {
+                const result = await apiSend('/api/admin/integrations/test', 'POST', { integration: 'operatoralerts' });
+                setAlertTest(result?.results?.operatorAlerts || { ok: false, message: 'Keine Antwort.' });
+              } catch (error) {
+                setAlertTest({ ok: false, message: error.message });
+              }
+            }}
+          >
+            <BellRing size={16} /> {alertTest?.loading ? 'Sendet…' : 'Testalarm senden'}
+          </button>
+          {alertTest && !alertTest.loading && (
+            <div style={{ marginTop: 10, fontSize: 13, color: alertTest.ok ? '#86efac' : '#ff8fab' }} data-testid="cfg-alerts-test-result">
+              {alertTest.message}
+            </div>
+          )}
+          <div style={{ fontSize: 12, color: '#64748b', marginTop: 8 }}>Der Testalarm nutzt die gespeicherte URL: erst speichern, dann testen.</div>
         </div>
 
         <div className="oa-card" style={{ marginBottom: 18 }} data-testid="cfg-station-health">

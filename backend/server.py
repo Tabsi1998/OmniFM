@@ -193,7 +193,7 @@ except Exception:
 # ------------------------------------------------------------------
 OWNER_CONFIG_ID = "global"
 SECRET_MASK = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
-SECRET_CONFIG_FIELDS = {"token", "secretKey", "webhookSecret", "secret", "clientSecret", "password", "apiKey"}
+SECRET_CONFIG_FIELDS = {"token", "secretKey", "webhookSecret", "secret", "clientSecret", "password", "apiKey", "webhookUrl"}
 
 DEFAULT_OWNER_CONFIG = {
     "company": {
@@ -238,6 +238,13 @@ DEFAULT_OWNER_CONFIG = {
     "system": {
         "discordOAuth": {"clientId": "", "clientSecret": "", "redirectUri": "", "scopes": "identify guilds"},
         "smtp": {"enabled": False, "host": "", "port": 587, "secure": False, "user": "", "password": "", "from": ""},
+        # Discord webhook for operator alerts (#260). The URL carries a token,
+        # so it is a secret like a password.
+        "operatorAlerts": {
+            "webhookUrl": "", "mention": "",
+            "workerOffline": True, "failoverExhausted": True, "playbackLoops": True,
+            "workerAutoheal": True, "diskSpace": True,
+        },
         "audioRecognition": {"enabled": False, "apiKey": ""},
         "songHistory": {"enabled": True, "maxPerGuild": 100},
         "stationHealth": {"enabled": True, "intervalMs": 5000, "batchSize": 2, "concurrency": 2, "timeoutMs": 8000},

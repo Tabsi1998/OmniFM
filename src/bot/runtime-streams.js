@@ -34,6 +34,7 @@ import {
   handleRuntimeStationUnavailable,
 } from "./runtime-failback.js";
 import { recordPlaybackPhase } from "./playback-phase.js";
+import { alertFailoverExhausted } from "../services/operator-alerts.js";
 // Moved to runtime-failback.js (#210); re-exported for existing importers.
 export {
   shouldHandleRuntimeIdleEvent,
@@ -1121,6 +1122,12 @@ async function restartRuntimeCurrentStationAttempt(runtime, state, guildId) {
         recoverableRestartError,
         streamErrorCount: errorCount,
         lastStreamErrorAt: previousLastStreamErrorAt,
+      }).catch(() => null);
+      void alertFailoverExhausted({
+        stationKey: resolvedStation.key,
+        stationName: resolvedStation.station.name || resolvedStation.key,
+        guildName: runtime.client?.guilds?.cache?.get(guildId)?.name || guildId,
+        runtimeName: runtime.config.name,
       }).catch(() => null);
     }
 

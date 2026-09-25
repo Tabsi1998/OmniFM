@@ -269,6 +269,10 @@ def effective_system_config():
             "secure": ("SMTP_SECURE", core.config_bool), "user": ("SMTP_USER", str),
             "password": ("SMTP_PASS", str), "from": ("SMTP_FROM", str),
         },
+        "operatorAlerts": {
+            "webhookUrl": ("OPERATOR_WEBHOOK_URL", str),
+            "mention": ("OPERATOR_WEBHOOK_MENTION", str),
+        },
         "audioRecognition": {
             "enabled": ("NOW_PLAYING_RECOGNITION_ENABLED", core.config_bool),
             "apiKey": ("ACOUSTID_API_KEY", str),

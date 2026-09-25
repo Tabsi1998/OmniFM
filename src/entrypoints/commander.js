@@ -48,6 +48,7 @@ import {
 import { TIERS } from "../lib/helpers.js";
 import { getGuildDailyStats } from "../listening-stats-store.js";
 import { log, logError } from "../lib/logging.js";
+import { startOperatorAlertWatchers } from "../services/operator-alerts.js";
 import {
   parseExpiryReminderDays,
   initializeSharedServices,
@@ -173,6 +174,11 @@ const stopRuntimeHealthReporter = startRuntimeHealthReporter(runtimes, {
   intervalMs: Number.parseInt(String(process.env.RUNTIME_HEALTH_INTERVAL_MS || "5000"), 10),
   resourceModel: "split-processes",
 });
+// Worker without heartbeat and low disk space reach the operator (#260).
+const stopOperatorAlerts = startOperatorAlertWatchers({
+  workers: workerManager.workers,
+  dataDir: process.env.OMNIFM_RUNTIME_DATA_DIR || process.cwd(),
+});
 
 installProcessHandlers({
   localRuntimes,
@@ -182,6 +188,7 @@ installProcessHandlers({
       workerManager.stopRemotePolling();
     },
     async () => {
+      stopOperatorAlerts();
       stopRuntimeHealthReporter();
       stopStationHealthService();
       await Promise.all([

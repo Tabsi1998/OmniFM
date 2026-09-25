@@ -16,6 +16,23 @@ import requests
 import smtplib
 import ssl
 import time
+from urllib.parse import urlparse
+
+
+DISCORD_WEBHOOK_HOSTS = {"discord.com", "discordapp.com", "canary.discord.com", "ptb.discord.com"}
+
+
+def is_discord_webhook_url(url):
+    """The same rule as isAllowedOperatorWebhookUrl in src/services/operator-webhook.js."""
+    try:
+        parsed = urlparse(str(url or "").strip())
+    except ValueError:
+        return False
+    return (
+        parsed.scheme == "https"
+        and (parsed.hostname or "").lower() in DISCORD_WEBHOOK_HOSTS
+        and re.match(r"^/api/webhooks/[^/]+/[^/]+", parsed.path or "") is not None
+    )
 
 
 def build_router(core):
@@ -220,10 +237,38 @@ def build_router(core):
         if guard is not None:
             return guard
         requested = str((body or {}).get("integration") or "all").strip().lower()
-        supported = {"mongo", "stripe", "discordoauth", "smtp", "recognition", "songhistory", "discordbotlist", "botsgg", "topgg"}
+        supported = {"mongo", "stripe", "discordoauth", "smtp", "recognition", "songhistory", "discordbotlist", "botsgg", "topgg", "operatoralerts"}
         names = supported if requested == "all" else {requested}
         if not names.issubset(supported):
             return core.json_error(400, "Unbekannte Integration.")
+
+        def check_operator_alerts(send):
+            # "Alle prüfen" only checks the setting; the dedicated button sends
+            # a real test alert into the Discord channel (#260).
+            url = str(core.system_setting("operatorAlerts", "webhookUrl", "OPERATOR_WEBHOOK_URL") or "").strip()
+            if not url:
+                return {"ok": False, "message": "Keine Webhook-URL für Betreiber-Alarme gesetzt."}
+            if not is_discord_webhook_url(url):
+                return {"ok": False, "message": "Die URL ist kein Discord-Webhook (https://discord.com/api/webhooks/…)."}
+            if not send:
+                return {"ok": True, "message": "Webhook-URL ist gesetzt."}
+            mention = str(core.system_setting("operatorAlerts", "mention", "OPERATOR_WEBHOOK_MENTION") or "").strip()
+            payload = {
+                "username": "OmniFM Operator",
+                "content": mention or None,
+                "embeds": [{
+                    "title": "🧪 Testalarm",
+                    "description": "So sehen Betreiber-Alarme von OmniFM aus. Die Einrichtung stimmt.",
+                    "color": 0x00F0FF,
+                }],
+            }
+            try:
+                response = requests.post(url, json=payload, timeout=10, allow_redirects=False)
+            except Exception as exc:
+                return {"ok": False, "message": core.clip_text(exc, 160)}
+            if response.status_code < 300:
+                return {"ok": True, "message": "Testalarm gesendet, schau in den Discord-Kanal."}
+            return {"ok": False, "message": f"Discord antwortet mit HTTP {response.status_code}."}
 
         def check_all():
             results = {}
@@ -284,6 +329,8 @@ def build_router(core):
             if "songhistory" in names:
                 enabled = core.config_bool(core.system_setting("songHistory", "enabled", "SONG_HISTORY_ENABLED", True), True)
                 results["songHistory"] = {"ok": enabled and core.db is not None, "message": "Song-Verlauf und MongoDB sind aktiv." if enabled and core.db is not None else "Song-Verlauf ist deaktiviert oder MongoDB fehlt."}
+            if "operatoralerts" in names:
+                results["operatorAlerts"] = check_operator_alerts(send=requested == "operatoralerts")
             directory_specs = {
                 "discordbotlist": ("discordBotList", "DISCORDBOTLIST_TOKEN", "DISCORDBOTLIST_BOT_ID", "Discord Bot List"),
                 "botsgg": ("botsGG", "BOTSGG_TOKEN", "BOTSGG_BOT_ID", "Bots.gg"),
