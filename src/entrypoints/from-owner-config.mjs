@@ -124,18 +124,10 @@ async function main() {
   setRuntimeEnv("SMTP_USER", smtp.user);
   setRuntimeEnv("SMTP_PASS", smtp.password);
   setRuntimeEnv("SMTP_FROM", smtp.from);
-  // Operator alerts (#260): webhook, mention and one switch per alert kind.
-  setRuntimeEnv("OPERATOR_WEBHOOK_URL", operatorAlerts.webhookUrl);
-  setRuntimeEnv("OPERATOR_WEBHOOK_MENTION", operatorAlerts.mention);
-  for (const [field, kind] of [
-    ["workerOffline", "WORKER_OFFLINE"],
-    ["failoverExhausted", "FAILOVER_EXHAUSTED"],
-    ["playbackLoops", "PLAYBACK_LOOPS"],
-    ["workerAutoheal", "WORKER_AUTOHEAL"],
-    ["diskSpace", "DISK_SPACE"],
-  ]) {
-    if (Object.hasOwn(operatorAlerts, field)) setRuntimeEnv(`OPERATOR_ALERT_${kind}`, operatorAlerts[field] === false ? "0" : "1");
-  }
+  // Operator alerts (#260): webhook, mention and one switch per alert kind,
+  // the same mapping scripts/notify-operator.mjs uses (#316).
+  const { applyOperatorAlertSettingsToEnv } = await import("../services/operator-alert-settings.js");
+  applyOperatorAlertSettingsToEnv(operatorAlerts, process.env);
   setRuntimeEnv("NOW_PLAYING_RECOGNITION_ENABLED", recognition.enabled ? "1" : "0");
   setRuntimeEnv("ACOUSTID_API_KEY", recognition.apiKey);
   setRuntimeEnv("SONG_HISTORY_ENABLED", history.enabled === false ? "0" : "1");

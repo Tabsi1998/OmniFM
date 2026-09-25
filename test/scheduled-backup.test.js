@@ -37,7 +37,7 @@ async function sandbox(t, { mongoFails = false } = {}) {
   const traceJs = JSON.stringify(trace);
   await fs.writeFile(path.join(scripts, "verify-mongo-backup.mjs"),
     `import fs from "node:fs"; fs.appendFileSync(${traceJs}, "restore-check\\n");\n`);
-  await fs.writeFile(path.join(scripts, "notify-backup-failed.mjs"),
+  await fs.writeFile(path.join(scripts, "notify-operator.mjs"),
     `import fs from "node:fs"; fs.appendFileSync(${traceJs}, "alert " + process.argv.slice(2).join("|") + "\\n");\n`);
   return { root, trace };
 }
@@ -67,7 +67,7 @@ test("a failed step does not stop the others and ends in one alert and exit 1", 
   const result = await run(root, { OMNIFM_RESTORE_CHECK_DAYS: "0" });
   assert.equal(result.code, 1);
   const lines = (await fs.readFile(trace, "utf8")).trim().split("\n");
-  assert.deepEqual(lines, ["runtime", "mongodb", "alert MongoDB sichern"]);
+  assert.deepEqual(lines, ["runtime", "mongodb", "alert backup-failed|MongoDB sichern"]);
 });
 
 test("the restore check waits for its interval after a good check, and repeats a failed one", async (t) => {

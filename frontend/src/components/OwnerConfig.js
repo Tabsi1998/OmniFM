@@ -211,6 +211,8 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
             <Toggle label="Wiedergabe dreht sich im Kreis" checked={alerts.playbackLoops !== false} onChange={(v) => setGroup('operatorAlerts', 'playbackLoops', v)} testid="cfg-alerts-loops" />
             <Toggle label="Autoheal-Neustart eines Workers" checked={alerts.workerAutoheal !== false} onChange={(v) => setGroup('operatorAlerts', 'workerAutoheal', v)} testid="cfg-alerts-autoheal" />
             <Toggle label="Wenig Speicherplatz" checked={alerts.diskSpace !== false} onChange={(v) => setGroup('operatorAlerts', 'diskSpace', v)} testid="cfg-alerts-disk" />
+            <Toggle label="Nächtliches Backup fehlgeschlagen" checked={alerts.backupFailed !== false} onChange={(v) => setGroup('operatorAlerts', 'backupFailed', v)} testid="cfg-alerts-backup" />
+            <Toggle label="Update erfolgreich oder fehlgeschlagen" checked={alerts.updates !== false} onChange={(v) => setGroup('operatorAlerts', 'updates', v)} testid="cfg-alerts-updates" />
           </div>
           <button
             className="oa-btn ghost"

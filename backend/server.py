@@ -243,7 +243,7 @@ DEFAULT_OWNER_CONFIG = {
         "operatorAlerts": {
             "webhookUrl": "", "mention": "",
             "workerOffline": True, "failoverExhausted": True, "playbackLoops": True,
-            "workerAutoheal": True, "diskSpace": True,
+            "workerAutoheal": True, "diskSpace": True, "backupFailed": True, "updates": True,
         },
         "audioRecognition": {"enabled": False, "apiKey": ""},
         "songHistory": {"enabled": True, "maxPerGuild": 100},

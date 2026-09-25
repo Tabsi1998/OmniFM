@@ -71,7 +71,7 @@ if restore_check_due; then
 fi
 
 if [ "${#FAILED[@]}" -gt 0 ]; then
-  "$NODE_BIN" "$ROOT/scripts/notify-backup-failed.mjs" "${FAILED[@]}" || true
+  "$NODE_BIN" "$ROOT/scripts/notify-operator.mjs" backup-failed "${FAILED[@]}" || true
   echo "[$(stamp)] === Backup mit Fehlern beendet: ${FAILED[*]} ===" >&2
   exit 1
 fi
