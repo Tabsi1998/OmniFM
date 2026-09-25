@@ -13,10 +13,12 @@ import {
 import { buildApiUrl } from '../lib/api.js';
 import BrandKit from './BrandKit.js';
 import OwnerConfig from './OwnerConfig.js';
+import OwnerCockpit from './OwnerCockpit.js';
 
 const TOKEN_KEY = 'omnifm_admin_token';
 
 const NAV = [
+  { id: 'cockpit', label: 'Cockpit', icon: HeartPulse },
   { id: 'overview', label: 'Global Overview', icon: LayoutDashboard },
   { id: 'monitoring', label: 'Live-Monitoring', icon: Radar },
   { id: 'system', label: 'System-Konfiguration', icon: Settings2 },
@@ -118,7 +120,7 @@ export default function OwnerAdmin() {
   const [loginErr, setLoginErr] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
 
-  const [section, setSection] = useState('overview');
+  const [section, setSection] = useState('cockpit');
   const [overview, setOverview] = useState(null);
   const [licenses, setLicenses] = useState([]);
   const [knownGuilds, setKnownGuilds] = useState([]);
@@ -670,6 +672,9 @@ export default function OwnerAdmin() {
           </button>
         </div>
 
+        {section === 'cockpit' && (
+          <OwnerCockpit apiGet={apiGet} apiSend={apiSend} onOpen={setSection} />
+        )}
         {section === 'overview' && (
           <>
             <div className="oa-grid cols-4">

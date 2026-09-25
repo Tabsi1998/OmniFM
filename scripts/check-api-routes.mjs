@@ -11,7 +11,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
-const NODE_PREFIXES = ["/api/auth/", "/api/dashboard/"];
+// The prefixes FastAPI forwards to the Node API, read from backend/server.py
+// so this check and the proxy can never disagree.
+function nodePrefixes() {
+  const source = fs.readFileSync(path.join(root, "backend", "server.py"), "utf8");
+  const tuple = /NODE_PROXY_PREFIXES\s*=\s*\(([^)]*)\)/.exec(source)?.[1] || "";
+  const prefixes = [...tuple.matchAll(/"([^"]+)"/g)].map((match) => `${match[1].replace(/\/+$/, "")}/`);
+  return prefixes.length ? prefixes : ["/api/auth/", "/api/dashboard/"];
+}
+const NODE_PREFIXES = nodePrefixes();
 
 function walk(directory, extensions, found = []) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {

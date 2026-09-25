@@ -34,6 +34,8 @@ import { createPremiumReadRoutesHandler } from "./routes/premium-read-routes.js"
 import { createPublicRoutesHandler } from "./routes/public-routes.js";
 import { createShareRoutesHandler } from "./routes/share-routes.js";
 import { createStationLogoRoutesHandler } from "./routes/station-logo-routes.js";
+import { createOwnerStatusRoutesHandler } from "./routes/owner-status-routes.js";
+import { getOwnerStatusService, startOwnerStatusService } from "../services/owner-status/service.js";
 import { WEBSITE_URL } from "../bot/runtime-links.js";
 import { resolveDiscordRedirectUri, startDiscordOauthSync } from "../lib/discord-oauth-settings.js";
 import { validateStageEventSpeakers } from "../bot/stage-moderator.js";
@@ -651,6 +653,9 @@ const handleDashboardPermsRoute = createDashboardPermsRouteHandler({
 
 // Logos of the servers' own stations (#340).
 const handleStationLogoRoutes = createStationLogoRoutesHandler();
+
+// The owner cockpit (#355).
+const handleOwnerStatusRoutes = createOwnerStatusRoutesHandler({ getService: getOwnerStatusService });
 
 // Link previews for Discord (#279); the invite page links to the commander.
 const handleShareRoutes = createShareRoutesHandler({
@@ -3155,6 +3160,8 @@ function startWebServer(runtimes) {
   _runtimes = runtimes;
   // A new OAuth secret from the owner console works without a restart.
   startDiscordOauthSync();
+  // The owner cockpit checks every service every 5 minutes (#355).
+  startOwnerStatusService(runtimes);
   const webInternalPort = Number(process.env.WEB_INTERNAL_PORT || "8080");
   const webPort = Number(process.env.WEB_PORT || "8081");
   const webBind = process.env.WEB_BIND || "0.0.0.0";
@@ -3256,6 +3263,9 @@ function startWebServer(runtimes) {
       return;
     }
     if (await handleStationLogoRoutes({ req, res, requestUrl })) {
+      return;
+    }
+    if (await handleOwnerStatusRoutes({ req, res, requestUrl, readJsonBody })) {
       return;
     }
 
