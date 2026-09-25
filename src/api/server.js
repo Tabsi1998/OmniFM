@@ -30,6 +30,8 @@ import { createPremiumBillingRoutesHandler } from "./routes/premium-billing-rout
 import { createPremiumOffersRoutesHandler } from "./routes/premium-offers-routes.js";
 import { createPremiumReadRoutesHandler } from "./routes/premium-read-routes.js";
 import { createPublicRoutesHandler } from "./routes/public-routes.js";
+import { createShareRoutesHandler } from "./routes/share-routes.js";
+import { WEBSITE_URL } from "../bot/runtime-links.js";
 import { createAdminRoutesHandler } from "./routes/admin-routes.js";
 import {
   isRuntimePlaybackActive,
@@ -614,6 +616,15 @@ const handleDashboardPermsRoute = createDashboardPermsRouteHandler({
   sendLocalizedError,
   serverHasCapability,
   setCommandRolePermission,
+});
+
+// Link previews for Discord (#279); the invite page links to the commander.
+const handleShareRoutes = createShareRoutesHandler({
+  websiteUrl: WEBSITE_URL,
+  getInviteUrl: (runtimes) => {
+    const commander = (Array.isArray(runtimes) ? runtimes : []).find((runtime) => runtime?.role === "commander");
+    return commander ? buildInviteUrlForRuntime(commander) : null;
+  },
 });
 
 const handlePublicRoutes = createPublicRoutesHandler({
@@ -3197,6 +3208,10 @@ function startWebServer(runtimes) {
     }
 
     // --- API routes ---
+    if (await handleShareRoutes({ req, res, requestUrl, runtimes })) {
+      return;
+    }
+
     if (await handlePublicRoutes({ req, res, requestUrl, runtimes })) {
       return;
     }

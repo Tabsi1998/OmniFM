@@ -27,6 +27,8 @@ export function toPositiveInt(rawValue, fallbackValue) {
   return parsed;
 }
 
+// "Share" in the now-playing panel posts a picture card (#282); 0 turns it off under load.
+export const SHARE_CARDS_ENABLED = String(process.env.SHARE_CARDS_ENABLED ?? "1") !== "0";
 export const VOICE_CHANNEL_STATUS_ENABLED = String(process.env.VOICE_CHANNEL_STATUS_ENABLED ?? "1") !== "0";
 export const VOICE_CHANNEL_STATUS_TEMPLATE =
   String(process.env.VOICE_CHANNEL_STATUS_TEMPLATE || "\uD83D\uDD0A | 24/7 {station}").trim()

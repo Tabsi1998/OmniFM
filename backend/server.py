@@ -308,7 +308,8 @@ NODE_API_URL = (
     os.environ.get("OMNIFM_NODE_API_URL")
     or f"http://127.0.0.1:{parse_int(os.environ.get('OMNIFM_NODE_API_PORT'), 8002)}"
 ).rstrip("/")
-NODE_PROXY_PREFIXES = ("/api/auth", "/api/dashboard")
+# /api/share: link previews for Discord (#279), rendered by the Node API.
+NODE_PROXY_PREFIXES = ("/api/auth", "/api/dashboard", "/api/share")
 NODE_PROXY_METHODS = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 NODE_PROXY_SKIPPED_HEADERS = {
     "connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "trailers",
