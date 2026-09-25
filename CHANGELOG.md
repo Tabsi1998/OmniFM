@@ -31,8 +31,9 @@ den Milestones M1 bis M7.
   auf einen zweiten Rechner kopiert und alle vier Wochen testweise
   wiederhergestellt. (#314)
 - **Betreiber-Alarme:** Ein Discord-Webhook meldet Worker ohne Lebenszeichen,
-  erschöpfte Failover-Ketten, Wiedergabe im Kreis, Autoheal-Neustarts und
-  wenig Speicherplatz. Einstellbar in der Owner-Konsole, mit Testalarm. (#315)
+  erschöpfte Failover-Ketten, Wiedergabe im Kreis, Autoheal-Neustarts,
+  wenig Speicherplatz, fehlgeschlagene Backups und das Ergebnis jedes
+  Updates. Einstellbar in der Owner-Konsole, mit Testalarm. (#315, #317)
 - **Versionen und Rückweg:** Diese Datei, Versionsnummern mit Tags, die
   Version in `/api/health` und in der Owner-Konsole und
   `./update.sh --rollback` zurück auf den Stand vor dem letzten Update. (#261)
