@@ -19,6 +19,7 @@ import {
   clipText,
 } from "../lib/helpers.js";
 import { languagePick, translateCustomStationErrorMessage } from "../lib/language.js";
+import { isStageChannel, missingStageModeratorPermissions, splitStageModeratorBots, stageModeratorHowTo } from "./stage-moderator.js";
 import {
   EVENT_FALLBACK_TIME_ZONE,
   buildDiscordScheduledEventRecurrenceRule,
@@ -338,16 +339,14 @@ export function validateDiscordScheduledEventPermissions(runtime, guild, channel
     missing.push("Connect");
   }
 
-  if (channel.type === ChannelType.GuildStageVoice) {
-    if (!guildPerms?.has(PermissionFlagsBits.ManageChannels)) {
-      missing.push("Manage Channels");
-    }
-    if (!guildPerms?.has(PermissionFlagsBits.MuteMembers)) {
-      missing.push("Mute Members");
-    }
-    if (!guildPerms?.has(PermissionFlagsBits.MoveMembers)) {
-      missing.push("Move Members");
-    }
+  if (!missing.length && isStageChannel(channel) && missingStageModeratorPermissions(channel, me).length) {
+    // Checked in the channel: Discord gives these rights as "Stage moderator"
+    // there, so checking the server-wide role blocked Stage events.
+    return languagePick(
+      language,
+      `Für ein Discord-Server-Event in ${channel.toString()} muss ${runtime.config?.name || "OmniFM"} dort Stage-Moderator sein.\n${stageModeratorHowTo("de")}`,
+      `For a Discord server event in ${channel.toString()}, ${runtime.config?.name || "OmniFM"} has to be a Stage moderator there.\n${stageModeratorHowTo("en")}`
+    );
   }
 
   if (!missing.length) return null;
@@ -757,6 +756,17 @@ export async function postScheduledEventAnnouncement(runtime, event, station, la
   });
 }
 
+// In a Stage channel a free worker that is Stage moderator there comes first:
+// only it can open the Stage and speak without being brought up by hand.
+export async function pickScheduledEventWorker(runtime, guild, event, tier) {
+  const channel = guild?.channels?.cache?.get?.(String(event?.voiceChannelId || "")) || null;
+  if (!isStageChannel(channel)) return runtime.workerManager.findFreeWorker(event.guildId, tier);
+  const available = runtime.workerManager.getAvailableWorkers(event.guildId, tier)
+    .sort((a, b) => Number(runtime.workerManager.getWorkerSlot(a) || 0) - Number(runtime.workerManager.getWorkerSlot(b) || 0));
+  const { moderators } = await splitStageModeratorBots(guild, channel, available);
+  return moderators[0] || available[0] || null;
+}
+
 export async function executeScheduledEvent(runtime, event) {
   if (runtime.workerManager?.refreshRemoteStates) {
     await runtime.workerManager.refreshRemoteStates().catch(() => null);
@@ -802,7 +812,7 @@ export async function executeScheduledEvent(runtime, event) {
     let startedBy = runtime.config.name;
     if (runtime.role === "commander" && runtime.workerManager) {
       const guildTier = getTier(event.guildId);
-      const worker = runtime.workerManager.findFreeWorker(event.guildId, guildTier);
+      const worker = await pickScheduledEventWorker(runtime, eventGuild, event, guildTier);
       if (!worker) {
         patchScheduledEvent(event.id, { runAtMs: now + EVENT_SCHEDULER_RETRY_MS, enabled: true });
         log(

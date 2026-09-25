@@ -21,6 +21,7 @@ import {
   buildEventNoticePayload,
 } from "./runtime-events.js";
 import { buildEventFormModal } from "./forms.js";
+import { validateStageEventSpeakers } from "./stage-moderator.js";
 import { buildRepeatChoices } from "../commands.js";
 
 /**
@@ -95,7 +96,7 @@ async function handleEventCommand(runtime, interaction, { formInput = null } = {
     return null;
   };
 
-  const validateVoiceChannel = (channel, { stageTopic = null, createDiscordEvent = false } = {}) => {
+  const validateVoiceChannel = async (channel, { stageTopic = null, createDiscordEvent = false } = {}) => {
     if (!channel) {
       return t("Voice- oder Stage-Channel fehlt.", "Voice or stage channel is missing.");
     }
@@ -115,6 +116,9 @@ async function handleEventCommand(runtime, interaction, { formInput = null } = {
     if (channel.type !== ChannelType.GuildStageVoice && !perms?.has(PermissionFlagsBits.Speak)) {
       return t(`Ich habe keine Speak-Berechtigung für ${channel.toString()}.`, `I do not have Speak permission for ${channel.toString()}.`);
     }
+    // Stage channels: a playing bot must be Stage moderator there, or it stays silent.
+    const stageError = await validateStageEventSpeakers(runtime, guild, channel, getTier(guildId), language);
+    if (stageError) return stageError;
     if (createDiscordEvent) {
       return runtime.validateDiscordScheduledEventPermissions(guild, channel, language);
     }
@@ -154,7 +158,7 @@ async function handleEventCommand(runtime, interaction, { formInput = null } = {
       return;
     }
 
-    const voiceError = validateVoiceChannel(voiceChannel, {
+    const voiceError = await validateVoiceChannel(voiceChannel, {
       stageTopic: stageTopicTemplate,
       createDiscordEvent,
     });
@@ -381,7 +385,7 @@ async function handleEventCommand(runtime, interaction, { formInput = null } = {
       return;
     }
 
-    const voiceError = validateVoiceChannel(nextVoiceChannel, {
+    const voiceError = await validateVoiceChannel(nextVoiceChannel, {
       stageTopic: nextStageTopic,
       createDiscordEvent: nextCreateDiscordEvent,
     });
