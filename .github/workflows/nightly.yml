@@ -1,8 +1,9 @@
 name: nightly-regression
 
+# Manual only (#263): the gate is the local check, scripts/local_check.py --all,
+# which runs every step of this workflow on the developer's machine. GitHub
+# is an optional second check: Actions -> this workflow -> Run workflow.
 on:
-  schedule:
-    - cron: "17 3 * * *"
   workflow_dispatch:
 
 concurrency:

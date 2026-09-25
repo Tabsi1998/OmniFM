@@ -1,10 +1,10 @@
 name: dependency-review
 
+# Manual only (#263): the gate is the local check, scripts/local_check.py --all,
+# which runs every step of this workflow on the developer's machine. GitHub
+# is an optional second check: Actions -> this workflow -> Run workflow.
 on:
-  pull_request:
-    branches:
-      - main
-      - master
+  workflow_dispatch:
 
 concurrency:
   group: dependency-review-${{ github.ref }}

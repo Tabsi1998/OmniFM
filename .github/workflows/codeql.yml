@@ -1,17 +1,10 @@
 name: codeql
 
+# Manual only (#263): the gate is the local check, scripts/local_check.py --all,
+# which runs every step of this workflow on the developer's machine. GitHub
+# is an optional second check: Actions -> this workflow -> Run workflow.
 on:
-  push:
-    branches:
-      - main
-      - master
-  pull_request:
-    branches:
-      - main
-      - master
   workflow_dispatch:
-  schedule:
-    - cron: "29 4 * * 1"
 
 concurrency:
   group: codeql-${{ github.workflow }}-${{ github.ref }}
