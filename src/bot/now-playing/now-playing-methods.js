@@ -25,7 +25,7 @@ import {
 } from "../../lib/helpers.js";
 import { languagePick } from "../../lib/language.js";
 import { fetchStreamSnapshot, normalizeTrackSearchText } from "../../services/now-playing.js";
-import { appendSongHistory } from "../../song-history-store.js";
+import { appendSongHistory, getSongHistory } from "../../song-history-store.js";
 import { getGuildListeningStats, getTopGuildsByActivity } from "../../listening-stats-store.js";
 import { BRAND } from "../../config/plans.js";
 import {
@@ -42,6 +42,42 @@ import {
   NP_PREFIX,
   getTierConfig,
 } from "../runtime-shared.js";
+import { derivePlaybackPhase } from "../playback-phase.js";
+import { isComponentsV2Message } from "../../discord/ui/index.js";
+import { buildNowPlayingPanel } from "./now-playing-panel.js";
+
+// #266: the panel is a Components V2 container. NOW_PLAYING_LAYOUT=classic
+// keeps the old embed for one release as a way back.
+const NOW_PLAYING_LAYOUT = String(process.env.NOW_PLAYING_LAYOUT || "panel").trim().toLowerCase();
+
+function hexColor(value) {
+  const match = String(value || "").trim().match(/^#?([0-9a-f]{6})$/i);
+  return match ? Number.parseInt(match[1], 16) : null;
+}
+
+function musicBrainzUrlFor(meta) {
+  if (meta?.musicBrainzReleaseId) return `https://musicbrainz.org/release/${encodeURIComponent(meta.musicBrainzReleaseId)}`;
+  if (meta?.musicBrainzRecordingId) return `https://musicbrainz.org/recording/${encodeURIComponent(meta.musicBrainzRecordingId)}`;
+  return null;
+}
+
+/** The last three songs before the current one, newest first. */
+function recentSongTitles(guildId, currentDisplayTitle) {
+  const current = String(currentDisplayTitle || "").trim().toLowerCase();
+  try {
+    return getSongHistory(guildId, { limit: 4 })
+      .map((entry) => String(entry?.displayTitle || "").trim())
+      .filter((entry) => entry && entry.toLowerCase() !== current)
+      .slice(0, 3);
+  } catch {
+    return [];
+  }
+}
+
+function httpsUrlOrNull(value) {
+  const url = String(value || "").trim();
+  return url.toLowerCase().startsWith("https://") ? url : null;
+}
 
 const nowPlayingMethods = {
   logNowPlayingIssue(guildId, state, message) {
@@ -666,11 +702,74 @@ const nowPlayingMethods = {
   },
 
   buildNowPlayingMessagePayload(guildId, station, meta, context = {}) {
-    return {
-      embeds: [this.buildNowPlayingEmbed(guildId, station, meta, context)],
-      components: this.buildTrackLinkComponents(guildId, station, meta),
-      allowedMentions: { parse: [] },
-    };
+    if (NOW_PLAYING_LAYOUT === "classic") {
+      return {
+        embeds: [this.buildNowPlayingEmbed(guildId, station, meta, context)],
+        components: this.buildTrackLinkComponents(guildId, station, meta),
+        allowedMentions: { parse: [] },
+      };
+    }
+    return { ...this.buildNowPlayingPanelPayload(guildId, station, meta, context), allowedMentions: { parse: [] } };
+  },
+
+  // The data of the panel (#266); the layout lives in now-playing-panel.js.
+  buildNowPlayingPanelPayload(guildId, station, meta, context = {}) {
+    const language = this.resolveGuildLanguage(guildId);
+    const t = (de, en) => (language === "de" ? de : en);
+    const tierConfig = getTierConfig(guildId);
+    const artist = clipText(this.normalizeNowPlayingValue(meta?.artist, station, meta, 120), 120);
+    const title = clipText(this.normalizeNowPlayingValue(meta?.title, station, meta, 140), 140);
+    const trackLabel = clipText(
+      this.normalizeNowPlayingValue(meta?.displayTitle || meta?.streamTitle, station, meta, 180)
+      || [artist, title].filter(Boolean).join(" - "),
+      140
+    );
+    const hasTrack = Boolean(trackLabel);
+    const sourceSummary = this.buildNowPlayingSourceSummary(language, meta, hasTrack);
+    const recent = recentSongTitles(guildId, meta?.displayTitle);
+    const volume = Number.parseInt(String(context?.volume ?? ""), 10);
+    const listeners = Math.max(0, Number.parseInt(String(context?.listenerCount || 0), 10) || 0);
+    const failover = context?.failover?.active === true && context.failover.desiredName
+      ? { active: true, desiredName: context.failover.desiredName, currentName: station?.name || null }
+      : null;
+    return buildNowPlayingPanel({
+      t,
+      applicationId: this.getApplicationId?.() || this.client?.application?.id || null,
+      workerName: context?.workerName || this.config?.name || BRAND.name,
+      planTier: tierConfig.tier,
+      station: {
+        name: station?.name || meta?.name || null,
+        key: context?.stationKey || station?.key || null,
+        genre: station?.genre || station?.category || "Radio",
+        tier: station?.tier || "free",
+        color: hexColor(station?.color),
+        logoUrl: httpsUrlOrNull(station?.logo),
+      },
+      track: {
+        hasTrack,
+        headline: clipText(title || trackLabel, 110) || trackLabel,
+        artist,
+        album: clipText(this.normalizeNowPlayingValue(meta?.album, station, meta, 140), 140),
+        artworkUrl: meta?.artworkUrl || null,
+        sourceNote: sourceSummary.sourceNote,
+        sourceLabel: sourceSummary.sourceLabel,
+        metadataHint: sourceSummary.metadataHint,
+      },
+      playback: {
+        phase: context?.phase || "playing",
+        paused: context?.paused === true,
+        listeners,
+        bitrate: tierConfig.bitrate || null,
+        volume: Number.isFinite(volume) ? volume : Number.NaN,
+        channelId: String(context?.channelId || "").trim() || null,
+      },
+      notices: { serverMuted: context?.serverMuted === true, failover },
+      recent,
+      searchQuery: this.buildTrackSearchQuery(station, meta) || null,
+      musicBrainzUrl: musicBrainzUrlFor(meta),
+      fallbackImageUrl: this.client?.user?.displayAvatarURL?.({ extension: "png", size: 256 }) || null,
+      pollSeconds: Math.round(NOW_PLAYING_POLL_MS / 1000),
+    });
   },
 
   recordSongHistory(guildId, state, station, meta) {
@@ -709,20 +808,30 @@ const nowPlayingMethods = {
     }
     state.nowPlayingChannelId = channel.id;
 
-    const messagePayload = {
-      embeds: [],
-      allowedMentions: { parse: [] },
-      components: [],
-    };
-    if (Array.isArray(payload?.embeds)) {
+    const isPanel = Boolean(Number(payload?.flags || 0) & MessageFlags.IsComponentsV2);
+    const messagePayload = isPanel
+      ? {
+        components: Array.isArray(payload?.components) ? payload.components : [],
+        flags: MessageFlags.IsComponentsV2,
+        allowedMentions: { parse: [] },
+      }
+      : { embeds: [], allowedMentions: { parse: [] }, components: [] };
+    if (!isPanel && Array.isArray(payload?.embeds)) {
       messagePayload.embeds = payload.embeds;
     }
-    if (Array.isArray(payload?.components)) {
+    if (!isPanel && Array.isArray(payload?.components)) {
       messagePayload.components = payload.components;
     }
 
     if (state.nowPlayingMessageId && channel.messages?.fetch) {
-      const existing = await channel.messages.fetch(state.nowPlayingMessageId).catch(() => null);
+      let existing = await channel.messages.fetch(state.nowPlayingMessageId).catch(() => null);
+      // An embed message cannot become a Components V2 panel (or back): the
+      // old one goes and a new one is sent, so no duplicate stays (#266).
+      if (existing && isComponentsV2Message(existing) !== isPanel) {
+        await existing.delete?.().catch(() => null);
+        state.nowPlayingMessageId = null;
+        existing = null;
+      }
       if (existing?.edit) {
         try {
           await existing.edit(messagePayload);
@@ -827,8 +936,11 @@ const nowPlayingMethods = {
         includeObserved: true,
         includeLastKnown: true,
       }) || null;
+      const playerStatus = state.player?.state?.status;
       const payload = this.buildNowPlayingMessagePayload(guildId, station, nextMeta, {
         stationKey,
+        phase: derivePlaybackPhase(state),
+        paused: playerStatus === "paused" || playerStatus === "autopaused",
         channelId: voiceChannelId,
         listenerCount,
         volume: state.volume,
