@@ -773,6 +773,7 @@ const nowPlayingMethods = {
       },
       notices: { serverMuted: context?.serverMuted === true, failover },
       recent,
+      favorites: this.role === "commander" ? [] : (this.getVisibleFavoriteStations?.(guildId) || []),
       searchQuery: this.buildTrackSearchQuery(station, meta) || null,
       musicBrainzUrl: musicBrainzUrlFor(meta),
       fallbackImageUrl: this.client?.user?.displayAvatarURL?.({ extension: "png", size: 256 }) || null,
@@ -935,7 +936,10 @@ const nowPlayingMethods = {
       // #277: a template with {title}, {artist} or {listeners} follows the song.
       this.syncVoiceChannelStatus?.(guildId, state.currentStationName || station.name || stationKey).catch(() => null);
 
-      const signature = buildNowPlayingSignature(stationKey, nextMeta, state, channel.id);
+      // The favourites come from the settings; a changed list re-renders the panel (#276).
+      await this.loadGuildSettingsCached?.(guildId).catch(() => null);
+      const favoritesKey = (this.getVisibleFavoriteStations?.(guildId) || []).map((favorite) => favorite.key).join(",");
+      const signature = `${buildNowPlayingSignature(stationKey, nextMeta, state, channel.id)}|fav:${favoritesKey}`;
 
       if (!force && signature === state.nowPlayingSignature) {
         return;
@@ -1009,6 +1013,8 @@ const nowPlayingMethods = {
       return true;
     }
     const action = String(interaction.customId || "").slice(NP_PREFIX.length);
+    // A favourite button (#276) switches the station, under the /play rule.
+    if (action.startsWith("fav:")) return this.handleFavoriteControl(interaction, action.slice(4));
     // "💾 Save" (#272) is personal: no role rule, its own answer.
     if (action === "save") return this.handleSaveSongControl(interaction);
     // Discord requires an acknowledgement within three seconds. Voice/player
