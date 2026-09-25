@@ -6,9 +6,11 @@ titles stay English, in the conventional style of the history
 (`feat(scope):`, `fix(scope):`, `chore:`); PR bodies follow
 `.github/PULL_REQUEST_TEMPLATE.md`.
 
-## Local first, GitHub second
+## Local first, GitHub only on request
 
-GitHub Actions is the second confirmation. Before every push:
+The local check is the gate (#263). The GitHub workflows run only when
+started by hand (Actions -> workflow -> Run workflow), as an optional second
+check; nothing runs on push, pull request or schedule. Before every push:
 
 ```bash
 python scripts/local_check.py                 # everything but extra
@@ -27,11 +29,12 @@ ignored by Git.
 | node | ci.yml `syntax`, `unit`, `voice-codec`, `mongo-smoke`; nightly | Node 22 as package.json pins it, `npm ci`, the syntax gates (`scripts/check-syntax.mjs` parses every module under `src/` and `scripts/`), the ESLint ratchet (`npm run lint`), the type check (`npm run typecheck`: tsc over `src/lib` and `src/core`, shared JSDoc types in `src/lib/types.js`), the Opus codec, the Mongo smoke, `test:unit` against a MongoDB 7.0.39 container |
 | backend | ci.yml `fastapi-smoke` | Python 3.12 venv, compileall, `backend/unit_tests`, the owner contract against a live uvicorn - the ci.yml assertions plus: admin routes refuse requests without the token; then the `backend/tests` contract suite against the same server (every failing test fails); then a second FastAPI with `OMNIFM_DASHBOARD_BACKEND=node` in front of the Node API started alone (`scripts/serve-node-api.mjs`, #195) |
 | frontend | ci.yml `frontend-build` | `npm ci`, the Vite build, and proof it produced `build/index.html` and bundles |
-| extra | - | npm audit (high and critical), settings read by the code vs `.env.example`, dependency licences, OSV over the lockfiles, ShellCheck |
+| extra | codeql.yml, live-smoke.yml, ci.yml `voice-codec` on Ubuntu | npm audit (high and critical), settings read by the code vs `.env.example`, dependency licences, OSV over the lockfiles, ShellCheck, the Opus codec on Linux in a `node:22-bookworm` container (a copy of the lockfile, the Windows `node_modules` stay untouched), Semgrep in place of CodeQL, the live smoke against omnifm.xyz |
 
-Not mirrored locally: CodeQL, the live smoke against omnifm.xyz.
+Everything the workflows check is mirrored locally; the server itself checks
+its logins and services every 5 minutes (owner cockpit, #355).
 
-Tools the checks expect: Docker Desktop (MongoDB, OSV, ShellCheck), Git for
+Tools the checks expect: Docker Desktop (MongoDB, OSV, ShellCheck, Linux Opus), Git for
 Windows, gitleaks, Python 3.12 through the `py` launcher, Node 22. A missing
 tool skips its steps with a hint instead of failing.
 

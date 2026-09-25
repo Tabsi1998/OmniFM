@@ -1614,6 +1614,29 @@ def live_smoke(context: Context) -> str:
     return note if token else note + " (public checks only; set OMNIFM_LIVE_ADMIN_TOKEN for the owner API)"
 
 
+LINUX_NODE_IMAGE = "node:22-bookworm"
+
+
+def voice_codec_linux(context: Context) -> str:
+    """The native Opus codec on Linux, where the server runs (#263).
+
+    GitHub ran the codec check on Ubuntu and Windows; the Windows run is the
+    node/voice-codec step. This one installs the lockfile in a Linux container
+    from a copy of package.json and package-lock.json, so the Windows
+    node_modules stay untouched. npm's cache lives in a named volume.
+    """
+    binary = docker(context)
+    script = ("set -e; mkdir -p /app/scripts; cp /src/package.json /src/package-lock.json /app/;"
+              " cp /src/scripts/check-voice-codec.mjs /app/scripts/; cd /app;"
+              " npm ci --no-audit --no-fund --loglevel=error; node scripts/check-voice-codec.mjs")
+    completed = context.run(binary, "run", "--rm", "-v", f"{ROOT}:/src:ro", "-v", "omnifm-local-check-npm:/root/.npm",
+                            LINUX_NODE_IMAGE, "bash", "-c", script, check=False, timeout=1800)
+    path = context.log("voice-codec-linux", completed.stdout + completed.stderr)
+    if completed.returncode != 0:
+        raise StepFailed(f"the native Opus codec does not work on Linux. Full output: {path}\n" + tail(completed))
+    return f"native Opus encode and decode on Linux ({LINUX_NODE_IMAGE})"
+
+
 def extra_steps() -> list:
     return [
         Step("extra", "npm-audit", "High and critical advisories in both trees", npm_audit),
@@ -1622,6 +1645,7 @@ def extra_steps() -> list:
              ("node/npm-ci", "frontend/npm-ci")),
         Step("extra", "osv", "Known vulnerabilities in the lockfiles", osv_scan),
         Step("extra", "shellcheck", "ShellCheck over the deployment scripts", shellcheck),
+        Step("extra", "voice-codec-linux", "The native Opus codec on Linux, like the server", voice_codec_linux),
         Step("extra", "semgrep", "Semgrep security analysis, in place of CodeQL", semgrep_scan),
         Step("extra", "live-smoke", "The live smoke check of omnifm.xyz", live_smoke),
     ]
