@@ -113,6 +113,7 @@ import { shareMethods } from "./runtime-methods/share.js";
 import { savedSongMethods } from "./runtime-methods/saved-songs.js";
 import { sleepMethods } from "./runtime-methods/sleep.js";
 import { pollMethods } from "./runtime-methods/polls.js";
+import { botProfileMethods } from "./runtime-methods/bot-profile.js";
 import { recordPlaybackPhase } from "./playback-phase.js";
 import { syncAppEmojisSafely } from "../discord/ui/app-emojis.js";
 
@@ -172,6 +173,8 @@ class BotRuntime {
         });
         this.startEventScheduler();
         this.startListenerStatsSampler();
+        // Servers that left Ultimate get the default bot look back (#280).
+        this.startBotProfileDowngradeWatcher();
         // Station polls that ran during a restart are evaluated now (#274).
         this.restoreStationPolls().catch((err) => {
           log("WARN", `[${this.config.name}] Umfragen konnten nicht wieder aufgenommen werden: ${err?.message || err}`);
@@ -1432,6 +1435,7 @@ Object.assign(
   savedSongMethods,
   sleepMethods,
   pollMethods,
+  botProfileMethods,
 );
 
 const MIME_TYPES = {

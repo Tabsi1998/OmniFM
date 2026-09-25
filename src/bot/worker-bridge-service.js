@@ -108,6 +108,8 @@ class WorkerBridgeService {
         return this.runtime.resumeInGuild(guildId);
       case "setSleepTimer":
         return this.runtime.setSleepTimerInGuild(guildId, payload.minutes);
+      case "setGuildProfile":
+        return this.runtime.applyGuildBotProfile(guildId, payload.changes || {});
       case "setVolume": {
         const parsedValue = Number.parseInt(String(payload.value ?? ""), 10);
         return this.runtime.setVolumeInGuild(guildId, Number.isFinite(parsedValue) ? parsedValue : payload.value);

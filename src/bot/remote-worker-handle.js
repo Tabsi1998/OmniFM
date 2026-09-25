@@ -536,6 +536,15 @@ class RemoteWorkerHandle {
     return this.sendCommand("setVolume", { guildId, value }, { timeoutMs: 15_000 });
   }
 
+  // The bot look per server (#280); the pictures travel as data URIs.
+  async applyGuildBotProfile(guildId, changes) {
+    return this.sendCommand("setGuildProfile", { guildId, changes }, { timeoutMs: 30_000 });
+  }
+
+  getGuildBotAvatarUrl() {
+    return null;
+  }
+
   async setSleepTimerInGuild(guildId, minutes) {
     return this.sendCommand("setSleepTimer", { guildId, minutes }, { timeoutMs: 15_000 });
   }
