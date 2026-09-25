@@ -24,6 +24,8 @@ LOG_DIR="$ROOT/logs"
 VENV="$ROOT/.venv"
 BACKEND_ENV="$ROOT/backend/.env"
 FRONTEND_ENV="$ROOT/frontend/.env"
+# A second installation such as staging brings its instance.env (#262).
+. "$ROOT/scripts/instance-env.sh"
 FRONTEND_PORT="${FRONTEND_PORT:-3000}"
 BACKEND_PORT="${BACKEND_PORT:-8001}"
 
@@ -342,33 +344,31 @@ NODE_BIN="$(command -v node)"
 NODE_DIR="$(dirname "$NODE_BIN")"
 UNIT_DIR="/etc/systemd/system"
 UNIT_TEMPLATE_DIR="$ROOT/deploy/systemd"
-OMNIFM_UNITS="omnifm-backend omnifm-frontend omnifm-bot"
+OMNIFM_UNITS="$UNIT_PREFIX-backend $UNIT_PREFIX-frontend $UNIT_PREFIX-bot"
 
-render_unit() { # unit name without .service
-  render_unit_file "$1.service"
-}
-
-render_unit_file() { # file name in deploy/systemd, e.g. omnifm-backup.timer
-  sed -e "s|__ROOT__|$ROOT|g" \
-      -e "s|__USER__|$RUN_USER|g" \
-      -e "s|__BACKEND_PORT__|$BACKEND_PORT|g" \
-      -e "s|__FRONTEND_PORT__|$FRONTEND_PORT|g" \
-      -e "s|__NODE__|$NODE_BIN|g" \
-      -e "s|__NODE_DIR__|$NODE_DIR|g" \
-      "$UNIT_TEMPLATE_DIR/$1" | $SUDO tee "$UNIT_DIR/$1" >/dev/null
+render_unit_file() { # template in deploy/systemd, e.g. omnifm-backup.timer
+  local target render template
+  target="$UNIT_PREFIX-${1#omnifm-}"
+  render="$ROOT/scripts/render-systemd-unit.sh"
+  template="$UNIT_TEMPLATE_DIR/$1"
+  env UNIT_PREFIX="$UNIT_PREFIX" ROOT="$ROOT" RUN_USER="$RUN_USER" \
+    BACKEND_PORT="$BACKEND_PORT" FRONTEND_PORT="$FRONTEND_PORT" \
+    NODE_BIN="$NODE_BIN" NODE_DIR="$NODE_DIR" \
+    bash "$render" "$template" | $SUDO tee "$UNIT_DIR/$target" >/dev/null
 }
 
 install_units() {
   log "Schreibe systemd-Units ($OMNIFM_UNITS)..."
-  if [ -f "$UNIT_DIR/omnifm.service" ]; then
+  # Only production ever had it; a staging instance must not touch it.
+  if [ -z "$OMNIFM_INSTANCE" ] && [ -f "$UNIT_DIR/omnifm.service" ]; then
     # Oneshot unit of earlier releases: it re-ran start.sh on every boot and
     # supervised nothing. Its ExecStop is never invoked here on purpose.
     $SUDO systemctl disable omnifm.service >>"$LOG_DIR/setup.log" 2>&1 || true
     $SUDO rm -f "$UNIT_DIR/omnifm.service"
   fi
-  local unit
-  for unit in $OMNIFM_UNITS; do
-    render_unit "$unit"
+  local part
+  for part in backend frontend bot; do
+    render_unit_file "omnifm-$part.service"
   done
   $SUDO systemctl daemon-reload
   # shellcheck disable=SC2086
@@ -378,12 +378,19 @@ install_units() {
 
 # The nightly backup (#259) is a timer, not a service to supervise: stop.sh
 # leaves it alone, so backups keep running while OmniFM itself is stopped.
+# A second installation such as staging holds test data and gets none.
 install_backup_timer() {
+  if [ -n "$OMNIFM_INSTANCE" ]; then
+    log "Instanz $OMNIFM_INSTANCE: kein naechtliches Backup (Testdaten)."
+    return 0
+  fi
   log "Schreibe Backup-Timer (omnifm-backup.timer, taeglich ca. 04:15)..."
   render_unit_file omnifm-backup.service
   render_unit_file omnifm-backup.timer
   $SUDO systemctl daemon-reload
-  $SUDO systemctl enable --now omnifm-backup.timer >>"$LOG_DIR/setup.log" 2>&1     || warn "Backup-Timer konnte nicht aktiviert werden (siehe logs/setup.log)."
+  if ! $SUDO systemctl enable --now omnifm-backup.timer >>"$LOG_DIR/setup.log" 2>&1; then
+    warn "Backup-Timer konnte nicht aktiviert werden (siehe logs/setup.log)."
+  fi
 }
 
 unit_active() {
@@ -432,7 +439,7 @@ wait_for_http() {
 
 backend_alive() {
   if [ "$USE_SYSTEMD" -eq 1 ]; then
-    unit_active omnifm-backend
+    unit_active "$UNIT_PREFIX-backend"
     return $?
   fi
   local pid
@@ -465,26 +472,26 @@ if [ "$USE_SYSTEMD" -eq 1 ]; then
   install_units
   install_backup_timer
 
-  log "Starte Backend (omnifm-backend) auf Port $BACKEND_PORT..."
-  $SUDO systemctl restart omnifm-backend
+  log "Starte Backend ($UNIT_PREFIX-backend) auf Port $BACKEND_PORT..."
+  $SUDO systemctl restart "$UNIT_PREFIX-backend"
   wait_for_backend_contract
 
-  log "Starte Frontend (omnifm-frontend) auf Port $FRONTEND_PORT..."
-  $SUDO systemctl restart omnifm-frontend
+  log "Starte Frontend ($UNIT_PREFIX-frontend) auf Port $FRONTEND_PORT..."
+  $SUDO systemctl restart "$UNIT_PREFIX-frontend"
   wait_for_http "React-Frontend" "http://127.0.0.1:${FRONTEND_PORT}/" "$LOG_DIR/frontend.log"
 
   if [ "$BOT_PREFLIGHT_STATUS" -eq 0 ]; then
-    log "Starte Discord-Bot (omnifm-bot) aus Owner-Menü-Konfiguration..."
-    $SUDO systemctl restart omnifm-bot
+    log "Starte Discord-Bot ($UNIT_PREFIX-bot) aus Owner-Menü-Konfiguration..."
+    $SUDO systemctl restart "$UNIT_PREFIX-bot"
     sleep 3
-    if unit_active omnifm-bot; then
-      log "Discord-Bot läuft (systemd: omnifm-bot)."
+    if unit_active "$UNIT_PREFIX-bot"; then
+      log "Discord-Bot läuft (systemd: $UNIT_PREFIX-bot)."
     else
       tail -n 40 "$LOG_DIR/bot-console.log" >&2 || true
-      warn "Discord-Bot ist nach dem Start nicht aktiv. Details: journalctl -u omnifm-bot -n 50 und logs/bot-console.log"
+      warn "Discord-Bot ist nach dem Start nicht aktiv. Details: journalctl -u $UNIT_PREFIX-bot -n 50 und logs/bot-console.log"
     fi
   else
-    $SUDO systemctl stop omnifm-bot >/dev/null 2>&1 || true
+    $SUDO systemctl stop "$UNIT_PREFIX-bot" >/dev/null 2>&1 || true
     warn "Discord-Bot nicht gestartet – noch kein Commander-Token hinterlegt."
     warn "Trage Tokens unter /admin → 'Discord & Bots' ein und führe ./update.sh (oder ./start.sh) erneut aus."
   fi
@@ -530,7 +537,7 @@ fi
 WEB_INFO="${PUBLIC_URL:-http://${SERVER_IP}:${FRONTEND_PORT}}"
 log "Fertig. Web: ${WEB_INFO}  |  Backend intern: http://127.0.0.1:${BACKEND_PORT}  |  API: ${FRONTEND_API:-/api (relativ)}"
 if [ "$USE_SYSTEMD" -eq 1 ]; then
-  log "Logs: $LOG_DIR (und journalctl -u omnifm-bot)   Status: ./update.sh --status quick   Stoppen: ./stop.sh"
+  log "Logs: $LOG_DIR (und journalctl -u $UNIT_PREFIX-bot)   Status: ./update.sh --status quick   Stoppen: ./stop.sh"
 else
   log "Logs: $LOG_DIR   Stoppen mit: ./stop.sh"
 fi
