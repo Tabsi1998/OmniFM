@@ -29,6 +29,7 @@ def build_router(core):
             "status": "online" if mongo_ready else "degraded",
             "brand": "OmniFM",
             "contractVersion": core.BACKEND_CONTRACT_VERSION,
+            "release": core.read_release_info(),
             "services": services,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }

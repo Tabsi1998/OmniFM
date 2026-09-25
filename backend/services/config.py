@@ -7,9 +7,11 @@ offers every function here as server.<name> again.
 from datetime import datetime
 from datetime import timezone
 from fastapi.responses import JSONResponse
+from pathlib import Path
 from urllib.parse import urlparse
 import json
 import os
+import subprocess
 import time
 
 core = None  # the server module, set by bind()
@@ -431,7 +433,31 @@ def parse_iso_datetime(raw_value):
         return None
 
 
+_RELEASE_INFO = {}
+
+
+def read_release_info():
+    """Version from package.json and the running commit (#261), read once: an
+    update restarts the backend, so the values cannot change while it runs."""
+    if _RELEASE_INFO:
+        return dict(_RELEASE_INFO)
+    root = Path(__file__).resolve().parent.parent.parent
+    try:
+        version = str(json.loads((root / "package.json").read_text(encoding="utf-8")).get("version") or "").strip()
+    except (OSError, ValueError):
+        version = ""
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"], cwd=root, capture_output=True, text=True, timeout=3, check=False,
+        ).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        commit = ""
+    _RELEASE_INFO.update({"version": version or "unknown", "commit": commit or "unknown"})
+    return dict(_RELEASE_INFO)
+
+
 __all__ = [
+    "read_release_info",
     "load_recovery_settings",
     "normalize_stream_recovery",
     "build_allowed_origins",
