@@ -144,6 +144,8 @@ def build_router(core):
                         "name": doc.get("name", doc.get("key", "")),
                         "url": doc.get("url", ""),
                         "tier": doc.get("tier", "free"),
+                        # genre, colour, logo ... for the website (#267, #268)
+                        **core.station_catalog_fields(doc),
                     })
             except Exception:
                 pass
@@ -159,6 +161,7 @@ def build_router(core):
                     "name": val.get("name", key),
                     "url": val.get("url", ""),
                     "tier": tier,
+                    **core.station_catalog_fields(val),
                 })
         tier_order = {"free": 0, "pro": 1}
         stations_list.sort(key=lambda s: (tier_order.get(s["tier"], 0), s["name"]))

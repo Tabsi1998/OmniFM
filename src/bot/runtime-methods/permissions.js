@@ -440,8 +440,13 @@ const permissionMethods = {
 
     if (interaction.deferred || interaction.replied) {
       const editPayload = { ...finalPayload };
+      const componentsV2 = Boolean(Number(editPayload.flags || 0) & MessageFlags.IsComponentsV2);
       delete editPayload.flags;
-      if (!editPayload.content && !editPayload.embeds) {
+      if (componentsV2) {
+        // A Components V2 answer (#264) has neither content nor embeds; the
+        // flag goes along with the edit.
+        editPayload.flags = MessageFlags.IsComponentsV2;
+      } else if (!editPayload.content && !editPayload.embeds) {
         const { t } = this.createInteractionTranslator(interaction);
         editPayload.content = t("Es ist ein Fehler aufgetreten.", "An error occurred.");
       }
