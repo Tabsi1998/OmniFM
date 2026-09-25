@@ -16,7 +16,7 @@ const GROUPS = [
       { key: "PUBLIC_WEB_URL", label: "Public Web URL", type: "url", example: "https://omnifm.xyz" },
       { key: "CORS_ALLOWED_ORIGINS", label: "Erlaubte CORS Origins", type: "origin-list", example: "https://omnifm.xyz" },
       { key: "CHECKOUT_RETURN_ORIGINS", label: "Checkout Return Origins", type: "origin-list", example: "https://omnifm.xyz" },
-      { key: "DEFAULT_LANGUAGE", label: "Standardsprache", type: "enum", values: ["de", "en"], example: "de" },
+      { key: "DEFAULT_LANGUAGE", label: "Standardsprache (nur Rückfall, z. B. E-Mails)", type: "enum", values: ["en", "de"], example: "en" },
       { key: "PRO_TRIAL_ENABLED", label: "Pro Trial aktiv", type: "boolean", example: "1" },
     ],
   },

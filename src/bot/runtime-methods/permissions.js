@@ -284,7 +284,7 @@ const permissionMethods = {
         content:
           `**${t("OmniFM Sprache", "OmniFM language")}**\n` +
           `${t("Aktiv", "Active")}: \`${effectiveLanguage}\`\n` +
-          `${t("Quelle", "Source")}: ${override ? t("Manuell gesetzt", "Manually set") : t("Discord-Server oder Client-Sprache", "Discord server or client locale")}\n` +
+          `${t("Quelle", "Source")}: ${override ? t("Manuell gesetzt", "Manually set") : t("Sprache des Discord-Servers (Deutsch, sonst Englisch)", "The Discord server's language (German, otherwise English)")}\n` +
           `${t("Deine Discord-Client-Sprache", "Your Discord client language")}: \`${clientLanguage}\`` +
           suggestOverride,
         flags: MessageFlags.Ephemeral,
@@ -342,8 +342,9 @@ const permissionMethods = {
     const guildOverride = guildKey ? getGuildLanguage(guildKey) : null;
     if (guildOverride) return guildOverride;
 
-    const guild = guildKey ? this.client.guilds.cache.get(guildKey) : null;
-    return resolveLanguageFromDiscordLocale(guild?.preferredLocale, getDefaultLanguage());
+    // The server's language decides: German server -> German, anything else -> English.
+    const guild = guildKey ? this.client?.guilds?.cache?.get?.(guildKey) : null;
+    return resolveLanguageFromDiscordLocale(guild?.preferredLocale, "en");
   },
 
   resolveInteractionLanguage(interaction) {
@@ -351,15 +352,12 @@ const permissionMethods = {
     const guildOverride = guildId ? getGuildLanguage(guildId) : null;
     if (guildOverride) return guildOverride;
 
-    const localeCandidates = [
-      interaction?.locale,
-      interaction?.guildLocale,
-      interaction?.guild?.preferredLocale,
-    ];
-    const hasGerman = localeCandidates.some((locale) => {
-      return resolveLanguageFromDiscordLocale(locale, "en") === "de";
-    });
-    return hasGerman ? "de" : "en";
+    // On a server its language decides, not the person's own Discord language
+    // (before, any German locale won, so an English server answered in German).
+    const serverLocale = interaction?.guildLocale || interaction?.guild?.preferredLocale;
+    if (guildId || serverLocale) return resolveLanguageFromDiscordLocale(serverLocale, "en");
+    // Direct messages have no server: the person's own Discord language.
+    return resolveLanguageFromDiscordLocale(interaction?.locale, "en");
   },
 
   createInteractionTranslator(interaction) {
