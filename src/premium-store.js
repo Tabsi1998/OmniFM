@@ -314,6 +314,24 @@ export async function initPremiumStore() {
   }
 }
 
+// --- For the owner routes on the Node API (#288) ---
+
+/** The store fresh from MongoDB (FastAPI's checkout writes there too), after this process's own writes. */
+export async function reloadPremiumStore() {
+  await mongoWriteQueue.catch(() => null);
+  if (getDb()) await refreshMongoSnapshot().catch(() => false);
+  return load();
+}
+
+export function savePremiumStore(data) {
+  save(data);
+}
+
+/** Resolves once every queued MongoDB write of this process is done. */
+export async function flushPremiumStoreWrites() {
+  await mongoWriteQueue.catch(() => null);
+}
+
 // --- License CRUD ---
 
 function isExpired(license) {
