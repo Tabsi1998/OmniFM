@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { log, rootDir } from "./logging.js";
 import { withFileStoreLock } from "./file-store-lock.js";
 import { resolveRuntimeDataPath } from "./runtime-data-path.js";
+import { getDb, isConnected } from "./db.js";
 
 const MAX_AUDIT_EVENTS = 500;
 const DEFAULT_AUDIT_LIMIT = 100;
@@ -114,9 +115,29 @@ function writeAuditState(filePath, state) {
   fs.renameSync(tmpFile, filePath);
 }
 
+const MONGO_STATUS = { success: "ok", failed: "error", denied: "denied", info: "ok" };
+
+/**
+ * The owner console reads its audit tab from MongoDB (owner_audit, written by
+ * FastAPI). Node's entries go there too, in the same shape, so changes made
+ * through the Node API (bot look, panel design, owner settings) show up.
+ */
+function mirrorOwnerAuditToMongo(normalized) {
+  if (!isConnected() || !getDb()) return;
+  getDb().collection("owner_audit").insertOne({
+    at: normalized.timestamp,
+    actor: normalized.actor || "owner",
+    action: normalized.action,
+    target: normalized.target || null,
+    detail: normalized.summary || null,
+    status: MONGO_STATUS[normalized.status] || "ok",
+    ip: "-",
+  }).catch((err) => log("WARN", `[owner-audit] MongoDB-Eintrag fehlgeschlagen: ${err?.message || err}`));
+}
+
 function recordOwnerAudit(event) {
   const filePath = resolveOwnerAuditFilePath();
-  return withFileStoreLock(filePath, () => {
+  const recorded = withFileStoreLock(filePath, () => {
     let state;
     try {
       state = readAuditState(filePath);
@@ -136,6 +157,8 @@ function recordOwnerAudit(event) {
     writeAuditState(filePath, state);
     return normalized;
   });
+  mirrorOwnerAuditToMongo(recorded);
+  return recorded;
 }
 
 function getOwnerAuditSnapshot({ limit = DEFAULT_AUDIT_LIMIT } = {}) {

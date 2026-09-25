@@ -49,8 +49,12 @@ function formatDuration(ms, t) {
   return `${Math.round(minutes / 60)} ${t("Std.", "h")}`;
 }
 
-/** Short lines for /diag, so support can read the effective values. */
-function describeRecoverySettings(env = process.env, t = (de) => de) {
+/**
+ * Short lines for /diag, so support can read the effective values.
+ * @param {Record<string, string | undefined>} [env]
+ * @param {(de: string, en: string) => string} [t]
+ */
+function describeRecoverySettings(env = process.env, t = (de, _en) => de) {
   const values = Object.fromEntries(getEffectiveRecoverySettings(env).map((item) => [item.key, item.value]));
   return [
     t(

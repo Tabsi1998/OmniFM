@@ -732,6 +732,15 @@ function getApiRateLimitSpec(pathname) {
       windowMs: parseEnvInt("API_RATE_LIMIT_WEBHOOK_WINDOW_MS", 60_000, 1_000, 10 * 60_000),
     };
   }
+  // The owner console loads many owner routes at once (#288); its own bucket
+  // keeps it from running into the public limit.
+  if (pathname.startsWith("/api/admin/") || pathname.startsWith("/api/owner/")) {
+    return {
+      scope: "owner",
+      max: parseEnvInt("API_RATE_LIMIT_OWNER_MAX", 600, 1, 10_000),
+      windowMs: parseEnvInt("API_RATE_LIMIT_OWNER_WINDOW_MS", 60_000, 1_000, 10 * 60_000),
+    };
+  }
   if (pathname.startsWith("/api/premium/")) {
     return {
       scope: "premium",

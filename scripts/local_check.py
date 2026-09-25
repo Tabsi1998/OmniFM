@@ -1173,7 +1173,7 @@ def node_contract_suite(context: Context) -> str:
         "PUBLIC_WEB_URL": base, "OMNIFM_RUNTIME_DATA_DIR": str(scratch), "LOGS_DIR": str(scratch / "logs"),
         # The suite fires hundreds of requests from one address; the limiter
         # would turn real gaps into 429 noise.
-        "API_RATE_LIMIT_MAX": "10000", "API_RATE_LIMIT_PREMIUM_MAX": "1000",
+        "API_RATE_LIMIT_MAX": "10000", "API_RATE_LIMIT_PREMIUM_MAX": "1000", "API_RATE_LIMIT_OWNER_MAX": "10000",
     })
     start_process(context, "node-contract-api", [node, "scripts/serve-node-api.mjs"], cwd=ROOT, env=node_env,
                   url=f"{base}/api/auth/session", seconds=90)
