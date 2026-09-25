@@ -17,6 +17,7 @@ import { BRAND } from "../../config/plans.js";
 import { INVITE_COMPONENT_ID_OPEN } from "../runtime-links.js";
 import { openRuntimeStationsBrowser } from "../runtime-panels.js";
 import { buildOmniEmbed } from "../discord-ui.js";
+import { derivePlaybackPhase } from "../playback-phase.js";
 import {
   getTierConfig,
   buildQuickActionRow,
@@ -244,7 +245,6 @@ async function handleNowCommand({ runtime, interaction, t, language }) {
 
   const activeRuntime = playback.runtime;
   const activeState = playback.state;
-  const playingGuilds = activeRuntime.getPlayingGuildCount();
   const current = runtime.getResolvedCurrentStation(interaction.guildId, activeState, language);
   if (!current?.station) {
     await interaction.reply(buildNoticePayload({
@@ -260,29 +260,25 @@ async function handleNowCommand({ runtime, interaction, t, language }) {
 
   const channelId = activeState.connection?.joinConfig?.channelId || activeState.lastChannelId || null;
   const meta = activeState.currentMeta || {};
-  const embed = runtime.buildNowPlayingEmbed(interaction.guildId, current.station, {
+  // The same panel as in the channel (#266), privately for the person asking.
+  const playerStatus = activeState.player?.state?.status;
+  const panel = runtime.buildNowPlayingPanelPayload(interaction.guildId, current.station, {
     ...meta,
     name: meta.name || current.station.name || null,
   }, {
     stationKey: activeState.currentStationKey,
+    phase: derivePlaybackPhase(activeState),
+    paused: playerStatus === "paused" || playerStatus === "autopaused",
     channelId,
     listenerCount: activeRuntime.getCurrentListenerCount(interaction.guildId, activeState),
     volume: activeState.volume,
     workerName: activeRuntime.config?.name || BRAND.name,
+    serverMuted: activeState.serverMuted === true,
+    failover: activeState.failoverActive === true
+      ? { active: true, desiredName: activeState.desiredStationName || activeState.desiredStationKey || "" }
+      : null,
   });
-  embed.addFields(
-    {
-      name: t("Aktiv auf", "Active on"),
-      value: `${playingGuilds} ${t(`Server${playingGuilds === 1 ? "" : "n"}`, `server${playingGuilds === 1 ? "" : "s"}`)}`,
-      inline: true,
-    }
-  );
-
-  await interaction.reply({
-    embeds: [embed],
-    components: runtime.buildTrackLinkComponents(interaction.guildId, current.station, meta),
-    flags: MessageFlags.Ephemeral,
-  });
+  await interaction.reply({ ...panel, flags: panel.flags | MessageFlags.Ephemeral });
   return;
 }
 
