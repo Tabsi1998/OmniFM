@@ -6,6 +6,70 @@ folgt [SemVer](https://semver.org/lang/de/): Die erste Zahl steigt bei
 Funktionen, die dritte bei reinen Fehlerbehebungen. Wie ein Release entsteht,
 steht in `scripts/release.mjs`.
 
+## 3.3.0 – 2026-09-25
+
+Werkzeuge für Server-Teams und ein neuer Arbeitsplatz für den Betrieb:
+Formulare, Umfragen, Share-Karten, eigenes Aussehen für Bot und Panel, und
+eine Owner-Konsole, die selbst prüft, ob alles läuft. Dazu wichtige
+Korrekturen am Discord-Login, an Stage-Events und an der Sprache.
+
+### Neu
+
+- **Umfrage:** `/umfrage` (`/poll`) lässt den Server abstimmen, welcher Sender als
+  Nächstes läuft. (#338)
+- **Formulare in Discord:** Eigenen Sender hinzufügen, Event planen und
+  Problem melden gehen per Formular statt langer Befehle. Ein neuer Sender
+  wird vor dem Speichern getestet; beim Sender geht jetzt auch ein Logo mit.
+  (#341, #351)
+- **Teilen:** „Teilen“ im Panel postet eine Karte mit Cover, Sender und
+  Farbe. Links zu OmniFM zeigen in Discord eine Vorschau. (#342)
+- **Eigenes Bot-Aussehen (Ultimate):** Avatar, Banner und Bio pro Worker,
+  nur auf dem eigenen Server. (#343)
+- **Panel-Designer (ab Pro):** Im Dashboard festlegen, welche Knöpfe das
+  Panel zeigt, eine eigene Akzentfarbe und ob „Zuletzt“ erscheint. Die
+  Vorschau daneben ist das echte Panel. (#352)
+- **Owner-Cockpit:** Alle 5 Minuten prüft OmniFM selbst, ob Discord-Login,
+  Website, Zahlungen, E-Mail, Song-Erkennung, Bots, Bot-Listen und Sender
+  wirklich funktionieren – nicht nur, ob etwas eingetragen ist. Wird etwas
+  rot, kommt ein Alarm in den Betreiber-Kanal. (#357)
+- **Neues Owner-Menü:** Sechs Bereiche statt fünfzehn Reiter, jede
+  Einstellung an genau einer Stelle, eine Suche über alle Einstellungen und
+  ein Hinweis auf ungespeicherte Änderungen. (#363)
+
+### Geändert
+
+- **Sprache:** Die Sprache des Discord-Servers entscheidet: deutscher Server
+  Deutsch, sonst Englisch. `/language` legt sie weiterhin fest. (#347)
+- **Senderkatalog:** Sender heißen jetzt nach dem, was sie spielen (zum
+  Beispiel „Dance Radio“ statt „Techno Radio“), und kein Stream läuft mehr
+  doppelt. Sendet ein Stream plötzlich einen anderen Namen, zeigt das
+  Cockpit es an. (#362)
+
+### Behoben
+
+- **Discord-Login:** In der Owner-Konsole ließ sich das Secret nicht mehr
+  eintippen; der Login schickte zu `localhost`, und „Mit Discord anmelden“
+  im Server-Dashboard zeigte nur Text. Die Weiterleitungsadresse bildet
+  OmniFM jetzt selbst aus der öffentlichen Adresse. Share-Links und
+  Dashboard-Knöpfe zeigen nicht mehr auf eine Heimnetz-Adresse.
+  (#344, #350, #354)
+- **Stage-Events:** Events lassen sich in Stage-Kanälen planen. OmniFM
+  prüft, ob der Bot dort Stage-Moderator ist, eröffnet die Stage und
+  beendet sie am Ende wieder. (#348, #359)
+- Die Suche im Sender-Browser kam nicht an. (#339)
+
+### Betrieb
+
+- Der lokale Check ist die Prüfung vor jedem Merge; die GitHub-Workflows
+  laufen nur noch auf Knopfdruck. Neu im Check: der Opus-Codec unter Linux
+  wie auf dem Server und die Vertragstests gegen die Node-API. (#360, #361)
+
+### Hinweis zum Update
+
+- Für Events in Stage-Kanälen muss ein Bot im Stage-Kanal Stage-Moderator
+  sein: Stage-Kanal bearbeiten → Berechtigungen → Stage-Moderatoren → Bot
+  hinzufügen.
+
 ## 3.2.0 – 2026-09-25
 
 Das neue Gesicht in Discord: Alle wichtigen Nachrichten des Bots sind neu
