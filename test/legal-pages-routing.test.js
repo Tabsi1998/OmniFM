@@ -354,14 +354,12 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     });
     assert.equal(adminOverviewResponse.status, 200);
     const adminOverview = await adminOverviewResponse.json();
-    assert.equal(adminOverview.bots.length, 1);
-    assert.equal(adminOverview.bots[0].guilds, 1);
+    // The owner console's overview with FastAPI's contract (#288).
+    assert.equal(adminOverview.brand, "OmniFM");
     assert.ok(adminOverview.stations.total > 0);
-    assert.equal(adminOverview.release?.appVersion, PACKAGE_VERSION);
-    assert.equal(adminOverview.release?.commit, "abcdef123456");
-    assert.equal(adminOverview.release?.branch, "main");
-    assert.equal(adminOverview.release?.lastDeployStatus, "success");
-    assert.equal(adminOverview.release?.lastLiveSmokeStatus, "success");
+    assert.equal(adminOverview.release?.version, PACKAGE_VERSION);
+    assert.equal(typeof adminOverview.bots.configured, "number");
+    assert.equal(typeof adminOverview.integrations.mongo, "boolean");
 
     const adminDiagnosticsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/diagnostics`, {
       headers: { Cookie: adminCookieHeader },
@@ -686,11 +684,15 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.match(secretEnvContent, /STRIPE_SECRET_KEY=sk_live_owner_test/);
     assert.match(secretEnvContent, /SMTP_PASS=smtp-owner-test/);
 
+    // The console's audit route answers with FastAPI's contract (#288); every
+    // owner action's details stay in the audit file, which is checked here.
     const adminAuditResponse = await fetch(`http://127.0.0.1:${port}/api/admin/audit`, {
       headers: { Cookie: adminCookieHeader },
     });
     assert.equal(adminAuditResponse.status, 200);
-    const adminAudit = await adminAuditResponse.json();
+    assert.ok(Array.isArray((await adminAuditResponse.json()).audit));
+    const { getOwnerAuditSnapshot } = await import("../src/lib/owner-audit-store.js");
+    const adminAudit = getOwnerAuditSnapshot({ limit: 500 });
     assert.equal(adminAudit.file, ownerAuditFile);
     assert.ok(adminAudit.events.some((event) => event.action === "owner.login" && event.status === "success"));
     assert.ok(adminAudit.events.some((event) => (
@@ -881,11 +883,9 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.equal(typeof adminJobResult.job.outputSummary.lastLine, "string");
     assert.equal(adminJobResult.job.outputSummary.truncated, false);
 
-    const adminAuditAfterJobResponse = await fetch(`http://127.0.0.1:${port}/api/admin/audit`, {
-      headers: { Cookie: adminCookieHeader },
-    });
-    assert.equal(adminAuditAfterJobResponse.status, 200);
-    const adminAuditAfterJob = await adminAuditAfterJobResponse.json();
+    // Details of the job starts live in the audit file (see above, #288).
+    const { getOwnerAuditSnapshot: readOwnerAudit } = await import("../src/lib/owner-audit-store.js");
+    const adminAuditAfterJob = readOwnerAudit({ limit: 500 });
     assert.ok(adminAuditAfterJob.events.some((event) => event.action === "owner.job.start" && event.target === "rollback-plan"));
     assert.ok(adminAuditAfterJob.events.some((event) => (
       event.action === "owner.job.start"
@@ -924,7 +924,9 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     });
     assert.equal(adminGuildsResponse.status, 200);
     const adminGuilds = await adminGuildsResponse.json();
-    assert.equal(adminGuilds.total, 1);
+    // FastAPI's contract (#288): the servers come from the bots' health document in MongoDB.
+    assert.ok(Array.isArray(adminGuilds.guilds));
+    assert.equal(adminGuilds.count, adminGuilds.guilds.length);
 
     const termsApiResponse = await fetch(`http://127.0.0.1:${port}/api/terms`);
     assert.equal(termsApiResponse.status, 200);

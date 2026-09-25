@@ -136,8 +136,9 @@ class TestDashboardLicenseEndpoint:
         assert response.status_code == 401, f"Expected 401, got {response.status_code}"
     
     def test_license_returns_german_error_message(self):
-        """GET /api/dashboard/license should return 'Nicht eingeloggt.' error message"""
-        response = requests.get(f"{BASE_URL}/api/dashboard/license")
+        """GET /api/dashboard/license answers a German browser with 'Nicht eingeloggt.'
+        (#347: German browser German, otherwise English)."""
+        response = requests.get(f"{BASE_URL}/api/dashboard/license", headers={"Accept-Language": "de-DE,de;q=0.9"})
         assert response.status_code == 401
         
         data = response.json()

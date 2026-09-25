@@ -88,7 +88,8 @@ def test_auth_discord_login_url_generation(api_client):
 
 
 def test_auth_logout_without_session_returns_success(api_client):
-    response = api_client.post(f"{BASE_URL}/api/auth/logout", timeout=20)
+    # The dashboard sends its CSRF intent with the logout (#195).
+    response = api_client.post(f"{BASE_URL}/api/auth/logout", timeout=20, headers={"X-OmniFM-CSRF": "dashboard-intent"})
     assert response.status_code == 200
 
     data = response.json()
