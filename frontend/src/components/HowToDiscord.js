@@ -89,7 +89,7 @@ export default function HowToDiscord({ bots = [] }) {
           <StepShell step={s.steps[0]} s={s}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
               <div style={{ width: 44, height: 44, borderRadius: '50%', overflow: 'hidden', background: '#08090d', flexShrink: 0 }}>
-                <img src="/brand/omnifm-discord-avatar.png" alt="OmniFM" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img src="/brand/omnifm-discord-avatar-192.png" alt="OmniFM" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               </div>
               <div>
                 <div style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>OmniFM</div>
@@ -131,7 +131,7 @@ export default function HowToDiscord({ bots = [] }) {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
               <div style={{ width: 30, height: 30, borderRadius: '50%', overflow: 'hidden', background: '#08090d', flexShrink: 0 }}>
-                <img src="/brand/omnifm-discord-avatar.png" alt="OmniFM" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img src="/brand/omnifm-discord-avatar-192.png" alt="OmniFM" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               </div>
               <div style={{ minWidth: 0 }}>
                 <div style={{ color: '#00a8fc', fontSize: 13, fontWeight: 600 }}>OmniFM · {s.connected}</div>

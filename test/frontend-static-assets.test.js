@@ -85,7 +85,16 @@ test("React SEO assets and base metadata are present", () => {
   assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/nutzungsbedingungen<\/loc>/);
   assert.equal(manifest.name, "OmniFM");
   assert.equal(manifest.start_url, "/");
-  assert.equal(manifest.icons[0].src, "/img/bot-1.png");
+  assert.ok(manifest.icons.length > 0, "the manifest declares icons");
+  for (const icon of manifest.icons) {
+    // Width and height of a PNG sit in its IHDR chunk at bytes 16-23. The
+    // declared size must be the real one; a landscape picture once stood
+    // here labelled 512x512 (#258).
+    const png = fs.readFileSync(path.join(publicDir, icon.src));
+    const size = `${png.readUInt32BE(16)}x${png.readUInt32BE(20)}`;
+    assert.equal(icon.type, "image/png", icon.src);
+    assert.equal(size, icon.sizes, `${icon.src} is ${size}, the manifest says ${icon.sizes}`);
+  }
 });
 
 test("SEO helper returns route-specific canonical metadata and structured data", () => {
