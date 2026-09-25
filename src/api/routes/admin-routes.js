@@ -39,6 +39,8 @@
 //   POST /api/admin/stations/:key/test → Konfigurierte Station testen
 // ============================================================
 
+import fs from "node:fs";
+
 import { getOwnerConfigSnapshot, patchOwnerConfig, patchOwnerSecrets } from "../../lib/owner-config-store.js";
 import { getOwnerJob, getOwnerJobsSnapshot, startOwnerJob } from "../../lib/owner-job-runner.js";
 import { getOwnerAuditSnapshot, recordOwnerAudit } from "../../lib/owner-audit-store.js";
@@ -55,6 +57,20 @@ import {
   ownerConfigResponse,
   sectionResponse,
 } from "../../lib/owner-config.js";
+import {
+  OwnerLicenseError,
+  addOwnerLicense,
+  adminLicenseRows,
+  isValidEmail,
+  licenseRows,
+  maskEmail,
+  parseIntLike,
+  patchOwnerLicense,
+  setLicenseServerLinks,
+} from "../../lib/owner-licenses.js";
+import { ArchiveError, archiveMongoRecords, listArchiveOperations, restoreArchivedOperation } from "../../lib/owner-archive.js";
+import { flushPremiumStoreWrites, reloadPremiumStore, savePremiumStore } from "../../premium-store.js";
+import { resolveRuntimeDataPath } from "../../lib/runtime-data-path.js";
 
 export function readRequestBody(req, limitBytes = 4096) {
   const maxBytes = Math.max(1, Math.floor(Number(limitBytes) || 4096));
@@ -136,7 +152,6 @@ export function createAdminRoutesHandler(deps) {
     ADMIN_TOKEN,
     getStationHealthReport,
     listLicenses,
-    patchLicenseById,
     loadStations,
     log,
     methodNotAllowed,
@@ -1548,45 +1563,167 @@ export function createAdminRoutesHandler(deps) {
       return true;
     }
 
-    // GET /api/admin/licenses
+    // The servers the running bots are in, for the license list (_runtime_guild_directory).
+    const guildDirectory = () => {
+      const directory = {};
+      for (const runtime of getRuntimes()) {
+        if (!runtime.client?.isReady?.()) continue;
+        for (const [guildId, guild] of (runtime.client.guilds?.cache || new Map()).entries()) {
+          const entry = directory[guildId] || { name: guild.name || guildId, memberCount: guild.memberCount || 0, iconUrl: guild.iconURL?.() || null, bots: [] };
+          entry.bots.push(runtime.config?.name || "?");
+          directory[guildId] = entry;
+        }
+      }
+      return directory;
+    };
+    const licenseError = (err) => {
+      const status = err instanceof OwnerLicenseError || err instanceof ArchiveError ? err.status : 500;
+      sendJson(res, status, { error: err?.message || "Fehler" });
+    };
+    const clientIp = () => {
+      try { return getClientIp(req) || "-"; } catch { return "-"; }
+    };
+
+    // GET/POST /api/admin/licenses: the license manager (#288, FastAPI contract)
     if (pathname === "/api/admin/licenses") {
-      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
-      const licenses = listLicenses?.() || {};
-      sendJson(res, 200, { licenses });
+      if (req.method === "GET") {
+        const data = await reloadPremiumStore();
+        const rows = requestUrl.searchParams.get("full") === "1" ? adminLicenseRows(data, guildDirectory()) : licenseRows(data);
+        sendJson(res, 200, { licenses: rows, count: rows.length });
+        return true;
+      }
+      if (req.method !== "POST") { methodNotAllowed(res, ["GET", "POST"]); return true; }
+      if (!isConnected() || !getDb()) { sendJson(res, 503, { error: "Keine Datenbank verbunden." }); return true; }
+      let body;
+      try { body = JSON.parse(await readRequestBody(req, 64 * 1024) || "{}") || {}; } catch { body = {}; }
+      const email = String(body.email || "").trim();
+      const tier = String(body.tier || "pro").trim().toLowerCase();
+      const months = parseIntLike(body.months ?? 1, 1);
+      const seats = Math.max(1, Math.min(5, parseIntLike(body.seats ?? 1, 1)));
+      const note = String(body.note || "").trim();
+      if (!["pro", "ultimate"].includes(tier)) { sendJson(res, 400, { error: "Tier muss 'pro' oder 'ultimate' sein." }); return true; }
+      if (email && !isValidEmail(email)) { sendJson(res, 400, { error: "Bitte eine gültige E-Mail-Adresse angeben." }); return true; }
+      try {
+        const data = await reloadPremiumStore();
+        const created = addOwnerLicense(data, { email, tier, months, seats, note, activatedBy: "owner" });
+        const serverId = String(body.serverId || body.guildId || "").trim();
+        if (serverId) setLicenseServerLinks(data, created.licenseKey, [serverId]);
+        savePremiumStore(data);
+        await flushPremiumStoreWrites();
+        auditOwnerAction(req, { action: "license.create", status: "success", target: created.licenseKey, summary: `${tier} · ${months}M · ${seats} seats` });
+        sendJson(res, 200, { ok: true, licenseKey: created.licenseKey, license: { ...data.licenses[created.licenseKey], licenseKey: created.licenseKey } });
+      } catch (err) {
+        licenseError(err);
+      }
       return true;
     }
 
-    // POST /api/admin/licenses/:id
+    // PATCH/DELETE /api/admin/licenses/<key>
     const licenseMatch = pathname.match(/^\/api\/admin\/licenses\/([^/]+)$/);
     if (licenseMatch) {
-      if (req.method !== "POST" && req.method !== "PATCH") { methodNotAllowed(res, ["POST", "PATCH"]); return true; }
-      const licenseId = decodeURIComponent(licenseMatch[1]);
+      const licenseKey = decodeURIComponent(licenseMatch[1]);
+      if (req.method !== "PATCH" && req.method !== "DELETE") { methodNotAllowed(res, ["PATCH", "DELETE"]); return true; }
+      if (!isConnected() || !getDb()) { sendJson(res, 503, { error: "Keine Datenbank verbunden." }); return true; }
       try {
-        const patch = JSON.parse(await readRequestBody(req) || "{}");
-        // Sicherheit: Nur erlaubte Felder patchen
-        const allowed = ["active", "expired", "expiresAt", "plan", "tier", "seats", "linkedServerIds", "contactEmail", "notes"];
-        const safePatch = {};
-        for (const key of allowed) {
-          if (key in patch) safePatch[key] = patch[key];
+        const data = await reloadPremiumStore();
+        if (req.method === "PATCH") {
+          let body;
+          try { body = JSON.parse(await readRequestBody(req, 64 * 1024) || "{}") || {}; } catch { body = {}; }
+          const changes = patchOwnerLicense(data, licenseKey, body);
+          savePremiumStore(data);
+          await flushPremiumStoreWrites();
+          auditOwnerAction(req, { action: "license.update", status: "success", target: licenseKey, summary: changes.join(", ") || "no-op" });
+          const row = adminLicenseRows(data, guildDirectory()).find((entry) => entry.licenseKey === licenseKey) || null;
+          sendJson(res, 200, { ok: true, license: row, changes });
+          return true;
         }
-        patchLicenseById?.(licenseId, safePatch);
-        log?.("INFO", `[Admin] Lizenz ${licenseId} gepatcht: ${JSON.stringify(safePatch)}`);
-        auditOwnerAction(req, {
-          action: "owner.license.patch",
-          status: "success",
-          target: licenseId,
-          summary: `Lizenz gepatcht: ${licenseId}`,
-          metadata: { patchedKeys: Object.keys(safePatch) },
-        });
-        sendJson(res, 200, { ok: true, licenseId, patched: safePatch });
+        if (!data.licenses?.[licenseKey]) { sendJson(res, 404, { error: "Lizenz nicht gefunden." }); return true; }
+        let archived;
+        try {
+          archived = await archiveMongoRecords(getDb(), [
+            ["licenses", { _licenseId: String(licenseKey) }],
+            ["server_entitlements", { licenseId: String(licenseKey) }],
+          ], { operation: "owner.license.delete", target: licenseKey, actor: "owner", ip: clientIp(), remove: false });
+        } catch (err) {
+          sendJson(res, 500, { error: `Lizenz konnte nicht sicher archiviert werden: ${String(err?.message || err).slice(0, 300)}` });
+          return true;
+        }
+        if (!archived.archived) { sendJson(res, 409, { error: "Lizenz konnte vor dem Löschen nicht archiviert werden." }); return true; }
+        const removed = data.licenses[licenseKey];
+        delete data.licenses[licenseKey];
+        for (const [serverId, entitlement] of Object.entries(data.serverEntitlements || {})) {
+          if (String(entitlement?.licenseId || "") === String(licenseKey)) delete data.serverEntitlements[serverId];
+        }
+        savePremiumStore(data);
+        await flushPremiumStoreWrites();
+        auditOwnerAction(req, { action: "license.delete", status: "success", target: licenseKey, summary: String(removed?.tier || removed?.plan || "") });
+        sendJson(res, 200, { ok: true, deleted: licenseKey, archiveId: archived.operationId });
       } catch (err) {
-        auditOwnerAction(req, {
-          action: "owner.license.patch",
-          status: "failed",
-          target: licenseId,
-          summary: err?.message || "Ungueltiger Body",
-        });
-        sendJson(res, err?.statusCode || 400, { ok: false, error: err?.message || "Ungültiger Body" });
+        licenseError(err);
+      }
+      return true;
+    }
+
+    // GET /api/admin/activity: redemptions, else issued licenses (FastAPI contract)
+    if (pathname === "/api/admin/activity") {
+      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
+      const data = await reloadPremiumStore();
+      let redemptions;
+      try {
+        const coupons = JSON.parse(fs.readFileSync(resolveRuntimeDataPath("coupons.json"), "utf8"));
+        redemptions = Object.entries(coupons?.redemptions || {})
+          .filter(([, row]) => row && typeof row === "object")
+          .map(([sessionId, row]) => ({ sessionId: String(row.sessionId || sessionId).trim(), ...row }))
+          .sort((a, b) => String(b.processedAt || "").localeCompare(String(a.processedAt || "")));
+      } catch {
+        redemptions = Array.isArray(data.recentRedemptions) ? data.recentRedemptions : [];
+      }
+      const events = redemptions.slice(0, 50).map((row) => ({
+        type: "redemption",
+        at: row.processedAt || row.createdAt || null,
+        label: `${String(row.tier || "premium").replace(/^./, (c) => c.toUpperCase())} Lizenz eingeloest`,
+        detail: maskEmail(String(row.email || "")),
+        meta: { seats: row.seats ?? null, sessionId: row.sessionId ?? null },
+      }));
+      if (!events.length) {
+        for (const row of licenseRows(data)) {
+          events.push({
+            type: "license",
+            at: row.createdAt,
+            label: `${row.planName} Lizenz ausgestellt`,
+            detail: row.contactEmail,
+            meta: { seats: row.seats, source: row.source, status: row.expired ? "expired" : "active" },
+          });
+        }
+      }
+      events.sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")));
+      sendJson(res, 200, { activity: events.slice(0, 50), count: events.length });
+      return true;
+    }
+
+    // GET /api/admin/archive, POST /api/admin/archive/<operation>/restore
+    if (pathname === "/api/admin/archive") {
+      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
+      if (!isConnected() || !getDb()) { sendJson(res, 503, { error: "MongoDB nicht verbunden." }); return true; }
+      const rows = await listArchiveOperations(getDb(), requestUrl.searchParams.get("limit") || 100);
+      sendJson(res, 200, { archive: rows, count: rows.length });
+      return true;
+    }
+    const restoreMatch = pathname.match(/^\/api\/admin\/archive\/([^/]+)\/restore$/);
+    if (restoreMatch) {
+      if (req.method !== "POST") { methodNotAllowed(res, ["POST"]); return true; }
+      const operationId = decodeURIComponent(restoreMatch[1]);
+      try {
+        const result = await restoreArchivedOperation(isConnected() ? getDb() : null, operationId, { ip: clientIp() });
+        auditOwnerAction(req, { action: "archive.restore", status: "success", target: operationId, summary: `${result.restored} Datensätze` });
+        sendJson(res, 200, { ok: true, ...result });
+      } catch (err) {
+        if (!(err instanceof ArchiveError) || err.status >= 500) {
+          auditOwnerAction(req, { action: "archive.restore", status: "failed", target: operationId, summary: String(err?.message || err) });
+        }
+        const status = err instanceof ArchiveError ? err.status : 500;
+        const message = status >= 500 && !(err instanceof ArchiveError) ? `Wiederherstellung fehlgeschlagen: ${String(err?.message || err).slice(0, 300)}` : err.message;
+        sendJson(res, status, { error: message });
       }
       return true;
     }
