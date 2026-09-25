@@ -2,6 +2,24 @@ import { getDb, isConnected } from "../../lib/db.js";
 import { logError } from "../../lib/logging.js";
 import { loadDashboardGuildSettings } from "./dashboard-guild-settings.js";
 import { resolveUserFacingErrorMessage } from "../../lib/user-facing-errors.js";
+import {
+  VOICE_STATUS_PLACEHOLDERS,
+  VOICE_STATUS_TEMPLATE_MAX_LENGTH,
+  normalizeVoiceStatusTemplate,
+  validateVoiceStatusTemplate,
+} from "../../lib/voice-status-template.js";
+import { VOICE_CHANNEL_STATUS_TEMPLATE } from "../../bot/runtime-shared.js";
+
+// The voice channel status text (#277): the server's own template or the
+// default of this installation, and what the dashboard can insert.
+export function buildDashboardVoiceStatusResponse(settings = {}) {
+  return {
+    template: normalizeVoiceStatusTemplate(settings.voiceStatusTemplate),
+    defaultTemplate: VOICE_CHANNEL_STATUS_TEMPLATE,
+    placeholders: [...VOICE_STATUS_PLACEHOLDERS],
+    maxLength: VOICE_STATUS_TEMPLATE_MAX_LENGTH,
+  };
+}
 
 export function createDashboardSettingsRouteHandler(deps) {
   const {
@@ -80,6 +98,7 @@ export function createDashboardSettingsRouteHandler(deps) {
         incidentAlerts: buildDashboardIncidentAlertsResponse(settings.incidentAlerts || {}),
         exportsWebhook: buildDashboardExportsWebhookResponse(settings.exportsWebhook || {}),
         voiceGuard,
+        voiceStatus: buildDashboardVoiceStatusResponse(settings),
       });
       return true;
     }
@@ -88,6 +107,7 @@ export function createDashboardSettingsRouteHandler(deps) {
       try {
         const body = await readJsonBody();
         const updates = { guildId: guildInfo.id };
+        const unsets = [];
         let currentSettings = null;
         const getCurrentSettings = async () => {
           if (currentSettings === null) {
@@ -204,6 +224,27 @@ export function createDashboardSettingsRouteHandler(deps) {
           updates.voiceGuard = validatedVoiceGuard.config;
         }
 
+        if (body?.voiceStatus && typeof body.voiceStatus === "object") {
+          const validated = validateVoiceStatusTemplate(body.voiceStatus.template);
+          if (!validated.ok) {
+            const names = validated.unknown.map((name) => `{${name}}`).join(", ");
+            sendJson(res, 400, {
+              error: languagePick(
+                language,
+                `Diese Platzhalter kennt OmniFM nicht: ${names}. Erlaubt sind ${VOICE_STATUS_PLACEHOLDERS.map((name) => `{${name}}`).join(", ")}.`,
+                `OmniFM does not know these placeholders: ${names}. Allowed: ${VOICE_STATUS_PLACEHOLDERS.map((name) => `{${name}}`).join(", ")}.`
+              ),
+            });
+            return true;
+          }
+          // Empty or the default: the server follows the installation's default.
+          if (!validated.template || validated.template === normalizeVoiceStatusTemplate(VOICE_CHANNEL_STATUS_TEMPLATE)) {
+            unsets.push("voiceStatusTemplate");
+          } else {
+            updates.voiceStatusTemplate = validated.template;
+          }
+        }
+
         if (!isConnected() || !getDb()) {
           sendLocalizedError(
             res,
@@ -218,9 +259,25 @@ export function createDashboardSettingsRouteHandler(deps) {
         const savedSettings = await getCurrentSettings();
         await getDb().collection("guild_settings").updateOne(
           { guildId: guildInfo.id },
-          { $set: updates },
+          {
+            $set: updates,
+            ...(unsets.length ? { $unset: Object.fromEntries(unsets.map((key) => [key, ""])) } : {}),
+          },
           { upsert: true }
         );
+        const voiceStatusChanged = Object.prototype.hasOwnProperty.call(updates, "voiceStatusTemplate")
+          || unsets.includes("voiceStatusTemplate");
+        if (voiceStatusChanged && Array.isArray(runtimes)) {
+          // Streams that run now show the new text right away (in this process).
+          for (const runtime of runtimes) {
+            runtime?.invalidateGuildSettingsCache?.(guildInfo.id);
+            const state = runtime?.guildState?.get?.(guildInfo.id);
+            if (state?.currentStationKey) {
+              runtime.syncVoiceChannelStatus?.(guildInfo.id, state.currentStationName || state.currentStationKey, { force: true })
+                .catch(() => null);
+            }
+          }
+        }
         if (Object.prototype.hasOwnProperty.call(updates, "voiceGuard") && Array.isArray(runtimes)) {
           for (const runtime of runtimes) {
             if (typeof runtime?.refreshVoiceGuardSettingsForGuild !== "function") continue;
@@ -267,6 +324,11 @@ export function createDashboardSettingsRouteHandler(deps) {
           incidentAlerts,
           exportsWebhook,
           voiceGuard,
+          voiceStatus: buildDashboardVoiceStatusResponse(
+            unsets.includes("voiceStatusTemplate")
+              ? {}
+              : { voiceStatusTemplate: updates.voiceStatusTemplate ?? savedSettings.voiceStatusTemplate }
+          ),
         });
       } catch (err) {
         logError("[DashboardSettings] Save failed", err, {

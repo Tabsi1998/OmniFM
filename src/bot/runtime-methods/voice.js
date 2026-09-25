@@ -12,6 +12,7 @@ import { normalizeLanguage, getDefaultLanguage } from "../../i18n.js";
 import { buildVoiceChannelAccessMessage } from "../../lib/user-facing-setup.js";
 import { buildRuntimePresenceActivity } from "../runtime-presence.js";
 import { getRuntimeConnectedChannelId } from "../runtime-live-state.js";
+import { renderVoiceStatusTemplate, voiceStatusTemplateIsLive } from "../../lib/voice-status-template.js";
 import {
   VOICE_CHANNEL_STATUS_ENABLED,
   VOICE_CHANNEL_STATUS_TEMPLATE,
@@ -91,15 +92,33 @@ const voiceMethods = {
       });
   },
 
-  renderVoiceStatusText(stationName) {
-    const station = clipText(String(stationName || "").trim(), 60) || "Radio";
-    const botName = clipText(String(this.config?.name || BRAND.name || "OmniFM"), 24);
-    const raw = VOICE_CHANNEL_STATUS_TEMPLATE
-      .replace(/\{station\}/gi, station)
-      .replace(/\{bot\}/gi, botName)
-      .trim();
-    if (!raw) return "";
-    return clipText(raw, VOICE_CHANNEL_STATUS_MAX_LENGTH);
+  // The status text (#277): the server's template from the dashboard, else
+  // VOICE_CHANNEL_STATUS_TEMPLATE; see src/lib/voice-status-template.js.
+  renderVoiceStatusText(stationName, { guildId = null, template = null } = {}) {
+    const source = String(template || "").trim() || VOICE_CHANNEL_STATUS_TEMPLATE;
+    const values = {
+      station: clipText(String(stationName || "").trim(), 60) || "Radio",
+      bot: clipText(String(this.config?.name || BRAND.name || "OmniFM"), 24),
+    };
+    const state = guildId ? this.guildState?.get?.(guildId) : null;
+    if (state) {
+      try {
+        const station = this.getResolvedCurrentStation?.(guildId, state)?.station || null;
+        values.genre = station?.genre || station?.category || "";
+        if (voiceStatusTemplateIsLive(source)) {
+          const meta = state.currentMeta || {};
+          values.title = this.normalizeNowPlayingValue?.(meta.title, station, meta, 60) || "";
+          values.artist = this.normalizeNowPlayingValue?.(meta.artist, station, meta, 40) || "";
+          values.listeners = this.getCurrentListenerCount?.(guildId, state) || 0;
+        }
+      } catch {
+        // Missing details only drop their placeholders.
+      }
+    }
+    return renderVoiceStatusTemplate(source, values, {
+      maxLength: VOICE_CHANNEL_STATUS_MAX_LENGTH,
+      fallbackTemplate: VOICE_CHANNEL_STATUS_TEMPLATE,
+    });
   },
 
   invalidateVoiceStatus(state, { clearText = false } = {}) {
@@ -134,7 +153,10 @@ const voiceMethods = {
       includeLastKnown: true,
     }) || "").trim();
     if (!/^\d{17,22}$/.test(channelId)) return;
-    const desired = stationName ? this.renderVoiceStatusText(stationName) : "";
+    const settings = stationName ? await this.loadGuildSettingsCached?.(guildId).catch(() => null) : null;
+    const desired = stationName
+      ? this.renderVoiceStatusText(stationName, { guildId, template: settings?.voiceStatusTemplate })
+      : "";
     if (!this.shouldRefreshVoiceStatus(state, desired, channelId, { force })) return;
     const guild = this.client.guilds.cache.get(guildId) || null;
     const channel = (guild?.channels?.cache?.get(channelId))
