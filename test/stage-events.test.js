@@ -79,3 +79,47 @@ test("at the start the worker that is Stage moderator plays, not the first free 
   const picked = await pickScheduledEventWorker(runtime, guild, { guildId: guild.id, voiceChannelId: "700000000000000001" }, "pro");
   assert.equal(picked.config.name, "OmniFM 2");
 });
+
+test("a Stage OmniFM opened ends with the stream; one someone else opened stays", async () => {
+  const { ensureRuntimeStageChannelReady } = await import("../src/bot/runtime-voice.js");
+  const { BotRuntime } = await import("../src/bot/runtime.js");
+  const GUILD = "600000000000000009";
+  const deleted = [];
+  const instances = new Map();
+  const guild = {
+    id: GUILD,
+    stageInstances: { fetch: async (channelId) => instances.get(channelId) || null },
+  };
+  const stage = (id, existing = null) => ({
+    id,
+    type: ChannelType.GuildStageVoice,
+    topic: null,
+    stageInstance: existing,
+    permissionsFor: () => ({ has: () => true }),
+    createStageInstance: async ({ topic }) => {
+      const instance = { channelId: id, topic, delete: async () => { deleted.push(id); instances.delete(id); } };
+      instances.set(id, instance);
+      return instance;
+    },
+  });
+
+  const runtime = Object.create(BotRuntime.prototype);
+  runtime.config = { name: "OmniFM 1" };
+  runtime.guildState = new Map([[GUILD, { currentStationKey: "lounge" }]]);
+  runtime.client = { guilds: { cache: new Map([[GUILD, guild]]) } };
+  runtime.resolveBotMember = async () => ({ voice: { channelId: null } });
+  runtime.clearRestoreRetry = () => {};
+  runtime.resetVoiceSession = () => {};
+
+  await ensureRuntimeStageChannelReady(runtime, guild, stage("700000000000000011"), { topic: "Vereinsabend" });
+  assert.equal(runtime.guildState.get(GUILD).ownedStageChannelId, "700000000000000011");
+  assert.equal((await runtime.stopInGuild(GUILD)).ok, true);
+  assert.deepEqual(deleted, ["700000000000000011"], "the Stage (and its server event) ends with the stop");
+  assert.equal(runtime.guildState.get(GUILD).ownedStageChannelId, null);
+
+  const foreign = { channelId: "700000000000000012", topic: "Talk", delete: async () => { deleted.push("foreign"); } };
+  instances.set("700000000000000012", foreign);
+  await ensureRuntimeStageChannelReady(runtime, guild, stage("700000000000000012", foreign), { topic: "Talk" });
+  await runtime.stopInGuild(GUILD);
+  assert.deepEqual(deleted, ["700000000000000011"], "a Stage someone else opened stays open");
+});

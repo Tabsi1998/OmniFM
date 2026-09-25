@@ -84,6 +84,9 @@ export async function ensureRuntimeStageChannelReady(
       );
       return null;
     });
+    // OmniFM opened this Stage, so a stop ends it again (endOwnedStageInstance).
+    const state = stageInstance ? runtime.guildState?.get?.(guild.id) : null;
+    if (state) state.ownedStageChannelId = channel.id;
     if (!stageInstance) {
       stageInstance = channel.stageInstance || await guild.stageInstances.fetch(channel.id).catch(() => null);
     }
@@ -109,6 +112,28 @@ export async function ensureRuntimeStageChannelReady(
   }
 
   return stageInstance;
+}
+
+/**
+ * Ends the Stage OmniFM opened itself, when the stream stops: otherwise the
+ * Stage stays "live" with nobody on it and its server event keeps running
+ * (Discord ends a Stage's event with the Stage). A Stage someone else opened
+ * stays as it is.
+ */
+export async function endOwnedStageInstance(runtime, guildId, state) {
+  const channelId = String(state?.ownedStageChannelId || "").trim();
+  if (!channelId) return false;
+  state.ownedStageChannelId = null;
+  const guild = runtime.client?.guilds?.cache?.get?.(guildId) || null;
+  const instance = guild ? await guild.stageInstances?.fetch?.(channelId).catch(() => null) : null;
+  if (!instance) return false;
+  try {
+    await instance.delete();
+    return true;
+  } catch (err) {
+    log("WARN", `[${runtime.config?.name}] Stage konnte nicht beendet werden (guild=${guildId}, channel=${channelId}): ${err?.message || err}`);
+    return false;
+  }
 }
 
 export async function ensureRuntimeVoiceConnectionForChannel(runtime, guildId, channelId, state, { source = "play" } = {}) {
