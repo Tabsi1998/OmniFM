@@ -32,6 +32,7 @@ import {
 } from '../lib/dashboardVoiceGuard.js';
 import DashboardOnboardingHint from './DashboardOnboardingHint.js';
 import DashboardBotProfile from './DashboardBotProfile.js';
+import DashboardPanelDesigner from './DashboardPanelDesigner.js';
 // The same renderer the bot uses, so the preview is exactly the status (#277).
 import { renderVoiceStatusTemplate } from '../../../src/lib/voice-status-template.js';
 
@@ -1026,6 +1027,8 @@ export default function DashboardSettings({
         </select>
       </div>
       )}
+
+      <DashboardPanelDesigner apiRequest={apiRequest} selectedGuildId={selectedGuildId} t={t} />
 
       <DashboardBotProfile apiRequest={apiRequest} selectedGuildId={selectedGuildId} t={t} />
 

@@ -16,6 +16,7 @@ import { createDashboardExportsRouteHandler } from "./routes/dashboard-exports.j
 import { createDashboardLicenseRouteHandler } from "./routes/dashboard-license.js";
 import { createDashboardPermsRouteHandler } from "./routes/dashboard-perms.js";
 import { createDashboardBotProfileRouteHandler } from "./routes/dashboard-bot-profile.js";
+import { createDashboardPanelDesignRouteHandler } from "./routes/dashboard-panel-design.js";
 import { createDashboardRolesRouteHandler } from "./routes/dashboard-roles.js";
 import { createDashboardSettingsDigestRouteHandler } from "./routes/dashboard-settings-digest.js";
 import { buildWeeklyDigestMessage } from "../services/weekly-digest-service.js";
@@ -608,6 +609,18 @@ const handleDashboardLicenseRoute = createDashboardLicenseRouteHandler({
 
 // The bot's own look per server (#280).
 const handleDashboardBotProfileRoute = createDashboardBotProfileRouteHandler({
+  getDashboardRequestTranslator,
+  getDashboardSession,
+  getLocalizedJsonBodyError,
+  languagePick,
+  methodNotAllowed,
+  resolveDashboardGuildForSession,
+  sendJson,
+  sendLocalizedError,
+});
+
+// The look of the now-playing panel per server (#281).
+const handleDashboardPanelDesignRoute = createDashboardPanelDesignRouteHandler({
   getDashboardRequestTranslator,
   getDashboardSession,
   getLocalizedJsonBodyError,
@@ -3285,6 +3298,9 @@ function startWebServer(runtimes) {
       return;
     }
 
+    if (await handleDashboardPanelDesignRoute({ req, res, requestUrl, readJsonBody, runtimes })) {
+      return;
+    }
     if (await handleDashboardBotProfileRoute({ req, res, requestUrl, readJsonBody, runtimes })) {
       return;
     }
