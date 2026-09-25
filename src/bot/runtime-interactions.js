@@ -45,6 +45,18 @@ export async function handleRuntimeAutocomplete(runtime, interaction) {
 
     const focused = interaction.options.getFocused(true);
 
+    // /poll genre: the genres of the stations on the server's plan (#274).
+    if (focused.name === "genre" && interaction.commandName === "poll") {
+      const available = filterStationsByTier(loadStations().stations, getTier(interaction.guildId));
+      const query = String(focused.value || "").toLowerCase().trim();
+      const genres = [...new Set(Object.values(available).map((station) => String(station?.genre || "").trim()).filter(Boolean))]
+        .filter((genre) => !query || genre.toLowerCase().includes(query))
+        .sort((a, b) => a.localeCompare(b))
+        .slice(0, 25);
+      await interaction.respond(genres.map((genre) => ({ name: clipText(genre, 100), value: clipText(genre, 100) })));
+      return;
+    }
+
     if (focused.name === "station") {
       const stations = loadStations();
       const guildId = interaction.guildId;
@@ -170,6 +182,7 @@ const PRE_PERMISSION_COMMANDS = {
 };
 
 const GENERAL_COMMANDS = {
+  poll: ({ runtime, interaction }) => runtime.handleStationPollCommand(interaction),
   event: SERVER_COMMANDS.event,
   stats: INFO_COMMANDS.stats,
   invite: INFO_COMMANDS.invite,

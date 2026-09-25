@@ -168,6 +168,38 @@ export function buildCommandBuilders() {
     "Deine gemerkten Songs: ansehen und löschen"
   );
 
+  const poll = describe(
+    new SlashCommandBuilder().setName("poll").setNameLocalizations(de("umfrage")),
+    "Let the server vote which station plays next",
+    "Den Server abstimmen lassen, welcher Sender als Nächstes läuft"
+  );
+  withStringOption(poll, "stations", "2 to 10 stations, separated by commas", "2 bis 10 Sender, mit Komma getrennt");
+  withStringOption(poll, "genre", "Or: stations from this genre", "Oder: Sender aus diesem Genre", { autocomplete: true });
+  poll.addIntegerOption((option) => option
+    .setName("count")
+    .setNameLocalizations(de("anzahl"))
+    .setDescription("How many stations from the genre (2-10)")
+    .setDescriptionLocalizations(de("Wie viele Sender aus dem Genre (2-10)"))
+    .setMinValue(2)
+    .setMaxValue(10)
+    .setRequired(false));
+  poll.addStringOption((option) => option
+    .setName("duration")
+    .setNameLocalizations(de("dauer"))
+    .setDescription("How long the vote runs")
+    .setDescriptionLocalizations(de("Wie lange abgestimmt wird"))
+    .setRequired(false)
+    .addChoices(
+      choice("5 min", "5"),
+      choice("15 min", "15"),
+      choice("30 min", "30"),
+      choice("1 h", "60"),
+      choice("3 h", "180"),
+      choice("6 h", "360"),
+      choice("12 h", "720"),
+      choice("24 h", "1440"),
+    ));
+
   const sleep = describe(
     new SlashCommandBuilder().setName("sleep"),
     "Turn the radio off after a while, with a soft fade",
@@ -480,6 +512,7 @@ export function buildCommandBuilders() {
     stats,
     history,
     saved,
+    poll,
     sleep,
     setvolume,
     status,

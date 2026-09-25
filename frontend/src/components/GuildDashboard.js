@@ -35,6 +35,7 @@ const COMMANDS = [
   { id: 'stop', label: '/stop' },
   { id: 'setvolume', label: '/setvolume' },
   { id: 'sleep', label: '/sleep' },
+  { id: 'poll', label: '/poll' },
   { id: 'stations', label: '/stations' },
   { id: 'list', label: '/list' },
   { id: 'now', label: '/now' },

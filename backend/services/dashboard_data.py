@@ -389,7 +389,7 @@ def dashboard_event_station_name(guild_id, station_key):
 def normalize_dashboard_perms(payload):
     body = payload if isinstance(payload, dict) else {}
     incoming = body.get("commandRoleMap") if isinstance(body.get("commandRoleMap"), dict) else {}
-    supported = {"play", "pause", "resume", "stop", "setvolume", "sleep", "stations", "list", "now", "stats", "history", "status", "health", "diag", "addstation", "removestation", "mystations", "event"}
+    supported = {"play", "pause", "resume", "stop", "setvolume", "sleep", "poll", "stations", "list", "now", "stats", "history", "status", "health", "diag", "addstation", "removestation", "mystations", "event"}
     normalized = {}
     for raw_command, raw_roles in incoming.items():
         command = core.clip_text(raw_command, 64).lstrip("/").lower()

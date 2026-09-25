@@ -110,6 +110,7 @@ import { onboardingMethods } from "./runtime-methods/onboarding.js";
 import { favoriteMethods } from "./runtime-methods/favorites.js";
 import { savedSongMethods } from "./runtime-methods/saved-songs.js";
 import { sleepMethods } from "./runtime-methods/sleep.js";
+import { pollMethods } from "./runtime-methods/polls.js";
 import { recordPlaybackPhase } from "./playback-phase.js";
 import { syncAppEmojisSafely } from "../discord/ui/app-emojis.js";
 
@@ -169,6 +170,10 @@ class BotRuntime {
         });
         this.startEventScheduler();
         this.startListenerStatsSampler();
+        // Station polls that ran during a restart are evaluated now (#274).
+        this.restoreStationPolls().catch((err) => {
+          log("WARN", `[${this.config.name}] Umfragen konnten nicht wieder aufgenommen werden: ${err?.message || err}`);
+        });
       } else {
         this.clearCommandsForWorker().catch((err) => {
           log("ERROR", `[${this.config.name}] Worker-Command-Cleanup fehlgeschlagen: ${err?.message || err}`);
@@ -1422,6 +1427,7 @@ Object.assign(
   favoriteMethods,
   savedSongMethods,
   sleepMethods,
+  pollMethods,
 );
 
 const MIME_TYPES = {

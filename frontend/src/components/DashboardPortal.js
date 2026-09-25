@@ -22,7 +22,7 @@ import {
 import { buildDashboardPermissionsHint as buildPermissionsOnboardingHint } from '../lib/dashboardOnboarding.js';
 
 const PERMISSION_COMMANDS = [
-  'play', 'pause', 'resume', 'stop', 'setvolume', 'sleep', 'stations', 'list', 'now', 'stats', 'history', 'status', 'health', 'diag', 'addstation', 'removestation', 'mystations', 'event',
+  'play', 'pause', 'resume', 'stop', 'setvolume', 'sleep', 'poll', 'stations', 'list', 'now', 'stats', 'history', 'status', 'health', 'diag', 'addstation', 'removestation', 'mystations', 'event',
 ];
 const EMPTY_SESSION = { authenticated: false, oauthConfigured: null, user: null, guilds: [] };
 const EMPTY_EVENT_FORM = Object.freeze({
