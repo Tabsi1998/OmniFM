@@ -41,6 +41,7 @@ import { getRuntimeConnectedChannelId, isRuntimePlaybackActive } from "../runtim
 import { runRuntimeFailbackProbe, keepRuntimeFailoverStation } from "../runtime-streams.js";
 import {
   NP_PREFIX,
+  SHARE_CARDS_ENABLED,
   getTierConfig,
 } from "../runtime-shared.js";
 import { derivePlaybackPhase } from "../playback-phase.js";
@@ -776,6 +777,7 @@ const nowPlayingMethods = {
       notices: { serverMuted: context?.serverMuted === true, failover },
       recent,
       favorites: this.role === "commander" ? [] : (this.getVisibleFavoriteStations?.(guildId) || []),
+      shareEnabled: SHARE_CARDS_ENABLED && this.role !== "commander",
       searchQuery: this.buildTrackSearchQuery(station, meta) || null,
       musicBrainzUrl: musicBrainzUrlFor(meta),
       fallbackImageUrl: this.client?.user?.displayAvatarURL?.({ extension: "png", size: 256 }) || null,
@@ -1019,6 +1021,8 @@ const nowPlayingMethods = {
       return true;
     }
     const action = String(interaction.customId || "").slice(NP_PREFIX.length);
+    // "Share" (#282): the now-playing card, posted in the channel.
+    if (action === "share") return this.handleShareCardControl(interaction);
     // "Report a problem" (#273): the form, then the report for the owner.
     if (action === "report") return this.showProblemReportForm(interaction);
     if (action === "reportform" && interaction.isModalSubmit?.()) return this.handleProblemReportSubmit(interaction);

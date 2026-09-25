@@ -109,6 +109,7 @@ import { voiceMethods } from "./runtime-methods/voice.js";
 import { onboardingMethods } from "./runtime-methods/onboarding.js";
 import { favoriteMethods } from "./runtime-methods/favorites.js";
 import { formMethods } from "./runtime-methods/forms.js";
+import { shareMethods } from "./runtime-methods/share.js";
 import { savedSongMethods } from "./runtime-methods/saved-songs.js";
 import { sleepMethods } from "./runtime-methods/sleep.js";
 import { pollMethods } from "./runtime-methods/polls.js";
@@ -1427,6 +1428,7 @@ Object.assign(
   onboardingMethods,
   favoriteMethods,
   formMethods,
+  shareMethods,
   savedSongMethods,
   sleepMethods,
   pollMethods,

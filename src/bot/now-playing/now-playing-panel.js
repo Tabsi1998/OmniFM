@@ -94,6 +94,8 @@ export function buildNowPlayingPanel(input) {
     ]),
   ];
   if (track.hasTrack && track.album) details.push(ui.subtext(`💿 ${clip(track.album, 120)}`));
+  // #282: MusicBrainz as a link in the text, so the button row has room for "Share".
+  if (track.hasTrack && input.musicBrainzUrl) details.push(ui.subtext(`[MusicBrainz](${input.musicBrainzUrl})`));
 
   const warnings = [];
   if (!track.hasTrack && track.metadataHint) warnings.push(`> ${ui.icon("info", appId)} ${clip(track.metadataHint, 300)}`);
@@ -156,7 +158,9 @@ export function buildNowPlayingPanel(input) {
   }
   // #273: "Report a problem" is always there, next to the song links when there are some.
   const reportButton = button(`${NP_PREFIX}report`, { label: t("Problem melden", "Report a problem"), emoji: "warning", appId });
-  if (!input.searchQuery) rows.push(new ActionRowBuilder().addComponents(reportButton));
+  // #282: the card to post in the channel.
+  const shareButton = input.shareEnabled === false ? null : button(`${NP_PREFIX}share`, { label: t("Teilen", "Share"), emoji: "link", appId });
+  if (!input.searchQuery) rows.push(new ActionRowBuilder().addComponents(...[shareButton, reportButton].filter(Boolean)));
   if (input.searchQuery) {
     const query = encodeURIComponent(input.searchQuery);
     const links = [
@@ -165,8 +169,7 @@ export function buildNowPlayingPanel(input) {
       linkButton(`https://open.spotify.com/search/${query}`, "Spotify", null, appId),
       linkButton(`https://www.youtube.com/results?search_query=${query}`, "YouTube", null, appId),
     ];
-    if (input.musicBrainzUrl) links.push(linkButton(input.musicBrainzUrl, "MusicBrainz", null, appId));
-    rows.push(new ActionRowBuilder().addComponents(...links, reportButton));
+    rows.push(new ActionRowBuilder().addComponents(...[links[0], shareButton, ...links.slice(1), reportButton].filter(Boolean)));
   }
 
   const footerParts = [

@@ -99,7 +99,14 @@ function StationCard({ station, index, isPlaying, onPlay, onStop, copy }) {
 function StationBrowser({ stations, loading }) {
   const { copy, formatNumber, locale } = useI18n();
   const player = usePlayer();
-  const [search, setSearch] = useState('');
+  // A shared link (#279) lands on /stations?station=<key>: start with that station.
+  const [search, setSearch] = useState(() => {
+    try {
+      return new URLSearchParams(window.location.search).get('station')?.slice(0, 80) || '';
+    } catch {
+      return '';
+    }
+  });
   const [activeTier, setActiveTier] = useState(null);
   const [visibleCount, setVisibleCount] = useState(8);
   // activeKey = ausgewählter Sender (auch bei Fehler), playingKey = wirklich spielend.
