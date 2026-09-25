@@ -11,6 +11,7 @@ import { tierColor } from "../brand-embed.js";
 import { STATIONS_COMPONENT_ID_OPEN } from "../runtime-links.js";
 import { colorSquare } from "../station-browser.js";
 import { NP_PREFIX } from "../runtime-shared.js";
+import { normalizePanelDesign } from "../../lib/panel-design.js";
 
 function clip(value, max) {
   const textValue = String(value ?? "").trim();
@@ -57,15 +58,18 @@ function linkButton(url, label, emoji, appId) {
  * @param {string|null} [input.musicBrainzUrl]
  * @param {string|null} [input.fallbackImageUrl] bot avatar when neither cover nor logo exists
  * @param {number} [input.pollSeconds]
+ * @param {object} [input.design] the server's panel look (#281), see panel-design.js
  */
 export function buildNowPlayingPanel(input) {
   const { t, applicationId: appId = null, station = {}, track = {}, playback = {}, notices = {} } = input;
   const stationName = clip(station.name || station.key || "-", 100);
+  const design = normalizePanelDesign(input.design);
+  const show = design.buttons;
 
-  // Accent: the station's own colour (#267), else the plan colour; without a
-  // recognised title amber, like the old embed.
-  const accent = Number.isInteger(station.color) ? station.color
-    : (track.hasTrack ? tierColor(input.planTier) : ui.UI_COLORS.warning);
+  // Accent: the server's own colour (#281), else the station's (#267), else
+  // the plan colour; without a recognised title amber, like the old embed.
+  const accent = design.accentColor ?? (Number.isInteger(station.color) ? station.color
+    : (track.hasTrack ? tierColor(input.planTier) : ui.UI_COLORS.warning));
 
   const headLines = [
     ui.subtext(`${phaseLabel(playback.phase, playback.paused, t, appId)} · ${clip(input.workerName || "OmniFM", 60)}`),
@@ -113,9 +117,12 @@ export function buildNowPlayingPanel(input) {
     )}`);
   }
 
-  const recent = (input.recent || []).map((title) => clip(title, 60)).filter(Boolean).slice(0, 3);
+  const recent = design.showRecent
+    ? (input.recent || []).map((title) => clip(title, 60)).filter(Boolean).slice(0, 3)
+    : [];
 
-  const controls = new ActionRowBuilder().addComponents(
+  // Pause and Stop always stay; the rest follows the server's design (#281).
+  const controls = new ActionRowBuilder().addComponents(...[
     button(`${NP_PREFIX}toggle`, {
       label: playback.paused ? t("Weiter", "Resume") : "Pause",
       emoji: playback.paused ? "play" : "pause",
@@ -123,13 +130,13 @@ export function buildNowPlayingPanel(input) {
       appId,
     }),
     button(`${NP_PREFIX}stop`, { label: "Stop", emoji: "stop", style: ButtonStyle.Danger, appId }),
-    button(`${NP_PREFIX}voldown`, { label: "−", appId }),
-    button(`${NP_PREFIX}volup`, { label: "+", appId }),
-    button(STATIONS_COMPONENT_ID_OPEN, { label: t("Sender", "Stations"), emoji: "radio", style: ButtonStyle.Primary, appId }),
-  );
+    show.volume ? button(`${NP_PREFIX}voldown`, { label: "−", appId }) : null,
+    show.volume ? button(`${NP_PREFIX}volup`, { label: "+", appId }) : null,
+    show.stations ? button(STATIONS_COMPONENT_ID_OPEN, { label: t("Sender", "Stations"), emoji: "radio", style: ButtonStyle.Primary, appId }) : null,
+  ].filter(Boolean));
   const rows = [controls];
   // #276: the server's favourite stations as quick buttons.
-  const favorites = (input.favorites || [])
+  const favorites = (show.favorites ? input.favorites || [] : [])
     .filter((favorite) => favorite?.key && `${NP_PREFIX}fav:${favorite.key}`.length <= 100)
     .slice(0, 5);
   if (favorites.length) {
@@ -157,20 +164,20 @@ export function buildNowPlayingPanel(input) {
     ));
   }
   // #273: "Report a problem" is always there, next to the song links when there are some.
-  const reportButton = button(`${NP_PREFIX}report`, { label: t("Problem melden", "Report a problem"), emoji: "warning", appId });
+  const reportButton = show.report ? button(`${NP_PREFIX}report`, { label: t("Problem melden", "Report a problem"), emoji: "warning", appId }) : null;
   // #282: the card to post in the channel.
-  const shareButton = input.shareEnabled === false ? null : button(`${NP_PREFIX}share`, { label: t("Teilen", "Share"), emoji: "link", appId });
-  if (!input.searchQuery) rows.push(new ActionRowBuilder().addComponents(...[shareButton, reportButton].filter(Boolean)));
-  if (input.searchQuery) {
-    const query = encodeURIComponent(input.searchQuery);
-    const links = [
-      // #272: personal, so it sits with the song links, not the controls.
-      button(`${NP_PREFIX}save`, { label: t("Merken", "Save"), emoji: "save", appId }),
-      linkButton(`https://open.spotify.com/search/${query}`, "Spotify", null, appId),
-      linkButton(`https://www.youtube.com/results?search_query=${query}`, "YouTube", null, appId),
-    ];
-    rows.push(new ActionRowBuilder().addComponents(...[links[0], shareButton, ...links.slice(1), reportButton].filter(Boolean)));
-  }
+  const shareButton = input.shareEnabled === false || !show.share ? null : button(`${NP_PREFIX}share`, { label: t("Teilen", "Share"), emoji: "link", appId });
+  const query = input.searchQuery ? encodeURIComponent(input.searchQuery) : "";
+  const songRow = [
+    // #272: personal, so it sits with the song links, not the controls.
+    query && show.save ? button(`${NP_PREFIX}save`, { label: t("Merken", "Save"), emoji: "save", appId }) : null,
+    shareButton,
+    query && show.links ? linkButton(`https://open.spotify.com/search/${query}`, "Spotify", null, appId) : null,
+    query && show.links ? linkButton(`https://www.youtube.com/results?search_query=${query}`, "YouTube", null, appId) : null,
+    reportButton,
+  ].filter(Boolean);
+  // Discord refuses an empty row, so a row with every button switched off goes.
+  if (songRow.length) rows.push(new ActionRowBuilder().addComponents(...songRow));
 
   const footerParts = [
     track.sourceLabel || null,

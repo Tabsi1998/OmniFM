@@ -47,6 +47,7 @@ import {
 import { derivePlaybackPhase } from "../playback-phase.js";
 import { isComponentsV2Message } from "../../discord/ui/index.js";
 import { buildNowPlayingPanel } from "./now-playing-panel.js";
+import { effectivePanelDesign, panelDesignSignature } from "../../lib/panel-design.js";
 
 // #266: the panel is a Components V2 container. NOW_PLAYING_LAYOUT=classic
 // keeps the old embed for one release as a way back.
@@ -782,7 +783,19 @@ const nowPlayingMethods = {
       musicBrainzUrl: musicBrainzUrlFor(meta),
       fallbackImageUrl: this.client?.user?.displayAvatarURL?.({ extension: "png", size: 256 }) || null,
       pollSeconds: Math.round(NOW_PLAYING_POLL_MS / 1000),
+      design: this.getPanelDesign(guildId),
     });
+  },
+
+  /** The server's panel look from the dashboard (#281); the standard look without Premium. */
+  getPanelDesign(guildId) {
+    let stored;
+    try {
+      stored = this.getCachedGuildSettings?.(guildId)?.panelDesign || null;
+    } catch {
+      stored = null;
+    }
+    return effectivePanelDesign(stored, getTierConfig(guildId).tier);
   },
 
   recordSongHistory(guildId, state, station, meta) {
@@ -947,7 +960,8 @@ const nowPlayingMethods = {
       // The favourites come from the settings; a changed list re-renders the panel (#276).
       await this.loadGuildSettingsCached?.(guildId).catch(() => null);
       const favoritesKey = (this.getVisibleFavoriteStations?.(guildId) || []).map((favorite) => favorite.key).join(",");
-      const signature = `${buildNowPlayingSignature(stationKey, nextMeta, state, channel.id)}|fav:${favoritesKey}`;
+      const designKey = panelDesignSignature(this.getPanelDesign(guildId));
+      const signature = `${buildNowPlayingSignature(stationKey, nextMeta, state, channel.id)}|fav:${favoritesKey}|design:${designKey}`;
 
       if (!force && signature === state.nowPlayingSignature) {
         return;
