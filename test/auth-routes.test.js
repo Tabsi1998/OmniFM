@@ -93,6 +93,33 @@ test("discord login stores only trusted frontend origins in oauth state", async 
   assert.match(res.payload.authUrl, /redirect_uri=https%3A%2F%2Fapp\.example%2Fapi%2Fauth%2Fdiscord%2Fcallback/);
 });
 
+test("the login link of the server dashboard sends the browser on to Discord, not to a JSON page", async () => {
+  // Live 2026-09-25: "Mit Discord anmelden" (a plain link with ?redirect=1) showed the JSON.
+  let stored = null;
+  const handler = createAuthRouteHandler({ setDashboardOauthState: (_token, payload) => { stored = payload; } });
+  const res = createResponseCapture();
+  await handler({
+    req: { method: "GET", headers: {} },
+    res,
+    requestUrl: new URL("http://localhost/api/auth/discord/login?redirect=1&nextPage=dashboard"),
+    publicUrl: "https://app.example",
+  });
+  assert.equal(res.statusCode, 302);
+  assert.match(res.headers.Location, /^https:\/\/discord\.example\/authorize\?state=.+&redirect_uri=https%3A%2F%2Fapp\.example/);
+  assert.equal(stored.nextPage, "dashboard");
+
+  const notConfigured = createAuthRouteHandler({ isDiscordOauthConfigured: () => false });
+  const refused = createResponseCapture();
+  await notConfigured({
+    req: { method: "GET", headers: {} },
+    res: refused,
+    requestUrl: new URL("http://localhost/api/auth/discord/login?redirect=1"),
+    publicUrl: "https://app.example",
+  });
+  assert.equal(refused.statusCode, 302);
+  assert.equal(refused.headers.Location, "https://app.example/?page=dashboard&authError=oauth_not_configured&lang=de");
+});
+
 test("discord callback falls back to the configured frontend origin and keeps the saved language", async () => {
   let storedSessionToken = "";
   let storedSessionPayload = null;
