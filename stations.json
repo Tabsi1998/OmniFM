@@ -11,602 +11,947 @@
     "groovesalad": {
       "name": "Groove Salad",
       "url": "https://ice4.somafm.com/groovesalad-128-mp3",
-      "tier": "free"
+      "tier": "free",
+      "genre": "Ambient",
+      "color": "#14B8A6",
+      "country": "US",
+      "logo": "https://api.somafm.com/logos/512/groovesalad512.png",
+      "homepage": "https://somafm.com/groovesalad/"
     },
     "dronezone": {
       "name": "Drone Zone",
       "url": "https://ice4.somafm.com/dronezone-128-mp3",
-      "tier": "free"
+      "tier": "free",
+      "genre": "Ambient",
+      "color": "#14B8A6",
+      "country": "US",
+      "logo": "https://api.somafm.com/logos/512/dronezone512.png",
+      "homepage": "https://somafm.com/dronezone/"
     },
     "deepspaceone": {
       "name": "Deep Space One",
       "url": "https://ice4.somafm.com/deepspaceone-128-mp3",
-      "tier": "free"
+      "tier": "free",
+      "genre": "Ambient",
+      "color": "#14B8A6",
+      "country": "US",
+      "logo": "https://api.somafm.com/logos/512/deepspaceone512.png",
+      "homepage": "https://somafm.com/deepspaceone/"
     },
     "spacestation": {
       "name": "Space Station",
       "url": "https://ice4.somafm.com/spacestation-128-mp3",
-      "tier": "free"
+      "tier": "free",
+      "genre": "Electronic",
+      "color": "#8B5CF6",
+      "country": "US",
+      "logo": "https://api.somafm.com/logos/512/spacestation512.png",
+      "homepage": "https://somafm.com/spacestation/"
     },
     "beatblender": {
       "name": "Beat Blender",
       "url": "https://ice4.somafm.com/beatblender-128-mp3",
-      "tier": "free"
+      "tier": "free",
+      "genre": "Electronic",
+      "color": "#8B5CF6",
+      "country": "US",
+      "logo": "https://api.somafm.com/logos/512/beatblender512.png",
+      "homepage": "https://somafm.com/beatblender/"
     },
     "poptron": {
       "name": "PopTron",
       "url": "https://ice4.somafm.com/poptron-128-mp3",
-      "tier": "free"
+      "tier": "free",
+      "genre": "Indie & Alternative",
+      "color": "#0EA5E9",
+      "country": "US",
+      "logo": "https://api.somafm.com/logos/512/poptron512.png",
+      "homepage": "https://somafm.com/poptron/"
     },
     "u80s": {
       "name": "Underground 80s",
       "url": "https://ice4.somafm.com/u80s-128-mp3",
-      "tier": "free"
+      "tier": "free",
+      "genre": "80s & Synthpop",
+      "color": "#F472B6",
+      "country": "US",
+      "logo": "https://api.somafm.com/logos/512/u80s512.png",
+      "homepage": "https://somafm.com/u80s/"
     },
     "metal": {
       "name": "Metal Detector",
       "url": "https://ice4.somafm.com/metal-128-mp3",
-      "tier": "free"
+      "tier": "free",
+      "genre": "Metal",
+      "color": "#B91C1C",
+      "country": "US",
+      "logo": "https://api.somafm.com/logos/512/metal512.png",
+      "homepage": "https://somafm.com/metal/"
     },
     "lush": {
       "name": "Lush",
       "url": "https://ice4.somafm.com/lush-128-mp3",
-      "tier": "free"
+      "tier": "free",
+      "genre": "Electronic",
+      "color": "#8B5CF6",
+      "country": "US",
+      "logo": "https://api.somafm.com/logos/512/lush512.png",
+      "homepage": "https://somafm.com/lush/"
     },
     "thetrip": {
       "name": "The Trip",
       "url": "https://ice4.somafm.com/thetrip-128-mp3",
-      "tier": "free"
+      "tier": "free",
+      "genre": "Electronic",
+      "color": "#8B5CF6",
+      "country": "US",
+      "logo": "https://api.somafm.com/logos/512/thetrip512.jpg",
+      "homepage": "https://somafm.com/thetrip/"
     },
     "classicalradio": {
       "name": "Classical Radio",
       "url": "https://stream.srg-ssr.ch/m/rsc_de/mp3_128",
-      "tier": "free"
+      "tier": "free",
+      "genre": "Classical",
+      "color": "#2563EB"
     },
     "bluesradio": {
       "name": "Blues Radio",
       "url": "https://stream.laut.fm/blues",
-      "tier": "free"
+      "tier": "free",
+      "genre": "Blues",
+      "color": "#1D4ED8",
+      "country": "DE"
     },
     "jazzradio": {
       "name": "Jazz Radio",
       "url": "https://jazzradio.ice.infomaniak.ch/jazzradio-high.mp3",
-      "tier": "free"
+      "tier": "free",
+      "genre": "Jazz",
+      "color": "#CA8A04"
     },
     "reggaeradio": {
       "name": "Reggae Radio",
       "url": "http://streams.bigfm.de/bigfm-reggaevibes-128-mp3",
-      "tier": "free"
+      "tier": "free",
+      "genre": "Reggae & Dancehall",
+      "color": "#16A34A",
+      "country": "DE"
     },
     "chartsradio": {
       "name": "Charts Radio",
       "url": "https://streams.ilovemusic.de/iloveradio1.mp3",
-      "tier": "free"
+      "tier": "free",
+      "genre": "Pop & Charts",
+      "color": "#EC4899",
+      "country": "DE"
     },
     "technoradio": {
       "name": "Techno Radio",
       "url": "https://streams.ilovemusic.de/iloveradio2.mp3",
-      "tier": "free"
+      "tier": "free",
+      "genre": "EDM & Festival",
+      "color": "#D946EF",
+      "country": "DE"
     },
     "rockradio": {
       "name": "Rock Radio",
       "url": "https://streams.ilovemusic.de/iloveradio4.mp3",
-      "tier": "free"
+      "tier": "free",
+      "genre": "Rock",
+      "color": "#DC2626",
+      "country": "DE"
     },
     "chilloutradio": {
       "name": "Chillout Radio",
       "url": "https://streams.ilovemusic.de/iloveradio10.mp3",
-      "tier": "free"
+      "tier": "free",
+      "genre": "Chillout",
+      "color": "#38BDF8",
+      "country": "DE"
     },
     "hiphopradio": {
       "name": "Hip Hop Radio",
       "url": "https://streams.ilovemusic.de/iloveradio6.mp3",
-      "tier": "free"
+      "tier": "free",
+      "genre": "Hip Hop & Rap",
+      "color": "#F59E0B",
+      "country": "DE",
+      "language": "de"
     },
     "loungebot": {
       "name": "Lounge Radio",
       "url": "https://ice4.somafm.com/secretagent-128-mp3",
-      "tier": "free"
+      "tier": "free",
+      "genre": "Lounge",
+      "color": "#D4A373",
+      "country": "US"
     },
     "pro_edm_01": {
       "name": "Festival Anthems",
       "url": "https://streams.ilovemusic.de/iloveradio22.mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "EDM & Festival",
+      "color": "#D946EF",
+      "country": "DE"
     },
     "pro_edm_02": {
       "name": "Big Room Arena",
       "url": "http://streams.bigfm.de/nitrox-128-mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "EDM & Festival",
+      "color": "#D946EF",
+      "country": "DE"
     },
     "pro_edm_03": {
       "name": "Mainstage Energy",
       "url": "http://stream.sunshine-live.de/edm/mp3-192/stream.sunshine-live.de/",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "EDM & Festival",
+      "color": "#D946EF",
+      "country": "DE"
     },
     "pro_tml_01": {
       "name": "Tomorrowland - One World Radio",
       "url": "https://tomorrowland.my105.ch/oneworldradio.mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "EDM & Festival",
+      "color": "#D946EF",
+      "country": "CH"
     },
     "pro_tml_02": {
       "name": "Tomorrowland - Daybreak Sessions",
       "url": "https://playerservices.streamtheworld.com/api/livestream-redirect/OWR_DAYBREAK.mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "EDM & Festival",
+      "color": "#D946EF"
     },
     "pro_tml_03": {
       "name": "Tomorrowland - Anthems",
       "url": "https://playerservices.streamtheworld.com/api/livestream-redirect/OWR_ANTHEMS.mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "EDM & Festival",
+      "color": "#D946EF"
     },
     "pro_sl_01": {
       "name": "Sunshine Live",
       "url": "http://stream.sunshine-live.de/live/mp3-192/",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Electronic",
+      "color": "#8B5CF6",
+      "country": "DE"
     },
     "pro_charts_01": {
       "name": "bigFM Charts",
       "url": "http://streams.bigfm.de/bigfm-charts-128-mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Pop & Charts",
+      "color": "#EC4899",
+      "country": "DE"
     },
     "pro_edm_05": {
       "name": "Progressive Arena",
       "url": "https://stream.technolovers.fm/electro-house?ref=radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "EDM & Festival",
+      "color": "#D946EF"
     },
     "pro_edm_06": {
       "name": "Future Dance",
-      "url": "https://streams.ilovemusic.de/iloveradio103.mp3",
-      "tier": "pro"
+      "url": "https://stream.technolovers.fm/edm",
+      "tier": "pro",
+      "genre": "EDM & Festival",
+      "color": "#D946EF"
     },
     "pro_edm_07": {
       "name": "Club Bangers",
       "url": "https://dancewave.online/dance.mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "EDM & Festival",
+      "color": "#D946EF"
     },
     "pro_edm_08": {
       "name": "Peak Time EDM",
       "url": "http://streams.bigfm.de/bigfm-dance-128-mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "EDM & Festival",
+      "color": "#D946EF",
+      "country": "DE"
     },
     "pro_schlager_01": {
       "name": "Schlager",
       "url": "https://stream.regenbogen.de/exschlager/mp3-192/",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Schlager & Party",
+      "color": "#FB923C",
+      "country": "DE",
+      "language": "de"
     },
     "pro_edm_10": {
       "name": "Ibiza Vibes",
       "url": "https://stream.technolovers.fm/ibiza-house?ref=radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "EDM & Festival",
+      "color": "#D946EF"
     },
     "pro_malle_01": {
       "name": "Mallorca Party",
       "url": "https://n17a-eu.rcs.revma.com/fmmmpr?rj-ttl=5&rj-tok=AAABnIY51kkAmUHAFcAIi5ej2w",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Schlager & Party",
+      "color": "#FB923C",
+      "language": "de"
     },
     "pro_edm_13": {
       "name": "Festival Classics",
       "url": "https://streams.ilovemusic.de/iloveradio26.mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "EDM & Festival",
+      "color": "#D946EF",
+      "country": "DE"
     },
     "pro_edm_14": {
       "name": "Aftermovie Sound",
       "url": "https://streams.ilovemusic.de/iloveradio28.mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "EDM & Festival",
+      "color": "#D946EF",
+      "country": "DE"
     },
     "pro_edm_15": {
       "name": "Rave Essentials",
       "url": "https://breakz-high.rautemusik.fm/?ref=radiobrowser-top100-djcharts",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "EDM & Festival",
+      "color": "#D946EF",
+      "country": "DE"
     },
     "pro_edm_18": {
       "name": "Hard EDM",
       "url": "https://stream.sunshine-live.de/hard/mp3-192/stream.sunshine-live.de/",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Hardstyle & Hardcore",
+      "color": "#EF4444",
+      "country": "DE"
     },
     "pro_edm_19": {
       "name": "EDM Workout",
       "url": "https://streams.ilovemusic.de/iloveradio23.mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "EDM & Festival",
+      "color": "#D946EF",
+      "country": "DE"
     },
     "pro_tech_01": {
       "name": "Peak Time Techno",
       "url": "http://stream.sunshine-live.de/techno/mp3-192/stream.sunshine-live.de/",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Techno",
+      "color": "#7C3AED",
+      "country": "DE"
     },
     "pro_tech_02": {
       "name": "Hard Techno",
       "url": "https://stream.technolovers.fm/hypertechno?ref=radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Techno",
+      "color": "#7C3AED"
     },
     "pro_tech_03": {
       "name": "Minimal Techno",
       "url": "https://stream.technolovers.fm/minimal?ref=radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Techno",
+      "color": "#7C3AED"
     },
     "pro_tech_04": {
       "name": "Melodic Techno",
       "url": "https://stream.technolovers.fm/melodic-house-techno?ref=radiobrowser-2",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Techno",
+      "color": "#7C3AED"
     },
     "pro_tech_05": {
       "name": "Industrial Techno",
       "url": "http://79.120.12.130:8000/industrialtechno",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Techno",
+      "color": "#7C3AED"
     },
     "pro_tech_06": {
       "name": "Warehouse Berlin",
       "url": "http://streams.90s90s.de/techno/mp3-192/radiode/",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Techno",
+      "color": "#7C3AED",
+      "country": "DE"
     },
     "pro_tech_07": {
       "name": "Afterhours Techno",
       "url": "https://stream.technolovers.fm/techhouse?ref=radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Techno",
+      "color": "#7C3AED"
     },
     "pro_tech_08": {
       "name": "Detroit Techno",
       "url": "http://79.120.77.11:8000/techno",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Techno",
+      "color": "#7C3AED"
     },
     "pro_tech_09": {
       "name": "Dark Techno",
       "url": "http://79.111.14.76:8000/darktechno",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Techno",
+      "color": "#7C3AED"
     },
     "pro_tech_10": {
       "name": "Acid Techno",
       "url": "https://streams.rautemusik.fm/techno/mp3-192?ref=radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Techno",
+      "color": "#7C3AED",
+      "country": "DE"
     },
     "pro_tech_11": {
       "name": "Suburbs of Goa",
       "url": "https://ice1.somafm.com/suburbsofgoa-128-mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "World",
+      "color": "#10B981",
+      "country": "US",
+      "logo": "https://api.somafm.com/logos/512/suburbsofgoa512.png",
+      "homepage": "https://somafm.com/suburbsofgoa/"
     },
     "pro_tech_12": {
       "name": "Raw Techno",
       "url": "https://stream.technolovers.fm/techno?ref=radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Techno",
+      "color": "#7C3AED"
     },
     "pro_tech_13": {
       "name": "Hypnotic Techno",
       "url": "http://strm112.1.fm/deeptech_mobile_mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Techno",
+      "color": "#7C3AED"
     },
     "pro_tech_14": {
       "name": "Hardgroove",
       "url": "http://79.111.119.111:8000/mintechhouse",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Techno",
+      "color": "#7C3AED"
     },
     "pro_tech_15": {
       "name": "Rave Techno",
-      "url": "http://lw2.mp3.tb-group.fm/tb.mp3",
-      "tier": "pro"
+      "url": "https://streams.rautemusik.fm/harder/mp3-192/",
+      "tier": "pro",
+      "genre": "Techno",
+      "color": "#7C3AED",
+      "country": "DE"
     },
     "pro_tech_16": {
       "name": "Deep Underground",
       "url": "https://stream.bigfm.de/deeptechhouse/mp3-128/radio-browser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Techno",
+      "color": "#7C3AED",
+      "country": "DE"
     },
     "pro_tech_17": {
       "name": "Techno Classics",
       "url": "https://stream.laut.fm/techno_classics",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Techno",
+      "color": "#7C3AED",
+      "country": "DE"
     },
     "pro_tech_18": {
       "name": "Peak Rave",
       "url": "https://playerservices.streamtheworld.com/api/livestream-redirect/Q_DANCE.mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Techno",
+      "color": "#7C3AED"
     },
     "pro_tech_19": {
       "name": "Minimal Grooves",
       "url": "https://ice4.somafm.com/cliqhop-128-mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Electronic",
+      "color": "#8B5CF6",
+      "country": "US"
     },
     "pro_tech_20": {
       "name": "Night Warehouse",
-      "url": "https://ice4.somafm.com/scanner-128-mp3",
-      "tier": "pro"
+      "url": "https://stream.technolovers.fm/dark-techno",
+      "tier": "pro",
+      "genre": "Techno",
+      "color": "#7C3AED"
     },
     "pro_trance_01": {
       "name": "Uplifting Trance",
       "url": "https://stream.technolovers.fm/uplifting-trance?ref=radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Trance",
+      "color": "#3B82F6"
     },
     "pro_trance_02": {
       "name": "Vocal Trance",
       "url": "https://stream.technolovers.fm/vocal-trance?ref=radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Trance",
+      "color": "#3B82F6"
     },
     "pro_trance_03": {
       "name": "Classic Trance",
       "url": "http://listen.trancebase.fm/tunein-aac-hd-pls",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Trance",
+      "color": "#3B82F6",
+      "country": "DE"
     },
     "pro_trance_04": {
       "name": "Progressive Trance",
       "url": "https://stream.laut.fm/progressive-trance-mix",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Trance",
+      "color": "#3B82F6",
+      "country": "DE"
     },
     "pro_trance_05": {
       "name": "Psy Trance",
       "url": "https://stream.technolovers.fm/psytrance?ref=radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Trance",
+      "color": "#3B82F6"
     },
     "pro_trance_06": {
       "name": "Goa Trance",
       "url": "http://cast.magicstreams.gr:9111/stream",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Trance",
+      "color": "#3B82F6"
     },
     "pro_trance_07": {
       "name": "Tech Trance",
       "url": "https://stream.technolovers.fm/trance?ref=radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Trance",
+      "color": "#3B82F6"
     },
     "pro_trance_08": {
       "name": "Trance Anthems",
       "url": "http://cast.streams.ovh:8008/stream",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Trance",
+      "color": "#3B82F6"
     },
     "pro_trance_09": {
       "name": "Melodic Trance",
       "url": "https://radiorecord.hostingradio.ru/trancehouse96.aacp",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Trance",
+      "color": "#3B82F6",
+      "country": "RU"
     },
     "pro_trance_10": {
       "name": "Trance Reloaded",
       "url": "https://radiorecord.hostingradio.ru/trancehits96.aacp",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Trance",
+      "color": "#3B82F6",
+      "country": "RU"
     },
     "pro_hard_01": {
       "name": "Hardstyle Arena",
       "url": "https://stream.technolovers.fm/hardstyle?ref=radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Hardstyle & Hardcore",
+      "color": "#EF4444"
     },
     "pro_hard_02": {
       "name": "Rawstyle",
       "url": "https://radiorecord.hostingradio.ru/teo96.aacp",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Hardstyle & Hardcore",
+      "color": "#EF4444",
+      "country": "RU"
     },
     "pro_hard_03": {
       "name": "Hardcore",
       "url": "http://shoutcast1.hardcoreradio.nl/",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Hardstyle & Hardcore",
+      "color": "#EF4444",
+      "country": "NL"
     },
     "pro_hard_04": {
       "name": "Frenchcore",
       "url": "https://stream.technolovers.fm/frenchcore?ref=radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Hardstyle & Hardcore",
+      "color": "#EF4444"
     },
     "pro_hard_05": {
       "name": "Uptempo",
       "url": "https://stream.technolovers.fm/gabber?ref=radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Hardstyle & Hardcore",
+      "color": "#EF4444"
     },
     "pro_hard_06": {
       "name": "Hard Dance",
       "url": "http://mp3.stream.tb-group.fm/hb.mp3?",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Hardstyle & Hardcore",
+      "color": "#EF4444",
+      "country": "DE"
     },
     "pro_hard_07": {
       "name": "Reverse Bass",
       "url": "https://streams.ilovemusic.de/iloveradio21.mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Hardstyle & Hardcore",
+      "color": "#EF4444",
+      "country": "DE"
     },
     "pro_hard_08": {
       "name": "Jumpstyle",
       "url": "https://stream.realhardstyle.nl/",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Hardstyle & Hardcore",
+      "color": "#EF4444",
+      "country": "NL"
     },
     "pro_hard_09": {
       "name": "Defqon Style",
       "url": "http://listen.hardbase.fm/tunein-aac-hd-pls",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Hardstyle & Hardcore",
+      "color": "#EF4444",
+      "country": "DE"
     },
     "pro_hard_10": {
       "name": "Harder Reloaded",
       "url": "http://79.111.14.76:8002/hardstyle",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Hardstyle & Hardcore",
+      "color": "#EF4444"
     },
     "pro_house_01": {
       "name": "Deep House Lounge",
       "url": "https://stream.technolovers.fm/deep-house?ref=radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "House",
+      "color": "#06B6D4"
     },
     "pro_house_02": {
       "name": "Tech House Club",
       "url": "http://stream.sunshine-live.de/sp4/mp3-192/stream.sunshine-live.de/",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "House",
+      "color": "#06B6D4",
+      "country": "DE"
     },
     "pro_house_03": {
       "name": "Afro House",
       "url": "https://stream.technolovers.fm/afro-house?ref=radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "House",
+      "color": "#06B6D4"
     },
     "pro_house_04": {
       "name": "Tropical House",
       "url": "https://stream.technolovers.fm/tropical-house?ref=radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "House",
+      "color": "#06B6D4"
     },
     "pro_house_05": {
       "name": "Ibiza Sunset",
       "url": "http://streams.bigfm.de/bigfm-sunsetlounge-128-mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "House",
+      "color": "#06B6D4",
+      "country": "DE"
     },
     "pro_house_06": {
       "name": "Soulful House",
-      "url": "https://ice4.somafm.com/7soul-128-mp3",
-      "tier": "pro"
+      "url": "https://streams.rautemusik.fm/house/mp3-192/",
+      "tier": "pro",
+      "genre": "House",
+      "color": "#06B6D4",
+      "country": "DE"
     },
     "pro_house_07": {
       "name": "Disco House",
       "url": "https://stream1.468.gr/8004/stream",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "House",
+      "color": "#06B6D4"
     },
     "pro_house_08": {
       "name": "French House",
       "url": "https://stream.technolovers.fm/funky-house?ref=radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "House",
+      "color": "#06B6D4"
     },
     "pro_house_09": {
       "name": "Minimal House",
       "url": "http://orion.shoutca.st:8750/",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "House",
+      "color": "#06B6D4"
     },
     "pro_house_10": {
       "name": "Latin House",
       "url": "https://stream.technolovers.fm/latinhouse?ref=radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "House",
+      "color": "#06B6D4"
     },
     "pro_house_11": {
       "name": "Organic House",
       "url": "https://dfm-organichouse.hostingradio.ru/organichouse96.aacp",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "House",
+      "color": "#06B6D4",
+      "country": "RU"
     },
     "pro_house_12": {
       "name": "Club House",
-      "url": "https://radio.edm1.fm/proxy/15_clubhouse?mp=/stream",
-      "tier": "pro"
+      "url": "http://radio.edm1.fm/proxy/15_clubhouse?mp=/stream",
+      "tier": "pro",
+      "genre": "House",
+      "color": "#06B6D4"
     },
     "pro_house_13": {
       "name": "Future House",
       "url": "https://stream.technolovers.fm/future-house?ref=radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "House",
+      "color": "#06B6D4"
     },
     "pro_house_14": {
       "name": "Vocal House",
       "url": "https://stream.technolovers.fm/house?ref=radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "House",
+      "color": "#06B6D4"
     },
     "pro_house_15": {
       "name": "House Classics",
       "url": "http://listen.housetime.fm/tunein-aac-hd-pls",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "House",
+      "color": "#06B6D4",
+      "country": "DE"
     },
     "pro_urban_01": {
       "name": "HipHop US",
       "url": "http://streams.bigfm.de/bigfm-usrap-128-aac",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Hip Hop & Rap",
+      "color": "#F59E0B",
+      "country": "DE"
     },
     "pro_urban_02": {
       "name": "Deutschrap",
       "url": "http://streams.bigfm.de/bigfm-deutschrap-128-mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Hip Hop & Rap",
+      "color": "#F59E0B",
+      "country": "DE",
+      "language": "de"
     },
     "pro_urban_03": {
       "name": "Trap Nation",
       "url": "https://stream.technolovers.fm/trap?ref=radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Hip Hop & Rap",
+      "color": "#F59E0B"
     },
     "pro_urban_04": {
       "name": "Drill Beats",
       "url": "http://streams.bigfm.de/bigfm-rapfeature-128-mp3?usid=0-0-H-M-D-60",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Hip Hop & Rap",
+      "color": "#F59E0B",
+      "country": "DE",
+      "language": "de"
     },
     "pro_urban_05": {
       "name": "R&B Smooth",
       "url": "http://streams.bigfm.de/bigfm-rnb-128-mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "R&B",
+      "color": "#A855F7",
+      "country": "DE"
     },
     "pro_urban_06": {
       "name": "Afrobeats",
       "url": "https://stream.bigfm.de/dancehall/mp3-128/radio-browser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Reggae & Dancehall",
+      "color": "#16A34A",
+      "country": "DE"
     },
     "pro_urban_07": {
       "name": "Reggaeton",
       "url": "https://reggaeton-fm.stream.laut.fm/reggaeton-fm",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Latin",
+      "color": "#F97316",
+      "country": "DE"
     },
     "pro_urban_08": {
       "name": "Oldschool HipHop",
       "url": "http://streams.bigfm.de/bigfm-oldschool-128-mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Hip Hop & Rap",
+      "color": "#F59E0B",
+      "country": "DE"
     },
     "pro_urban_09": {
       "name": "LoFi Beats",
       "url": "https://stream.bigfm.de/lofifocus/mp3-128/radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Lo-Fi",
+      "color": "#94A3B8",
+      "country": "DE"
     },
     "pro_urban_10": {
       "name": "Latin Urban",
       "url": "http://streams.bigfm.de/bigfm-latinbeats-128-mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Latin",
+      "color": "#F97316",
+      "country": "DE"
     },
     "pro_urban_11": {
       "name": "Urban Charts",
       "url": "http://streams.bigfm.de/bigfm-urbanclubbeats-128-mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Hip Hop & Rap",
+      "color": "#F59E0B",
+      "country": "DE"
     },
     "pro_urban_12": {
       "name": "Smooth Grooves",
       "url": "http://streams.bigfm.de/bigfm-groovenight-128-mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "R&B",
+      "color": "#A855F7",
+      "country": "DE"
     },
     "pro_urban_13": {
       "name": "Bass & Trap",
       "url": "https://streams.ilovemusic.de/iloveradio29.mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Hip Hop & Rap",
+      "color": "#F59E0B",
+      "country": "DE"
     },
     "pro_urban_14": {
       "name": "Chill R&B",
       "url": "https://stream.bigfm.de/slowjamz/mp3-128/radiobrowser",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "R&B",
+      "color": "#A855F7",
+      "country": "DE"
     },
     "pro_urban_15": {
       "name": "Street Vibes",
       "url": "http://listen.181fm.com/181-beat_128k.mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Hip Hop & Rap",
+      "color": "#F59E0B",
+      "country": "US"
     },
     "pro_rock_01": {
       "name": "Classic Rock",
       "url": "http://streams.radiobob.de/bob-classicrock/mp3-192/streams.radiobob.de/",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Rock",
+      "color": "#DC2626",
+      "country": "DE"
     },
     "pro_rock_02": {
       "name": "Hard Rock",
       "url": "http://streams.radiobob.de/bob-hartesaite/mp3-192/streams.radiobob.de/",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Rock",
+      "color": "#DC2626",
+      "country": "DE"
     },
     "pro_rock_03": {
       "name": "Indie Rock",
       "url": "https://ice4.somafm.com/indiepop-128-mp3",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Indie & Alternative",
+      "color": "#0EA5E9",
+      "country": "US"
     },
     "pro_rock_04": {
       "name": "Alternative",
       "url": "http://streams.radiobob.de/bob-alternative/mp3-192/streams.radiobob.de/",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Indie & Alternative",
+      "color": "#0EA5E9",
+      "country": "DE"
     },
     "pro_rock_05": {
       "name": "Metal Arena",
       "url": "http://streams.radiobob.de/bob-metal/mp3-192/streams.radiobob.de/",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Metal",
+      "color": "#B91C1C",
+      "country": "DE"
     },
     "pro_rock_06": {
       "name": "Nu Metal",
       "url": "https://streams.radiobob.de/numetal/mp3-192/",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Metal",
+      "color": "#B91C1C",
+      "country": "DE"
     },
     "pro_rock_07": {
       "name": "Pop Punk",
       "url": "http://streams.radiobob.de/bob-punk/mp3-192/streams.radiobob.de/",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Rock",
+      "color": "#DC2626",
+      "country": "DE"
     },
     "pro_rock_08": {
       "name": "Grunge",
       "url": "http://streams.radiobob.de/bob-grunge/mp3-192/streams.radiobob.de/",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Rock",
+      "color": "#DC2626",
+      "country": "DE"
     },
     "pro_rock_09": {
       "name": "Prog Rock",
       "url": "https://streams.radiobob.de/progrock/mp3-192/",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Rock",
+      "color": "#DC2626",
+      "country": "DE"
     },
     "pro_rock_10": {
       "name": "Rock Classics",
       "url": "http://streams.radiobob.de/bob-bestofrock/mp3-192/streams.radiobob.de/",
-      "tier": "pro"
+      "tier": "pro",
+      "genre": "Rock",
+      "color": "#DC2626",
+      "country": "DE"
     }
   }
 }

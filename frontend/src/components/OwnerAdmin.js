@@ -333,8 +333,49 @@ export default function OwnerAdmin() {
     if (section === 'archive') loadArchive();
   }, [authed, section, loadStations, loadAudit, loadArchive]);
 
-  const openNewStation = () => { setStTest(null); setStMsg(null); setStForm({ key: '', name: '', url: '', tier: 'free', genre: '', _isNew: true }); };
-  const openEditStation = (s) => { setStTest(null); setStMsg(null); setStForm({ key: s.key, name: s.name, url: s.url, tier: s.tier, genre: s.genre || '', _isNew: false }); };
+  const emptyCatalogFields = { country: '', language: '', color: '', logo: '', homepage: '' };
+  const openNewStation = () => { setStTest(null); setStMsg(null); setStForm({ key: '', name: '', url: '', tier: 'free', genre: '', ...emptyCatalogFields, _isNew: true }); };
+  const openEditStation = (s) => {
+    setStTest(null);
+    setStMsg(null);
+    setStForm({
+      key: s.key, name: s.name, url: s.url, tier: s.tier, genre: s.genre || '',
+      country: s.country || '', language: s.language || '', color: s.color || '', logo: s.logo || '', homepage: s.homepage || '',
+      _isNew: false,
+    });
+  };
+  // Proposes the station colour from its logo (#267): the average of the
+  // coloured pixels. Needs the logo host to allow it (CORS); otherwise the
+  // owner picks the colour by hand.
+  const suggestColorFromLogo = () => {
+    if (!stForm?.logo) return;
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 24;
+        canvas.height = 24;
+        const context = canvas.getContext('2d');
+        context.drawImage(image, 0, 0, 24, 24);
+        const { data } = context.getImageData(0, 0, 24, 24);
+        let r = 0; let g = 0; let b = 0; let count = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          const [pr, pg, pb, alpha] = [data[i], data[i + 1], data[i + 2], data[i + 3]];
+          const spread = Math.max(pr, pg, pb) - Math.min(pr, pg, pb);
+          if (alpha < 128 || spread < 40) continue; // transparent, white, black or grey
+          r += pr; g += pg; b += pb; count += 1;
+        }
+        if (!count) { setStMsg({ ok: false, text: 'Im Logo ist keine klare Farbe – bitte selbst wählen.' }); return; }
+        const hex = [r, g, b].map((value) => Math.round(value / count).toString(16).padStart(2, '0')).join('');
+        setStForm((form) => ({ ...form, color: `#${hex.toUpperCase()}` }));
+      } catch {
+        setStMsg({ ok: false, text: 'Der Logo-Server erlaubt keinen Farbzugriff – bitte Farbe selbst wählen.' });
+      }
+    };
+    image.onerror = () => setStMsg({ ok: false, text: 'Logo konnte nicht geladen werden.' });
+    image.src = stForm.logo;
+  };
   const closeStationForm = () => { setStForm(null); setStTest(null); };
 
   const testStationUrl = async (url) => {
@@ -350,7 +391,10 @@ export default function OwnerAdmin() {
     if (!stForm) return;
     setStBusy(true); setStMsg(null);
     try {
-      await apiSend('/api/admin/stations', 'POST', { key: stForm.key, name: stForm.name, url: stForm.url, tier: stForm.tier, genre: stForm.genre });
+      await apiSend('/api/admin/stations', 'POST', {
+        key: stForm.key, name: stForm.name, url: stForm.url, tier: stForm.tier, genre: stForm.genre,
+        country: stForm.country, language: stForm.language, color: stForm.color, logo: stForm.logo, homepage: stForm.homepage,
+      });
       setStMsg({ ok: true, text: stForm._isNew ? 'Station angelegt.' : 'Station gespeichert.' });
       setStForm(null); setStTest(null);
       await loadStations();
@@ -1191,7 +1235,34 @@ export default function OwnerAdmin() {
                   </div>
                   <div>
                     <label className="oa-stat-label">Genre</label>
-                    <input className="oa-input" style={{ marginTop: 6, fontFamily: 'DM Sans' }} value={stForm.genre} placeholder="z.B. Lo-Fi / Chill" onChange={(e) => setStForm({ ...stForm, genre: e.target.value })} data-testid="station-input-genre" />
+                    <input className="oa-input" style={{ marginTop: 6, fontFamily: 'DM Sans' }} value={stForm.genre} placeholder="z.B. Techno" onChange={(e) => setStForm({ ...stForm, genre: e.target.value })} data-testid="station-input-genre" />
+                  </div>
+                  <div>
+                    <label className="oa-stat-label">Land</label>
+                    <input className="oa-input" style={{ marginTop: 6 }} value={stForm.country} placeholder="z.B. DE" onChange={(e) => setStForm({ ...stForm, country: e.target.value })} data-testid="station-input-country" />
+                  </div>
+                  <div>
+                    <label className="oa-stat-label">Sprache</label>
+                    <input className="oa-input" style={{ marginTop: 6 }} value={stForm.language} placeholder="z.B. de" onChange={(e) => setStForm({ ...stForm, language: e.target.value })} data-testid="station-input-language" />
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label className="oa-stat-label">Logo (https-Link)</label>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 6, alignItems: 'center' }}>
+                      {stForm.logo && <img src={stForm.logo} alt="" width={40} height={40} style={{ borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />}
+                      <input className="oa-input" value={stForm.logo} placeholder="https://…/logo.png" onChange={(e) => setStForm({ ...stForm, logo: e.target.value })} data-testid="station-input-logo" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="oa-stat-label">Farbe (Akzent im Now-Playing-Panel)</label>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 6, alignItems: 'center' }}>
+                      <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(stForm.color) ? stForm.color : '#FF6B00'} onChange={(e) => setStForm({ ...stForm, color: e.target.value.toUpperCase() })} style={{ width: 46, height: 46, border: 'none', background: 'none' }} data-testid="station-input-color-picker" />
+                      <input className="oa-input oa-mono" value={stForm.color} placeholder="#7C3AED" onChange={(e) => setStForm({ ...stForm, color: e.target.value })} data-testid="station-input-color" />
+                      <button type="button" className="oa-btn ghost" style={{ height: 46, whiteSpace: 'nowrap' }} disabled={!stForm.logo} onClick={suggestColorFromLogo} data-testid="station-color-from-logo">Aus Logo</button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="oa-stat-label">Homepage (https-Link)</label>
+                    <input className="oa-input" style={{ marginTop: 6 }} value={stForm.homepage} placeholder="https://…" onChange={(e) => setStForm({ ...stForm, homepage: e.target.value })} data-testid="station-input-homepage" />
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
@@ -1211,7 +1282,14 @@ export default function OwnerAdmin() {
                     return (
                     <tr key={s.key || i} data-testid={`station-row-${s.key}`}>
                       <td className="oa-mono" style={{ fontSize: 12, color: '#94a3b8' }}>{s.key}{s.isDefault && <span className="oa-pill orange" style={{ marginLeft: 8, padding: '2px 7px' }}>default</span>}</td>
-                      <td style={{ fontWeight: 600 }}>{s.name}</td>
+                      <td style={{ fontWeight: 600 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                          {s.logo
+                            ? <img src={s.logo} alt="" width={22} height={22} loading="lazy" style={{ borderRadius: 5, objectFit: 'cover' }} />
+                            : <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color || '#475569', display: 'inline-block' }} />}
+                          {s.name}
+                        </span>
+                      </td>
                       <td style={{ color: '#94a3b8' }}>{s.genre || '—'}</td>
                       <td><span className={`oa-pill ${s.tier === 'ultimate' ? 'orange' : s.tier === 'pro' ? 'cyan' : 'slate'}`}>{String(s.tier || 'free').toUpperCase()}</span></td>
                       <td data-testid={`station-status-${s.key}`}>
