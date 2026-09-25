@@ -31,6 +31,7 @@ import {
   normalizeDashboardVoiceGuardConfig,
 } from '../lib/dashboardVoiceGuard.js';
 import DashboardOnboardingHint from './DashboardOnboardingHint.js';
+import DashboardBotProfile from './DashboardBotProfile.js';
 // The same renderer the bot uses, so the preview is exactly the status (#277).
 import { renderVoiceStatusTemplate } from '../../../src/lib/voice-status-template.js';
 
@@ -1025,6 +1026,8 @@ export default function DashboardSettings({
         </select>
       </div>
       )}
+
+      <DashboardBotProfile apiRequest={apiRequest} selectedGuildId={selectedGuildId} t={t} />
 
       <div data-testid="settings-exports-webhooks" style={{ background: '#0A0A0A', border: '1px solid #1A1A2E', padding: 16, opacity: canManageExports ? 1 : 0.5 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>

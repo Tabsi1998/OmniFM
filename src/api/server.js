@@ -15,6 +15,7 @@ import { createDashboardEventsRouteHandler } from "./routes/dashboard-events.js"
 import { createDashboardExportsRouteHandler } from "./routes/dashboard-exports.js";
 import { createDashboardLicenseRouteHandler } from "./routes/dashboard-license.js";
 import { createDashboardPermsRouteHandler } from "./routes/dashboard-perms.js";
+import { createDashboardBotProfileRouteHandler } from "./routes/dashboard-bot-profile.js";
 import { createDashboardRolesRouteHandler } from "./routes/dashboard-roles.js";
 import { createDashboardSettingsDigestRouteHandler } from "./routes/dashboard-settings-digest.js";
 import { buildWeeklyDigestMessage } from "../services/weekly-digest-service.js";
@@ -596,6 +597,18 @@ const handleDashboardLicenseRoute = createDashboardLicenseRouteHandler({
   serverHasCapability,
   unlinkServerFromLicense,
   updateLicenseContactEmail,
+});
+
+// The bot's own look per server (#280).
+const handleDashboardBotProfileRoute = createDashboardBotProfileRouteHandler({
+  getDashboardRequestTranslator,
+  getDashboardSession,
+  getLocalizedJsonBodyError,
+  languagePick,
+  methodNotAllowed,
+  resolveDashboardGuildForSession,
+  sendJson,
+  sendLocalizedError,
 });
 
 const handleDashboardPermsRoute = createDashboardPermsRouteHandler({
@@ -3184,8 +3197,9 @@ function startWebServer(runtimes) {
       });
     }
 
-    async function readJsonBody() {
-      const raw = await readRawBody();
+    // A route may allow a larger body, e.g. the bot look's pictures (#280).
+    async function readJsonBody({ maxBytes } = {}) {
+      const raw = await readRawBody(maxBytes);
       if (!raw.trim()) return {};
       try {
         return JSON.parse(raw);
@@ -3233,6 +3247,10 @@ function startWebServer(runtimes) {
       return;
     }
     if (await handleDashboardEventsRoute({ req, res, requestUrl, readJsonBody, runtimes })) {
+      return;
+    }
+
+    if (await handleDashboardBotProfileRoute({ req, res, requestUrl, readJsonBody, runtimes })) {
       return;
     }
 
