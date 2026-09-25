@@ -23,6 +23,7 @@ import {
 import { normalizePermissionCommandName, isPermissionManagedCommand } from "../../config/command-permissions.js";
 import { getGuildLanguage, setGuildLanguage, resetGuildLanguage } from "../../guild-language-store.js";
 import { BRAND } from "../../config/plans.js";
+import { buildNoticePayload } from "../commands/command-helpers.js";
 import { normalizeLanguage, getDefaultLanguage } from "../../i18n.js";
 import { botLimitEmbed } from "../../ui/upgradeEmbeds.js";
 import {
@@ -172,7 +173,7 @@ const permissionMethods = {
       const result = setCommandRolePermission(guildId, command, role.id, sub);
       if (!result.ok) {
         const storeMessage = translatePermissionStoreMessage(result.message, language);
-        await interaction.reply({ content: t(`Fehler: ${storeMessage}`, `Error: ${storeMessage}`), flags: MessageFlags.Ephemeral });
+        await interaction.reply(buildNoticePayload({ t, language: this.resolveInteractionLanguage(interaction), code: "failed", params: { detail: storeMessage } }));
         return;
       }
       await this.respondLongInteraction(
@@ -190,7 +191,7 @@ const permissionMethods = {
       const result = removeCommandRolePermission(guildId, command, role.id);
       if (!result.ok) {
         const storeMessage = translatePermissionStoreMessage(result.message, language);
-        await interaction.reply({ content: t(`Fehler: ${storeMessage}`, `Error: ${storeMessage}`), flags: MessageFlags.Ephemeral });
+        await interaction.reply(buildNoticePayload({ t, language: this.resolveInteractionLanguage(interaction), code: "failed", params: { detail: storeMessage } }));
         return;
       }
       await this.respondLongInteraction(
@@ -207,7 +208,7 @@ const permissionMethods = {
       const result = resetCommandPermissions(guildId, command || null);
       if (!result.ok) {
         const storeMessage = translatePermissionStoreMessage(result.message, language);
-        await interaction.reply({ content: t(`Fehler: ${storeMessage}`, `Error: ${storeMessage}`), flags: MessageFlags.Ephemeral });
+        await interaction.reply(buildNoticePayload({ t, language: this.resolveInteractionLanguage(interaction), code: "failed", params: { detail: storeMessage } }));
         return;
       }
 
@@ -261,7 +262,7 @@ const permissionMethods = {
       return;
     }
 
-    await interaction.reply({ content: t("Unbekannte /perm Aktion.", "Unknown /perm action."), flags: MessageFlags.Ephemeral });
+    await interaction.reply(buildNoticePayload({ t, language: this.resolveInteractionLanguage(interaction), code: "unknown-action", params: { command: "/perm" } }));
   },
 
   async handleLanguageCommand(interaction) {
@@ -333,7 +334,7 @@ const permissionMethods = {
       return;
     }
 
-    await interaction.reply({ content: t("Unbekannte /language Aktion.", "Unknown /language action."), flags: MessageFlags.Ephemeral });
+    await interaction.reply(buildNoticePayload({ t, language: this.resolveInteractionLanguage(interaction), code: "unknown-action", params: { command: "/language" } }));
   },
 
   resolveGuildLanguage(guildId) {
@@ -450,7 +451,15 @@ const permissionMethods = {
         const { t } = this.createInteractionTranslator(interaction);
         editPayload.content = t("Es ist ein Fehler aufgetreten.", "An error occurred.");
       }
-      return interaction.editReply(editPayload);
+      try {
+        return await interaction.editReply(editPayload);
+      } catch (error) {
+        // A classic answer ("Verbinde Worker …") cannot be edited into a
+        // Components V2 notice or back (#270): it goes, the new one follows.
+        if (!interaction.replied) throw error;
+        await interaction.deleteReply?.().catch(() => null);
+        return interaction.followUp({ ...finalPayload, flags: Number(finalPayload.flags || 0) | MessageFlags.Ephemeral });
+      }
     }
     return interaction.reply(finalPayload);
   },

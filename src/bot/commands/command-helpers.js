@@ -20,6 +20,8 @@ import {
   withLanguageParam,
 } from "../runtime-links.js";
 import { buildOmniEmbed } from "../discord-ui.js";
+import * as ui from "../../discord/ui/index.js";
+import { NOTICE_CATALOG } from "../../discord/ui/notice-catalog.js";
 
 export async function deferRuntimeReply(interaction) {
   if (interaction?.deferred || interaction?.replied || typeof interaction?.deferReply !== "function") return;
@@ -116,20 +118,58 @@ export function buildSupportRow(language, {
   return new ActionRowBuilder().addComponents(...components.slice(0, 5));
 }
 
+const TONE_KINDS = { info: "info", success: "success", warning: "warning", danger: "error", error: "error", premium: "premium", neutral: "info" };
+
+/** The button that fixes a catalogued problem (#270). */
+export function buildNoticeFixRow(fix, t, language) {
+  const button = new ButtonBuilder();
+  if (fix === "quickstart") {
+    button.setCustomId(PLAY_COMPONENT_ID_OPEN).setStyle(ButtonStyle.Primary).setLabel(t("Schnellstart öffnen", "Open quick start"));
+  } else if (fix === "stations") {
+    button.setCustomId(STATIONS_COMPONENT_ID_OPEN).setStyle(ButtonStyle.Primary).setLabel(t("Anderen Sender wählen", "Pick another station"));
+  } else if (fix === "premium") {
+    button.setStyle(ButtonStyle.Link).setURL(withLanguageParam(BRAND.upgradeUrl || WEBSITE_URL, language)).setLabel(t("Premium ansehen", "See Premium"));
+  } else if (fix === "permissions") {
+    button.setStyle(ButtonStyle.Link).setURL(withLanguageParam(`${String(WEBSITE_URL).replace(/\/+$/, "")}/faq`, language))
+      .setLabel(t("So gibst du die Rechte", "How to grant them"));
+  } else {
+    return null;
+  }
+  return new ActionRowBuilder().addComponents(button);
+}
+
+/**
+ * A notice in the design system (#264, #270): a container in the colour of
+ * its tone, private. With `code` the text and the fix button come from the
+ * notice catalog; `title`/`description` still work for one-off texts.
+ */
 export function buildNoticePayload({
   t,
   language,
   tone = "info",
   title,
   description,
+  code = null,
+  params = {},
   fields = [],
   quickActions = null,
   supportActions = null,
   extraComponents = [],
 } = {}) {
+  const entry = code ? NOTICE_CATALOG[code] : null;
+  const kind = entry?.kind || TONE_KINDS[tone] || "info";
+  const style = ui.NOTICE_KINDS[kind] || ui.NOTICE_KINDS.info;
+  const translate = typeof t === "function" ? t : (de) => de;
+  const heading = entry ? `${ui.icon(style.icon)} ${translate(...entry.title)}` : String(title || "");
+  const bodyText = entry ? translate(...entry.body(params)) : String(description || "");
+
   const rows = [];
+  if (entry?.fix) {
+    const fixRow = buildNoticeFixRow(entry.fix, translate, language);
+    if (fixRow) rows.push(fixRow);
+  }
   if (quickActions) {
-    const quickRow = buildQuickActionRow(t, quickActions);
+    const quickRow = buildQuickActionRow(translate, quickActions);
     if (quickRow) rows.push(quickRow);
   }
   if (supportActions) {
@@ -139,18 +179,21 @@ export function buildNoticePayload({
   for (const row of Array.isArray(extraComponents) ? extraComponents : []) {
     if (row) rows.push(row);
   }
-  return {
-    embeds: [
-      buildOmniEmbed({
-        tone,
-        title,
-        description,
-        fields,
-      }),
-    ],
-    components: rows,
-    flags: MessageFlags.Ephemeral,
-  };
+
+  const body = [];
+  if (bodyText) body.push(ui.text(clipText(bodyText, 3000)));
+  const fieldText = (Array.isArray(fields) ? fields : [])
+    .filter((field) => field && (field.name || field.value))
+    .map((field) => ui.field(field.name, clipText(String(field.value ?? ""), 1000)))
+    .join("\n\n");
+  if (fieldText) body.push(ui.text(fieldText));
+
+  return ui.reply(ui.panel({
+    accent: tone === "neutral" && !entry ? ui.UI_COLORS.neutral : style.color,
+    title: heading,
+    body,
+    actions: rows.slice(0, 5),
+  }));
 }
 
 export function formatWorkerList(workers = []) {
