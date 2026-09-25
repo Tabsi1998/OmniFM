@@ -41,17 +41,17 @@ function normalizeGuildSettings(rawSettings = {}) {
     delete normalized.guildId;
   }
 
+  if (normalizedWeeklyDigestLastSent) {
+    normalized.weeklyDigestLastSent = normalizedWeeklyDigestLastSent;
+  } else {
+    delete normalized.weeklyDigestLastSent;
+  }
+
   const voiceStatusTemplate = normalizeVoiceStatusTemplate(input.voiceStatusTemplate);
   if (voiceStatusTemplate) {
     normalized.voiceStatusTemplate = voiceStatusTemplate;
   } else {
     delete normalized.voiceStatusTemplate;
-  }
-
-  if (normalizedWeeklyDigestLastSent) {
-    normalized.weeklyDigestLastSent = normalizedWeeklyDigestLastSent;
-  } else {
-    delete normalized.weeklyDigestLastSent;
   }
 
   return normalized;
