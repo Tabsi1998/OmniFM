@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Save, Plus, Trash2, CheckCircle2, XCircle, Bot, CreditCard, Building2,
-  Tag, Terminal, ShieldCheck, Info, Star, Heart, Settings2, Mail, Music2, History, Fingerprint, Globe2, BellRing,
+  Tag, Terminal, ShieldCheck, Info, Star, Heart, Mail, Music2, History, Fingerprint, Globe2, BellRing,
 } from 'lucide-react';
 import { discordRedirectUriFor, secretInputValue } from '../lib/ownerConfigSecrets.js';
 
@@ -55,12 +55,18 @@ function Toggle({ label, checked, onChange, testid }) {
   );
 }
 
-function SaveBar({ onSave, saving, msg, testid }) {
+// Stays at the bottom of the page and says when something is not saved yet (#356).
+function SaveBar({ onSave, saving, msg, testid, dirty = false }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 8 }}>
-      <button className="oa-btn primary" onClick={onSave} disabled={saving} data-testid={testid}>
+    <div data-testid={`${testid}-bar`} style={{ position: 'sticky', bottom: 0, zIndex: 5, display: 'flex', alignItems: 'center', gap: 14, marginTop: 8, padding: '10px 0', background: 'var(--oa-bg, #0b1120)', borderTop: dirty ? '1px solid #fab219' : '1px solid transparent' }}>
+      <button className="oa-btn primary" onClick={onSave} disabled={saving || !dirty} data-testid={testid}>
         <Save size={16} /> {saving ? 'Speichert…' : 'Speichern'}
       </button>
+      {dirty && !saving && (
+        <span data-testid={`${testid}-dirty`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: '#fab219' }}>
+          ! Ungespeicherte Änderungen
+        </span>
+      )}
       {msg && (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: msg.ok ? '#10b981' : '#ff8fab' }}>
           {msg.ok ? <CheckCircle2 size={15} /> : <XCircle size={15} />} {msg.text}
@@ -75,7 +81,7 @@ const toCents = (v) => Math.max(0, Math.round(parseFloat(String(v).replace(',', 
 const featuresText = (arr) => (Array.isArray(arr) ? arr.join('\n') : '');
 const textToFeatures = (t) => String(t || '').split('\n').map((s) => s.trim()).filter(Boolean);
 
-export default function OwnerConfig({ section, apiGet, apiSend, token }) {
+export default function OwnerConfig({ section, part = null, apiGet, apiSend, token }) {
   const [company, setCompany] = useState(null);
   const [plans, setPlans] = useState(null);
   const [discord, setDiscord] = useState(null);
@@ -87,19 +93,32 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
   const [logs, setLogs] = useState(null);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
-  const [systemTest, setSystemTest] = useState(null);
   const [alertTest, setAlertTest] = useState(null);
   const [loadError, setLoadError] = useState('');
+  // What the server sent, per section: a difference means unsaved changes.
+  const [loaded, setLoaded] = useState({});
 
   const load = useCallback(async () => {
     setLoadError('');
     try {
       const d = await apiGet('/api/admin/config', token);
       setCompany(d.company); setPlans(d.plans); setDiscord(d.discord); setPayments(d.payments); setMarketing(d.marketing); setSystem(d.system); setRecoverySettings(Array.isArray(d.recoverySettings) ? d.recoverySettings : []); setEnv(d.env || {});
+      setLoaded({ company: JSON.stringify(d.company), plans: JSON.stringify(d.plans), discord: JSON.stringify(d.discord), payments: JSON.stringify(d.payments), marketing: JSON.stringify(d.marketing), system: JSON.stringify(d.system) });
     } catch (error) { setLoadError(error?.message || 'Konfiguration konnte nicht geladen werden.'); }
   }, [apiGet, token]);
 
   useEffect(() => { load(); }, [load]);
+
+  const current = { company, plans, discord, payments, marketing, system };
+  const isDirty = (sec) => current[sec] != null && loaded[sec] !== undefined && JSON.stringify(current[sec]) !== loaded[sec];
+  const anyDirty = Object.keys(current).some(isDirty);
+  // Leaving the page with unsaved changes asks first.
+  useEffect(() => {
+    if (!anyDirty) return undefined;
+    const warn = (event) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [anyDirty]);
   useEffect(() => { setMsg(null); }, [section]);
   useEffect(() => {
     if (section === 'discord') apiGet('/api/admin/discord/logs', token).then(setLogs).catch(() => {});
@@ -150,18 +169,11 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
     // Typed text shows; a stored secret (sent as a mask) stays hidden (see ownerConfigSecrets.js).
     const secretValue = secretInputValue;
     const secretHint = (group, key) => group?.[`${key}Set`] ? 'Bereits gesetzt – leer lassen, um den Wert beizubehalten.' : 'Wird verschlüsselt übertragen und nie wieder angezeigt.';
-    const testSystem = async () => {
-      setSystemTest({ loading: true });
-      try { setSystemTest(await apiSend('/api/admin/integrations/test', 'POST', { integration: 'all' })); }
-      catch (error) { setSystemTest({ ok: false, error: error.message }); }
-    };
+    // #356: the system settings are spread over the pages where they are looked for.
+    const show = (name) => !part || part === name;
     return (
       <div className="oa-fade" data-testid="config-system">
-        <div className="oa-card" style={{ marginBottom: 18 }}>
-          <div className="oa-section-title"><Settings2 size={15} /> Zentrale System-Konfiguration</div>
-          <div style={{ fontSize: 13, color: '#94a3b8' }}>Diese Werte werden dauerhaft in MongoDB gespeichert. Bot-Runtime-Einstellungen werden beim nächsten Neustart übernommen; Web-Funktionen sofort.</div>
-        </div>
-
+        {show('login') && (
         <div className="oa-card" style={{ marginBottom: 18 }}>
           <div className="oa-section-title"><Fingerprint size={15} /> Discord OAuth Login</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 18px' }}>
@@ -175,7 +187,9 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
             <Field label="Scopes" value={oauth.scopes} onChange={(v) => setGroup('discordOAuth', 'scopes', v)} placeholder="identify guilds" testid="cfg-oauth-scopes" />
           </div>
         </div>
+        )}
 
+        {show('email') && (
         <div className="oa-card" style={{ marginBottom: 18 }}>
           <div className="oa-section-title"><Mail size={15} /> E-Mail Versand (SMTP)</div>
           <Toggle label="SMTP aktivieren" checked={!!smtp.enabled} onChange={(v) => setGroup('smtp', 'enabled', v)} testid="cfg-smtp-enabled" />
@@ -188,7 +202,9 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
           </div>
           <Toggle label="TLS-Verbindung (SMTPS)" checked={!!smtp.secure} onChange={(v) => setGroup('smtp', 'secure', v)} testid="cfg-smtp-secure" />
         </div>
+        )}
 
+        {show('recognition') && (
         <div className="oa-grid cols-2" style={{ marginBottom: 18 }}>
           <div className="oa-card">
             <div className="oa-section-title"><Music2 size={15} /> Audio Song-Erkennung</div>
@@ -201,7 +217,9 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
             <Field label="Max. Einträge pro Server" value={history.maxPerGuild} onChange={(v) => setGroup('songHistory', 'maxPerGuild', Math.max(10, parseInt(v, 10) || 100))} type="number" testid="cfg-history-max" />
           </div>
         </div>
+        )}
 
+        {show('alerts') && (
         <div className="oa-card" style={{ marginBottom: 18 }} data-testid="cfg-operator-alerts">
           <div className="oa-section-title"><BellRing size={15} /> Betreiber-Alarme (Discord)</div>
           <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 14 }}>
@@ -244,7 +262,10 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
           )}
           <div style={{ fontSize: 12, color: '#64748b', marginTop: 8 }}>Der Testalarm nutzt die gespeicherte URL: erst speichern, dann testen.</div>
         </div>
+        )}
 
+        {show('streams') && (
+          <>
         <div className="oa-card" style={{ marginBottom: 18 }} data-testid="cfg-station-health">
           <div className="oa-section-title"><Globe2 size={15} /> Automatische Sender-Überwachung</div>
           <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 14 }}>Die Sender werden in kleinen Round-Robin-Batches geprüft. Zwei aufeinanderfolgende Fehler erzeugen einen Incident; eine Erholung wird ebenfalls protokolliert. Änderungen werden beim nächsten Bot-Neustart aktiv.</div>
@@ -314,7 +335,10 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
             </button>
           )}
         </div>
+          </>
+        )}
 
+        {show('directories') && (
         <div className="oa-card" style={{ marginBottom: 18 }}>
           <div className="oa-section-title"><Globe2 size={15} /> Technische Bot-Verzeichnis-Integrationen</div>
           <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 14 }}>Private API-Tokens, Webhook-Secrets, Bot-IDs und Statistik-Sync. Diese Daten steuern die technische Anbindung und werden nicht öffentlich angezeigt. Öffentliche Profil-Links pflegst du separat unter „Marketing & Listings“.</div>
@@ -345,23 +369,9 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
             })}
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <SaveBar onSave={() => save('system', system)} saving={saving} msg={msg} testid="cfg-system-save" />
-          <button className="oa-btn ghost" onClick={testSystem} disabled={systemTest?.loading} data-testid="cfg-system-test">
-            <ShieldCheck size={16} /> {systemTest?.loading ? 'Prüft…' : 'Alle Integrationen prüfen'}
-          </button>
-        </div>
-        {systemTest?.results && (
-          <div className="oa-grid cols-3" style={{ marginTop: 16 }}>
-            {Object.entries(systemTest.results).map(([key, result]) => (
-              <div key={key} className="oa-card" style={{ padding: 14, borderColor: result.ok ? '#10b981' : '#ef476f' }}>
-                <div style={{ fontWeight: 800, color: result.ok ? '#10b981' : '#ff8fab' }}>{result.ok ? '✓' : '×'} {key}</div>
-                <div style={{ color: '#94a3b8', fontSize: 12, marginTop: 5 }}>{result.message}</div>
-              </div>
-            ))}
-          </div>
         )}
-        {systemTest?.error && <div style={{ color: '#ff8fab', marginTop: 12 }}>{systemTest.error}</div>}
+
+        <SaveBar onSave={() => save('system', system)} saving={saving} msg={msg} testid="cfg-system-save" dirty={isDirty('system')} />
       </div>
     );
   }
@@ -404,7 +414,7 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
             <Field label="Anwendbares Recht" value={company.governingLaw} onChange={(v) => setC('governingLaw', v)} testid="cfg-company-law" />
           </div>
         </div>
-        <SaveBar onSave={() => save('company', company)} saving={saving} msg={msg} testid="cfg-company-save" />
+        <SaveBar onSave={() => save('company', company)} saving={saving} msg={msg} testid="cfg-company-save" dirty={isDirty('company')} />
       </div>
     );
   }
@@ -434,7 +444,7 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
             );
           })}
         </div>
-        <SaveBar onSave={() => save('plans', plans)} saving={saving} msg={msg} testid="cfg-plans-save" />
+        <SaveBar onSave={() => save('plans', plans)} saving={saving} msg={msg} testid="cfg-plans-save" dirty={isDirty('plans')} />
       </div>
     );
   }
@@ -490,7 +500,7 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
             </div>
           ))}
         </div>
-        <SaveBar onSave={() => save('discord', discord)} saving={saving} msg={msg} testid="cfg-discord-save" />
+        <SaveBar onSave={() => save('discord', discord)} saving={saving} msg={msg} testid="cfg-discord-save" dirty={isDirty('discord')} />
 
         <div className="oa-card" style={{ marginTop: 22 }}>
           <div className="oa-section-title"><Terminal size={15} /> Bot-Logs</div>
@@ -583,7 +593,7 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
             </div>
           ))}
         </div>
-        <SaveBar onSave={() => save('payments', payments)} saving={saving} msg={msg} testid="cfg-payments-save" />
+        <SaveBar onSave={() => save('payments', payments)} saving={saving} msg={msg} testid="cfg-payments-save" dirty={isDirty('payments')} />
       </div>
     );
   }
@@ -637,7 +647,7 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
             </div>
           ))}
         </div>
-        <SaveBar onSave={() => save('marketing', marketing)} saving={saving} msg={msg} testid="cfg-marketing-save" />
+        <SaveBar onSave={() => save('marketing', marketing)} saving={saving} msg={msg} testid="cfg-marketing-save" dirty={isDirty('marketing')} />
       </div>
     );
   }

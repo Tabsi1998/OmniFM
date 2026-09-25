@@ -42,7 +42,6 @@
     "frontend/src/components/NowPlayingBar.js::react-hooks/exhaustive-deps::2",
     "frontend/src/components/NowPlayingBar.js::react-hooks/exhaustive-deps::3",
     "frontend/src/components/OwnerAdmin.js::no-unused-vars::1",
-    "frontend/src/components/OwnerAdmin.js::no-unused-vars::2",
     "frontend/src/components/OwnerAdmin.js::react-hooks/exhaustive-deps::1",
     "frontend/src/components/OwnerConfig.js::no-unused-vars::1",
     "frontend/src/components/Premium.js::no-unused-vars::1",

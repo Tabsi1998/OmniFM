@@ -1,10 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
-  Radio, LayoutDashboard, Server, KeyRound, ListMusic, PlugZap, Activity as ActivityIcon,
-  LogOut, ShieldCheck, TrendingUp, Users, Cpu, RefreshCw, CheckCircle2, XCircle,
-  Music2, Globe, CreditCard, Mail, Database, Fingerprint, AlertTriangle,
-  Radar, Terminal, Gauge, HeartPulse, Plus, Pencil, Trash2, Save, ScrollText, SignalHigh, X as CloseIcon, Palette,
-  Building2, Tag, Bot, Megaphone, Settings2,
+  Radio, LayoutDashboard, Server, KeyRound, ListMusic, LogOut, ShieldCheck, TrendingUp, Users, Cpu, RefreshCw, CheckCircle2, XCircle,
+  Music2, Globe, Database, AlertTriangle,
+  Radar, Terminal, Gauge, HeartPulse, Plus, Pencil, Trash2, Save, ScrollText, SignalHigh, X as CloseIcon, Bot, Settings2,
 } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
@@ -14,27 +12,19 @@ import { buildApiUrl } from '../lib/api.js';
 import BrandKit from './BrandKit.js';
 import OwnerConfig from './OwnerConfig.js';
 import OwnerCockpit from './OwnerCockpit.js';
+import { OWNER_AREAS, areaOfPage, pagesOfArea, searchOwnerPages, systemPartOf } from '../lib/ownerNavigation.js';
 
 const TOKEN_KEY = 'omnifm_admin_token';
 
-const NAV = [
-  { id: 'cockpit', label: 'Cockpit', icon: HeartPulse },
-  { id: 'overview', label: 'Global Overview', icon: LayoutDashboard },
-  { id: 'monitoring', label: 'Live-Monitoring', icon: Radar },
-  { id: 'system', label: 'System-Konfiguration', icon: Settings2 },
-  { id: 'company', label: 'Unternehmen & Recht', icon: Building2 },
-  { id: 'plans', label: 'Pläne & Preise', icon: Tag },
-  { id: 'discord', label: 'Discord & Bots', icon: Bot },
-  { id: 'payments', label: 'Zahlungen', icon: CreditCard },
-  { id: 'marketing', label: 'Marketing & Listings', icon: Megaphone },
-  { id: 'licenses', label: 'License Manager', icon: KeyRound },
-  { id: 'stations', label: 'Radio Catalog', icon: ListMusic },
-  { id: 'integrations', label: 'Integrations', icon: PlugZap },
-  { id: 'activity', label: 'Activity Log', icon: ActivityIcon },
-  { id: 'audit', label: 'Audit-Log', icon: ScrollText },
-  { id: 'archive', label: 'Datenarchiv', icon: Database },
-  { id: 'brand', label: 'Brand Kit', icon: Palette },
-];
+// Six areas instead of fifteen tabs (#356); the pages live in lib/ownerNavigation.js.
+const AREA_ICONS = {
+  cockpit: HeartPulse,
+  server: KeyRound,
+  stations: ListMusic,
+  bots: Bot,
+  settings: Settings2,
+  logs: ScrollText,
+};
 
 const PLAN_COLORS = { free: '#64748b', pro: '#00e5ff', ultimate: '#ff6b00' };
 
@@ -121,11 +111,12 @@ export default function OwnerAdmin() {
   const [loggingIn, setLoggingIn] = useState(false);
 
   const [section, setSection] = useState('cockpit');
+  const [navQuery, setNavQuery] = useState('');
+  const openPage = useCallback((pageId) => setSection(areaOfPage(pageId) ? pageId : 'cockpit'), []);
   const [overview, setOverview] = useState(null);
   const [licenses, setLicenses] = useState([]);
   const [knownGuilds, setKnownGuilds] = useState([]);
   const [stations, setStations] = useState(null);
-  const [integrations, setIntegrations] = useState(null);
   const [activity, setActivity] = useState([]);
   const [monitoring, setMonitoring] = useState(null);
   const [monitorLogLevel, setMonitorLogLevel] = useState('ALL');
@@ -261,19 +252,17 @@ export default function OwnerAdmin() {
   const loadAll = useCallback(async (tk) => {
     setRefreshing(true);
     try {
-      const [ov, lic, guilds, st, integ, act] = await Promise.allSettled([
+      const [ov, lic, guilds, st, act] = await Promise.allSettled([
         apiGet('/api/admin/overview', tk),
         apiGet('/api/admin/licenses?full=1', tk),
         apiGet('/api/admin/guilds', tk),
         apiGet('/api/admin/stations', tk),
-        apiGet('/api/admin/integrations', tk),
         apiGet('/api/admin/activity', tk),
       ]);
       if (ov.status === 'fulfilled') setOverview(ov.value);
       if (lic.status === 'fulfilled') setLicenses(lic.value.licenses || []);
       if (guilds.status === 'fulfilled') setKnownGuilds(guilds.value.guilds || []);
       if (st.status === 'fulfilled') setStations(st.value);
-      if (integ.status === 'fulfilled') setIntegrations(integ.value);
       if (act.status === 'fulfilled') setActivity(act.value.activity || []);
       if (ov.status === 'rejected' && ov.reason?.message === 'unauthorized') throw new Error('unauthorized');
     } finally {
@@ -620,17 +609,38 @@ export default function OwnerAdmin() {
             <div className="oa-owner-badge">Owner Engine</div>
           </div>
         </div>
+        <input
+          className="oa-input"
+          data-testid="admin-search"
+          placeholder="Einstellung suchen …"
+          value={navQuery}
+          onChange={(e) => setNavQuery(e.target.value)}
+          style={{ marginBottom: 8 }}
+        />
+        {navQuery.trim().length >= 2 && (
+          <div data-testid="admin-search-results" style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 10 }}>
+            {searchOwnerPages(navQuery).map((page) => (
+              <button key={page.id} className="oa-nav-btn" onClick={() => { openPage(page.id); setNavQuery(''); }} style={{ fontSize: 13 }}>
+                {page.areaLabel} › {page.label}
+              </button>
+            ))}
+            {searchOwnerPages(navQuery).length === 0 && <div className="oa-sub" style={{ padding: '4px 10px' }}>Nichts gefunden.</div>}
+          </div>
+        )}
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
-          {NAV.map((n) => (
-            <button
-              key={n.id}
-              className={`oa-nav-btn ${section === n.id ? 'active' : ''}`}
-              onClick={() => setSection(n.id)}
-              data-testid={`admin-nav-${n.id}`}
-            >
-              <n.icon size={18} /> {n.label}
-            </button>
-          ))}
+          {OWNER_AREAS.map((area) => {
+            const Icon = AREA_ICONS[area.id] || LayoutDashboard;
+            return (
+              <button
+                key={area.id}
+                className={`oa-nav-btn ${areaOfPage(section) === area.id ? 'active' : ''}`}
+                onClick={() => openPage(area.pages[0].id)}
+                data-testid={`admin-nav-${area.id}`}
+              >
+                <Icon size={18} /> {area.label}
+              </button>
+            );
+          })}
         </nav>
         <button className="oa-nav-btn" onClick={logout} data-testid="admin-logout-button" style={{ color: '#ff8fab' }}>
           <LogOut size={18} /> Abmelden
@@ -640,7 +650,7 @@ export default function OwnerAdmin() {
       <main className="oa-main">
         <div className="oa-topbar">
           <div>
-            <h1 className="oa-h1 oa-display" data-testid="admin-section-title">{NAV.find((n) => n.id === section)?.label}</h1>
+            <h1 className="oa-h1 oa-display" data-testid="admin-section-title">{OWNER_AREAS.find((area) => area.id === areaOfPage(section))?.label}</h1>
             <div className="oa-sub">
               Zentrale Steuerung der OmniFM Broadcast-Plattform
               {ov?.release?.version && (
@@ -662,18 +672,37 @@ export default function OwnerAdmin() {
         </div>
 
         <div className="oa-mobile-nav">
-          {NAV.map((n) => (
-            <button key={n.id} className={`oa-nav-btn ${section === n.id ? 'active' : ''}`} style={{ width: 'auto', whiteSpace: 'nowrap' }} onClick={() => setSection(n.id)} data-testid={`admin-mobile-nav-${n.id}`}>
-              <n.icon size={16} /> {n.label}
-            </button>
-          ))}
+          {OWNER_AREAS.map((area) => {
+            const Icon = AREA_ICONS[area.id] || LayoutDashboard;
+            return (
+              <button key={area.id} className={`oa-nav-btn ${areaOfPage(section) === area.id ? 'active' : ''}`} style={{ width: 'auto', whiteSpace: 'nowrap' }} onClick={() => openPage(area.pages[0].id)} data-testid={`admin-mobile-nav-${area.id}`}>
+                <Icon size={16} /> {area.label}
+              </button>
+            );
+          })}
           <button className="oa-nav-btn" style={{ width: 'auto', whiteSpace: 'nowrap', color: '#ff8fab' }} onClick={logout} data-testid="admin-mobile-logout-button">
             <LogOut size={16} /> Abmelden
           </button>
         </div>
 
+        {pagesOfArea(areaOfPage(section)).length > 1 && (
+          <div data-testid="admin-subnav" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+            {pagesOfArea(areaOfPage(section)).map((page) => (
+              <button
+                key={page.id}
+                className={`oa-btn ${section === page.id ? 'primary' : 'ghost'}`}
+                onClick={() => openPage(page.id)}
+                data-testid={`admin-page-${page.id}`}
+                style={{ height: 32, padding: '0 12px', fontSize: 13 }}
+              >
+                {page.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {section === 'cockpit' && (
-          <OwnerCockpit apiGet={apiGet} apiSend={apiSend} onOpen={setSection} />
+          <OwnerCockpit apiGet={apiGet} apiSend={apiSend} onOpen={openPage} />
         )}
         {section === 'overview' && (
           <>
@@ -743,24 +772,6 @@ export default function OwnerAdmin() {
                     </BarChart>
                   </ResponsiveContainer>
                 ) : <div style={{ color: '#64748b', fontSize: 13, padding: '30px 0', textAlign: 'center' }}>Keine aktiven Lizenzen</div>}
-              </div>
-              <div className="oa-card oa-fade" data-testid="overview-integrations">
-                <div className="oa-stat-label" style={{ marginBottom: 6 }}>System-Integrationen</div>
-                {[
-                  { k: 'mongo', label: 'MongoDB', icon: Database },
-                  { k: 'stripe', label: 'Stripe Billing', icon: CreditCard },
-                  { k: 'discordOAuth', label: 'Discord OAuth', icon: Fingerprint },
-                  { k: 'smtp', label: 'E-Mail (SMTP)', icon: Mail },
-                  { k: 'recognition', label: 'Song-Erkennung', icon: Music2 },
-                ].map(({ k, label, icon: Icon }) => {
-                  const on = ov?.integrations?.[k];
-                  return (
-                    <div className="oa-integration" key={k} data-testid={`integration-${k}`}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5 }}><Icon size={16} style={{ color: '#94a3b8' }} /> {label}</span>
-                      <span className={`oa-pill ${on ? 'green' : 'slate'}`}>{on ? <><CheckCircle2 size={12} /> Aktiv</> : <><XCircle size={12} /> Aus</>}</span>
-                    </div>
-                  );
-                })}
               </div>
             </div>
           </>
@@ -1386,51 +1397,6 @@ export default function OwnerAdmin() {
           </div>
         )}
 
-        {section === 'integrations' && integrations && (
-          <div className="oa-grid cols-2">
-            <div className="oa-card oa-fade" data-testid="integrations-config">
-              <div className="oa-stat-label" style={{ marginBottom: 6 }}>Konfiguration</div>
-              {[
-                { k: 'mongo', label: 'MongoDB Datenspeicher', icon: Database },
-                { k: 'stripe', label: 'Stripe Zahlungen', icon: CreditCard },
-                { k: 'discordOAuth', label: 'Discord OAuth Login', icon: Fingerprint },
-                { k: 'smtp', label: 'E-Mail Versand (SMTP)', icon: Mail },
-                { k: 'recognition', label: 'Audio Song-Erkennung', icon: Music2 },
-                { k: 'songHistory', label: 'Song-Verlauf', icon: ActivityIcon },
-              ].map(({ k, label, icon: Icon }) => {
-                const on = integrations?.config?.[k];
-                return (
-                  <div className="oa-integration" key={k} data-testid={`integ-config-${k}`}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5 }}><Icon size={16} style={{ color: '#94a3b8' }} /> {label}</span>
-                    <span className={`oa-pill ${on ? 'green' : 'slate'}`}>{on ? 'Aktiv' : 'Nicht konfiguriert'}</span>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="oa-card oa-fade" data-testid="integrations-directory">
-              <div className="oa-stat-label" style={{ marginBottom: 12 }}>Bot-Verzeichnisse</div>
-              {[
-                ['discordBotList', 'Discord Bot List'],
-                ['botsGG', 'Bots.gg'],
-                ['topGG', 'Top.gg'],
-              ].map(([key, label]) => {
-                const directory = integrations?.botDirectories?.[key] || {};
-                return (
-                  <div className="oa-integration" key={key}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5 }}><Globe size={16} style={{ color: '#94a3b8' }} /> {label}</span>
-                    <span className={`oa-pill ${directory.configured ? 'green' : directory.enabled ? 'amber' : 'slate'}`}>
-                      {directory.configured ? 'Konfiguriert' : directory.enabled ? 'Unvollständig' : 'Aus'}
-                    </span>
-                  </div>
-                );
-              })}
-              <p style={{ color: '#64748b', fontSize: 12.5, marginTop: 14, lineHeight: 1.6 }}>
-                Tokens, Bot-IDs und Sync-Umfang werden unter System-Konfiguration verwaltet und beim nächsten Bot-Neustart übernommen.
-              </p>
-            </div>
-          </div>
-        )}
-
         {section === 'activity' && (
           <div className="oa-card oa-fade" data-testid="activity-log">
             {activity.length === 0 && <div style={{ color: '#64748b', textAlign: 'center', padding: 24 }}>Keine Aktivität</div>}
@@ -1448,8 +1414,8 @@ export default function OwnerAdmin() {
             ))}
           </div>
         )}
-        {(section === 'system' || section === 'company' || section === 'plans' || section === 'discord' || section === 'payments' || section === 'marketing') && (
-          <OwnerConfig section={section} apiGet={apiGet} apiSend={apiSend} token={token} />
+        {(systemPartOf(section) || ['company', 'plans', 'discord', 'payments', 'marketing'].includes(section)) && (
+          <OwnerConfig section={systemPartOf(section) ? 'system' : section} part={systemPartOf(section)} apiGet={apiGet} apiSend={apiSend} token={token} />
         )}
         {section === 'brand' && (
           <div data-testid="owner-brand-kit"><BrandKit embedded /></div>
