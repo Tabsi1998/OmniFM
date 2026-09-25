@@ -580,6 +580,19 @@ export default function DashboardSettings({
               <option value="en">English</option>
             </select>
           </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Für wen', 'For whom')}</label>
+            <select
+              data-testid="digest-audience-select"
+              disabled={!canManageWeeklyDigest}
+              value={wd.audience === 'public' ? 'public' : 'team'}
+              onChange={(e) => setSettings((current) => ({ ...(current || {}), weeklyDigest: { ...wd, audience: e.target.value } }))}
+              style={{ width: '100%', height: 40, padding: '0 10px', border: '1px solid #1A1A2E', background: '#050505', color: '#fff', boxSizing: 'border-box', fontSize: 13 }}
+            >
+              <option value="team">{t('Team (mit Technik-Zahlen)', 'Team (with technical numbers)')}</option>
+              <option value="public">{t('Öffentlich (für die Community)', 'Public (for the community)')}</option>
+            </select>
+          </div>
         </div>
 
         <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>

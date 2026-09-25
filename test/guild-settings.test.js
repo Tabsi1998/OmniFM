@@ -39,6 +39,7 @@ test("normalizeGuildSettings repairs malformed nested guild settings", () => {
     dayOfWeek: 6,
     hour: 0,
     language: "de",
+    audience: "team",
   });
   assert.equal(Object.prototype.hasOwnProperty.call(normalized, "weeklyDigestLastSent"), false);
   assert.deepEqual(normalized.failoverChain, ["rock", "jazz"]);

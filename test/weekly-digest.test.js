@@ -25,7 +25,10 @@ test("normalizeWeeklyDigestConfig clamps values and limits language", () => {
     dayOfWeek: 6,
     hour: 0,
     language: "de",
+    audience: "team",
   });
+  assert.equal(normalizeWeeklyDigestConfig({ audience: "public" }).audience, "public");
+  assert.equal(normalizeWeeklyDigestConfig({ audience: "everyone" }).audience, "team", "unknown values stay team");
 });
 
 test("computeNextWeeklyDigestRunAt picks the upcoming weekly slot", () => {

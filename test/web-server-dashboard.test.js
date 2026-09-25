@@ -1468,6 +1468,7 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
       dayOfWeek: 6,
       hour: 0,
       language: "de",
+      audience: "team",
     });
     assert.equal(normalizedSettingsResponse.payload.weeklyDigestMeta.ready, true);
     assert.equal(normalizedSettingsResponse.payload.weeklyDigestMeta.lastSentAt, null);
@@ -1663,7 +1664,9 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
   assert.equal(digestTestResponse.status, 200);
   assert.equal(digestTestResponse.payload.channelName, "announcements");
   assert.equal(runtimeStub.__sentMessages.length, 1);
-  assert.equal(runtimeStub.__sentMessages[0].embeds[0].title, "Weekly radio report");
+  // The test digest is the real weekly recap: Components V2 (#278).
+  assert.equal(runtimeStub.__sentMessages[0].flags, 1 << 15);
+  assert.match(JSON.stringify(runtimeStub.__sentMessages[0].components[0].toJSON()), /Weekly recap/);
 
   const blockedCustomStationsEnResponse = await requestJson(
     baseUrl,
