@@ -33,6 +33,7 @@ import { createPremiumReadRoutesHandler } from "./routes/premium-read-routes.js"
 import { createPublicRoutesHandler } from "./routes/public-routes.js";
 import { createShareRoutesHandler } from "./routes/share-routes.js";
 import { WEBSITE_URL } from "../bot/runtime-links.js";
+import { resolveDiscordRedirectUri, startDiscordOauthSync } from "../lib/discord-oauth-settings.js";
 import { createAdminRoutesHandler } from "./routes/admin-routes.js";
 import {
   isRuntimePlaybackActive,
@@ -1423,8 +1424,9 @@ function getDiscordClientSecret() {
   return String(process.env.DISCORD_CLIENT_SECRET || "").trim();
 }
 
+// Made from the website's address (DISCORD_REDIRECT_URI only for special setups).
 function getDiscordRedirectUri() {
-  return String(process.env.DISCORD_REDIRECT_URI || "").trim();
+  return resolveDiscordRedirectUri(process.env);
 }
 
 function isDiscordOauthConfigured() {
@@ -3125,6 +3127,8 @@ const handleAdminRoutes = createAdminRoutesHandler({
 
 function startWebServer(runtimes) {
   _runtimes = runtimes;
+  // A new OAuth secret from the owner console works without a restart.
+  startDiscordOauthSync();
   const webInternalPort = Number(process.env.WEB_INTERNAL_PORT || "8080");
   const webPort = Number(process.env.WEB_PORT || "8081");
   const webBind = process.env.WEB_BIND || "0.0.0.0";

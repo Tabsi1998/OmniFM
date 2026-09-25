@@ -3,6 +3,7 @@ import {
   Save, Plus, Trash2, CheckCircle2, XCircle, Bot, CreditCard, Building2,
   Tag, Terminal, ShieldCheck, Info, Star, Heart, Settings2, Mail, Music2, History, Fingerprint, Globe2, BellRing,
 } from 'lucide-react';
+import { discordRedirectUriFor, secretInputValue } from '../lib/ownerConfigSecrets.js';
 
 const labelStyle = {
   fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase',
@@ -146,7 +147,8 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
         [directory]: { ...(p.botDirectories?.[directory] || {}), [key]: value },
       },
     }));
-    const secretValue = (group, key) => group?.[`${key}Set`] ? '' : (group?.[key] || '');
+    // Typed text shows; a stored secret (sent as a mask) stays hidden (see ownerConfigSecrets.js).
+    const secretValue = secretInputValue;
     const secretHint = (group, key) => group?.[`${key}Set`] ? 'Bereits gesetzt – leer lassen, um den Wert beizubehalten.' : 'Wird verschlüsselt übertragen und nie wieder angezeigt.';
     const testSystem = async () => {
       setSystemTest({ loading: true });
@@ -165,7 +167,11 @@ export default function OwnerConfig({ section, apiGet, apiSend, token }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 18px' }}>
             <Field label="OAuth Client ID" value={oauth.clientId} onChange={(v) => setGroup('discordOAuth', 'clientId', v)} testid="cfg-oauth-client" />
             <Field label="OAuth Client Secret" value={secretValue(oauth, 'clientSecret')} onChange={(v) => setGroup('discordOAuth', 'clientSecret', v)} type="password" hint={secretHint(oauth, 'clientSecret')} testid="cfg-oauth-secret" />
-            <Field label="Redirect URI" value={oauth.redirectUri} onChange={(v) => setGroup('discordOAuth', 'redirectUri', v)} placeholder="https://omnifm.xyz/api/auth/discord/callback" testid="cfg-oauth-redirect" />
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>Redirect URI (automatisch)</label>
+              <input className="oa-input" data-testid="cfg-oauth-redirect" readOnly value={discordRedirectUriFor(window.location.origin)} onFocus={(e) => e.target.select()} />
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>Wird von OmniFM gebildet. Im Discord Developer Portal unter OAuth2 → Redirects genau so eintragen.</div>
+            </div>
             <Field label="Scopes" value={oauth.scopes} onChange={(v) => setGroup('discordOAuth', 'scopes', v)} placeholder="identify guilds" testid="cfg-oauth-scopes" />
           </div>
         </div>
