@@ -185,6 +185,7 @@ const STATION_COMMANDS = {
   resume: PLAYBACK_COMMANDS.resume,
   stop: PLAYBACK_COMMANDS.stop,
   setvolume: PLAYBACK_COMMANDS.setvolume,
+  sleep: PLAYBACK_COMMANDS.sleep,
   premium: INFO_COMMANDS.premium,
   health: INFO_COMMANDS.health,
   diag: PLAYBACK_COMMANDS.diag,

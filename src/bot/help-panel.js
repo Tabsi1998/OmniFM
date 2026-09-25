@@ -70,6 +70,7 @@ export function buildHelpPayload(input) {
       body: [
         t("`/play` startet einen Sender, `/pause` und `/resume` halten an und machen weiter, `/stop` beendet.", "`/play` starts a station, `/pause` and `/resume` hold and continue, `/stop` ends it."),
         t("`/setvolume` stellt die Lautstärke, `/now` zeigt, was gerade läuft.", "`/setvolume` sets the volume, `/now` shows what is playing."),
+        t("`/sleep` schaltet das Radio nach 15 Minuten bis 2 Stunden leise aus.", "`/sleep` turns the radio off softly after 15 minutes to 2 hours."),
         t("Im Now-Playing-Panel geht das alles auch per Knopf.", "The now-playing panel does all of this with buttons too."),
         t("Gefällt dir ein Song? **💾 Merken** im Panel schickt ihn dir per DM, `/merkliste` zeigt deine Liste.", "Like a song? **💾 Save** in the panel sends it to you by DM, `/saved` shows your list."),
       ],

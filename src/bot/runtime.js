@@ -108,6 +108,7 @@ import { statusMethods } from "./runtime-methods/status.js";
 import { voiceMethods } from "./runtime-methods/voice.js";
 import { onboardingMethods } from "./runtime-methods/onboarding.js";
 import { savedSongMethods } from "./runtime-methods/saved-songs.js";
+import { sleepMethods } from "./runtime-methods/sleep.js";
 import { recordPlaybackPhase } from "./playback-phase.js";
 import { syncAppEmojisSafely } from "../discord/ui/app-emojis.js";
 
@@ -331,6 +332,9 @@ class BotRuntime {
         lastVoiceStatusErrorAt: 0,
         activeScheduledEventId: null,
         activeScheduledEventStopAtMs: 0,
+        sleepUntilMs: 0,
+        sleepTimers: null,
+        sleepWarning: null,
         transientVoiceIssues: {},
         voiceConnectInFlight: false,
         reconnectInFlight: false,
@@ -1229,6 +1233,8 @@ class BotRuntime {
       if (!state) return { ok: false, error: "Kein State für diesen Server." };
 
       this.clearRestoreRetry(guildId);
+      // A stop ends a sleep timer too (#275).
+      this.clearSleepTimer?.(guildId);
       state.shouldReconnect = false;
       this.resetVoiceSession(guildId, state, { preservePlaybackTarget: false, clearLastChannel: true });
       recordPlaybackPhase(this, guildId, state, "stop");
@@ -1413,6 +1419,7 @@ Object.assign(
   voiceMethods,
   onboardingMethods,
   savedSongMethods,
+  sleepMethods,
 );
 
 const MIME_TYPES = {

@@ -535,6 +535,10 @@ class RemoteWorkerHandle {
   async setVolumeInGuild(guildId, value) {
     return this.sendCommand("setVolume", { guildId, value }, { timeoutMs: 15_000 });
   }
+
+  async setSleepTimerInGuild(guildId, minutes) {
+    return this.sendCommand("setSleepTimer", { guildId, minutes }, { timeoutMs: 15_000 });
+  }
 }
 
 export { RemoteWorkerHandle };

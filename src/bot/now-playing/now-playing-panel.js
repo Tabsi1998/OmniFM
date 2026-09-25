@@ -88,6 +88,7 @@ export function buildNowPlayingPanel(input) {
       playback.bitrate ? `${ui.icon("quality", appId)} ${playback.bitrate}` : null,
       Number.isFinite(playback.volume) ? `🔊 ${Math.max(0, Math.min(100, playback.volume))}%` : null,
       playback.channelId ? `<#${playback.channelId}>` : null,
+      playback.sleepUntilMs > 0 ? `😴 ${t("Schläft um", "Sleeps at")} <t:${Math.floor(playback.sleepUntilMs / 1000)}:t>` : null,
     ]),
   ];
   if (track.hasTrack && track.album) details.push(ui.subtext(`💿 ${clip(track.album, 120)}`));
