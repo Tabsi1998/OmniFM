@@ -26,6 +26,7 @@ import {
   buildStreamingRuntimeSelectionPayload,
 } from "./command-helpers.js";
 import { derivePlaybackPhase, describePlaybackPhaseHistory } from "../playback-phase.js";
+import * as ui from "../../discord/ui/index.js";
 
 /** /workers */
 async function handleWorkersCommand({ runtime, interaction, t, language }) {
@@ -714,49 +715,31 @@ async function handleStatusCommand({ runtime, interaction, t, language }) {
     failbackNextProbeAt: Number(activeState.failbackNextProbeAt || 0) || 0,
   }, { t });
 
-  const statusEmbed = new EmbedBuilder()
-    .setColor(userStatus.accent)
-    .setTitle(t("Bot-Status", "Bot status"))
-    .setDescription(`${activeRuntime.config.name} | ${interaction.guild?.name || interaction.guildId}`)
-    .addFields(
-      {
-        name: t("Status", "Status"),
-        value: userStatus.label,
-        inline: false,
-      },
-      {
-        name: t("Aktuell", "Currently"),
-        value: userStatus.summary,
-        inline: false,
-      },
-      {
-        name: t("Wiedergabe", "Playback"),
-        value: userStatus.playback,
-        inline: false,
-      },
-      {
-        name: t("Hinweis", "Hint"),
-        value: userStatus.nextStep,
-        inline: false,
-      }
-    );
-
-  statusEmbed.setAuthor(brandAuthor());
-  statusEmbed.setFooter(brandFooter(t("OmniFM · /status", "OmniFM · /status")));
-  statusEmbed.setTimestamp(new Date());
-
-  await interaction.reply({
-    embeds: [statusEmbed],
-    components: [
+  // First command on the Discord design system (#264): one container in the
+  // colour of the status, the actions inside, the brand line at the bottom.
+  await interaction.reply(ui.reply(ui.panel({
+    accent: userStatus.accent,
+    title: t("Bot-Status", "Bot status"),
+    subtitle: ui.statusLine([activeRuntime.config.name, interaction.guild?.name || interaction.guildId]),
+    body: [
+      ui.text([
+        ui.field(t("Status", "Status"), userStatus.label),
+        ui.field(t("Aktuell", "Currently"), userStatus.summary),
+        ui.field(t("Wiedergabe", "Playback"), userStatus.playback),
+      ].join("\n\n")),
+      ui.separator({ divider: false }),
+      ui.text(`${ui.icon("info")} ${userStatus.nextStep}`),
+    ],
+    actions: [
       buildQuickActionRow(t, {
         includePlay: true,
         includeStations: true,
         includeWorkers: runtime.role === "commander" && Boolean(runtime.workerManager),
       }),
       buildSupportRow(language, { includeDashboard: true, includePremium: false, includeSupport: true }),
-    ].filter(Boolean),
-    flags: MessageFlags.Ephemeral,
-  });
+    ],
+    footer: "/status",
+  })));
   return;
 }
 
