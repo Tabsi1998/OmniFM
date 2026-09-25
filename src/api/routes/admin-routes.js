@@ -721,10 +721,10 @@ export function createAdminRoutesHandler(deps) {
       .filter(Boolean)));
   }
 
-  function buildOwnerLegalReadiness() {
-    const legal = typeof buildPublicLegalNotice === "function" ? buildPublicLegalNotice() : null;
-    const privacy = typeof buildPublicPrivacyNotice === "function" ? buildPublicPrivacyNotice() : null;
-    const terms = typeof buildPublicTermsNotice === "function" ? buildPublicTermsNotice() : null;
+  async function buildOwnerLegalReadiness() {
+    const legal = typeof buildPublicLegalNotice === "function" ? await buildPublicLegalNotice() : null;
+    const privacy = typeof buildPublicPrivacyNotice === "function" ? await buildPublicPrivacyNotice() : null;
+    const terms = typeof buildPublicTermsNotice === "function" ? await buildPublicTermsNotice() : null;
     const sections = [
       {
         id: "legal",
@@ -1695,7 +1695,7 @@ export function createAdminRoutesHandler(deps) {
     // GET /api/admin/legal
     if (pathname === "/api/admin/legal") {
       if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
-      sendJson(res, 200, buildOwnerLegalReadiness());
+      sendJson(res, 200, await buildOwnerLegalReadiness());
       return true;
     }
 
