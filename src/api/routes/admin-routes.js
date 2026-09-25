@@ -35,8 +35,13 @@
 //   GET  /api/admin/logs         → Letzte Operator-Incidents
 //   GET  /api/admin/log-files    → Erlaubte lokale Logdateien
 //   GET  /api/admin/log-files/:name → Tail einer erlaubten lokalen Logdatei
-//   GET  /api/admin/stations     → Alle Stationen (inkl. Health-Status)
-//   POST /api/admin/stations/:key/test → Konfigurierte Station testen
+//   GET  /api/admin/stations     → Katalog-Zusammenfassung (free/pro/Stichprobe)
+//   GET  /api/admin/stations/list → Katalog mit Health je Sender
+//   POST /api/admin/stations      → Sender anlegen/ändern
+//   DELETE /api/admin/stations/:key → Sender archivieren und löschen
+//   POST /api/admin/stations/test → Stream-URL prüfen
+//   POST /api/admin/stations/health → Health-Check jetzt (bis 25 Sender)
+//   POST /api/admin/stations/:key/test → Konfigurierte Station testen (alte Seite)
 // ============================================================
 
 import fs from "node:fs";
@@ -53,6 +58,7 @@ import {
   OWNER_CONFIG_ID,
   OWNER_CONFIG_SECTIONS,
   configSectionFrom,
+  effectiveSystemConfig,
   loadOwnerConfigRaw,
   mergedSectionForSave,
   ownerConfigResponse,
@@ -70,6 +76,14 @@ import {
   setLicenseServerLinks,
 } from "../../lib/owner-licenses.js";
 import { ArchiveError, archiveMongoRecords, listArchiveOperations, restoreArchivedOperation } from "../../lib/owner-archive.js";
+import {
+  OwnerStationError,
+  buildStationDocument,
+  runStationHealth,
+  stationListResponse,
+  testStationStream,
+} from "../../lib/owner-stations.js";
+import { reloadStationsFromMongo } from "../../stations-store.js";
 import {
   FAILOVER_HISTORY_EVENTS,
   TIER_PRICE_CENTS,
@@ -2049,43 +2063,108 @@ export function createAdminRoutesHandler(deps) {
       return true;
     }
 
-    // GET /api/admin/stations
+    // Station catalogue (FastAPI contract, backend/routers/admin_stations.py)
+    const stationDb = () => (isConnected() ? getDb() : null);
+    const readStationBody = async () => {
+      try { return JSON.parse(await readRequestBody(req, 64 * 1024) || "{}") || {}; } catch { return {}; }
+    };
+
+    // GET /api/admin/stations: summary · POST: create or update
     if (pathname === "/api/admin/stations") {
+      if (req.method === "GET") {
+        const summary = await stationSummary(stationDb(), loadCatalogFileStations);
+        sendJson(res, 200, summary);
+        return true;
+      }
+      if (req.method !== "POST") { methodNotAllowed(res, ["GET", "POST"]); return true; }
+      const db = stationDb();
+      if (!db) { sendJson(res, 503, { error: "MongoDB nicht verbunden – Stationsverwaltung nicht verfügbar." }); return true; }
+      let doc;
+      try {
+        doc = await buildStationDocument(await readStationBody());
+      } catch (err) {
+        if (!(err instanceof OwnerStationError)) throw err;
+        sendJson(res, err.status, { error: err.message });
+        return true;
+      }
+      const stations = db.collection("stations");
+      const existing = await stations.findOne({ key: doc.key });
+      const now = new Date().toISOString();
+      doc.updated_at = now;
+      if (!existing) {
+        doc.created_at = now;
+        doc.is_default = false;
+      }
+      await stations.updateOne({ key: doc.key }, { $set: doc }, { upsert: true });
+      await reloadStationsFromMongo();
+      auditOwnerAction(req, { action: existing ? "station.update" : "station.create", status: "success", target: doc.key, summary: `${doc.name} · ${doc.tier} · ${doc.url}` });
+      sendJson(res, 200, { ok: true, created: !existing, station: doc });
+      return true;
+    }
+
+    // GET /api/admin/stations/list
+    if (pathname === "/api/admin/stations/list") {
       if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
-      const stationsData = loadStations?.() || {};
-      const healthReport = getStationHealthReport?.() || [];
-      const healthMap = Object.fromEntries(healthReport.map((h) => [h.key, h]));
-      const defaultStationKey = String(stationsData?.defaultStationKey || "").trim() || null;
-      const fallbackKeys = Array.isArray(stationsData?.fallbackKeys)
-        ? stationsData.fallbackKeys.map((key) => String(key || "").trim()).filter(Boolean)
-        : [];
-      const fallbackSet = new Set(fallbackKeys);
-      const tierSummary = { free: 0, pro: 0, ultimate: 0 };
+      const stationHealthConfig = effectiveSystemConfig(await loadOwnerConfigRaw()).stationHealth || {};
+      sendJson(res, 200, await stationListResponse(stationDb(), stationHealthConfig));
+      return true;
+    }
 
-      const stations = Object.entries(stationsData?.stations || {}).map(([key, s]) => ({
-        key,
-        name: s.name || key,
-        url: s.url || null,
-        tier: s.tier || "free",
-        genre: s.genre || null,
-        isDefault: key === defaultStationKey,
-        isFallback: fallbackSet.has(key),
-        fallbackIndex: fallbackKeys.indexOf(key),
-        health: healthMap[key] || null,
-      })).map((station) => {
-        if (Object.hasOwn(tierSummary, station.tier)) tierSummary[station.tier] += 1;
-        return station;
-      });
+    // POST /api/admin/stations/test
+    if (pathname === "/api/admin/stations/test") {
+      if (req.method !== "POST") { methodNotAllowed(res, ["POST"]); return true; }
+      const url = String((await readStationBody()).url || "").trim();
+      try {
+        const result = await testStationStream(url);
+        const detail = result.status ? `status=${result.status} type=${result.contentType} ${result.latencyMs}ms` : result.message;
+        auditOwnerAction(req, { action: "station.test", status: result.ok ? "success" : (result.status ? "warn" : "failed"), target: url, summary: detail });
+        sendJson(res, 200, result);
+      } catch (err) {
+        if (!(err instanceof OwnerStationError)) throw err;
+        auditOwnerAction(req, { action: "station.test", status: "failed", target: url, summary: err.message });
+        sendJson(res, err.status, { error: err.message });
+      }
+      return true;
+    }
 
-      sendJson(res, 200, {
-        stations,
-        total: stations.length,
-        defaultStationKey,
-        fallbackKeys,
-        locked: Boolean(stationsData?.locked),
-        qualityPreset: stationsData?.qualityPreset || "custom",
-        tierSummary,
-      });
+    // POST /api/admin/stations/health
+    if (pathname === "/api/admin/stations/health") {
+      if (req.method !== "POST") { methodNotAllowed(res, ["POST"]); return true; }
+      const db = stationDb();
+      if (!db) { sendJson(res, 503, { error: "MongoDB nicht verbunden." }); return true; }
+      sendJson(res, 200, await runStationHealth(db, (await readStationBody()).keys));
+      return true;
+    }
+
+    // DELETE /api/admin/stations/<key>: archived first, the default station stays
+    const stationKeyMatch = pathname.match(/^\/api\/admin\/stations\/([^/]+)$/);
+    if (stationKeyMatch) {
+      if (req.method !== "DELETE") { methodNotAllowed(res, ["DELETE"]); return true; }
+      const db = stationDb();
+      if (!db) { sendJson(res, 503, { error: "MongoDB nicht verbunden." }); return true; }
+      const key = decodeURIComponent(stationKeyMatch[1]).trim().toLowerCase();
+      const existing = await db.collection("stations").findOne({ key });
+      if (!existing) { sendJson(res, 404, { error: "Station nicht gefunden." }); return true; }
+      if (existing.is_default) {
+        sendJson(res, 400, { error: "Standard-Station kann nicht gelöscht werden. Setze zuerst eine andere Default-Station." });
+        return true;
+      }
+      let archived;
+      try {
+        archived = await archiveMongoRecords(db, [["stations", { _id: existing._id }]], {
+          operation: "owner.station.delete", target: key, actor: "owner", ip: clientIp(), remove: true,
+        });
+      } catch (err) {
+        sendJson(res, 500, { error: `Station konnte nicht sicher archiviert werden: ${String(err?.message || err).slice(0, 300)}` });
+        return true;
+      }
+      if (!Number(archived.deleted?.stations || 0)) {
+        sendJson(res, 409, { error: "Station wurde archiviert, aber nicht aus dem aktiven Katalog entfernt." });
+        return true;
+      }
+      await reloadStationsFromMongo();
+      auditOwnerAction(req, { action: "station.delete", status: "success", target: key, summary: String(existing.name || "") });
+      sendJson(res, 200, { ok: true, deleted: key, archiveId: archived.operationId });
       return true;
     }
 

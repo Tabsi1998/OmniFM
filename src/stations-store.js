@@ -279,53 +279,85 @@ export async function initStationsStore() {
       }
     }
 
-    const docs = await c.find({}, { projection: { _id: 0 } }).toArray();
-    if (docs.length === 0) {
-      // Seed from file
-      const fileData = loadStationsFromFile();
-      _stationsCache = fileData;
-      return _stationsCache;
-    }
-
-    const stations = {};
-    let defaultKey = null;
-    for (const doc of docs) {
-      const key = doc.key;
-      if (key) {
-        stations[key] = {
-          name: doc.name || key,
-          url: doc.url || "",
-          tier: doc.tier || "free",
-          ...normalizeStationCatalogFields(doc),
-        };
-        if (doc.is_default) defaultKey = key;
-      }
-    }
-
-    // Load config
-    const cc = configCol();
-    let config = {};
-    if (cc) {
-      try {
-        config = (await cc.findOne({ _id: "main" })) || {};
-      } catch {}
-    }
-
-    _stationsCache = normalizeStationsData({
-      defaultStationKey: defaultKey || config.defaultStationKey || Object.keys(stations)[0] || null,
-      stations,
-      locked: config.locked || false,
-      qualityPreset: config.qualityPreset || "custom",
-      fallbackKeys: config.fallbackKeys || [],
-    });
-
-    log("INFO", `Stations geladen: ${Object.keys(stations).length} Sender`);
+    _stationsCache = await readStationsFromMongo(c);
+    log("INFO", `Stations geladen: ${Object.keys(_stationsCache.stations || {}).length} Sender`);
+    startStationsRefresh();
     return _stationsCache;
   } catch (err) {
     log("WARN", `Stations aus DB laden fehlgeschlagen: ${err.message}, Fallback auf Datei`);
     _stationsCache = loadStationsFromFile();
     return _stationsCache;
   }
+}
+
+async function readStationsFromMongo(c) {
+  const docs = await c.find({}, { projection: { _id: 0 } }).toArray();
+  if (docs.length === 0) {
+    // Seed from file
+    return loadStationsFromFile();
+  }
+
+  const stations = {};
+  let defaultKey = null;
+  for (const doc of docs) {
+    const key = doc.key;
+    if (key) {
+      stations[key] = {
+        name: doc.name || key,
+        url: doc.url || "",
+        tier: doc.tier || "free",
+        ...normalizeStationCatalogFields(doc),
+      };
+      if (doc.is_default) defaultKey = key;
+    }
+  }
+
+  // Load config
+  const cc = configCol();
+  let config = {};
+  if (cc) {
+    try {
+      config = (await cc.findOne({ _id: "main" })) || {};
+    } catch {}
+  }
+
+  return normalizeStationsData({
+    defaultStationKey: defaultKey || config.defaultStationKey || Object.keys(stations)[0] || null,
+    stations,
+    locked: config.locked || false,
+    qualityPreset: config.qualityPreset || "custom",
+    fallbackKeys: config.fallbackKeys || [],
+  });
+}
+
+let _stationsRefreshTimer = null;
+
+/**
+ * Reads the catalogue from MongoDB again. The owner console changes stations
+ * in another process (#288), so every process refreshes on its own: once a
+ * minute and right after a change the API made itself. A failed read keeps
+ * the last good catalogue.
+ */
+export async function reloadStationsFromMongo() {
+  const c = col();
+  if (!c) return _stationsCache;
+  try {
+    _stationsCache = await readStationsFromMongo(c);
+  } catch (err) {
+    log("WARN", `Stations neu laden fehlgeschlagen: ${err?.message || err}`);
+  }
+  return _stationsCache;
+}
+
+export function startStationsRefresh(intervalMs = 60_000) {
+  if (_stationsRefreshTimer || intervalMs <= 0) return;
+  _stationsRefreshTimer = setInterval(() => { reloadStationsFromMongo().catch(() => {}); }, intervalMs);
+  _stationsRefreshTimer.unref?.();
+}
+
+export function stopStationsRefresh() {
+  if (_stationsRefreshTimer) clearInterval(_stationsRefreshTimer);
+  _stationsRefreshTimer = null;
 }
 
 export async function saveStations(data) {

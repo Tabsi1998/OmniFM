@@ -59,7 +59,7 @@ function sanitizeValue(key, value, depth = 0) {
 function normalizeAuditEvent(rawEvent) {
   const source = rawEvent && typeof rawEvent === "object" ? rawEvent : {};
   const action = sanitizeText(source.action || "owner.unknown", 120);
-  const status = ["success", "failed", "denied", "info"].includes(source.status) ? source.status : "info";
+  const status = ["success", "failed", "denied", "info", "warn"].includes(source.status) ? source.status : "info";
   return {
     id: sanitizeText(source.id || randomUUID(), 80),
     timestamp: sanitizeText(source.timestamp || new Date().toISOString(), 40),
@@ -115,7 +115,7 @@ function writeAuditState(filePath, state) {
   fs.renameSync(tmpFile, filePath);
 }
 
-const MONGO_STATUS = { success: "ok", failed: "error", denied: "denied", info: "ok" };
+const MONGO_STATUS = { success: "ok", failed: "error", denied: "denied", info: "ok", warn: "warn" };
 
 /**
  * The owner console reads its audit tab from MongoDB (owner_audit, written by
