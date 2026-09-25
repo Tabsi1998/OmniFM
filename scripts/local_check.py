@@ -79,6 +79,7 @@ MONGO_CONTAINER = "omnifm-local-check-mongo"
 API_PORT = 18001
 NODE_API_PORT = 18002
 PROXY_API_PORT = 18003
+NODE_CONTRACT_PORT = 18004
 API_TOKEN = "ci-owner-token"
 MASK = "•" * 8
 
@@ -1150,6 +1151,50 @@ def fastapi_contract_suite(context: Context) -> str:
     return f"{describe_counts(counts)}; {verdict}"
 
 
+def node_contract_suite(context: Context) -> str:
+    """#287: the same contract suite against the Node API, which will be the only server.
+
+    Starts the Node API alone on the contract database and runs backend/tests
+    against it. What fails is the gap list of M10: a route Node does not have
+    yet, another status, other fields. A ratchet keeps it honest: the number
+    may only go down, each PR of M10 records the smaller baseline.
+    """
+    env = context.cache.get("fastapi:env")
+    if not env:
+        raise StepSkipped("the FastAPI environment of backend/contract is missing")
+    if port_open(NODE_CONTRACT_PORT):
+        raise StepSkipped(f"port {NODE_CONTRACT_PORT} is taken; stop what uses it and run again")
+    node = node_of(context, NODE_MAJOR)
+    scratch = Path(tempfile.mkdtemp(prefix="omnifm-node-contract-"))
+    base = f"http://127.0.0.1:{NODE_CONTRACT_PORT}"
+    node_env = dict(node_path_env(context, node), **{
+        "MONGO_URL": env["MONGO_URL"], "DB_NAME": env["DB_NAME"], "API_ADMIN_TOKEN": env["API_ADMIN_TOKEN"],
+        "WEB_SERVER_ENABLED": "1", "WEB_BIND": "127.0.0.1", "WEB_INTERNAL_PORT": str(NODE_CONTRACT_PORT),
+        "PUBLIC_WEB_URL": base, "OMNIFM_RUNTIME_DATA_DIR": str(scratch), "LOGS_DIR": str(scratch / "logs"),
+        # The suite fires hundreds of requests from one address; the limiter
+        # would turn real gaps into 429 noise.
+        "API_RATE_LIMIT_MAX": "10000", "API_RATE_LIMIT_PREMIUM_MAX": "1000",
+    })
+    start_process(context, "node-contract-api", [node, "scripts/serve-node-api.mjs"], cwd=ROOT, env=node_env,
+                  url=f"{base}/api/auth/session", seconds=90)
+    completed = context.run(
+        venv_python(), "-m", "pytest", BACKEND / "tests", "-q", "-p", "no:cacheprovider", "-rfE",
+        env={**env, "OMNIFM_RUN_BACKEND_CONTRACT_TESTS": "1", "OMNIFM_TEST_BASE_URL": base,
+             "REACT_APP_BACKEND_URL": base, "OMNIFM_TEST_ADMIN_TOKEN": API_TOKEN},
+        check=False, timeout=1800)
+    text = completed.stdout + completed.stderr
+    gaps = context.run(node, "scripts/check-api-routes.mjs", "--node-gaps", env=node_path_env(context, node),
+                       check=False, timeout=120)
+    path = context.log("node-contract-suite", text + "\n\n" + gaps.stdout)
+    shutil.rmtree(scratch, ignore_errors=True)
+    counts = pytest_counts(text)
+    if completed.returncode not in (0, 1) or not (counts.get("passed") or counts.get("failed")):
+        raise StepFailed(f"pytest did not run the contract suite against Node. Full output: {path}\n" + tail(completed))
+    failing = set(re.findall(r"^(?:FAILED|ERROR) (\S+)", text, re.M))
+    verdict = ratchet(context, "node-contract-suite", failing, "contract tests the Node API still fails")
+    return f"{describe_counts(counts)} against Node; {verdict}. Gap list: {path}"
+
+
 def check_owner_contract(in_mongo, run_mongo) -> None:
     _, _, health = request("GET", "/api/health")
     expect(health.get("ok") is True, f"/api/health is not ok: {health}")
@@ -1332,6 +1377,8 @@ def backend_steps() -> list:
              fastapi_contract_suite, ("contract",)),
         Step("backend", "node-dashboard", "FastAPI forwards the dashboard to the Node API",
              node_dashboard_proxy, ("contract", "node/npm-ci")),
+        Step("backend", "node-contract", "The contract suite against the Node API (M10 gap list)",
+             node_contract_suite, ("contract", "node/npm-ci")),
     ]
 
 
