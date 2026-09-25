@@ -181,7 +181,7 @@ class BotRuntime {
     // delivered to the application that created the message. Worker-owned
     // now-playing messages therefore have to be handled by the worker itself.
     this.client.on("interactionCreate", (interaction) => {
-      const isComponent = interaction?.isButton?.() || interaction?.isStringSelectMenu?.();
+      const isComponent = interaction?.isButton?.() || interaction?.isStringSelectMenu?.() || interaction?.isModalSubmit?.();
       if (this.role !== "commander" && !isComponent) return;
       const task = this.role === "commander"
         ? this.handleInteraction(interaction)

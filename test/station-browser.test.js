@@ -171,6 +171,21 @@ test("choosing a genre, searching and closing all happen in the same message", a
   assert.equal(runtime.getInteractiveUiSession(session.id), null);
 });
 
+test("the search form's submit arrives through the real entry point", async () => {
+  const runtime = createRuntime();
+  const session = runtime.createInteractiveUiSession("stations", { guildId: "guild-browser", userId: "user-1", data: {} });
+  const submit = interaction(runtime, `${STATIONS_COMPONENT_PREFIX}searchform:${session.id}`, {
+    isButton: () => false,
+    isModalSubmit: () => true,
+    fields: { getTextInputValue: () => "drone" },
+  });
+  // Before, handleComponentInteraction let only buttons and menus through,
+  // so the submitted search never reached the browser.
+  assert.equal(await runtime.handleComponentInteraction(submit), true);
+  assert.equal(submit.calls[0][0], "update");
+  assert.match(texts(tree(submit.calls[0][1])).join("\n"), /Drone Zone/);
+});
+
 test("play without a voice channel opens the quick start as its own message", async () => {
   const runtime = createRuntime();
   const session = runtime.createInteractiveUiSession("stations", { guildId: "guild-browser", userId: "user-1", data: {} });

@@ -584,7 +584,9 @@ const menuMethods = {
   },
 
   async handleComponentInteraction(interaction) {
-    if (!interaction || (!interaction.isButton?.() && !interaction.isStringSelectMenu?.())) return false;
+    // Modal submits too: the station browser's search form (#268) never
+    // arrived here before and failed with "interaction failed".
+    if (!interaction || (!interaction.isButton?.() && !interaction.isStringSelectMenu?.() && !interaction.isModalSubmit?.())) return false;
     const customId = String(interaction.customId || "");
     try {
       if (customId.startsWith(SETUP_COMPONENT_PREFIX)) {
