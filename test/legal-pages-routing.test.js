@@ -379,16 +379,11 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     });
     assert.equal(adminStationsResponse.status, 200);
     const adminStations = await adminStationsResponse.json();
+    // FastAPI's summary (#288): counts by tier and a sample, from stations.json without MongoDB.
     assert.ok(adminStations.total > 0);
-    assert.ok(Array.isArray(adminStations.stations));
-    assert.equal(typeof adminStations.locked, "boolean");
-    assert.equal(typeof adminStations.qualityPreset, "string");
-    assert.ok(Array.isArray(adminStations.fallbackKeys));
-    assert.equal(typeof adminStations.tierSummary.free, "number");
-    assert.ok(adminStations.stations.some((station) => Object.hasOwn(station, "isDefault")));
-    if (adminStations.defaultStationKey) {
-      assert.ok(adminStations.stations.some((station) => station.key === adminStations.defaultStationKey && station.isDefault));
-    }
+    assert.equal(adminStations.total, adminStations.free + adminStations.pro);
+    assert.ok(Array.isArray(adminStations.sample) && adminStations.sample.length > 0);
+    assert.ok(adminStations.sample.every((station) => station.key && station.tier));
 
     const missingStationTestResponse = await fetch(`http://127.0.0.1:${port}/api/admin/stations/not-existing/test`, {
       method: "POST",

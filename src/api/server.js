@@ -32,6 +32,8 @@ import { createPremiumBillingRoutesHandler } from "./routes/premium-billing-rout
 import { createPremiumOffersRoutesHandler } from "./routes/premium-offers-routes.js";
 import { createPremiumReadRoutesHandler } from "./routes/premium-read-routes.js";
 import { createPublicRoutesHandler } from "./routes/public-routes.js";
+import { legalNotice, privacyNotice, termsNotice } from "../lib/owner-public.js";
+import { loadOwnerConfigRaw } from "../lib/owner-config.js";
 import { createShareRoutesHandler } from "./routes/share-routes.js";
 import { createStationLogoRoutesHandler } from "./routes/station-logo-routes.js";
 import { createOwnerStatusRoutesHandler } from "./routes/owner-status-routes.js";
@@ -521,15 +523,6 @@ function buildDashboardConnectionEventEntryId(event = {}) {
     String(event?.channelId || ""),
     String(event?.details || ""),
   ]);
-}
-
-function extractMailbox(rawValue) {
-  const text = String(rawValue || "").trim();
-  if (!text) return "";
-  const bracketMatch = text.match(/<([^>]+)>/);
-  if (bracketMatch?.[1]) return bracketMatch[1].trim();
-  const plainMatch = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
-  return plainMatch?.[0] || "";
 }
 
 function getBlockedCapabilitiesForServer(serverId) {
@@ -1179,215 +1172,18 @@ function getHealthBinaryProbe() {
   return binaryHealthCache;
 }
 
-function isPublicLegalPlaceholder(value) {
-  const normalized = String(value || "").trim().toLowerCase();
-  if (!normalized) return false;
-  return normalized.includes("example operator")
-    || normalized.startsWith("example ")
-    || normalized.endsWith("@example.com")
-    || normalized.includes("://localhost")
-    || normalized.includes("://127.0.0.1");
+// The legal texts read the company section of the owner console (#288),
+// like FastAPI; LEGAL_* and PRIVACY_* stay as fallbacks.
+async function buildPublicLegalNotice() {
+  return legalNotice(await loadOwnerConfigRaw());
 }
 
-function readPublicLegalEnv(name) {
-  const value = String(process.env[name] || "").trim();
-  return isPublicLegalPlaceholder(value) ? "" : value;
+async function buildPublicPrivacyNotice() {
+  return privacyNotice(await loadOwnerConfigRaw());
 }
 
-function buildPublicLegalNotice() {
-  const publicUrl = readPublicLegalEnv("PUBLIC_WEB_URL");
-  const fallbackEmail = isPublicLegalPlaceholder(process.env.SMTP_FROM)
-    ? ""
-    : extractMailbox(process.env.SMTP_FROM || "");
-  const productName = readPublicLegalEnv("LEGAL_PRODUCT_NAME") || BRAND.name || "OmniFM";
-  const legal = {
-    productName,
-    providerName: readPublicLegalEnv("LEGAL_PROVIDER_NAME"),
-    legalForm: readPublicLegalEnv("LEGAL_LEGAL_FORM"),
-    representative: readPublicLegalEnv("LEGAL_REPRESENTATIVE"),
-    streetAddress: readPublicLegalEnv("LEGAL_STREET_ADDRESS"),
-    postalCode: readPublicLegalEnv("LEGAL_POSTAL_CODE"),
-    city: readPublicLegalEnv("LEGAL_CITY"),
-    country: readPublicLegalEnv("LEGAL_COUNTRY"),
-    email: readPublicLegalEnv("LEGAL_EMAIL") || fallbackEmail,
-    phone: readPublicLegalEnv("LEGAL_PHONE"),
-    website: readPublicLegalEnv("LEGAL_WEBSITE") || publicUrl,
-    businessPurpose: readPublicLegalEnv("LEGAL_BUSINESS_PURPOSE"),
-    commercialRegisterNumber: readPublicLegalEnv("LEGAL_COMMERCIAL_REGISTER_NUMBER"),
-    commercialRegisterCourt: readPublicLegalEnv("LEGAL_COMMERCIAL_REGISTER_COURT"),
-    vatId: readPublicLegalEnv("LEGAL_VAT_ID"),
-    supervisoryAuthority: readPublicLegalEnv("LEGAL_SUPERVISORY_AUTHORITY"),
-    chamber: readPublicLegalEnv("LEGAL_CHAMBER"),
-    profession: readPublicLegalEnv("LEGAL_PROFESSION"),
-    professionRules: readPublicLegalEnv("LEGAL_PROFESSION_RULES"),
-    editorialResponsible: readPublicLegalEnv("LEGAL_EDITORIAL_RESPONSIBLE"),
-    mediaOwner: readPublicLegalEnv("LEGAL_MEDIA_OWNER"),
-    mediaLine: readPublicLegalEnv("LEGAL_MEDIA_LINE"),
-  };
-
-  const missingCoreFields = [];
-  if (!legal.providerName) missingCoreFields.push("providerName");
-  if (!legal.streetAddress) missingCoreFields.push("streetAddress");
-  if (!legal.postalCode) missingCoreFields.push("postalCode");
-  if (!legal.city) missingCoreFields.push("city");
-  if (!legal.email) missingCoreFields.push("email");
-
-  return {
-    legal,
-    missingCoreFields,
-    isConfigured: missingCoreFields.length === 0,
-    basis: ["ECG_5", "UGB_14", "GewO_63", "MedienG_25"],
-    updatedAt: new Date().toISOString(),
-  };
-}
-
-function buildPublicPrivacyNotice() {
-  const legalNotice = buildPublicLegalNotice();
-  const legal = legalNotice.legal || {};
-  const hasStripe = Boolean(getStripeSecretKey());
-  const hasSmtp = Boolean(String(process.env.SMTP_HOST || "").trim());
-  const hasDiscordBotList = String(process.env.DISCORDBOTLIST_ENABLED || "1").trim() !== "0"
-    && Boolean(String(process.env.DISCORDBOTLIST_TOKEN || "").trim());
-  const hasBotsGG = String(process.env.BOTSGG_ENABLED || "0").trim() !== "0"
-    && Boolean(String(process.env.BOTSGG_TOKEN || "").trim());
-  const hasTopGG = String(process.env.TOPGG_ENABLED || "0").trim() !== "0"
-    && Boolean(String(process.env.TOPGG_TOKEN || "").trim());
-  const hasRecognition = String(process.env.NOW_PLAYING_RECOGNITION_ENABLED || "0").trim() === "1"
-    && Boolean(String(process.env.ACOUSTID_API_KEY || "").trim());
-
-  const controller = {
-    name: readPublicLegalEnv("PRIVACY_CONTROLLER_NAME") || legal.providerName,
-    representative: readPublicLegalEnv("PRIVACY_CONTROLLER_REPRESENTATIVE") || legal.representative,
-    streetAddress: readPublicLegalEnv("PRIVACY_CONTROLLER_STREET_ADDRESS") || legal.streetAddress,
-    postalCode: readPublicLegalEnv("PRIVACY_CONTROLLER_POSTAL_CODE") || legal.postalCode,
-    city: readPublicLegalEnv("PRIVACY_CONTROLLER_CITY") || legal.city,
-    country: readPublicLegalEnv("PRIVACY_CONTROLLER_COUNTRY") || legal.country || "Österreich",
-    website: readPublicLegalEnv("PRIVACY_CONTROLLER_WEBSITE") || legal.website,
-  };
-
-  const contact = {
-    email: readPublicLegalEnv("PRIVACY_CONTACT_EMAIL") || legal.email,
-    phone: readPublicLegalEnv("PRIVACY_CONTACT_PHONE") || legal.phone,
-  };
-
-  const dpo = {
-    name: readPublicLegalEnv("PRIVACY_DPO_NAME"),
-    email: readPublicLegalEnv("PRIVACY_DPO_EMAIL"),
-  };
-
-  const hosting = {
-    provider: readPublicLegalEnv("PRIVACY_HOSTING_PROVIDER"),
-    location: readPublicLegalEnv("PRIVACY_HOSTING_LOCATION"),
-  };
-
-  const authority = {
-    name: readPublicLegalEnv("PRIVACY_AUTHORITY_NAME") || "Österreichische Datenschutzbehörde",
-    website: readPublicLegalEnv("PRIVACY_AUTHORITY_WEBSITE") || "https://www.dsb.gv.at/",
-  };
-
-  const additionalRecipients = readPublicLegalEnv("PRIVACY_ADDITIONAL_RECIPIENTS");
-  const customNote = readPublicLegalEnv("PRIVACY_CUSTOM_NOTE");
-  const missingCoreFields = [];
-
-  if (!controller.name) missingCoreFields.push("controllerName");
-  if (!controller.streetAddress) missingCoreFields.push("controllerStreetAddress");
-  if (!controller.postalCode) missingCoreFields.push("controllerPostalCode");
-  if (!controller.city) missingCoreFields.push("controllerCity");
-  if (!contact.email) missingCoreFields.push("contactEmail");
-
-  return {
-    controller,
-    productName: legal.productName || String(process.env.LEGAL_PRODUCT_NAME || BRAND.name || "OmniFM").trim(),
-    contact,
-    dpo,
-    hosting,
-    authority,
-    additionalRecipients,
-    customNote,
-    features: {
-      stripeEnabled: hasStripe,
-      smtpEnabled: hasSmtp,
-      discordBotListEnabled: hasDiscordBotList,
-      botsGGEnabled: hasBotsGG,
-      topGGEnabled: hasTopGG,
-      recognitionEnabled: hasRecognition,
-      googleAnalyticsEnabled: true,
-      googleAnalyticsMeasurementId: "G-J5X0ZZ5E3Z",
-      cookieConsentStorageKey: "omnifm.cookieConsent.v1",
-      stationPreviewEnabled: true,
-      localeStorageKey: "omnifm.web.locale",
-    },
-    retention: {
-      logDays: Number.parseInt(String(process.env.LOG_MAX_DAYS || "14"), 10) || 14,
-      songHistoryEnabled: String(process.env.SONG_HISTORY_ENABLED || "1").trim() !== "0",
-      songHistoryMaxPerGuild: Number.parseInt(String(process.env.SONG_HISTORY_MAX_PER_GUILD || "100"), 10) || 100,
-      listeningStatsEnabled: true,
-      scheduledEventsEnabled: true,
-    },
-    missingCoreFields,
-    isConfigured: missingCoreFields.length === 0,
-    basis: ["GDPR_ART_13", "GDPR_ART_15_22", "DSB_AT"],
-    updatedAt: new Date().toISOString(),
-  };
-}
-
-function buildPublicTermsNotice() {
-  const legalNotice = buildPublicLegalNotice();
-  const legal = legalNotice.legal || {};
-  const publicUrl = readPublicLegalEnv("PUBLIC_WEB_URL");
-  const fallbackEmail = isPublicLegalPlaceholder(process.env.SMTP_FROM)
-    ? ""
-    : extractMailbox(process.env.SMTP_FROM || "");
-  const hasStripe = Boolean(getStripeSecretKey());
-  const hasSmtp = Boolean(String(process.env.SMTP_HOST || "").trim());
-
-  const operator = {
-    providerName: legal.providerName || "",
-    representative: legal.representative || "",
-    businessPurpose: legal.businessPurpose || "",
-    website: legal.website || publicUrl,
-  };
-
-  const contact = {
-    email: readPublicLegalEnv("TERMS_CONTACT_EMAIL")
-      || readPublicLegalEnv("PRIVACY_CONTACT_EMAIL")
-      || legal.email
-      || fallbackEmail,
-    website: readPublicLegalEnv("TERMS_SUPPORT_URL")
-      || legal.website
-      || publicUrl,
-    effectiveDate: readPublicLegalEnv("TERMS_EFFECTIVE_DATE"),
-    governingLaw: readPublicLegalEnv("TERMS_GOVERNING_LAW"),
-  };
-
-  const missingCoreFields = [];
-  if (!operator.providerName) missingCoreFields.push("providerName");
-  if (!contact.email) missingCoreFields.push("contactEmail");
-  if (!contact.website) missingCoreFields.push("website");
-
-  return {
-    operator,
-    productName: legal.productName || String(process.env.LEGAL_PRODUCT_NAME || BRAND.name || "OmniFM").trim(),
-    contact,
-    service: {
-      discordBotEnabled: true,
-      dashboardEnabled: true,
-      stationPreviewEnabled: true,
-      scheduledEventsEnabled: true,
-      customStationsEnabled: true,
-    },
-    billing: {
-      premiumCheckoutEnabled: hasStripe,
-      paymentProvider: hasStripe ? "Stripe" : "",
-      emailDeliveryEnabled: hasSmtp,
-      trialEnabled: isProTrialEnabled(),
-    },
-    customNote: readPublicLegalEnv("TERMS_CUSTOM_NOTE"),
-    missingCoreFields,
-    isConfigured: missingCoreFields.length === 0,
-    basis: ["DISCORD_TERMS", "AUSTRIAN_SERVICE_TERMS", "STREAM_RIGHTS_NOTICE"],
-    updatedAt: new Date().toISOString(),
-  };
+async function buildPublicTermsNotice() {
+  return termsNotice(await loadOwnerConfigRaw());
 }
 
 const SPA_ENTRY_PATHS = new Set([

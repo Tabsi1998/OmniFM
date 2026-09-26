@@ -1,28 +1,19 @@
+import { loadOwnerConfigRaw } from "../../lib/owner-config.js";
+import { premiumPricing, premiumTiers } from "../../lib/owner-public.js";
+
 export function createPremiumReadRoutesHandler(deps) {
   const {
-    BRAND,
-    DURATION_OPTIONS,
-    PRO_TRIAL_MONTHS,
-    SEAT_OPTIONS,
-    TIERS,
     buildInviteUrlForRuntime,
     calculateUpgradePrice,
-    durationPricingInEuro,
     getBotAccessForTier,
     getDashboardRequestTranslator,
-    getDefaultLanguage,
     getLicense,
-    getPricePerMonthCents,
     getTierConfig,
     isAdminApiRequest,
     isProTrialEnabled,
     languagePick,
     methodNotAllowed,
-    normalizeLanguage,
-    normalizeSeats,
-    resolveLanguageFromAcceptLanguage,
     sanitizeLicenseForApi,
-    seatPricingInEuro,
     sendJson,
   } = deps;
 
@@ -97,7 +88,7 @@ export function createPremiumReadRoutesHandler(deps) {
         methodNotAllowed(res, ["GET"]);
         return true;
       }
-      sendJson(res, 200, { tiers: TIERS });
+      sendJson(res, 200, premiumTiers(await loadOwnerConfigRaw()));
       return true;
     }
 
@@ -110,91 +101,17 @@ export function createPremiumReadRoutesHandler(deps) {
       return true;
     }
 
-    const pricingLanguage = normalizeLanguage(
-      requestUrl.searchParams.get("lang"),
-      resolveLanguageFromAcceptLanguage(req.headers["accept-language"], getDefaultLanguage())
-    );
-    const t = (de, en) => languagePick(pricingLanguage, de, en);
-    const formatPricingValue = (cents) => (Number(cents || 0) / 100).toFixed(2);
-    const serverId = requestUrl.searchParams.get("serverId");
-
-    const result = {
-      brand: BRAND.name,
-      tiers: {
-        free: {
-          name: "Free",
-          pricePerMonth: 0,
-          features: [
-            t("64k Bitrate", "64k bitrate"),
-            t("Bis zu 2 Bots", "Up to 2 bots"),
-            t("20 Free Stationen", "20 free stations"),
-            t("Standard Reconnect (5s)", "Standard reconnect (5s)"),
-          ],
-        },
-        pro: {
-          name: "Pro",
-          pricePerMonth: TIERS.pro.pricePerMonth,
-          startingAt: formatPricingValue(getPricePerMonthCents("pro", 1)),
-          durationPricing: durationPricingInEuro("pro"),
-          seatPricing: seatPricingInEuro("pro"),
-          features: [
-            t("128k Bitrate (HQ Opus)", "128k bitrate (HQ Opus)"),
-            t("Bis zu 8 Bots", "Up to 8 bots"),
-            t("120 Stationen (Free + Pro)", "120 stations (free + pro)"),
-            t("Priority Reconnect (1,5s)", "Priority reconnect (1.5s)"),
-            t("Rollenbasierte Command-Berechtigungen", "Role-based command permissions"),
-            t("Event-Scheduler", "Event scheduler"),
-          ],
-        },
-        ultimate: {
-          name: "Ultimate",
-          pricePerMonth: TIERS.ultimate.pricePerMonth,
-          startingAt: formatPricingValue(getPricePerMonthCents("ultimate", 1)),
-          durationPricing: durationPricingInEuro("ultimate"),
-          seatPricing: seatPricingInEuro("ultimate"),
-          features: [
-            t("320k Bitrate (Ultra HQ)", "320k bitrate (Ultra HQ)"),
-            t("Bis zu 16 Bots", "Up to 16 bots"),
-            t("Alle Stationen + Custom URLs", "All stations + custom URLs"),
-            t("Instant Reconnect (0,4s)", "Instant reconnect (0.4s)"),
-            t("Rollenbasierte Command-Berechtigungen", "Role-based command permissions"),
-          ],
-        },
-      },
-      durations: [...DURATION_OPTIONS],
-      seatOptions: [...SEAT_OPTIONS],
-      trial: {
-        enabled: isProTrialEnabled(),
-        tier: "pro",
-        months: PRO_TRIAL_MONTHS,
-        oneTimePerEmail: true,
-      },
-    };
-
-    if (serverId && /^\d{17,22}$/.test(serverId)) {
-      const license = getLicense(serverId);
-      if (license && !license.expired) {
-        result.currentLicense = {
-          tier: license.tier || license.plan,
-          seats: normalizeSeats(license.seats || 1),
-          expiresAt: license.expiresAt,
-          remainingDays: license.remainingDays,
-        };
-        if ((license.tier || license.plan) === "pro") {
-          const upgrade = calculateUpgradePrice(license, "ultimate");
-          if (upgrade) {
-            result.upgrade = {
-              to: "ultimate",
-              seats: upgrade.seats,
-              cost: upgrade.upgradeCost,
-              daysLeft: upgrade.daysLeft,
-            };
-          }
-        }
+    // Prices and features from the owner's plans (#288, FastAPI contract).
+    const serverId = String(requestUrl.searchParams.get("serverId") || "").trim();
+    let license = null;
+    let upgrade = null;
+    if (/^\d{17,22}$/.test(serverId)) {
+      license = getLicense(serverId);
+      if (license && !license.expired && (license.tier || license.plan) === "pro") {
+        upgrade = calculateUpgradePrice(license, "ultimate") || null;
       }
     }
-
-    sendJson(res, 200, result);
+    sendJson(res, 200, premiumPricing(await loadOwnerConfigRaw(), { license, upgrade, trialEnabled: isProTrialEnabled() }));
     return true;
   };
 }

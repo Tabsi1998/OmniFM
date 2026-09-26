@@ -1,18 +1,35 @@
 import fs from "node:fs";
 import { getDb, isConnected } from "../../lib/db.js";
 import { resolveRuntimeDataPath } from "../../lib/runtime-data-path.js";
+import { loadOwnerConfigRaw } from "../../lib/owner-config.js";
+import { loadConfiguredBots, readRuntimeHealthFresh } from "../../lib/owner-monitoring.js";
+import {
+  coverLookup,
+  healthDocFromRuntimes,
+  marketingResponse,
+  publicBotsResponse,
+  publicStatsResponse,
+} from "../../lib/owner-public.js";
 
-function buildPublicBotTotals(bots) {
-  return bots.reduce(
-    (acc, bot) => {
-      acc.servers += Number(bot.servers) || 0;
-      acc.users += Number(bot.users) || 0;
-      acc.connections += Number(bot.connections) || 0;
-      acc.listeners += Number(bot.listeners) || 0;
-      return acc;
-    },
-    { servers: 0, users: 0, connections: 0, listeners: 0 }
-  );
+/**
+ * The live numbers for the website, like FastAPI: the bots' health document
+ * in MongoDB (all processes of a split setup, fresh for 30 seconds). Without
+ * one (no MongoDB, or right after the start) the ready bots of this process
+ * stand in; with none of them the numbers stay 0.
+ */
+async function readPublicLiveDoc(runtimes) {
+  if (isConnected() && getDb()) {
+    const doc = await readRuntimeHealthFresh(getDb());
+    if (doc) return doc;
+  }
+  return runtimes.some((runtime) => runtime.client?.isReady?.()) ? healthDocFromRuntimes(runtimes) : null;
+}
+
+/** The configured bots (environment, else owner console); a lone process without either lists its own. */
+async function readConfiguredBots(runtimes) {
+  const configured = loadConfiguredBots(await loadOwnerConfigRaw());
+  if (configured.length || !runtimes.length) return configured;
+  return runtimes.map((runtime) => runtime.getPublicStatus());
 }
 
 function buildWorkerPayload(runtime, fallbackIndex = 0) {
@@ -75,8 +92,8 @@ export function createPublicRoutesHandler(deps) {
         methodNotAllowed(res, ["GET"]);
         return true;
       }
-      const bots = runtimes.map((runtime) => runtime.getPublicStatus());
-      sendJson(res, 200, { bots, totals: buildPublicBotTotals(bots) });
+      const configured = await readConfiguredBots(runtimes);
+      sendJson(res, 200, publicBotsResponse(configured, await readPublicLiveDoc(runtimes)));
       return true;
     }
 
@@ -121,17 +138,9 @@ export function createPublicRoutesHandler(deps) {
         methodNotAllowed(res, ["GET"]);
         return true;
       }
-      const bots = runtimes.map((runtime) => runtime.getPublicStatus());
-      const totals = buildPublicBotTotals(bots);
-      const publicStations = buildPublicStationCatalog(loadStations());
-      sendJson(res, 200, {
-        ...totals,
-        bots: runtimes.length,
-        stations: publicStations.total,
-        freeStations: publicStations.freeStations,
-        proStations: publicStations.proStations,
-        ultimateStations: publicStations.ultimateStations,
-      });
+      const configured = await readConfiguredBots(runtimes);
+      const catalog = buildPublicStationCatalog(loadStations());
+      sendJson(res, 200, publicStatsResponse(configured, await readPublicLiveDoc(runtimes), catalog));
       return true;
     }
 
@@ -155,7 +164,7 @@ export function createPublicRoutesHandler(deps) {
         methodNotAllowed(res, ["GET"]);
         return true;
       }
-      sendJson(res, 200, buildPublicLegalNotice());
+      sendJson(res, 200, await buildPublicLegalNotice());
       return true;
     }
 
@@ -164,7 +173,7 @@ export function createPublicRoutesHandler(deps) {
         methodNotAllowed(res, ["GET"]);
         return true;
       }
-      sendJson(res, 200, buildPublicPrivacyNotice());
+      sendJson(res, 200, await buildPublicPrivacyNotice());
       return true;
     }
 
@@ -173,7 +182,30 @@ export function createPublicRoutesHandler(deps) {
         methodNotAllowed(res, ["GET"]);
         return true;
       }
-      sendJson(res, 200, buildPublicTermsNotice());
+      sendJson(res, 200, await buildPublicTermsNotice());
+      return true;
+    }
+
+    if (requestUrl.pathname === "/api/marketing") {
+      if (req.method !== "GET") {
+        methodNotAllowed(res, ["GET"]);
+        return true;
+      }
+      sendJson(res, 200, marketingResponse(await loadOwnerConfigRaw()));
+      return true;
+    }
+
+    if (requestUrl.pathname === "/api/cover") {
+      if (req.method !== "GET") {
+        methodNotAllowed(res, ["GET"]);
+        return true;
+      }
+      const params = requestUrl.searchParams;
+      sendJson(res, 200, await coverLookup({
+        artist: params.get("artist") || "",
+        title: params.get("title") || "",
+        term: params.get("term") || "",
+      }));
       return true;
     }
 
