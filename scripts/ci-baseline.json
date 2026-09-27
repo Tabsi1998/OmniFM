@@ -289,31 +289,15 @@
     "test/web-server-dashboard.test.js::no-await-in-loop::3",
     "test/web-server-dashboard.test.js::no-await-in-loop::4"
   ],
-  "licences": [
-    "frontend: lightningcss (MPL-2.0)",
-    "frontend: lightningcss-win32-x64-msvc (MPL-2.0)",
-    "frontend: path-is-inside ((WTFPL OR MIT))",
-    "frontend: rc ((BSD-2-Clause OR MIT OR Apache-2.0))",
-    "frontend: victory-vendor (MIT AND ISC)",
-    "root: axe-core (MPL-2.0)",
-    "root: caniuse-lite (CC-BY-4.0)",
-    "root: type-fest ((MIT OR CC0-1.0))"
-  ],
+  "licences": [],
   "lighthouse-performance": [
     "67"
   ],
   "line-endings": [],
   "live-smoke": [],
   "node-contract-suite": [],
-  "npm-audit": [
-    "frontend: fast-uri (high)"
-  ],
-  "osv": [
-    "frontend/package-lock.json: fast-uri 3.1.5 GHSA-5jgf-p345-68v8",
-    "frontend/package-lock.json: fast-uri 3.1.5 GHSA-f65p-4m7j-42xc",
-    "frontend/package-lock.json: fast-uri 3.1.5 GHSA-fph4-wmhf-6fwf",
-    "frontend/package-lock.json: fast-uri 3.1.5 GHSA-jqff-g426-hqxp"
-  ],
+  "npm-audit": [],
+  "osv": [],
   "semgrep": [
     "backend/routers/admin_stations.py: ssrf-requests: lambda: requests.get(url, stream=True, timeout=6, headers={\"Range\": \"bytes=0-2047\", \"User-Agent\": \"OmniFM-StreamTest/1.0\", \"Icy-MetaData\": \"",
     "backend/routers/dashboard.py: ssrf-requests: resp = requests.get( f\"https://discord.com/api/v10/guilds/{guild.get('id')}/emojis\", headers={\"Authorization\": f\"Bot {bot_token}\"}, timeout=",
@@ -324,8 +308,5 @@
     "frontend/src/components/RichMessageEditor.js: react-dangerouslysetinnerhtml: <div dangerouslySetInnerHTML={{ __html: renderDiscordMarkdown(resolvedPreviewText, { serverEmojis: resolvedServerEmojis }) }} />",
     "src/lib/api-helpers.js: cors-misconfiguration: res.setHeader(\"Access-Control-Allow-Origin\", normalizedOrigin);"
   ],
-  "shellcheck": [
-    "start.sh: SC1091 (info)",
-    "stop.sh: SC2034 (warning)"
-  ]
+  "shellcheck": []
 }

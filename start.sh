@@ -25,6 +25,7 @@ VENV="$ROOT/.venv"
 BACKEND_ENV="$ROOT/backend/.env"
 FRONTEND_ENV="$ROOT/frontend/.env"
 # A second installation such as staging brings its instance.env (#262).
+# shellcheck source=scripts/instance-env.sh
 . "$ROOT/scripts/instance-env.sh"
 FRONTEND_PORT="${FRONTEND_PORT:-3000}"
 BACKEND_PORT="${BACKEND_PORT:-8001}"
@@ -153,6 +154,7 @@ fi
 # --- MongoDB 8.0 Community ----------------------------------------------------
 if ! command -v mongod >/dev/null 2>&1; then
   log "Installiere MongoDB 8.0 Community..."
+  # shellcheck source=/dev/null  # the host's file, nothing to check
   UBU_CODENAME="$( ( . /etc/os-release 2>/dev/null && echo "${UBUNTU_CODENAME:-${VERSION_CODENAME:-noble}}" ) || echo noble)"
   curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc \
     | $SUDO gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor --yes >>"$LOG_DIR/setup.log" 2>&1

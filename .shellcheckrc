@@ -1,0 +1,3 @@
+# start.sh and stop.sh source scripts/instance-env.sh; ShellCheck follows it (#286).
+external-sources=true
+source-path=SCRIPTDIR

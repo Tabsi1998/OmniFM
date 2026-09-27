@@ -10,6 +10,7 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUN_DIR="$ROOT/run"
 # A second installation such as staging stops only its own units (#262).
+# shellcheck source=scripts/instance-env.sh
 . "$ROOT/scripts/instance-env.sh"
 
 log() { printf "\033[1;36m[OmniFM]\033[0m %s\n" "$*"; }
@@ -21,8 +22,7 @@ kill_pid() {
     if kill -0 "$pid" 2>/dev/null; then
       log "Stoppe $name (PID $pid)..."
       kill "$pid" 2>/dev/null || true
-      local attempt
-      for attempt in $(seq 1 30); do
+      for _ in $(seq 1 30); do
         kill -0 "$pid" 2>/dev/null || break
         sleep 0.5
       done
