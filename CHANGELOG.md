@@ -6,6 +6,43 @@ folgt [SemVer](https://semver.org/lang/de/): Die erste Zahl steigt bei
 Funktionen, die dritte bei reinen Fehlerbehebungen. Wie ein Release entsteht,
 steht in `scripts/release.mjs`.
 
+## 3.6.0 – 2026-09-27
+
+Datenschutz zum Selbstbedienen: Jede Person sieht, was OmniFM über sie
+speichert, bekommt es als Datei und kann es selbst löschen. Serverdaten
+werden 30 Tage nach dem Entfernen des Bots gelöscht.
+
+### Neu
+
+- **`/meine-daten`** (englisch `/mydata`): zeigt privat, was OmniFM über dich
+  gespeichert hat: Merkliste, Votes, Dashboard-Anmeldungen, Umfragen und
+  Events, die du gestartet hast, und deine Änderungen im Dashboard.
+  „Als Datei schicken“ schickt alles per Direktnachricht. „Alles löschen“
+  löscht Merkliste, Votes und Anmeldungen sofort; bei Umfragen, Events und
+  Dashboard-Änderungen bleibt der Eintrag für den Server, dein Name wird
+  entfernt. Premium-Käufe sind ausgenommen, die müssen wir aus steuerlichen
+  Gründen aufbewahren. Der Befehl ist immer erlaubt, auch ohne Rechte in
+  `/perm`. (#285, #386)
+- **Serverdaten nach dem Entfernen:** Wird OmniFM von einem Server entfernt,
+  bekommt der Server-Owner eine Direktnachricht mit dem Datum. 30 Tage später
+  löschen wir Einstellungen, eigene Sender, Events, Statistiken und den
+  Song-Verlauf des Servers. Wird OmniFM vorher wieder eingeladen, bleibt
+  alles. Premium-Lizenzen bleiben immer erhalten. Die Owner-Konsole zeigt
+  unter „Server & Lizenzen › Übersicht“, welcher Server wann gelöscht wird.
+  (#285, #387)
+
+### Geändert
+
+- Verlässt ein Bot einen Server, vergisst er ihn ganz, auch die Lautstärke.
+  Wird er wieder eingeladen, startet er mit der Standard-Lautstärke. (#387)
+- Die Datenschutzerklärung erklärt beides in einfachen Worten. (#386, #387)
+
+### Intern
+
+- Die Node-API ist in Module aufgeteilt; keine Datei in `src/api` hat mehr
+  als 800 Zeilen, ein Test hält das fest. Dabei sind 16 alte
+  ESLint-Hinweise weggefallen. (#293, #385)
+
 ## 3.5.0 – 2026-09-27
 
 Alle Daten liegen in Produktion nur noch in MongoDB. Vorher schrieben viele
