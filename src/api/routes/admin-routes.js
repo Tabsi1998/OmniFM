@@ -19,8 +19,6 @@
 //   POST /api/admin/stations/test | health, DELETE /api/admin/stations/:key
 // ============================================================
 
-import fs from "node:fs";
-
 import { recordOwnerAudit } from "../../lib/owner-audit-store.js";
 import { syncDiscordOauthFromOwnerConfig } from "../../lib/discord-oauth-settings.js";
 import {
@@ -45,32 +43,12 @@ import {
   OWNER_CONFIG_ID,
   OWNER_CONFIG_SECTIONS,
   configSectionFrom,
-  effectiveSystemConfig,
   loadOwnerConfigRaw,
   mergedSectionForSave,
   ownerConfigResponse,
   sectionResponse,
 } from "../../lib/owner-config.js";
-import {
-  OwnerLicenseError,
-  addOwnerLicense,
-  adminLicenseRows,
-  isValidEmail,
-  licenseRows,
-  maskEmail,
-  parseIntLike,
-  patchOwnerLicense,
-  setLicenseServerLinks,
-} from "../../lib/owner-licenses.js";
-import { ArchiveError, archiveMongoRecords, listArchiveOperations, restoreArchivedOperation } from "../../lib/owner-archive.js";
-import {
-  OwnerStationError,
-  buildStationDocument,
-  runStationHealth,
-  stationListResponse,
-  testStationStream,
-} from "../../lib/owner-stations.js";
-import { reloadStationsFromMongo } from "../../stations-store.js";
+import { licenseRows, parseIntLike } from "../../lib/owner-licenses.js";
 import {
   FAILOVER_HISTORY_EVENTS,
   TIER_PRICE_CENTS,
@@ -93,8 +71,9 @@ import {
 } from "../../lib/owner-monitoring.js";
 import { isAllowedOperatorWebhookUrl } from "../../services/operator-webhook.js";
 import nodemailer from "nodemailer";
-import { flushPremiumStoreWrites, reloadPremiumStore, savePremiumStore } from "../../premium-store.js";
-import { resolveRuntimeDataPath } from "../../lib/runtime-data-path.js";
+import { reloadPremiumStore } from "../../premium-store.js";
+import { createAdminLicenseRoutes } from "./admin-license-routes.js";
+import { createAdminStationRoutes, loadCatalogFileStations } from "./admin-station-routes.js";
 
 export function readRequestBody(req, limitBytes = 4096) {
   const maxBytes = Math.max(1, Math.floor(Number(limitBytes) || 4096));
@@ -218,15 +197,6 @@ export function createAdminRoutesHandler(deps) {
       userAgent: String(req.headers?.["user-agent"] || "").slice(0, 200),
       origin: String(req.headers?.origin || "").slice(0, 200),
     };
-  }
-
-  // stations.json for the station summary when MongoDB has no catalog yet.
-  function loadCatalogFileStations() {
-    try {
-      return JSON.parse(fs.readFileSync(new URL("../../../stations.json", import.meta.url), "utf8"))?.stations || {};
-    } catch {
-      return {};
-    }
   }
 
   /** The checks of POST /api/admin/integrations/test, like FastAPI's check_all(). */
@@ -354,6 +324,11 @@ export function createAdminRoutesHandler(deps) {
       return null;
     }
   }
+
+  // Licenses, activity and archive; the station catalogue (#293).
+  const routeDeps = { sendJson, methodNotAllowed, auditOwnerAction, readRequestBody };
+  const handleLicenseRoutes = createAdminLicenseRoutes(routeDeps);
+  const handleStationRoutes = createAdminStationRoutes(routeDeps);
 
   return async function handleAdminRoutes(context) {
     const { req, res, requestUrl } = context;
@@ -707,269 +682,9 @@ export function createAdminRoutesHandler(deps) {
       return true;
     }
 
-    // The servers the running bots are in (_runtime_guild_directory), from MongoDB like FastAPI.
-    const guildDirectory = async () => {
-      const db = isConnected() ? getDb() : null;
-      return runtimeGuildDirectory(db, await readRuntimeHealthFresh(db));
-    };
-    const licenseError = (err) => {
-      const status = err instanceof OwnerLicenseError || err instanceof ArchiveError ? err.status : 500;
-      sendJson(res, status, { error: err?.message || "Fehler" });
-    };
-    const clientIp = () => {
-      try { return getClientIp(req) || "-"; } catch { return "-"; }
-    };
-
-    // GET/POST /api/admin/licenses: the license manager (#288, FastAPI contract)
-    if (pathname === "/api/admin/licenses") {
-      if (req.method === "GET") {
-        const data = await reloadPremiumStore();
-        const rows = requestUrl.searchParams.get("full") === "1" ? adminLicenseRows(data, await guildDirectory()) : licenseRows(data);
-        sendJson(res, 200, { licenses: rows, count: rows.length });
-        return true;
-      }
-      if (req.method !== "POST") { methodNotAllowed(res, ["GET", "POST"]); return true; }
-      if (!isConnected() || !getDb()) { sendJson(res, 503, { error: "Keine Datenbank verbunden." }); return true; }
-      let body;
-      try { body = JSON.parse(await readRequestBody(req, 64 * 1024) || "{}") || {}; } catch { body = {}; }
-      const email = String(body.email || "").trim();
-      const tier = String(body.tier || "pro").trim().toLowerCase();
-      const months = parseIntLike(body.months ?? 1, 1);
-      const seats = Math.max(1, Math.min(5, parseIntLike(body.seats ?? 1, 1)));
-      const note = String(body.note || "").trim();
-      if (!["pro", "ultimate"].includes(tier)) { sendJson(res, 400, { error: "Tier muss 'pro' oder 'ultimate' sein." }); return true; }
-      if (email && !isValidEmail(email)) { sendJson(res, 400, { error: "Bitte eine gültige E-Mail-Adresse angeben." }); return true; }
-      try {
-        const data = await reloadPremiumStore();
-        const created = addOwnerLicense(data, { email, tier, months, seats, note, activatedBy: "owner" });
-        const serverId = String(body.serverId || body.guildId || "").trim();
-        if (serverId) setLicenseServerLinks(data, created.licenseKey, [serverId]);
-        savePremiumStore(data);
-        await flushPremiumStoreWrites();
-        auditOwnerAction(req, { action: "license.create", status: "success", target: created.licenseKey, summary: `${tier} · ${months}M · ${seats} seats` });
-        sendJson(res, 200, { ok: true, licenseKey: created.licenseKey, license: { ...data.licenses[created.licenseKey], licenseKey: created.licenseKey } });
-      } catch (err) {
-        licenseError(err);
-      }
-      return true;
-    }
-
-    // PATCH/DELETE /api/admin/licenses/<key>
-    const licenseMatch = pathname.match(/^\/api\/admin\/licenses\/([^/]+)$/);
-    if (licenseMatch) {
-      const licenseKey = decodeURIComponent(licenseMatch[1]);
-      if (req.method !== "PATCH" && req.method !== "DELETE") { methodNotAllowed(res, ["PATCH", "DELETE"]); return true; }
-      if (!isConnected() || !getDb()) { sendJson(res, 503, { error: "Keine Datenbank verbunden." }); return true; }
-      try {
-        const data = await reloadPremiumStore();
-        if (req.method === "PATCH") {
-          let body;
-          try { body = JSON.parse(await readRequestBody(req, 64 * 1024) || "{}") || {}; } catch { body = {}; }
-          const changes = patchOwnerLicense(data, licenseKey, body);
-          savePremiumStore(data);
-          await flushPremiumStoreWrites();
-          auditOwnerAction(req, { action: "license.update", status: "success", target: licenseKey, summary: changes.join(", ") || "no-op" });
-          const row = adminLicenseRows(data, await guildDirectory()).find((entry) => entry.licenseKey === licenseKey) || null;
-          sendJson(res, 200, { ok: true, license: row, changes });
-          return true;
-        }
-        if (!data.licenses?.[licenseKey]) { sendJson(res, 404, { error: "Lizenz nicht gefunden." }); return true; }
-        let archived;
-        try {
-          archived = await archiveMongoRecords(getDb(), [
-            ["licenses", { _licenseId: String(licenseKey) }],
-            ["server_entitlements", { licenseId: String(licenseKey) }],
-          ], { operation: "owner.license.delete", target: licenseKey, actor: "owner", ip: clientIp(), remove: false });
-        } catch (err) {
-          sendJson(res, 500, { error: `Lizenz konnte nicht sicher archiviert werden: ${String(err?.message || err).slice(0, 300)}` });
-          return true;
-        }
-        if (!archived.archived) { sendJson(res, 409, { error: "Lizenz konnte vor dem Löschen nicht archiviert werden." }); return true; }
-        const removed = data.licenses[licenseKey];
-        delete data.licenses[licenseKey];
-        for (const [serverId, entitlement] of Object.entries(data.serverEntitlements || {})) {
-          if (String(entitlement?.licenseId || "") === String(licenseKey)) delete data.serverEntitlements[serverId];
-        }
-        savePremiumStore(data);
-        await flushPremiumStoreWrites();
-        auditOwnerAction(req, { action: "license.delete", status: "success", target: licenseKey, summary: String(removed?.tier || removed?.plan || "") });
-        sendJson(res, 200, { ok: true, deleted: licenseKey, archiveId: archived.operationId });
-      } catch (err) {
-        licenseError(err);
-      }
-      return true;
-    }
-
-    // GET /api/admin/activity: redemptions, else issued licenses (FastAPI contract)
-    if (pathname === "/api/admin/activity") {
-      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
-      const data = await reloadPremiumStore();
-      let redemptions;
-      try {
-        const coupons = JSON.parse(fs.readFileSync(resolveRuntimeDataPath("coupons.json"), "utf8"));
-        redemptions = Object.entries(coupons?.redemptions || {})
-          .filter(([, row]) => row && typeof row === "object")
-          .map(([sessionId, row]) => ({ sessionId: String(row.sessionId || sessionId).trim(), ...row }))
-          .sort((a, b) => String(b.processedAt || "").localeCompare(String(a.processedAt || "")));
-      } catch {
-        redemptions = Array.isArray(data.recentRedemptions) ? data.recentRedemptions : [];
-      }
-      const events = redemptions.slice(0, 50).map((row) => ({
-        type: "redemption",
-        at: row.processedAt || row.createdAt || null,
-        label: `${String(row.tier || "premium").replace(/^./, (c) => c.toUpperCase())} Lizenz eingeloest`,
-        detail: maskEmail(String(row.email || "")),
-        meta: { seats: row.seats ?? null, sessionId: row.sessionId ?? null },
-      }));
-      if (!events.length) {
-        for (const row of licenseRows(data)) {
-          events.push({
-            type: "license",
-            at: row.createdAt,
-            label: `${row.planName} Lizenz ausgestellt`,
-            detail: row.contactEmail,
-            meta: { seats: row.seats, source: row.source, status: row.expired ? "expired" : "active" },
-          });
-        }
-      }
-      events.sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")));
-      sendJson(res, 200, { activity: events.slice(0, 50), count: events.length });
-      return true;
-    }
-
-    // GET /api/admin/archive, POST /api/admin/archive/<operation>/restore
-    if (pathname === "/api/admin/archive") {
-      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
-      if (!isConnected() || !getDb()) { sendJson(res, 503, { error: "MongoDB nicht verbunden." }); return true; }
-      const rows = await listArchiveOperations(getDb(), requestUrl.searchParams.get("limit") || 100);
-      sendJson(res, 200, { archive: rows, count: rows.length });
-      return true;
-    }
-    const restoreMatch = pathname.match(/^\/api\/admin\/archive\/([^/]+)\/restore$/);
-    if (restoreMatch) {
-      if (req.method !== "POST") { methodNotAllowed(res, ["POST"]); return true; }
-      const operationId = decodeURIComponent(restoreMatch[1]);
-      try {
-        const result = await restoreArchivedOperation(isConnected() ? getDb() : null, operationId, { ip: clientIp() });
-        auditOwnerAction(req, { action: "archive.restore", status: "success", target: operationId, summary: `${result.restored} Datensätze` });
-        sendJson(res, 200, { ok: true, ...result });
-      } catch (err) {
-        if (!(err instanceof ArchiveError) || err.status >= 500) {
-          auditOwnerAction(req, { action: "archive.restore", status: "failed", target: operationId, summary: String(err?.message || err) });
-        }
-        const status = err instanceof ArchiveError ? err.status : 500;
-        const message = status >= 500 && !(err instanceof ArchiveError) ? `Wiederherstellung fehlgeschlagen: ${String(err?.message || err).slice(0, 300)}` : err.message;
-        sendJson(res, status, { error: message });
-      }
-      return true;
-    }
-
-    // Station catalogue (FastAPI contract, backend/routers/admin_stations.py)
-    const stationDb = () => (isConnected() ? getDb() : null);
-    const readStationBody = async () => {
-      try { return JSON.parse(await readRequestBody(req, 64 * 1024) || "{}") || {}; } catch { return {}; }
-    };
-
-    // GET /api/admin/stations: summary · POST: create or update
-    if (pathname === "/api/admin/stations") {
-      if (req.method === "GET") {
-        const summary = await stationSummary(stationDb(), loadCatalogFileStations);
-        sendJson(res, 200, summary);
-        return true;
-      }
-      if (req.method !== "POST") { methodNotAllowed(res, ["GET", "POST"]); return true; }
-      const db = stationDb();
-      if (!db) { sendJson(res, 503, { error: "MongoDB nicht verbunden – Stationsverwaltung nicht verfügbar." }); return true; }
-      let doc;
-      try {
-        doc = await buildStationDocument(await readStationBody());
-      } catch (err) {
-        if (!(err instanceof OwnerStationError)) throw err;
-        sendJson(res, err.status, { error: err.message });
-        return true;
-      }
-      const stations = db.collection("stations");
-      const existing = await stations.findOne({ key: doc.key });
-      const now = new Date().toISOString();
-      doc.updated_at = now;
-      if (!existing) {
-        doc.created_at = now;
-        doc.is_default = false;
-      }
-      await stations.updateOne({ key: doc.key }, { $set: doc }, { upsert: true });
-      await reloadStationsFromMongo();
-      auditOwnerAction(req, { action: existing ? "station.update" : "station.create", status: "success", target: doc.key, summary: `${doc.name} · ${doc.tier} · ${doc.url}` });
-      sendJson(res, 200, { ok: true, created: !existing, station: doc });
-      return true;
-    }
-
-    // GET /api/admin/stations/list
-    if (pathname === "/api/admin/stations/list") {
-      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
-      const stationHealthConfig = effectiveSystemConfig(await loadOwnerConfigRaw()).stationHealth || {};
-      sendJson(res, 200, await stationListResponse(stationDb(), stationHealthConfig));
-      return true;
-    }
-
-    // POST /api/admin/stations/test
-    if (pathname === "/api/admin/stations/test") {
-      if (req.method !== "POST") { methodNotAllowed(res, ["POST"]); return true; }
-      const url = String((await readStationBody()).url || "").trim();
-      try {
-        const result = await testStationStream(url);
-        const detail = result.status ? `status=${result.status} type=${result.contentType} ${result.latencyMs}ms` : result.message;
-        auditOwnerAction(req, { action: "station.test", status: result.ok ? "success" : (result.status ? "warn" : "failed"), target: url, summary: detail });
-        sendJson(res, 200, result);
-      } catch (err) {
-        if (!(err instanceof OwnerStationError)) throw err;
-        auditOwnerAction(req, { action: "station.test", status: "failed", target: url, summary: err.message });
-        sendJson(res, err.status, { error: err.message });
-      }
-      return true;
-    }
-
-    // POST /api/admin/stations/health
-    if (pathname === "/api/admin/stations/health") {
-      if (req.method !== "POST") { methodNotAllowed(res, ["POST"]); return true; }
-      const db = stationDb();
-      if (!db) { sendJson(res, 503, { error: "MongoDB nicht verbunden." }); return true; }
-      sendJson(res, 200, await runStationHealth(db, (await readStationBody()).keys));
-      return true;
-    }
-
-    // DELETE /api/admin/stations/<key>: archived first, the default station stays
-    const stationKeyMatch = pathname.match(/^\/api\/admin\/stations\/([^/]+)$/);
-    if (stationKeyMatch) {
-      if (req.method !== "DELETE") { methodNotAllowed(res, ["DELETE"]); return true; }
-      const db = stationDb();
-      if (!db) { sendJson(res, 503, { error: "MongoDB nicht verbunden." }); return true; }
-      const key = decodeURIComponent(stationKeyMatch[1]).trim().toLowerCase();
-      const existing = await db.collection("stations").findOne({ key });
-      if (!existing) { sendJson(res, 404, { error: "Station nicht gefunden." }); return true; }
-      if (existing.is_default) {
-        sendJson(res, 400, { error: "Standard-Station kann nicht gelöscht werden. Setze zuerst eine andere Default-Station." });
-        return true;
-      }
-      let archived;
-      try {
-        archived = await archiveMongoRecords(db, [["stations", { _id: existing._id }]], {
-          operation: "owner.station.delete", target: key, actor: "owner", ip: clientIp(), remove: true,
-        });
-      } catch (err) {
-        sendJson(res, 500, { error: `Station konnte nicht sicher archiviert werden: ${String(err?.message || err).slice(0, 300)}` });
-        return true;
-      }
-      if (!Number(archived.deleted?.stations || 0)) {
-        sendJson(res, 409, { error: "Station wurde archiviert, aber nicht aus dem aktiven Katalog entfernt." });
-        return true;
-      }
-      await reloadStationsFromMongo();
-      auditOwnerAction(req, { action: "station.delete", status: "success", target: key, summary: String(existing.name || "") });
-      sendJson(res, 200, { ok: true, deleted: key, archiveId: archived.operationId });
-      return true;
-    }
-
-    return false;
+    // Licenses, activity and archive; the station catalogue (#293).
+    if (await handleLicenseRoutes(context)) return true;
+    return handleStationRoutes(context);
   };
 }
 
