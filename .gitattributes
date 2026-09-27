@@ -9,4 +9,5 @@
 Dockerfile text eol=lf
 README.md text eol=lf
 .gitignore text eol=lf
+.shellcheckrc text eol=lf
 .gitattributes text eol=lf
