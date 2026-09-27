@@ -357,7 +357,9 @@ export async function initCouponStore({ refreshMs = 5000 } = {}) {
   await database.collection(REDEMPTIONS).createIndex({ _sessionId: 1 }, { name: "coupon_session", unique: true }).catch(() => null);
   const fileStore = readStore(STORE_FILE) || readStore(BACKUP_FILE) || emptyStore();
   let migrated = 0;
-  for (const [collection, keyField, rows] of [[OFFERS, "_code", fileStore.offers], [REDEMPTIONS, "_sessionId", fileStore.redemptions]]) {
+  /** @type {Array<[string, string, Record<string, any>]>} */
+  const sources = [[OFFERS, "_code", fileStore.offers], [REDEMPTIONS, "_sessionId", fileStore.redemptions]];
+  for (const [collection, keyField, rows] of sources) {
     for (const [key, value] of Object.entries(rows || {})) {
       // eslint-disable-next-line no-await-in-loop -- a one-time copy, row by row
       const result = await database.collection(collection).updateOne({ [keyField]: key }, { $setOnInsert: { [keyField]: key, ...value } }, { upsert: true });

@@ -234,7 +234,9 @@ function buildVolumeOnlyEntry(entry = {}) {
   };
 }
 
+/** @param {Record<string, any>} [rawEntry] */
 function normalizeStoredBotStateEntry(rawEntry = {}) {
+  /** @type {Record<string, any>} */
   const input = rawEntry && typeof rawEntry === "object" ? rawEntry : {};
   const volume = normalizeStoredVolume(input.volume);
   const volumePreference = input.volumePreference === true;

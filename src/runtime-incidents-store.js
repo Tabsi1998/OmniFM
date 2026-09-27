@@ -183,8 +183,12 @@ function normalizeRuntimeIncident(rawIncident, guildId = "") {
  * One German line for the owner console, e.g. "Server X: Alpha FM nicht
  * erreichbar, Ersatzsender Beta FM". Stored with the incident so the owner
  * monitoring (FastAPI) can list server incidents next to process incidents.
+ * @param {string} eventKey
+ * @param {Record<string, any>} [payload]
+ * @param {string} [guildLabel]
  */
 export function describeRuntimeIncident(eventKey, payload = {}, guildLabel = "") {
+  /** @type {Record<string, any>} */
   const p = payload && typeof payload === "object" ? payload : {};
   const previous = p.previousStationName || p.previousStationKey || "Sender";
   const prefix = guildLabel ? `${guildLabel}: ` : "";
