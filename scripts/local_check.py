@@ -32,6 +32,7 @@ Results go to .local-testing/, which Git ignores.
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import os
 import platform
@@ -80,6 +81,7 @@ API_PORT = 18001
 NODE_API_PORT = 18002
 PROXY_API_PORT = 18003
 NODE_CONTRACT_PORT = 18004
+NODE_OWNER_CONTRACT_PORT = 18005
 API_TOKEN = "ci-owner-token"
 MASK = "•" * 8
 
@@ -1068,10 +1070,10 @@ def parse_json(raw: str) -> dict:
 
 
 def request(method: str, path: str, *, token: str = "", body: dict | None = None,
-            follow: bool = True) -> tuple:
-    """One call against the local server: status, headers and JSON."""
+            follow: bool = True, base: str = "") -> tuple:
+    """One call against the local server (FastAPI unless base says otherwise): status, headers and JSON."""
     data = json.dumps(body).encode() if body is not None else None
-    call = urllib.request.Request(f"http://127.0.0.1:{API_PORT}{path}", data=data, method=method)
+    call = urllib.request.Request(f"{base or f'http://127.0.0.1:{API_PORT}'}{path}", data=data, method=method)
     if token:
         call.add_header("X-Admin-Token", token)
     if data is not None:
@@ -1089,18 +1091,9 @@ def expect(condition: object, message: str) -> None:
         raise StepFailed(message)
 
 
-def fastapi_contract(context: Context) -> str:
-    """Drive a live FastAPI through the owner contract the dashboard relies on.
-
-    The CI's longest gate, and the one that catches the breakages that matter:
-    a masked secret that overwrites the real one, a licence that leaves an
-    entitlement behind when it is deleted, an archive that cannot be restored,
-    a monitoring answer with per-process figures for a shared process. Every
-    step asserts both the answer and what reached the database.
-    """
+def contract_database(context: Context, url: str, database: str) -> tuple:
+    """An empty contract database and two helpers that read and write it with pymongo."""
     exe = venv_python()
-    url = start_mongo(context, MONGO_CONTAINER, MONGO_PORT)
-    database = "omnifm_local_contract"
     env = {"MONGO_URL": url, "DB_NAME": database, "API_ADMIN_TOKEN": API_TOKEN, "SEED_DEMO_DATA": "0"}
     prelude = f"import json;from pymongo import MongoClient;d=MongoClient({url!r})[{database!r}];"
 
@@ -1113,6 +1106,21 @@ def fastapi_contract(context: Context) -> str:
         context.run(exe, "-c", prelude + statement, env=env, timeout=120)
 
     run_mongo("d.client.drop_database(d.name)")
+    return env, in_mongo, run_mongo
+
+
+def fastapi_contract(context: Context) -> str:
+    """Drive a live FastAPI through the owner contract the dashboard relies on.
+
+    The CI's longest gate, and the one that catches the breakages that matter:
+    a masked secret that overwrites the real one, a licence that leaves an
+    entitlement behind when it is deleted, an archive that cannot be restored,
+    a monitoring answer with per-process figures for a shared process. Every
+    step asserts both the answer and what reached the database.
+    """
+    exe = venv_python()
+    url = start_mongo(context, MONGO_CONTAINER, MONGO_PORT)
+    env, in_mongo, run_mongo = contract_database(context, url, "omnifm_local_contract")
     if port_open(API_PORT):
         raise StepSkipped(f"port {API_PORT} is taken; stop what uses it and run again")
     start_process(context, "fastapi", [exe, "-m", "uvicorn", "backend.server:app", "--host", "127.0.0.1",
@@ -1195,7 +1203,8 @@ def node_contract_suite(context: Context) -> str:
     return f"{describe_counts(counts)} against Node; {verdict}. Gap list: {path}"
 
 
-def check_owner_contract(in_mongo, run_mongo) -> None:
+def check_owner_contract(in_mongo, run_mongo, base: str = "") -> None:
+    request = functools.partial(globals()["request"], base=base)
     _, _, health = request("GET", "/api/health")
     expect(health.get("ok") is True, f"/api/health is not ok: {health}")
     expect(health.get("contractVersion") == "owner-live-v5",
@@ -1293,6 +1302,35 @@ def check_owner_contract(in_mongo, run_mongo) -> None:
            f"the OAuth login does not redirect to Discord: {location!r}")
 
 
+def node_owner_contract(context: Context) -> str:
+    """#288: the owner contract of backend/contract, driven against the Node API.
+
+    Node answers the owner console once #290 switches over, so the same walk
+    (masked secrets, licence, archive and restore, runtime health, OAuth
+    redirect) has to hold there too. Its own empty database, so nothing the
+    FastAPI steps left behind changes the counts.
+    """
+    if port_open(NODE_OWNER_CONTRACT_PORT):
+        raise StepSkipped(f"port {NODE_OWNER_CONTRACT_PORT} is taken; stop what uses it and run again")
+    url = start_mongo(context, MONGO_CONTAINER, MONGO_PORT)
+    env, in_mongo, run_mongo = contract_database(context, url, "omnifm_local_contract_node")
+    node = node_of(context, NODE_MAJOR)
+    scratch = Path(tempfile.mkdtemp(prefix="omnifm-node-owner-"))
+    base = f"http://127.0.0.1:{NODE_OWNER_CONTRACT_PORT}"
+    node_env = dict(node_path_env(context, node), **{
+        "MONGO_URL": url, "DB_NAME": env["DB_NAME"], "API_ADMIN_TOKEN": API_TOKEN,
+        "WEB_SERVER_ENABLED": "1", "WEB_BIND": "127.0.0.1", "WEB_INTERNAL_PORT": str(NODE_OWNER_CONTRACT_PORT),
+        "PUBLIC_WEB_URL": base, "OMNIFM_RUNTIME_DATA_DIR": str(scratch), "LOGS_DIR": str(scratch / "logs"),
+    })
+    start_process(context, "node-owner-api", [node, "scripts/serve-node-api.mjs"], cwd=ROOT, env=node_env,
+                  url=f"{base}/api/health", seconds=90)
+    try:
+        check_owner_contract(in_mongo, run_mongo, base=base)
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+    return "the owner contract holds end to end against Node"
+
+
 def node_dashboard_proxy(context: Context) -> str:
     """#195: FastAPI forwards /api/auth and /api/dashboard to the Node API.
 
@@ -1377,6 +1415,8 @@ def backend_steps() -> list:
              fastapi_contract_suite, ("contract",)),
         Step("backend", "node-dashboard", "FastAPI forwards the dashboard to the Node API",
              node_dashboard_proxy, ("contract", "node/npm-ci")),
+        Step("backend", "node-owner-contract", "The owner contract against the Node API",
+             node_owner_contract, ("venv",)),
         Step("backend", "node-contract", "The contract suite against the Node API (M10 gap list)",
              node_contract_suite, ("contract", "node/npm-ci")),
     ]
