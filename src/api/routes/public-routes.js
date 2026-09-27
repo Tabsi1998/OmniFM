@@ -75,6 +75,7 @@ export function createPublicRoutesHandler(deps) {
     getDashboardRequestTranslator,
     getGlobalStats,
     getHealthBinaryProbe,
+    getRuntimeApiStatus,
     getReleaseInfo,
     getStripeSecretKey,
     isAdminApiRequest,
@@ -231,7 +232,13 @@ export function createPublicRoutesHandler(deps) {
         brand: BRAND.name,
         contractVersion: BACKEND_CONTRACT_VERSION,
         release: readReleaseInfo(),
-        services: { api: true, mongo, dashboardBackend: "node" },
+        services: {
+          api: true,
+          mongo,
+          dashboardBackend: "node",
+          // The public entry reports whether the commander answers (FastAPI's dashboardApi).
+          ...await getRuntimeApiStatus?.().then((reachable) => (reachable === null ? {} : { dashboardApi: reachable })),
+        },
         timestamp: new Date().toISOString(),
         uptimeSec: Math.floor((Date.now() - appStartTime) / 1000),
         bots: runtimes.length,

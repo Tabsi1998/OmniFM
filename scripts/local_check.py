@@ -82,6 +82,9 @@ NODE_API_PORT = 18002
 PROXY_API_PORT = 18003
 NODE_CONTRACT_PORT = 18004
 NODE_OWNER_CONTRACT_PORT = 18005
+# #290: the commander's Node API and the public Node entry in front of it.
+NODE_RUNTIME_PORT = 18006
+NODE_PUBLIC_PORT = 18007
 API_TOKEN = "ci-owner-token"
 MASK = "•" * 8
 
@@ -1405,6 +1408,88 @@ def node_dashboard_proxy(context: Context) -> str:
     return "FastAPI forwards the dashboard to the Node API end to end"
 
 
+def node_public_entry(context: Context) -> str:
+    """#290: the public Node entry (src/entrypoints/api.js) in front of the commander's Node API.
+
+    Production after the switch: api.js answers :8001 and passes the paths that
+    need the bots to the commander on 127.0.0.1. scripts/serve-node-api.mjs
+    stands in for the commander. Checked: the contract version start.sh
+    expects, what is forwarded and what is answered locally, the commander's
+    CSRF and origin guards behind the entry, and a restarting commander: the
+    dashboard gives a clear 503, the website and the owner console go on.
+    """
+    for port in (NODE_RUNTIME_PORT, NODE_PUBLIC_PORT):
+        if port_open(port):
+            raise StepSkipped(f"port {port} is taken; stop what uses it and run again")
+    url = start_mongo(context, MONGO_CONTAINER, MONGO_PORT)
+    env, _, _ = contract_database(context, url, "omnifm_local_public_entry")
+    node = node_of(context, NODE_MAJOR)
+    scratch = Path(tempfile.mkdtemp(prefix="omnifm-node-public-"))
+    public_base = f"http://127.0.0.1:{NODE_PUBLIC_PORT}"
+    common = dict(node_path_env(context, node), **{
+        "MONGO_URL": url, "DB_NAME": env["DB_NAME"], "API_ADMIN_TOKEN": API_TOKEN, "PUBLIC_WEB_URL": public_base,
+        "OMNIFM_RUNTIME_DATA_DIR": str(scratch), "LOGS_DIR": str(scratch / "logs"),
+    })
+    runtime_env = dict(common, **{
+        "WEB_SERVER_ENABLED": "1", "WEB_BIND": "127.0.0.1", "WEB_INTERNAL_PORT": str(NODE_RUNTIME_PORT),
+        "TRUST_PROXY_HEADERS": "1", "TRUSTED_PROXY_IPS": "127.0.0.1,::1",
+    })
+    start_process(context, "node-runtime-api", [node, "scripts/serve-node-api.mjs"], cwd=ROOT, env=runtime_env,
+                  url=f"http://127.0.0.1:{NODE_RUNTIME_PORT}/api/health", seconds=90)
+    runtime_process = context.processes[-1][0]
+    public_env = dict(common, OMNIFM_NODE_API_URL=f"http://127.0.0.1:{NODE_RUNTIME_PORT}")
+    start_process(context, "node-public-entry", [node, "src/entrypoints/api.js", "--port", str(NODE_PUBLIC_PORT),
+                                                 "--host", "127.0.0.1"],
+                  cwd=ROOT, env=public_env, url=f"{public_base}/api/health", seconds=90)
+
+    def call(method: str, path: str, headers: dict | None = None, body: dict | None = None) -> tuple:
+        data = json.dumps(body).encode() if body is not None else None
+        prepared = urllib.request.Request(f"{public_base}{path}", data=data, method=method)
+        for key, value in (headers or {}).items():
+            prepared.add_header(key, value)
+        if data is not None:
+            prepared.add_header("Content-Type", "application/json")
+        try:
+            with urllib.request.build_opener(NoRedirect).open(prepared, timeout=30) as answer:
+                return answer.status, dict(answer.headers), parse_json(answer.read().decode("utf-8", "replace"))
+        except urllib.error.HTTPError as error:
+            return error.code, dict(error.headers), parse_json(error.read().decode("utf-8", "replace"))
+
+    server = "123456789012345678"
+    owner = {"X-Admin-Token": API_TOKEN}
+    try:
+        _, _, health = call("GET", "/api/health")
+        services = health.get("services", {})
+        expect(health.get("contractVersion") == "owner-live-v5" and services.get("dashboardApi") is True,
+               f"the public entry does not report the contract and the commander: {health}")
+        status, _, session = call("GET", "/api/auth/session")
+        expect(status == 200 and session.get("authenticated") is False,
+               f"/api/auth/session did not come from the commander: {status} {session}")
+        status, _, answer = call("GET", f"/api/dashboard/capabilities?serverId={server}")
+        expect(status == 401, f"/api/dashboard/capabilities answered {status} {answer}")
+        status, _, answer = call("PUT", f"/api/dashboard/settings?serverId={server}",
+                                 headers={"Origin": public_base}, body={"failoverChain": ["alpha"]})
+        expect(status == 403 and "CSRF" in str(answer.get("error", "")),
+               f"a dashboard change without the CSRF header was not refused behind the entry: {status} {answer}")
+        status, _, answer = call("GET", f"/api/dashboard/stats?serverId={server}", headers={"Origin": "https://evil.example"})
+        expect(status == 403, f"a foreign origin reached the dashboard: {status} {answer}")
+        expect(call("GET", "/api/admin/config", headers=owner)[0] == 200, "the owner console does not answer")
+        expect(call("GET", "/api/admin/config")[0] == 401, "the owner console answers without the token")
+
+        runtime_process.terminate()
+        runtime_process.wait(timeout=20)
+        status, headers, answer = call("GET", "/api/auth/session")
+        retry_after = {key.lower(): value for key, value in headers.items()}.get("retry-after")
+        expect(status == 503 and answer.get("retryable") is True and retry_after == "5",
+               f"a restarting commander did not give a clear 503: {status} {answer}")
+        for path, headers in (("/api/stats", {}), ("/api/stations", {}), ("/api/admin/config", owner)):
+            status, _, _ = call("GET", path, headers=headers)
+            expect(status == 200, f"{path} stopped with the commander ({status}); it belongs to the public entry")
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+    return "the public Node entry answers and forwards like FastAPI, and outlives a commander restart"
+
+
 def backend_steps() -> list:
     return [
         Step("backend", "venv", f"Python {BACKEND_PYTHON} with backend/requirements.txt", backend_environment),
@@ -1415,6 +1500,8 @@ def backend_steps() -> list:
              fastapi_contract_suite, ("contract",)),
         Step("backend", "node-dashboard", "FastAPI forwards the dashboard to the Node API",
              node_dashboard_proxy, ("contract", "node/npm-ci")),
+        Step("backend", "node-public-entry", "The public Node entry in front of the commander (#290)",
+             node_public_entry, ("venv", "node/npm-ci")),
         Step("backend", "node-owner-contract", "The owner contract against the Node API",
              node_owner_contract, ("venv",)),
         Step("backend", "node-contract", "The contract suite against the Node API (M10 gap list)",

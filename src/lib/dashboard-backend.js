@@ -1,18 +1,25 @@
-// Which backend answers /api/auth and /api/dashboard (#195).
+// Which process answers what (#195, #290).
 //
-// "node": FastAPI (the public :8001) forwards these paths to the Node API of
-// the commander. The Node API then listens on 127.0.0.1 only and trusts the
-// forwarded client address of that local proxy. Failover chain, voice guard,
-// alerts, exports and digest use the same modules as the bot itself.
-// "fastapi": the previous FastAPI routes answer, the Node API stays off.
+// OMNIFM_PUBLIC_BACKEND picks the public entry on :8001: "node" (default since
+// #290) is src/entrypoints/api.js, "fastapi" the previous Uvicorn service,
+// kept as the way back. Either way the public entry forwards /api/auth,
+// /api/dashboard and the other paths that need the running bots to the Node
+// API of the commander. That one listens on 127.0.0.1 only and trusts the
+// forwarded client address of the local entry.
 //
-// OMNIFM_DASHBOARD_BACKEND in backend/.env switches both sides; start.sh sets
-// it to "node". Without it everything behaves as before.
+// OMNIFM_DASHBOARD_BACKEND only matters with the FastAPI entry: "fastapi"
+// lets FastAPI's own dashboard routes answer and keeps the commander API off.
 
 const DEFAULT_NODE_API_PORT = 8002;
 const LOOPBACK_PROXIES = ["127.0.0.1", "::1"];
 
+function resolvePublicBackend(env = process.env) {
+  return String(env.OMNIFM_PUBLIC_BACKEND || "node").trim().toLowerCase() === "fastapi" ? "fastapi" : "node";
+}
+
 function resolveDashboardBackend(env = process.env) {
+  // The Node entry has no dashboard of its own: the commander always answers it.
+  if (resolvePublicBackend(env) === "node") return "node";
   return String(env.OMNIFM_DASHBOARD_BACKEND || "fastapi").trim().toLowerCase() === "node" ? "node" : "fastapi";
 }
 
@@ -42,7 +49,7 @@ function configureDashboardBackend(env = process.env, { redirectUri = "" } = {})
 
   const port = resolveNodeApiPort(env);
   env.WEB_SERVER_ENABLED = "1";
-  // Only FastAPI on the same machine may reach it, whatever backend/.env says.
+  // Only the public entry on the same machine may reach it, whatever backend/.env says.
   env.WEB_BIND = "127.0.0.1";
   env.WEB_INTERNAL_PORT = String(port);
   env.TRUST_PROXY_HEADERS = "1";
@@ -54,7 +61,7 @@ function configureDashboardBackend(env = process.env, { redirectUri = "" } = {})
   if (!originOf(env.PUBLIC_WEB_URL) && originOf(redirectUri)) {
     env.PUBLIC_WEB_URL = originOf(redirectUri);
   }
-  return { backend: "node", enabled: true, port };
+  return { backend: "node", enabled: true, port, publicBackend: resolvePublicBackend(env) };
 }
 
 export {
@@ -62,4 +69,5 @@ export {
   configureDashboardBackend,
   resolveDashboardBackend,
   resolveNodeApiPort,
+  resolvePublicBackend,
 };

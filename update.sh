@@ -361,7 +361,7 @@ else
   log "Kein Git-Repository – überspringe git pull."
 fi
 
-log "Bereite Update vor und starte Frontend, FastAPI und Discord-Runtime gemeinsam neu..."
+log "Bereite Update vor und starte Frontend, API und Discord-Runtime gemeinsam neu..."
 ./start.sh
 if [ -n "${PRE_PULL_REV:-}" ]; then
   mkdir -p "$(dirname "$UPDATE_HISTORY")"

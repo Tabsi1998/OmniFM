@@ -56,6 +56,7 @@ kill_orphaned_omnifm_processes() {
     if [ "$cwd" = "$root_real" ]; then
       case "$command" in
         *src/entrypoints/from-owner-config.mjs*|*src/entrypoints/commander.js*|*src/entrypoints/worker.js*|*src/index.js*) service="Bot-Runtime" ;;
+        *src/entrypoints/api.js*) service="Node-API" ;;
       esac
     elif [ "$cwd" = "$backend_real" ]; then
       case "$command" in
@@ -81,7 +82,7 @@ kill_orphaned_omnifm_processes() {
     cwd="$(readlink -f "$proc/cwd" 2>/dev/null || true)"
     command="$(tr '\0' ' ' < "$proc/cmdline" 2>/dev/null || true)"
     case "$cwd:$command" in
-      "$root_real":*src/entrypoints/from-owner-config.mjs*|"$root_real":*src/entrypoints/commander.js*|"$root_real":*src/entrypoints/worker.js*|"$root_real":*src/index.js*|"$backend_real":*uvicorn*server:app*|"$frontend_real":*node_modules/.bin/serve*-s*build*|"$frontend_real":*serve/build/main.js*-s*build*)
+      "$root_real":*src/entrypoints/from-owner-config.mjs*|"$root_real":*src/entrypoints/commander.js*|"$root_real":*src/entrypoints/worker.js*|"$root_real":*src/index.js*|"$root_real":*src/entrypoints/api.js*|"$backend_real":*uvicorn*server:app*|"$frontend_real":*node_modules/.bin/serve*-s*build*|"$frontend_real":*serve/build/main.js*-s*build*)
         kill -9 "$pid" 2>/dev/null || true
         ;;
     esac

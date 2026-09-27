@@ -175,7 +175,10 @@ if ! command -v mongodump >/dev/null 2>&1 || ! command -v mongorestore >/dev/nul
 fi
 
 # --- MongoDB starten ---------------------------------------------------------
-if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files 2>/dev/null | grep -q '^mongod\.service'; then
+# systemd only when it runs: in a container or WSL systemctl exists without it,
+# and MongoDB would then never start (found by scripts/rehearse-public-switch.sh).
+if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ] \
+  && systemctl list-unit-files 2>/dev/null | grep -q '^mongod\.service'; then
   log "Starte MongoDB (systemd)..."
   $SUDO systemctl enable mongod >>"$LOG_DIR/setup.log" 2>&1 || true
   $SUDO systemctl start mongod  >>"$LOG_DIR/setup.log" 2>&1 || warn "MongoDB-Start via systemd meldete Fehler (siehe logs/setup.log)."
@@ -239,6 +242,7 @@ CHECKOUT_RETURN_ORIGINS=${CORS_ORIGINS}
 DEFAULT_LANGUAGE=en
 SEED_DEMO_DATA=0
 OMNIFM_DASHBOARD_BACKEND=node
+OMNIFM_PUBLIC_BACKEND=node
 EOF
 else
   # Fehlenden/Platzhalter-Token nachtragen, damit Owner-Login funktioniert
@@ -255,7 +259,15 @@ else
   # #195: the dashboard is answered by the Node API behind FastAPI. Only added
   # when missing; OMNIFM_DASHBOARD_BACKEND=fastapi in backend/.env switches back.
   grep -qE '^OMNIFM_DASHBOARD_BACKEND=' "$BACKEND_ENV" || set_kv "$BACKEND_ENV" OMNIFM_DASHBOARD_BACKEND node
+  # #290: the public entry on the backend port is Node. Only added when
+  # missing; OMNIFM_PUBLIC_BACKEND=fastapi in backend/.env is the way back.
+  grep -qE '^OMNIFM_PUBLIC_BACKEND=' "$BACKEND_ENV" || set_kv "$BACKEND_ENV" OMNIFM_PUBLIC_BACKEND node
 fi
+
+# Which process answers the backend port: node (src/entrypoints/api.js) or fastapi (Uvicorn).
+PUBLIC_BACKEND="$(grep -E '^OMNIFM_PUBLIC_BACKEND=' "$BACKEND_ENV" 2>/dev/null | tail -n1 | cut -d '=' -f2- | tr -d '"'"'"' ' | tr '[:upper:]' '[:lower:]')"
+[ "$PUBLIC_BACKEND" = "fastapi" ] || PUBLIC_BACKEND="node"
+if [ "$PUBLIC_BACKEND" = "node" ]; then BACKEND_NAME="Node-API"; else BACKEND_NAME="FastAPI-Backend (Rückweg)"; fi
 
 # The frontend's API target is also configuration. Preserve it unless a
 # caller explicitly requested a different public URL for this deployment.
@@ -312,7 +324,9 @@ done
 log "MongoDB antwortet."
 
 log "Prüfe FastAPI-Import vor dem Umschalten..."
-( cd "$ROOT" && "$VENV/bin/python" -c "import backend.server as app; assert app.mongo_is_reachable(), 'MongoDB nicht erreichbar'" ) \
+# From backend/, like Uvicorn: FastAPI reads the .env of its working directory,
+# and on a new server backend/.env is the only one.
+( cd "$ROOT/backend" && "$VENV/bin/python" -c "import server as app; assert app.mongo_is_reachable(), 'MongoDB nicht erreichbar'" ) \
   || die "FastAPI-Preflight fehlgeschlagen; laufende Version bleibt aktiv."
 
 log "Prüfe DB-gesteuerte Discord-Konfiguration vor dem Umschalten..."
@@ -351,6 +365,10 @@ render_unit_file() { # template in deploy/systemd, e.g. omnifm-backup.timer
   target="$UNIT_PREFIX-${1#omnifm-}"
   render="$ROOT/scripts/render-systemd-unit.sh"
   template="$UNIT_TEMPLATE_DIR/$1"
+  # The way back of #290: the same unit name, Uvicorn inside.
+  if [ "$1" = "omnifm-backend.service" ] && [ "$PUBLIC_BACKEND" = "fastapi" ]; then
+    template="$UNIT_TEMPLATE_DIR/omnifm-backend-fastapi.service"
+  fi
   env UNIT_PREFIX="$UNIT_PREFIX" ROOT="$ROOT" RUN_USER="$RUN_USER" \
     BACKEND_PORT="$BACKEND_PORT" FRONTEND_PORT="$FRONTEND_PORT" \
     NODE_BIN="$NODE_BIN" NODE_DIR="$NODE_DIR" \
@@ -452,17 +470,17 @@ wait_for_backend_contract() {
   for _ in {1..30}; do
     if ! backend_alive; then
       tail -n 80 "$LOG_DIR/backend.log" >&2 || true
-      die "FastAPI-Backend ist beim Start beendet worden."
+      die "$BACKEND_NAME ist beim Start beendet worden."
     fi
     body="$(curl --fail --silent --show-error --max-time 2 "$url" 2>/dev/null || true)"
-    if [ -n "$body" ] && printf '%s' "$body" | "$VENV/bin/python" -c 'import json,sys; data=json.load(sys.stdin); raise SystemExit(0 if data.get("contractVersion") == "owner-live-v5" else 1)' 2>/dev/null; then
-      log "FastAPI-Backend ist bereit und API-Vertrag owner-live-v5 ist aktiv: $url"
+    if [ -n "$body" ] && printf '%s' "$body" | node -e 'let s="";process.stdin.on("data",(c)=>{s+=c;}).on("end",()=>{try{process.exit(JSON.parse(s).contractVersion==="owner-live-v5"?0:1);}catch{process.exit(1);}});' 2>/dev/null; then
+      log "$BACKEND_NAME ist bereit und API-Vertrag owner-live-v5 ist aktiv: $url"
       return 0
     fi
     sleep 1
   done
   tail -n 80 "$LOG_DIR/backend.log" >&2 || true
-  die "FastAPI-Backend liefert nicht den erwarteten API-Vertrag owner-live-v5. Ein alter Prozess oder ein fehlerhaftes Deployment ist aktiv."
+  die "$BACKEND_NAME liefert nicht den erwarteten API-Vertrag owner-live-v5. Ein alter Prozess oder ein fehlerhaftes Deployment ist aktiv."
 }
 
 if [ "$USE_SYSTEMD" -eq 1 ]; then
@@ -472,7 +490,7 @@ if [ "$USE_SYSTEMD" -eq 1 ]; then
   install_units
   install_backup_timer
 
-  log "Starte Backend ($UNIT_PREFIX-backend) auf Port $BACKEND_PORT..."
+  log "Starte $BACKEND_NAME ($UNIT_PREFIX-backend) auf Port $BACKEND_PORT..."
   $SUDO systemctl restart "$UNIT_PREFIX-backend"
   wait_for_backend_contract
 
@@ -502,9 +520,14 @@ else
   # ===========================================================================
   warn "Kein systemd verfügbar (oder OMNIFM_SKIP_SYSTEMD=1): Prozesse laufen ohne Neustart-Überwachung."
 
-  log "Starte Backend auf Port $BACKEND_PORT..."
-  ( cd "$ROOT/backend" && nohup "$VENV/bin/uvicorn" server:app --host 0.0.0.0 --port "$BACKEND_PORT" --workers 1 \
-    >"$LOG_DIR/backend.log" 2>&1 & echo $! > "$RUN_DIR/backend.pid" )
+  log "Starte $BACKEND_NAME auf Port $BACKEND_PORT..."
+  if [ "$PUBLIC_BACKEND" = "node" ]; then
+    ( cd "$ROOT" && nohup node src/entrypoints/api.js --port "$BACKEND_PORT" --host 0.0.0.0 \
+      >"$LOG_DIR/backend.log" 2>&1 & echo $! > "$RUN_DIR/backend.pid" )
+  else
+    ( cd "$ROOT/backend" && nohup "$VENV/bin/uvicorn" server:app --host 0.0.0.0 --port "$BACKEND_PORT" --workers 1 \
+      >"$LOG_DIR/backend.log" 2>&1 & echo $! > "$RUN_DIR/backend.pid" )
+  fi
   wait_for_backend_contract
 
   log "Serviere Frontend auf Port $FRONTEND_PORT..."

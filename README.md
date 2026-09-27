@@ -23,15 +23,21 @@
 
 ```
 ┌────────────┐     /api/*      ┌──────────────┐        ┌───────────┐
-│  React SPA │ ───────────────▶│  FastAPI     │ ─────▶ │  MongoDB  │
-│ (frontend) │                 │  (backend)   │        └───────────┘
-└────────────┘                 └──────────────┘
-      :3000                          :8001
+│  React SPA │ ───────────────▶│  Node-API    │ ─────▶ │  MongoDB  │
+│ (frontend) │                 │  (api.js)    │        └───────────┘
+└────────────┘                 └──────┬───────┘              ▲
+      :3000                          :8001                   │
+                        Dashboard,    │  127.0.0.1:8002      │
+                        Login, Cockpit▼                      │
+                               ┌──────────────┐              │
+                               │ Commander +  │ ─────────────┘
+                               │ Worker (Bot) │
+                               └──────────────┘
 ```
 
 - **Frontend:** React + Vite, Design-System „Broadcast Studio" (Obsidian + Signal-Orange + Cyber-Cyan), `recharts`, `lucide-react`.
-- **Backend:** FastAPI ist der einzige öffentliche Eingang für `/api` (Port 8001), MongoDB über `MONGO_URL`. Owner-Konsole (`/api/admin/*`) und öffentliche Endpunkte beantwortet FastAPI selbst.
-- **Dashboard-API (Entscheidung #195, 2026-09-24):** `/api/auth/*` und `/api/dashboard/*` leitet FastAPI intern an die Node-API im Commander-Prozess weiter (nur `127.0.0.1:8002`). So gelten für Failover-Kette, Voice Guard, Alerts, Exporte und Digest dieselben Module wie im Bot. Schalter: `OMNIFM_DASHBOARD_BACKEND=node` in `backend/.env` (setzt `start.sh`), `fastapi` schaltet zurück. `scripts/check-api-routes.mjs` prüft, dass jede `/api`-Route des Frontends im zuständigen Backend existiert.
+- **Backend:** Die Node-API (`src/entrypoints/api.js`, Dienst `omnifm-backend`) ist der öffentliche Eingang für `/api` (Port 8001), MongoDB über `MONGO_URL`. Owner-Konsole (`/api/admin/*`), Website-Daten, Premium und Webhooks beantwortet sie selbst; Dashboard, Discord-Login, Share-Karten und Cockpit gibt sie an die Node-API im Commander (127.0.0.1:8002) weiter. Rückweg auf den bisherigen FastAPI-Dienst: `OMNIFM_PUBLIC_BACKEND=fastapi` in `backend/.env`, dann `./update.sh`.
+- **Dashboard-API (Entscheidung #195, 2026-09-24):** `/api/auth/*` und `/api/dashboard/*` beantwortet die Node-API im Commander-Prozess (nur `127.0.0.1:8002`); der öffentliche Eingang leitet sie weiter. So gelten für Failover-Kette, Voice Guard, Alerts, Exporte und Digest dieselben Module wie im Bot. `scripts/check-api-routes.mjs` prüft, dass jede `/api`-Route des Frontends im zuständigen Backend existiert.
 - **Discord-Voice-Bot:** Node.js / `discord.js` (Commander/Worker-Split) – der eigentliche Streaming-Runtime unter `src/`. **Wird von `start.sh` mitgestartet und liest Commander + Worker vollständig aus dem Owner-Menü (MongoDB `owner_config.discord`) – keine Token-Env-Variablen nötig.** Teilt sich dieselbe MongoDB wie das Backend.
 
 ## 🎨 Marke
@@ -46,9 +52,9 @@ Ein einziges Vektor-Logo (Unendlichkeit + Schallwelle) in allen Varianten unter
 ## 🚀 Schnellstart (lokal)
 
 ```bash
-# Backend (FastAPI)
-cd backend && pip install -r requirements.txt
-uvicorn server:app --host 0.0.0.0 --port 8001
+# Backend (öffentliche Node-API; Dashboard und Login brauchen zusätzlich den Bot)
+npm ci
+node src/entrypoints/api.js --port 8001
 
 # Frontend (React)
 cd frontend && npm ci && npm start
