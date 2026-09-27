@@ -44,6 +44,15 @@ def build_router(core):
         Here nobody is signed in that way, so the console offers the token login."""
         return {"authenticated": False, "discordLogin": False}
 
+    @router.get("/api/admin/server-retention")
+    async def admin_server_retention(request: Request):
+        """Deleting a server's data 30 days after OmniFM was removed (#285) runs
+        in the Node commander only; this way back lists nothing."""
+        guard = core._admin_guard(request)
+        if guard is not None:
+            return guard
+        return {"retentionDays": 30, "pending": [], "count": 0}
+
     @router.post("/api/admin/login")
     async def admin_login(request: Request, body: dict = None):
         if not core.ADMIN_API_TOKEN:

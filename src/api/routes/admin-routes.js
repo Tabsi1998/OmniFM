@@ -72,6 +72,7 @@ import {
 import { isAllowedOperatorWebhookUrl } from "../../services/operator-webhook.js";
 import nodemailer from "nodemailer";
 import { reloadPremiumStore } from "../../premium-store.js";
+import { SERVER_DATA_RETENTION_DAYS, listGuildDepartures } from "../../guild-departures-store.js";
 import { createAdminLicenseRoutes } from "./admin-license-routes.js";
 import { createAdminStationRoutes, loadCatalogFileStations } from "./admin-station-routes.js";
 
@@ -478,6 +479,20 @@ export function createAdminRoutesHandler(deps) {
       const guilds = Object.values(await runtimeGuildDirectory(db, health))
         .sort((a, b) => String(a.name || "").toLowerCase().localeCompare(String(b.name || "").toLowerCase()));
       sendJson(res, 200, { guilds, count: guilds.length, live: Boolean(health) });
+      return true;
+    }
+
+    // GET /api/admin/server-retention: servers OmniFM was removed from, and when their data goes (#285)
+    if (pathname === "/api/admin/server-retention") {
+      if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
+      const pending = (await listGuildDepartures()).map((departure) => ({
+        guildId: departure.guildId,
+        guildName: departure.guildName || "",
+        leftAt: departure.leftAt,
+        deleteAfter: departure.deleteAfter,
+        ownerNotified: Boolean(departure.ownerNotifiedAt),
+      }));
+      sendJson(res, 200, { retentionDays: SERVER_DATA_RETENTION_DAYS, pending, count: pending.length });
       return true;
     }
 

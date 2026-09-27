@@ -12,6 +12,7 @@ import { buildApiUrl } from '../lib/api.js';
 import BrandKit from './BrandKit.js';
 import OwnerConfig from './OwnerConfig.js';
 import OwnerCockpit from './OwnerCockpit.js';
+import OwnerServerRetention from './OwnerServerRetention.js';
 import { OWNER_AREAS, areaOfPage, pagesOfArea, searchOwnerPages, systemPartOf } from '../lib/ownerNavigation.js';
 
 const TOKEN_KEY = 'omnifm_admin_token';
@@ -778,6 +779,8 @@ export default function OwnerAdmin() {
               <StatTile testid="stat-stations" label="Radio-Stationen" value={ov?.stations?.total ?? '—'} icon={Music2} accent="#ff6b00"
                 foot={<span>{ov?.stations?.free ?? 0} Free · {ov?.stations?.pro ?? 0} Pro</span>} />
             </div>
+
+            <OwnerServerRetention apiGet={apiGet} />
 
             <div className="oa-grid cols-3" style={{ marginTop: 18 }}>
               <div className="oa-card oa-fade" style={{ gridColumn: 'span 2' }} data-testid="chart-revenue">

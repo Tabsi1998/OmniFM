@@ -34,6 +34,7 @@ import { EMPTY_COMMANDS_HASH, defaultCommandFingerprintStore } from "../discord/
 import { buildCommandBuilders } from "../commands.js";
 import { loadGuildSettings } from "../lib/guild-settings.js";
 import { buildResolvedVoiceGuardConfig, formatVoiceGuardDurationMs } from "../lib/voice-guard.js";
+import { handleCommanderGuildJoined, handleCommanderGuildLeft, startServerDataRetention } from "../lib/server-data-retention.js";
 import { isRuntimePlaybackActive, isRuntimeVoiceConnected } from "./runtime-live-state.js";
 import { endOwnedStageInstance } from "./runtime-voice.js";
 import {
@@ -167,6 +168,8 @@ class BotRuntime {
       // are there, messages use the Unicode fallback.
       void syncAppEmojisSafely(this.client, this.config.name);
       if (this.role === "commander") {
+        // Servers OmniFM left 30 days ago lose their data (#285).
+        startServerDataRetention(this);
         this.enforcePremiumGuildScope("startup").catch((err) => {
           log("ERROR", `[${this.config.name}] Premium-Guild-Scope Pruefung fehlgeschlagen: ${err?.message || err}`);
         });
@@ -233,6 +236,8 @@ class BotRuntime {
       this.client.on("guildCreate", (guild) => {
         this.handleGuildJoin(guild).then((allowed) => {
           if (!allowed) return;
+          // Back on a server within its 30 days: its data stays (#285).
+          handleCommanderGuildJoined(guild?.id).catch(() => null);
           this.sendGuildOnboardingMessage(guild).catch((err) => {
             log("WARN", `[${this.config.name}] Onboarding-Nachricht fehlgeschlagen: ${err?.message || err}`);
           });
@@ -248,6 +253,12 @@ class BotRuntime {
     }
 
     this.client.on("guildDelete", (guild) => {
+      if (this.role === "commander") {
+        // Removed from the server: its owner hears when the data goes (#285).
+        handleCommanderGuildLeft(this, guild).catch((err) => {
+          log("WARN", `[${this.config.name}] Entfernen von ${guild?.id} nicht vermerkt: ${err?.message || err}`);
+        });
+      }
       this.resetGuildRuntimeState(guild?.id);
     });
   }
@@ -663,7 +674,8 @@ class BotRuntime {
       this.guildSettingsCache.delete(guildId);
     }
     deleteScheduledEventsByFilter({ guildId, botId: this.config.id });
-    clearBotGuild(this.config.id, guildId);
+    // The bot left the server: nothing of it stays, not even the volume (#285).
+    clearBotGuild(this.config.id, guildId, { keepVolume: false });
   }
 
   getCommandRegistrationMode() {

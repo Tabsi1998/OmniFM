@@ -485,6 +485,17 @@ export async function deleteDashboardSessionsOfUser(userId) {
   return Math.max(removed, result.deletedCount || 0);
 }
 
+/** Forgets the dashboard telemetry of a server (#285). */
+export function deleteDashboardTelemetry(serverId) {
+  const id = sanitizeSnowflake(serverId);
+  if (!id) return false;
+  return mutateState((state) => {
+    if (!state.telemetry[id]) return { changed: false, value: false };
+    delete state.telemetry[id];
+    return { changed: true, value: true };
+  });
+}
+
 export function cleanupDashboardAuthState(nowTs) {
   cleanupExpiredAuthEntries(nowTs);
 }
