@@ -47,6 +47,13 @@ test("settings from the environment show until the owner saves them, like FastAP
   assert.equal(response.env.stripeEnvKey, true);
 });
 
+test("the owner console gets the access list it saved", () => {
+  const OWNER_ID = String(10n ** 17n + 42n);
+  const accounts = [{ discordId: OWNER_ID, name: "Fabian", role: "owner" }];
+  assert.deepEqual(config.ownerConfigResponse({ access: { accounts, tokenEnabled: false } }).access, { accounts, tokenEnabled: false });
+  assert.deepEqual(config.ownerConfigResponse({}).access, { accounts: [], tokenEnabled: true }, "the default without a saved list");
+});
+
 test("stream recovery values are clamped to the bounds the bot uses", () => {
   const saved = config.mergedSectionForSave({}, "system", { streamRecovery: { stableResetMs: 1, failoverMinFailures: "abc", unknown: 5 } });
   assert.ok(saved.streamRecovery.stableResetMs > 1, "clamped up to the minimum");
