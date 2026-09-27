@@ -10,6 +10,7 @@ import {
   CartesianGrid, Cell,
 } from 'recharts';
 import { buildApiUrl } from '../lib/api.js';
+import { dashboardApiRequest } from '../lib/dashboardApi.js';
 import { useI18n } from '../i18n.js';
 import DashboardEvents from './DashboardEvents.js';
 
@@ -138,23 +139,8 @@ function eventFormFromRow(event) {
   };
 }
 
-async function apiRequest(path, options = {}) {
-  const response = await fetch(buildApiUrl(path), {
-    credentials: 'include', cache: 'no-store', ...options,
-    headers: {
-      Accept: 'application/json',
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-      ...(options.headers || {}),
-    },
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const error = new Error(payload?.error || payload?.detail || `HTTP ${response.status}`);
-    error.status = response.status;
-    throw error;
-  }
-  return payload;
-}
+// Every change carries the dashboard's CSRF header; without it the API refuses it (#374).
+const apiRequest = (path, options = {}) => dashboardApiRequest(path, options);
 
 function normalizeTrend(detail, advanced) {
   const rows = Array.isArray(detail?.dailyStats) && detail.dailyStats.length
