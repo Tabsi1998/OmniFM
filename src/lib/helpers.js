@@ -3,6 +3,7 @@
 // ============================================================
 import { BRAND, PLANS } from "../config/plans.js";
 import { sanitizeUrlForLog } from "./redact-sensitive.js";
+import { ownerPlanPriceCents } from "./owner-settings-cache.js";
 
 // ---- Constants ----
 const YEARLY_DISCOUNT_MONTHS = 10;
@@ -90,12 +91,31 @@ function parseExpiryReminderDays(raw) {
 }
 
 // ---- Pricing (Laufzeit-basiert) ----
+/** Python's round(): halves go to the even neighbour, so Node charges what FastAPI charged. */
+function roundHalfEven(value) {
+  const floor = Math.floor(value);
+  if (Math.abs(value - floor - 0.5) > 1e-9) return Math.round(value);
+  return floor % 2 === 0 ? floor : floor + 1;
+}
+
+/**
+ * The owner console's plan price over the built-in one (#289). Every price is
+ * scaled by it, the ones the website shows and the ones Stripe charges, so
+ * both always match. Without an owner price the factor is 1.
+ */
+function ownerPriceScale(tier) {
+  const base = DURATION_PRICING_CENTS[tier]?.[1] || 0;
+  const owner = ownerPlanPriceCents(tier);
+  return base > 0 && owner ? owner / base : 1;
+}
+
 function getPricePerMonthCents(tier, months = 1) {
   const normalizedTier = String(tier || "").toLowerCase();
   const tierPricing = DURATION_PRICING_CENTS[normalizedTier];
   if (!tierPricing) return 0;
   const normalizedMonths = normalizeDuration(months);
-  return tierPricing[normalizedMonths] || tierPricing[1] || 0;
+  const cents = tierPricing[normalizedMonths] || tierPricing[1] || 0;
+  return roundHalfEven(cents * ownerPriceScale(normalizedTier));
 }
 
 function getSeatPricePerMonthCents(tier, seats = 1) {
@@ -104,23 +124,27 @@ function getSeatPricePerMonthCents(tier, seats = 1) {
   const tierPricing = SEAT_PRICING_CENTS[normalizedTier];
   if (!tierPricing) return 0;
   const normalizedSeats = normalizeSeats(seats);
-  return tierPricing[normalizedSeats] || tierPricing[1] || 0;
+  const cents = tierPricing[normalizedSeats] || tierPricing[1] || 0;
+  return roundHalfEven(cents * ownerPriceScale(normalizedTier));
 }
 
+/**
+ * FastAPI's calculate_price(): the monthly total for the seats with the
+ * discount of the chosen duration, rounded per month, times the months.
+ */
 function calculatePrice(tier, months, seats = 1) {
   const normalizedTier = String(tier || "").toLowerCase();
   if (normalizedTier === "free") return 0;
+  const tierPricing = DURATION_PRICING_CENTS[normalizedTier];
+  if (!tierPricing) return 0;
 
   const normalizedMonths = normalizeDuration(months);
-  const baseMonthly = getPricePerMonthCents(normalizedTier, 1);
-  const discountedMonthly = getPricePerMonthCents(normalizedTier, normalizedMonths);
+  const baseMonthly = tierPricing[1] || 0;
+  const discountedMonthly = tierPricing[normalizedMonths] || baseMonthly;
   const seatMonthly = getSeatPricePerMonthCents(normalizedTier, seats);
   if (baseMonthly <= 0 || discountedMonthly <= 0 || seatMonthly <= 0) return 0;
 
-  return Math.max(
-    0,
-    Math.round((seatMonthly * discountedMonthly * normalizedMonths) / baseMonthly)
-  );
+  return normalizedMonths * roundHalfEven(seatMonthly * (discountedMonthly / baseMonthly));
 }
 
 function calculateUpgradePrice(currentLicense, targetTier) {
@@ -152,7 +176,7 @@ function durationPricingInEuro(tier) {
   const tierPricing = DURATION_PRICING_CENTS[normalizedTier];
   if (!tierPricing) return {};
   return Object.fromEntries(
-    Object.entries(tierPricing).map(([months, cents]) => [months, (cents / 100).toFixed(2)])
+    Object.keys(tierPricing).map((months) => [months, (getPricePerMonthCents(normalizedTier, Number(months)) / 100).toFixed(2)])
   );
 }
 
@@ -161,7 +185,7 @@ function seatPricingInEuro(tier) {
   const tierPricing = SEAT_PRICING_CENTS[normalizedTier];
   if (!tierPricing) return {};
   return Object.fromEntries(
-    Object.entries(tierPricing).map(([seats, cents]) => [seats, (cents / 100).toFixed(2)])
+    Object.keys(tierPricing).map((seats) => [seats, (getSeatPricePerMonthCents(normalizedTier, Number(seats)) / 100).toFixed(2)])
   );
 }
 
@@ -415,6 +439,7 @@ export {
   normalizeSeats,
   isValidEmailAddress,
   isProTrialEnabled,
+  roundHalfEven,
   parseExpiryReminderDays,
   // Pricing
   getPricePerMonthCents,

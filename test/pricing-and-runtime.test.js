@@ -240,7 +240,8 @@ test("seat pricing stays aligned with documented bundle totals", () => {
 
 test("calculatePrice applies seat bundles and duration discounts together", () => {
   assert.equal(calculatePrice("pro", 1, 2), 549);
-  assert.equal(calculatePrice("pro", 3, 2), 1372);
+  // Rounded per month like FastAPI, which charged production (#289): 3 x round(549 x 249 / 299).
+  assert.equal(calculatePrice("pro", 3, 2), 1371);
   assert.equal(calculatePrice("ultimate", 1, 5), 1699);
 });
 

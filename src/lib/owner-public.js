@@ -19,6 +19,7 @@ import {
   systemSetting,
 } from "./owner-monitoring.js";
 import { parseIntLike } from "./owner-licenses.js";
+import { roundHalfEven } from "./helpers.js";
 import { isPublicOrigin, pickPublicOrigin, webDomainOrigin } from "./public-origin.js";
 import { safeFetch } from "./safe-outbound-http.js";
 
@@ -258,14 +259,6 @@ export function premiumTiers(raw) {
 }
 
 const formatCents = (cents) => (Math.trunc(Number(cents) || 0) / 100).toFixed(2).replace(".", ",");
-
-/** Python's round(): halves go to the even neighbour. */
-function roundHalfEven(value) {
-  const floor = Math.floor(value);
-  const diff = value - floor;
-  if (Math.abs(diff - 0.5) > 1e-9) return Math.round(value);
-  return floor % 2 === 0 ? floor : floor + 1;
-}
 
 /**
  * GET /api/premium/pricing. Features only when the owner changed them, else []

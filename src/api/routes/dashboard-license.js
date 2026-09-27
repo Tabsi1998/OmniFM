@@ -12,6 +12,7 @@ export function createDashboardLicenseRouteHandler(deps) {
     getLicense,
     getLocalizedJsonBodyError,
     getStripeSecretKey,
+    isStripeCheckoutEnabled,
     isValidEmailAddress,
     languagePick,
     linkServerToLicense,
@@ -694,6 +695,12 @@ export function createDashboardLicenseRouteHandler(deps) {
         if (!stripeKey) {
           sendJson(res, 503, {
             error: t("Stripe ist nicht konfiguriert.", "Stripe is not configured."),
+          });
+          return true;
+        }
+        if (!isStripeCheckoutEnabled()) {
+          sendJson(res, 503, {
+            error: t("Stripe-Checkout ist im Owner-Menü deaktiviert.", "Stripe checkout is switched off in the owner console."),
           });
           return true;
         }

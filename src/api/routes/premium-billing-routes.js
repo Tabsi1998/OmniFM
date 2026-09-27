@@ -11,6 +11,8 @@ export function createPremiumBillingRoutesHandler(deps) {
     getDefaultLanguage,
     getLocalizedJsonBodyError,
     getStripeSecretKey,
+    getStripeWebhookSecret,
+    isStripeCheckoutEnabled,
     isEventProcessed,
     isProTrialEnabled,
     isSessionProcessed,
@@ -277,6 +279,12 @@ export function createPremiumBillingRoutesHandler(deps) {
           });
           return true;
         }
+        if (!isStripeCheckoutEnabled()) {
+          sendJson(res, 503, {
+            error: t("Stripe-Checkout ist im Owner-Menü deaktiviert.", "Stripe checkout is switched off in the owner console."),
+          });
+          return true;
+        }
 
         const tierName = TIERS[tier].name;
         const seatsLabel = seats > 1
@@ -476,7 +484,7 @@ export function createPremiumBillingRoutesHandler(deps) {
       const t = getTranslator(language);
       try {
         const stripeKey = getStripeSecretKey();
-        const webhookSecret = String(process.env.STRIPE_WEBHOOK_SECRET || "").trim();
+        const webhookSecret = getStripeWebhookSecret();
         if (!stripeKey || !webhookSecret) {
           sendJson(res, 503, {
             error: t("Stripe Webhook nicht konfiguriert.", "Stripe webhook is not configured."),
