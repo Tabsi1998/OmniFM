@@ -522,7 +522,8 @@ else
 
   log "Starte $BACKEND_NAME auf Port $BACKEND_PORT..."
   if [ "$PUBLIC_BACKEND" = "node" ]; then
-    ( cd "$ROOT" && nohup node src/entrypoints/api.js --port "$BACKEND_PORT" --host 0.0.0.0 \
+    # Production like the systemd units: MongoDB only, no store files (#292).
+    ( cd "$ROOT" && NODE_ENV=production nohup node src/entrypoints/api.js --port "$BACKEND_PORT" --host 0.0.0.0 \
       >"$LOG_DIR/backend.log" 2>&1 & echo $! > "$RUN_DIR/backend.pid" )
   else
     ( cd "$ROOT/backend" && nohup "$VENV/bin/uvicorn" server:app --host 0.0.0.0 --port "$BACKEND_PORT" --workers 1 \
@@ -537,7 +538,7 @@ else
 
   if [ "$BOT_PREFLIGHT_STATUS" -eq 0 ]; then
     log "Starte Discord-Bot aus Owner-Menü-Konfiguration..."
-    ( cd "$ROOT" && nohup node src/entrypoints/from-owner-config.mjs >"$LOG_DIR/bot-console.log" 2>&1 & echo $! > "$RUN_DIR/bot.pid" )
+    ( cd "$ROOT" && NODE_ENV=production nohup node src/entrypoints/from-owner-config.mjs >"$LOG_DIR/bot-console.log" 2>&1 & echo $! > "$RUN_DIR/bot.pid" )
     sleep 3
     BOT_PID="$(cat "$RUN_DIR/bot.pid" 2>/dev/null)"
     if [ -n "$BOT_PID" ] && kill -0 "$BOT_PID" 2>/dev/null; then
