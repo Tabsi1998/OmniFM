@@ -171,7 +171,6 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     OMNIFM_LAST_DEPLOY_STATUS: "success",
     OMNIFM_LAST_LIVE_SMOKE_STATUS: "success",
     OMNIFM_OWNER_AUDIT_FILE: ownerAuditFile,
-    STRIPE_SECRET_KEY: undefined,
     SMTP_PASS: undefined,
     ADMIN_EMAIL: "owner@it-tabelander.at",
     DISCORD_CLIENT_SECRET: undefined,

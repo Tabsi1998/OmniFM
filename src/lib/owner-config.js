@@ -3,7 +3,7 @@
 // ============================================================
 // The Node twin of backend/services/config.py, so the Node API can answer
 // the owner console with the same data and the same rules:
-// - sections company, plans, discord, payments, marketing, system in
+// - sections company, plans, discord, marketing, system, access in
 //   owner_config {_id: "global"}, defaults from src/config/owner-config-defaults.json;
 // - secrets leave the API masked ("••••••••" plus "<key>Set": true) and a
 //   masked or blank value sent back never replaces the stored secret;
@@ -205,34 +205,18 @@ export function effectiveSystemConfig(raw, env = process.env) {
   return config;
 }
 
-/** payments with a Stripe key from the environment until the owner saves one, like effective_payments_config(). */
-export function effectivePaymentsConfig(raw, env = process.env) {
-  const config = configSectionFrom(raw, "payments");
-  const storedStripe = raw?.payments?.stripe || {};
-  const stripe = isObject(config.stripe) ? config.stripe : (config.stripe = {});
-  const envKey = String(env.STRIPE_SECRET_KEY || env.STRIPE_API_KEY || "").trim();
-  const envWebhook = String(env.STRIPE_WEBHOOK_SECRET || "").trim();
-  if (!("secretKey" in storedStripe) && envKey) stripe.secretKey = envKey;
-  if (!("webhookSecret" in storedStripe) && envWebhook) stripe.webhookSecret = envWebhook;
-  if (!("enabled" in storedStripe) && envKey) stripe.enabled = true;
-  if (!("mode" in storedStripe) && envKey) stripe.mode = envKey.startsWith("sk_live_") ? "live" : "test";
-  return config;
-}
-
 /** GET /api/admin/config, the shape the owner console reads. */
 export function ownerConfigResponse(raw, env = process.env) {
   return {
     company: configSectionFrom(raw, "company"),
     plans: configSectionFrom(raw, "plans"),
     discord: maskConfigSecrets(configSectionFrom(raw, "discord")),
-    payments: maskConfigSecrets(effectivePaymentsConfig(raw, env)),
     marketing: configSectionFrom(raw, "marketing"),
     system: maskConfigSecrets(effectiveSystemConfig(raw, env)),
     // The Discord accounts of the owner console (#283). Without it the page
     // showed none after a reload, and saving it again emptied the list.
     access: configSectionFrom(raw, "access"),
     recoverySettings: RECOVERY_SETTINGS,
-    env: { stripeEnvKey: Boolean(String(env.STRIPE_SECRET_KEY || env.STRIPE_API_KEY || "").trim()) },
   };
 }
 
@@ -240,8 +224,7 @@ export function ownerConfigResponse(raw, env = process.env) {
 export function mergedSectionForSave(raw, name, data, env = process.env) {
   let next = stripSecretMarkers(data);
   const current = name === "system" ? effectiveSystemConfig(raw, env)
-    : name === "payments" ? effectivePaymentsConfig(raw, env)
-      : raw?.[name];
+    : raw?.[name];
   if ((isObject(next) || Array.isArray(next)) && current !== undefined && current !== null) {
     if (isObject(next) && isObject(current)) next = deepMerge(clone(current), next);
     next = mergeConfigSecrets(current, next);
@@ -250,10 +233,9 @@ export function mergedSectionForSave(raw, name, data, env = process.env) {
   return next;
 }
 
-/** The fresh section as PUT answers it (secrets masked for discord, payments and system). */
+/** The fresh section as PUT answers it (secrets masked for discord and system). */
 export function sectionResponse(raw, name, env = process.env) {
   const fresh = name === "system" ? effectiveSystemConfig(raw, env)
-    : name === "payments" ? effectivePaymentsConfig(raw, env)
-      : configSectionFrom(raw, name);
-  return ["discord", "payments", "system"].includes(name) ? maskConfigSecrets(fresh) : fresh;
+    : configSectionFrom(raw, name);
+  return ["discord", "system"].includes(name) ? maskConfigSecrets(fresh) : fresh;
 }

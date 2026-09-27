@@ -43,7 +43,6 @@ export const OWNER_AREAS = Object.freeze([
       { id: 'cfg-email', label: 'E-Mail', keywords: ['smtp', 'mail', 'absender', 'passwort', 'tls'] },
       { id: 'cfg-recognition', label: 'Song-Erkennung & Verlauf', keywords: ['acoustid', 'erkennung', 'song-verlauf', 'history'] },
       { id: 'cfg-alerts', label: 'Alarme', keywords: ['betreiber', 'alarm', 'operator', 'webhook', 'erwähnung'] },
-      { id: 'payments', label: 'Zahlungen', keywords: ['stripe', 'paypal', 'zahlung', 'webhook', 'checkout'] },
       { id: 'plans', label: 'Pläne & Preise', keywords: ['preis', 'plan', 'pro', 'ultimate', 'features', 'laufzeit'] },
       { id: 'company', label: 'Firma & Recht', keywords: ['impressum', 'datenschutz', 'firma', 'uid', 'hosting', 'recht'] },
       { id: 'marketing', label: 'Listings & Partner', keywords: ['profilseite', 'listing', 'sponsor', 'partner', 'marketing'] },

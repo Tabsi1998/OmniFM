@@ -44,8 +44,7 @@
     "ipaddr.js": "^2.5.0",
     "mongodb": "^7.6.0",
     "nodemailer": "^10.0.10",
-    "sodium-native": "^5.1.0",
-    "stripe": "^22.6.2"
+    "sodium-native": "^5.1.0"
   },
   "overrides": {
     "@discordjs/node-pre-gyp": {

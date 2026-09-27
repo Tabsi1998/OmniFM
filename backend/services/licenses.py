@@ -1,4 +1,4 @@
-"""Licenses: tiers, prices, license keys, server links, Stripe settings and
+"""Licenses: tiers, prices, license keys, server links, and
 license mails.
 
 Moved out of server.py (#200). server.py calls bind() with itself; names
@@ -183,7 +183,7 @@ def generate_license_key():
     return f"OMNI-{parts[0]}-{parts[1]}-{parts[2]}"
 
 
-def add_license(email, tier, months, seats=1, activated_by="stripe", note=""):
+def add_license(email, tier, months, seats=1, activated_by="owner", note=""):
     if tier not in core.TIERS or tier == "free":
         raise ValueError("Tier muss 'pro' oder 'ultimate' sein.")
     months = core.normalize_months(months)
@@ -435,34 +435,6 @@ def _admin_license_rows(state):
     return rows
 
 
-def get_stripe_secret_key():
-    try:
-        cfg_key = str(((core.get_config_section("payments") or {}).get("stripe") or {}).get("secretKey") or "").strip()
-        if cfg_key:
-            return cfg_key
-    except Exception:
-        pass
-    key = (os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY") or "").strip()
-    return key
-
-
-def is_stripe_enabled():
-    stored = ((core.load_owner_config_raw().get("payments") or {}).get("stripe") or {})
-    if "enabled" in stored:
-        return bool(stored.get("enabled"))
-    return bool(core.get_stripe_secret_key())
-
-
-def get_stripe_webhook_secret():
-    try:
-        value = str(((core.get_config_section("payments") or {}).get("stripe") or {}).get("webhookSecret") or "").strip()
-        if value:
-            return value
-    except Exception:
-        pass
-    return str(os.environ.get("STRIPE_WEBHOOK_SECRET") or "").strip()
-
-
 def send_license_email_best_effort(email, license_data):
     host = str(core.system_setting("smtp", "host", "SMTP_HOST") or "").strip()
     if not host or not core.config_bool(core.system_setting("smtp", "enabled", default=True), True):
@@ -510,17 +482,6 @@ def send_license_email_best_effort(email, license_data):
             pass
 
 
-def validate_stripe_key(key):
-    """Prueft ob der Stripe Key gueltig aussieht"""
-    if not key:
-        return False, "Stripe ist nicht konfiguriert. Bitte STRIPE_SECRET_KEY oder STRIPE_API_KEY in der .env setzen."
-    if not (key.startswith("sk_test_") or key.startswith("sk_live_")):
-        return False, "Stripe API-Key ungueltig. Der Key muss mit 'sk_test_' oder 'sk_live_' beginnen. Bitte den richtigen Secret Key aus dem Stripe Dashboard verwenden."
-    if len(key) < 30:
-        return False, "Stripe API-Key zu kurz. Bitte den vollstaendigen Key aus dem Stripe Dashboard kopieren."
-    return True, ""
-
-
 __all__ = [
     "is_expired",
     "remaining_days",
@@ -540,9 +501,5 @@ __all__ = [
     "_normalize_license_server_ids",
     "_set_license_server_links",
     "_admin_license_rows",
-    "get_stripe_secret_key",
-    "is_stripe_enabled",
-    "get_stripe_webhook_secret",
     "send_license_email_best_effort",
-    "validate_stripe_key",
 ]

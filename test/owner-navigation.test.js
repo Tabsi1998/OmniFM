@@ -38,7 +38,7 @@ test("the cockpit's 'Einstellen' leads to a real page", () => {
 test("the search finds a setting by what people type", () => {
   const find = (query) => nav.searchOwnerPages(query).map((page) => page.id);
   assert.ok(find("smtp").includes("cfg-email"));
-  assert.ok(find("Stripe").includes("payments"));
+  assert.ok(find("preis").includes("plans"));
   assert.ok(find("top.gg").includes("cfg-directories"));
   assert.ok(find("redirect").includes("cfg-login"));
   assert.ok(find("impressum").includes("company"));

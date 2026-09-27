@@ -33,16 +33,15 @@ test("the website fallback is never a LAN or example address", () => {
 test("privacy and terms take the owner's company and integration settings", () => {
   const raw = {
     company: { providerName: "Radio GmbH", email: "hi@radio.at", website: "https://radio.at", dpoName: "Data Person", governingLaw: "AT" },
-    payments: { stripe: { enabled: true, secretKey: "sk_live_x" } },
     system: { botDirectories: { topGG: { enabled: true, token: "t" }, discordBotList: { enabled: true, token: "t", botId: "abc" } } },
   };
   const privacy = pub.privacyNotice(raw, {});
   assert.equal(privacy.dpo.name, "Data Person");
-  assert.equal(privacy.features.stripeEnabled, true);
+  assert.equal("stripeEnabled" in privacy.features, false, "no payment provider on the website (#321)");
   assert.equal(privacy.features.topGGEnabled, true);
   assert.equal(privacy.features.discordBotListEnabled, false, "needs a real bot ID");
   const terms = pub.termsNotice(raw, {});
-  assert.deepEqual([terms.billing.paymentProvider, terms.contact.governingLaw, terms.isConfigured], ["Stripe", "AT", true]);
+  assert.deepEqual([terms.billing.premiumCheckoutEnabled, terms.billing.paymentProvider, terms.contact.governingLaw, terms.isConfigured], [false, "", "AT", true]);
 });
 
 test("prices follow the owner's plans; features only when the owner changed them", () => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Save, Plus, Trash2, CheckCircle2, XCircle, Bot, CreditCard, Building2,
+  Save, Plus, Trash2, CheckCircle2, XCircle, Bot, Building2,
   Tag, Terminal, ShieldCheck, Info, Star, Heart, Mail, Music2, History, Fingerprint, Globe2, BellRing, Users, KeyRound,
 } from 'lucide-react';
 import { discordRedirectUriFor, secretInputValue } from '../lib/ownerConfigSecrets.js';
@@ -85,12 +85,10 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
   const [company, setCompany] = useState(null);
   const [plans, setPlans] = useState(null);
   const [discord, setDiscord] = useState(null);
-  const [payments, setPayments] = useState(null);
   const [marketing, setMarketing] = useState(null);
   const [system, setSystem] = useState(null);
   const [access, setAccess] = useState(null);
   const [recoverySettings, setRecoverySettings] = useState([]);
-  const [env, setEnv] = useState({});
   const [logs, setLogs] = useState(null);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
@@ -103,14 +101,14 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
     setLoadError('');
     try {
       const d = await apiGet('/api/admin/config', token);
-      setCompany(d.company); setPlans(d.plans); setDiscord(d.discord); setPayments(d.payments); setMarketing(d.marketing); setSystem(d.system); setAccess(d.access || { accounts: [], tokenEnabled: true }); setRecoverySettings(Array.isArray(d.recoverySettings) ? d.recoverySettings : []); setEnv(d.env || {});
-      setLoaded({ company: JSON.stringify(d.company), plans: JSON.stringify(d.plans), discord: JSON.stringify(d.discord), payments: JSON.stringify(d.payments), marketing: JSON.stringify(d.marketing), system: JSON.stringify(d.system), access: JSON.stringify(d.access || { accounts: [], tokenEnabled: true }) });
+      setCompany(d.company); setPlans(d.plans); setDiscord(d.discord); setMarketing(d.marketing); setSystem(d.system); setAccess(d.access || { accounts: [], tokenEnabled: true }); setRecoverySettings(Array.isArray(d.recoverySettings) ? d.recoverySettings : []);
+      setLoaded({ company: JSON.stringify(d.company), plans: JSON.stringify(d.plans), discord: JSON.stringify(d.discord), marketing: JSON.stringify(d.marketing), system: JSON.stringify(d.system), access: JSON.stringify(d.access || { accounts: [], tokenEnabled: true }) });
     } catch (error) { setLoadError(error?.message || 'Konfiguration konnte nicht geladen werden.'); }
   }, [apiGet, token]);
 
   useEffect(() => { load(); }, [load]);
 
-  const current = { company, plans, discord, payments, marketing, system, access };
+  const current = { company, plans, discord, marketing, system, access };
   const isDirty = (sec) => current[sec] != null && loaded[sec] !== undefined && JSON.stringify(current[sec]) !== loaded[sec];
   const anyDirty = Object.keys(current).some(isDirty);
   // Leaving the page with unsaved changes asks first.
@@ -526,79 +524,6 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
   }
 
   // ---------------- PAYMENTS ----------------
-  if (section === 'payments') {
-    if (!payments) return <div className="oa-sub">Lade Konfiguration…</div>;
-    const stripe = payments.stripe || {};
-    const paypal = payments.paypal || {};
-    const providers = payments.providers || [];
-    const setStripe = (k, v) => setPayments((p) => ({ ...p, stripe: { ...p.stripe, [k]: v } }));
-    const setPaypal = (k, v) => setPayments((p) => ({ ...p, paypal: { ...p.paypal, [k]: v } }));
-    const setProvider = (i, k, v) => setPayments((p) => ({ ...p, providers: p.providers.map((x, idx) => idx === i ? { ...x, [k]: v } : x) }));
-    const addProvider = () => setPayments((p) => ({ ...p, providers: [...(p.providers || []), { name: '', enabled: false, note: '' }] }));
-    const removeProvider = (i) => setPayments((p) => ({ ...p, providers: p.providers.filter((_, idx) => idx !== i) }));
-    return (
-      <div className="oa-fade" data-testid="config-payments">
-        <div className="oa-card" style={{ marginBottom: 18 }}>
-          <div className="oa-section-title"><CreditCard size={15} /> Stripe</div>
-          {env.stripeEnvKey && (
-            <div style={{ fontSize: 12, color: '#10b981', display: 'flex', gap: 6, alignItems: 'center', marginBottom: 12 }}>
-              <CheckCircle2 size={14} /> Ein Stripe-Test-Key ist bereits in der Umgebung hinterlegt und aktiv.
-            </div>
-          )}
-          <Toggle label="Stripe-Checkout aktivieren" checked={!!stripe.enabled} onChange={(v) => setStripe('enabled', v)} testid="cfg-stripe-enabled" />
-          <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 14 }}>
-            Stripe Webhook-Ziel: <code className="oa-mono">https://omnifm.xyz/api/premium/webhook</code> · Ereignis: <code className="oa-mono">checkout.session.completed</code>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 18px' }}>
-            <div style={{ marginBottom: 14 }}>
-              <label style={labelStyle}>Modus</label>
-              <select className="oa-input" value={stripe.mode || 'test'} onChange={(e) => setStripe('mode', e.target.value)} data-testid="cfg-stripe-mode">
-                <option value="test">Test</option>
-                <option value="live">Live</option>
-              </select>
-            </div>
-            <Field label="Publishable Key" value={stripe.publishableKey} onChange={(v) => setStripe('publishableKey', v)} placeholder="pk_…" testid="cfg-stripe-pk" />
-            <Field label="Secret Key" value={stripe.secretKeySet ? '' : stripe.secretKey} onChange={(v) => setStripe('secretKey', v)} placeholder={stripe.secretKeySet ? '•••••••• gesetzt (leer = behalten)' : 'sk_…'} testid="cfg-stripe-sk" />
-            <Field label="Webhook Secret" value={stripe.webhookSecretSet ? '' : stripe.webhookSecret} onChange={(v) => setStripe('webhookSecret', v)} placeholder={stripe.webhookSecretSet ? '•••••••• gesetzt' : 'whsec_…'} testid="cfg-stripe-wh" />
-          </div>
-        </div>
-
-        <div className="oa-card" style={{ marginBottom: 18 }}>
-          <div className="oa-section-title"><CreditCard size={15} /> PayPal · vorbereitet, noch nicht live</div>
-          <div style={{ fontSize: 12, color: '#f59e0b', marginBottom: 12 }}>Die FastAPI-Zahlungsstrecke unterstützt derzeit Stripe. PayPal wird erst nach Implementierung der Checkout- und Webhook-Strecke aktivierbar.</div>
-          <Toggle label="PayPal-Konfiguration vormerken" checked={!!paypal.enabled} onChange={(v) => setPaypal('enabled', v)} testid="cfg-paypal-enabled" />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 18px' }}>
-            <div style={{ marginBottom: 14 }}>
-              <label style={labelStyle}>Modus</label>
-              <select className="oa-input" value={paypal.mode || 'sandbox'} onChange={(e) => setPaypal('mode', e.target.value)} data-testid="cfg-paypal-mode">
-                <option value="sandbox">Sandbox</option>
-                <option value="live">Live</option>
-              </select>
-            </div>
-            <Field label="Client ID" value={paypal.clientId} onChange={(v) => setPaypal('clientId', v)} testid="cfg-paypal-clientid" />
-            <Field label="Secret" value={paypal.secretSet ? '' : paypal.secret} onChange={(v) => setPaypal('secret', v)} placeholder={paypal.secretSet ? '•••••••• gesetzt' : 'PayPal Secret'} testid="cfg-paypal-secret" />
-          </div>
-        </div>
-
-        <div className="oa-card" style={{ marginBottom: 18 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <div className="oa-section-title" style={{ margin: 0 }}><Plus size={15} /> Weitere Anbieter ({providers.length})</div>
-            <button className="oa-btn ghost" onClick={addProvider} data-testid="cfg-payments-add-provider"><Plus size={15} /> Anbieter</button>
-          </div>
-          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>Platzhalter für zukünftige Zahlungsanbieter (z.B. Klarna, SEPA, Crypto). Erweiterbar.</div>
-          {providers.map((pr, i) => (
-            <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', marginBottom: 10 }} data-testid={`cfg-provider-${i}`}>
-              <div style={{ flex: 1 }}><Field label="Name" value={pr.name} onChange={(v) => setProvider(i, 'name', v)} testid={`cfg-provider-${i}-name`} /></div>
-              <div style={{ flex: 2 }}><Field label="Notiz" value={pr.note} onChange={(v) => setProvider(i, 'note', v)} testid={`cfg-provider-${i}-note`} /></div>
-              <button className="oa-btn ghost" style={{ marginBottom: 14, color: '#ff8fab' }} onClick={() => removeProvider(i)} data-testid={`cfg-provider-${i}-remove`}><Trash2 size={14} /></button>
-            </div>
-          ))}
-        </div>
-        <SaveBar onSave={() => save('payments', payments)} saving={saving} msg={msg} testid="cfg-payments-save" dirty={isDirty('payments')} />
-      </div>
-    );
-  }
-
   // ---------------- MARKETING (bot listings + sponsors) ----------------
   if (section === 'marketing') {
     if (!marketing) return <div className="oa-sub">Lade Konfiguration…</div>;

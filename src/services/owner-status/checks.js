@@ -115,29 +115,6 @@ export async function checkDiscordLogin({ env, fetchImpl, storedRedirectUri = ""
   return result("discordLogin", "ok", `Secret gültig · Weiterleitung ${redirectUri}`);
 }
 
-/** Payments: the key works, the webhook that unlocks paid plans is set up. */
-export async function checkStripe({ ownerConfig, env, fetchImpl }) {
-  const stripe = ownerConfig?.payments?.stripe || {};
-  if (stripe.enabled === false) return result("stripe", "off", "Stripe ist ausgeschaltet – Premium kann nicht gekauft werden.");
-  const key = text(stripe.secretKey) || text(env.STRIPE_SECRET_KEY) || text(env.STRIPE_API_KEY);
-  if (!key) return result("stripe", "off", "Kein Stripe-Schlüssel – Premium kann nicht gekauft werden.");
-  let response;
-  try {
-    response = await request(fetchImpl, "https://api.stripe.com/v1/balance", { headers: { Authorization: `Bearer ${key}` } });
-  } catch (err) {
-    return result("stripe", "warn", "Stripe war für die Prüfung nicht erreichbar.", String(err?.message || err));
-  }
-  if (response.status === 401 || response.status === 403) {
-    return result("stripe", "fail", "Stripe lehnt den Schlüssel ab – Käufe schlagen fehl.");
-  }
-  if (!response.ok) return result("stripe", "warn", `Stripe antwortet mit HTTP ${response.status}.`);
-  const webhookSecret = text(stripe.webhookSecret) || text(env.STRIPE_WEBHOOK_SECRET);
-  if (!webhookSecret) {
-    return result("stripe", "warn", "Schlüssel gültig, aber das Webhook-Secret fehlt – bezahlte Käufe werden nicht automatisch freigeschaltet.");
-  }
-  return result("stripe", key.startsWith("sk_test_") ? "warn" : "ok", key.startsWith("sk_test_") ? "Stripe läuft im Testmodus – echte Zahlungen gehen nicht." : "Schlüssel gültig, Webhook eingerichtet.");
-}
-
 /** E-mail: connect and log in, no mail is sent. */
 export async function checkSmtp({ ownerConfig, env, createTransport }) {
   const smtp = ownerConfig?.system?.smtp || {};
@@ -302,7 +279,6 @@ export const OWNER_STATUS_CHECKS = Object.freeze([
   { key: "discordLogin", label: "Discord-Login", area: "cfg-login" },
   { key: "website", label: "Website", area: "cfg-login" },
   { key: "mongo", label: "Datenbank", area: null },
-  { key: "stripe", label: "Zahlungen (Stripe)", area: "payments" },
   { key: "smtp", label: "E-Mail (SMTP)", area: "cfg-email" },
   { key: "recognition", label: "Song-Erkennung", area: "cfg-recognition" },
   { key: "operatorWebhook", label: "Alarm-Kanal", area: "cfg-alerts" },

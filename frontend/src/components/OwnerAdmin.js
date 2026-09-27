@@ -1479,7 +1479,7 @@ export default function OwnerAdmin() {
             ))}
           </div>
         )}
-        {(systemPartOf(section) || ['company', 'plans', 'discord', 'payments', 'marketing', 'access'].includes(section)) && (
+        {(systemPartOf(section) || ['company', 'plans', 'discord', 'marketing', 'access'].includes(section)) && (
           <OwnerConfig section={systemPartOf(section) ? 'system' : section} part={systemPartOf(section)} apiGet={apiGet} apiSend={apiSend} token={token} />
         )}
         {section === 'brand' && (

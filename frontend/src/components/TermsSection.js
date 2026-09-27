@@ -223,7 +223,6 @@ function TermsSection({ terms }) {
 
   const billingRows = [
     { label: copy.terms.fields.premiumCheckout, value: billing.premiumCheckoutEnabled ? enabledLabel : disabledLabel },
-    { label: copy.terms.fields.paymentProvider, value: billing.paymentProvider || disabledLabel },
     { label: copy.terms.fields.emailDelivery, value: billing.emailDeliveryEnabled ? enabledLabel : disabledLabel },
     { label: copy.terms.fields.trialMonth, value: billing.trialEnabled ? enabledLabel : disabledLabel },
   ];
@@ -378,10 +377,7 @@ function TermsSection({ terms }) {
           />
           <PolicyBlock
             title={copy.terms.sections.premiumTitle}
-            body={copy.terms.sections.premiumBody({
-              premiumCheckoutEnabled: billing.premiumCheckoutEnabled,
-              paymentProvider: billing.paymentProvider,
-            })}
+            body={copy.terms.sections.premiumBody()}
           />
           <PolicyBlock
             title={copy.terms.sections.streamRightsTitle}

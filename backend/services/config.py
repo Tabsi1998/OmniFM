@@ -208,8 +208,6 @@ def save_config_section(name, data):
         # Owner save sends their masked placeholders back to the API.
         if name == "system":
             current = core.effective_system_config()
-        elif name == "payments":
-            current = core.effective_payments_config()
         else:
             current = core.load_owner_config_raw().get(name)
         if isinstance(data, (dict, list)) and current is not None:
@@ -339,23 +337,6 @@ def effective_system_config():
     return config
 
 
-def effective_payments_config():
-    config = core.get_config_section("payments")
-    stored_stripe = ((core.load_owner_config_raw().get("payments") or {}).get("stripe") or {})
-    stripe = config.setdefault("stripe", {})
-    env_key = str(os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY") or "").strip()
-    env_webhook = str(os.environ.get("STRIPE_WEBHOOK_SECRET") or "").strip()
-    if "secretKey" not in stored_stripe and env_key:
-        stripe["secretKey"] = env_key
-    if "webhookSecret" not in stored_stripe and env_webhook:
-        stripe["webhookSecret"] = env_webhook
-    if "enabled" not in stored_stripe and env_key:
-        stripe["enabled"] = True
-    if "mode" not in stored_stripe and env_key:
-        stripe["mode"] = "live" if env_key.startswith("sk_live_") else "test"
-    return config
-
-
 def json_error(status_code, message):
     return JSONResponse(status_code=status_code, content={"error": message})
 
@@ -473,7 +454,6 @@ __all__ = [
     "directory_setting",
     "config_bool",
     "effective_system_config",
-    "effective_payments_config",
     "json_error",
     "parse_int",
     "is_valid_email",

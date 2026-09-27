@@ -59,7 +59,7 @@ test("security headers include CSP and Permissions-Policy without forcing HSTS o
     assert.match(csp, /https:\/\/www\.google-analytics\.com/);
     assert.match(csp, /https:\/\/fonts\.googleapis\.com/);
     assert.match(csp, /https:\/\/fonts\.gstatic\.com/);
-    assert.match(csp, /https:\/\/checkout\.stripe\.com/);
+    assert.doesNotMatch(csp, /stripe/, "no payment pages since #321");
 
     assert.match(permissions, /camera=\(\)/);
     assert.match(permissions, /microphone=\(\)/);

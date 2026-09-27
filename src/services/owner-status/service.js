@@ -28,7 +28,6 @@ import {
   checkRecognition,
   checkSmtp,
   checkStations,
-  checkStripe,
   checkVersion,
   checkWebsite,
 } from "./checks.js";
@@ -86,7 +85,6 @@ export function createOwnerStatusService({
     discordLogin: (context) => checkDiscordLogin({ env, fetchImpl, storedRedirectUri: context.storedRedirectUri }),
     website: (context) => checkWebsite({ env, fetchImpl, storedRedirectUri: context.storedRedirectUri }),
     mongo: () => checkMongo({ db: isConnected() ? getDb() : null }),
-    stripe: (context) => checkStripe({ ownerConfig: context.ownerConfig, env, fetchImpl }),
     smtp: (context) => checkSmtp({ ownerConfig: context.ownerConfig, env, createTransport: nodemailer.createTransport.bind(nodemailer) }),
     recognition: (context) => checkRecognition({ ownerConfig: context.ownerConfig, env, fetchImpl }),
     operatorWebhook: () => checkOperatorWebhook({ env, fetchImpl }),

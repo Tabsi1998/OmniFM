@@ -49,7 +49,7 @@ class TestConfigShape:
         r = client.get(f"{BASE_URL}/api/admin/config", timeout=30)
         assert r.status_code == 200, r.text[:300]
         d = r.json()
-        for sec in ("company", "plans", "discord", "payments", "env"):
+        for sec in ("company", "plans", "discord", "system", "marketing"):
             assert sec in d, f"missing section {sec}"
         assert "_id" not in str(d)
         assert d["company"]["country"] == "\u00d6sterreich"
@@ -204,51 +204,6 @@ class TestDiscordConfig:
         assert r.json()["data"]["workers"] == []
         assert client.get(f"{BASE_URL}/api/admin/discord/logs", timeout=30).json()["workerCount"] == 0
 
-
-# ---------- payments ----------
-class TestPaymentsConfig:
-    def test_save_stripe_secret_masked(self, client):
-        pay = client.get(f"{BASE_URL}/api/admin/config", timeout=30).json()["payments"]
-        pay["stripe"].update({"enabled": True, "mode": "test",
-                              "publishableKey": "pk_test_TEST", "secretKey": "sk_test_TESTSECRET"})
-        r = client.put(f"{BASE_URL}/api/admin/config", json={"section": "payments", "data": pay}, timeout=30)
-        assert r.status_code == 200, r.text[:300]
-        got = r.json()["data"]
-        assert got["stripe"]["enabled"] is True
-        assert got["stripe"]["secretKey"] == MASK
-        assert got["stripe"].get("secretKeySet") is True
-        assert got["stripe"]["publishableKey"] == "pk_test_TEST"
-
-        fresh = client.get(f"{BASE_URL}/api/admin/config", timeout=30).json()["payments"]
-        assert "sk_test_TESTSECRET" not in str(fresh)
-
-    def test_resave_keeps_stripe_secret(self, client):
-        pay = client.get(f"{BASE_URL}/api/admin/config", timeout=30).json()["payments"]
-        pay["stripe"]["secretKey"] = ""
-        pay["stripe"]["publishableKey"] = "pk_test_TEST2"
-        r = client.put(f"{BASE_URL}/api/admin/config", json={"section": "payments", "data": pay}, timeout=30)
-        assert r.status_code == 200
-        got = r.json()["data"]
-        assert got["stripe"]["secretKey"] == MASK, "stripe secret wiped on blank re-save"
-        assert got["stripe"]["publishableKey"] == "pk_test_TEST2"
-
-    def test_resave_masked_value_keeps_secret(self, client):
-        pay = client.get(f"{BASE_URL}/api/admin/config", timeout=30).json()["payments"]
-        # send back the masked value verbatim
-        r = client.put(f"{BASE_URL}/api/admin/config", json={"section": "payments", "data": pay}, timeout=30)
-        assert r.status_code == 200
-        assert r.json()["data"]["stripe"]["secretKey"] == MASK
-
-    def test_paypal_and_custom_provider(self, client):
-        pay = client.get(f"{BASE_URL}/api/admin/config", timeout=30).json()["payments"]
-        pay["paypal"].update({"enabled": True, "mode": "sandbox", "clientId": "TEST_pp", "secret": "TEST_pp_secret"})
-        pay["providers"] = [{"name": "TEST_Klarna", "enabled": False, "note": "later"}]
-        r = client.put(f"{BASE_URL}/api/admin/config", json={"section": "payments", "data": pay}, timeout=30)
-        assert r.status_code == 200
-        got = r.json()["data"]
-        assert got["paypal"]["enabled"] is True
-        assert got["paypal"]["secret"] == MASK
-        assert got["providers"][0]["name"] == "TEST_Klarna"
 
 
 # ---------- regression on existing owner endpoints ----------

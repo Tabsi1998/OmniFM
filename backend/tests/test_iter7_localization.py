@@ -137,7 +137,7 @@ class TestPublicEndpoints:
 
 # --- module: admin sections persist with masked secrets ---
 class TestAdminSections:
-    @pytest.mark.parametrize("section", ["company", "plans", "discord", "payments"])
+    @pytest.mark.parametrize("section", ["company", "plans", "discord", "marketing"])
     def test_get_section(self, client, section):
         r = client.get(f"{BASE_URL}/api/admin/config?section={section}", timeout=30)
         assert r.status_code == 200, r.text[:300]
@@ -146,13 +146,12 @@ class TestAdminSections:
         assert "_id" not in str(body)
 
     def test_secrets_masked(self, client):
-        r = client.get(f"{BASE_URL}/api/admin/config?section=payments", timeout=30)
+        r = client.get(f"{BASE_URL}/api/admin/config?section=discord", timeout=30)
         assert r.status_code == 200
-        payments = r.json().get("payments") or {}
-        stripe = (payments or {}).get("stripe") or {}
-        secret = stripe.get("secretKey") or ""
+        discord = r.json().get("discord") or {}
+        secret = (discord.get("commander") or {}).get("token") or ""
         if secret:
-            assert "*" in secret or secret.startswith("sk_") is False, "raw secret exposed"
+            assert secret.startswith("\u2022"), "raw secret exposed"
 
     def test_owner_tabs_endpoints(self, client):
         for path in ["/api/admin/overview", "/api/admin/licenses", "/api/admin/workers",

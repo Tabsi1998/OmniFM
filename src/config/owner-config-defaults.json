@@ -154,22 +154,6 @@
       }
     }
   },
-  "payments": {
-    "stripe": {
-      "enabled": false,
-      "mode": "test",
-      "publishableKey": "",
-      "secretKey": "",
-      "webhookSecret": ""
-    },
-    "paypal": {
-      "enabled": false,
-      "mode": "sandbox",
-      "clientId": "",
-      "secret": ""
-    },
-    "providers": []
-  },
   "marketing": {
     "sponsors": [],
     "botListings": [

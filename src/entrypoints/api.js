@@ -2,8 +2,8 @@
 // OmniFM: the public API on :8001 (#290)
 // ============================================================
 // The only public HTTP entry once FastAPI is gone (M10). It answers the owner
-// console, the website (stations, prices, legal texts, stats), premium,
-// checkout and the Stripe and bot list webhooks itself, from MongoDB. What
+// console, the website (stations, prices, legal texts, stats), premium
+// codes and the trial, and the bot list webhooks itself, from MongoDB. What
 // needs the running bots (dashboard, Discord login, share cards, station
 // logos, cockpit) goes to the Node API of the commander on 127.0.0.1.
 //

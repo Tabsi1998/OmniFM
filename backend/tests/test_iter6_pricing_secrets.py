@@ -137,19 +137,6 @@ class TestSecretMergeIdentity:
         finally:
             put_section(client, "discord", original)
 
-    def test_secrets_masked_on_get(self, client):
-        original = get_section(client, "payments")
-        try:
-            data = dict(original or {})
-            stripe = dict(data.get("stripe") or {})
-            stripe["secretKey"] = "sk_test_QA_SECRET_123"
-            data["stripe"] = stripe
-            assert put_section(client, "payments", data).status_code == 200
-            got = get_section(client, "payments")
-            assert "sk_test_QA_SECRET_123" not in str(got)
-            assert got["stripe"].get("secretKeySet") is True
-        finally:
-            put_section(client, "payments", original)
 
 
 # ---------------- Localized legal tax note ----------------
