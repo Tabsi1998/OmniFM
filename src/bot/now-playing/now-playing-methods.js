@@ -5,14 +5,16 @@
 import {
   ChannelType,
   PermissionFlagsBits,
-  EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
   MessageFlags,
 } from "discord.js";
 import { log } from "../../lib/logging.js";
-import { buildNowPlayingSignature, getNowPlayingCandidateIds } from "../../lib/now-playing-target.js";
+import {
+  buildNowPlayingSignature,
+  getNowPlayingCandidateIds,
+} from "../../lib/now-playing-target.js";
 import { recordSongPlay } from "../../song-plays-store.js";
 import {
   clipText,
@@ -24,48 +26,35 @@ import {
   SONG_HISTORY_DEDUPE_WINDOW_MS,
   NOW_PLAYING_COVER_ENABLED,
 } from "../../lib/helpers.js";
-import { languagePick } from "../../lib/language.js";
 import { fetchStreamSnapshot, normalizeTrackSearchText } from "../../services/now-playing.js";
 import { appendSongHistory, getSongHistory } from "../../song-history-store.js";
-import { getGuildListeningStats, getTopGuildsByActivity } from "../../listening-stats-store.js";
-import { BRAND } from "../../config/plans.js";
-import {
-  OMNI_COLORS,
-  tierColor,
-  brandFooter,
-  brandAuthor,
-  versionTag,
-} from "../brand-embed.js";
 import { STATIONS_COMPONENT_ID_OPEN } from "../runtime-links.js";
 import { getRuntimeConnectedChannelId, isRuntimePlaybackActive } from "../runtime-live-state.js";
-import { runRuntimeFailbackProbe, keepRuntimeFailoverStation } from "../runtime-streams.js";
-import {
-  NP_PREFIX,
-  SHARE_CARDS_ENABLED,
-  getTierConfig,
-} from "../runtime-shared.js";
+import { NP_PREFIX, getTierConfig } from "../runtime-shared.js";
 import { derivePlaybackPhase } from "../playback-phase.js";
 import { isComponentsV2Message } from "../../discord/ui/index.js";
-import { buildNowPlayingPanel } from "./now-playing-panel.js";
 import { effectivePanelDesign, panelDesignSignature } from "../../lib/panel-design.js";
+import { nowPlayingStatsMethods } from "./stats-methods.js";
+import { nowPlayingEmbedMethods } from "./embed-methods.js";
+import { nowPlayingControlMethods } from "./control-methods.js";
 
 // #266: the panel is a Components V2 container. NOW_PLAYING_LAYOUT=classic
 // keeps the old embed for one release as a way back.
-const NOW_PLAYING_LAYOUT = String(process.env.NOW_PLAYING_LAYOUT || "panel").trim().toLowerCase();
+export const NOW_PLAYING_LAYOUT = String(process.env.NOW_PLAYING_LAYOUT || "panel").trim().toLowerCase();
 
-function hexColor(value) {
+export function hexColor(value) {
   const match = String(value || "").trim().match(/^#?([0-9a-f]{6})$/i);
   return match ? Number.parseInt(match[1], 16) : null;
 }
 
-function musicBrainzUrlFor(meta) {
+export function musicBrainzUrlFor(meta) {
   if (meta?.musicBrainzReleaseId) return `https://musicbrainz.org/release/${encodeURIComponent(meta.musicBrainzReleaseId)}`;
   if (meta?.musicBrainzRecordingId) return `https://musicbrainz.org/recording/${encodeURIComponent(meta.musicBrainzRecordingId)}`;
   return null;
 }
 
 /** The last three songs before the current one, newest first. */
-function recentSongTitles(guildId, currentDisplayTitle) {
+export function recentSongTitles(guildId, currentDisplayTitle) {
   const current = String(currentDisplayTitle || "").trim().toLowerCase();
   try {
     return getSongHistory(guildId, { limit: 4 })
@@ -77,12 +66,15 @@ function recentSongTitles(guildId, currentDisplayTitle) {
   }
 }
 
-function httpsUrlOrNull(value) {
+export function httpsUrlOrNull(value) {
   const url = String(value || "").trim();
   return url.toLowerCase().startsWith("https://") ? url : null;
 }
 
 const nowPlayingMethods = {
+  ...nowPlayingStatsMethods,
+  ...nowPlayingEmbedMethods,
+  ...nowPlayingControlMethods,
   logNowPlayingIssue(guildId, state, message) {
     const now = Date.now();
     const cooldownMs = 120_000;
@@ -339,212 +331,6 @@ const nowPlayingMethods = {
     return { metadataSource, sourceLabel, sourceDetail, sourceNote, metadataHint };
   },
 
-  formatStatsHourBucket(hour, language = "de") {
-    const normalizedHour = Number.parseInt(String(hour || 0), 10);
-    const safeHour = Number.isFinite(normalizedHour) ? Math.max(0, Math.min(23, normalizedHour)) : 0;
-    const nextHour = (safeHour + 1) % 24;
-    if (language === "de") {
-      return `${String(safeHour).padStart(2, "0")}:00-${String(nextHour).padStart(2, "0")}:00`;
-    }
-    return `${String(safeHour).padStart(2, "0")}:00-${String(nextHour).padStart(2, "0")}:00`;
-  },
-
-  formatDurationMs(ms, language = "de") {
-    const totalMinutes = Math.floor(ms / 60_000);
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    if (hours > 0) {
-      return language === "de" ? `${hours}h ${minutes}m` : `${hours}h ${minutes}m`;
-    }
-    return language === "de" ? `${minutes}m` : `${minutes}m`;
-  },
-
-  buildListeningStatsEmbed(guildId, language = "de") {
-    const t = (de, en) => languagePick(language, de, en);
-    const guild = this.client.guilds.cache.get(guildId) || null;
-    const stats = getGuildListeningStats(guildId);
-    const liveStreams = this.getLiveGuildPlaybackSnapshot(guildId);
-    const totalLiveListeners = liveStreams.reduce((sum, item) => sum + (Number(item.listenerCount) || 0), 0);
-    const topStationEntry = Object.entries(stats?.stationStarts || {})
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0] || null;
-    const topHourEntry = Object.entries(stats?.hours || {})
-      .sort((a, b) => b[1] - a[1] || Number(a[0]) - Number(b[0]))[0] || null;
-    const topDayEntry = Object.entries(stats?.daysOfWeek || {})
-      .sort((a, b) => b[1] - a[1] || Number(a[0]) - Number(b[0]))[0] || null;
-    const dayNames = language === "de"
-      ? ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"]
-      : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const topChannels = Object.entries(stats?.voiceChannels || {})
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .slice(0, 3)
-      .map(([channelId, count]) => {
-        const name = guild?.channels?.cache?.get(channelId)?.name || channelId;
-        return `#${name}: ${count}`;
-      });
-    const topGuild = getTopGuildsByActivity(1)[0] || null;
-    const topGuildName = topGuild
-      ? (this.client.guilds.cache.get(topGuild.guildId)?.name || topGuild.guildId)
-      : null;
-    const liveStationsText = liveStreams.length
-      ? liveStreams.map((item) => {
-        const stationName = clipText(item.stationName || item.stationKey || "-", 80);
-        const voiceLabel = item.channelId ? `<#${item.channelId}>` : t("unbekannt", "unknown");
-        return `**${stationName}** - ${voiceLabel} - ${item.listenerCount} ${t("Zuhörer", "listeners")}`;
-      }).join("\n")
-      : t("Aktuell läuft auf diesem Server kein Stream.", "No stream is currently running on this server.");
-
-    // Calculate total listening time (including active sessions)
-    const totalListeningMs = stats?.currentTotalListeningMs || stats?.totalListeningMs || 0;
-    const totalListeningText = totalListeningMs > 0
-      ? this.formatDurationMs(totalListeningMs, language)
-      : t("Noch keine Daten", "No data yet");
-
-    // Connection health
-    const totalConnections = stats?.totalConnections || 0;
-    const totalReconnects = stats?.totalReconnects || 0;
-    const totalDisconnects = stats?.totalConnectionDisconnects || 0;
-    const totalErrors = stats?.totalConnectionErrors || 0;
-    const successfulConnections = totalConnections + totalReconnects;
-    const reliability = (successfulConnections + totalDisconnects + totalErrors) > 0
-      ? Math.round((successfulConnections / (successfulConnections + totalDisconnects + totalErrors)) * 100)
-      : 100;
-
-    // Session stats
-    const avgSessionText = stats?.avgSessionMs > 0
-      ? this.formatDurationMs(stats.avgSessionMs, language)
-      : "-";
-    const longestSessionText = stats?.longestSessionMs > 0
-      ? this.formatDurationMs(stats.longestSessionMs, language)
-      : "-";
-
-    const embed = new EmbedBuilder()
-      .setColor(OMNI_COLORS.cyan)
-      .setAuthor(brandAuthor())
-      .setTitle(t("📊 Listening-Stats", "📊 Listening stats"))
-      .setDescription(
-        t(
-          `Server: **${guild?.name || guildId}**\nLive-Zuhörer jetzt: **${totalLiveListeners}**`,
-          `Server: **${guild?.name || guildId}**\nLive listeners now: **${totalLiveListeners}**`
-        )
-      )
-      .addFields(
-        {
-          name: t("Live gerade", "Live now"),
-          value: clipText(liveStationsText, 900),
-          inline: false,
-        },
-        {
-          name: t("Gesamte Hörzeit", "Total listening time"),
-          value: totalListeningText,
-          inline: true,
-        },
-        {
-          name: t("Sessions gesamt", "Total sessions"),
-          value: String(stats?.totalSessions || 0),
-          inline: true,
-        },
-        {
-          name: t("Peak-Zuhörer", "Peak listeners"),
-          value: String(Number(stats?.peakListeners || 0)),
-          inline: true,
-        },
-        {
-          name: t("Meist gespielte Station", "Most played station"),
-          value: topStationEntry
-            ? `${clipText(topStationEntry[0], 100)} (${topStationEntry[1]}x)`
-            : t("Noch keine Daten", "No data yet"),
-          inline: true,
-        },
-        {
-          name: t("Peak-Stunde", "Peak hour"),
-          value: topHourEntry && Number(topHourEntry[1]) > 0
-            ? `${this.formatStatsHourBucket(topHourEntry[0], language)} (${topHourEntry[1]})`
-            : t("Noch keine Daten", "No data yet"),
-          inline: true,
-        },
-        {
-          name: t("Aktivster Tag", "Busiest day"),
-          value: topDayEntry && Number(topDayEntry[1]) > 0
-            ? `${dayNames[Number(topDayEntry[0])] || "?"} (${topDayEntry[1]})`
-            : t("Noch keine Daten", "No data yet"),
-          inline: true,
-        },
-        {
-          name: t("Aktivste Voice-Channels", "Most active voice channels"),
-          value: topChannels.length ? clipText(topChannels.join("\n"), 900) : t("Noch keine Daten", "No data yet"),
-          inline: false,
-        },
-        {
-          name: t("Session-Daten", "Session data"),
-          value: t(
-            `Durchschnitt: **${avgSessionText}** | Längste: **${longestSessionText}**`,
-            `Average: **${avgSessionText}** | Longest: **${longestSessionText}**`
-          ),
-          inline: false,
-        },
-        {
-          name: t("Verbindung", "Connection"),
-          value: t(
-            `Verbindungen: **${totalConnections}** | Reconnects: **${totalReconnects}** | Zuverlässigkeit: **${reliability}%**`,
-            `Connections: **${totalConnections}** | Reconnects: **${totalReconnects}** | Reliability: **${reliability}%**`
-          ),
-          inline: false,
-        },
-        {
-          name: t("Server gesamt", "Server totals"),
-          value: t(
-            `Starts ohne Recovery: **${Number(stats?.totalStarts || 0)}**\nLetzter Start: ${stats?.lastStartedAt ? this.formatDiscordTimestamp(stats.lastStartedAt, "R") : "-"}`,
-            `Starts without recovery: **${Number(stats?.totalStarts || 0)}**\nLast start: ${stats?.lastStartedAt ? this.formatDiscordTimestamp(stats.lastStartedAt, "R") : "-"}`
-          ),
-          inline: true,
-        },
-        {
-          name: t("Top-Server global", "Top server global"),
-          value: topGuild
-            ? `${clipText(topGuildName, 80)} (${topGuild.totalStarts} ${t("Starts", "starts")})`
-            : t("Noch keine Daten", "No data yet"),
-          inline: true,
-        }
-      )
-      .setFooter(brandFooter(t("OmniFM Analytics · /stats", "OmniFM analytics · /stats")))
-      .setTimestamp(new Date());
-
-    return embed;
-  },
-
-  buildSongHistoryEmbed(history, guildId, playbackRuntime, language = "de") {
-    const t = (de, en) => languagePick(language, de, en);
-    const lines = history.map((entry, index) => {
-      const unix = Number.isFinite(entry.timestampMs) ? Math.floor(entry.timestampMs / 1000) : null;
-      const when = unix ? `<t:${unix}:R>` : "-";
-      const title = clipText(entry.displayTitle || entry.streamTitle || "-", 150);
-      const station = entry.stationName ? clipText(entry.stationName, 80) : null;
-      return `${index + 1}. ${when} - **${title}**${station ? `\n${t("Station", "Station")}: ${station}` : ""}`;
-    });
-
-    const latest = history[0] || null;
-    const embed = new EmbedBuilder()
-      .setColor(OMNI_COLORS.orange)
-      .setAuthor(brandAuthor())
-      .setTitle(t("🕘 Song-History", "🕘 Song history"))
-      .setDescription(clipText(lines.join("\n\n"), 3800))
-      .setFooter(brandFooter(playbackRuntime
-        ? `${playbackRuntime.config?.name || BRAND.name} · ${t("letzte", "latest")} ${history.length}`
-        : `${BRAND.name} · ${t("letzte", "latest")} ${history.length}`))
-      .setTimestamp(new Date());
-
-    if (latest?.artworkUrl) {
-      embed.setThumbnail(latest.artworkUrl);
-    }
-
-    return {
-      embeds: [embed],
-      components: latest
-        ? this.buildTrackLinkComponents(guildId, { name: latest.stationName || latest.stationKey || "-" }, latest)
-        : [],
-    };
-  },
-
   async resolveNowPlayingChannel(guildId, state) {
     const guild = this.client.guilds.cache.get(guildId);
     if (!guild) return null;
@@ -577,214 +363,6 @@ const nowPlayingMethods = {
 
     fallbackChannels.sort((a, b) => this.scoreNowPlayingFallbackChannel(b) - this.scoreNowPlayingFallbackChannel(a));
     return fallbackChannels[0] || null;
-  },
-
-  buildNowPlayingEmbed(guildId, station, meta, context = {}) {
-    const language = this.resolveGuildLanguage(guildId);
-    const isDe = language === "de";
-    const tierConfig = getTierConfig(guildId);
-    const stationName = clipText(station?.name || meta?.name || "-", 120) || "-";
-    const stationKey = clipText(String(context?.stationKey || station?.key || "").trim(), 80);
-    const stationGenre = clipText(String(station?.genre || station?.category || (isDe ? "Radio" : "Radio")).trim(), 80) || "Radio";
-    const stationTier = String(station?.tier || "free").trim().toUpperCase();
-    const artist = clipText(this.normalizeNowPlayingValue(meta?.artist, station, meta, 120), 120);
-    const title = clipText(this.normalizeNowPlayingValue(meta?.title, station, meta, 140), 140);
-    const album = clipText(this.normalizeNowPlayingValue(meta?.album, station, meta, 140), 140);
-    const trackLabel = clipText(
-      this.normalizeNowPlayingValue(meta?.displayTitle || meta?.streamTitle, station, meta, 180)
-      || ([artist, title].filter(Boolean).join(" - ")),
-      140
-    );
-    const headline = clipText(title || trackLabel || "", 110) || trackLabel;
-    const streamInfo = this.normalizeNowPlayingValue(meta?.description, station, meta, 240);
-    const hasTrack = Boolean(trackLabel);
-    const listenerCount = Math.max(0, Number.parseInt(String(context?.listenerCount || 0), 10) || 0);
-    const parsedVolume = Number.parseInt(String(context?.volume ?? ""), 10);
-    const visibleVolume = Number.isFinite(parsedVolume)
-      ? `${Math.max(0, Math.min(100, parsedVolume))}%`
-      : null;
-    const voiceChannelId = String(context?.channelId || "").trim();
-    const workerName = clipText(String(context?.workerName || this.config.name || BRAND.name), 60) || BRAND.name;
-    const embed = new EmbedBuilder()
-      .setTimestamp(new Date(meta?.updatedAt || Date.now()));
-    if (meta?.artworkUrl) {
-      embed.setThumbnail(meta.artworkUrl);
-    }
-
-    const sourceSummary = this.buildNowPlayingSourceSummary(language, meta, hasTrack);
-    const visibleListenerCount = listenerCount >= 2 ? String(listenerCount) : null;
-    const descriptionLines = [];
-    if (hasTrack) {
-      // Großer Titel + dezente Unterzeile (Artist · Sender) im Website-Stil.
-      descriptionLines.push(`## ${headline}`);
-      const subParts = [artist].filter(Boolean);
-      if (subParts.length) descriptionLines.push(`-# ${subParts.join("  ·  ")}`);
-      if (sourceSummary.sourceNote) descriptionLines.push(`-# ${sourceSummary.sourceNote}`);
-    } else {
-      descriptionLines.push(`## ${stationName}`);
-      descriptionLines.push(`-# ${isDe ? "Live-Radio-Stream läuft" : "Live radio stream playing"}`);
-      descriptionLines.push(`> ⚠️ ${sourceSummary.metadataHint}`);
-    }
-
-    if (context?.serverMuted === true) {
-      descriptionLines.push(isDe
-        ? "> \u{1f507} OmniFM ist auf diesem Server stummgeschaltet, niemand hört den Stream. Rechtsklick auf OmniFM im Sprachkanal → Server-Stummschaltung aufheben."
-        : "> \u{1f507} OmniFM is server-muted here, nobody hears the stream. Right-click OmniFM in the voice channel → remove the server mute.");
-    }
-    const failoverDesiredName = clipText(String(context?.failover?.desiredName || "").trim(), 80);
-    if (context?.failover?.active === true && failoverDesiredName) {
-      descriptionLines.push(isDe
-        ? `> \u21aa Ersatzsender aktiv: **${failoverDesiredName}** ist gerade nicht erreichbar. OmniFM prüft ihn automatisch und wechselt zurück, sobald er wieder läuft.`
-        : `> \u21aa Backup station active: **${failoverDesiredName}** is unreachable right now. OmniFM keeps checking and switches back once it plays again.`);
-    }
-
-    const stationDetails = [stationGenre, stationTier !== "FREE" ? stationTier : null].filter(Boolean).join(" · ");
-    const stableFields = [
-      {
-        name: isDe ? "📻 Sender" : "📻 Station",
-        value: `**${stationName}**\n${stationDetails}${stationKey ? `\n-# ID: \`${stationKey}\`` : ""}`,
-        inline: false,
-      },
-      {
-        name: isDe ? "\u{1f3a7} Qualit\u00e4t" : "\u{1f3a7} Quality",
-        value: tierConfig.bitrate || "\u2014",
-        inline: true,
-      },
-    ];
-
-    if (voiceChannelId) {
-      stableFields.push({
-        name: isDe ? "\u{1f39b} L\u00e4uft in" : "\u{1f39b} Running in",
-        value: `<#${voiceChannelId}>`,
-        inline: true,
-      });
-    }
-    if (visibleListenerCount) {
-      stableFields.push({
-        name: isDe ? "\u{1f465} H\u00f6ren gerade" : "\u{1f465} Listening now",
-        value: visibleListenerCount,
-        inline: true,
-      });
-    }
-    if (visibleVolume) {
-      stableFields.push({
-        name: isDe ? "\u{1f50a} Lautst\u00e4rke" : "\u{1f50a} Volume",
-        value: visibleVolume,
-        inline: true,
-      });
-    }
-    if (album) {
-      stableFields.push({
-        name: "\u{1f4bf} Album",
-        value: album,
-        inline: true,
-      });
-    }
-    if (streamInfo) {
-      stableFields.push({
-        name: isDe ? "\u2139\ufe0f Stream-Info" : "\u2139\ufe0f Stream info",
-        value: streamInfo,
-        inline: false,
-      });
-    }
-
-    const stableFooterParts = [
-      `${workerName} \u00b7 ${BRAND.name}`,
-      sourceSummary.sourceLabel,
-      isDe ? `\u21bb Auto-Update ${Math.round(NOW_PLAYING_POLL_MS / 1000)}s` : `\u21bb Auto update ${Math.round(NOW_PLAYING_POLL_MS / 1000)}s`,
-      versionTag(),
-    ].filter(Boolean);
-
-    embed
-      .setColor(hasTrack ? tierColor(tierConfig.tier) : OMNI_COLORS.warning)
-      .setTitle(isDe ? "\u{1f534} LIVE \u00b7 Jetzt auf Sendung" : "\u{1f534} LIVE \u00b7 On air now")
-      .setDescription(descriptionLines.join("\n"))
-      .setAuthor(brandAuthor(`${workerName} \u00b7 ${BRAND.name}`, this.client.user?.displayAvatarURL?.({ extension: "png", size: 128 })))
-      .setFooter(brandFooter(stableFooterParts.join("  \u00b7  ")));
-
-    const existingFieldCount = Array.isArray(embed.data?.fields) ? embed.data.fields.length : 0;
-    if (existingFieldCount > 0) {
-      embed.spliceFields(0, existingFieldCount, ...stableFields);
-    } else if (stableFields.length > 0) {
-      embed.addFields(...stableFields);
-    }
-
-    return embed;
-  },
-
-  buildNowPlayingMessagePayload(guildId, station, meta, context = {}) {
-    if (NOW_PLAYING_LAYOUT === "classic") {
-      return {
-        embeds: [this.buildNowPlayingEmbed(guildId, station, meta, context)],
-        components: this.buildTrackLinkComponents(guildId, station, meta),
-        allowedMentions: { parse: [] },
-      };
-    }
-    return { ...this.buildNowPlayingPanelPayload(guildId, station, meta, context), allowedMentions: { parse: [] } };
-  },
-
-  // The data of the panel (#266); the layout lives in now-playing-panel.js.
-  buildNowPlayingPanelPayload(guildId, station, meta, context = {}) {
-    const language = this.resolveGuildLanguage(guildId);
-    const t = (de, en) => (language === "de" ? de : en);
-    const tierConfig = getTierConfig(guildId);
-    const artist = clipText(this.normalizeNowPlayingValue(meta?.artist, station, meta, 120), 120);
-    const title = clipText(this.normalizeNowPlayingValue(meta?.title, station, meta, 140), 140);
-    const trackLabel = clipText(
-      this.normalizeNowPlayingValue(meta?.displayTitle || meta?.streamTitle, station, meta, 180)
-      || [artist, title].filter(Boolean).join(" - "),
-      140
-    );
-    const hasTrack = Boolean(trackLabel);
-    const sourceSummary = this.buildNowPlayingSourceSummary(language, meta, hasTrack);
-    const recent = recentSongTitles(guildId, meta?.displayTitle);
-    const volume = Number.parseInt(String(context?.volume ?? ""), 10);
-    const listeners = Math.max(0, Number.parseInt(String(context?.listenerCount || 0), 10) || 0);
-    const failover = context?.failover?.active === true && context.failover.desiredName
-      ? { active: true, desiredName: context.failover.desiredName, currentName: station?.name || null }
-      : null;
-    return buildNowPlayingPanel({
-      t,
-      applicationId: this.getApplicationId?.() || this.client?.application?.id || null,
-      workerName: context?.workerName || this.config?.name || BRAND.name,
-      planTier: tierConfig.tier,
-      station: {
-        name: station?.name || meta?.name || null,
-        key: context?.stationKey || station?.key || null,
-        genre: station?.genre || station?.category || "Radio",
-        tier: station?.tier || "free",
-        color: hexColor(station?.color),
-        logoUrl: httpsUrlOrNull(station?.logo),
-      },
-      track: {
-        hasTrack,
-        headline: clipText(title || trackLabel, 110) || trackLabel,
-        artist,
-        album: clipText(this.normalizeNowPlayingValue(meta?.album, station, meta, 140), 140),
-        artworkUrl: meta?.artworkUrl || null,
-        sourceNote: sourceSummary.sourceNote,
-        sourceLabel: sourceSummary.sourceLabel,
-        metadataHint: sourceSummary.metadataHint,
-      },
-      playback: {
-        phase: context?.phase || "playing",
-        paused: context?.paused === true,
-        listeners,
-        bitrate: tierConfig.bitrate || null,
-        volume: Number.isFinite(volume) ? volume : Number.NaN,
-        channelId: String(context?.channelId || "").trim() || null,
-        sleepUntilMs: Number(this.guildState?.get?.(guildId)?.sleepUntilMs) || 0,
-      },
-      notices: { serverMuted: context?.serverMuted === true, failover },
-      recent,
-      favorites: this.role === "commander" ? [] : (this.getVisibleFavoriteStations?.(guildId) || []),
-      shareEnabled: SHARE_CARDS_ENABLED && this.role !== "commander",
-      searchQuery: this.buildTrackSearchQuery(station, meta) || null,
-      musicBrainzUrl: musicBrainzUrlFor(meta),
-      fallbackImageUrl: this.client?.user?.displayAvatarURL?.({ extension: "png", size: 256 }) || null,
-      pollSeconds: Math.round(NOW_PLAYING_POLL_MS / 1000),
-      design: this.getPanelDesign(guildId),
-    });
   },
 
   /** The server's panel look from the dashboard (#281); the standard look without Premium. */
@@ -1026,136 +604,6 @@ const nowPlayingMethods = {
     scheduleNextUpdate();
   },
 
-  // Live-Steuerung direkt aus der Now-Playing-Nachricht (Buttons).
-  async handleNowPlayingControl(interaction) {
-    const { t } = this.createInteractionTranslator(interaction);
-    const guildId = interaction.guildId;
-    if (!guildId) {
-      await interaction.reply({ content: t("Nur in Servern verfuegbar.", "Only available in servers."), flags: MessageFlags.Ephemeral });
-      return true;
-    }
-    const action = String(interaction.customId || "").slice(NP_PREFIX.length);
-    // "Share" (#282): the now-playing card, posted in the channel.
-    if (action === "share") return this.handleShareCardControl(interaction);
-    // "Report a problem" (#273): the form, then the report for the owner.
-    if (action === "report") return this.showProblemReportForm(interaction);
-    if (action === "reportform" && interaction.isModalSubmit?.()) return this.handleProblemReportSubmit(interaction);
-    // A favourite button (#276) switches the station, under the /play rule.
-    if (action.startsWith("fav:")) return this.handleFavoriteControl(interaction, action.slice(4));
-    // "💾 Save" (#272) is personal: no role rule, its own answer.
-    if (action === "save") return this.handleSaveSongControl(interaction);
-    // The sleep warning's buttons (#275) change that message in place.
-    if (action === "sleepextend" || action === "sleepoff") return this.handleSleepControl(interaction, action);
-    // Discord requires an acknowledgement within three seconds. Voice/player
-    // operations and the embed refresh can take longer, so acknowledge first.
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    const state = this.guildState.get(guildId);
-
-    // A button does what its slash command does, so it follows the same /perm
-    // role rules; before, anyone who saw the message could stop the stream (#232).
-    const statusBefore = state?.player?.state?.status;
-    const buttonCommand = {
-      toggle: statusBefore === "paused" || statusBefore === "autopaused" ? "resume" : "pause",
-      stop: "stop",
-      volup: "setvolume",
-      voldown: "setvolume",
-      failback: "play",
-      keepstation: "play",
-    }[action];
-    if (buttonCommand && typeof this.checkCommandRolePermission === "function") {
-      const permission = this.checkCommandRolePermission(interaction, buttonCommand);
-      if (!permission?.ok) {
-        await interaction.editReply({ content: permission?.message || t("Dafür fehlen dir die Rechte.", "You are not allowed to do that.") });
-        return true;
-      }
-    }
-
-    let result = { ok: false, error: t("Es laeuft gerade nichts.", "Nothing is playing right now.") };
-    let msg = "";
-
-    if (action === "toggle") {
-      const status = state?.player?.state?.status;
-      const paused = status === "paused" || status === "autopaused";
-      result = paused ? await this.resumeInGuild(guildId) : await this.pauseInGuild(guildId);
-      msg = paused ? t("\u25b6 Wiedergabe fortgesetzt.", "\u25b6 Resumed.") : t("\u23f8 Pausiert.", "\u23f8 Paused.");
-    } else if (action === "stop") {
-      result = await this.stopInGuild(guildId);
-      msg = t("\u23f9 Wiedergabe gestoppt.", "\u23f9 Playback stopped.");
-    } else if (action === "volup" || action === "voldown") {
-      const cur = Number(state?.volume ?? 100);
-      const next = Math.max(0, Math.min(100, cur + (action === "volup" ? 10 : -10)));
-      result = await this.setVolumeInGuild(guildId, next);
-      msg = `\u{1f50a} ${t("Lautstaerke", "Volume")}: ${next}%`;
-    } else if (action === "failback") {
-      const desiredName = state?.desiredStationName || state?.desiredStationKey || "-";
-      if (!state || state.failoverActive !== true) {
-        result = { ok: false, error: t("Es ist gerade kein Ersatzsender aktiv.", "No backup station is active right now.") };
-      } else {
-        const probe = await runRuntimeFailbackProbe(this, guildId, state, { requiredConfirmations: 1 });
-        if (probe?.switched) {
-          result = { ok: true };
-          msg = t(`\u21a9 Zurück auf ${desiredName}.`, `\u21a9 Back on ${desiredName}.`);
-        } else if (probe?.abandoned) {
-          result = {
-            ok: false,
-            error: t(
-              `${desiredName} ist auf diesem Server nicht mehr verfügbar. OmniFM bleibt beim aktuellen Sender.`,
-              `${desiredName} is no longer available on this server. OmniFM stays on the current station.`
-            ),
-          };
-        } else if (probe?.skipped === "paused") {
-          result = {
-            ok: false,
-            error: t("Die Wiedergabe ist pausiert. Setze sie fort und versuche es erneut.", "Playback is paused. Resume it and try again."),
-          };
-        } else if (probe?.skipped) {
-          result = {
-            ok: false,
-            error: t(
-              "OmniFM stellt die Verbindung gerade wieder her. Versuche es in einer Minute erneut.",
-              "OmniFM is restoring the connection right now. Try again in a minute."
-            ),
-          };
-        } else {
-          result = {
-            ok: false,
-            error: t(
-              `${desiredName} ist noch nicht erreichbar. OmniFM prüft automatisch weiter und wechselt zurück, sobald der Sender wieder läuft.`,
-              `${desiredName} is not reachable yet. OmniFM keeps checking and switches back once the station plays again.`
-            ),
-          };
-        }
-      }
-    } else if (action === "keepstation") {
-      const kept = state ? keepRuntimeFailoverStation(this, guildId, state) : { ok: false };
-      result = kept.ok
-        ? { ok: true }
-        : { ok: false, error: t("Es ist gerade kein Ersatzsender aktiv.", "No backup station is active right now.") };
-      msg = t(
-        `\u2714 ${state?.currentStationName || state?.currentStationKey || "-"} bleibt der Sender für diesen Server.`,
-        `\u2714 ${state?.currentStationName || state?.currentStationKey || "-"} stays the station for this server.`
-      );
-    } else {
-      await interaction.editReply({ content: t("Unbekannte Aktion.", "Unknown action.") });
-      return true;
-    }
-
-    if (!result?.ok) {
-      await interaction.editReply({ content: result?.error || t("Aktion fehlgeschlagen.", "Action failed.") });
-      return true;
-    }
-
-    // Now-Playing-Nachricht sofort aktualisieren (Buttons/State spiegeln).
-    try {
-      const fresh = this.guildState.get(guildId);
-      if (fresh && typeof this.updateNowPlayingEmbed === "function" && action !== "stop") {
-        await this.updateNowPlayingEmbed(guildId, fresh, { force: true }).catch(() => {});
-      }
-    } catch { /* noop */ }
-
-    await interaction.editReply({ content: msg });
-    return true;
-  },
 };
 
 export { nowPlayingMethods };
