@@ -39,6 +39,7 @@ export const OWNER_AREAS = Object.freeze([
     label: 'Einstellungen',
     pages: [
       { id: 'cfg-login', label: 'Discord-Login', keywords: ['oauth', 'client secret', 'redirect', 'scopes', 'anmeldung', 'dashboard login'] },
+      { id: 'access', label: 'Zugänge', keywords: ['zugang', 'rollen', 'owner', 'support', 'abrechnung', 'discord-konto', 'admin-token'] },
       { id: 'cfg-email', label: 'E-Mail', keywords: ['smtp', 'mail', 'absender', 'passwort', 'tls'] },
       { id: 'cfg-recognition', label: 'Song-Erkennung & Verlauf', keywords: ['acoustid', 'erkennung', 'song-verlauf', 'history'] },
       { id: 'cfg-alerts', label: 'Alarme', keywords: ['betreiber', 'alarm', 'operator', 'webhook', 'erwähnung'] },

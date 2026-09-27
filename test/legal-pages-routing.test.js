@@ -278,6 +278,9 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
       assert.equal(response.status, 401, `${attempt.url} ${JSON.stringify(attempt.headers)} must not open the owner API`);
     });
     const ownerHeaders = { "X-Admin-Token": "admin-route-token" };
+    // /api/admin/session is the Discord sign-in of #283 now: without a session nobody is signed in.
+    const sessionAnswer = await fetch(`http://127.0.0.1:${port}/api/admin/session`);
+    assert.equal((await sessionAnswer.json()).authenticated, false);
     const bearerResponse = await fetch(`http://127.0.0.1:${port}/api/admin/workers`, {
       headers: { Authorization: "Bearer admin-route-token" },
     });
@@ -311,7 +314,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     // Routes only the old page had: the .env editor, jobs that start scripts,
     // log files, offers, the mail test. None of them exists any more.
     const removedRoutes = [
-      ["POST", "/api/admin/session"], ["POST", "/api/admin/logout"], ["GET", "/api/admin/diagnostics"],
+      ["POST", "/api/admin/logout"], ["GET", "/api/admin/diagnostics"],
       ["GET", "/api/admin/operations"], ["GET", "/api/admin/env"], ["POST", "/api/admin/env/secrets"],
       ["GET", "/api/admin/jobs"], ["GET", "/api/admin/log-files"], ["GET", "/api/admin/logs"],
       ["GET", "/api/admin/offers"], ["GET", "/api/admin/mail"], ["GET", "/api/admin/legal"],

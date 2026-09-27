@@ -1272,7 +1272,8 @@ function hasManageGuildPermission(rawPermissions) {
 
 function sanitizeDashboardPage(rawPage) {
   const page = String(rawPage || "dashboard").trim().toLowerCase();
-  return page === "home" ? "home" : "dashboard";
+  // "admin": back to the owner console after its Discord sign-in (#283).
+  return ["home", "admin"].includes(page) ? page : "dashboard";
 }
 
 function parseCookieHeader(rawCookieHeader) {
@@ -2932,6 +2933,10 @@ const handleAdminRoutes = createAdminRoutesHandler({
   methodNotAllowed,
   sendJson,
   getCommonSecurityHeaders,
+  // Discord sign-in of the owner console (#283): the dashboard's login session.
+  readDashboardUser: (req) => getDashboardSession(req).session?.user || null,
+  isSecureRequest: (req) => isSecureCookieRequest(req, process.env.PUBLIC_WEB_URL),
+  isDiscordLoginConfigured: () => isDiscordOauthConfigured(),
 });
 
 /**

@@ -204,5 +204,9 @@
         "note": "wumpus.store – kuratiertes Verzeichnis."
       }
     ]
+  },
+  "access": {
+    "accounts": [],
+    "tokenEnabled": true
   }
 }

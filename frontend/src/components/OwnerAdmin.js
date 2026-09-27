@@ -15,6 +15,11 @@ import OwnerCockpit from './OwnerCockpit.js';
 import { OWNER_AREAS, areaOfPage, pagesOfArea, searchOwnerPages, systemPartOf } from '../lib/ownerNavigation.js';
 
 const TOKEN_KEY = 'omnifm_admin_token';
+// Set before the Discord sign-in; on the way back the console turns the
+// dashboard sign-in into an owner session (#283).
+const DISCORD_PENDING_KEY = 'omnifm_owner_discord_pending';
+// Changes through the owner session cookie need this header (#283).
+const CSRF_HEADERS = { 'X-OmniFM-CSRF': 'owner-intent' };
 
 // Six areas instead of fifteen tabs (#356); the pages live in lib/ownerNavigation.js.
 const AREA_ICONS = {
@@ -109,6 +114,9 @@ export default function OwnerAdmin() {
   const [tokenInput, setTokenInput] = useState('');
   const [loginErr, setLoginErr] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
+  // Who is signed in: { via: 'discord' | 'token', role, roleLabel, user } (#283).
+  const [session, setSession] = useState(null);
+  const [discordLogin, setDiscordLogin] = useState(false);
 
   const [section, setSection] = useState('cockpit');
   const [navQuery, setNavQuery] = useState('');
@@ -142,7 +150,8 @@ export default function OwnerAdmin() {
   const [licMsg, setLicMsg] = useState(null);
 
   const apiGet = useCallback(async (path, tk) => {
-    const res = await fetch(buildApiUrl(path), { headers: { 'X-Admin-Token': tk || token }, cache: 'no-store' });
+    const key = tk || token;
+    const res = await fetch(buildApiUrl(path), { headers: key ? { 'X-Admin-Token': key } : {}, credentials: 'include', cache: 'no-store' });
     if (res.status === 401) throw new Error('unauthorized');
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
@@ -152,7 +161,8 @@ export default function OwnerAdmin() {
   const apiSend = useCallback(async (path, method, bodyObj) => {
     const res = await fetch(buildApiUrl(path), {
       method,
-      headers: { 'X-Admin-Token': token, 'Content-Type': 'application/json' },
+      headers: { ...(token ? { 'X-Admin-Token': token } : {}), ...CSRF_HEADERS, 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: bodyObj ? JSON.stringify(bodyObj) : undefined,
     });
     const data = await res.json().catch(() => ({}));
@@ -271,15 +281,43 @@ export default function OwnerAdmin() {
     }
   }, [apiGet]);
 
-  // Session bootstrap
+  // Session bootstrap: a Discord owner session first (#283), then the stored token.
+  // A server without /api/admin/session (404) keeps the token login only.
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!token) { setChecking(false); return; }
+      let known = null;
+      try {
+        const res = await fetch(buildApiUrl('/api/admin/session'), { credentials: 'include', cache: 'no-store' });
+        if (res.ok) known = await res.json();
+      } catch { /* offline: the token path below */ }
+      if (!cancelled && known) setDiscordLogin(Boolean(known.discordLogin || known.via === 'discord'));
+      // Back from Discord: turn the dashboard sign-in into an owner session.
+      if (known && !known.authenticated && window.sessionStorage.getItem(DISCORD_PENDING_KEY)) {
+        window.sessionStorage.removeItem(DISCORD_PENDING_KEY);
+        try {
+          const res = await fetch(buildApiUrl('/api/admin/session'), { method: 'POST', credentials: 'include', headers: CSRF_HEADERS });
+          const data = await res.json().catch(() => ({}));
+          if (res.ok) known = data;
+          else if (!cancelled) setLoginErr(data.error || 'Discord-Anmeldung fehlgeschlagen.');
+        } catch {
+          if (!cancelled) setLoginErr('Verbindung fehlgeschlagen.');
+        }
+      }
+      if (known?.authenticated && known.via === 'discord') {
+        try {
+          setLoading(true);
+          await loadAll('');
+          if (!cancelled) { setSession(known); setAuthed(true); }
+        } catch { /* the session ended in between */ }
+        finally { if (!cancelled) setChecking(false); }
+        return;
+      }
+      if (!token) { if (!cancelled) setChecking(false); return; }
       try {
         setLoading(true);
         await loadAll(token);
-        if (!cancelled) { setAuthed(true); }
+        if (!cancelled) { setSession({ via: 'token', role: 'owner', roleLabel: 'Owner', user: null }); setAuthed(true); }
       } catch {
         if (!cancelled) { setAuthed(false); window.localStorage.removeItem(TOKEN_KEY); setToken(''); }
       } finally {
@@ -515,6 +553,7 @@ export default function OwnerAdmin() {
       setToken(tk);
       setLoading(true);
       await loadAll(tk);
+      setSession({ via: 'token', role: 'owner', roleLabel: 'Owner', user: null });
       setAuthed(true);
     } catch (err) {
       setLoginErr('Verbindung fehlgeschlagen.');
@@ -523,9 +562,17 @@ export default function OwnerAdmin() {
     }
   };
 
+  const startDiscordLogin = () => {
+    window.sessionStorage.setItem(DISCORD_PENDING_KEY, '1');
+    window.location.href = buildApiUrl('/api/auth/discord/login?redirect=1&nextPage=admin');
+  };
+
   const logout = () => {
+    if (session?.via === 'discord') {
+      fetch(buildApiUrl('/api/admin/session'), { method: 'DELETE', credentials: 'include', headers: CSRF_HEADERS }).catch(() => {});
+    }
     window.localStorage.removeItem(TOKEN_KEY);
-    setToken(''); setAuthed(false); setOverview(null); setTokenInput('');
+    setToken(''); setAuthed(false); setOverview(null); setTokenInput(''); setSession(null);
   };
 
   if (checking) {
@@ -553,8 +600,15 @@ export default function OwnerAdmin() {
             </div>
             <h1 className="oa-display" style={{ fontSize: 22, marginTop: 18 }}>Owner Console</h1>
             <p style={{ color: '#94a3b8', fontSize: 13.5, marginTop: 6, lineHeight: 1.5 }}>
-              Zugriff nur mit dem Owner-Token (<span className="oa-mono">API_ADMIN_TOKEN</span>).
+              {discordLogin
+                ? <>Mit einem freigeschalteten Discord-Konto anmelden. Der Owner-Token (<span className="oa-mono">API_ADMIN_TOKEN</span>) geht weiterhin.</>
+                : <>Zugriff nur mit dem Owner-Token (<span className="oa-mono">API_ADMIN_TOKEN</span>).</>}
             </p>
+            {discordLogin && (
+              <button type="button" onClick={startDiscordLogin} className="oa-btn primary" style={{ width: '100%', marginTop: 18 }} data-testid="admin-discord-login-button">
+                <Users size={16} /> Mit Discord anmelden
+              </button>
+            )}
             <div style={{ marginTop: 20 }}>
               <label className="oa-stat-label" htmlFor="oa-token">Owner Token</label>
               <input
@@ -642,6 +696,14 @@ export default function OwnerAdmin() {
             );
           })}
         </nav>
+        {session && (
+          <div className="oa-sub" data-testid="admin-signed-in-as" style={{ padding: '8px 10px', lineHeight: 1.4 }}>
+            Angemeldet als <b>{session.user?.name || 'Owner-Token'}</b>
+            <br />Rolle: {session.roleLabel || session.role}
+            {session.role === 'support' && <><br />Lesen und prüfen, keine Änderungen.</>}
+            {session.role === 'billing' && <><br />Lizenzen, Zahlungen und Preise.</>}
+          </div>
+        )}
         <button className="oa-nav-btn" onClick={logout} data-testid="admin-logout-button" style={{ color: '#ff8fab' }}>
           <LogOut size={18} /> Abmelden
         </button>
@@ -1414,7 +1476,7 @@ export default function OwnerAdmin() {
             ))}
           </div>
         )}
-        {(systemPartOf(section) || ['company', 'plans', 'discord', 'payments', 'marketing'].includes(section)) && (
+        {(systemPartOf(section) || ['company', 'plans', 'discord', 'payments', 'marketing', 'access'].includes(section)) && (
           <OwnerConfig section={systemPartOf(section) ? 'system' : section} part={systemPartOf(section)} apiGet={apiGet} apiSend={apiSend} token={token} />
         )}
         {section === 'brand' && (
