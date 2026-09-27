@@ -175,6 +175,7 @@ export async function handleRuntimeAutocomplete(runtime, interaction) {
 const PRE_PERMISSION_COMMANDS = {
   // The person's own list (#272): no role rule and no plan in the way.
   saved: ({ runtime, interaction }) => runtime.handleSavedSongsCommand(interaction),
+  mydata: ({ runtime, interaction }) => runtime.handlePersonalDataCommand(interaction),
   help: INFO_COMMANDS.help,
   setup: INFO_COMMANDS.setup,
   language: INFO_COMMANDS.language,
@@ -243,7 +244,8 @@ export async function handleRuntimeInteraction(runtime, interaction) {
   }
 
   const { t, language } = runtime.createInteractionTranslator(interaction);
-  const unrestrictedCommands = new Set(["help", "setup", "premium", "license", "language", "saved"]);
+  // A person's own data is always theirs to see and delete (#272, #285).
+  const unrestrictedCommands = new Set(["help", "setup", "premium", "license", "language", "saved", "mydata"]);
   if (!unrestrictedCommands.has(interaction.commandName)) {
     const access = runtime.getGuildAccess(interaction.guildId);
     if (!access.allowed) {

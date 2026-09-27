@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { getDb, isConnected } from "./lib/db.js";
 import { log } from "./lib/logging.js";
 import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
+import { erasedBefore } from "./lib/personal-data-erasures.js";
 
 const STATE_FILE = resolveRuntimeDataPath("vote-events.json");
 const MAX_STORED_VOTE_EVENTS = 1000;
@@ -288,6 +289,8 @@ function saveRawState(state, votes = []) {
 function mergeVoteIntoState(state, rawVote) {
   const vote = normalizeVoteEvent(rawVote);
   if (!vote) return { state, added: false, vote: null };
+  // A sync reading a vote again that the person deleted with /mydata (#285).
+  if (erasedBefore(vote.userId, vote.votedAt)) return { state, added: false, vote: null };
 
   const providerState = state.providers[vote.provider] || emptyProviderState();
   state.providers[vote.provider] = providerState;
@@ -339,6 +342,33 @@ function mergeVoteEvents(rawVotes, hints = {}) {
   };
 }
 
+/** The votes of one person (#285), newest first. */
+async function listVoteEventsOfUser(userId) {
+  const id = String(userId || "").trim();
+  if (!/^\d{17,22}$/.test(id)) return [];
+  if (mongoActive && isConnected()) {
+    return getDb().collection(EVENTS).find({ userId: id }, { projection: { _id: 0, _key: 0 } }).sort({ votedAt: -1 }).toArray();
+  }
+  return loadRawState().votes.filter((vote) => vote.userId === id);
+}
+
+/** Deletes every vote of one person (#285); the totals per provider stay. */
+async function forgetVoteEventsOfUser(userId) {
+  const id = String(userId || "").trim();
+  if (!/^\d{17,22}$/.test(id)) return 0;
+  if (mongoActive) {
+    if (mongoCache) mongoCache.votes = mongoCache.votes.filter((vote) => vote.userId !== id);
+    if (!isConnected()) return 0;
+    const result = await getDb().collection(EVENTS).deleteMany({ userId: id });
+    return result.deletedCount || 0;
+  }
+  const state = loadRawState();
+  const before = state.votes.length;
+  state.votes = state.votes.filter((vote) => vote.userId !== id);
+  if (state.votes.length !== before) saveRawState(state);
+  return before - state.votes.length;
+}
+
 function getVoteEventsState({ limit = 50, provider = "" } = {}) {
   const state = loadRawState();
   const normalizedProvider = normalizeProvider(provider);
@@ -356,7 +386,9 @@ function getVoteEventsState({ limit = 50, provider = "" } = {}) {
 }
 
 export {
+  forgetVoteEventsOfUser,
   getVoteEventsState,
+  listVoteEventsOfUser,
   mergeVoteEvents,
   normalizeVoteEvent,
   recordVoteEvent,

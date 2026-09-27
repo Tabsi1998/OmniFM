@@ -455,6 +455,36 @@ export function deleteDashboardAuthSession(token) {
   });
 }
 
+/** The logins of one Discord account (#285), without their tokens. */
+export async function listDashboardSessionsOfUser(userId) {
+  const id = sanitizeSnowflake(userId);
+  if (!id) return [];
+  if (mongoActive && isConnected()) {
+    const docs = await getDb().collection(SESSIONS).find({ "session.user.id": id }, { projection: { _id: 0, session: 1 } }).toArray();
+    return docs.map((doc) => normalizeAuthSession(doc.session)).filter(Boolean);
+  }
+  return Object.values(loadLatestState().authSessions).filter((session) => session?.user?.id === id).map(deepClone);
+}
+
+/** Signs one Discord account out everywhere and forgets its logins (#285). */
+export async function deleteDashboardSessionsOfUser(userId) {
+  const id = sanitizeSnowflake(userId);
+  if (!id) return 0;
+  const removed = mutateState((state) => {
+    let count = 0;
+    for (const [key, session] of Object.entries(state.authSessions)) {
+      if (session?.user?.id !== id) continue;
+      delete state.authSessions[key];
+      count += 1;
+    }
+    return { changed: count > 0, value: count };
+  }) || 0;
+  if (!mongoActive || !isConnected()) return removed;
+  // Logins another process made a moment ago are not in this cache yet.
+  const result = await getDb().collection(SESSIONS).deleteMany({ "session.user.id": id });
+  return Math.max(removed, result.deletedCount || 0);
+}
+
 export function cleanupDashboardAuthState(nowTs) {
   cleanupExpiredAuthEntries(nowTs);
 }
