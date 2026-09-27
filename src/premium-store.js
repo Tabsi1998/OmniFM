@@ -109,7 +109,7 @@ function saveFile(data) {
     for (const mapKey of ["processedSessions", "processedEvents"]) {
       const entries = Object.entries(data[mapKey] || {});
       if (entries.length > MAX_PROCESSED_ENTRIES) {
-        entries.sort((a, b) => new Date(b[1]?.processedAt || 0) - new Date(a[1]?.processedAt || 0));
+        entries.sort((a, b) => new Date(b[1]?.processedAt || 0).getTime() - new Date(a[1]?.processedAt || 0).getTime());
         data[mapKey] = Object.fromEntries(entries.slice(0, MAX_PROCESSED_ENTRIES));
       }
     }

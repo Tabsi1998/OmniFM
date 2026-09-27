@@ -172,9 +172,7 @@ async function putGuildCommandsWithTimeout({
           // ignore abort errors
         }
       }
-      const timeoutError = new Error(`Guild command sync timeout after ${timeoutMs}ms`);
-      timeoutError.code = "SYNC_TIMEOUT";
-      reject(timeoutError);
+      reject(Object.assign(new Error(`Guild command sync timeout after ${timeoutMs}ms`), { code: "SYNC_TIMEOUT" }));
     }, timeoutMs);
   });
 
@@ -186,10 +184,7 @@ async function putGuildCommandsWithTimeout({
     }
     const aborted = didTimeout || controller?.signal?.aborted || err?.name === "AbortError";
     if (aborted) {
-      const wrapped = new Error(`Guild command sync timeout after ${timeoutMs}ms`);
-      wrapped.code = "SYNC_TIMEOUT";
-      wrapped.cause = err;
-      throw wrapped;
+      throw Object.assign(new Error(`Guild command sync timeout after ${timeoutMs}ms`, { cause: err }), { code: "SYNC_TIMEOUT" });
     }
     throw err;
   } finally {
@@ -239,10 +234,7 @@ async function putGuildCommandsViaFetchWithTimeout({
   } catch (err) {
     const aborted = controller?.signal?.aborted || err?.name === "AbortError";
     if (aborted) {
-      const timeoutError = new Error(`Guild command sync timeout after ${timeoutMs}ms`);
-      timeoutError.code = "SYNC_TIMEOUT";
-      timeoutError.cause = err;
-      throw timeoutError;
+      throw Object.assign(new Error(`Guild command sync timeout after ${timeoutMs}ms`, { cause: err }), { code: "SYNC_TIMEOUT" });
     }
     throw err;
   } finally {
@@ -257,11 +249,11 @@ async function putGuildCommandsViaFetchWithTimeout({
   }
 
   if (!response.ok) {
-    const err = new Error(body?.message || `Discord API status=${response.status}`);
-    err.status = response.status;
-    err.rawError = body;
-    err.data = body;
-    throw err;
+    throw Object.assign(new Error(body?.message || `Discord API status=${response.status}`), {
+      status: response.status,
+      rawError: body,
+      data: body,
+    });
   }
 }
 
