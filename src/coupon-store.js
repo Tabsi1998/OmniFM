@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
+import { getDb, isConnected } from "./lib/db.js";
+import { log } from "./lib/logging.js";
 
 const STORE_FILE = resolveRuntimeDataPath("coupons.json");
 const BACKUP_FILE = `${STORE_FILE}.bak`;
@@ -284,6 +286,103 @@ function readStore(filePath) {
 
 let storeCache = null;
 
+// ---- MongoDB (#292) ----
+// The checkout runs in the public entry and in the commander since #290, so
+// both write offers and redemptions. In MongoDB each offer and each
+// redemption is its own document: a process only writes what it changed and
+// never overwrites what the other wrote. The cache is refreshed every few
+// seconds; coupons.json is only the store without MongoDB (development).
+const OFFERS = "coupon_offers";
+const REDEMPTIONS = "coupon_redemptions";
+let mongoActive = false;
+let persisted = null;
+let mongoRefreshTimer = null;
+let mongoWritesPending = 0;
+let mongoWriteQueue = Promise.resolve();
+
+const cloneStore = (store) => JSON.parse(JSON.stringify(store || emptyStore()));
+
+async function readMongoStore() {
+  if (!mongoActive || !isConnected() || mongoWritesPending > 0) return;
+  const database = getDb();
+  const [offerDocs, redemptionDocs] = await Promise.all([
+    database.collection(OFFERS).find({}, { projection: { _id: 0 } }).toArray(),
+    database.collection(REDEMPTIONS).find({}, { projection: { _id: 0 } }).toArray(),
+  ]);
+  if (mongoWritesPending > 0) return;
+  const next = normalizeStore({
+    offers: Object.fromEntries(offerDocs.map(({ _code, ...offer }) => [_code, offer])),
+    redemptions: Object.fromEntries(redemptionDocs.map(({ _sessionId, ...redemption }) => [_sessionId, redemption])),
+  });
+  storeCache = next;
+  persisted = cloneStore(next);
+}
+
+function queueMongoDelta(previous, next) {
+  const operations = [];
+  const delta = (collection, keyField, before, after) => {
+    const ops = [];
+    for (const [key, value] of Object.entries(after)) {
+      if (JSON.stringify(before[key]) === JSON.stringify(value)) continue;
+      ops.push({ replaceOne: { filter: { [keyField]: key }, replacement: { [keyField]: key, ...value }, upsert: true } });
+    }
+    for (const key of Object.keys(before)) {
+      if (!(key in after)) ops.push({ deleteOne: { filter: { [keyField]: key } } });
+    }
+    if (ops.length) operations.push([collection, ops]);
+  };
+  delta(OFFERS, "_code", previous.offers || {}, next.offers || {});
+  delta(REDEMPTIONS, "_sessionId", previous.redemptions || {}, next.redemptions || {});
+  if (!operations.length) return;
+  mongoWritesPending += 1;
+  mongoWriteQueue = mongoWriteQueue
+    .then(async () => {
+      if (!isConnected()) return;
+      for (const [collection, ops] of operations) {
+        // eslint-disable-next-line no-await-in-loop -- offers first, then redemptions
+        await getDb().collection(collection).bulkWrite(ops, { ordered: false });
+      }
+    })
+    .catch((err) => log("ERROR", `[coupons] MongoDB-Speichern fehlgeschlagen: ${err?.message || err}`))
+    .finally(() => { mongoWritesPending = Math.max(0, mongoWritesPending - 1); });
+}
+
+/**
+ * MongoDB becomes the store: offers and redemptions of coupons.json that
+ * MongoDB does not have yet are copied once, then the cache follows MongoDB.
+ */
+export async function initCouponStore({ refreshMs = 5000 } = {}) {
+  if (!isConnected() || !getDb()) return { backend: "file" };
+  const database = getDb();
+  await database.collection(OFFERS).createIndex({ _code: 1 }, { name: "coupon_code", unique: true }).catch(() => null);
+  await database.collection(REDEMPTIONS).createIndex({ _sessionId: 1 }, { name: "coupon_session", unique: true }).catch(() => null);
+  const fileStore = readStore(STORE_FILE) || readStore(BACKUP_FILE) || emptyStore();
+  let migrated = 0;
+  for (const [collection, keyField, rows] of [[OFFERS, "_code", fileStore.offers], [REDEMPTIONS, "_sessionId", fileStore.redemptions]]) {
+    for (const [key, value] of Object.entries(rows || {})) {
+      // eslint-disable-next-line no-await-in-loop -- a one-time copy, row by row
+      const result = await database.collection(collection).updateOne({ [keyField]: key }, { $setOnInsert: { [keyField]: key, ...value } }, { upsert: true });
+      if (result.upsertedCount) migrated += 1;
+    }
+  }
+  if (migrated) log("INFO", `[coupons] ${migrated} Angebote/Einlösungen aus coupons.json nach MongoDB übernommen.`);
+  mongoActive = true;
+  await readMongoStore();
+  if (!mongoRefreshTimer) {
+    mongoRefreshTimer = setInterval(() => {
+      readMongoStore().catch((err) => log("WARN", `[coupons] MongoDB-Refresh fehlgeschlagen: ${err?.message || err}`));
+    }, Math.max(1000, Number(refreshMs) || 5000));
+    mongoRefreshTimer.unref?.();
+  }
+  return { backend: "mongo", offers: Object.keys(storeCache?.offers || {}).length };
+}
+
+export async function stopCouponStore() {
+  if (mongoRefreshTimer) clearInterval(mongoRefreshTimer);
+  mongoRefreshTimer = null;
+  await mongoWriteQueue.catch(() => null);
+}
+
 function ensureStore() {
   if (storeCache) return storeCache;
   storeCache = readStore(STORE_FILE) || readStore(BACKUP_FILE) || emptyStore();
@@ -292,6 +391,11 @@ function ensureStore() {
 
 function saveStore() {
   const store = ensureStore();
+  if (mongoActive) {
+    queueMongoDelta(persisted || emptyStore(), store);
+    persisted = cloneStore(store);
+    return;
+  }
   const tmpFile = `${STORE_FILE}.tmp-${process.pid}-${Date.now()}`;
   const payload = JSON.stringify(store, null, 2) + "\n";
 

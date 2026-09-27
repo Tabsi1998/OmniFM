@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { fileStoresAllowed } from "./lib/store-policy.js";
 import path from "node:path";
 import { getDb, isConnected } from "./lib/db.js";
 import { log } from "./lib/logging.js";
@@ -261,6 +262,8 @@ function ensureState() {
 }
 
 function saveState() {
+  // No file copy in production (#292); the incident is in the log already.
+  if (!fileStoresAllowed()) return;
   const state = ensureState();
   const payload = `${JSON.stringify(normalizeState(state), null, 2)}\n`;
   const tmpFile = `${STORE_FILE}.tmp-${process.pid}-${Date.now()}`;

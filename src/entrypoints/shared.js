@@ -13,6 +13,8 @@ import {
   initPremiumStore,
 } from "../premium-store.js";
 import { setLicenseProvider } from "../core/entitlements.js";
+import { initCouponStore } from "../coupon-store.js";
+import { MONGO_REQUIRED_MESSAGE, fileStoresAllowed } from "../lib/store-policy.js";
 import { installOperatorIncidentRecorder, logRecentOperatorIncidentSummary } from "../operator-incidents-store.js";
 
 const entryDir = path.dirname(fileURLToPath(import.meta.url));
@@ -76,8 +78,13 @@ async function initializeSharedServices({ requireMongo = false } = {}) {
   if (requireMongo && !mongoConnected) {
     throw new Error("Split-Commander/Worker benoetigt eine aktive MongoDB-Verbindung.");
   }
+  // Production keeps its data in MongoDB only (#292); no silent fall back to files.
+  if (!mongoConnected && !fileStoresAllowed()) {
+    throw new Error(MONGO_REQUIRED_MESSAGE);
+  }
 
   await initPremiumStore();
+  await initCouponStore();
   await initStationsStore();
   await logRecentOperatorIncidentSummary({
     label: "Owner summary on startup",

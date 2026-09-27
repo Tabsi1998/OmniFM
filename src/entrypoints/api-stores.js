@@ -6,6 +6,9 @@
 // MongoDB first, then every store, then the licence lookup of the entitlements.
 
 export async function initApiStores({ env = process.env, attempts = 10, retryMs = 3000, log = console.log } = {}) {
+  const { MONGO_REQUIRED_MESSAGE, fileStoresAllowed } = await import("../lib/store-policy.js");
+  // Production keeps its data in MongoDB only (#292): without it the start stops here.
+  if (!String(env.MONGO_URL || "").trim() && !fileStoresAllowed(env)) throw new Error(MONGO_REQUIRED_MESSAGE);
   if (String(env.MONGO_URL || "").trim()) {
     const { connect } = await import("../lib/db.js");
     // MongoDB may still be starting after a reboot; systemd restarts us after that.
@@ -28,7 +31,9 @@ export async function initApiStores({ env = process.env, attempts = 10, retryMs 
   const { initCommandPermissionsStore } = await import("../command-permissions-store.js");
   const { initScheduledEventsStore } = await import("../scheduled-events-store.js");
   const { setLicenseProvider } = await import("../core/entitlements.js");
+  const { initCouponStore } = await import("../coupon-store.js");
   await initPremiumStore();
+  await initCouponStore();
   await initStationsStore();
   await initCustomStationsStore();
   await initCommandPermissionsStore();
