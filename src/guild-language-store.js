@@ -1,5 +1,6 @@
 import fs from "node:fs";
-import path from "node:path";
+import { getDb, isConnected } from "./lib/db.js";
+import { fileStoresAllowed } from "./lib/store-policy.js";
 import { getDefaultLanguage, normalizeLanguage } from "./i18n.js";
 import { log, logStoreLoadError } from "./lib/logging.js";
 import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
@@ -60,7 +61,7 @@ function loadState() {
     // Auto-repair: restore primary from backup
     try {
       const payload = `${JSON.stringify(backup, null, 2)}\n`;
-      fs.writeFileSync(STORE_FILE, payload, "utf8");
+      if (fileStoresAllowed()) fs.writeFileSync(STORE_FILE, payload, "utf8");
       log("WARN", `[guild-languages] Auto-repaired ${STORE_FILE} from backup.`);
     } catch (repairErr) {
       log("ERROR", `[guild-languages] Auto-repair failed: ${repairErr?.message || repairErr}`);
@@ -71,7 +72,7 @@ function loadState() {
   // Both corrupt/missing - start fresh and write a clean file
   const fresh = emptyState();
   try {
-    fs.writeFileSync(STORE_FILE, `${JSON.stringify(fresh, null, 2)}\n`, "utf8");
+    if (fileStoresAllowed()) fs.writeFileSync(STORE_FILE, `${JSON.stringify(fresh, null, 2)}\n`, "utf8");
     log("INFO", `[guild-languages] Initialized fresh ${STORE_FILE}.`);
   } catch {
     // ignore - will work in-memory
@@ -80,6 +81,11 @@ function loadState() {
 }
 
 function saveState(state) {
+  if (mongoActive) {
+    queueMongoDelta(persisted?.guilds || {}, state.guilds || {});
+    persisted = JSON.parse(JSON.stringify(state));
+    return;
+  }
   const normalized = normalizeState(state);
   const payload = `${JSON.stringify(normalized, null, 2)}\n`;
   const tmpFile = `${STORE_FILE}.tmp-${process.pid}-${Date.now()}`;
@@ -111,6 +117,71 @@ function ensureState() {
   if (cache) return cache;
   cache = loadState();
   return cache;
+}
+
+// ---- MongoDB (#292) ----
+// /language runs in the commander, but the workers speak in the server's
+// language too, and they read this store. With the file each worker kept
+// what it read at its start, so a new language only reached them after a
+// restart. In MongoDB each server is one document in guild_languages, and
+// every process refreshes its cache every 10 s.
+const COLLECTION = "guild_languages";
+let mongoActive = false;
+let persisted = null;
+let mongoRefreshTimer = null;
+let mongoWritesPending = 0;
+let mongoWriteQueue = Promise.resolve();
+
+async function readMongoState() {
+  if (!mongoActive || !isConnected() || mongoWritesPending > 0) return;
+  const docs = await getDb().collection(COLLECTION).find({}).toArray();
+  if (mongoWritesPending > 0) return;
+  const next = normalizeState({ guilds: Object.fromEntries(docs.map((doc) => [doc._id, doc.language])) });
+  cache = next;
+  persisted = JSON.parse(JSON.stringify(next));
+}
+
+function queueMongoDelta(before, after) {
+  const ops = [];
+  for (const [guildId, language] of Object.entries(after)) {
+    if (before[guildId] !== language) ops.push({ replaceOne: { filter: { _id: guildId }, replacement: { language }, upsert: true } });
+  }
+  for (const guildId of Object.keys(before)) {
+    if (!(guildId in after)) ops.push({ deleteOne: { filter: { _id: guildId } } });
+  }
+  if (!ops.length) return;
+  mongoWritesPending += 1;
+  mongoWriteQueue = mongoWriteQueue
+    .then(async () => { if (isConnected()) await getDb().collection(COLLECTION).bulkWrite(ops, { ordered: false }); })
+    .catch((err) => log("ERROR", `[guild-languages] MongoDB-Speichern fehlgeschlagen: ${err?.message || err}`))
+    .finally(() => { mongoWritesPending = Math.max(0, mongoWritesPending - 1); });
+}
+
+/** MongoDB becomes the store; the languages of guild-languages.json are copied once. */
+export async function initGuildLanguageStore({ refreshMs = 10_000 } = {}) {
+  if (!isConnected() || !getDb()) return { backend: "file" };
+  const collection = getDb().collection(COLLECTION);
+  const fileState = readState(STORE_FILE) || readState(BACKUP_FILE);
+  for (const [guildId, language] of Object.entries(fileState?.guilds || {})) {
+    // eslint-disable-next-line no-await-in-loop -- a one-time copy
+    await collection.updateOne({ _id: guildId }, { $setOnInsert: { language } }, { upsert: true });
+  }
+  mongoActive = true;
+  cache = normalizeState({});
+  await readMongoState();
+  if (!mongoRefreshTimer) {
+    mongoRefreshTimer = setInterval(() => {
+      readMongoState().catch((err) => log("WARN", `[guild-languages] MongoDB-Refresh fehlgeschlagen: ${err?.message || err}`));
+    }, Math.max(1000, Number(refreshMs) || 10_000));
+    mongoRefreshTimer.unref?.();
+  }
+  return { backend: "mongo" };
+}
+
+export async function stopGuildLanguageStore() {
+  if (mongoRefreshTimer) clearInterval(mongoRefreshTimer);
+  mongoRefreshTimer = null;
+  await mongoWriteQueue.catch(() => null);
 }
 
 export function getGuildLanguage(guildId) {

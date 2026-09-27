@@ -29,6 +29,19 @@ import {
 
 dotenv.config();
 
+// The CLI works on the server's data (#292): backend/.env, and MongoDB when
+// it is configured, instead of a JSON copy next to it.
+const { loadBackendEnv } = await import("./entrypoints/owner-env.mjs");
+loadBackendEnv();
+if (String(process.env.MONGO_URL || "").trim()) {
+  const { connect } = await import("./lib/db.js");
+  const { initPremiumStore } = await import("./premium-store.js");
+  const { initCouponStore } = await import("./coupon-store.js");
+  await connect();
+  await initPremiumStore();
+  await initCouponStore();
+}
+
 function normalizeSeats(rawSeats) {
   return normalizeSeatsShared(rawSeats);
 }
@@ -986,4 +999,9 @@ if (cliMode === "offers" || cliMode === "--offers") {
 }
 
 rl.close();
+// Every change reaches MongoDB before the process ends.
+const { flushPremiumStoreWrites } = await import("./premium-store.js");
+const { stopCouponStore } = await import("./coupon-store.js");
+await flushPremiumStoreWrites().catch(() => {});
+await stopCouponStore().catch(() => {});
 process.exit(code);

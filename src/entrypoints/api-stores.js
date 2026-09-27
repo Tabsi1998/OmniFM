@@ -33,9 +33,11 @@ export async function initApiStores({ env = process.env, attempts = 10, retryMs 
   const { setLicenseProvider } = await import("../core/entitlements.js");
   const { initCouponStore } = await import("../coupon-store.js");
   const { initProviderStores } = await import("../lib/provider-stores.js");
+  const { initDashboardStore } = await import("../dashboard-store.js");
   await initPremiumStore();
   await initCouponStore();
   await initProviderStores();
+  await initDashboardStore();
   await initStationsStore();
   await initCustomStationsStore();
   await initCommandPermissionsStore();

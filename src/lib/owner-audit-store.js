@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { fileStoresAllowed } from "./store-policy.js";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -131,11 +132,18 @@ function mirrorOwnerAuditToMongo(normalized) {
     target: normalized.target || null,
     detail: normalized.summary || null,
     status: MONGO_STATUS[normalized.status] || "ok",
-    ip: "-",
+    ip: String(normalized.metadata?.ip || "-").slice(0, 64),
   }).catch((err) => log("WARN", `[owner-audit] MongoDB-Eintrag fehlgeschlagen: ${err?.message || err}`));
 }
 
 function recordOwnerAudit(event) {
+  // Production with MongoDB: the audit lives in owner_audit only, where the
+  // owner console reads it (#292).
+  if (isConnected() && getDb() && !fileStoresAllowed()) {
+    const normalized = normalizeAuditEvent(event);
+    mirrorOwnerAuditToMongo(normalized);
+    return normalized;
+  }
   const filePath = resolveOwnerAuditFilePath();
   const recorded = withFileStoreLock(filePath, () => {
     let state;

@@ -2,6 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { readStoreFileWithRetry, withFileStoreLock, withFileWriteRetry } from "./lib/file-store-lock.js";
 import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
+import { createHash } from "node:crypto";
+import { getDb, isConnected } from "./lib/db.js";
+import { log } from "./lib/logging.js";
 
 const STORE_FILE = path.resolve(process.env.OMNIFM_DASHBOARD_FILE || resolveRuntimeDataPath("dashboard.json"));
 const BACKUP_FILE = `${STORE_FILE}.bak`;
@@ -168,6 +171,8 @@ function ensureState() {
 }
 
 function loadLatestState() {
+  // With MongoDB the refreshed cache is the latest state.
+  if (mongoActive) return ensureState();
   stateCache = readStateFile(STORE_FILE, { strict: true }) || readStateFile(BACKUP_FILE) || emptyState();
   return stateCache;
 }
@@ -193,7 +198,143 @@ function saveStateUnlocked(state = ensureState()) {
   }
 }
 
+// ---- MongoDB (#292) ----
+// Dashboard logins are written by the commander and read by the public entry
+// (owner sign-in, #283) since #290. In MongoDB each login is a document keyed
+// by the hash of its token (the token itself is never stored), each OAuth
+// state and each server's telemetry too; MongoDB drops what expired (TTL).
+// The cache is refreshed every 2 s; findDashboardAuthSession() asks MongoDB
+// directly for a login that is only seconds old. Without MongoDB the locked
+// dashboard.json stays the store, as before.
+const SESSIONS = "dashboard_auth_sessions";
+const OAUTH_STATES = "dashboard_oauth_states";
+const TELEMETRY = "dashboard_telemetry";
+let mongoActive = false;
+let mongoRefreshTimer = null;
+let mongoWritesPending = 0;
+let mongoWriteQueue = Promise.resolve();
+
+const hashToken = (token) => createHash("sha256").update(String(token)).digest("hex");
+/** The key of a login in the state: the token in the file, its hash in MongoDB. */
+const sessionKey = (token) => (mongoActive ? hashToken(token) : token);
+const expiryDate = (seconds) => new Date(Number(seconds || 0) * 1000);
+
+async function readMongoState() {
+  if (!mongoActive || !isConnected() || mongoWritesPending > 0) return;
+  const database = getDb();
+  const now = new Date();
+  const [sessions, oauthStates, telemetry] = await Promise.all([
+    database.collection(SESSIONS).find({ expiresAt: { $gt: now } }).toArray(),
+    database.collection(OAUTH_STATES).find({ expiresAt: { $gt: now } }).toArray(),
+    database.collection(TELEMETRY).find({}).toArray(),
+  ]);
+  if (mongoWritesPending > 0) return;
+  const next = emptyState();
+  for (const doc of sessions) {
+    const session = normalizeAuthSession(doc.session);
+    if (session) next.authSessions[doc._id] = session;
+  }
+  for (const doc of oauthStates) {
+    const row = normalizeOauthState({ ...doc.state, token: doc._id });
+    if (row) {
+      const { token: _token, ...rest } = row;
+      next.oauthStates[doc._id] = rest;
+    }
+  }
+  for (const doc of telemetry) next.telemetry[doc._id] = normalizeTelemetryRow(doc.telemetry);
+  stateCache = next;
+}
+
+function queueMongoDelta(before, after) {
+  const operations = [];
+  const delta = (collection, beforeMap, afterMap, toDoc) => {
+    const ops = [];
+    for (const [key, value] of Object.entries(afterMap || {})) {
+      if (JSON.stringify(beforeMap?.[key]) === JSON.stringify(value)) continue;
+      ops.push({ replaceOne: { filter: { _id: key }, replacement: toDoc(value), upsert: true } });
+    }
+    for (const key of Object.keys(beforeMap || {})) {
+      if (!(key in (afterMap || {}))) ops.push({ deleteOne: { filter: { _id: key } } });
+    }
+    if (ops.length) operations.push([collection, ops]);
+  };
+  delta(SESSIONS, before.authSessions, after.authSessions, (session) => ({ session, expiresAt: expiryDate(session.expiresAt) }));
+  delta(OAUTH_STATES, before.oauthStates, after.oauthStates, (state) => ({ state, expiresAt: expiryDate(state.expiresAt) }));
+  delta(TELEMETRY, before.telemetry, after.telemetry, (telemetry) => ({ telemetry }));
+  if (!operations.length) return;
+  mongoWritesPending += 1;
+  mongoWriteQueue = mongoWriteQueue
+    .then(async () => {
+      if (!isConnected()) return;
+      for (const [collection, ops] of operations) {
+        // eslint-disable-next-line no-await-in-loop -- one collection after the other
+        await getDb().collection(collection).bulkWrite(ops, { ordered: false });
+      }
+    })
+    .catch((err) => log("ERROR", `[dashboard-store] MongoDB-Speichern fehlgeschlagen: ${err?.message || err}`))
+    .finally(() => { mongoWritesPending = Math.max(0, mongoWritesPending - 1); });
+}
+
+/** MongoDB becomes the store; logins, OAuth states and telemetry of dashboard.json are copied once. */
+export async function initDashboardStore({ refreshMs = 2000 } = {}) {
+  if (!isConnected() || !getDb()) return { backend: "file" };
+  const database = getDb();
+  await database.collection(SESSIONS).createIndex({ expiresAt: 1 }, { name: "session_expiry", expireAfterSeconds: 0 }).catch(() => null);
+  await database.collection(OAUTH_STATES).createIndex({ expiresAt: 1 }, { name: "oauth_expiry", expireAfterSeconds: 0 }).catch(() => null);
+  const fileState = readStateFile(STORE_FILE) || readStateFile(BACKUP_FILE);
+  if (fileState) {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const copies = [];
+    for (const [token, session] of Object.entries(fileState.authSessions || {})) {
+      if (Number(session.expiresAt) > nowSeconds) copies.push([SESSIONS, hashToken(token), { session, expiresAt: expiryDate(session.expiresAt) }]);
+    }
+    for (const [serverId, telemetry] of Object.entries(fileState.telemetry || {})) copies.push([TELEMETRY, serverId, { telemetry }]);
+    for (const [collection, id, doc] of copies) {
+      // eslint-disable-next-line no-await-in-loop -- a one-time copy
+      await database.collection(collection).updateOne({ _id: id }, { $setOnInsert: doc }, { upsert: true });
+    }
+    if (copies.length) log("INFO", `[dashboard-store] ${copies.length} Logins/Telemetrie-Einträge aus dashboard.json nach MongoDB übernommen.`);
+  }
+  mongoActive = true;
+  stateCache = null;
+  await readMongoState();
+  if (!stateCache) stateCache = emptyState();
+  if (!mongoRefreshTimer) {
+    mongoRefreshTimer = setInterval(() => {
+      readMongoState().catch((err) => log("WARN", `[dashboard-store] MongoDB-Refresh fehlgeschlagen: ${err?.message || err}`));
+    }, Math.max(500, Number(refreshMs) || 2000));
+    mongoRefreshTimer.unref?.();
+  }
+  return { backend: "mongo" };
+}
+
+export async function stopDashboardStore() {
+  if (mongoRefreshTimer) clearInterval(mongoRefreshTimer);
+  mongoRefreshTimer = null;
+  await mongoWriteQueue.catch(() => null);
+}
+
+/**
+ * A login straight from MongoDB, for a process that did not create it (the
+ * public entry signing an owner in seconds after the commander's login).
+ */
+export async function findDashboardAuthSession(token) {
+  const safeToken = sanitizeText(token, 160);
+  if (!safeToken) return null;
+  if (!mongoActive || !isConnected()) return getDashboardAuthSession(safeToken);
+  const doc = await getDb().collection(SESSIONS).findOne({ _id: hashToken(safeToken), expiresAt: { $gt: new Date() } });
+  const session = doc ? normalizeAuthSession(doc.session) : null;
+  return session ? deepClone(session) : null;
+}
+
 function mutateState(mutator) {
+  if (mongoActive) {
+    const state = ensureState();
+    const before = deepClone({ authSessions: state.authSessions, oauthStates: state.oauthStates, telemetry: state.telemetry });
+    const result = mutator(state) || {};
+    if (result.changed) queueMongoDelta(before, state);
+    return result.value;
+  }
   return withFileStoreLock(STORE_FILE, () => {
     const state = loadLatestState();
     const result = mutator(state) || {};
@@ -289,8 +430,8 @@ export function setDashboardAuthSession(token, payload) {
   if (!safeToken || !normalizedSession) return null;
   return mutateState((state) => {
     cleanupExpiredAuthEntriesFromState(state);
-    state.authSessions[safeToken] = normalizedSession;
-    return { changed: true, value: deepClone(state.authSessions[safeToken]) };
+    state.authSessions[sessionKey(safeToken)] = normalizedSession;
+    return { changed: true, value: deepClone(normalizedSession) };
   });
 }
 
@@ -299,7 +440,7 @@ export function getDashboardAuthSession(token) {
   if (!safeToken) return null;
   cleanupExpiredAuthEntries();
   const state = loadLatestState();
-  const session = state.authSessions[safeToken];
+  const session = state.authSessions[sessionKey(safeToken)];
   return session ? deepClone(session) : null;
 }
 
@@ -307,8 +448,9 @@ export function deleteDashboardAuthSession(token) {
   const safeToken = sanitizeText(token, 160);
   if (!safeToken) return false;
   return mutateState((state) => {
-    if (!state.authSessions[safeToken]) return { changed: false, value: false };
-    delete state.authSessions[safeToken];
+    const key = sessionKey(safeToken);
+    if (!state.authSessions[key]) return { changed: false, value: false };
+    delete state.authSessions[key];
     return { changed: true, value: true };
   });
 }

@@ -145,7 +145,6 @@
     "src/entrypoints/commander.js::no-await-in-loop::2",
     "src/entrypoints/shared.js::no-extra-boolean-cast::1",
     "src/entrypoints/worker-autoheal.js::no-await-in-loop::1",
-    "src/guild-language-store.js::no-unused-vars::1",
     "src/index.js::no-await-in-loop::1",
     "src/index.js::no-await-in-loop::2",
     "src/index.js::no-await-in-loop::3",
