@@ -1,5 +1,6 @@
 import fs from "node:fs";
-import path from "node:path";
+import { getDb, isConnected } from "./lib/db.js";
+import { log } from "./lib/logging.js";
 import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 
 const STATE_FILE = resolveRuntimeDataPath("vote-events.json");
@@ -143,7 +144,101 @@ function normalizeState(rawState) {
   };
 }
 
+// ---- MongoDB (#292) ----
+// Votes arrive through the webhooks of the public entry and through the
+// commander's sync loops since #290. In MongoDB every vote is its own
+// document in vote_events (unique key), and vote_counters holds the totals
+// per provider, raised with $inc only when a vote really is new. Two
+// processes that see the same vote count it once. Reads come from a cache
+// refreshed every few seconds; without MongoDB vote-events.json stays the store.
+const EVENTS = "vote_events";
+const COUNTERS = "vote_counters";
+let mongoActive = false;
+let mongoCache = null;
+let mongoRefreshTimer = null;
+let mongoWritesPending = 0;
+let mongoWriteQueue = Promise.resolve();
+
+async function readMongoState() {
+  if (!mongoActive || !isConnected() || mongoWritesPending > 0) return;
+  const database = getDb();
+  const [counters, events] = await Promise.all([
+    database.collection(COUNTERS).find({}).toArray(),
+    database.collection(EVENTS).find({}, { projection: { _id: 0, _key: 0 } }).sort({ votedAt: -1 }).limit(MAX_STORED_VOTE_EVENTS).toArray(),
+  ]);
+  if (mongoWritesPending > 0) return;
+  const providers = {};
+  for (const counter of counters) {
+    providers[counter._id] = { totalVotes: counter.totalVotes || 0, lastVoteAt: counter.lastVoteAt || null, lastReceivedAt: counter.lastReceivedAt || null };
+  }
+  mongoCache = normalizeState({ votes: events, providers });
+}
+
+function queueMongoVotes(votes) {
+  if (!votes.length) return;
+  mongoWritesPending += 1;
+  mongoWriteQueue = mongoWriteQueue
+    .then(async () => {
+      if (!isConnected()) return;
+      const database = getDb();
+      for (const vote of votes) {
+        let inserted = false;
+        try {
+          // eslint-disable-next-line no-await-in-loop -- one vote after the other, the counter follows the insert
+          await database.collection(EVENTS).insertOne({ _key: vote.key, ...vote });
+          inserted = true;
+        } catch (err) {
+          if (err?.code !== 11000) throw err;
+        }
+        // eslint-disable-next-line no-await-in-loop
+        await database.collection(COUNTERS).updateOne(
+          { _id: vote.provider },
+          { ...(inserted ? { $inc: { totalVotes: 1 } } : {}), $max: { lastVoteAt: vote.votedAt, lastReceivedAt: vote.receivedAt } },
+          { upsert: true },
+        );
+      }
+    })
+    .catch((err) => log("ERROR", `[vote-events] MongoDB-Speichern fehlgeschlagen: ${err?.message || err}`))
+    .finally(() => { mongoWritesPending = Math.max(0, mongoWritesPending - 1); });
+}
+
+/** MongoDB becomes the store; the votes and totals of vote-events.json are copied once. */
+export async function initVoteEventsStore({ refreshMs = 5000 } = {}) {
+  if (!isConnected() || !getDb()) return { backend: "file" };
+  const database = getDb();
+  await database.collection(EVENTS).createIndex({ _key: 1 }, { name: "vote_key", unique: true }).catch(() => null);
+  await database.collection(EVENTS).createIndex({ votedAt: -1 }, { name: "vote_time" }).catch(() => null);
+  if (!(await database.collection(COUNTERS).countDocuments({})) && fs.existsSync(STATE_FILE)) {
+    const fileState = loadRawState();
+    for (const vote of fileState.votes) {
+      // eslint-disable-next-line no-await-in-loop -- a one-time copy
+      await database.collection(EVENTS).updateOne({ _key: vote.key }, { $setOnInsert: { _key: vote.key, ...vote } }, { upsert: true });
+    }
+    for (const [provider, counter] of Object.entries(fileState.providers || {})) {
+      // eslint-disable-next-line no-await-in-loop
+      await database.collection(COUNTERS).updateOne({ _id: provider }, { $setOnInsert: counter }, { upsert: true });
+    }
+    log("INFO", `[vote-events] ${fileState.votes.length} Votes aus vote-events.json nach MongoDB übernommen.`);
+  }
+  mongoActive = true;
+  await readMongoState();
+  if (!mongoRefreshTimer) {
+    mongoRefreshTimer = setInterval(() => {
+      readMongoState().catch((err) => log("WARN", `[vote-events] MongoDB-Refresh fehlgeschlagen: ${err?.message || err}`));
+    }, Math.max(1000, Number(refreshMs) || 5000));
+    mongoRefreshTimer.unref?.();
+  }
+  return { backend: "mongo" };
+}
+
+export async function stopVoteEventsStore() {
+  if (mongoRefreshTimer) clearInterval(mongoRefreshTimer);
+  mongoRefreshTimer = null;
+  await mongoWriteQueue.catch(() => null);
+}
+
 function loadRawState() {
+  if (mongoActive && mongoCache) return normalizeState(JSON.parse(JSON.stringify(mongoCache)));
   try {
     if (!fs.existsSync(STATE_FILE)) return emptyState();
     if (fs.statSync(STATE_FILE).isDirectory()) return emptyState();
@@ -155,8 +250,13 @@ function loadRawState() {
   }
 }
 
-function saveRawState(state) {
+function saveRawState(state, votes = []) {
   const normalized = normalizeState(state);
+  if (mongoActive) {
+    mongoCache = normalized;
+    queueMongoVotes(votes);
+    return normalized;
+  }
   const tempPath = `${STATE_FILE}.tmp-${process.pid}-${Date.now()}`;
   const serialized = `${JSON.stringify(normalized, null, 2)}\n`;
 
@@ -207,7 +307,7 @@ function mergeVoteIntoState(state, rawVote) {
 function recordVoteEvent(rawVote) {
   const state = loadRawState();
   const merged = mergeVoteIntoState(state, rawVote);
-  const saved = saveRawState(state);
+  const saved = saveRawState(state, merged.vote ? [merged.vote] : []);
   const providerState = merged.vote ? saved.providers?.[merged.vote.provider] || emptyProviderState() : emptyProviderState();
   return {
     ok: Boolean(merged.vote),
@@ -222,13 +322,15 @@ function mergeVoteEvents(rawVotes, hints = {}) {
   const votes = Array.isArray(rawVotes) ? rawVotes : [];
   const state = loadRawState();
   let added = 0;
+  const merged = [];
 
   for (const rawVote of votes) {
-    const merged = mergeVoteIntoState(state, { ...hints, ...rawVote });
-    if (merged.added) added += 1;
+    const result = mergeVoteIntoState(state, { ...hints, ...rawVote });
+    if (result.added) added += 1;
+    if (result.vote) merged.push(result.vote);
   }
 
-  const saved = saveRawState(state);
+  const saved = saveRawState(state, merged);
   return {
     added,
     totalVotes: saved.totalVotes,

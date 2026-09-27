@@ -117,7 +117,6 @@
     "src/bot/runtime.js::no-unused-vars::1",
     "src/bot/worker-manager.js::no-await-in-loop::1",
     "src/bot/worker-manager.js::no-await-in-loop::2",
-    "src/botsgg-store.js::no-unused-vars::1",
     "src/command-permissions-store.js::no-await-in-loop::1",
     "src/command-permissions-store.js::no-await-in-loop::2",
     "src/commands/play-url.js::no-unused-vars::1",
@@ -141,7 +140,6 @@
     "src/discord/syncGuildCommandsSafe.js::no-await-in-loop::9",
     "src/discord/syncGuildCommandsSafe.js::no-useless-assignment::1",
     "src/discord/syncGuildCommandsSafe.js::promise/param-names::1",
-    "src/discordbotlist-store.js::no-unused-vars::1",
     "src/email.js::no-useless-assignment::1",
     "src/entrypoints/commander.js::no-await-in-loop::1",
     "src/entrypoints/commander.js::no-await-in-loop::2",
@@ -277,8 +275,6 @@
     "src/stations-store.js::no-await-in-loop::1",
     "src/stations-store.js::no-await-in-loop::2",
     "src/stations-store.js::no-await-in-loop::3",
-    "src/topgg-store.js::no-unused-vars::1",
-    "src/vote-events-store.js::no-unused-vars::1",
     "test/coupon-store.test.js::no-await-in-loop::1",
     "test/coupon-store.test.js::no-await-in-loop::2",
     "test/coupon-store.test.js::no-await-in-loop::3",
@@ -302,6 +298,9 @@
     "root: axe-core (MPL-2.0)",
     "root: caniuse-lite (CC-BY-4.0)",
     "root: type-fest ((MIT OR CC0-1.0))"
+  ],
+  "lighthouse-performance": [
+    "67"
   ],
   "line-endings": [],
   "live-smoke": [],
@@ -328,8 +327,5 @@
   "shellcheck": [
     "start.sh: SC1091 (info)",
     "stop.sh: SC2034 (warning)"
-  ],
-  "lighthouse-performance": [
-    "67"
   ]
 }

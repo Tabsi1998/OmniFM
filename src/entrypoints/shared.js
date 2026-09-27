@@ -14,6 +14,7 @@ import {
 } from "../premium-store.js";
 import { setLicenseProvider } from "../core/entitlements.js";
 import { initCouponStore } from "../coupon-store.js";
+import { initProviderStores } from "../lib/provider-stores.js";
 import { MONGO_REQUIRED_MESSAGE, fileStoresAllowed } from "../lib/store-policy.js";
 import { installOperatorIncidentRecorder, logRecentOperatorIncidentSummary } from "../operator-incidents-store.js";
 
@@ -85,6 +86,7 @@ async function initializeSharedServices({ requireMongo = false } = {}) {
 
   await initPremiumStore();
   await initCouponStore();
+  await initProviderStores();
   await initStationsStore();
   await logRecentOperatorIncidentSummary({
     label: "Owner summary on startup",
