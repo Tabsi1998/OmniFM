@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useCallback, useRef } from 'react';
 import Hero from './components/Hero.js';
 import TrustBar from './components/TrustBar.js';
 import WhyOmniFM from './components/WhyOmniFM.js';
@@ -6,14 +6,8 @@ import DashboardShowcase from './components/DashboardShowcase.js';
 import StationBrowser from './components/StationBrowser.js';
 import UseCasesSection from './components/UseCasesSection.js';
 import Premium from './components/Premium.js';
-import ImpressumSection from './components/ImpressumSection.js';
-import PrivacySection from './components/PrivacySection.js';
-import TermsSection from './components/TermsSection.js';
 import StatsFooter from './components/StatsFooter.js';
 import Navbar from './components/Navbar.js';
-import GuildDashboard from './components/GuildDashboard.js';
-import OwnerAdmin from './components/OwnerAdmin.js';
-import BrandKit from './components/BrandKit.js';
 import DiscordShowcase from './components/DiscordShowcase.js';
 import HowToDiscord from './components/HowToDiscord.js';
 import CommunitySection from './components/CommunitySection.js';
@@ -24,6 +18,20 @@ import { I18nProvider } from './i18n.js';
 import { PlayerProvider } from './lib/player.js';
 import { buildApiUrl } from './lib/api.js';
 import { getSectionAnchorForPage, resolvePageFromUrl } from './lib/pageRouting.js';
+
+// Loaded only on their own pages (#296): the start page carries neither the
+// dashboard nor the owner console, nor the charts both of them draw.
+const GuildDashboard = lazy(() => import('./components/GuildDashboard.js'));
+const OwnerAdmin = lazy(() => import('./components/OwnerAdmin.js'));
+const BrandKit = lazy(() => import('./components/BrandKit.js'));
+const ImpressumSection = lazy(() => import('./components/ImpressumSection.js'));
+const PrivacySection = lazy(() => import('./components/PrivacySection.js'));
+const TermsSection = lazy(() => import('./components/TermsSection.js'));
+
+// What shows for the moment a page's code is on its way.
+function PageLoading() {
+  return <div data-testid="page-loading" style={{ minHeight: '60vh' }} aria-busy="true" />;
+}
 
 async function fetchJson(path, signal) {
   const res = await fetch(buildApiUrl(path), {
@@ -189,7 +197,9 @@ function AppContent() {
       <div data-testid="app-root" style={{ position: 'relative', minHeight: '100vh' }}>
         <div className="noise-overlay" />
         <Navbar page={currentPage} />
-        <ImpressumSection legal={legal} standalone />
+        <Suspense fallback={<PageLoading />}>
+          <ImpressumSection legal={legal} standalone />
+        </Suspense>
         <StatsFooter stats={stats} bots={bots} legal={legal} />
         <CookieConsent />
       </div>
@@ -201,7 +211,9 @@ function AppContent() {
       <div data-testid="app-root" style={{ position: 'relative', minHeight: '100vh' }}>
         <div className="noise-overlay" />
         <Navbar page={currentPage} />
-        <PrivacySection legal={legal} privacy={privacy} standalone />
+        <Suspense fallback={<PageLoading />}>
+          <PrivacySection legal={legal} privacy={privacy} standalone />
+        </Suspense>
         <StatsFooter stats={stats} bots={bots} legal={legal} />
         <CookieConsent />
       </div>
@@ -213,7 +225,9 @@ function AppContent() {
       <div data-testid="app-root" style={{ position: 'relative', minHeight: '100vh' }}>
         <div className="noise-overlay" />
         <Navbar page={currentPage} />
-        <TermsSection legal={legal} terms={terms} />
+        <Suspense fallback={<PageLoading />}>
+          <TermsSection legal={legal} terms={terms} />
+        </Suspense>
         <StatsFooter stats={stats} bots={bots} legal={legal} />
         <CookieConsent />
       </div>
@@ -223,7 +237,9 @@ function AppContent() {
   if (currentPage === 'dashboard') {
     return (
       <div data-testid="app-dashboard-root" style={{ position: 'relative', minHeight: '100vh' }}>
-        <GuildDashboard />
+        <Suspense fallback={<PageLoading />}>
+          <GuildDashboard />
+        </Suspense>
       </div>
     );
   }
@@ -231,7 +247,9 @@ function AppContent() {
   if (currentPage === 'dashboard-classic') {
     return (
       <div data-testid="app-dashboard-classic-root" style={{ position: 'relative', minHeight: '100vh' }}>
-        <GuildDashboard />
+        <Suspense fallback={<PageLoading />}>
+          <GuildDashboard />
+        </Suspense>
       </div>
     );
   }
@@ -239,7 +257,9 @@ function AppContent() {
   if (currentPage === 'dashboard-studio') {
     return (
       <div data-testid="app-dashboard-studio-root" style={{ position: 'relative', minHeight: '100vh' }}>
-        <GuildDashboard />
+        <Suspense fallback={<PageLoading />}>
+          <GuildDashboard />
+        </Suspense>
       </div>
     );
   }
@@ -247,7 +267,9 @@ function AppContent() {
   if (currentPage === 'admin') {
     return (
       <div data-testid="app-admin-root" style={{ position: 'relative', minHeight: '100vh' }}>
-        <OwnerAdmin />
+        <Suspense fallback={<PageLoading />}>
+          <OwnerAdmin />
+        </Suspense>
       </div>
     );
   }
@@ -255,7 +277,9 @@ function AppContent() {
   if (currentPage === 'brand') {
     return (
       <div data-testid="app-brand-root" style={{ position: 'relative', minHeight: '100vh' }}>
-        <BrandKit />
+        <Suspense fallback={<PageLoading />}>
+          <BrandKit />
+        </Suspense>
       </div>
     );
   }

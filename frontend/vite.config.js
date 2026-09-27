@@ -64,7 +64,8 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (!id.includes('/node_modules/')) return undefined;
-          if (id.includes('/recharts/') || id.includes('/d3-')) return 'charts';
+          // recharts goes with the pages that draw charts (#296); forcing it into a
+          // chunk of its own put a shared helper there, and the start page loaded it all.
           if (id.includes('/lucide-react/')) return 'icons';
           if (
             id.includes('/react/') ||
