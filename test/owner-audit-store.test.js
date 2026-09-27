@@ -31,7 +31,7 @@ test("owner audit store records events without leaking sensitive metadata values
     target: "env",
     summary: "Secrets aktualisiert",
     metadata: {
-      updatedKeys: ["STRIPE_SECRET_KEY", "SMTP_PASS"],
+      updatedKeys: ["SMTP_HOST", "SMTP_PASS"],
       token: "must-not-leak",
       nested: { apiKey: "also-secret", visible: "ok" },
     },
@@ -45,7 +45,7 @@ test("owner audit store records events without leaking sensitive metadata values
   const snapshot = getOwnerAuditSnapshot();
   assert.equal(snapshot.total, 1);
   assert.equal(snapshot.events[0].action, "owner.config.secrets.update");
-  assert.deepEqual(snapshot.events[0].metadata.updatedKeys, ["STRIPE_SECRET_KEY", "SMTP_PASS"]);
+  assert.deepEqual(snapshot.events[0].metadata.updatedKeys, ["SMTP_HOST", "SMTP_PASS"]);
 
   const raw = await fs.readFile(auditFile, "utf8");
   assert.doesNotMatch(raw, /must-not-leak/);

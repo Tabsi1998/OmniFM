@@ -5,7 +5,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { timingSafeEqual } from "node:crypto";
 import { webDir } from "./logging.js";
-import { ownerStripeSettings } from "./owner-settings-cache.js";
 import { TIER_RANK, MIME_TYPES, normalizeSeats } from "./helpers.js";
 import { buildCommandBuilders } from "../commands.js";
 import { buildInviteUrl } from "../bot-config.js";
@@ -22,7 +21,6 @@ import {
   isTrustedProxyAddress,
   normalizeIpAddress,
   parseTrustedProxyIps,
-  resolveCheckoutReturnBase,
   shouldTrustProxyHeaders,
   toOrigin,
 } from "./api-cors.js";
@@ -451,24 +449,6 @@ function buildInviteOverviewForTier(runtimes, tier) {
   return overview;
 }
 
-// ---- Stripe (owner console first, then the environment, like FastAPI #289) ----
-function getStripeSecretKey() {
-  const stored = String(ownerStripeSettings().secretKey || "").trim();
-  return stored || String(process.env.STRIPE_SECRET_KEY || process.env.STRIPE_API_KEY || "").trim();
-}
-
-function getStripeWebhookSecret() {
-  const stored = String(ownerStripeSettings().webhookSecret || "").trim();
-  return stored || String(process.env.STRIPE_WEBHOOK_SECRET || "").trim();
-}
-
-/** The console's switch wins; without it Stripe is on when a key exists (is_stripe_enabled). */
-function isStripeCheckoutEnabled() {
-  const stored = ownerStripeSettings();
-  if (Object.hasOwn(stored, "enabled")) return Boolean(stored.enabled);
-  return Boolean(getStripeSecretKey());
-}
-
 export {
   getCommonSecurityHeaders,
   buildContentSecurityPolicy,
@@ -488,10 +468,6 @@ export {
   buildInviteUrlForRuntime,
   resolvePublicWebsiteUrl,
   buildInviteOverviewForTier,
-  getStripeSecretKey,
-  getStripeWebhookSecret,
-  isStripeCheckoutEnabled,
-  resolveCheckoutReturnBase,
   getConfiguredPublicOrigin,
   isAllowedFrontendOrigin,
   toOrigin,

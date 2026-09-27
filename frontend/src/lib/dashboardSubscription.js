@@ -95,14 +95,14 @@ export function buildSubscriptionNextAction(data, blockedFeatureLabels, t) {
       key: 'renew-expired',
       accent: '#EF4444',
       eyebrow: t('Naechste Aktion', 'Next action'),
-      title: t('Diese Lizenz jetzt direkt verlaengern', 'Renew this license right now'),
+      title: t('Diese Lizenz ist abgelaufen', 'This license has expired'),
       body: t(
-        'Die Lizenz ist bereits abgelaufen. Starte den Checkout direkt aus dem Dashboard, damit Pro- oder Ultimate-Funktionen wieder freigeschaltet werden.',
-        'The license has already expired. Start the checkout directly from the dashboard so Pro or Ultimate features become active again.'
+        'Premium kommt bald direkt in Discord. Hast du einen Code, löst du ihn hier ein, dann sind Pro- oder Ultimate-Funktionen wieder da.',
+        'Premium is coming to Discord soon. If you have a code, redeem it here and Pro or Ultimate features are back.'
       ),
       cta: {
         kind: 'checkout',
-        label: t('Jetzt verlaengern', 'Renew now'),
+        label: t('Code einlösen', 'Redeem a code'),
       },
     };
   }
@@ -114,8 +114,8 @@ export function buildSubscriptionNextAction(data, blockedFeatureLabels, t) {
       eyebrow: t('Naechste Aktion', 'Next action'),
       title: t('Eine gueltige Lizenz-E-Mail hinterlegen', 'Save a valid license email'),
       body: t(
-        'Ohne gueltige E-Mail werden Checkout, Rechnungen und Lizenz-Kommunikation unnoetig fragil. Hinterlege sie direkt in diesem Panel.',
-        'Without a valid email, checkout, invoices, and license communication become unnecessarily fragile. Save it directly in this panel.'
+        'Ohne gültige E-Mail erreichen dich Lizenz-Hinweise nicht, und ein Code lässt sich nicht zuordnen. Hinterlege sie direkt in diesem Panel.',
+        'Without a valid email, license notices do not reach you and a code cannot be matched. Save it directly in this panel.'
       ),
       cta: {
         kind: 'edit-email',
@@ -131,8 +131,8 @@ export function buildSubscriptionNextAction(data, blockedFeatureLabels, t) {
       eyebrow: t('Naechste Aktion', 'Next action'),
       title: t('Seat-Kapazitaet fuer weitere Server planen', 'Plan seat capacity for more servers'),
       body: t(
-        'Alle Seats dieser Lizenz sind bereits belegt. Fuer weitere Server brauchst du ein groesseres Seat-Bundle oder eine zweite Lizenz ueber die Hauptseite.',
-        'All seats of this license are already linked. Additional servers need a larger seat bundle or a second license on the main site.'
+        'Alle Seats dieser Lizenz sind bereits belegt. Für weitere Server brauchst du ein größeres Seat-Bundle oder eine zweite Lizenz.',
+        'All seats of this license are already linked. Additional servers need a larger seat bundle or a second license.'
       ),
       cta: {
         kind: 'plans',
@@ -146,14 +146,14 @@ export function buildSubscriptionNextAction(data, blockedFeatureLabels, t) {
       key: 'renew-soon',
       accent: '#F59E0B',
       eyebrow: t('Naechste Aktion', 'Next action'),
-      title: t('Die Verlaengerung vor Ablauf vorbereiten', 'Prepare the renewal before expiry'),
+      title: t('Die Lizenz läuft bald ab', 'The license expires soon'),
       body: t(
-        `Die Lizenz laeuft in ${remainingDays} Tagen ab. Verlaengere sie jetzt direkt im Dashboard, damit es zu keiner Unterbrechung kommt.`,
-        `The license expires in ${remainingDays} days. Renew it directly in the dashboard now to avoid any interruption.`
+        `Die Lizenz läuft in ${remainingDays} Tagen ab. Premium kommt bald direkt in Discord; mit einem Code verlängerst du sie hier.`,
+        `The license expires in ${remainingDays} days. Premium is coming to Discord soon; with a code you extend it here.`
       ),
       cta: {
         kind: 'checkout',
-        label: t('Verlaengerung starten', 'Start renewal'),
+        label: t('Code einlösen', 'Redeem a code'),
       },
     };
   }
@@ -174,8 +174,8 @@ export function buildSubscriptionNextAction(data, blockedFeatureLabels, t) {
         `For this server, ${highlightText} are currently the strongest reasons for the next step toward ${targetTier}.`
       ),
       cta: {
-        kind: 'checkout',
-        label: t(`Upgrade zu ${targetTier}`, `Upgrade to ${targetTier}`),
+        kind: 'plans',
+        label: t('Pläne ansehen', 'See the plans'),
       },
     };
   }
@@ -188,24 +188,13 @@ export function buildSubscriptionPromotionNotes(data, t) {
   const license = data?.license || null;
   const promotions = data?.promotions || {};
 
-  if (promotions.couponCodesSupported) {
-    notes.push({
-      key: 'coupons',
-      label: t('Rabattcodes', 'Coupon codes'),
-      detail: t(
-        'Rabattcodes koennen direkt im Dashboard-Checkout geprueft und angewendet werden.',
-        'Coupon codes can be checked and applied directly in the dashboard checkout.'
-      ),
-    });
-  }
-
   if (promotions.directGrantCodesSupported) {
     notes.push({
       key: 'grant-codes',
       label: t('Gratis-Lizenzcodes', 'Free license codes'),
       detail: t(
-        'Spezielle Codes koennen eine Gratis-Lizenz direkt aktivieren, ohne dass Stripe geoeffnet wird.',
-        'Special codes can activate a free license directly without opening Stripe.'
+        'Gratis-Codes aktivieren eine Lizenz direkt hier im Dashboard.',
+        'Free codes activate a license directly here in the dashboard.'
       ),
     });
   }
@@ -233,32 +222,6 @@ export function buildSubscriptionPromotionNotes(data, t) {
   }
 
   return notes;
-}
-
-export function buildSubscriptionReplayStatus(activity, t) {
-  const replay = activity?.replayProtection || {};
-  const count = Math.max(0, Number(replay.recentSessionCount || 0) || 0);
-  const lastSessionId = String(replay.lastSessionId || '').trim();
-
-  if (count <= 0) {
-    return {
-      label: t('Noch keine verarbeitete Zahlung', 'No processed payment yet'),
-      detail: t(
-        'Abgeschlossene Stripe-Sessions werden vor der Lizenzaktivierung gegen Replay geschuetzt.',
-        'Completed Stripe sessions are protected against replay before license activation.'
-      ),
-      accent: '#71717A',
-    };
-  }
-
-  return {
-    label: t('Replay-Schutz aktiv', 'Replay protection active'),
-    detail: t(
-      `${count} verarbeitete Zahlung${count === 1 ? '' : 'en'}${lastSessionId ? `, zuletzt ${lastSessionId}` : ''}.`,
-      `${count} processed payment${count === 1 ? '' : 's'}${lastSessionId ? `, latest ${lastSessionId}` : ''}.`
-    ),
-    accent: '#10B981',
-  };
 }
 
 export function buildSubscriptionActivityRows(activity, t) {

@@ -101,7 +101,7 @@ test("direct grant offers preview as zero-charge license grants", async (t) => {
     couponCode: "FREEPRO1",
   });
 
-  assert.equal(preview.requiresStripe, false);
+  assert.equal(preview.requiresPayment, false);
   assert.equal(preview.finalAmountCents, 0);
   assert.equal(preview.discountCents, 1990);
   assert.equal(preview.applied.code, "FREEPRO1");

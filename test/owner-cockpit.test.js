@@ -53,21 +53,6 @@ test("Discord login: the secret is tried at Discord, and this morning's localhos
   assert.match(leftovers.summary, /localhost:8081/);
 });
 
-test("Stripe: no key is 'not set up', a refused key is red, a missing webhook is a warning", async () => {
-  const none = await checks.checkStripe({ ownerConfig: {}, env: {}, fetchImpl: fakeFetch([]) });
-  assert.equal(none.state, "off");
-  assert.match(none.summary, /Premium kann nicht gekauft werden/);
-  assert.equal((await checks.checkStripe({ ownerConfig: { payments: { stripe: { enabled: false, secretKey: "sk_live_x" } } }, env: {}, fetchImpl: fakeFetch([]) })).state, "off");
-  const config = { payments: { stripe: { secretKey: "sk_live_x", webhookSecret: "whsec_x" } } };
-  assert.equal((await checks.checkStripe({ ownerConfig: config, env: {}, fetchImpl: fakeFetch([{ match: "stripe.com", status: 401 }]) })).state, "fail");
-  assert.equal((await checks.checkStripe({ ownerConfig: config, env: {}, fetchImpl: fakeFetch([{ match: "stripe.com", status: 200 }]) })).state, "ok");
-  const noWebhook = await checks.checkStripe({ ownerConfig: {}, env: { STRIPE_SECRET_KEY: "sk_live_x" }, fetchImpl: fakeFetch([{ match: "stripe.com", status: 200 }]) });
-  assert.equal(noWebhook.state, "warn");
-  assert.match(noWebhook.summary, /Webhook-Secret fehlt/);
-  const testMode = await checks.checkStripe({ ownerConfig: { payments: { stripe: { secretKey: "sk_test_x", webhookSecret: "w" } } }, env: {}, fetchImpl: fakeFetch([{ match: "stripe.com", status: 200 }]) });
-  assert.match(testMode.summary, /Testmodus/);
-});
-
 test("SMTP logs in without sending; recognition and the alarm channel are tried for real", async () => {
   assert.equal((await checks.checkSmtp({ ownerConfig: {}, env: {}, createTransport: () => null })).state, "off");
   const good = await checks.checkSmtp({ ownerConfig: { system: { smtp: { host: "mail.example", port: 587, user: "u", password: "p" } } }, env: {}, createTransport: () => ({ verify: async () => true, close() {} }) });
@@ -144,12 +129,12 @@ test("bots, bot lists, stations and the version", async () => {
 });
 
 test("the service: every 5 minutes on its own, one alarm when something turns red and one when it is fine again", async () => {
-  let stripeState = "ok";
+  let smtpState = "ok";
   const alarms = [];
   let clock = Date.parse("2026-09-25T12:00:00Z");
   const service = createOwnerStatusService({
     checks: {
-      stripe: async () => ({ key: "stripe", state: stripeState, summary: `Stripe ${stripeState}` }),
+      smtp: async () => ({ key: "smtp", state: smtpState, summary: `SMTP ${smtpState}` }),
       mongo: async () => { throw new Error("boom"); },
     },
     getOwnerConfig: async () => ({}),
@@ -157,26 +142,26 @@ test("the service: every 5 minutes on its own, one alarm when something turns re
     now: () => clock,
   });
   await service.run();
-  stripeState = "fail";
+  smtpState = "fail";
   clock += 300_000;
   await service.run();
   clock += 300_000;
   await service.run();
-  assert.deepEqual(alarms.map((alarm) => alarm.title), ["🔴 Zahlungen (Stripe) funktioniert nicht"], "red once, not every run");
-  stripeState = "ok";
+  assert.deepEqual(alarms.map((alarm) => alarm.title), ["🔴 E-Mail (SMTP) funktioniert nicht"], "red once, not every run");
+  smtpState = "ok";
   await service.run();
-  assert.equal(alarms.at(-1).title, "🟢 Zahlungen (Stripe) wieder in Ordnung");
+  assert.equal(alarms.at(-1).title, "🟢 E-Mail (SMTP) wieder in Ordnung");
 
   const snapshot = service.snapshot();
-  const stripe = snapshot.checks.find((entry) => entry.key === "stripe");
-  assert.deepEqual(stripe.history.map((entry) => entry.state), ["ok", "fail", "fail", "ok"]);
-  assert.equal(stripe.area, "payments", "the tile leads to the one place to fix it");
+  const smtp = snapshot.checks.find((entry) => entry.key === "smtp");
+  assert.deepEqual(smtp.history.map((entry) => entry.state), ["ok", "fail", "fail", "ok"]);
+  assert.equal(smtp.area, "cfg-email", "the tile leads to the one place to fix it");
   assert.equal(snapshot.checks.find((entry) => entry.key === "mongo").state, "warn", "a crashing check does not take the others down");
   assert.equal(snapshot.checks.find((entry) => entry.key === "bots").state, "pending");
 
-  stripeState = "warn";
+  smtpState = "warn";
   await service.run({ only: ["mongo"] });
-  assert.equal(service.snapshot().checks.find((entry) => entry.key === "stripe").state, "ok", "only the asked check runs");
+  assert.equal(service.snapshot().checks.find((entry) => entry.key === "smtp").state, "ok", "only the asked check runs");
 });
 
 test("the cockpit route needs the owner token", async () => {
@@ -191,7 +176,7 @@ test("the cockpit route needs the owner token", async () => {
   };
   assert.equal((await call("GET", "/api/owner/status")).status, 401);
   assert.equal((await call("GET", "/api/owner/status", { "x-admin-token": "owner" })).status, 200);
-  assert.deepEqual((await call("POST", "/api/owner/status/check", { "x-admin-token": "owner" }, { key: "stripe" })).body.only, ["stripe"]);
+  assert.deepEqual((await call("POST", "/api/owner/status/check", { "x-admin-token": "owner" }, { key: "smtp" })).body.only, ["smtp"]);
   assert.equal((await call("POST", "/api/owner/status/check", { "x-admin-token": "owner" }, { key: "rm -rf" })).body.only, null, "unknown keys check everything");
 });
 
@@ -199,10 +184,10 @@ test("the page: red first, a headline in words, the strip keeps the last hours",
   const list = [
     { key: "bots", state: "ok" },
     { key: "smtp", state: "off" },
-    { key: "stripe", state: "fail" },
+    { key: "mongo", state: "fail" },
     { key: "website", state: "warn" },
   ];
-  assert.deepEqual(cockpit.sortCockpitChecks(list).map((entry) => entry.key), ["stripe", "website", "smtp", "bots"]);
+  assert.deepEqual(cockpit.sortCockpitChecks(list).map((entry) => entry.key), ["mongo", "website", "smtp", "bots"]);
   assert.deepEqual(cockpit.cockpitHeadline(list), { state: "fail", text: "1 Dienst funktioniert nicht." });
   assert.equal(cockpit.cockpitHeadline([{ state: "ok" }, { state: "off" }]).text, "Alles läuft. 1 Dienst ist nicht eingerichtet.");
   assert.equal(cockpit.historyCells(Array.from({ length: 50 }, (_, index) => ({ state: "ok", at: new Date(index * 300_000).toISOString() }))).length, 36);

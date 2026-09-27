@@ -15,14 +15,12 @@ export const CSP_DIRECTIVES = Object.freeze({
     "'unsafe-inline'",
     "https://www.googletagmanager.com",
     "https://www.google-analytics.com",
-    "https://js.stripe.com",
   ],
   "script-src-elem": [
     "'self'",
     "'unsafe-inline'",
     "https://www.googletagmanager.com",
     "https://www.google-analytics.com",
-    "https://js.stripe.com",
   ],
   "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
   "style-src-elem": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
@@ -34,19 +32,15 @@ export const CSP_DIRECTIVES = Object.freeze({
     "https://www.googletagmanager.com",
     "https://www.google-analytics.com",
     "https://region1.google-analytics.com",
-    "https://api.stripe.com",
   ],
   "frame-src": [
     "'self'",
-    "https://checkout.stripe.com",
-    "https://js.stripe.com",
-    "https://hooks.stripe.com",
     "https://discord.com",
   ],
   "worker-src": ["'self'", "blob:"],
   "child-src": ["'self'", "blob:"],
   "manifest-src": ["'self'"],
-  "form-action": ["'self'", "https://checkout.stripe.com", "https://discord.com"],
+  "form-action": ["'self'", "https://discord.com"],
 });
 
 export const PERMISSIONS_POLICY = [

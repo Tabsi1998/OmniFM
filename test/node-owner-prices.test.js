@@ -2,7 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 const helpers = await import("../src/lib/helpers.js");
-const { getStripeSecretKey, getStripeWebhookSecret, isStripeCheckoutEnabled } = await import("../src/lib/api-helpers.js");
 const { setOwnerSettingsForTests } = await import("../src/lib/owner-settings-cache.js");
 const { premiumPricing } = await import("../src/lib/owner-public.js");
 const { DEFAULT_OWNER_CONFIG } = await import("../src/lib/owner-config.js");
@@ -22,7 +21,7 @@ test("without owner prices Node charges exactly what FastAPI charged", () => {
   assert.equal(helpers.calculatePrice("ultimate", 12, 5), 12 * Math.round(1699 * 299 / 499));
 });
 
-test("an owner price changes what the website shows and what Stripe charges alike (#289)", () => {
+test("an owner price changes every price OmniFM shows alike (#289)", () => {
   const raw = withPlans({ pro: { pricePerMonth: 349 }, ultimate: { pricePerMonth: 599 } });
   setOwnerSettingsForTests(raw);
   try {
@@ -46,22 +45,3 @@ test("an owner price changes what the website shows and what Stripe charges alik
   }
 });
 
-test("Stripe keys come from the owner console first, then from the environment", () => {
-  const saved = { key: process.env.STRIPE_SECRET_KEY, hook: process.env.STRIPE_WEBHOOK_SECRET };
-  process.env.STRIPE_SECRET_KEY = "sk_env";
-  process.env.STRIPE_WEBHOOK_SECRET = "whsec_env";
-  try {
-    setOwnerSettingsForTests({});
-    assert.deepEqual([getStripeSecretKey(), getStripeWebhookSecret(), isStripeCheckoutEnabled()], ["sk_env", "whsec_env", true]);
-    setOwnerSettingsForTests({ payments: { stripe: { secretKey: "sk_owner", webhookSecret: "whsec_owner" } } });
-    assert.deepEqual([getStripeSecretKey(), getStripeWebhookSecret()], ["sk_owner", "whsec_owner"]);
-    setOwnerSettingsForTests({ payments: { stripe: { enabled: false, secretKey: "sk_owner" } } });
-    assert.equal(isStripeCheckoutEnabled(), false, "the console's switch wins over a key");
-  } finally {
-    setOwnerSettingsForTests({});
-    for (const [name, value] of [["STRIPE_SECRET_KEY", saved.key], ["STRIPE_WEBHOOK_SECRET", saved.hook]]) {
-      if (value === undefined) delete process.env[name];
-      else process.env[name] = value;
-    }
-  }
-});

@@ -1,8 +1,8 @@
 // ============================================================
 // OmniFM: the owner console's settings for code that has to answer at once
 // ============================================================
-// Prices and the Stripe keys are read synchronously (price helpers, checkout,
-// webhook). FastAPI reads MongoDB on every request; Node keeps the last read
+// Prices are read synchronously (price helpers, code redemption).
+// FastAPI reads MongoDB on every request; Node keeps the last read
 // owner_config here, refreshed once a minute and right after the console
 // saves (#289). Before the first read everything falls back to the built-in
 // prices and the environment, exactly as without an owner console.
@@ -45,12 +45,6 @@ export function setOwnerSettingsForTests(value) {
 }
 
 const text = (value) => String(value ?? "").trim();
-
-/** payments.stripe of the console, like FastAPI's get_stripe_secret_key() and friends. */
-export function ownerStripeSettings() {
-  const stripe = snapshot?.payments?.stripe;
-  return stripe && typeof stripe === "object" ? stripe : {};
-}
 
 /** The monthly price the owner set for a plan, in cents; null when none is set. */
 export function ownerPlanPriceCents(tier) {

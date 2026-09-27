@@ -10,7 +10,7 @@ test("the defaults are the same file FastAPI reads", () => {
   assert.deepEqual(Object.keys(config.DEFAULT_OWNER_CONFIG), Object.keys(shared));
   assert.deepEqual(config.DEFAULT_OWNER_CONFIG.company, shared.company);
   assert.ok(config.DEFAULT_OWNER_CONFIG.system.streamRecovery.stableResetMs > 0, "streamRecovery comes from the recovery settings");
-  assert.deepEqual(config.OWNER_CONFIG_SECTIONS, ["company", "plans", "discord", "system", "payments", "marketing", "access"]);
+  assert.deepEqual(config.OWNER_CONFIG_SECTIONS, ["company", "plans", "discord", "system", "marketing", "access"]);
 });
 
 test("secrets leave masked, and a mask sent back never replaces the stored secret", () => {
@@ -30,7 +30,7 @@ test("secrets leave masked, and a mask sent back never replaces the stored secre
 });
 
 test("settings from the environment show until the owner saves them, like FastAPI", () => {
-  const env = { SMTP_HOST: "mail.example", SMTP_PORT: "2525", STRIPE_SECRET_KEY: "sk_live_x", TOPGG_TOKEN: "tg", STATION_HEALTH_BATCH_SIZE: "5.5" };
+  const env = { SMTP_HOST: "mail.example", SMTP_PORT: "2525", TOPGG_TOKEN: "tg", STATION_HEALTH_BATCH_SIZE: "5.5" };
   const system = config.effectiveSystemConfig({}, env);
   assert.equal(system.smtp.host, "mail.example");
   assert.equal(system.smtp.port, 2525);
@@ -40,11 +40,8 @@ test("settings from the environment show until the owner saves them, like FastAP
   const stored = config.effectiveSystemConfig({ system: { smtp: { host: "own.example" } } }, env);
   assert.equal(stored.smtp.host, "own.example", "what the owner saved wins");
 
-  const payments = config.effectivePaymentsConfig({}, env);
-  assert.deepEqual([payments.stripe.secretKey, payments.stripe.enabled, payments.stripe.mode], ["sk_live_x", true, "live"]);
-  const response = config.ownerConfigResponse({}, env);
-  assert.equal(response.payments.stripe.secretKey, MASK);
-  assert.equal(response.env.stripeEnvKey, true);
+  // No payment settings since the website sells nothing any more (#321).
+  assert.equal("payments" in config.ownerConfigResponse({}, env), false);
 });
 
 test("stream recovery values are clamped to the bounds the bot uses", () => {

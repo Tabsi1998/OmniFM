@@ -119,7 +119,6 @@ def build_router(core):
             "guilds": {"managed": live["servers"], "live": live["live"]},
             "integrations": {
                 "mongo": core.mongo_is_reachable(),
-                "stripe": core.is_stripe_enabled() and bool(core.get_stripe_secret_key()),
                 "discordOAuth": core.is_discord_oauth_configured(),
                 "smtp": core.config_bool(core.system_setting("smtp", "enabled", default=bool(core.system_setting("smtp", "host", "SMTP_HOST")))) and bool(core.system_setting("smtp", "host", "SMTP_HOST")),
                 "discordBotList": bool(str(core.directory_setting("discordBotList", "token", "DISCORDBOTLIST_TOKEN") or "").strip()),
@@ -236,7 +235,6 @@ def build_router(core):
             "botDirectories": {"discordBotList": dbl, "botsGG": bots_gg, "topGG": top_gg},
             "config": {
                 "mongo": core.mongo_is_reachable(),
-                "stripe": core.is_stripe_enabled() and bool(core.get_stripe_secret_key()),
                 "discordOAuth": core.is_discord_oauth_configured(),
                 "smtp": core.config_bool(core.system_setting("smtp", "enabled", default=bool(core.system_setting("smtp", "host", "SMTP_HOST")))) and bool(core.system_setting("smtp", "host", "SMTP_HOST")),
                 "recognition": core.config_bool(core.system_setting("audioRecognition", "enabled", "NOW_PLAYING_RECOGNITION_ENABLED", False)),
@@ -253,7 +251,7 @@ def build_router(core):
         if guard is not None:
             return guard
         requested = str((body or {}).get("integration") or "all").strip().lower()
-        supported = {"mongo", "stripe", "discordoauth", "smtp", "recognition", "songhistory", "discordbotlist", "botsgg", "topgg", "operatoralerts"}
+        supported = {"mongo", "discordoauth", "smtp", "recognition", "songhistory", "discordbotlist", "botsgg", "topgg", "operatoralerts"}
         names = supported if requested == "all" else {requested}
         if not names.issubset(supported):
             return core.json_error(400, "Unbekannte Integration.")
@@ -296,16 +294,6 @@ def build_router(core):
                     results["mongo"] = {"ok": True, "message": "MongoDB antwortet."}
                 except Exception as exc:
                     results["mongo"] = {"ok": False, "message": core.clip_text(exc, 160)}
-            if "stripe" in names:
-                key = core.get_stripe_secret_key()
-                if not key:
-                    results["stripe"] = {"ok": False, "message": "Kein Stripe Secret Key konfiguriert."}
-                else:
-                    try:
-                        response = requests.get("https://api.stripe.com/v1/balance", auth=(key, ""), timeout=10)
-                        results["stripe"] = {"ok": response.status_code < 400, "message": "Stripe API erreichbar." if response.status_code < 400 else f"Stripe HTTP {response.status_code}"}
-                    except Exception as exc:
-                        results["stripe"] = {"ok": False, "message": core.clip_text(exc, 160)}
             if "discordoauth" in names:
                 results["discordOAuth"] = {"ok": core.is_discord_oauth_configured(), "message": "OAuth-Konfiguration vollständig." if core.is_discord_oauth_configured() else "Client ID, Secret oder Redirect URI fehlt."}
             if "smtp" in names:
@@ -593,13 +581,10 @@ def build_router(core):
             "company": core.get_config_section("company"),
             "plans": core.get_config_section("plans"),
             "discord": core.mask_config_secrets(core.get_config_section("discord")),
-            "payments": core.mask_config_secrets(core.effective_payments_config()),
             "marketing": core.get_config_section("marketing"),
             "system": core.mask_config_secrets(core.effective_system_config()),
+            "access": core.get_config_section("access"),
             "recoverySettings": core.RECOVERY_SETTINGS,
-            "env": {
-                "stripeEnvKey": bool((os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY") or "").strip()),
-            },
         }
 
     @router.put("/api/admin/config")
@@ -621,8 +606,8 @@ def build_router(core):
             core.record_owner_audit("config.update", target=section, status="error", request=request)
             return core.json_error(500, "Speichern fehlgeschlagen.")
         core.record_owner_audit("config.update", target=section, detail="aktualisiert", request=request)
-        fresh = core.effective_system_config() if section == "system" else core.effective_payments_config() if section == "payments" else core.get_config_section(section)
-        if section in ("discord", "payments", "system"):
+        fresh = core.effective_system_config() if section == "system" else core.get_config_section(section)
+        if section in ("discord", "system"):
             fresh = core.mask_config_secrets(fresh)
         return {"ok": True, "section": section, "data": fresh}
 

@@ -7,7 +7,6 @@ import {
   buildSubscriptionNextAction,
   buildSubscriptionUpgradeSummary,
   buildSubscriptionPromotionNotes,
-  buildSubscriptionReplayStatus,
   buildSubscriptionActivityRows,
 } from "../frontend/src/lib/dashboardSubscription.js";
 
@@ -93,12 +92,8 @@ test("subscription promotion notes expose coupon, trial, and seat saturation hin
     },
     license: null,
   }, t);
+  // Discount codes need a purchase; the website sells nothing since #321.
   assert.deepEqual(freeNotes, [
-    {
-      key: "coupons",
-      label: "Coupon codes",
-      detail: "Coupon codes can be checked and applied directly in the dashboard checkout.",
-    },
     {
       key: "trial",
       label: "Pro trial month",
@@ -187,11 +182,11 @@ test("subscription next action prioritizes renewal, email hygiene, seat planning
     },
   }, ["Advanced analytics", "Failover rules"], t);
   assert.equal(upgradeAction.key, "review-upgrade");
-  assert.equal(upgradeAction.cta.kind, "checkout");
+  assert.equal(upgradeAction.cta.kind, "plans", "an upgrade is not bought in the dashboard since #321");
   assert.match(upgradeAction.body, /Advanced analytics/i);
 });
 
-test("subscription replay status and activity rows summarize processed billing sessions", () => {
+test("subscription activity rows summarize earlier renewals and upgrades", () => {
   const t = (_de, en) => en;
   const activity = {
     replayProtection: {
@@ -225,10 +220,6 @@ test("subscription replay status and activity rows summarize processed billing s
     ],
   };
 
-  const replay = buildSubscriptionReplayStatus(activity, t);
-  assert.equal(replay.label, "Replay protection active");
-  assert.match(replay.detail, /2 processed payments/i);
-  assert.equal(replay.accent, "#10B981");
 
   const rows = buildSubscriptionActivityRows(activity, t);
   assert.equal(rows.length, 2);

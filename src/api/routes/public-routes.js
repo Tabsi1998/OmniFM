@@ -77,7 +77,6 @@ export function createPublicRoutesHandler(deps) {
     getHealthBinaryProbe,
     getRuntimeApiStatus,
     getReleaseInfo,
-    getStripeSecretKey,
     isAdminApiRequest,
     languagePick,
     loadStations,
@@ -302,9 +301,6 @@ export function createPublicRoutesHandler(deps) {
           connected: isConnected(),
           database: getDb()?.databaseName || null,
           fallbackActive: !isConnected(),
-        },
-        stripe: {
-          configured: Boolean(getStripeSecretKey()),
         },
         binaries: {
           ffmpeg: binaryProbe.ffmpeg,

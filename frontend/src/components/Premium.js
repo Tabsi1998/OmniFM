@@ -106,25 +106,21 @@ function buildPriceLabel(planId, tier, copy, formatDecimal) {
   return formatEuroAmount(tier.pricePerMonth / 100, formatDecimal);
 }
 
+// Nothing is bought on the website any more (#321): Premium comes to Discord.
+// Here a free code is redeemed, and Pro can be tried for a month.
 function CheckoutModal(props) {
   const {
     planId,
     tier,
     meta,
-    durations,
-    seatOptions,
     trialConfig,
     onClose,
     copy,
-    formatDecimal,
     locale,
   } = props;
 
   const [email, setEmail] = useState('');
   const [coupon, setCoupon] = useState('');
-  const [referral, setReferral] = useState('');
-  const [selectedSeats, setSelectedSeats] = useState(1);
-  const [selectedDuration, setSelectedDuration] = useState(1);
   const [loading, setLoading] = useState(false);
   const [trialLoading, setTrialLoading] = useState(false);
   const [error, setError] = useState('');
@@ -133,27 +129,6 @@ function CheckoutModal(props) {
 
   const Icon = meta.icon;
   const trialEnabled = planId === 'pro' && trialConfig?.enabled !== false;
-  const seatEntries = Object.entries(tier.seatPricing || {})
-    .map(([seats, value]) => [Number(seats), parsePriceNumber(value)])
-    .filter(([seats, value]) => seatOptions.includes(seats) && Number.isFinite(value))
-    .sort((a, b) => a[0] - b[0]);
-  const durationEntries = Object.entries(tier.durationPricing || {})
-    .map(([months, value]) => [Number(months), parsePriceNumber(value)])
-    .filter(([months, value]) => durations.includes(months) && Number.isFinite(value))
-    .sort((a, b) => a[0] - b[0]);
-
-  const baseMonthly = durationEntries.find(([months]) => months === 1)?.[1] || 0;
-  const selectedDurationPrice = durationEntries.find(([months]) => months === selectedDuration)?.[1] || baseMonthly;
-  const seatMonthly = seatEntries.find(([seats]) => seats === selectedSeats)?.[1] || baseMonthly;
-  const discountRatio = baseMonthly > 0 ? selectedDurationPrice / baseMonthly : 1;
-  const totalPrice = seatMonthly * discountRatio * selectedDuration;
-  const durationLabel = copy.premium.monthLabel({ count: selectedDuration });
-  const seatsLabel = copy.premium.seatsLabelInline({ count: selectedSeats });
-  const summaryLabel = copy.premium.summary({
-    durationLabel,
-    seatsLabel: selectedSeats > 1 ? seatsLabel : '',
-  });
-  const payAmount = formatEuroAmount(totalPrice, formatDecimal);
 
   const inputStyle = {
     width: '100%',
@@ -191,10 +166,14 @@ function CheckoutModal(props) {
     };
   }, [onClose]);
 
-  const handlePay = async () => {
+  const handleRedeem = async () => {
     const trimmedEmail = email.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       setError(copy.premium.invalidEmail);
+      return;
+    }
+    if (!coupon.trim()) {
+      setError(copy.premium.codeRequired);
       return;
     }
 
@@ -209,28 +188,19 @@ function CheckoutModal(props) {
         body: JSON.stringify({
           tier: planId,
           email: trimmedEmail,
-          months: selectedDuration,
-          seats: selectedSeats,
-          couponCode: coupon.trim() || undefined,
-          referralCode: referral.trim() || undefined,
-          returnUrl: window.location.origin,
+          months: 1,
+          seats: 1,
+          couponCode: coupon.trim(),
+          language: locale,
         }),
       });
       const payload = await response.json();
-      if (!response.ok || payload?.error) {
+      if (!response.ok || payload?.error || !payload?.activated) {
         setError(payload?.error || copy.premium.checkoutFailed);
         return;
       }
-      if (payload?.activated) {
-        setNoticeColor('#ff6b00');
-        setNotice(payload?.message || copy.premium.trialActivatedDefault);
-        return;
-      }
-      if (payload?.url) {
-        window.location.href = payload.url;
-        return;
-      }
-      setError(copy.premium.checkoutUrlMissing);
+      setNoticeColor('#ff6b00');
+      setNotice(payload?.message || copy.premium.trialActivatedDefault);
     } catch {
       setError(copy.premium.checkoutFailed);
     } finally {
@@ -335,8 +305,20 @@ function CheckoutModal(props) {
             <Icon size={26} color={meta.color} />
           </div>
           <h3 style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 22, color: '#fff', margin: 0 }}>
-            {copy.premium.checkoutTitle({ name: tier.name })}
+            {copy.premium.redeemTitle({ name: tier.name })}
           </h3>
+        </div>
+
+        <div data-testid="checkout-discord-note" style={{
+          padding: '12px 16px',
+          borderRadius: 12,
+          marginBottom: 20,
+          background: 'rgba(88,101,242,0.08)',
+          border: '1px solid rgba(88,101,242,0.25)',
+        }}>
+          <p style={{ margin: 0, fontSize: 12, color: '#C7CBFF', lineHeight: 1.5 }}>
+            {copy.premium.discordSoon}
+          </p>
         </div>
 
         <div style={{ marginBottom: 18 }}>
@@ -369,152 +351,6 @@ function CheckoutModal(props) {
           />
         </div>
 
-        <div style={{ marginBottom: 22 }}>
-          <label style={labelStyle}>{copy.premium.referralLabel}</label>
-          <input
-            data-testid="checkout-referral-input"
-            value={referral}
-            onChange={(event) => setReferral(event.target.value)}
-            placeholder={copy.premium.referralPlaceholder}
-            style={inputStyle}
-            onFocus={(event) => { event.target.style.borderColor = `${meta.color}60`; }}
-            onBlur={(event) => { event.target.style.borderColor = 'rgba(255,255,255,0.12)'; }}
-          />
-          <p style={{ margin: '4px 0 0', fontSize: 11, color: '#52525B' }}>
-            {copy.premium.referralHint}
-          </p>
-        </div>
-
-        {seatEntries.length > 0 && (
-          <div style={{ marginBottom: 22 }}>
-            <label style={labelStyle}>{copy.premium.seatsLabel}</label>
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(seatEntries.length, 4)}, 1fr)`, gap: 8 }}>
-              {seatEntries.map(([seats, monthlyTotal]) => {
-                const isSelected = selectedSeats === seats;
-                const isBest = seats === Math.max(...seatEntries.map(([seatCount]) => seatCount));
-                return (
-                  <button
-                    key={seats}
-                    data-testid={`checkout-seats-${seats}`}
-                    onClick={() => setSelectedSeats(seats)}
-                    style={{
-                      position: 'relative',
-                      padding: '14px 8px',
-                      borderRadius: 12,
-                      border: `2px solid ${isSelected ? meta.color : 'rgba(255,255,255,0.1)'}`,
-                      background: isSelected ? `${meta.color}18` : 'rgba(255,255,255,0.03)',
-                      color: isSelected ? '#fff' : '#A1A1AA',
-                      cursor: 'pointer',
-                      textAlign: 'center',
-                      transition: 'all 0.2s',
-                      outline: 'none',
-                    }}
-                  >
-                    {isBest && (
-                      <span style={{
-                        position: 'absolute',
-                        top: -8,
-                        right: -4,
-                        padding: '2px 6px',
-                        borderRadius: 6,
-                        background: '#ff6b00',
-                        color: '#050505',
-                        fontSize: 8,
-                        fontWeight: 800,
-                        letterSpacing: '0.05em',
-                        fontFamily: "'Syne', sans-serif",
-                      }}>
-                        {copy.premium.bestValue}
-                      </span>
-                    )}
-                    <div style={{ fontSize: 22, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", color: isSelected ? meta.color : '#fff' }}>
-                      {seats}
-                    </div>
-                    <div style={{ fontSize: 11, marginTop: 2 }}>{copy.premium.seatsSuffix}</div>
-                    <div style={{ fontSize: 10, marginTop: 2, color: '#52525B' }}>
-                      {copy.premium.seatsMonthly({ amount: formatEuroAmount(monthlyTotal, formatDecimal) })}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-            <p style={{ margin: '6px 0 0', fontSize: 11, color: '#52525B' }}>
-              {copy.premium.seatsHint}
-            </p>
-          </div>
-        )}
-
-        <div style={{ marginBottom: 22 }}>
-          <label style={labelStyle}>{copy.premium.durationLabel}</label>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(durationEntries.length, 4)}, 1fr)`, gap: 8 }}>
-            {durationEntries.map(([months]) => {
-              const isSelected = selectedDuration === months;
-              const isYearly = months === 12;
-              return (
-                <button
-                  key={months}
-                  data-testid={`checkout-duration-${months}`}
-                  onClick={() => setSelectedDuration(months)}
-                  style={{
-                    position: 'relative',
-                    padding: '14px 8px',
-                    borderRadius: 12,
-                    border: `2px solid ${isSelected ? meta.color : 'rgba(255,255,255,0.1)'}`,
-                    background: isSelected ? `${meta.color}18` : 'rgba(255,255,255,0.03)',
-                    color: isSelected ? '#fff' : '#A1A1AA',
-                    cursor: 'pointer',
-                    textAlign: 'center',
-                    transition: 'all 0.2s',
-                    outline: 'none',
-                  }}
-                >
-                  {isYearly && (
-                    <span style={{
-                      position: 'absolute',
-                      top: -8,
-                      right: -4,
-                      padding: '2px 6px',
-                      borderRadius: 6,
-                      background: '#ff6b00',
-                      color: '#050505',
-                      fontSize: 8,
-                      fontWeight: 800,
-                      letterSpacing: '0.05em',
-                      fontFamily: "'Syne', sans-serif",
-                    }}>
-                      {copy.premium.durationBonus}
-                    </span>
-                  )}
-                  <div style={{ fontSize: 22, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", color: isSelected ? meta.color : '#fff' }}>
-                    {months}
-                  </div>
-                  <div style={{ fontSize: 11, marginTop: 2 }}>
-                    {months === 1 ? copy.premium.durationMonth : copy.premium.durationMonths}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '14px 16px',
-          borderRadius: 12,
-          background: 'rgba(255,255,255,0.03)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          marginBottom: 16,
-        }}>
-          <span style={{ fontSize: 14, color: '#A1A1AA', fontFamily: "'DM Sans', sans-serif" }}>
-            {summaryLabel}
-          </span>
-          <span style={{ fontSize: 26, fontWeight: 800, color: meta.color, fontFamily: "'JetBrains Mono', monospace" }}>
-            {payAmount}
-          </span>
-        </div>
-
         <div style={{
           padding: '12px 16px',
           borderRadius: 12,
@@ -544,7 +380,7 @@ function CheckoutModal(props) {
 
         <button
           data-testid={`checkout-pay-btn-${planId}`}
-          onClick={handlePay}
+          onClick={handleRedeem}
           disabled={loading || trialLoading}
           style={{
             width: '100%',
@@ -571,7 +407,7 @@ function CheckoutModal(props) {
             event.currentTarget.style.boxShadow = `0 0 25px ${meta.color}30`;
           }}
         >
-          {loading ? copy.premium.checkoutRedirect : copy.premium.payButton({ amount: payAmount })}
+          {loading ? copy.premium.redeemWorking : copy.premium.redeemButton}
         </button>
 
         {trialEnabled && (
@@ -928,8 +764,11 @@ function Premium({ bots = [] }) {
                         event.currentTarget.style.boxShadow = `0 0 20px ${meta.color}30`;
                       }}
                     >
-                      {copy.premium.buy({ name: tier.name })}
+                      {copy.premium.redeemCta}
                     </button>
+                    <p style={{ margin: '8px 0 0', fontSize: 11, color: '#71717A', textAlign: 'center' }}>
+                      {copy.premium.discordSoonShort}
+                    </p>
                     {trialEnabled && (
                       <button
                         data-testid="premium-pro-trial-open-btn"

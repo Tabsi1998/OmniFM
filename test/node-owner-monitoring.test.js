@@ -67,6 +67,4 @@ test("settings: what the owner saved first, then the environment, then the defau
   assert.equal(monitoring.systemSetting(raw, "smtp", "host", "SMTP_HOST", "", { SMTP_HOST: "env.example" }), "owner.example");
   assert.equal(monitoring.systemSetting(raw, "smtp", "port", "SMTP_PORT", 587, { SMTP_PORT: "2525" }), "2525", "an empty saved value falls through");
   assert.equal(monitoring.systemSetting(raw, "smtp", "user", "SMTP_USER", "x", {}), "x");
-  assert.equal(monitoring.isStripeEnabled({ payments: { stripe: { enabled: false, secretKey: "sk" } } }, {}), false);
-  assert.equal(monitoring.isStripeEnabled({}, { STRIPE_SECRET_KEY: "sk_live_x" }), true);
 });

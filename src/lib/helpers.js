@@ -100,8 +100,8 @@ function roundHalfEven(value) {
 
 /**
  * The owner console's plan price over the built-in one (#289). Every price is
- * scaled by it, the ones the website shows and the ones Stripe charges, so
- * both always match. Without an owner price the factor is 1.
+ * scaled by it, so every place that shows a price shows the same one.
+ * Without an owner price the factor is 1.
  */
 function ownerPriceScale(tier) {
   const base = DURATION_PRICING_CENTS[tier]?.[1] || 0;

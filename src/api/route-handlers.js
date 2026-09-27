@@ -72,10 +72,6 @@ import {
   getBotAccessForTier,
   buildInviteUrlForRuntime,
   resolvePublicWebsiteUrl,
-  getStripeSecretKey,
-  getStripeWebhookSecret,
-  isStripeCheckoutEnabled,
-  resolveCheckoutReturnBase,
   getConfiguredPublicOrigin,
   isAllowedFrontendOrigin,
 } from "../lib/api-helpers.js";
@@ -103,14 +99,10 @@ import {
   linkServerToLicense,
   unlinkServerFromLicense,
   updateLicenseContactEmail,
-  isSessionProcessed,
-  isEventProcessed,
-  markEventProcessed,
 } from "../premium-store.js";
 import {
   resolveCheckoutOfferForRequest,
   activateOfferGrant,
-  activatePaidStripeSession,
   activateProTrial,
 } from "../services/payment.js";
 import {
@@ -236,7 +228,6 @@ import {
 } from "./helpers/stats.js";
 
 const appStartTime = Date.now();
-const webhookEventsInFlight = new Set();
 
 export const handleDashboardLicenseRoute = createDashboardLicenseRouteHandler({
   BRAND,
@@ -247,8 +238,6 @@ export const handleDashboardLicenseRoute = createDashboardLicenseRouteHandler({
   getDashboardSession,
   getLicense,
   getLocalizedJsonBodyError,
-  getStripeSecretKey,
-  isStripeCheckoutEnabled,
   isValidEmailAddress,
   languagePick,
   linkServerToLicense,
@@ -259,7 +248,6 @@ export const handleDashboardLicenseRoute = createDashboardLicenseRouteHandler({
   normalizeLanguage,
   normalizeSeats,
   resolveCheckoutOfferForRequest,
-  resolveCheckoutReturnBase,
   resolveDashboardGuildForSession,
   resolveDashboardRequestLanguage,
   resolvePublicWebsiteUrl,
@@ -349,7 +337,6 @@ export const handlePublicRoutes = createPublicRoutesHandler({
   getDashboardRequestTranslator,
   getGlobalStats,
   getHealthBinaryProbe,
-  getStripeSecretKey,
   isAdminApiRequest,
   languagePick,
   loadStations,
@@ -491,31 +478,22 @@ export const handlePremiumBillingRoutes = createPremiumBillingRoutesHandler({
   SEAT_OPTIONS,
   TIERS,
   activateOfferGrant,
-  activatePaidStripeSession,
   activateProTrial,
   calculatePrice,
   getDashboardRequestTranslator,
   getDefaultLanguage,
   getLocalizedJsonBodyError,
-  getStripeSecretKey,
-  getStripeWebhookSecret,
-  isStripeCheckoutEnabled,
-  isEventProcessed,
   isProTrialEnabled,
-  isSessionProcessed,
   isValidEmailAddress,
   log,
-  markEventProcessed,
   methodNotAllowed,
   normalizeDuration,
   normalizeLanguage,
   normalizeSeats,
   resolveCheckoutOfferForRequest,
-  resolveCheckoutReturnBase,
   resolveLanguageFromAcceptLanguage,
   sanitizeOfferCode,
   sendJson,
-  webhookEventsInFlight,
 });
 
 export const handlePremiumOffersRoutes = createPremiumOffersRoutesHandler({

@@ -399,14 +399,12 @@ function PrivacySection({ legal, privacy }) {
           <PolicyBlock
             title={copy.privacy.sections.premiumTitle}
             body={copy.privacy.sections.premiumBody({
-              stripeEnabled: features.stripeEnabled,
               smtpEnabled: features.smtpEnabled,
             })}
           />
           <PolicyBlock
             title={copy.privacy.sections.integrationsTitle}
             body={copy.privacy.sections.integrationsBody({
-              stripeEnabled: features.stripeEnabled,
               smtpEnabled: features.smtpEnabled,
               discordBotListEnabled: features.discordBotListEnabled,
               botsGGEnabled: features.botsGGEnabled,

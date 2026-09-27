@@ -13,9 +13,7 @@ import {
 import {
   configBool,
   directorySetting,
-  isStripeEnabled,
   liveRuntimeTotals,
-  stripeSecretKey,
   systemSetting,
 } from "./owner-monitoring.js";
 import { parseIntLike } from "./owner-licenses.js";
@@ -168,7 +166,6 @@ export function privacyNotice(raw, env = process.env) {
     additionalRecipients: envValue(env, "PRIVACY_ADDITIONAL_RECIPIENTS"),
     customNote: envValue(env, "PRIVACY_CUSTOM_NOTE"),
     features: {
-      stripeEnabled: isStripeEnabled(raw, env) && Boolean(stripeSecretKey(raw, env)),
       smtpEnabled: Boolean(text(systemSetting(raw, "smtp", "host", "SMTP_HOST", "", env))),
       discordBotListEnabled: directoryEnabled(raw, env, "discordBotList", "DISCORDBOTLIST") && /^\d{17,22}$/.test(botId),
       botsGGEnabled: directoryEnabled(raw, env, "botsGG", "BOTSGG"),
@@ -201,7 +198,6 @@ export function termsNotice(raw, env = process.env) {
   const company = configSectionFrom(raw, "company");
   const publicUrl = publicWebsite(env);
   const fallbackEmail = extractMailbox(systemSetting(raw, "smtp", "from", "SMTP_FROM", "", env));
-  const hasStripe = isStripeEnabled(raw, env) && Boolean(stripeSecretKey(raw, env));
   const operator = {
     providerName: legal.providerName || "",
     representative: legal.representative || "",
@@ -230,8 +226,10 @@ export function termsNotice(raw, env = process.env) {
       customStationsEnabled: true,
     },
     billing: {
-      premiumCheckoutEnabled: hasStripe,
-      paymentProvider: hasStripe ? "Stripe" : "",
+      // No purchase on the website any more (#321); Premium comes
+      // to Discord, which then sells it. Until then: licenses, codes, trial.
+      premiumCheckoutEnabled: false,
+      paymentProvider: "",
       emailDeliveryEnabled: Boolean(text(systemSetting(raw, "smtp", "host", "SMTP_HOST", "", env))),
       trialEnabled: isProTrialEnabled(env),
     },

@@ -188,7 +188,7 @@ CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 REACT_APP_BACKEND_URL=https://deine-domain.tld
 ```
 
-Bestehende `STRIPE_*`, Discord-OAuth-, SMTP-, Song-Erkennungs- und Bot-Verzeichnis-Werte werden
+Bestehende Discord-OAuth-, SMTP-, Song-Erkennungs- und Bot-Verzeichnis-Werte werden
 beim ersten Speichern sicher in die Owner-Konfiguration übernommen; laufende Installationen
 verlieren bei einem Update keine Secrets.
 
@@ -204,8 +204,8 @@ verlieren bei einem Update keine Secrets.
 - **Discord & Bots** — Commander-Token/Client-ID, Worker-Bots (**„+ Bot hinzufügen“**), Invite-Links, Bot-Logs.
 - **System-Konfiguration** — Discord OAuth, SMTP, Song-Erkennung, Song-Verlauf sowie Discord Bot
   List, Bots.gg und Top.gg; inklusive zentralem Konfigurations-/Verbindungstest.
-- **Zahlungen** — Stripe Checkout + signierter Webhook (Secrets maskiert); PayPal ist als spätere
-  Integration vorbereitet und in der Oberfläche eindeutig als noch nicht live markiert.
+- **Premium** — Lizenzen und Gratis-Codes aus der Konsole, dazu der Testmonat. Auf der Website
+  wird nichts mehr verkauft; Premium kommt direkt in Discord (#320).
 - **Global Overview** (Lizenzen, MRR/ARR, Server, Stationen), **Live-Monitoring** (Worker-Health, Incidents, Logs).
 - **Radio-Katalog** verwalten inkl. **Stream-Test**, **Lizenz-Manager**, **Audit-Log**, **Brand-Kit**.
 
@@ -220,13 +220,12 @@ GET  /api/cover?term=                             # keyless Cover-Art (iTunes)
 # Owner (Header: X-Admin-Token)
 POST /api/admin/login
 GET  /api/admin/overview | /workers | /licenses | /stations | /monitoring | /audit | /integrations
-GET/PUT /api/admin/config            # company, plans, discord, system, payments, marketing
+GET/PUT /api/admin/config            # company, plans, discord, system, marketing, access
 POST /api/admin/integrations/test
 GET  /api/admin/discord/logs
 POST /api/admin/licenses   PATCH/DELETE /api/admin/licenses/{license_key}
 POST /api/admin/stations   DELETE /api/admin/stations/{key}   POST /api/admin/stations/test
 POST /api/admin/stations/health
-POST /api/premium/webhook             # Stripe checkout.session.completed
 # Server-Dashboard (Discord OAuth Session)
 GET  /api/auth/session   GET/PUT /api/dashboard/perms   GET/POST/DELETE /api/dashboard/custom-stations
 ```

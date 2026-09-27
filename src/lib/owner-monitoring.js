@@ -64,17 +64,6 @@ export function configBool(value, fallback = false) {
   return ["1", "true", "yes", "on"].includes(String(value).trim().toLowerCase());
 }
 
-export function stripeSecretKey(raw, env = process.env) {
-  const stored = String(configSectionFrom(raw, "payments")?.stripe?.secretKey || "").trim();
-  return stored || String(env.STRIPE_SECRET_KEY || env.STRIPE_API_KEY || "").trim();
-}
-
-export function isStripeEnabled(raw, env = process.env) {
-  const stored = raw?.payments?.stripe || {};
-  if ("enabled" in stored) return Boolean(stored.enabled);
-  return Boolean(stripeSecretKey(raw, env));
-}
-
 export function isDiscordOauthConfigured(raw, env = process.env) {
   return Boolean(systemSetting(raw, "discordOAuth", "clientId", "DISCORD_CLIENT_ID", "", env)
     && systemSetting(raw, "discordOAuth", "clientSecret", "DISCORD_CLIENT_SECRET", "", env));
@@ -362,7 +351,6 @@ export function commanderIndex(env = process.env) {
 export async function integrationFlags(db, raw, env = process.env) {
   return {
     mongo: await mongoIsReachable(db),
-    stripe: isStripeEnabled(raw, env) && Boolean(stripeSecretKey(raw, env)),
     discordOAuth: isDiscordOauthConfigured(raw, env),
     smtp: smtpConfigured(raw, env),
     recognition: configBool(systemSetting(raw, "audioRecognition", "enabled", "NOW_PLAYING_RECOGNITION_ENABLED", false, env)),

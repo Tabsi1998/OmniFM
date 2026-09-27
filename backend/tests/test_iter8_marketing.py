@@ -128,9 +128,8 @@ class TestOwnerRegression:
     def test_secrets_masked(self, admin):
         cfg = admin.get(f"{BASE_URL}/api/admin/config", timeout=30).json()
         mask = "\u2022" * 8
-        for key in ("secretKey", "webhookSecret"):
-            val = cfg["payments"]["stripe"].get(key, "")
-            assert val in ("", mask), f"{key} not masked: {val!r}"
+        val = ((cfg.get("discord") or {}).get("commander") or {}).get("token", "")
+        assert val in ("", mask), f"commander token not masked: {val!r}"
 
     @pytest.mark.parametrize("path", [
         "/api/stations", "/api/stats", "/api/legal", "/api/premium/pricing", "/api/bots", "/api/marketing",

@@ -1,7 +1,6 @@
 // OmniFM: API helpers: allowed origins, CORS and trusted proxies.
 // Split out of src/lib/api-helpers.js (#295).
 import net from "node:net";
-import { log } from "./logging.js";
 import { TRUST_PROXY_HEADERS } from "./helpers.js";
 
 // ---- CORS ----
@@ -168,56 +167,6 @@ function buildAllowedFrontendOrigins(publicUrl) {
     if (origin) allowed.add(origin);
   }
   return allowed;
-}
-
-function buildAllowedReturnOrigins(publicUrl, _req) {
-  const configured = [
-    ...parseCsvEnv(process.env.CHECKOUT_RETURN_ORIGINS || ""),
-    ...parseCsvEnv(process.env.CORS_ALLOWED_ORIGINS || process.env.CORS_ORIGINS || ""),
-  ];
-
-  const candidates = [
-    ...configured,
-    publicUrl,
-    ...buildWebDomainOriginCandidates(),
-  ];
-
-  if (shouldIncludeDefaultLocalOrigins(publicUrl, configured)) {
-    candidates.push(
-      "http://localhost",
-      "http://127.0.0.1"
-    );
-  }
-
-  const allowed = new Set();
-  for (const candidate of candidates) {
-    const origin = toOrigin(candidate);
-    if (origin) allowed.add(origin);
-  }
-  return allowed;
-}
-
-export function resolveCheckoutReturnBase(returnUrl, publicUrl, req) {
-  const fallback = getConfiguredPublicOrigin(publicUrl);
-  if (!returnUrl) return fallback;
-
-  let parsed;
-  try {
-    parsed = new URL(String(returnUrl).trim());
-  } catch {
-    return fallback;
-  }
-
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return fallback;
-
-  const allowed = buildAllowedReturnOrigins(publicUrl, req);
-  if (!allowed.has(parsed.origin)) {
-    log("INFO", `Checkout returnUrl verworfen (nicht erlaubt): ${parsed.origin}`);
-    return fallback;
-  }
-
-  const safePath = parsed.pathname && parsed.pathname !== "/" ? parsed.pathname : "";
-  return `${parsed.origin}${safePath}`;
 }
 
 export function buildAllowedApiOrigins(publicUrl) {

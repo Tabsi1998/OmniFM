@@ -159,7 +159,7 @@ function startWebServer(runtimes, { forwardRuntimeTo = "" } = {}) {
     // The owner cockpit checks every service every 5 minutes (#355).
     startOwnerStatusService(runtimes);
   }
-  // Stripe keys and plan prices of the owner console (#289).
+  // Plan prices of the owner console (#289).
   startOwnerSettingsRefresh();
   const webInternalPort = Number(process.env.WEB_INTERNAL_PORT || "8080");
   const webPort = Number(process.env.WEB_PORT || "8081");

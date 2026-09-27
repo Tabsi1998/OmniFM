@@ -567,16 +567,6 @@ function evaluateSingleOffer(store, rawCode, context = {}, expectedKind = null) 
   };
 }
 
-function capDiscountForStripeMinimum(baseAmountCents, discountCents) {
-  const base = Math.max(0, Number.parseInt(String(baseAmountCents || 0), 10) || 0);
-  const discount = Math.max(0, Number.parseInt(String(discountCents || 0), 10) || 0);
-  if (base <= 0) return 0;
-  // Stripe card payments generally require at least 0.50 EUR.
-  const minChargeCents = 50;
-  const maxDiscount = Math.max(0, base - minChargeCents);
-  return Math.max(0, Math.min(discount, maxDiscount));
-}
-
 export function getOffer(code) {
   const normalizedCode = normalizeCode(code);
   if (!normalizedCode) return null;
@@ -675,7 +665,8 @@ export function previewCheckoutOffer(context = {}) {
   if (applied?.fulfillmentMode === "direct_grant") {
     discountCents = baseAmountCents;
   } else {
-    discountCents = capDiscountForStripeMinimum(baseAmountCents, discountCents);
+    // A discount is never more than the price.
+    discountCents = Math.max(0, Math.min(discountCents, baseAmountCents));
   }
 
   const finalAmountCents = applied?.fulfillmentMode === "direct_grant"
@@ -687,7 +678,8 @@ export function previewCheckoutOffer(context = {}) {
     baseAmountCents,
     finalAmountCents,
     discountCents,
-    requiresStripe: !(applied?.fulfillmentMode === "direct_grant"),
+    // Only a code that grants a license goes through without a purchase (#321).
+    requiresPayment: !(applied?.fulfillmentMode === "direct_grant"),
     applied: applied
       ? {
         code: applied.code,

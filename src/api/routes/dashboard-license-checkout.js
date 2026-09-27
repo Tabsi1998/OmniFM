@@ -4,26 +4,19 @@ import { logError } from "../../lib/logging.js";
 
 export function createDashboardLicenseCheckoutRoute(deps) {
   const {
-    BRAND,
-    TIERS,
     activateOfferGrant,
     calculatePrice,
     getDashboardSession,
     getLicense,
     getLocalizedJsonBodyError,
-    getStripeSecretKey,
-    isStripeCheckoutEnabled,
     isValidEmailAddress,
     methodNotAllowed,
     normalizeDuration,
     normalizeLanguage,
     normalizeSeats,
     resolveCheckoutOfferForRequest,
-    resolveCheckoutReturnBase,
     resolveDashboardGuildForSession,
     resolveDashboardRequestLanguage,
-    resolvePublicWebsiteUrl,
-    sanitizeOfferCode,
     sendJson,
     sendLocalizedError,
     updateLicenseContactEmail,
@@ -100,7 +93,6 @@ export function createDashboardLicenseCheckoutRoute(deps) {
         const requestedTier = String(body?.tier || currentPlan).trim().toLowerCase();
         const durationMonths = normalizeDuration(body?.months);
         const seats = normalizeSeats(license.seats || 1);
-        const returnUrl = String(body?.returnUrl || "").trim();
         const couponCode = body?.couponCode ?? body?.coupon ?? "";
         const referralCode = body?.referralCode ?? body?.referral ?? "";
 
@@ -158,23 +150,7 @@ export function createDashboardLicenseCheckoutRoute(deps) {
         }
 
         const offerPreview = offerResolution.preview;
-        const discountCents = Math.max(
-          0,
-          Number.isFinite(Number(offerPreview?.discountCents))
-            ? Number(offerPreview.discountCents)
-            : 0
-        );
-        const priceInCents = Math.max(
-          0,
-          Number.isFinite(Number(offerPreview?.finalAmountCents))
-            ? Number(offerPreview.finalAmountCents)
-            : basePriceInCents
-        );
-        const appliedOfferCode = sanitizeOfferCode(offerPreview?.applied?.code);
-        const appliedOfferKind = String(offerPreview?.applied?.kind || "").trim().toLowerCase();
-        const resolvedReferralCode = sanitizeOfferCode(offerPreview?.attributionReferralCode || "");
-        const requiresStripe = offerPreview?.requiresStripe !== false;
-        if (!requiresStripe) {
+        if (offerPreview?.requiresPayment === false) {
           const grantResult = await activateOfferGrant({
             preview: offerPreview,
             email: licenseEmail,
@@ -216,96 +192,17 @@ export function createDashboardLicenseCheckoutRoute(deps) {
           return true;
         }
 
-        if (priceInCents <= 0) {
-          sendJson(res, 400, {
-            error: t("Preis ist nach Rabatt ungültig.", "Price is invalid after discount."),
-            discount: offerPreview,
-          });
-          return true;
-        }
-
-        const stripeKey = getStripeSecretKey();
-        if (!stripeKey) {
-          sendJson(res, 503, {
-            error: t("Stripe ist nicht konfiguriert.", "Stripe is not configured."),
-          });
-          return true;
-        }
-        if (!isStripeCheckoutEnabled()) {
-          sendJson(res, 503, {
-            error: t("Stripe-Checkout ist im Owner-Menü deaktiviert.", "Stripe checkout is switched off in the owner console."),
-          });
-          return true;
-        }
-
-        const publicUrl = resolvePublicWebsiteUrl(req);
-        const seatsLabel = seats > 1
-          ? (isDe ? ` (${seats} Server)` : ` (${seats} servers)`)
-          : "";
-        const isUpgrade = currentPlan === "pro" && requestedTier === "ultimate";
-        const description = isUpgrade
-          ? (isDe
-            ? `${TIERS[requestedTier].name}${seatsLabel} - Upgrade für ${durationMonths} Monat${durationMonths > 1 ? "e" : ""}`
-            : `${TIERS[requestedTier].name}${seatsLabel} - upgrade for ${durationMonths} month${durationMonths > 1 ? "s" : ""}`)
-          : (isDe
-            ? `${TIERS[requestedTier].name}${seatsLabel} - Verlängerung für ${durationMonths} Monat${durationMonths > 1 ? "e" : ""}`
-            : `${TIERS[requestedTier].name}${seatsLabel} - renewal for ${durationMonths} month${durationMonths > 1 ? "s" : ""}`);
-
-        const stripe = await import("stripe");
-        const stripeClient = new stripe.default(stripeKey);
-        const checkoutSession = await stripeClient.checkout.sessions.create({
-          payment_method_types: ["card"],
-          mode: "payment",
-          customer_email: licenseEmail,
-          line_items: [{
-            price_data: {
-              currency: "eur",
-              product_data: {
-                name: `${BRAND.name} ${TIERS[requestedTier].name}`,
-                description,
-              },
-              unit_amount: priceInCents,
-            },
-            quantity: 1,
-          }],
-          metadata: {
-            email: licenseEmail,
-            tier: requestedTier,
-            seats: String(seats),
-            months: String(durationMonths),
-            language: checkoutLanguage,
-            isUpgrade: String(isUpgrade),
-            checkoutCreatedAt: new Date().toISOString(),
-            couponCode: offerResolution.couponCode || "",
-            referralCode: resolvedReferralCode || "",
-            appliedOfferCode: appliedOfferCode || "",
-            appliedOfferKind: appliedOfferKind || "",
-            offerOwnerLabel: String(offerPreview?.applied?.ownerLabel || ""),
-            baseAmountCents: String(basePriceInCents),
-            discountCents: String(discountCents),
-            finalAmountCents: String(priceInCents),
-          },
-          success_url: resolveCheckoutReturnBase(returnUrl, publicUrl, req) + "?payment=success&session_id={CHECKOUT_SESSION_ID}",
-          cancel_url: resolveCheckoutReturnBase(returnUrl, publicUrl, req) + "?payment=cancelled",
-        });
-
-        sendJson(res, 200, {
-          sessionId: checkoutSession.id,
-          url: checkoutSession.url,
-          pricing: {
-            baseAmountCents: basePriceInCents,
-            discountCents,
-            finalAmountCents: priceInCents,
-          },
+        // Buying on the website ended (#321); Premium comes to
+        // Discord. A code that grants a license still works above.
+        sendJson(res, 400, {
+          error: t(
+            "Premium kann man gerade nicht auf der Website kaufen, es kommt bald direkt in Discord. Mit einem Gratis-Code oder dem Testmonat geht es schon jetzt.",
+            "Premium cannot be bought on the website right now; it is coming to Discord soon. A free code or the trial month works already."
+          ),
+          code: "purchase_unavailable",
           discount: offerPreview,
-          renewal: {
-            currentPlan,
-            targetPlan: requestedTier,
-            seats,
-            months: durationMonths,
-            emailMasked: licenseEmail.replace(/^(.{2}).*(@.*)$/, "$1***$2"),
-          },
         });
+        return true;
       } catch (err) {
         const status = Number(err?.status || 0);
         if (status === 400 || status === 413) {

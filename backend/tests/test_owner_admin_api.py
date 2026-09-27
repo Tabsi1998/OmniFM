@@ -175,7 +175,7 @@ class TestIntegrations:
         d = r.json()
         assert "discordBotList" in d
         cfg = d["config"]
-        for k in ("mongo", "stripe", "discordOAuth", "smtp"):
+        for k in ("mongo", "discordOAuth", "smtp"):
             assert k in cfg, k
             assert isinstance(cfg[k], bool)
         assert cfg["mongo"] is True

@@ -1,5 +1,5 @@
 // ============================================================
-// OmniFM: Payment / Stripe / Trial Functions
+// OmniFM: licenses from codes and the trial month (no purchase since #321)
 // ============================================================
 import { createHash } from "node:crypto";
 import { log } from "../lib/logging.js";
@@ -29,7 +29,6 @@ import {
 } from "../premium-store.js";
 import { markOfferRedemption, previewCheckoutOffer } from "../coupon-store.js";
 import { buildInviteOverviewForTier, resolvePublicWebsiteUrl } from "../lib/api-helpers.js";
-import { activatePaidStripeSession } from "./payment-stripe.js";
 import { activateProTrial } from "./payment-trial.js";
 
 async function sendMailWithRetry({ to, subject, html, label, maxAttempts = 2 }) {
@@ -400,6 +399,5 @@ export {
   sendMailWithRetry,
   resolveCheckoutOfferForRequest,
   activateOfferGrant,
-  activatePaidStripeSession,
   activateProTrial,
 };

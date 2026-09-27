@@ -61,11 +61,6 @@ async function restoreFile(filePath, snapshot) {
   await fs.rm(filePath, { force: true });
 }
 
-// Preview-/CI-Umgebungen können globale Stripe-Keys setzen — für deterministische
-// "Stripe nicht konfiguriert"-Tests hier hart entfernen.
-delete process.env.STRIPE_SECRET_KEY;
-delete process.env.STRIPE_API_KEY;
-
 function setEnv(overrides) {
   const previous = new Map();
   for (const [key, value] of Object.entries(overrides)) {
@@ -986,8 +981,10 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
       }),
     }
   );
-  assert.equal(premiumCheckoutUnavailableResponse.status, 503);
-  assert.match(premiumCheckoutUnavailableResponse.payload.error, /Stripe is not configured/i);
+  // No purchase on the website since #321; Premium comes to Discord.
+  assert.equal(premiumCheckoutUnavailableResponse.status, 400);
+  assert.equal(premiumCheckoutUnavailableResponse.payload.code, "purchase_unavailable");
+  assert.match(premiumCheckoutUnavailableResponse.payload.error, /Discord/);
 
   const premiumOffersUnauthorizedResponse = await requestJson(
     baseUrl,
@@ -1103,35 +1100,12 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
   assert.equal(premiumRedemptionsResponse.status, 200);
   assert.equal(premiumRedemptionsResponse.payload.redemptions.some((entry) => entry.code === "RENEW25"), true);
 
-  const premiumVerifyUnavailableResponse = await requestJson(
-    baseUrl,
-    "/api/premium/verify",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-OmniFM-Language": "en",
-      },
-      body: JSON.stringify({
-        sessionId: "cs_test_missing_stripe",
-      }),
-    }
-  );
-  assert.equal(premiumVerifyUnavailableResponse.status, 503);
-  assert.match(premiumVerifyUnavailableResponse.payload.error, /Stripe is not configured/i);
-
-  const premiumWebhookUnavailableResponse = await requestJson(
-    baseUrl,
-    "/api/premium/webhook",
-    {
-      method: "POST",
-      headers: {
-        "X-OmniFM-Language": "en",
-      },
-    }
-  );
-  assert.equal(premiumWebhookUnavailableResponse.status, 503);
-  assert.match(premiumWebhookUnavailableResponse.payload.error, /Stripe webhook is not configured/i);
+  // The Stripe return page and webhook went with the purchase (#321).
+  for (const gone of ["/api/premium/verify", "/api/premium/webhook"]) {
+    // eslint-disable-next-line no-await-in-loop -- two requests, one after the other
+    const goneResponse = await requestJson(baseUrl, gone, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    assert.equal(goneResponse.status, 404, gone);
+  }
 
   const oauthUnavailableResponse = await requestJson(baseUrl, "/api/auth/discord/login?lang=en");
   assert.equal(oauthUnavailableResponse.status, 503);

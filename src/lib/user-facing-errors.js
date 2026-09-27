@@ -2,7 +2,7 @@ function pickLanguage(language, germanText, englishText) {
   return String(language || "").trim().toLowerCase().startsWith("de") ? germanText : englishText;
 }
 
-const TECHNICAL_ERROR_PATTERN = /\b(mongodb|mongo|worker|ffmpeg|stack|exception|internal server error|discord_[a-z_]+|stripe|prisma|redis|econn|enotfound|etimedout|socket|spawn|epipe|sql|database|fetch failed|network request failed|http\s+\d{3}|timeout)\b/i;
+const TECHNICAL_ERROR_PATTERN = /\b(mongodb|mongo|worker|ffmpeg|stack|exception|internal server error|discord_[a-z_]+|prisma|redis|econn|enotfound|etimedout|socket|spawn|epipe|sql|database|fetch failed|network request failed|http\s+\d{3}|timeout)\b/i;
 
 export function isSafeUserFacingErrorMessage(message) {
   const normalized = String(message || "").trim();

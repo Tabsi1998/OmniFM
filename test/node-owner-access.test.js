@@ -157,6 +157,6 @@ test("roles in short: who may do what", async () => {
   assert.equal(roleAllows("billing", "PATCH", "/api/admin/licenses/OMNI-1"), true);
   assert.equal(roleAllows("billing", "POST", "/api/admin/archive/arc_1/restore"), false);
   assert.equal(roleAllows("nobody", "GET", "/api/admin/overview"), false);
-  assert.equal(roleMaySaveSection("billing", "payments"), true);
+  assert.equal(roleMaySaveSection("billing", "plans"), true);
   assert.equal(roleMaySaveSection("billing", "access"), false);
 });

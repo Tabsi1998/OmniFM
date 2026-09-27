@@ -120,7 +120,6 @@ def build_public_privacy_notice():
     legal_notice = core.build_public_legal_notice()
     legal = legal_notice.get("legal", {})
     c = core.get_config_section("company")
-    has_stripe = core.is_stripe_enabled() and bool(core.get_stripe_secret_key())
     has_smtp = bool(core.system_setting("smtp", "host", "SMTP_HOST"))
     bot_id_candidate = str(core.directory_setting("discordBotList", "botId", "DISCORDBOTLIST_BOT_ID") or os.environ.get("BOT_1_CLIENT_ID") or "").strip()
     has_discordbotlist = core.config_bool(core.directory_setting("discordBotList", "enabled", "DISCORDBOTLIST_ENABLED", False)) and bool(str(core.directory_setting("discordBotList", "token", "DISCORDBOTLIST_TOKEN") or "").strip()) and bool(re.match(r"^\d{17,22}$", bot_id_candidate))
@@ -173,7 +172,6 @@ def build_public_privacy_notice():
         "additionalRecipients": (os.environ.get("PRIVACY_ADDITIONAL_RECIPIENTS") or "").strip(),
         "customNote": (os.environ.get("PRIVACY_CUSTOM_NOTE") or "").strip(),
         "features": {
-            "stripeEnabled": has_stripe,
             "smtpEnabled": has_smtp,
             "discordBotListEnabled": has_discordbotlist,
             "recognitionEnabled": has_recognition,
@@ -198,13 +196,8 @@ def build_public_terms_notice():
     legal_notice = core.build_public_legal_notice()
     legal = legal_notice.get("legal", {})
     c = core.get_config_section("company")
-    pay = core.get_config_section("payments")
     public_url = (os.environ.get("PUBLIC_WEB_URL") or "").strip()
     fallback_email = core.extract_mailbox(core.system_setting("smtp", "from", "SMTP_FROM") or "")
-    has_stripe = core.is_stripe_enabled() and bool(core.get_stripe_secret_key())
-    # PayPal settings are reserved for the future; no production checkout
-    # route exists yet, so public legal notices must not advertise it.
-    paypal_enabled = False
     has_smtp = bool(core.system_setting("smtp", "host", "SMTP_HOST"))
 
     operator = {
@@ -244,8 +237,9 @@ def build_public_terms_notice():
             "customStationsEnabled": True,
         },
         "billing": {
-            "premiumCheckoutEnabled": has_stripe or paypal_enabled,
-            "paymentProvider": " / ".join([p for p in ["Stripe" if has_stripe else "", "PayPal" if paypal_enabled else ""] if p]),
+            # No purchase on the website any more (#321); Premium comes to Discord.
+            "premiumCheckoutEnabled": False,
+            "paymentProvider": "",
             "emailDeliveryEnabled": has_smtp,
             "trialEnabled": core.is_pro_trial_enabled(),
         },

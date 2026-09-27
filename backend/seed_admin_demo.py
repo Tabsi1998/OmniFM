@@ -26,7 +26,7 @@ DEMO_LICENSES = [
         "plan": "ultimate", "tier": "ultimate", "seats": 3, "active": True,
         "contactEmail": "studio@nightwave.gg",
         "linkedServerIds": ["100000000000000001", "100000000000000002"],
-        "source": "stripe", "createdAt": iso(now - timedelta(days=42)),
+        "source": "owner", "createdAt": iso(now - timedelta(days=42)),
         "expiresAt": iso(now + timedelta(days=323)),
     },
     {
@@ -34,7 +34,7 @@ DEMO_LICENSES = [
         "plan": "pro", "tier": "pro", "seats": 2, "active": True,
         "contactEmail": "admin@lofilounge.io",
         "linkedServerIds": ["100000000000000003"],
-        "source": "stripe", "createdAt": iso(now - timedelta(days=17)),
+        "source": "owner", "createdAt": iso(now - timedelta(days=17)),
         "expiresAt": iso(now + timedelta(days=13)),
     },
     {
@@ -50,7 +50,7 @@ DEMO_LICENSES = [
         "plan": "ultimate", "tier": "ultimate", "seats": 5, "active": True,
         "contactEmail": "team@bassdrop.network",
         "linkedServerIds": ["100000000000000005", "100000000000000006", "100000000000000007"],
-        "source": "stripe", "createdAt": iso(now - timedelta(days=88)),
+        "source": "owner", "createdAt": iso(now - timedelta(days=88)),
         "expiresAt": iso(now + timedelta(days=277)),
     },
     {
@@ -58,7 +58,7 @@ DEMO_LICENSES = [
         "plan": "pro", "tier": "pro", "seats": 1, "active": True,
         "contactEmail": "hello@retrowave.club",
         "linkedServerIds": ["100000000000000008"],
-        "source": "stripe", "createdAt": iso(now - timedelta(days=400)),
+        "source": "owner", "createdAt": iso(now - timedelta(days=400)),
         "expiresAt": iso(now - timedelta(days=6)),
     },
 ]

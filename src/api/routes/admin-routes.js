@@ -65,7 +65,6 @@ import {
   readRuntimeHealthFresh,
   runtimeGuildDirectory,
   stationSummary,
-  stripeSecretKey,
   systemSetting,
   workersResponse,
 } from "../../lib/owner-monitoring.js";
@@ -213,19 +212,6 @@ export function createAdminRoutesHandler(deps) {
         results.mongo = { ok: true, message: "MongoDB antwortet." };
       } catch (err) {
         results.mongo = { ok: false, message: clipMessage(err) };
-      }
-    }
-    if (names.includes("stripe")) {
-      const key = stripeSecretKey(raw);
-      if (!key) {
-        results.stripe = { ok: false, message: "Kein Stripe Secret Key konfiguriert." };
-      } else {
-        try {
-          const response = await fetch("https://api.stripe.com/v1/balance", { headers: { Authorization: `Basic ${Buffer.from(`${key}:`).toString("base64")}` }, signal: AbortSignal.timeout(10_000) });
-          results.stripe = { ok: response.status < 400, message: response.status < 400 ? "Stripe API erreichbar." : `Stripe HTTP ${response.status}` };
-        } catch (err) {
-          results.stripe = { ok: false, message: clipMessage(err) };
-        }
       }
     }
     if (names.includes("discordoauth")) {
@@ -459,7 +445,6 @@ export function createAdminRoutesHandler(deps) {
         guilds: { managed: live.servers, live: live.live },
         integrations: {
           mongo: flags.mongo,
-          stripe: flags.stripe,
           discordOAuth: flags.discordOAuth,
           smtp: flags.smtp,
           discordBotList: directoryToken("discordBotList", "DISCORDBOTLIST_TOKEN"),
@@ -579,7 +564,7 @@ export function createAdminRoutesHandler(deps) {
       let body;
       try { body = JSON.parse(await readRequestBody(req) || "{}") || {}; } catch { body = {}; }
       const requested = String(body.integration || "all").trim().toLowerCase();
-      const supported = ["mongo", "stripe", "discordoauth", "smtp", "recognition", "songhistory", "discordbotlist", "botsgg", "topgg", "operatoralerts"];
+      const supported = ["mongo", "discordoauth", "smtp", "recognition", "songhistory", "discordbotlist", "botsgg", "topgg", "operatoralerts"];
       const names = requested === "all" ? supported : [requested];
       if (!names.every((name) => supported.includes(name))) { sendJson(res, 400, { error: "Unbekannte Integration." }); return true; }
       const results = await runIntegrationTests(names, requested === "operatoralerts");
@@ -685,7 +670,7 @@ export function createAdminRoutesHandler(deps) {
         const raw = await loadOwnerConfigRaw();
         const next = section === "access" ? saveData : mergedSectionForSave(raw, section, saveData);
         await getDb().collection("owner_config").updateOne({ _id: OWNER_CONFIG_ID }, { $set: { [section]: next } }, { upsert: true });
-        // A new Discord login, Stripe key or plan price works at once, not only after the next sync.
+        // A new Discord login or plan price works at once, not only after the next sync.
         if (section === "system") await syncDiscordOauthFromOwnerConfig().catch(() => false);
         await refreshOwnerSettings();
         auditOwnerAction(req, { action: "config.update", status: "success", target: section, summary: "aktualisiert" });
