@@ -32,6 +32,7 @@ Results go to .local-testing/, which Git ignores.
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import functools
 import json
 import os
@@ -111,6 +112,17 @@ ENV_PROVIDED = {
 ALLOWED_LICENCES = {
     "MIT", "ISC", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "0BSD", "Unlicense",
     "CC0-1.0", "BlueOak-1.0.0", "Python-2.0", "MIT-0",
+}
+
+# Packages under a licence outside the list above that were looked at and
+# accepted, each with its licence and why (#286). Named one by one, so a new
+# MPL or CC package still fails until someone looks at it, and a package that
+# changes its licence fails again.
+ACCEPTED_LICENCE_EXCEPTIONS = {
+    "axe-core": ("MPL-2.0", "dev only: comes with lighthouse for the local Lighthouse check, never shipped"),
+    "caniuse-lite": ("CC-BY-4.0", "dev only: browser data for browserslist in ESLint and Babel, never shipped"),
+    "lightningcss": ("MPL-2.0", "frontend build tool under vite, used unmodified, not in the bundle"),
+    "lightningcss-*": ("MPL-2.0", "the platform binaries of lightningcss, same reason"),
 }
 
 
@@ -1744,6 +1756,60 @@ def env_contract(context: Context) -> str:
                    "settings read by the code but absent from .env.example")
 
 
+def licence_allowed(expression: str) -> bool:
+    """An SPDX expression like "(MIT OR CC0-1.0)" or "MIT AND ISC".
+
+    One allowed side of an OR is enough, every part of an AND has to be
+    allowed; AND binds tighter than OR. Anything else (WITH, a broken
+    expression) counts as not allowed.
+    """
+    tokens = expression.replace("(", " ( ").replace(")", " ) ").split()
+    position = 0
+
+    def atom() -> bool:
+        nonlocal position
+        token = tokens[position]
+        position += 1
+        if token != "(":
+            return token in ALLOWED_LICENCES
+        value = either()
+        if tokens[position] != ")":
+            raise IndexError
+        position += 1
+        return value
+
+    def both() -> bool:
+        nonlocal position
+        value = atom()
+        while position < len(tokens) and tokens[position] == "AND":
+            position += 1
+            right = atom()
+            value = value and right
+        return value
+
+    def either() -> bool:
+        nonlocal position
+        value = both()
+        while position < len(tokens) and tokens[position] == "OR":
+            position += 1
+            right = both()
+            value = value or right
+        return value
+
+    try:
+        return either() and position == len(tokens)
+    except IndexError:
+        return False
+
+
+def licence_accepted(name: str, licence: str) -> bool:
+    """Allowed by the list, or one of the named exceptions with its licence."""
+    if licence_allowed(licence):
+        return True
+    return any(fnmatch.fnmatchcase(name, pattern) and licence == accepted
+               for pattern, (accepted, _why) in ACCEPTED_LICENCE_EXCEPTIONS.items())
+
+
 def licence_inventory(context: Context) -> str:
     """What the shipped dependencies are licensed under.
 
@@ -1762,8 +1828,9 @@ def licence_inventory(context: Context) -> str:
                 licence = " OR ".join(str(item.get("type", item)) if isinstance(item, dict) else str(item)
                                       for item in licence)
             licence = licence if isinstance(licence, str) else str(licence)
-            if licence not in ALLOWED_LICENCES:
-                found.add(f"{label}: {data.get('name', manifest.parent.name)} ({licence})")
+            name = data.get("name", manifest.parent.name)
+            if not licence_accepted(name, licence):
+                found.add(f"{label}: {name} ({licence})")
     return ratchet(context, "licences", found, "dependencies outside the allowed licences")
 
 
