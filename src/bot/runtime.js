@@ -112,6 +112,7 @@ import { favoriteMethods } from "./runtime-methods/favorites.js";
 import { formMethods } from "./runtime-methods/forms.js";
 import { shareMethods } from "./runtime-methods/share.js";
 import { savedSongMethods } from "./runtime-methods/saved-songs.js";
+import { personalDataMethods } from "./runtime-methods/personal-data.js";
 import { sleepMethods } from "./runtime-methods/sleep.js";
 import { pollMethods } from "./runtime-methods/polls.js";
 import { botProfileMethods } from "./runtime-methods/bot-profile.js";
@@ -1436,6 +1437,7 @@ Object.assign(
   formMethods,
   shareMethods,
   savedSongMethods,
+  personalDataMethods,
   sleepMethods,
   pollMethods,
   botProfileMethods,

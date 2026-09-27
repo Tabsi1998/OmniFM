@@ -1,5 +1,6 @@
 import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 import { createStateDocumentStore } from "./lib/state-document-store.js";
+import { erasedBefore } from "./lib/personal-data-erasures.js";
 
 const STATE_FILE = resolveRuntimeDataPath("discordbotlist.json");
 const MAX_STORED_VOTES = 500;
@@ -101,6 +102,8 @@ export const stopDiscordBotListStore = () => stateDocument.stop();
 function mergeVoteIntoState(state, rawVote, { source = "webhook" } = {}) {
   const vote = normalizeVote(rawVote, source);
   if (!vote) return { state, added: false, vote: null };
+  // A sync reading a vote again that the person deleted with /mydata (#285).
+  if (erasedBefore(vote.userId, vote.votedAt)) return { state, added: false, vote: null };
 
   const key = `${vote.userId}:${vote.votedAt}`;
   const hasVote = state.votes.some((entry) => `${entry.userId}:${entry.votedAt}` === key);
@@ -112,6 +115,17 @@ function mergeVoteIntoState(state, rawVote, { source = "webhook" } = {}) {
   }
   state.lastWebhookVoteAt = vote.receivedAt;
   return { state, added: !hasVote, vote };
+}
+
+/** Takes one person out of the list of recent votes (#285); returns how many went. */
+function forgetDiscordBotListVoter(userId) {
+  const id = String(userId || "").trim();
+  if (!id) return 0;
+  const state = loadRawState();
+  const before = state.votes.length;
+  state.votes = state.votes.filter((vote) => vote.userId !== id);
+  if (state.votes.length !== before) saveRawState(state);
+  return before - state.votes.length;
 }
 
 function recordDiscordBotListVote(rawVote, { source = "webhook" } = {}) {
@@ -175,6 +189,7 @@ function getDiscordBotListState({ voteLimit = 50 } = {}) {
 }
 
 export {
+  forgetDiscordBotListVoter,
   getDiscordBotListState,
   recordDiscordBotListVote,
   mergeDiscordBotListVotes,

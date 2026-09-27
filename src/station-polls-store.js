@@ -80,6 +80,30 @@ export async function deleteActiveStationPoll(guildId) {
   await collection()?.deleteOne({ guildId: gid }).catch(() => null);
 }
 
+/** Running polls one person started (#285). */
+export async function listStationPollsOfCreator(userId) {
+  const id = sanitizeId(userId);
+  if (!id) return [];
+  return (await listActiveStationPolls()).filter((poll) => poll.createdBy === id);
+}
+
+/** The polls keep running; only the person who started them is forgotten (#285). */
+export async function forgetStationPollCreator(userId) {
+  const id = sanitizeId(userId);
+  if (!id) return 0;
+  let count = 0;
+  for (const poll of memory.values()) {
+    if (poll.createdBy === id) {
+      poll.createdBy = null;
+      count += 1;
+    }
+  }
+  const polls = collection();
+  if (!polls) return count;
+  const result = await polls.updateMany({ createdBy: id }, { $set: { createdBy: null } }).catch(() => null);
+  return Math.max(count, result?.modifiedCount || 0);
+}
+
 export function resetStationPollsForTests() {
   memory.clear();
 }

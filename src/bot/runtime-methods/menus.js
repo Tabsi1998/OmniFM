@@ -12,6 +12,7 @@ import {
 } from "discord.js";
 import { log } from "../../lib/logging.js";
 import { SAVED_SONGS_PREFIX } from "../saved-songs.js";
+import { PERSONAL_DATA_PREFIX } from "../personal-data-panel.js";
 import { clipText } from "../../lib/helpers.js";
 import { getTier } from "../../core/entitlements.js";
 import { BRAND } from "../../config/plans.js";
@@ -618,6 +619,9 @@ const menuMethods = {
       }
       if (customId.startsWith(SAVED_SONGS_PREFIX)) {
         return this.handleSavedSongsComponent(interaction);
+      }
+      if (customId.startsWith(PERSONAL_DATA_PREFIX)) {
+        return this.handlePersonalDataComponent(interaction);
       }
       return false;
     } catch (err) {

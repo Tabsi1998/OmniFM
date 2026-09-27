@@ -168,6 +168,12 @@ export function buildCommandBuilders() {
     "Deine gemerkten Songs: ansehen und löschen"
   );
 
+  const mydata = describe(
+    new SlashCommandBuilder().setName("mydata").setNameLocalizations(de("meine-daten")),
+    "What OmniFM keeps about you: see it, get it as a file, delete it",
+    "Was OmniFM über dich speichert: ansehen, als Datei holen, löschen"
+  );
+
   const poll = describe(
     new SlashCommandBuilder().setName("poll").setNameLocalizations(de("umfrage")),
     "Let the server vote which station plays next",
@@ -518,6 +524,7 @@ export function buildCommandBuilders() {
     stats,
     history,
     saved,
+    mydata,
     poll,
     sleep,
     setvolume,

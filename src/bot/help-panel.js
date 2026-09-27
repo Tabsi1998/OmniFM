@@ -99,6 +99,7 @@ export function buildHelpPayload(input) {
         t("`/setup` führt Schritt für Schritt durch die Einrichtung.", "`/setup` walks you through the setup."),
         t("`/invite` holt weitere Worker auf den Server, `/workers` zeigt, welcher gerade spielt.", "`/invite` brings more workers to the server, `/workers` shows which one plays."),
         t("`/perm` legt fest, welche Rollen welche Befehle dürfen; `/language` stellt Deutsch oder Englisch ein.", "`/perm` sets which roles may use which commands; `/language` switches between German and English."),
+        t("`/meine-daten` zeigt, was OmniFM über dich speichert; dort holst du es als Datei oder löschst alles.", "`/mydata` shows what OmniFM keeps about you; there you get it as a file or delete everything."),
       ],
       actions: [row(button(INVITE_COMPONENT_ID_OPEN, t("Worker einladen", "Invite workers"), ButtonStyle.Primary), button(WORKERS_COMPONENT_ID_OPEN, t("Worker ansehen", "See workers")))],
     },

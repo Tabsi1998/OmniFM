@@ -130,6 +130,22 @@ export async function deleteOwnerSession(token) {
   if (collection) await collection.deleteOne({ _id: id }).catch(() => null);
 }
 
+/** Signs one Discord account out of the owner console (#285); its access in the settings stays. */
+export async function deleteOwnerSessionsOfUser(discordId) {
+  const id = String(discordId || "").trim();
+  if (!id) return 0;
+  let count = 0;
+  for (const [key, doc] of memorySessions.entries()) {
+    if (doc.discordId !== id) continue;
+    memorySessions.delete(key);
+    count += 1;
+  }
+  const collection = sessionsCollection();
+  if (!collection) return count;
+  const result = await collection.deleteMany({ discordId: id }).catch(() => null);
+  return count + (result?.deletedCount || 0);
+}
+
 export function ownerSessionCookie(token, { secure = false, maxAgeSeconds = OWNER_SESSION_TTL_MS / 1000 } = {}) {
   const value = token ? encodeURIComponent(token) : "";
   const age = token ? maxAgeSeconds : 0;
