@@ -6,6 +6,44 @@ folgt [SemVer](https://semver.org/lang/de/): Die erste Zahl steigt bei
 Funktionen, die dritte bei reinen Fehlerbehebungen. Wie ein Release entsteht,
 steht in `scripts/release.mjs`.
 
+## 3.5.0 – 2026-09-27
+
+Alle Daten liegen in Produktion nur noch in MongoDB. Vorher schrieben viele
+Teile zusätzlich eine JSON-Datei in `runtime-data/`, und Bot, Website und
+Konsole konnten dadurch verschiedene Stände sehen.
+
+### Geändert
+
+- **Nur noch MongoDB in Produktion:** Gutscheine, Bot-Listen und Votes,
+  Dashboard-Logins, Server-Sprachen, das Owner-Protokoll, der Bot-Zustand
+  und der Song-Verlauf liegen jetzt in MongoDB. Premium, Hörstatistik,
+  Störungen und Sender schreiben in Produktion keine Datei mehr. Ohne
+  MongoDB startet Produktion nicht, mit einer klaren Meldung, statt still
+  auf Dateien auszuweichen. Für Entwicklung und Tests bleiben die Dateien
+  (`OMNIFM_ALLOW_FILE_STORES=1`). (#292; #379, #380, #381, #382)
+- **Einmaliger Import:** Beim ersten Start nach dem Update werden die alten
+  Dateien einmal nach MongoDB übernommen. Im Log steht je Bereich, wie viel
+  übernommen wurde. Die Dateien bleiben liegen, nichts wird gelöscht. (#382)
+- **Dashboard-Logins:** Die Anmelde-Tokens liegen nicht mehr im Klartext in
+  der Datenbank, sondern nur als Prüfwert (Hash). Laufende Anmeldungen
+  werden mit übernommen, niemand muss sich neu anmelden. (#381)
+- **Sprache sofort überall:** Eine mit `/language` geänderte Sprache gilt
+  nach spätestens 10 Sekunden auch für die anderen Bots, nicht erst nach
+  einem Neustart. (#381)
+- **`/history`** zeigt auch Songs von Servern, die ein anderer Bot abspielt.
+  (#382)
+- **Start ohne systemd:** `start.sh` startet API und Bot auch ohne systemd
+  als Produktion, genau wie die systemd-Dienste. (#382)
+
+### Intern
+
+- Die Listen der bekannten Sicherheitslücken, Lizenz-Ausnahmen und
+  ShellCheck-Hinweise sind leer. Jeder neue Fund schlägt sofort an. Drei
+  Werkzeuge, die nur beim Entwickeln und Bauen laufen und nie ausgeliefert
+  werden, stehen einzeln mit Begründung als Ausnahme drin. (#286, #383)
+- Ein Test prüft mit Produktions-Einstellungen gegen eine echte MongoDB,
+  dass kein Bereich mehr eine Datei schreibt. (#382)
+
 ## 3.4.1 – 2026-09-27
 
 Zwei Fehler im Server-Dashboard behoben, die schon länger live waren.
