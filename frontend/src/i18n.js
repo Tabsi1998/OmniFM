@@ -28,7 +28,8 @@ const LOCALE_META = {
   },
 };
 
-const LOCALE_MESSAGES = {
+// Exported for the completeness test (#294): every text in German and English.
+export const LOCALE_MESSAGES = {
   de: {
     meta: {
       title: 'OmniFM | 24/7 Radio für Discord',
@@ -834,6 +835,7 @@ const LOCALE_MESSAGES = {
       notProvided: 'Nicht angegeben',
       vatStatusLabel: 'Umsatzsteuer',
       kleinunternehmerNote: 'Umsatzsteuerbefreit als Kleinunternehmer gemäß § 6 Abs. 1 Z 27 UStG (keine Umsatzsteuer, kein USt-Ausweis).',
+      warningTitle: 'Pflichtangaben fehlen',
       warningFallback: 'Pflichtangaben',
       warning: ({ fields }) => `Diese Angaben fehlen aktuell noch oder sind unvollständig: ${fields}. Für einen rechtssicheren Betrieb in Österreich solltest du das ergänzen.`,
       noteTitle: 'Rechtlicher Hinweis',
