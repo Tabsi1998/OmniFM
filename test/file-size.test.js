@@ -5,16 +5,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 // #293, #295: files a person can read. A file in src/ has at most 800
-// lines. The ones below were longer before the limit; they may not grow and
-// leave this list once they are split (the test says when).
+// lines. KNOWN_LONG_FILES is the way to let a file in only for a while:
+// it may not grow and leaves the list once it is split (the test says when).
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MAX_LINES = 800;
-const KNOWN_LONG_FILES = {
-  "src/bot/runtime.js": 1474,
-  "src/premium-cli.js": 1007,
-  "src/services/payment.js": 961,
-  "src/bot/commands/playback-commands.js": 897,
-};
+const KNOWN_LONG_FILES = {};
 
 function listSourceFiles(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
