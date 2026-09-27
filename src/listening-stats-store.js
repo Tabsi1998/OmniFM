@@ -3,245 +3,36 @@
 // ============================================================
 import fs from "node:fs";
 import { fileStoresAllowed } from "./lib/store-policy.js";
-import path from "node:path";
 import { getDb, isConnected } from "./lib/db.js";
 import { log } from "./lib/logging.js";
 import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
+import {
+  emptyState,
+  normalizeCount,
+  normalizeDateOnly,
+  normalizeGuildId,
+  normalizeGuildStats,
+  normalizeState,
+  normalizeStoredConnectionEvent,
+  normalizeStoredListenerSnapshot,
+  normalizeStoredSession,
+  normalizeText,
+} from "./listening-stats/normalize.js";
+import {
+  MAX_SESSION_SAMPLES,
+  SESSION_SAMPLE_MIN_INTERVAL_MS,
+  buildConnectionTimelineBucketsFromEvents,
+  buildDailyListeningBreakdown,
+  summarizeSessionListeners,
+} from "./listening-stats/session-math.js";
 
 const STORE_FILE = resolveRuntimeDataPath("listening-stats.json");
 const BACKUP_FILE = `${STORE_FILE}.bak`;
-const MAX_FALLBACK_DAILY_STATS = 400;
-const MAX_FALLBACK_SESSION_HISTORY = 120;
-const MAX_FALLBACK_CONNECTION_EVENTS = 400;
-const MAX_FALLBACK_LISTENER_SNAPSHOTS = 2_880;
+export const MAX_FALLBACK_DAILY_STATS = 400;
+export const MAX_FALLBACK_SESSION_HISTORY = 120;
+export const MAX_FALLBACK_CONNECTION_EVENTS = 400;
+export const MAX_FALLBACK_LISTENER_SNAPSHOTS = 2_880;
 const LISTENER_SNAPSHOT_DEDUPE_MS = 120_000;
-
-// ============================================================
-// JSON Fallback (legacy, used when MongoDB is unavailable)
-// ============================================================
-function emptyState() {
-  return {
-    version: 3,
-    guilds: {},
-    dailyStats: {},
-    sessionHistory: {},
-    connectionEvents: {},
-    listenerSnapshots: {},
-  };
-}
-
-function normalizeGuildId(guildId) {
-  const value = String(guildId || "").trim();
-  return /^\d{17,22}$/.test(value) ? value : null;
-}
-
-function normalizeText(value, maxLen = 160) {
-  const text = String(value || "").trim();
-  return text ? text.slice(0, maxLen) : null;
-}
-
-function normalizeCount(value) {
-  const parsed = Number.parseInt(String(value || ""), 10);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
-}
-
-function normalizeTimestamp(value) {
-  const parsed = Number.parseInt(String(value || ""), 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
-}
-
-function normalizeBucketMap(source, maxEntries = 200) {
-  const input = source && typeof source === "object" ? source : {};
-  const output = {};
-  for (const [key, rawValue] of Object.entries(input)) {
-    const normalizedKey = normalizeText(key, 120);
-    if (!normalizedKey) continue;
-    output[normalizedKey] = normalizeCount(rawValue);
-  }
-  return Object.fromEntries(
-    Object.entries(output)
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .slice(0, maxEntries)
-  );
-}
-
-function normalizeTextMap(source, maxEntries = 200) {
-  const input = source && typeof source === "object" ? source : {};
-  const output = {};
-  for (const [key, rawValue] of Object.entries(input)) {
-    const normalizedKey = normalizeText(key, 120);
-    const normalizedValue = normalizeText(rawValue, 120);
-    if (!normalizedKey || !normalizedValue) continue;
-    output[normalizedKey] = normalizedValue;
-  }
-  return Object.fromEntries(Object.entries(output).slice(0, maxEntries));
-}
-
-function normalizeHourMap(source) {
-  const output = {};
-  for (let h = 0; h < 24; h++) output[String(h)] = 0;
-  const input = source && typeof source === "object" ? source : {};
-  for (const [rawH, rawV] of Object.entries(input)) {
-    const hour = Number.parseInt(String(rawH || ""), 10);
-    if (Number.isFinite(hour) && hour >= 0 && hour <= 23) {
-      output[String(hour)] = normalizeCount(rawV);
-    }
-  }
-  return output;
-}
-
-function normalizeDayOfWeekMap(source) {
-  const output = {};
-  for (let d = 0; d < 7; d++) output[String(d)] = 0;
-  const input = source && typeof source === "object" ? source : {};
-  for (const [rawD, rawV] of Object.entries(input)) {
-    const day = Number.parseInt(String(rawD || ""), 10);
-    if (Number.isFinite(day) && day >= 0 && day <= 6) {
-      output[String(day)] = normalizeCount(rawV);
-    }
-  }
-  return output;
-}
-
-function normalizeIsoDate(value) {
-  const date = value instanceof Date ? value : new Date(String(value || ""));
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString();
-}
-
-function normalizeDateOnly(value) {
-  const text = String(value || "").trim();
-  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
-}
-
-function normalizeGuildStats(raw, guildId) {
-  const s = raw && typeof raw === "object" ? raw : {};
-  return {
-    guildId,
-    // Core counters
-    totalStarts: normalizeCount(s.totalStarts),
-    totalStops: normalizeCount(s.totalStops),
-    totalListeningMs: normalizeCount(s.totalListeningMs),
-    totalSessions: normalizeCount(s.totalSessions),
-    peakListeners: normalizeCount(s.peakListeners),
-    peakConcurrentStreams: normalizeCount(s.peakConcurrentStreams),
-    // Timestamps
-    lastStartedAt: normalizeTimestamp(s.lastStartedAt),
-    lastStoppedAt: normalizeTimestamp(s.lastStoppedAt),
-    lastCommandAt: normalizeTimestamp(s.lastCommandAt),
-    firstSeenAt: normalizeTimestamp(s.firstSeenAt),
-    // Breakdown maps
-    stationStarts: normalizeBucketMap(s.stationStarts, 200),
-    stationListeningMs: normalizeBucketMap(s.stationListeningMs, 200),
-    stationNames: normalizeTextMap(s.stationNames, 200),
-    voiceChannels: normalizeBucketMap(s.voiceChannels, 120),
-    commands: normalizeBucketMap(s.commands, 120),
-    hours: normalizeHourMap(s.hours),
-    daysOfWeek: normalizeDayOfWeekMap(s.daysOfWeek),
-    // Connection health
-    totalConnections: normalizeCount(s.totalConnections),
-    totalReconnects: normalizeCount(s.totalReconnects),
-    totalReconnectRetries: normalizeCount(s.totalReconnectRetries),
-    totalConnectionDisconnects: normalizeCount(s.totalConnectionDisconnects),
-    totalConnectionErrors: normalizeCount(s.totalConnectionErrors),
-    avgSessionMs: normalizeCount(s.avgSessionMs),
-    longestSessionMs: normalizeCount(s.longestSessionMs),
-  };
-}
-
-function normalizeStoredDailyStat(raw) {
-  const entry = raw && typeof raw === "object" ? raw : {};
-  const date = normalizeDateOnly(entry.date);
-  if (!date) return null;
-  return {
-    date,
-    totalStarts: normalizeCount(entry.totalStarts),
-    totalListeningMs: normalizeCount(entry.totalListeningMs),
-    totalSessions: normalizeCount(entry.totalSessions),
-    peakListeners: normalizeCount(entry.peakListeners),
-  };
-}
-
-function normalizeStoredSession(raw, guildId) {
-  const entry = raw && typeof raw === "object" ? raw : {};
-  const startedAt = normalizeIsoDate(entry.startedAt);
-  const endedAt = normalizeIsoDate(entry.endedAt);
-  const stationKey = normalizeText(entry.stationKey, 120) || "unknown";
-  if (!startedAt || !endedAt) return null;
-  return {
-    guildId,
-    botId: normalizeText(entry.botId, 120) || "",
-    stationKey,
-    stationName: normalizeText(entry.stationName, 120) || stationKey,
-    channelId: normalizeText(entry.channelId, 120) || "",
-    startedAt,
-    endedAt,
-    durationMs: normalizeCount(entry.durationMs),
-    humanListeningMs: normalizeCount(entry.humanListeningMs),
-    peakListeners: normalizeCount(entry.peakListeners),
-    avgListeners: normalizeCount(entry.avgListeners),
-  };
-}
-
-function normalizeStoredConnectionEvent(raw, guildId) {
-  const entry = raw && typeof raw === "object" ? raw : {};
-  const timestamp = normalizeIsoDate(entry.timestamp);
-  const eventType = normalizeText(entry.eventType, 40) || "unknown";
-  if (!timestamp) return null;
-  return {
-    guildId,
-    botId: normalizeText(entry.botId, 120) || "",
-    eventType,
-    channelId: normalizeText(entry.channelId, 120) || "",
-    details: normalizeText(entry.details, 500) || "",
-    timestamp,
-  };
-}
-
-function normalizeStoredListenerSnapshot(raw, guildId) {
-  const entry = raw && typeof raw === "object" ? raw : {};
-  const timestamp = normalizeIsoDate(entry.timestamp);
-  if (!timestamp) return null;
-  return {
-    guildId,
-    listeners: normalizeCount(entry.listeners),
-    timestamp,
-  };
-}
-
-function normalizePerGuildArrayMap(source, normalizer, maxPerGuild) {
-  const input = source && typeof source === "object" ? source : {};
-  const output = {};
-  for (const [rawGuildId, rawEntries] of Object.entries(input)) {
-    const gid = normalizeGuildId(rawGuildId);
-    if (!gid) continue;
-    const entries = Array.isArray(rawEntries) ? rawEntries : [];
-    output[gid] = entries
-      .map((entry) => normalizer(entry, gid))
-      .filter(Boolean)
-      .slice(0, maxPerGuild);
-  }
-  return output;
-}
-
-function normalizeState(input) {
-  const source = input && typeof input === "object" ? input : {};
-  const guilds = {};
-  const rawGuilds = source.guilds && typeof source.guilds === "object" ? source.guilds : {};
-  for (const [rawGuildId, rawGuildStats] of Object.entries(rawGuilds)) {
-    const gid = normalizeGuildId(rawGuildId);
-    if (!gid) continue;
-    guilds[gid] = normalizeGuildStats(rawGuildStats, gid);
-  }
-  return {
-    version: 3,
-    guilds,
-    dailyStats: normalizePerGuildArrayMap(source.dailyStats, normalizeStoredDailyStat, MAX_FALLBACK_DAILY_STATS),
-    sessionHistory: normalizePerGuildArrayMap(source.sessionHistory, normalizeStoredSession, MAX_FALLBACK_SESSION_HISTORY),
-    connectionEvents: normalizePerGuildArrayMap(source.connectionEvents, normalizeStoredConnectionEvent, MAX_FALLBACK_CONNECTION_EVENTS),
-    listenerSnapshots: normalizePerGuildArrayMap(source.listenerSnapshots, normalizeStoredListenerSnapshot, MAX_FALLBACK_LISTENER_SNAPSHOTS),
-  };
-}
 
 // ---- JSON file I/O ----
 function readStateFile(filePath) {
@@ -259,7 +50,7 @@ function readStateFile(filePath) {
 
 let stateCache = null;
 
-function ensureState() {
+export function ensureState() {
   if (stateCache) return stateCache;
   stateCache = readStateFile(STORE_FILE) || readStateFile(BACKUP_FILE) || emptyState();
   return stateCache;
@@ -323,7 +114,7 @@ function resolveDayOfWeekBucket(timestampMs) {
   return new Date(value).getDay();
 }
 
-function todayDateString(timestampMs) {
+export function todayDateString(timestampMs) {
   const d = new Date(Number.isFinite(Number(timestampMs)) && Number(timestampMs) > 0 ? Number(timestampMs) : Date.now());
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
@@ -400,7 +191,7 @@ function appendFallbackListenerSnapshot(guildId, snapshot) {
   return { saved: true, entry };
 }
 
-function getFallbackConnectionHealth(guildId, days = 7) {
+export function getFallbackConnectionHealth(guildId, days = 7) {
   const gid = normalizeGuildId(guildId);
   if (!gid) return { connects: 0, reconnects: 0, retries: 0, disconnects: 0, errors: 0, events: [], timeline: [] };
   const events = (ensureState().connectionEvents?.[gid] || []).filter((entry) => {
@@ -422,55 +213,7 @@ function getFallbackConnectionHealth(guildId, days = 7) {
   };
 }
 
-function buildConnectionTimelineBuckets(rows = [], days = 7, nowMs = Date.now()) {
-  const safeDays = Math.max(1, Math.min(90, Number.parseInt(String(days || 7), 10) || 7));
-  const buckets = [];
-  const bucketMap = new Map();
-
-  for (let offset = safeDays - 1; offset >= 0; offset -= 1) {
-    const date = todayDateString(nowMs - (offset * 86400_000));
-    const bucket = {
-      date,
-      connects: 0,
-      reconnects: 0,
-      retries: 0,
-      disconnects: 0,
-      errors: 0,
-    };
-    buckets.push(bucket);
-    bucketMap.set(date, bucket);
-  }
-
-  for (const row of Array.isArray(rows) ? rows : []) {
-    const timestampMs = Date.parse(row?.timestamp);
-    const derivedDate = Number.isFinite(timestampMs) ? todayDateString(timestampMs) : "";
-    const date = normalizeDateOnly(row?.date) || normalizeDateOnly(derivedDate);
-    const bucket = date ? bucketMap.get(date) : null;
-    if (!bucket) continue;
-    const count = normalizeCount(row?.count ?? 1);
-    if (row?.eventType === "connect") bucket.connects += count;
-    else if (row?.eventType === "reconnect") bucket.reconnects += count;
-    else if (row?.eventType === "retry") bucket.retries += count;
-    else if (row?.eventType === "disconnect") bucket.disconnects += count;
-    else if (row?.eventType === "error") bucket.errors += count;
-  }
-
-  return buckets;
-}
-
-function buildConnectionTimelineBucketsFromEvents(events = [], days = 7, nowMs = Date.now()) {
-  return buildConnectionTimelineBuckets(
-    (Array.isArray(events) ? events : []).map((event) => ({
-      date: todayDateString(Date.parse(event?.timestamp)),
-      eventType: String(event?.eventType || ""),
-      count: 1,
-    })),
-    days,
-    nowMs
-  );
-}
-
-function getActiveListeningMsTotal() {
+export function getActiveListeningMsTotal() {
   const now = Date.now();
   let total = 0;
   for (const session of activeSessions.values()) {
@@ -484,165 +227,14 @@ function getActiveListeningMsTotal() {
   return total;
 }
 
-const SESSION_SAMPLE_MIN_INTERVAL_MS = 30_000;
-const MAX_SESSION_SAMPLES = 4_320;
-
-function normalizeSampleEntries(samples, startedAtMs, endedAtMs) {
-  const startMs = normalizeTimestamp(startedAtMs) || Date.now();
-  const endMs = Math.max(startMs, normalizeTimestamp(endedAtMs) || startMs);
-  const entries = [];
-
-  for (const sample of Array.isArray(samples) ? samples : []) {
-    const timestamp = Math.min(endMs, Math.max(startMs, normalizeTimestamp(sample?.t) || startMs));
-    const listeners = normalizeCount(sample?.n);
-    const previous = entries[entries.length - 1];
-    if (previous && previous.t === timestamp) {
-      previous.n = listeners;
-    } else {
-      entries.push({ t: timestamp, n: listeners });
-    }
-  }
-
-  entries.sort((a, b) => a.t - b.t);
-
-  const collapsed = [];
-  for (const entry of entries) {
-    const previous = collapsed[collapsed.length - 1];
-    if (previous && previous.t === entry.t) {
-      previous.n = entry.n;
-    } else {
-      collapsed.push(entry);
-    }
-  }
-
-  if (!collapsed.length) {
-    return [{ t: startMs, n: 0 }];
-  }
-
-  if (collapsed[0].t > startMs) {
-    collapsed.unshift({ t: startMs, n: collapsed[0].n });
-  } else if (collapsed[0].t < startMs) {
-    collapsed[0] = { ...collapsed[0], t: startMs };
-  }
-
-  return collapsed;
-}
-
-export function buildSessionListenerSegments({
-  samples = [],
-  startedAtMs = Date.now(),
-  endedAtMs = Date.now(),
-} = {}) {
-  const startMs = normalizeTimestamp(startedAtMs) || Date.now();
-  const endMs = Math.max(startMs, normalizeTimestamp(endedAtMs) || startMs);
-  if (endMs <= startMs) return [];
-
-  const normalizedSamples = normalizeSampleEntries(samples, startMs, endMs);
-  const segments = [];
-
-  for (let index = 0; index < normalizedSamples.length; index += 1) {
-    const current = normalizedSamples[index];
-    const next = normalizedSamples[index + 1];
-    const segmentStartMs = Math.min(endMs, Math.max(startMs, current.t));
-    const segmentEndMs = next
-      ? Math.min(endMs, Math.max(segmentStartMs, next.t))
-      : endMs;
-    if (segmentEndMs <= segmentStartMs) continue;
-
-    segments.push({
-      startAtMs: segmentStartMs,
-      endAtMs: segmentEndMs,
-      durationMs: segmentEndMs - segmentStartMs,
-      listeners: normalizeCount(current.n),
-    });
-  }
-
-  return segments;
-}
-
-export function summarizeSessionListeners({
-  samples = [],
-  startedAtMs = Date.now(),
-  endedAtMs = Date.now(),
-} = {}) {
-  const startMs = normalizeTimestamp(startedAtMs) || Date.now();
-  const endMs = Math.max(startMs, normalizeTimestamp(endedAtMs) || startMs);
-  const segments = buildSessionListenerSegments({ samples, startedAtMs: startMs, endedAtMs: endMs });
-  const durationMs = Math.max(0, endMs - startMs);
-
-  let humanListeningMs = 0;
-  let weightedListenerMs = 0;
-  let peakListeners = 0;
-
-  for (const segment of segments) {
-    peakListeners = Math.max(peakListeners, normalizeCount(segment.listeners));
-    weightedListenerMs += segment.durationMs * normalizeCount(segment.listeners);
-    if (segment.listeners > 0) {
-      humanListeningMs += segment.durationMs;
-    }
-  }
-
-  return {
-    durationMs,
-    peakListeners,
-    humanListeningMs: Math.min(humanListeningMs, durationMs),
-    avgListeners: durationMs > 0 ? Math.round(weightedListenerMs / durationMs) : 0,
-    segments,
-  };
-}
-
-export function buildDailyListeningBreakdown({
-  samples = [],
-  startedAtMs = Date.now(),
-  endedAtMs = Date.now(),
-} = {}) {
-  const summary = summarizeSessionListeners({ samples, startedAtMs, endedAtMs });
-  const days = new Map();
-
-  for (const segment of summary.segments) {
-    let cursorMs = segment.startAtMs;
-    while (cursorMs < segment.endAtMs) {
-      const cursorDate = new Date(cursorMs);
-      const nextMidnightMs = new Date(
-        cursorDate.getFullYear(),
-        cursorDate.getMonth(),
-        cursorDate.getDate() + 1,
-        0, 0, 0, 0
-      ).getTime();
-      const sliceEndMs = Math.min(segment.endAtMs, nextMidnightMs);
-      const sliceDurationMs = Math.max(0, sliceEndMs - cursorMs);
-      const date = todayDateString(cursorMs);
-      const current = days.get(date) || {
-        date,
-        totalListeningMs: 0,
-        peakListeners: 0,
-      };
-
-      if (segment.listeners > 0) {
-        current.totalListeningMs += sliceDurationMs;
-      }
-      current.peakListeners = Math.max(current.peakListeners, segment.listeners);
-      days.set(date, current);
-      cursorMs = sliceEndMs;
-    }
-  }
-
-  if (!days.size) {
-    const date = todayDateString(startedAtMs);
-    days.set(date, { date, totalListeningMs: 0, peakListeners: 0 });
-  }
-
-  return [...days.values()].sort((a, b) => a.date.localeCompare(b.date));
-}
-
 // ============================================================
 // MongoDB Operations
 // ============================================================
-function useMongo() {
+export function useMongo() {
   return isConnected() && getDb() !== null;
 }
 
-async function mongoSafe(fn) {
+export async function mongoSafe(fn) {
   if (!useMongo()) return null;
   try {
     return await fn(getDb());
@@ -1095,433 +687,6 @@ export function recordConnectionEvent(guildId, {
 }
 
 // ============================================================
-// Public API - Read Functions
-// ============================================================
-function mergeActiveSessionsIntoListeningStats(stats, activeSessions = []) {
-  const result = stats ? JSON.parse(JSON.stringify(stats)) : normalizeGuildStats({});
-  result.stationListeningMs = { ...(result.stationListeningMs || {}) };
-  result.stationNames = { ...(result.stationNames || {}) };
-
-  let activeListeningMs = 0;
-  let peakListeners = Number(result.peakListeners || 0) || 0;
-
-  for (const session of activeSessions) {
-    const stationKey = normalizeText(session?.stationKey, 120);
-    const stationName = normalizeText(session?.stationName, 120);
-    const currentHumanListeningMs = Math.max(0, Number(session?.currentHumanListeningMs || 0) || 0);
-    const sessionPeak = Math.max(
-      0,
-      Number(session?.peakListeners || 0) || 0,
-      Number(session?.currentListeners || 0) || 0
-    );
-
-    activeListeningMs += currentHumanListeningMs;
-    peakListeners = Math.max(peakListeners, sessionPeak);
-
-    if (stationKey) {
-      result.stationListeningMs[stationKey] = (Number(result.stationListeningMs[stationKey] || 0) || 0) + currentHumanListeningMs;
-      if (stationName) {
-        result.stationNames[stationKey] = stationName;
-      }
-    }
-  }
-
-  result.activeSessions = activeSessions.length;
-  result.activeListeningMs = activeListeningMs;
-  result.currentTotalListeningMs = (Number(result.totalListeningMs || 0) || 0) + activeListeningMs;
-  result.peakListeners = peakListeners;
-  return result;
-}
-
-function mergeActiveSessionsIntoDailyStats(rows = [], activeSessions = [], nowMs = Date.now()) {
-  const byDate = new Map();
-  for (const row of Array.isArray(rows) ? rows : []) {
-    const date = String(row?.date || "").trim();
-    if (!date) continue;
-    byDate.set(date, {
-      date,
-      totalStarts: Number(row?.totalStarts || 0) || 0,
-      totalListeningMs: Number(row?.totalListeningMs || 0) || 0,
-      totalSessions: Number(row?.totalSessions || 0) || 0,
-      peakListeners: Number(row?.peakListeners || 0) || 0,
-    });
-  }
-
-  for (const session of Array.isArray(activeSessions) ? activeSessions : []) {
-    const breakdown = buildDailyListeningBreakdown({
-      samples: session?.listenerSamples || [],
-      startedAtMs: Number(session?.startedAt || 0) || nowMs,
-      endedAtMs: nowMs,
-    });
-    for (const day of breakdown) {
-      const key = String(day?.date || "").trim();
-      if (!key) continue;
-      const current = byDate.get(key) || {
-        date: key,
-        totalStarts: 0,
-        totalListeningMs: 0,
-        totalSessions: 0,
-        peakListeners: 0,
-      };
-      current.totalListeningMs += Number(day?.totalListeningMs || 0) || 0;
-      current.peakListeners = Math.max(current.peakListeners || 0, Number(day?.peakListeners || 0) || 0);
-      byDate.set(key, current);
-    }
-  }
-
-  return [...byDate.values()].sort((a, b) => b.date.localeCompare(a.date));
-}
-
-export function getGuildListeningStats(guildId) {
-  const gid = normalizeGuildId(guildId);
-  if (!gid) return null;
-  const state = ensureState();
-  const stats = state.guilds[gid];
-  const activeSess = getActiveSessionsForGuild(gid);
-  return mergeActiveSessionsIntoListeningStats(
-    stats ? JSON.parse(JSON.stringify(stats)) : normalizeGuildStats({}, gid),
-    activeSess
-  );
-}
-
-export function getTopGuildsByActivity(limit = 5) {
-  const safeLimit = Math.max(1, Math.min(20, Number.parseInt(String(limit || 5), 10) || 5));
-  const state = ensureState();
-  return Object.values(state.guilds)
-    .sort((a, b) => b.totalStarts - a.totalStarts || b.peakListeners - a.peakListeners || String(a.guildId).localeCompare(String(b.guildId)))
-    .slice(0, safeLimit)
-    .map((stats) => JSON.parse(JSON.stringify(stats)));
-}
-
-// ---- MongoDB-only queries for enhanced stats ----
-export async function getGuildDailyStats(guildId, days = 30) {
-  const gid = normalizeGuildId(guildId);
-  if (!gid) return [];
-  const safeDays = Math.min(days, 365);
-  const activeSess = getActiveSessionsForGuild(gid);
-  const nowMs = Date.now();
-
-  const result = await mongoSafe(async (db) => {
-    return db.collection("daily_stats")
-      .find({ guildId: gid })
-      .sort({ date: -1 })
-      .limit(safeDays)
-      .toArray();
-  });
-
-  if (result) {
-    return mergeActiveSessionsIntoDailyStats(result.map((doc) => ({
-      date: doc.date,
-      totalStarts: doc.totalStarts || 0,
-      totalListeningMs: doc.totalListeningMs || 0,
-      totalSessions: doc.totalSessions || 0,
-      peakListeners: doc.peakListeners || 0,
-    })), activeSess, nowMs).slice(0, safeDays);
-  }
-
-  return mergeActiveSessionsIntoDailyStats((ensureState().dailyStats?.[gid] || [])
-    .slice()
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, Math.min(safeDays, MAX_FALLBACK_DAILY_STATS))
-    .map((entry) => ({ ...entry })), activeSess, nowMs).slice(0, safeDays);
-}
-
-/** Finished sessions that started since `sinceMs`, newest first (weekly digest, #278). */
-export async function getGuildSessionsSince(guildId, sinceMs, { limit = 5000 } = {}) {
-  const gid = normalizeGuildId(guildId);
-  if (!gid) return [];
-  const sinceIso = new Date(Number(sinceMs) || 0).toISOString();
-  const max = Math.max(1, Math.min(20000, Number(limit) || 5000));
-
-  const result = await mongoSafe(async (db) => {
-    return db.collection("listening_sessions")
-      .find({ guildId: gid, startedAt: { $gte: sinceIso } })
-      .sort({ startedAt: -1 })
-      .limit(max)
-      .project({ _id: 0, stationKey: 1, stationName: 1, startedAt: 1, humanListeningMs: 1, peakListeners: 1 })
-      .toArray();
-  });
-  if (result) return result;
-
-  return (ensureState().sessionHistory?.[gid] || [])
-    .filter((entry) => String(entry?.startedAt || "") >= sinceIso)
-    .sort((a, b) => String(b.startedAt || "").localeCompare(String(a.startedAt || "")))
-    .map((entry) => ({ ...entry }));
-}
-
-export async function getGuildSessionHistory(guildId, limit = 20) {
-  const gid = normalizeGuildId(guildId);
-  if (!gid) return [];
-
-  const result = await mongoSafe(async (db) => {
-    return db.collection("listening_sessions")
-      .find({ guildId: gid })
-      .sort({ startedAt: -1 })
-      .limit(Math.min(limit, 100))
-      .project({ _id: 0 })
-      .toArray();
-  });
-
-  if (result) {
-    return result || [];
-  }
-
-  return (ensureState().sessionHistory?.[gid] || [])
-    .slice()
-    .sort((a, b) => String(b.startedAt || "").localeCompare(String(a.startedAt || "")))
-    .slice(0, Math.min(limit, MAX_FALLBACK_SESSION_HISTORY))
-    .map((entry) => ({ ...entry }));
-}
-
-export async function getGuildConnectionHealth(guildId, days = 7) {
-  const gid = normalizeGuildId(guildId);
-  if (!gid) return { connects: 0, reconnects: 0, retries: 0, disconnects: 0, errors: 0, events: [], timeline: [] };
-
-  const result = await mongoSafe(async (db) => {
-    const since = new Date(Date.now() - days * 86400_000);
-    const [events, counts, timelineCounts] = await Promise.all([
-      db.collection("connection_events")
-        .find({ guildId: gid, timestamp: { $gte: since } })
-        .sort({ timestamp: -1 })
-        .limit(100)
-        .project({ _id: 0 })
-        .toArray(),
-      db.collection("connection_events").aggregate([
-        { $match: { guildId: gid, timestamp: { $gte: since } } },
-        {
-          $group: {
-            _id: "$eventType",
-            count: { $sum: 1 },
-          },
-        },
-      ]).toArray(),
-      db.collection("connection_events").aggregate([
-        { $match: { guildId: gid, timestamp: { $gte: since } } },
-        {
-          $project: {
-            eventType: 1,
-            date: {
-              $dateToString: {
-                format: "%Y-%m-%d",
-                date: "$timestamp",
-              },
-            },
-          },
-        },
-        {
-          $group: {
-            _id: {
-              date: "$date",
-              eventType: "$eventType",
-            },
-            count: { $sum: 1 },
-          },
-        },
-        { $sort: { "_id.date": 1 } },
-      ]).toArray(),
-    ]);
-
-    const summary = { connects: 0, reconnects: 0, retries: 0, disconnects: 0, errors: 0 };
-    for (const row of counts) {
-      if (row._id === "connect") summary.connects = normalizeCount(row.count);
-      else if (row._id === "reconnect") summary.reconnects = normalizeCount(row.count);
-      else if (row._id === "retry") summary.retries = normalizeCount(row.count);
-      else if (row._id === "disconnect") summary.disconnects = normalizeCount(row.count);
-      else if (row._id === "error") summary.errors = normalizeCount(row.count);
-    }
-
-    return {
-      ...summary,
-      events,
-      timeline: buildConnectionTimelineBuckets(
-        timelineCounts.map((row) => ({
-          date: row?._id?.date,
-          eventType: row?._id?.eventType,
-          count: row?.count,
-        })),
-        days
-      ),
-    };
-  });
-
-  return result || getFallbackConnectionHealth(guildId, days);
-}
-
-export async function getGuildListenerTimeline(guildId, hours = 24) {
-  const gid = normalizeGuildId(guildId);
-  if (!gid) return [];
-
-  const result = await mongoSafe(async (db) => {
-    const since = new Date(Date.now() - hours * 3600_000);
-    return db.collection("listener_snapshots")
-      .find({ guildId: gid, timestamp: { $gte: since } })
-      .sort({ timestamp: 1 })
-      .project({ _id: 0, listeners: 1, timestamp: 1 })
-      .toArray();
-  });
-
-  if (result) {
-    return result || [];
-  }
-
-  const sinceMs = Date.now() - (hours * 3600_000);
-  return (ensureState().listenerSnapshots?.[gid] || [])
-    .filter((entry) => Date.parse(entry.timestamp) >= sinceMs)
-    .slice()
-    .sort((a, b) => String(a.timestamp || "").localeCompare(String(b.timestamp || "")))
-    .map((entry) => ({ ...entry }));
-}
-
-export async function getGlobalStats() {
-  const activeListeningMs = getActiveListeningMsTotal();
-  // First try MongoDB
-  const mongoResult = await mongoSafe(async (db) => {
-    const pipeline = [
-      {
-        $group: {
-          _id: null,
-          totalGuilds: { $sum: 1 },
-          totalStarts: { $sum: "$totalStarts" },
-          totalListeningMs: { $sum: "$totalListeningMs" },
-          totalSessions: { $sum: "$totalSessions" },
-          globalPeakListeners: { $max: "$peakListeners" },
-        },
-      },
-    ];
-    const result = await db.collection("guild_stats").aggregate(pipeline).toArray();
-    return result[0] || null;
-  });
-
-  if (mongoResult) {
-    const completedListeningMs = mongoResult.totalListeningMs || 0;
-    const currentTotalListeningMs = completedListeningMs + activeListeningMs;
-    return {
-      totalGuilds: mongoResult.totalGuilds || 0,
-      totalStarts: mongoResult.totalStarts || 0,
-      totalListeningMs: currentTotalListeningMs,
-      completedListeningMs,
-      activeListeningMs,
-      totalSessions: mongoResult.totalSessions || 0,
-      globalPeakListeners: mongoResult.globalPeakListeners || 0,
-      totalListeningHours: Math.round(currentTotalListeningMs / 3_600_000 * 10) / 10,
-    };
-  }
-
-  // JSON fallback
-  const state = ensureState();
-  const guilds = Object.values(state.guilds);
-  const completedListeningMs = guilds.reduce((sum, g) => sum + (g.totalListeningMs || 0), 0);
-  const currentTotalListeningMs = completedListeningMs + activeListeningMs;
-  return {
-    totalGuilds: guilds.length,
-    totalStarts: guilds.reduce((sum, g) => sum + (g.totalStarts || 0), 0),
-    totalListeningMs: currentTotalListeningMs,
-    completedListeningMs,
-    activeListeningMs,
-    totalSessions: guilds.reduce((sum, g) => sum + (g.totalSessions || 0), 0),
-    globalPeakListeners: Math.max(0, ...guilds.map((g) => g.peakListeners || 0)),
-    totalListeningHours: Math.round(currentTotalListeningMs / 3_600_000 * 10) / 10,
-  };
-}
-
-// ============================================================
-// Migration: Import JSON data to MongoDB on first connect
-// ============================================================
-export async function migrateJsonToMongo() {
-  if (!useMongo()) return { migrated: false, reason: "mongodb-not-connected" };
-
-  const db = getDb();
-  const existingCount = await db.collection("guild_stats").countDocuments();
-  if (existingCount > 0) return { migrated: false, reason: "data-exists" };
-
-  const state = ensureState();
-  const guilds = Object.values(state.guilds);
-  if (guilds.length === 0) return { migrated: false, reason: "no-json-data" };
-
-  let migrated = 0;
-  for (const guildStats of guilds) {
-    try {
-      const doc = { ...guildStats };
-      delete doc._id;
-      doc.createdAt = new Date();
-      doc.migratedFromJson = true;
-      await db.collection("guild_stats").updateOne(
-        { guildId: doc.guildId },
-        { $set: doc },
-        { upsert: true }
-      );
-      const gid = doc.guildId;
-      const dailyStats = state.dailyStats?.[gid] || [];
-      const sessionHistory = state.sessionHistory?.[gid] || [];
-      const connectionEvents = state.connectionEvents?.[gid] || [];
-      const listenerSnapshots = state.listenerSnapshots?.[gid] || [];
-
-      for (const day of dailyStats) {
-        // eslint-disable-next-line no-await-in-loop
-        await db.collection("daily_stats").updateOne(
-          { guildId: gid, date: day.date },
-          {
-            $set: {
-              guildId: gid,
-              date: day.date,
-              totalStarts: day.totalStarts || 0,
-              totalListeningMs: day.totalListeningMs || 0,
-              totalSessions: day.totalSessions || 0,
-              peakListeners: day.peakListeners || 0,
-              createdAt: new Date(),
-            },
-          },
-          { upsert: true }
-        );
-      }
-
-      if (sessionHistory.length) {
-        // eslint-disable-next-line no-await-in-loop
-        await db.collection("listening_sessions").insertMany(
-          sessionHistory.map((entry) => ({
-            ...entry,
-            guildId: gid,
-            startedAt: new Date(entry.startedAt),
-            endedAt: new Date(entry.endedAt),
-          })),
-          { ordered: false }
-        ).catch(() => null);
-      }
-
-      if (connectionEvents.length) {
-        // eslint-disable-next-line no-await-in-loop
-        await db.collection("connection_events").insertMany(
-          connectionEvents.map((entry) => ({
-            ...entry,
-            guildId: gid,
-            timestamp: new Date(entry.timestamp),
-          })),
-          { ordered: false }
-        ).catch(() => null);
-      }
-
-      if (listenerSnapshots.length) {
-        // eslint-disable-next-line no-await-in-loop
-        await db.collection("listener_snapshots").insertMany(
-          listenerSnapshots.map((entry) => ({
-            ...entry,
-            guildId: gid,
-            timestamp: new Date(entry.timestamp),
-          })),
-          { ordered: false }
-        ).catch(() => null);
-      }
-      migrated++;
-    } catch (err) {
-      log("WARN", `Migration Guild ${guildStats.guildId} fehlgeschlagen: ${err?.message || err}`);
-    }
-  }
-
-  log("INFO", `JSON -> MongoDB Migration: ${migrated}/${guilds.length} Guilds migriert.`);
-  return { migrated: true, count: migrated, total: guilds.length };
-}
-
-// ============================================================
 // Reset guild stats (in-memory + optionally called after DB wipe)
 // ============================================================
 export function resetGuildStats(guildId) {
@@ -1558,3 +723,21 @@ export function __resetListeningStatsStoreForTests({ deleteFiles = false } = {})
     try { if (fs.existsSync(BACKUP_FILE)) fs.unlinkSync(BACKUP_FILE); } catch {}
   }
 }
+
+// Split into topic modules (#295); the public API stays here.
+export { migrateJsonToMongo } from "./listening-stats/migration.js";
+export {
+  getGlobalStats,
+  getGuildConnectionHealth,
+  getGuildDailyStats,
+  getGuildListenerTimeline,
+  getGuildListeningStats,
+  getGuildSessionHistory,
+  getGuildSessionsSince,
+  getTopGuildsByActivity,
+} from "./listening-stats/queries.js";
+export {
+  buildDailyListeningBreakdown,
+  buildSessionListenerSegments,
+  summarizeSessionListeners,
+} from "./listening-stats/session-math.js";

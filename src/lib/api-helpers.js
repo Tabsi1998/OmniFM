@@ -3,18 +3,10 @@
 // ============================================================
 import fs from "node:fs";
 import path from "node:path";
-import net from "node:net";
 import { timingSafeEqual } from "node:crypto";
-import { log, webDir } from "./logging.js";
+import { webDir } from "./logging.js";
 import { ownerStripeSettings } from "./owner-settings-cache.js";
-import {
-  TIER_RANK,
-  TRUST_PROXY_HEADERS,
-  MIME_TYPES,
-  normalizeSeats,
-  clipText,
-  parseEnvInt,
-} from "./helpers.js";
+import { TIER_RANK, MIME_TYPES, normalizeSeats } from "./helpers.js";
 import { buildCommandBuilders } from "../commands.js";
 import { buildInviteUrl } from "../bot-config.js";
 import {
@@ -22,6 +14,19 @@ import {
   buildContentSecurityPolicy,
   buildPermissionsPolicy,
 } from "../config/security-headers.js";
+import {
+  buildAllowedApiOrigins,
+  getConfiguredPublicOrigin,
+  getTrustedForwardedProto,
+  isAllowedFrontendOrigin,
+  isTrustedProxyAddress,
+  normalizeIpAddress,
+  parseTrustedProxyIps,
+  resolveCheckoutReturnBase,
+  shouldTrustProxyHeaders,
+  toOrigin,
+} from "./api-cors.js";
+import { enforceApiRateLimit, getClientIp } from "./api-rate-limit.js";
 
 // ---- Security & HTTP ----
 
@@ -193,242 +198,6 @@ function sendStaticFile(res, filePath, { headOnly = false, notFoundPath = "" } =
   }
 
   streamStaticFile(res, resolved, { headOnly });
-}
-
-// ---- CORS ----
-function toOrigin(rawUrl) {
-  try {
-    const parsed = new URL(String(rawUrl || "").trim());
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
-    return parsed.origin;
-  } catch {
-    return null;
-  }
-}
-
-function parseCsvEnv(rawValue) {
-  return String(rawValue || "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-}
-
-function normalizeIpAddress(rawValue) {
-  let value = String(rawValue || "").trim().toLowerCase();
-  if (value.startsWith("[") && value.endsWith("]")) {
-    value = value.slice(1, -1);
-  }
-  if (value.startsWith("::ffff:")) {
-    const mappedIpv4 = value.slice("::ffff:".length);
-    if (net.isIP(mappedIpv4) === 4) return mappedIpv4;
-  }
-  return net.isIP(value) ? value : "";
-}
-
-function parseTrustedProxyIps(rawValue = process.env.TRUSTED_PROXY_IPS || "") {
-  return new Set(
-    parseCsvEnv(rawValue)
-      .map((value) => normalizeIpAddress(value))
-      .filter(Boolean)
-  );
-}
-
-const TRUSTED_PROXY_IPS = parseTrustedProxyIps();
-
-function toTrustedProxyIpSet(rawValue) {
-  if (rawValue instanceof Set) {
-    return new Set([...rawValue].map((value) => normalizeIpAddress(value)).filter(Boolean));
-  }
-  return parseTrustedProxyIps(Array.isArray(rawValue) ? rawValue.join(",") : rawValue);
-}
-
-function isTrustedProxyAddress(rawAddress, trustedProxyIps = TRUSTED_PROXY_IPS) {
-  const address = normalizeIpAddress(rawAddress);
-  if (!address) return false;
-
-  const trusted = toTrustedProxyIpSet(trustedProxyIps);
-  return trusted.has(address);
-}
-
-function shouldTrustProxyHeaders(req, {
-  enabled = TRUST_PROXY_HEADERS,
-  trustedProxyIps = TRUSTED_PROXY_IPS,
-} = {}) {
-  if (!enabled) return false;
-  return isTrustedProxyAddress(req?.socket?.remoteAddress, trustedProxyIps);
-}
-
-function getTrustedForwardedProto(req, proxyOptions = undefined) {
-  if (!shouldTrustProxyHeaders(req, proxyOptions)) return "";
-
-  const rawHeader = req?.headers?.["x-forwarded-proto"];
-  const values = (Array.isArray(rawHeader) ? rawHeader : [rawHeader])
-    .flatMap((value) => String(value || "").split(","))
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-  const nearestProtocol = values.at(-1);
-  return nearestProtocol === "https" || nearestProtocol === "http" ? nearestProtocol : "";
-}
-
-function buildWebDomainOriginCandidates() {
-  const rawDomain = String(process.env.WEB_DOMAIN || "").trim();
-  if (!rawDomain) return [];
-
-  let host = rawDomain.replace(/^https?:\/\//i, "").trim();
-  host = host.replace(/\/.*$/, "").trim();
-  if (!host || /[\s/\\]/.test(host)) return [];
-
-  let hostOnly = host;
-  let portPart = "";
-  const lastColon = host.lastIndexOf(":");
-  if (lastColon > 0 && /^\d+$/.test(host.slice(lastColon + 1))) {
-    hostOnly = host.slice(0, lastColon);
-    portPart = `:${host.slice(lastColon + 1)}`;
-  }
-
-  const candidates = [`https://${host}`];
-  if (/^www\./i.test(hostOnly)) {
-    candidates.push(`https://${hostOnly.replace(/^www\./i, "")}${portPart}`);
-  } else if (hostOnly.includes(".")) {
-    candidates.push(`https://www.${hostOnly}${portPart}`);
-  }
-
-  const unique = [];
-  const seen = new Set();
-  for (const candidate of candidates) {
-    const origin = toOrigin(candidate);
-    if (!origin || seen.has(origin)) continue;
-    seen.add(origin);
-    unique.push(origin);
-  }
-  return unique;
-}
-
-function getConfiguredPublicOrigin(publicUrl) {
-  const explicit = toOrigin(publicUrl);
-  if (explicit) return explicit;
-  const domainOrigins = buildWebDomainOriginCandidates();
-  return domainOrigins[0] || "http://localhost";
-}
-
-function isLocalDevelopmentOrigin(rawOrigin) {
-  const origin = toOrigin(rawOrigin);
-  if (!origin) return false;
-  try {
-    const parsed = new URL(origin);
-    const hostname = String(parsed.hostname || "").trim().toLowerCase();
-    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
-  } catch {
-    return false;
-  }
-}
-
-function shouldIncludeDefaultLocalOrigins(publicUrl, configuredOrigins = []) {
-  const candidates = [
-    ...configuredOrigins,
-    publicUrl,
-    ...buildWebDomainOriginCandidates(),
-  ];
-  const hasExplicitNonLocalOrigin = candidates
-    .map((candidate) => toOrigin(candidate))
-    .filter(Boolean)
-    .some((origin) => !isLocalDevelopmentOrigin(origin));
-  return !hasExplicitNonLocalOrigin;
-}
-
-function buildAllowedFrontendOrigins(publicUrl) {
-  const configured = parseCsvEnv(process.env.CORS_ALLOWED_ORIGINS || process.env.CORS_ORIGINS || "");
-  const candidates = [
-    ...configured,
-    publicUrl,
-    ...buildWebDomainOriginCandidates(),
-  ];
-
-  if (shouldIncludeDefaultLocalOrigins(publicUrl, configured)) {
-    candidates.push(
-      "http://localhost",
-      "http://127.0.0.1",
-      "http://localhost:3000",
-      "http://127.0.0.1:3000"
-    );
-  }
-
-  const allowed = new Set();
-  for (const candidate of candidates) {
-    const origin = toOrigin(candidate);
-    if (origin) allowed.add(origin);
-  }
-  return allowed;
-}
-
-function buildAllowedReturnOrigins(publicUrl, req) {
-  const configured = [
-    ...parseCsvEnv(process.env.CHECKOUT_RETURN_ORIGINS || ""),
-    ...parseCsvEnv(process.env.CORS_ALLOWED_ORIGINS || process.env.CORS_ORIGINS || ""),
-  ];
-
-  const candidates = [
-    ...configured,
-    publicUrl,
-    ...buildWebDomainOriginCandidates(),
-  ];
-
-  if (shouldIncludeDefaultLocalOrigins(publicUrl, configured)) {
-    candidates.push(
-      "http://localhost",
-      "http://127.0.0.1"
-    );
-  }
-
-  const allowed = new Set();
-  for (const candidate of candidates) {
-    const origin = toOrigin(candidate);
-    if (origin) allowed.add(origin);
-  }
-  return allowed;
-}
-
-function resolveCheckoutReturnBase(returnUrl, publicUrl, req) {
-  const fallback = getConfiguredPublicOrigin(publicUrl);
-  if (!returnUrl) return fallback;
-
-  let parsed;
-  try {
-    parsed = new URL(String(returnUrl).trim());
-  } catch {
-    return fallback;
-  }
-
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return fallback;
-
-  const allowed = buildAllowedReturnOrigins(publicUrl, req);
-  if (!allowed.has(parsed.origin)) {
-    log("INFO", `Checkout returnUrl verworfen (nicht erlaubt): ${parsed.origin}`);
-    return fallback;
-  }
-
-  const safePath = parsed.pathname && parsed.pathname !== "/" ? parsed.pathname : "";
-  return `${parsed.origin}${safePath}`;
-}
-
-function buildAllowedApiOrigins(publicUrl) {
-  const configured = parseCsvEnv(process.env.CORS_ALLOWED_ORIGINS || process.env.CORS_ORIGINS || "");
-  // Credentialed API CORS must be entirely operator-configured. Do not infer
-  // aliases or development origins from WEB_DOMAIN, Host, or the runtime.
-  const candidates = [...configured, publicUrl];
-
-  const allowed = new Set();
-  for (const candidate of candidates) {
-    const origin = toOrigin(candidate);
-    if (origin) allowed.add(origin);
-  }
-  return allowed;
-}
-
-function isAllowedFrontendOrigin(rawOrigin, publicUrl) {
-  const origin = toOrigin(rawOrigin);
-  if (!origin) return false;
-  return buildAllowedFrontendOrigins(publicUrl).has(origin);
 }
 
 function applyCors(req, res, publicUrl) {
@@ -698,117 +467,6 @@ function isStripeCheckoutEnabled() {
   const stored = ownerStripeSettings();
   if (Object.hasOwn(stored, "enabled")) return Boolean(stored.enabled);
   return Boolean(getStripeSecretKey());
-}
-
-// ---- Rate limiting ----
-const apiRateLimitState = new Map();
-const MAX_API_RATE_STATE_ENTRIES = Math.max(
-  1_000,
-  Number.parseInt(String(process.env.API_RATE_STATE_MAX_ENTRIES || "50000"), 10) || 50_000
-);
-
-function getForwardedClientIp(rawHeader, trustedProxyIps) {
-  const rawValues = Array.isArray(rawHeader) ? rawHeader : [rawHeader];
-  const chain = rawValues
-    .flatMap((value) => String(value || "").split(","))
-    .map((value) => normalizeIpAddress(value))
-    .filter(Boolean);
-
-  // Standard reverse proxies append their immediate peer to X-Forwarded-For.
-  // Working backwards prevents an attacker-controlled value at the beginning
-  // of the chain from becoming the rate-limit identity.
-  for (let index = chain.length - 1; index >= 0; index -= 1) {
-    if (!isTrustedProxyAddress(chain[index], trustedProxyIps)) return chain[index];
-  }
-  return "";
-}
-
-function getClientIp(req, proxyOptions = undefined) {
-  const peerIp = normalizeIpAddress(req?.socket?.remoteAddress);
-  if (!shouldTrustProxyHeaders(req, proxyOptions)) {
-    return peerIp || req?.socket?.remoteAddress || "unknown";
-  }
-
-  const trustedProxyIps = proxyOptions?.trustedProxyIps ?? TRUSTED_PROXY_IPS;
-  const forwarded = getForwardedClientIp(req?.headers?.["x-forwarded-for"], trustedProxyIps);
-  return forwarded || peerIp || req?.socket?.remoteAddress || "unknown";
-}
-
-function getApiRateLimitSpec(pathname) {
-  if (
-    pathname === "/api/premium/webhook"
-    || pathname === "/api/discordbotlist/vote"
-    || pathname === "/api/topgg/webhook"
-  ) {
-    return {
-      scope: "webhook",
-      max: parseEnvInt("API_RATE_LIMIT_WEBHOOK_MAX", 60, 1, 10_000),
-      windowMs: parseEnvInt("API_RATE_LIMIT_WEBHOOK_WINDOW_MS", 60_000, 1_000, 10 * 60_000),
-    };
-  }
-  // The owner console loads many owner routes at once (#288); its own bucket
-  // keeps it from running into the public limit.
-  if (pathname.startsWith("/api/admin/") || pathname.startsWith("/api/owner/")) {
-    return {
-      scope: "owner",
-      max: parseEnvInt("API_RATE_LIMIT_OWNER_MAX", 600, 1, 10_000),
-      windowMs: parseEnvInt("API_RATE_LIMIT_OWNER_WINDOW_MS", 60_000, 1_000, 10 * 60_000),
-    };
-  }
-  if (pathname.startsWith("/api/premium/")) {
-    return {
-      scope: "premium",
-      max: parseEnvInt("API_RATE_LIMIT_PREMIUM_MAX", 12, 1, 1_000),
-      windowMs: parseEnvInt("API_RATE_LIMIT_PREMIUM_WINDOW_MS", 60_000, 1_000, 10 * 60_000),
-    };
-  }
-  return {
-    scope: "general",
-    max: parseEnvInt("API_RATE_LIMIT_MAX", 60, 1, 10_000),
-    windowMs: parseEnvInt("API_RATE_LIMIT_WINDOW_MS", 60_000, 1_000, 10 * 60_000),
-  };
-}
-
-function cleanupRateLimitState(now = Date.now()) {
-  if (apiRateLimitState.size < MAX_API_RATE_STATE_ENTRIES) return;
-  const keysToDelete = [];
-  for (const [key, entry] of apiRateLimitState.entries()) {
-    if (now - entry.windowStart > entry.windowMs * 2) {
-      keysToDelete.push(key);
-    }
-  }
-  for (const key of keysToDelete) {
-    apiRateLimitState.delete(key);
-  }
-  if (apiRateLimitState.size >= MAX_API_RATE_STATE_ENTRIES) {
-    const oldest = [...apiRateLimitState.entries()].sort((a, b) => a[1].windowStart - b[1].windowStart);
-    const removeCount = Math.ceil(apiRateLimitState.size * 0.2);
-    for (let i = 0; i < removeCount && i < oldest.length; i++) {
-      apiRateLimitState.delete(oldest[i][0]);
-    }
-  }
-}
-
-function enforceApiRateLimit(req, res, pathname) {
-  const spec = getApiRateLimitSpec(pathname);
-  const ip = getClientIp(req);
-  const key = `${spec.scope}:${ip}`;
-  const now = Date.now();
-
-  cleanupRateLimitState(now);
-
-  let entry = apiRateLimitState.get(key);
-  if (!entry || now - entry.windowStart > spec.windowMs) {
-    entry = { count: 0, windowStart: now, windowMs: spec.windowMs };
-    apiRateLimitState.set(key, entry);
-  }
-
-  entry.count += 1;
-  if (entry.count > spec.max) {
-    sendJson(res, 429, { error: "Too many requests. Please try again later." });
-    return false;
-  }
-  return true;
 }
 
 export {
