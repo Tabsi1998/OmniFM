@@ -1,13 +1,25 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { configureDashboardBackend, resolveDashboardBackend, resolveNodeApiPort } from "../src/lib/dashboard-backend.js";
+import {
+  configureDashboardBackend,
+  resolveDashboardBackend,
+  resolveNodeApiPort,
+  resolvePublicBackend,
+} from "../src/lib/dashboard-backend.js";
 
-test("without the switch the Node API stays off", () => {
-  const env = { WEB_SERVER_ENABLED: "1" };
+test("the Node entry is the default since #290; FastAPI is the way back", () => {
+  assert.equal(resolvePublicBackend({}), "node");
+  assert.equal(resolvePublicBackend({ OMNIFM_PUBLIC_BACKEND: "FastAPI" }), "fastapi");
+  // Behind the Node entry the commander always answers the dashboard.
+  assert.equal(resolveDashboardBackend({ OMNIFM_DASHBOARD_BACKEND: "fastapi" }), "node");
+});
+
+test("behind the FastAPI entry without the dashboard switch the Node API stays off", () => {
+  const env = { WEB_SERVER_ENABLED: "1", OMNIFM_PUBLIC_BACKEND: "fastapi" };
   assert.deepEqual(configureDashboardBackend(env), { backend: "fastapi", enabled: false });
   assert.equal(env.WEB_SERVER_ENABLED, "0");
-  assert.equal(resolveDashboardBackend({ OMNIFM_DASHBOARD_BACKEND: "FastAPI" }), "fastapi");
+  assert.equal(resolveDashboardBackend({ OMNIFM_PUBLIC_BACKEND: "fastapi", OMNIFM_DASHBOARD_BACKEND: "FastAPI" }), "fastapi");
 });
 
 test("node mode binds the Node API to loopback and trusts only the local proxy", () => {
@@ -18,7 +30,7 @@ test("node mode binds the Node API to loopback and trusts only the local proxy",
     PUBLIC_WEB_URL: "https://omnifm.xyz",
   };
   const result = configureDashboardBackend(env, { redirectUri: "https://other.example/api/auth/discord/callback" });
-  assert.deepEqual(result, { backend: "node", enabled: true, port: 8002 });
+  assert.deepEqual(result, { backend: "node", enabled: true, port: 8002, publicBackend: "node" });
   assert.equal(env.WEB_SERVER_ENABLED, "1");
   assert.equal(env.WEB_BIND, "127.0.0.1", "never public, whatever backend/.env says");
   assert.equal(env.WEB_INTERNAL_PORT, "8002");

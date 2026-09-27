@@ -35,6 +35,7 @@ import { createPublicRoutesHandler } from "./routes/public-routes.js";
 import { legalNotice, privacyNotice, termsNotice } from "../lib/owner-public.js";
 import { loadOwnerConfigRaw } from "../lib/owner-config.js";
 import { startOwnerSettingsRefresh } from "../lib/owner-settings-cache.js";
+import { forwardToRuntime, isRuntimePath, runtimeApiReachable } from "./runtime-forward.js";
 import { createShareRoutesHandler } from "./routes/share-routes.js";
 import { createStationLogoRoutesHandler } from "./routes/station-logo-routes.js";
 import { createOwnerStatusRoutesHandler } from "./routes/owner-status-routes.js";
@@ -658,7 +659,11 @@ const handleShareRoutes = createShareRoutesHandler({
   },
 });
 
+// The commander's Node API when this process is the public entry (#290).
+let runtimeForwardTarget = "";
+
 const handlePublicRoutes = createPublicRoutesHandler({
+  getRuntimeApiStatus: async () => (runtimeForwardTarget ? runtimeApiReachable(runtimeForwardTarget) : null),
   API_COMMANDS,
   BRAND,
   TIERS,
@@ -2929,13 +2934,22 @@ const handleAdminRoutes = createAdminRoutesHandler({
   getCommonSecurityHeaders,
 });
 
-function startWebServer(runtimes) {
-  // A new OAuth secret from the owner console works without a restart.
-  startDiscordOauthSync();
+/**
+ * @param {any[]} runtimes the bots of this process ([] for the public entry)
+ * @param {{ forwardRuntimeTo?: string }} [options] forwardRuntimeTo: the
+ *   commander's Node API. Set for the public entry (#290): the paths that need
+ *   the bots go there, and login sync and cockpit run in the commander only.
+ */
+function startWebServer(runtimes, { forwardRuntimeTo = "" } = {}) {
+  runtimeForwardTarget = forwardRuntimeTo;
+  if (!forwardRuntimeTo) {
+    // A new OAuth secret from the owner console works without a restart.
+    startDiscordOauthSync();
+    // The owner cockpit checks every service every 5 minutes (#355).
+    startOwnerStatusService(runtimes);
+  }
   // Stripe keys and plan prices of the owner console (#289).
   startOwnerSettingsRefresh();
-  // The owner cockpit checks every service every 5 minutes (#355).
-  startOwnerStatusService(runtimes);
   const webInternalPort = Number(process.env.WEB_INTERNAL_PORT || "8080");
   const webPort = Number(process.env.WEB_PORT || "8081");
   const webBind = process.env.WEB_BIND || "0.0.0.0";
@@ -2950,10 +2964,17 @@ function startWebServer(runtimes) {
       return;
     }
 
-    // Owner/admin routes use their own token/cookie auth and must not be
-    // blocked by generic frontend CORS when a reverse proxy rewrites Host.
-    // They are still rate-limited before parsing any potentially large body.
-    if (requestUrl.pathname === "/admin" || requestUrl.pathname === "/admin/" || requestUrl.pathname.startsWith("/api/admin/")) {
+    // The public entry passes what needs the bots to the commander, which
+    // applies its own CORS, CSRF and rate limits (#290).
+    if (forwardRuntimeTo && isRuntimePath(requestUrl.pathname)) {
+      forwardToRuntime(req, res, forwardRuntimeTo, { securityHeaders: getCommonSecurityHeaders() });
+      return;
+    }
+
+    // Owner routes use their own token auth and must not be blocked by
+    // generic frontend CORS when a reverse proxy rewrites Host. They are
+    // still rate-limited before parsing any potentially large body.
+    if (requestUrl.pathname.startsWith("/api/admin/")) {
       if (!enforceApiRateLimit(req, res, requestUrl.pathname)) {
         return;
       }
