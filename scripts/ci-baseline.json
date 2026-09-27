@@ -72,9 +72,9 @@
     "backend/routers/dashboard.py: ssrf-requests: resp = requests.get( f\"https://discord.com/api/v10/guilds/{guild.get('id')}/emojis\", headers={\"Authorization\": f\"Bot {bot_token}\"}, timeout=",
     "backend/server.py: wildcard-cors: allow_origins=[\"*\"] if CORS_HAS_WILDCARD else ALLOWED_ORIGINS,",
     "backend/services/dashboard_auth.py: directly-returned-format-string: return f\"{parsed_origin.scheme}://{parsed_origin.netloc}\"",
-    "frontend/src/components/DashboardEvents.js: react-dangerouslysetinnerhtml: <div dangerouslySetInnerHTML={{ __html: renderDiscordMarkdown(announcementPreview, { serverEmojis }) }} />",
-    "frontend/src/components/DashboardEvents.js: react-dangerouslysetinnerhtml: <div dangerouslySetInnerHTML={{ __html: renderDiscordMarkdown(descriptionPreview, { serverEmojis }) }} />",
     "frontend/src/components/RichMessageEditor.js: react-dangerouslysetinnerhtml: <div dangerouslySetInnerHTML={{ __html: renderDiscordMarkdown(resolvedPreviewText, { serverEmojis: resolvedServerEmojis }) }} />",
+    "frontend/src/components/events/EventCard.js: react-dangerouslysetinnerhtml: <div dangerouslySetInnerHTML={{ __html: renderDiscordMarkdown(announcementPreview, { serverEmojis }) }} />",
+    "frontend/src/components/events/EventCard.js: react-dangerouslysetinnerhtml: <div dangerouslySetInnerHTML={{ __html: renderDiscordMarkdown(descriptionPreview, { serverEmojis }) }} />",
     "src/lib/api-helpers.js: cors-misconfiguration: res.setHeader(\"Access-Control-Allow-Origin\", normalizedOrigin);"
   ],
   "shellcheck": []
