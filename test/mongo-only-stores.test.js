@@ -81,3 +81,60 @@ test("premium in production: MongoDB only, no premium.json", { skip: !hasMongoCo
   await premium.flushPremiumStoreWrites();
   assert.equal(fs.existsSync(path.join(dataDir, "premium.json")), false, "no premium.json in production");
 });
+
+test("bot list states: webhook and sync loop write their own fields, neither is lost", { skip: !hasMongoConfig }, async (t) => {
+  const previousEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = "production";
+  const { connect, getDb } = await import("../src/lib/db.js");
+  await connect();
+  const state = getDb().collection("provider_state");
+  await state.deleteOne({ _id: "topgg" });
+  const topgg = await import("../src/topgg-store.js");
+  t.after(async () => {
+    await topgg.stopTopGGStore();
+    await state.deleteOne({ _id: "topgg" });
+    process.env.NODE_ENV = previousEnv;
+  });
+  await topgg.initTopGGStore({ refreshMs: 60_000 });
+  // The public entry's webhook set its field; this process has not refreshed yet.
+  await state.updateOne({ _id: "topgg" }, { $set: { lastWebhookVoteAt: "2026-09-27T10:00:00.000Z" } }, { upsert: true });
+  topgg.setTopGGSyncStatus("stats", { ok: true, source: "test-292" });
+  await topgg.stopTopGGStore();
+  const doc = await state.findOne({ _id: "topgg" });
+  assert.equal(doc.lastWebhookVoteAt, "2026-09-27T10:00:00.000Z", "the webhook's field survived the sync loop's save");
+  assert.equal(doc.lastStatsSync?.source, "test-292");
+  assert.equal(fs.existsSync(path.join(dataDir, "topgg.json")), false, "no topgg.json in production");
+});
+
+test("votes: one document each, a vote seen by two processes counts once", { skip: !hasMongoConfig }, async (t) => {
+  const previousEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = "production";
+  const { connect, getDb } = await import("../src/lib/db.js");
+  await connect();
+  const events = getDb().collection("vote_events");
+  const counters = getDb().collection("vote_counters");
+  const clean = async () => {
+    await events.deleteMany({ _key: /^topgg:test292-/ });
+    await counters.deleteOne({ _id: "topgg" });
+  };
+  await clean();
+  const votes = await import("../src/vote-events-store.js");
+  t.after(async () => {
+    await votes.stopVoteEventsStore();
+    await clean();
+    process.env.NODE_ENV = previousEnv;
+  });
+  await votes.initVoteEventsStore({ refreshMs: 60_000 });
+  const vote = (id) => ({ provider: "topgg", voteId: `test292-${id}`, userId: "123456789012345678", votedAt: "2026-09-27T12:00:00.000Z" });
+
+  votes.recordVoteEvent(vote("a"));
+  // The other process already stored vote b; this one merges it from the provider's list.
+  await events.insertOne({ _key: "topgg:test292-b", ...vote("b"), key: "topgg:test292-b", provider: "topgg" });
+  await counters.updateOne({ _id: "topgg" }, { $inc: { totalVotes: 1 } }, { upsert: true });
+  votes.mergeVoteEvents([vote("b"), vote("a")]);
+  await votes.stopVoteEventsStore();
+
+  assert.equal(await events.countDocuments({ _key: /^topgg:test292-/ }), 2);
+  assert.equal((await counters.findOne({ _id: "topgg" })).totalVotes, 2, "a and b once each");
+  assert.equal(fs.existsSync(path.join(dataDir, "vote-events.json")), false, "no vote-events.json in production");
+});

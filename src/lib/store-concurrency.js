@@ -83,9 +83,9 @@ export const STORE_CONCURRENCY_REGISTRY = [
     store: "provider-directory",
     files: ["discordbotlist.json", "botsgg.json", "topgg.json", "vote-events.json"],
     scope: "global provider sync",
-    runtimeOwner: "commander sync process",
-    splitSafety: "commander-owned",
-    protection: "provider sync loops run in the commander process",
+    runtimeOwner: "MongoDB: webhooks in the public entry, sync loops in the commander (#292)",
+    splitSafety: "mongo-source",
+    protection: "state documents set field by field; one document per vote, totals with $inc; JSON is one-time migration and local fallback",
   },
   {
     store: "incidents",

@@ -1,6 +1,5 @@
-import fs from "node:fs";
-import path from "node:path";
 import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
+import { createStateDocumentStore } from "./lib/state-document-store.js";
 
 const STATE_FILE = resolveRuntimeDataPath("topgg.json");
 
@@ -72,47 +71,19 @@ function normalizeState(rawState) {
   };
 }
 
+// MongoDB when connected (#292), the JSON file otherwise; saves set only changed fields.
+const stateDocument = createStateDocumentStore({ id: "topgg", file: STATE_FILE, emptyState, normalize: normalizeState });
+
 function loadRawState() {
-  try {
-    if (!fs.existsSync(STATE_FILE)) return emptyState();
-    if (fs.statSync(STATE_FILE).isDirectory()) return emptyState();
-    const raw = fs.readFileSync(STATE_FILE, "utf8");
-    if (!raw.trim()) return emptyState();
-    return normalizeState(JSON.parse(raw));
-  } catch {
-    return emptyState();
-  }
+  return stateDocument.load();
 }
 
 function saveRawState(state) {
-  const normalized = normalizeState(state);
-  const tempPath = `${STATE_FILE}.tmp-${process.pid}-${Date.now()}`;
-  const serialized = `${JSON.stringify(normalized, null, 2)}\n`;
-
-  try {
-    fs.writeFileSync(tempPath, serialized, "utf8");
-    try {
-      fs.renameSync(tempPath, STATE_FILE);
-    } catch (renameErr) {
-      const code = String(renameErr?.code || "");
-      if (["EBUSY", "EPERM", "EACCES", "EXDEV"].includes(code)) {
-        fs.writeFileSync(STATE_FILE, serialized, "utf8");
-      } else {
-        throw renameErr;
-      }
-    }
-  } catch {
-    // ignore store write failures
-  } finally {
-    try {
-      if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
-    } catch {
-      // ignore cleanup failures
-    }
-  }
-
-  return normalized;
+  return stateDocument.save(state);
 }
+
+export const initTopGGStore = (options) => stateDocument.init(options);
+export const stopTopGGStore = () => stateDocument.stop();
 
 function setTopGGSyncStatus(kind, payload = {}) {
   const keyMap = {
