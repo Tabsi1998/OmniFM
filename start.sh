@@ -175,7 +175,10 @@ if ! command -v mongodump >/dev/null 2>&1 || ! command -v mongorestore >/dev/nul
 fi
 
 # --- MongoDB starten ---------------------------------------------------------
-if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files 2>/dev/null | grep -q '^mongod\.service'; then
+# systemd only when it runs: in a container or WSL systemctl exists without it,
+# and MongoDB would then never start (found by scripts/rehearse-public-switch.sh).
+if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ] \
+  && systemctl list-unit-files 2>/dev/null | grep -q '^mongod\.service'; then
   log "Starte MongoDB (systemd)..."
   $SUDO systemctl enable mongod >>"$LOG_DIR/setup.log" 2>&1 || true
   $SUDO systemctl start mongod  >>"$LOG_DIR/setup.log" 2>&1 || warn "MongoDB-Start via systemd meldete Fehler (siehe logs/setup.log)."
@@ -321,7 +324,9 @@ done
 log "MongoDB antwortet."
 
 log "Prüfe FastAPI-Import vor dem Umschalten..."
-( cd "$ROOT" && "$VENV/bin/python" -c "import backend.server as app; assert app.mongo_is_reachable(), 'MongoDB nicht erreichbar'" ) \
+# From backend/, like Uvicorn: FastAPI reads the .env of its working directory,
+# and on a new server backend/.env is the only one.
+( cd "$ROOT/backend" && "$VENV/bin/python" -c "import server as app; assert app.mongo_is_reachable(), 'MongoDB nicht erreichbar'" ) \
   || die "FastAPI-Preflight fehlgeschlagen; laufende Version bleibt aktiv."
 
 log "Prüfe DB-gesteuerte Discord-Konfiguration vor dem Umschalten..."
