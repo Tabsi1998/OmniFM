@@ -169,10 +169,13 @@ async function initBotStateStore() {
   } catch (err) {
     log("WARN", `[bot-state] Split-Dateien nicht lesbar: ${err?.message || err}`);
   }
+  let copied = 0;
   for (const [botId, guilds] of fromFiles) {
     // eslint-disable-next-line no-await-in-loop -- a one-time copy
-    await collection.updateOne({ _id: botId }, { $setOnInsert: { guilds, updatedAt: new Date().toISOString() } }, { upsert: true });
+    const result = await collection.updateOne({ _id: botId }, { $setOnInsert: { guilds, updatedAt: new Date().toISOString() } }, { upsert: true });
+    if (result.upsertedCount) copied += 1;
   }
+  if (copied) log("INFO", `[bot-state] Zustand von ${copied} Bot(s) aus den bot-state-Dateien nach MongoDB übernommen.`);
   for (const doc of await collection.find({}).toArray()) mongoCache.set(String(doc._id), doc.guilds || {});
   mongoActive = true;
   return { backend: "mongo", bots: mongoCache.size };
