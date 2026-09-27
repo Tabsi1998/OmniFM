@@ -1,4 +1,6 @@
 import fs from "node:fs";
+import { getDb, isConnected } from "./lib/db.js";
+import { log } from "./lib/logging.js";
 import path from "node:path";
 import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 
@@ -164,6 +166,87 @@ function saveState() {
   }
 }
 
+// ---- MongoDB (#292) ----
+// A song is written by the worker that plays the server and read by the
+// panel (same worker) and /history (commander). In MongoDB each song is one
+// document in song_history; the playing worker keeps the latest songs of its
+// servers in memory for the panel and the duplicate check, and /history asks
+// MongoDB directly (readSongHistory). Without MongoDB the files stay.
+const COLLECTION = "song_history";
+let mongoActive = false;
+const recentByGuild = new Map();
+const warming = new Set();
+let mongoWriteQueue = Promise.resolve();
+
+function queueMongo(task) {
+  mongoWriteQueue = mongoWriteQueue
+    .then(async () => { if (isConnected()) await task(getDb().collection(COLLECTION)); })
+    .catch((err) => log("ERROR", `[song-history] MongoDB-Speichern fehlgeschlagen: ${err?.message || err}`));
+  return mongoWriteQueue;
+}
+
+/** The latest songs of a server from MongoDB, into this process's memory (panel after a restart). */
+function warmGuild(gid) {
+  if (warming.has(gid) || recentByGuild.has(gid) || !isConnected()) return;
+  warming.add(gid);
+  getDb().collection(COLLECTION).find({ guildId: gid }, { projection: { _id: 0 } }).sort({ timestampMs: -1 }).limit(DEFAULT_MAX_PER_GUILD).toArray()
+    .then((rows) => { if (!recentByGuild.has(gid)) recentByGuild.set(gid, rows.reverse()); })
+    .catch(() => null)
+    .finally(() => warming.delete(gid));
+}
+
+/** The latest songs of a server straight from MongoDB, newest first (/history in another process). */
+export async function readSongHistory(guildId, options = {}) {
+  const gid = normalizeGuildId(guildId);
+  if (!gid) return [];
+  if (!mongoActive || !isConnected()) return getSongHistory(gid, options);
+  const limitRaw = Number.parseInt(String(options.limit ?? DEFAULT_LIMIT), 10);
+  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(MAX_LIMIT, limitRaw)) : DEFAULT_LIMIT;
+  return getDb().collection(COLLECTION).find({ guildId: gid }, { projection: { _id: 0 } }).sort({ timestampMs: -1 }).limit(limit).toArray();
+}
+
+/** MongoDB becomes the store; the songs of the history files are copied once. */
+export async function initSongHistoryStore() {
+  if (!isConnected() || !getDb()) return { backend: "file" };
+  const collection = getDb().collection(COLLECTION);
+  await collection.createIndex({ guildId: 1, timestampMs: -1 }, { name: "guild_time" }).catch(() => null);
+  await collection.createIndex({ guildId: 1, id: 1 }, { name: "guild_entry", unique: true }).catch(() => null);
+  const guilds = {};
+  const legacy = readStateFile(STORE_FILE) || readStateFile(BACKUP_FILE);
+  Object.assign(guilds, legacy?.guilds || {});
+  try {
+    if (fs.existsSync(SPLIT_HISTORY_DIR) && fs.statSync(SPLIT_HISTORY_DIR).isDirectory()) {
+      for (const name of fs.readdirSync(SPLIT_HISTORY_DIR)) {
+        if (!name.endsWith(".json")) continue;
+        const state = readStateFile(path.join(SPLIT_HISTORY_DIR, name));
+        Object.assign(guilds, state?.guilds || {});
+      }
+    }
+  } catch (err) {
+    log("WARN", `[song-history] Verlaufsdateien nicht lesbar: ${err?.message || err}`);
+  }
+  const ops = [];
+  for (const [gid, entries] of Object.entries(guilds)) {
+    for (const entry of Array.isArray(entries) ? entries : []) {
+      if (!entry?.id) continue;
+      ops.push({ updateOne: { filter: { guildId: gid, id: entry.id }, update: { $setOnInsert: { ...entry, guildId: gid } }, upsert: true } });
+    }
+  }
+  if (!(await collection.estimatedDocumentCount().catch(() => 0)) && ops.length) {
+    for (let index = 0; index < ops.length; index += 1000) {
+      // eslint-disable-next-line no-await-in-loop -- a one-time copy in batches
+      await collection.bulkWrite(ops.slice(index, index + 1000), { ordered: false }).catch(() => null);
+    }
+    log("INFO", `[song-history] ${ops.length} Songs aus den Verlaufsdateien nach MongoDB übernommen.`);
+  }
+  mongoActive = true;
+  return { backend: "mongo" };
+}
+
+export async function stopSongHistoryStore() {
+  await mongoWriteQueue.catch(() => null);
+}
+
 function buildTrackFingerprint(track) {
   const parts = [
     normalizeText(track.displayTitle, 220) || "",
@@ -200,6 +283,25 @@ export function appendSongHistory(guildId, track, options = {}) {
   }, gid);
 
   if (!entry) return { saved: false, reason: "invalid-entry" };
+
+  if (mongoActive) {
+    const list = recentByGuild.get(gid) || [];
+    const previous = list.length ? list[list.length - 1] : null;
+    if (previous
+      && buildTrackFingerprint(previous) === buildTrackFingerprint(entry)
+      && Math.abs(entry.timestampMs - previous.timestampMs) <= dedupeWindowMs) {
+      return { saved: false, reason: "duplicate", entry: previous };
+    }
+    list.push(entry);
+    const kept = list.slice(-maxPerGuild);
+    recentByGuild.set(gid, kept);
+    queueMongo(async (collection) => {
+      await collection.insertOne({ ...entry, guildId: gid });
+      // Only the newest songs per server stay, as in the files.
+      if (list.length > maxPerGuild) await collection.deleteMany({ guildId: gid, timestampMs: { $lt: kept[0].timestampMs } });
+    });
+    return { saved: true, entry };
+  }
 
   const state = SPLIT_HISTORY_STORAGE_ENABLED
     ? readSplitGuildState(gid)
@@ -238,6 +340,12 @@ export function getSongHistory(guildId, options = {}) {
     ? Math.max(1, Math.min(MAX_LIMIT, limitRaw))
     : DEFAULT_LIMIT;
 
+  if (mongoActive) {
+    // This process's memory; after a restart it is filled from MongoDB in the background.
+    if (!recentByGuild.has(gid)) warmGuild(gid);
+    return (recentByGuild.get(gid) || []).slice(-limit).reverse().map((entry) => ({ ...entry }));
+  }
+
   const state = SPLIT_HISTORY_STORAGE_ENABLED
     ? readSplitGuildState(gid)
     : ensureState();
@@ -248,6 +356,12 @@ export function getSongHistory(guildId, options = {}) {
 export function clearSongHistory(guildId) {
   const gid = normalizeGuildId(guildId);
   if (!gid) return false;
+
+  if (mongoActive) {
+    recentByGuild.delete(gid);
+    queueMongo((collection) => collection.deleteMany({ guildId: gid }));
+    return true;
+  }
 
   const state = SPLIT_HISTORY_STORAGE_ENABLED
     ? readSplitGuildState(gid)

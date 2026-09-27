@@ -162,10 +162,13 @@ export async function initGuildLanguageStore({ refreshMs = 10_000 } = {}) {
   if (!isConnected() || !getDb()) return { backend: "file" };
   const collection = getDb().collection(COLLECTION);
   const fileState = readState(STORE_FILE) || readState(BACKUP_FILE);
+  let copied = 0;
   for (const [guildId, language] of Object.entries(fileState?.guilds || {})) {
     // eslint-disable-next-line no-await-in-loop -- a one-time copy
-    await collection.updateOne({ _id: guildId }, { $setOnInsert: { language } }, { upsert: true });
+    const result = await collection.updateOne({ _id: guildId }, { $setOnInsert: { language } }, { upsert: true });
+    if (result.upsertedCount) copied += 1;
   }
+  if (copied) log("INFO", `[guild-languages] ${copied} Server-Sprache(n) aus guild-languages.json nach MongoDB übernommen.`);
   mongoActive = true;
   cache = normalizeState({});
   await readMongoState();

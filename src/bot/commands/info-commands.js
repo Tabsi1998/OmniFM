@@ -10,7 +10,7 @@ import {
 } from "discord.js";
 import { TIER_RANK, SONG_HISTORY_ENABLED, clipText } from "../../lib/helpers.js";
 import { getTier } from "../../core/entitlements.js";
-import { getSongHistory } from "../../song-history-store.js";
+import { readSongHistory } from "../../song-history-store.js";
 import { recordCommandUsage } from "../../listening-stats-store.js";
 import { buildInviteUrl } from "../../bot-config.js";
 import { BRAND } from "../../config/plans.js";
@@ -317,7 +317,8 @@ async function handleHistoryCommand({ runtime, interaction, t, language }) {
   const playback = await runtime.resolveStreamingRuntimeForInteraction(interaction);
   const requestedLimit = interaction.options.getInteger("limit") || 10;
   const limit = Math.max(1, Math.min(20, requestedLimit));
-  const history = getSongHistory(interaction.guildId, { limit });
+  // Straight from MongoDB: the worker that plays the server wrote it (#292).
+  const history = await readSongHistory(interaction.guildId, { limit });
 
   if (!history.length) {
     await interaction.reply(buildNoticePayload({

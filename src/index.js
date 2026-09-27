@@ -107,7 +107,29 @@ logStoreConcurrencyReport({
   mongoConnected,
   requireMongo: false,
 });
+// Production keeps its data in MongoDB only (#292); no silent fall back to files.
+{
+  const { MONGO_REQUIRED_MESSAGE, fileStoresAllowed } = await import("./lib/store-policy.js");
+  if (!mongoConnected && !fileStoresAllowed()) {
+    log("ERROR", MONGO_REQUIRED_MESSAGE);
+    process.exit(1);
+  }
+}
 await initPremiumStore();
+{
+  const { initCouponStore } = await import("./coupon-store.js");
+  const { initProviderStores } = await import("./lib/provider-stores.js");
+  const { initDashboardStore } = await import("./dashboard-store.js");
+  const { initGuildLanguageStore } = await import("./guild-language-store.js");
+  const { initBotStateStore } = await import("./bot-state.js");
+  const { initSongHistoryStore } = await import("./song-history-store.js");
+  await initCouponStore();
+  await initProviderStores();
+  await initDashboardStore();
+  await initGuildLanguageStore();
+  await initBotStateStore();
+  await initSongHistoryStore();
+}
 await initStationsStore();
 await initCustomStationsStore();
 await initCommandPermissionsStore();
@@ -602,6 +624,11 @@ async function shutdown(signal) {
 
   webServer?.close();
   await Promise.all(runtimes.map((runtime) => runtime.stop()));
+  // The state saved above has to reach MongoDB before the process ends (#292).
+  {
+    const { flushBotStateStore } = await import("./bot-state.js");
+    await flushBotStateStore().catch(() => null);
+  }
   await Promise.all([
     stopScheduledEventsStore(),
     stopCustomStationsStore(),
