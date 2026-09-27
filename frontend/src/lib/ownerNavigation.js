@@ -15,6 +15,7 @@ export const OWNER_AREAS = Object.freeze([
     pages: [
       { id: 'overview', label: 'Übersicht', keywords: ['umsatz', 'mrr', 'arr', 'server', 'guilds', 'hörer'] },
       { id: 'licenses', label: 'Lizenzen', keywords: ['lizenz', 'seats', 'testphase', 'trial', 'kunde', 'e-mail', 'verlängern'] },
+      { id: 'discordShop', label: 'Premium in Discord', keywords: ['kaufen', 'verkauf', 'abo', 'sku', 'discord shop', 'monetarisierung', 'zahlung'] },
     ],
   },
   {

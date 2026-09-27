@@ -18,6 +18,7 @@ import { INVITE_COMPONENT_ID_OPEN } from "../runtime-links.js";
 import { openRuntimeStationsBrowser } from "../runtime-panels.js";
 import { buildOmniEmbed } from "../discord-ui.js";
 import { derivePlaybackPhase } from "../playback-phase.js";
+import { discordShopSettings } from "../../premium/discord-shop.js";
 import {
   getTierConfig,
   buildQuickActionRow,
@@ -386,18 +387,35 @@ async function handlePremiumCommand({ runtime, interaction, t, language }) {
     footer: t("Plan, Audio-Profil und Lizenzstatus für diesen Server.", "Plan, audio profile, and license status for this server."),
   });
 
-  if (tierConfig.tier === "free") {
+  // Premium is bought right here in Discord (#320); until Discord lets the
+  // app sell, the owner console keeps the shop switched off.
+  const shop = discordShopSettings();
+  const buyable = [
+    tierConfig.tier === "free" ? shop.skus.pro : "",
+    tierConfig.tier !== "ultimate" ? shop.skus.ultimate : "",
+  ].filter(Boolean);
+  if (tierConfig.tier !== "ultimate") {
     premiumEmbed.addFields({
       name: t("Upgrade", "Upgrade"),
-      value: t(
-        `Upgrade auf ${BRAND.name} Pro oder Ultimate fuer bessere Audioqualitaet, mehr Worker und schnellere Reconnects.`,
-        `Upgrade to ${BRAND.name} Pro or Ultimate for better audio quality, more workers, and faster reconnects.`
-      ),
+      value: [
+        t(
+          `Upgrade auf ${BRAND.name} Pro oder Ultimate fuer bessere Audioqualitaet, mehr Worker und schnellere Reconnects.`,
+          `Upgrade to ${BRAND.name} Pro or Ultimate for better audio quality, more workers, and faster reconnects.`
+        ),
+        shop.enabled && buyable.length
+          ? t("Kaufen geht direkt hier in Discord, mit den Knöpfen unten. Das Abo gilt für diesen Server.", "You buy it right here in Discord with the buttons below. The subscription is for this server.")
+          : t("Kaufen geht bald direkt hier in Discord. Bis dahin: Testmonat oder Gratis-Code auf omnifm.xyz.", "Buying comes to Discord soon. Until then: the trial month or a free code on omnifm.xyz."),
+      ].join("\n"),
       inline: false,
     });
   }
 
   const rows = [];
+  if (shop.enabled && buyable.length) {
+    rows.push(new ActionRowBuilder().addComponents(
+      ...buyable.map((skuId) => new ButtonBuilder().setStyle(ButtonStyle.Premium).setSKUId(skuId))
+    ));
+  }
   const quickRow = buildQuickActionRow(t, {
     includePlay: true,
     includeStations: true,

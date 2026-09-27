@@ -3,7 +3,7 @@
 // ============================================================
 // The Node twin of backend/services/config.py, so the Node API can answer
 // the owner console with the same data and the same rules:
-// - sections company, plans, discord, marketing, system, access in
+// - sections company, plans, discord, marketing, system, access, discordShop in
 //   owner_config {_id: "global"}, defaults from src/config/owner-config-defaults.json;
 // - secrets leave the API masked ("••••••••" plus "<key>Set": true) and a
 //   masked or blank value sent back never replaces the stored secret;
@@ -216,6 +216,8 @@ export function ownerConfigResponse(raw, env = process.env) {
     // The Discord accounts of the owner console (#283). Without it the page
     // showed none after a reload, and saving it again emptied the list.
     access: configSectionFrom(raw, "access"),
+    // Premium sold in Discord (#320): the switch and a SKU per plan.
+    discordShop: configSectionFrom(raw, "discordShop"),
     recoverySettings: RECOVERY_SETTINGS,
   };
 }

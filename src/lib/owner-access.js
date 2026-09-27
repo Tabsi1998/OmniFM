@@ -75,7 +75,7 @@ export function roleAllows(role, method, pathname) {
 
 export function roleMaySaveSection(role, section) {
   if (role === "owner") return true;
-  return role === "billing" && section === "plans";
+  return role === "billing" && ["plans", "discordShop"].includes(section);
 }
 
 /** The owner access section as the owner saves it: no lock-out. */

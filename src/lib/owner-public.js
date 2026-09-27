@@ -20,6 +20,7 @@ import { parseIntLike } from "./owner-licenses.js";
 import { roundHalfEven } from "./helpers.js";
 import { isPublicOrigin, pickPublicOrigin, webDomainOrigin } from "./public-origin.js";
 import { safeFetch } from "./safe-outbound-http.js";
+import { discordShopSettings, discordStoreUrl } from "./discord-shop-settings.js";
 
 /** FastAPI's TIERS: the base the owner's plans are laid over. */
 export const BASE_TIERS = Object.freeze({
@@ -262,7 +263,15 @@ const formatCents = (cents) => (Math.trunc(Number(cents) || 0) / 100).toFixed(2)
  * GET /api/premium/pricing. Features only when the owner changed them, else []
  * so the website shows its own translated copy.
  */
-export function premiumPricing(raw, { license = null, upgrade = null, trialEnabled = isProTrialEnabled() } = {}) {
+/** The commander's application: the owner console first, then the environment. */
+function commanderApplicationId(raw, env) {
+  const fromConsole = String(raw?.discord?.commander?.clientId || "").trim();
+  if (/^\d{17,22}$/.test(fromConsole)) return fromConsole;
+  const index = parseIntLike(env.COMMANDER_BOT_INDEX || 1, 1);
+  return String(env[`BOT_${index}_CLIENT_ID`] || "").trim();
+}
+
+export function premiumPricing(raw, { license = null, upgrade = null, trialEnabled = isProTrialEnabled(), env = process.env } = {}) {
   const plans = configSectionFrom(raw, "plans");
   const rawPlans = raw?.plans && typeof raw.plans === "object" ? raw.plans : {};
   const defaultPlans = DEFAULT_OWNER_CONFIG.plans || {};
@@ -300,6 +309,12 @@ export function premiumPricing(raw, { license = null, upgrade = null, trialEnabl
     seatOptions: [...SEAT_OPTIONS],
     trial: { enabled: trialEnabled, tier: "pro", months: PRO_TRIAL_MONTHS, oneTimePerEmail: true },
   };
+  // Premium is bought in Discord (#320); the website links to the app's store page.
+  const shop = discordShopSettings(raw);
+  const storeUrl = discordStoreUrl(commanderApplicationId(raw, env));
+  result.discordShop = shop.enabled && storeUrl && (shop.skus.pro || shop.skus.ultimate)
+    ? { enabled: true, storeUrl }
+    : { enabled: false };
   if (license && !license.expired) {
     result.currentLicense = {
       tier: license.tier || license.plan || "free",
