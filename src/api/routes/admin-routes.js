@@ -340,7 +340,7 @@ export function createAdminRoutesHandler(deps) {
 
   function auditOwnerAction(req, event) {
     try {
-      // The person behind the request (#283): a Discord account, or "token" for scripts.
+      // The person behind the request (#283): the Discord account, or "owner" for the script token like FastAPI.
       return recordOwnerAudit({
         actor: req.ownerIdentity?.actor || "owner",
         ...event,

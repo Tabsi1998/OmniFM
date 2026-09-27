@@ -38,6 +38,12 @@ def is_discord_webhook_url(url):
 def build_router(core):
     router = APIRouter()
 
+    @router.get("/api/admin/session")
+    async def admin_session():
+        """The Discord sign-in of the owner console (#283) runs on the Node API only.
+        Here nobody is signed in that way, so the console offers the token login."""
+        return {"authenticated": False, "discordLogin": False}
+
     @router.post("/api/admin/login")
     async def admin_login(request: Request, body: dict = None):
         if not core.ADMIN_API_TOKEN:

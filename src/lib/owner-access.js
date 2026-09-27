@@ -164,7 +164,8 @@ export async function resolveOwnerIdentity(req, { adminToken = "" } = {}) {
   const access = accessSettings();
   const token = headerToken(req);
   if (token && adminToken && tokenLoginEnabled(access) && safeTokenEquals(token, adminToken)) {
-    return { via: "token", role: "owner", actor: "token", user: null };
+    // The audit keeps FastAPI's actor for the token; Discord sign-ins name the person.
+    return { via: "token", role: "owner", actor: "owner", user: null };
   }
   const session = await readOwnerSession(ownerSessionTokenFrom(req));
   if (!session) return null;
