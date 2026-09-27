@@ -1,19 +1,42 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Radio, LayoutDashboard, Server, KeyRound, ListMusic, LogOut, ShieldCheck, TrendingUp, Users, Cpu, RefreshCw, CheckCircle2, XCircle,
-  Music2, Globe, Database, AlertTriangle,
-  Radar, Terminal, Gauge, HeartPulse, Plus, Pencil, Trash2, Save, ScrollText, SignalHigh, X as CloseIcon, Bot, Settings2,
+  Radio,
+  LayoutDashboard,
+  KeyRound,
+  ListMusic,
+  LogOut,
+  RefreshCw,
+  HeartPulse,
+  ScrollText,
+  Bot,
+  Settings2,
 } from 'lucide-react';
-import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
-  PieChart, Pie, AreaChart, Area, CartesianGrid,
-} from 'recharts';
 import { buildApiUrl } from '../lib/api.js';
 import BrandKit from './BrandKit.js';
 import OwnerConfig from './OwnerConfig.js';
 import OwnerCockpit from './OwnerCockpit.js';
-import OwnerServerRetention from './OwnerServerRetention.js';
-import { OWNER_AREAS, areaOfPage, pagesOfArea, searchOwnerPages, systemPartOf } from '../lib/ownerNavigation.js';
+import {
+  OWNER_AREAS,
+  areaOfPage,
+  pagesOfArea,
+  searchOwnerPages,
+  systemPartOf,
+} from '../lib/ownerNavigation.js';
+import {
+  BROWSER_CACHE_TTL,
+  Equalizer,
+  PLAN_COLORS,
+  readBrowserCache,
+  writeBrowserCache,
+} from './owner/ownerUi.js';
+import OwnerOverview from './owner/OwnerOverview.js';
+import OwnerMonitoring from './owner/OwnerMonitoring.js';
+import OwnerLicenses from './owner/OwnerLicenses.js';
+import OwnerStations from './owner/OwnerStations.js';
+import OwnerSignIn from './owner/OwnerSignIn.js';
+import OwnerArchive from './owner/OwnerArchive.js';
+import OwnerAudit from './owner/OwnerAudit.js';
+import OwnerActivity from './owner/OwnerActivity.js';
 
 const TOKEN_KEY = 'omnifm_admin_token';
 // Set before the Discord sign-in; on the way back the console turns the
@@ -31,82 +54,6 @@ const AREA_ICONS = {
   settings: Settings2,
   logs: ScrollText,
 };
-
-const PLAN_COLORS = { free: '#64748b', pro: '#00e5ff', ultimate: '#ff6b00' };
-
-// Browser-Abspielbarkeit pro Sender cachen, damit der 120-Sender-Check nicht
-// jedes Mal alles neu ~2 Min probt. Key + URL + Zeitstempel; 24h gültig.
-const BROWSER_CACHE_KEY = 'omnifm_browser_playable_v1';
-const BROWSER_CACHE_TTL = 24 * 3600 * 1000;
-function readBrowserCache() {
-  try { return JSON.parse(window.localStorage.getItem(BROWSER_CACHE_KEY) || '{}') || {}; } catch { return {}; }
-}
-function writeBrowserCache(cache) {
-  try { window.localStorage.setItem(BROWSER_CACHE_KEY, JSON.stringify(cache)); } catch { /* noop */ }
-}
-
-function Equalizer() {
-  return (
-    <span className="oa-eq" aria-hidden="true">
-      <span /><span /><span /><span /><span />
-    </span>
-  );
-}
-
-function fmtMoney(v, cur = 'EUR') {
-  try {
-    return new Intl.NumberFormat('de-DE', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(v || 0);
-  } catch { return `${Math.round(v || 0)} ${cur}`; }
-}
-function fmtDate(v) {
-  if (!v) return '—';
-  try { return new Date(v).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return '—'; }
-}
-function relTime(v) {
-  if (!v) return '';
-  const d = (Date.now() - new Date(v).getTime()) / 1000;
-  if (d < 60) return 'gerade eben';
-  if (d < 3600) return `vor ${Math.floor(d / 60)} Min`;
-  if (d < 86400) return `vor ${Math.floor(d / 3600)} Std`;
-  return `vor ${Math.floor(d / 86400)} Tagen`;
-}
-
-function fmtUptime(sec) {
-  const s = Math.max(0, Math.round(sec || 0));
-  const d = Math.floor(s / 86400);
-  const h = Math.floor((s % 86400) / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  if (d > 0) return `${d}d ${h}h`;
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
-
-function StatTile({ label, value, foot, icon: Icon, accent = '#ff6b00', testid }) {
-  return (
-    <div className="oa-card hoverable oa-fade" data-testid={testid}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div className="oa-stat-label">{label}</div>
-        <div style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', background: `${accent}1f`, color: accent }}>
-          <Icon size={17} />
-        </div>
-      </div>
-      <div className="oa-stat-value">{value}</div>
-      {foot && <div className="oa-stat-foot">{foot}</div>}
-    </div>
-  );
-}
-
-function ChartTooltip({ active, payload, label }) {
-  if (!active || !payload || !payload.length) return null;
-  return (
-    <div style={{ background: '#0e111a', border: '1px solid #2a3450', borderRadius: 10, padding: '8px 12px', fontSize: 12, fontFamily: 'JetBrains Mono, monospace' }}>
-      <div style={{ color: '#94a3b8', marginBottom: 4 }}>{label}</div>
-      {payload.map((p, i) => (
-        <div key={i} style={{ color: p.color || '#fff' }}>{p.name}: <b>{p.value}</b></div>
-      ))}
-    </div>
-  );
-}
 
 export default function OwnerAdmin() {
   const [token, setToken] = useState(() => (typeof window !== 'undefined' ? window.localStorage.getItem(TOKEN_KEY) || '' : ''));
@@ -589,50 +536,15 @@ export default function OwnerAdmin() {
 
   if (!authed) {
     return (
-      <div className="oa-root">
-        <div className="oa-login">
-          <form className="oa-login-card oa-fade" onSubmit={handleLogin} data-testid="admin-login-form">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-              <div className="oa-brand-logo"><Radio size={20} /></div>
-              <div>
-                <div className="oa-display" style={{ fontSize: 20, fontWeight: 800 }}>OmniFM</div>
-                <div className="oa-owner-badge">Super-Admin / Owner Engine</div>
-              </div>
-            </div>
-            <h1 className="oa-display" style={{ fontSize: 22, marginTop: 18 }}>Owner Console</h1>
-            <p style={{ color: '#94a3b8', fontSize: 13.5, marginTop: 6, lineHeight: 1.5 }}>
-              {discordLogin
-                ? <>Mit einem freigeschalteten Discord-Konto anmelden. Der Owner-Token (<span className="oa-mono">API_ADMIN_TOKEN</span>) geht weiterhin.</>
-                : <>Zugriff nur mit dem Owner-Token (<span className="oa-mono">API_ADMIN_TOKEN</span>).</>}
-            </p>
-            {discordLogin && (
-              <button type="button" onClick={startDiscordLogin} className="oa-btn primary" style={{ width: '100%', marginTop: 18 }} data-testid="admin-discord-login-button">
-                <Users size={16} /> Mit Discord anmelden
-              </button>
-            )}
-            <div style={{ marginTop: 20 }}>
-              <label className="oa-stat-label" htmlFor="oa-token">Owner Token</label>
-              <input
-                id="oa-token" type="password" className="oa-input" style={{ marginTop: 8 }}
-                placeholder="••••••••••••••••" value={tokenInput}
-                onChange={(e) => setTokenInput(e.target.value)}
-                data-testid="admin-token-input" autoFocus
-              />
-            </div>
-            {loginErr && (
-              <div className="oa-pill red" style={{ marginTop: 14 }} data-testid="admin-login-error">
-                <AlertTriangle size={13} /> {loginErr}
-              </div>
-            )}
-            <button type="button" onClick={handleLogin} className="oa-btn primary" style={{ width: '100%', marginTop: 20 }} disabled={loggingIn} data-testid="admin-login-button">
-              {loggingIn ? 'Verbinde…' : <><ShieldCheck size={16} /> Anmelden</>}
-            </button>
-            <div style={{ marginTop: 16, textAlign: 'center' }}>
-              <a href="/" className="oa-mono" style={{ fontSize: 11, color: '#64748b' }}>← Zurück zur Website</a>
-            </div>
-          </form>
-        </div>
-      </div>
+      <OwnerSignIn
+        discordLogin={discordLogin}
+        handleLogin={handleLogin}
+        loggingIn={loggingIn}
+        loginErr={loginErr}
+        setTokenInput={setTokenInput}
+        startDiscordLogin={startDiscordLogin}
+        tokenInput={tokenInput}
+      />
     );
   }
 
@@ -768,716 +680,90 @@ export default function OwnerAdmin() {
           <OwnerCockpit apiGet={apiGet} apiSend={apiSend} onOpen={openPage} />
         )}
         {section === 'overview' && (
-          <>
-            <div className="oa-grid cols-4">
-              <StatTile testid="stat-licenses" label="Aktive Lizenzen" value={ov?.licenses?.active ?? '—'} icon={KeyRound} accent="#00e5ff"
-                foot={<span><b>{ov?.licenses?.seatsSold ?? 0}</b> Seats verkauft · {ov?.licenses?.expired ?? 0} abgelaufen</span>} />
-              <StatTile testid="stat-mrr" label="MRR" value={fmtMoney(mrr)} icon={TrendingUp} accent="#10b981"
-                foot={<span className="oa-trend-up"><TrendingUp size={13} /> {fmtMoney(ov?.revenue?.arr)} ARR</span>} />
-              <StatTile testid="stat-guilds" label="Verwaltete Server" value={ov?.guilds?.managed ?? '—'} icon={Users} accent="#00e5ff"
-                foot={<span>{ov?.bots?.online ?? 0}/{ov?.bots?.configured ?? 0} Bots online{ov?.guilds?.live === false ? ' · Bot offline' : ''}</span>} />
-              <StatTile testid="stat-stations" label="Radio-Stationen" value={ov?.stations?.total ?? '—'} icon={Music2} accent="#ff6b00"
-                foot={<span>{ov?.stations?.free ?? 0} Free · {ov?.stations?.pro ?? 0} Pro</span>} />
-            </div>
-
-            <OwnerServerRetention apiGet={apiGet} />
-
-            <div className="oa-grid cols-3" style={{ marginTop: 18 }}>
-              <div className="oa-card oa-fade" style={{ gridColumn: 'span 2' }} data-testid="chart-revenue">
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-                  <div><div className="oa-stat-label">MRR — aktueller Stand</div><div style={{ fontSize: 18, fontWeight: 700, marginTop: 4 }}>{fmtMoney(mrr)} <span style={{ fontSize: 12, color: '#64748b' }}>/ Monat · keine Historie</span></div></div>
-                  <Equalizer />
-                </div>
-                <ResponsiveContainer width="100%" height={210}>
-                  <AreaChart data={revenueTrend} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="oaRev" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#ff6b00" stopOpacity={0.5} />
-                        <stop offset="100%" stopColor="#ff6b00" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1b2133" vertical={false} />
-                    <XAxis dataKey="month" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} tick={false} />
-                    <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Area type="monotone" dataKey="mrr" name="MRR" stroke="#ff6b00" strokeWidth={2.5} fill="url(#oaRev)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="oa-card oa-fade" data-testid="chart-stations">
-                <div className="oa-stat-label" style={{ marginBottom: 10 }}>Stationen nach Tier</div>
-                <ResponsiveContainer width="100%" height={210}>
-                  <PieChart>
-                    <Pie data={stationPie} dataKey="value" nameKey="name" innerRadius={52} outerRadius={82} paddingAngle={3} stroke="none">
-                      {stationPie.map((e, i) => <Cell key={i} fill={e.fill} />)}
-                    </Pie>
-                    <Tooltip content={<ChartTooltip />} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 4 }}>
-                  <span className="oa-mono" style={{ fontSize: 11, color: '#94a3b8' }}><span style={{ color: '#64748b' }}>●</span> Free {stations?.free ?? 0}</span>
-                  <span className="oa-mono" style={{ fontSize: 11, color: '#94a3b8' }}><span style={{ color: '#ff6b00' }}>●</span> Pro {stations?.pro ?? 0}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="oa-grid cols-2" style={{ marginTop: 18 }}>
-              <div className="oa-card oa-fade" data-testid="chart-plans">
-                <div className="oa-stat-label" style={{ marginBottom: 14 }}>Aktive Lizenzen nach Plan</div>
-                {planData.length ? (
-                  <ResponsiveContainer width="100%" height={180}>
-                    <BarChart data={planData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1b2133" vertical={false} />
-                      <XAxis dataKey="plan" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
-                      <YAxis allowDecimals={false} stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
-                      <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-                      <Bar dataKey="count" name="Lizenzen" radius={[6, 6, 0, 0]}>
-                        {planData.map((e, i) => <Cell key={i} fill={e.fill} />)}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : <div style={{ color: '#64748b', fontSize: 13, padding: '30px 0', textAlign: 'center' }}>Keine aktiven Lizenzen</div>}
-              </div>
-            </div>
-          </>
+          <OwnerOverview
+            apiGet={apiGet}
+            mrr={mrr}
+            ov={ov}
+            planData={planData}
+            revenueTrend={revenueTrend}
+            stationPie={stationPie}
+            stations={stations}
+          />
         )}
 
         {section === 'monitoring' && (
-          <>
-            {!monitoring ? (
-              <div className="oa-card" style={{ textAlign: 'center', color: '#64748b', padding: 40 }} data-testid="monitoring-loading">
-                <Equalizer /> <div className="oa-mono" style={{ marginTop: 12, fontSize: 12 }}>TELEMETRIE WIRD GELADEN…</div>
-              </div>
-            ) : monitoring.waiting ? (
-              <div className="oa-card oa-fade" style={{ textAlign: 'center', padding: 48 }} data-testid="monitoring-waiting">
-                <div style={{ width: 56, height: 56, borderRadius: 16, margin: '0 auto 18px', display: 'grid', placeItems: 'center', background: 'rgba(245,158,11,0.14)', color: '#f59e0b' }}><Radar size={26} /></div>
-                <div style={{ fontWeight: 800, fontSize: 18, fontFamily: "'Syne','Outfit',sans-serif", marginBottom: 10 }}>Warte auf Live-Daten vom Bot</div>
-                <div style={{ color: '#94a3b8', fontSize: 14, maxWidth: 560, margin: '0 auto', lineHeight: 1.6 }}>{monitoring.message}</div>
-                <div className="oa-mono" style={{ marginTop: 18, fontSize: 11, color: '#94a3b8' }}>MongoDB: {monitoring.health?.mongo ? 'verbunden' : 'nicht verbunden'} · keine Fake-Werte</div>
-              </div>
-            ) : (
-              <div data-testid="monitoring-panel">
-                {(() => {
-                  const live = monitoring.live;
-                  const sim = monitoring.simulated;
-                  const bg = live ? 'rgba(16,185,129,0.12)' : sim ? 'rgba(245,158,11,0.12)' : 'rgba(100,116,139,0.12)';
-                  const bd = live ? 'rgba(16,185,129,0.4)' : sim ? 'rgba(245,158,11,0.4)' : '#2a3450';
-                  const col = live ? '#4ade80' : sim ? '#fbbf24' : '#94a3b8';
-                  const label = live ? 'LIVE · echte Node-Telemetrie' : sim ? 'DEMO · simulierte Werte (SEED_DEMO_DATA)' : 'KEINE LIVE-DATEN';
-                  return (
-                    <div data-testid="monitoring-banner" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: bg, border: `1px solid ${bd}`, color: col, fontSize: 12.5, fontWeight: 700, marginBottom: 16, fontFamily: "'JetBrains Mono',monospace" }}>
-                      <span className="oa-dot" style={{ background: col }} /> {label}
-                      {monitoring.process && <span style={{ marginLeft: 'auto', color: '#64748b', fontWeight: 500 }}>
-                        {monitoring.process.resourceModel === 'split-processes'
-                          ? `${monitoring.process.processCount || 0} getrennte Bot-Prozesse · echte Werte je Node`
-                          : 'Prozess: 1 Node · CPU/RAM geteilt'}
-                        {' · '}{monitoring.process.cores} Cores · Node {monitoring.process.nodeVersion || ''}
-                      </span>}
-                    </div>
-                  );
-                })()}
-                <div className="oa-grid cols-4">
-                  <StatTile testid="mon-nodes" label="Healthy Nodes" value={`${monitoring.health.healthyNodes}/${monitoring.health.totalNodes}`} icon={HeartPulse} accent="#10b981"
-                    foot={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span className="oa-dot" style={{ background: '#10b981' }} /> Echtzeit · alle 5s</span>} />
-                  <StatTile testid="mon-uptime" label={monitoring.live ? 'Prozess-Uptime' : 'Uptime'} value={monitoring.live ? fmtUptime(monitoring.health.uptimeSec) : (monitoring.simulated ? `${monitoring.health.uptimePct}%` : '—')} icon={TrendingUp} accent="#00e5ff" foot={<span>{monitoring.live ? 'seit letztem Start' : '30-Tage rollierend'}</span>} />
-                  <StatTile testid="mon-latency" label={monitoring.live ? (monitoring.process?.resourceModel === 'split-processes' ? 'RAM (alle Bots)' : 'RAM (Prozess)') : 'API-Latenz'} value={monitoring.live ? `${monitoring.process?.totalRamMb ?? monitoring.process?.ramMb ?? 0} MB` : (monitoring.simulated ? `${monitoring.health.apiLatencyMs} ms` : '—')} icon={Gauge} accent="#ff6b00" foot={<span>{monitoring.live ? (monitoring.process?.resourceModel === 'split-processes' ? `${monitoring.process?.processCount || 0} getrennte Prozesse` : 'geteilt für alle Bots') : 'Commander → API'}</span>} />
-                  <StatTile testid="mon-incidents" label="Offene Incidents" value={monitoring.health.openIncidents} icon={AlertTriangle} accent={monitoring.health.openIncidents ? '#ff2a5f' : '#10b981'} foot={<span>{monitoring.incidents.length} in Historie</span>} />
-                </div>
-
-                {monitoring.live && monitoring.process && (
-                  <div className="oa-card oa-fade" style={{ marginTop: 18 }} data-testid="monitoring-process-model">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <div>
-                        <div className="oa-section-title" style={{ margin: 0 }}><Cpu size={15} /> {monitoring.process.resourceModel === 'split-processes' ? 'Getrennte Bot-Prozesse' : 'Gemeinsamer Node.js-Prozess'}</div>
-                        <div className="oa-stat-foot" style={{ marginTop: 7 }}>{monitoring.process.resourceModel === 'split-processes' ? 'Commander und Worker laufen getrennt. CPU, RAM, PID und Uptime stammen direkt vom jeweiligen Bot-Prozess.' : 'Commander und Worker laufen im expliziten Legacy-Modus in einem Prozess. Diese Ressourcen sind deshalb gemeinsam.'}</div>
-                      </div>
-                      <div className="oa-mono" style={{ color: '#94a3b8', fontSize: 11 }}>CPU {monitoring.process.cpuPct ?? '—'}% · RAM {monitoring.process.ramMb ?? '—'} MB · {monitoring.process.cores ?? '—'} Cores · {monitoring.process.nodeVersion || 'Node'}</div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="oa-section-title"><Server size={15} /> Node-Health (live)</div>
-                <div className="oa-grid cols-3">
-                  {monitoring.nodes.map((n) => {
-                    const cpuColor = n.cpuPct > 80 ? '#ff2a5f' : n.cpuPct > 55 ? '#f59e0b' : '#10b981';
-                    const nodeMetrics = monitoring.live && n.resourceScope === 'shared-process'
-                      ? [
-                        { label: 'PING', val: n.pingMs == null ? '—' : `${n.pingMs} ms`, pct: Math.min(100, n.pingMs || 0), color: '#ff6b00' },
-                        { label: 'VOICE-AUSLASTUNG', val: `${n.voiceConnections || 0} Streams`, pct: Math.min(100, (n.voiceConnections || 0) * 10), color: '#00e5ff' },
-                        { label: 'SERVER-AUSLASTUNG', val: `${n.guilds || 0} Guilds`, pct: Math.min(100, (n.guilds || 0) * 2), color: '#10b981' },
-                      ]
-                      : [
-                        { label: 'CPU', val: n.cpuPct == null ? '—' : `${n.cpuPct}%`, pct: n.cpuPct || 0, color: cpuColor },
-                        { label: 'RAM', val: n.ramMb == null ? '—' : `${n.ramMb} MB`, pct: Math.min(100, (n.ramMb || 0) / 6), color: '#00e5ff' },
-                        { label: 'PING', val: n.pingMs == null ? '—' : `${n.pingMs} ms`, pct: Math.min(100, n.pingMs || 0), color: '#ff6b00' },
-                      ];
-                    return (
-                      <div className="oa-card oa-fade" key={n.botId} data-testid={`mon-node-${n.index}`}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <div style={{ width: 34, height: 34, borderRadius: 9, background: n.role === 'commander' ? 'rgba(255,107,0,0.15)' : 'rgba(0,229,255,0.12)', color: n.role === 'commander' ? '#ff6b00' : '#00e5ff', display: 'grid', placeItems: 'center' }}>
-                              {n.role === 'commander' ? <Cpu size={16} /> : <Server size={16} />}
-                            </div>
-                            <div>
-                              <div style={{ fontWeight: 700, fontSize: 14 }}>{n.name}</div>
-                              <div className="oa-mono" style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{n.role} · {String(n.requiredTier || 'free').toUpperCase()}</div>
-                            </div>
-                          </div>
-                          <span className={`oa-pill ${n.status === 'online' ? 'green' : n.status === 'offline' ? 'red' : 'amber'}`}>{n.status === 'online' ? 'Online' : n.status === 'offline' ? 'Offline' : 'Degraded'}</span>
-                        </div>
-                        {nodeMetrics.map((m) => (
-                          <div key={m.label} style={{ marginTop: 12 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#94a3b8', marginBottom: 5 }} className="oa-mono">
-                              <span>{m.label}</span><span>{m.val}</span>
-                            </div>
-                            <div className="oa-progress"><i style={{ width: `${m.pct}%`, background: m.color }} /></div>
-                          </div>
-                        ))}
-                        <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#64748b' }} className="oa-mono">
-                          <span>{n.voiceConnections} VOICE · {n.listeners || 0} LISTENERS</span><span>{n.guilds} GUILDS</span>
-                        </div>
-                        {(n.guildDetails || []).filter((detail) => detail.playing || detail.voiceConnected).length > 0 && <div style={{ marginTop: 10, paddingTop: 9, borderTop: '1px solid #1b2133', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                          {(n.guildDetails || []).filter((detail) => detail.playing || detail.voiceConnected).slice(0, 4).map((detail) => <div key={`${detail.guildId}-${detail.channelId || ''}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 10.5 }}><span style={{ color: '#cbd5e1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{detail.stationName || detail.stationKey || detail.channelName || detail.guildName}</span><span className="oa-mono" style={{ color: detail.recovering ? '#fbbf24' : '#4ade80', flexShrink: 0 }}>{detail.recovering ? 'RECOVERY' : `${detail.listenerCount || 0} HÖRER`}</span></div>)}
-                          {(n.guildDetails || []).filter((detail) => detail.playing || detail.voiceConnected).length > 4 && <div className="oa-mono" style={{ color: '#64748b', fontSize: 10 }}>+{(n.guildDetails || []).filter((detail) => detail.playing || detail.voiceConnected).length - 4} weitere Streams</div>}
-                        </div>}
-                        {monitoring.live && n.resourceScope === 'shared-process' && <div style={{ marginTop: 8, fontSize: 10.5, color: '#64748b' }}>CPU/RAM werden oben einmal für den gemeinsamen Node-Prozess angezeigt.</div>}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {(monitoring.affectedServers || []).length > 0 && (
-                  <div className="oa-card oa-fade" style={{ marginTop: 18 }} data-testid="mon-affected-servers">
-                    <div className="oa-stat-label" style={{ marginBottom: 10 }}>Betroffene Server ({monitoring.affectedServers.length})</div>
-                    <div className="oa-table-wrap">
-                      <table className="oa-table">
-                        <thead>
-                          <tr><th>Server</th><th>Bot</th><th>Zustand</th><th>Seit</th><th>Details</th></tr>
-                        </thead>
-                        <tbody>
-                          {monitoring.affectedServers.map((row) => (
-                            <tr key={`${row.guildId}-${row.botName}`}>
-                              <td>{row.guildName || row.guildId}</td>
-                              <td className="oa-mono">{row.botName}</td>
-                              <td><span className={`oa-pill ${row.state === 'parked' ? 'red' : 'amber'}`}>{{ parked: 'Pausiert', failover: 'Ersatzsender', muted: 'Stumm', recovering: 'Recovery' }[row.state] || row.state}</span></td>
-                              <td className="oa-mono">{row.durationSec != null ? fmtUptime(row.durationSec) : '—'}</td>
-                              <td style={{ fontSize: 12, color: '#94a3b8' }}>{row.state === 'failover' ? `${row.stationName} statt ${row.desiredStationName}` : (row.detail || '—')}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                <div className="oa-card oa-fade" style={{ marginTop: 18 }} data-testid="mon-failover-history">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                    <div className="oa-stat-label">Failover-Historie (letzte 100 Umschaltungen)</div>
-                    <button className="oa-btn ghost" style={{ padding: '4px 10px' }} onClick={loadFailoverHistory}>Aktualisieren</button>
-                  </div>
-                  {failoverHistory === null && <div className="oa-sub">Lade…</div>}
-                  {failoverHistory && failoverHistory.length === 0 && <div style={{ color: '#64748b', fontSize: 13, padding: 12 }}>Noch keine Umschaltung aufgezeichnet.</div>}
-                  {failoverHistory && failoverHistory.length > 0 && (
-                    <div className="oa-table-wrap" style={{ maxHeight: 360, overflowY: 'auto' }}>
-                      <table className="oa-table">
-                        <thead>
-                          <tr><th>Wann</th><th>Server</th><th>Was</th><th>Von → Nach</th><th>Dauer</th><th>Grund</th></tr>
-                        </thead>
-                        <tbody>
-                          {failoverHistory.map((row, i) => (
-                            <tr key={`${row.at}-${row.guildId}-${i}`}>
-                              <td className="oa-mono" title={row.at}>{relTime(row.at)}</td>
-                              <td>{row.guildName || row.guildId}</td>
-                              <td><span className={`oa-pill ${row.kind === 'back' ? 'green' : row.kind === 'exhausted' ? 'red' : 'amber'}`}>{{ switch: 'Ersatzsender', back: 'Zurück', stay: 'Ersatz bleibt', exhausted: 'Kein Sender' }[row.kind] || row.kind}</span></td>
-                              <td style={{ fontSize: 12 }}>{row.from || '—'}{row.to ? ` → ${row.to}` : ''}</td>
-                              <td className="oa-mono">{row.durationSec != null ? fmtUptime(row.durationSec) : '—'}</td>
-                              <td style={{ fontSize: 12, color: '#94a3b8', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.reason}>{row.reason || '—'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-
-                <div className="oa-grid cols-2" style={{ marginTop: 18 }}>
-                  <div className="oa-card oa-fade" data-testid="mon-incidents-list">
-                    <div className="oa-stat-label" style={{ marginBottom: 6 }}>Incidents</div>
-                    {monitoring.incidents.length === 0 && <div style={{ color: '#64748b', fontSize: 13, padding: 16 }}>Keine Incidents</div>}
-                    {monitoring.incidents.map((inc, i) => {
-                      const sev = inc.severity === 'critical' ? 'red' : inc.severity === 'warning' ? 'amber' : 'cyan';
-                      return (
-                        <div className="oa-integration" key={i} data-testid={`mon-incident-${i}`}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
-                            <span className={`oa-pill ${sev}`} style={{ textTransform: 'uppercase' }}>{inc.severity}</span>
-                            <span style={{ minWidth: 0 }}>
-                              <span style={{ fontSize: 13, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inc.message}</span>
-                              <span className="oa-mono" style={{ fontSize: 11, color: '#64748b' }}>{inc.source} · {relTime(inc.at)}</span>
-                            </span>
-                          </span>
-                          <span className={`oa-pill ${inc.resolved ? 'green' : 'slate'}`}>{inc.resolved ? 'behoben' : 'offen'}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <div className="oa-card oa-fade" data-testid="mon-log-stream" style={{ background: '#0a0c12' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                      <div className="oa-stat-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Terminal size={14} /> Live-Log</div>
-                      <span className="oa-pill red" style={{ padding: '3px 9px' }}><span className="oa-dot" /> LIVE</span>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '130px minmax(160px, 1fr)', gap: 8, marginBottom: 10 }}>
-                      <select className="oa-input" value={monitorLogLevel} onChange={(event) => setMonitorLogLevel(event.target.value)} aria-label="Log-Level filtern" style={{ height: 36, padding: '0 9px' }}>
-                        <option value="ALL">Alle Level</option>
-                        <option value="INFO">Info</option>
-                        <option value="WARN">Warnungen</option>
-                        <option value="ERROR">Fehler</option>
-                      </select>
-                      <input className="oa-input" value={monitorLogQuery} onChange={(event) => setMonitorLogQuery(event.target.value)} placeholder="Quelle oder Meldung filtern…" aria-label="Logs durchsuchen" style={{ height: 36 }} />
-                    </div>
-                    <div style={{ maxHeight: 320, overflowY: 'auto' }}>
-                      {monitoring.logs.filter((entry) => monitorLogLevel === 'ALL' || entry.level === monitorLogLevel).filter((entry) => {
-                        const query = monitorLogQuery.trim().toLowerCase();
-                        return !query || `${entry.source || ''} ${entry.message || ''}`.toLowerCase().includes(query);
-                      }).map((l, i) => {
-                        const c = l.level === 'WARN' ? '#fbbf24' : l.level === 'ERROR' ? '#ff8fab' : '#4ade80';
-                        return (
-                          <div key={i} className="oa-mono" style={{ fontSize: 11.5, padding: '5px 0', borderBottom: '1px solid #12151f', display: 'flex', gap: 8, lineHeight: 1.4 }} data-testid={`mon-log-${i}`}>
-                            <span style={{ color: '#475569', flexShrink: 0 }}>{new Date(l.at).toLocaleTimeString('de-DE')}</span>
-                            <span style={{ color: c, flexShrink: 0, fontWeight: 700 }}>{l.level}</span>
-                            <span style={{ color: '#64748b', flexShrink: 0 }}>[{l.source}]</span>
-                            <span style={{ color: '#cbd5e1', minWidth: 0 }}>{l.message}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-                <div style={{ marginTop: 12, color: '#94a3b8', fontSize: 11 }} className="oa-mono">
-                  {monitoring.simulated ? 'SIMULIERTE TELEMETRIE · echte Node-Runtime-Daten überschreiben diese Werte automatisch' : 'LIVE NODE TELEMETRY'} · Stand {new Date(monitoring.generatedAt).toLocaleTimeString('de-DE')}
-                </div>
-              </div>
-            )}
-          </>
+          <OwnerMonitoring
+            failoverHistory={failoverHistory}
+            loadFailoverHistory={loadFailoverHistory}
+            monitorLogLevel={monitorLogLevel}
+            monitorLogQuery={monitorLogQuery}
+            monitoring={monitoring}
+            setMonitorLogLevel={setMonitorLogLevel}
+            setMonitorLogQuery={setMonitorLogQuery}
+          />
         )}
 
         {section === 'licenses' && (
-          <div className="oa-fade" data-testid="license-manager">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
-              <div style={{ position: 'relative', flex: '1 1 260px', maxWidth: 420 }}>
-                <input
-                  className="oa-input"
-                  placeholder="Suche: Lizenz-ID (GUID), E-Mail oder Server-ID…"
-                  value={licQuery}
-                  onChange={(e) => setLicQuery(e.target.value)}
-                  data-testid="license-search"
-                />
-              </div>
-              <button className="oa-btn primary" style={{ height: 42 }} onClick={openNewLicense} data-testid="license-create-button"><Plus size={16} /> Lizenz erstellen</button>
-            </div>
-
-            {licMsg && (
-              <div className={`oa-pill ${licMsg.ok ? 'green' : 'red'}`} style={{ marginBottom: 14 }} data-testid="license-message">
-                {licMsg.ok ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />} {licMsg.text}
-              </div>
-            )}
-
-            <datalist id="owner-known-guilds">
-              {knownGuilds.map((guild) => <option key={guild.id} value={guild.id}>{guild.name} · {guild.id}</option>)}
-            </datalist>
-
-            {licForm && (
-              <div className="oa-card oa-fade" style={{ marginBottom: 18, borderColor: 'rgba(0,229,255,0.35)' }} data-testid="license-form">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                  <div style={{ fontWeight: 700, fontFamily: "'Syne','Outfit',sans-serif", fontSize: 17 }}>
-                    {licForm._isNew ? 'Neue Lizenz' : <>Lizenz bearbeiten · <span className="oa-mono" style={{ fontSize: 13, color: '#00e5ff' }}>{licForm.licenseKey}</span></>}
-                  </div>
-                  <button className="oa-btn ghost" style={{ height: 34, padding: '0 12px' }} onClick={closeLicForm} data-testid="license-form-close"><CloseIcon size={15} /></button>
-                </div>
-
-                <div className="oa-grid cols-2" style={{ gap: 14 }}>
-                  <div>
-                    <label className="oa-stat-label">E-Mail (Kontakt)</label>
-                    <input className="oa-input" style={{ marginTop: 6 }} value={licForm.email} placeholder="kunde@example.com" onChange={(e) => setLicForm({ ...licForm, email: e.target.value })} data-testid="license-input-email" />
-                  </div>
-                  <div>
-                    <label className="oa-stat-label">Plan / Tier</label>
-                    <select className="oa-input" style={{ marginTop: 6 }} value={licForm.tier} onChange={(e) => setLicForm({ ...licForm, tier: e.target.value })} data-testid="license-input-tier">
-                      <option value="pro">Pro</option>
-                      <option value="ultimate">Ultimate</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="oa-stat-label">Seats (1–5)</label>
-                    <input className="oa-input" type="number" min={1} max={5} style={{ marginTop: 6 }} value={licForm.seats} onChange={(e) => setLicForm({ ...licForm, seats: e.target.value })} data-testid="license-input-seats" />
-                  </div>
-                  {licForm._isNew ? (
-                    <div>
-                      <label className="oa-stat-label">Laufzeit (Monate)</label>
-                      <input className="oa-input" type="number" min={1} max={60} style={{ marginTop: 6 }} value={licForm.months} onChange={(e) => setLicForm({ ...licForm, months: e.target.value })} data-testid="license-input-months" />
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="oa-stat-label">Läuft ab (Datum)</label>
-                      <input className="oa-input" type="date" style={{ marginTop: 6 }} value={licForm.expiresAt} onChange={(e) => setLicForm({ ...licForm, expiresAt: e.target.value })} data-testid="license-input-expiry" />
-                    </div>
-                  )}
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label className="oa-stat-label">Notiz</label>
-                    <input className="oa-input" style={{ marginTop: 6 }} value={licForm.note} placeholder="interne Notiz" onChange={(e) => setLicForm({ ...licForm, note: e.target.value })} data-testid="license-input-note" />
-                  </div>
-                  {licForm._isNew && (
-                    <div style={{ gridColumn: '1 / -1' }}>
-                      <label className="oa-stat-label">Server-ID verknüpfen (optional)</label>
-                      <input className="oa-input oa-mono" list="owner-known-guilds" style={{ marginTop: 6 }} value={licForm.serverId} placeholder="Discord Guild-ID (17–22 Ziffern)" onChange={(e) => setLicForm({ ...licForm, serverId: e.target.value.trim() })} data-testid="license-input-guild" />
-                      <div className="oa-stat-foot" style={{ marginTop: 6 }}>Bekannte Server werden vorgeschlagen. Werte wie „1“ sind keine gültige Discord-Guild-ID.</div>
-                    </div>
-                  )}
-                </div>
-
-                {licForm._isNew ? (
-                  <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
-                    <button className="oa-btn primary" style={{ height: 40 }} disabled={licBusy || Boolean(licForm.serverId) && !/^\d{17,22}$/.test(licForm.serverId)} onClick={createLicense} data-testid="license-save-new"><Save size={15} /> Lizenz erstellen</button>
-                  </div>
-                ) : (
-                  <>
-                    <div style={{ marginTop: 16, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                      <button className="oa-btn primary" style={{ height: 40 }} disabled={licBusy} onClick={() => patchLicense({ email: licForm.email, tier: licForm.tier, seats: Number(licForm.seats) || 1, note: licForm.note, expiresAt: licForm.expiresAt || undefined }, 'Änderungen gespeichert.')} data-testid="license-save-edit"><Save size={15} /> Speichern</button>
-                    </div>
-
-                    <div style={{ marginTop: 18 }}>
-                      <label className="oa-stat-label">Schnell verlängern / verkürzen</label>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-                        <button className="oa-btn ghost" style={{ height: 36 }} disabled={licBusy} onClick={() => patchLicense({ extendMonths: 1 }, '+1 Monat')} data-testid="license-extend-1m">+1 Monat</button>
-                        <button className="oa-btn ghost" style={{ height: 36 }} disabled={licBusy} onClick={() => patchLicense({ extendMonths: 3 }, '+3 Monate')} data-testid="license-extend-3m">+3 Monate</button>
-                        <button className="oa-btn ghost" style={{ height: 36 }} disabled={licBusy} onClick={() => patchLicense({ extendMonths: 12 }, '+12 Monate')} data-testid="license-extend-12m">+12 Monate</button>
-                        <button className="oa-btn ghost" style={{ height: 36 }} disabled={licBusy} onClick={() => patchLicense({ extendMonths: -1 }, '−1 Monat')} data-testid="license-shorten-1m">−1 Monat</button>
-                        <button className="oa-btn ghost" style={{ height: 36, color: '#ff8fab', borderColor: 'rgba(255,42,95,0.4)' }} disabled={licBusy} onClick={() => patchLicense({ expireNow: true }, 'Sofort deaktiviert (abgelaufen)')} data-testid="license-expire-now">Sofort deaktivieren</button>
-                      </div>
-                    </div>
-
-                    <div style={{ marginTop: 18 }}>
-                      <label className="oa-stat-label">Verknüpfte Server ({(licForm.linkedServerIds || []).length})</label>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '8px 0' }}>
-                        {(licForm.linkedServerIds || []).length === 0 && <span style={{ color: '#64748b', fontSize: 13 }}>Keine Server verknüpft</span>}
-                        {(licForm.linkedServerIds || []).map((sid) => {
-                          const server = (licForm.linkedServers || []).find((item) => item.id === sid) || knownGuilds.find((item) => item.id === sid) || { id: sid, name: sid, valid: /^\d{17,22}$/.test(sid) };
-                          return (
-                            <span key={sid} className={`oa-pill ${server.valid === false ? 'red' : server.known === false ? 'amber' : 'slate'}`} style={{ padding: '6px 9px', display: 'inline-flex', alignItems: 'center', gap: 7 }}>
-                              <span><strong>{server.name}</strong> <span className="oa-mono" style={{ opacity: 0.75 }}>{sid}</span></span>
-                              {server.discordUrl && <a href={server.discordUrl} target="_blank" rel="noreferrer" style={{ color: '#00e5ff' }} title="Server in Discord öffnen"><Globe size={13} /></a>}
-                              <button style={{ background: 'none', border: 'none', color: '#ff8fab', cursor: 'pointer', padding: 0, lineHeight: 0 }} disabled={licBusy} onClick={() => patchLicense({ removeServerId: sid }, 'Server entfernt')} data-testid={`license-guild-remove-${sid}`}><CloseIcon size={13} /></button>
-                            </span>
-                          );
-                        })}
-                      </div>
-                      {(licForm.linkedServers || []).map((server) => (
-                        <div key={`status-${server.id}`} style={{ fontSize: 11.5, margin: '5px 0', color: server.licenseResolved ? '#4ade80' : '#ff8fab' }} data-testid={`license-guild-status-${server.id}`}>
-                          {server.licenseResolved ? `✓ Lizenzauflösung: ${String(server.effectivePlan || 'free').toUpperCase()}` : '✕ Keine aktive Lizenzauflösung'} · {server.known ? `Live erkannt als ${server.name}` : 'nicht im Live-Guild-Verzeichnis – Guild-ID prüfen oder Commander-Telemetrie abwarten'}
-                        </div>
-                      ))}
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <input className="oa-input oa-mono" list="owner-known-guilds" style={{ maxWidth: 320 }} placeholder="Discord Guild-ID hinzufügen" value={licForm.newGuild} onChange={(e) => setLicForm({ ...licForm, newGuild: e.target.value.trim() })} data-testid="license-guild-input" />
-                        <button className="oa-btn ghost" style={{ height: 42 }} disabled={licBusy || !/^\d{17,22}$/.test(licForm.newGuild || '')} onClick={() => patchLicense({ addServerId: licForm.newGuild }, 'Server verknüpft')} data-testid="license-guild-add"><Plus size={15} /> Verknüpfen</button>
-                      </div>
-                    </div>
-
-                    <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #1a1f2e' }}>
-                      <button className="oa-btn ghost" style={{ height: 40, color: '#ff8fab', borderColor: 'rgba(255,42,95,0.4)' }} disabled={licBusy} onClick={() => deleteLicense(licForm.licenseKey)} data-testid="license-delete"><Trash2 size={15} /> Lizenz löschen</button>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
-            <div className="oa-table-wrap" data-testid="licenses-table">
-              <table className="oa-table">
-                <thead>
-                  <tr>
-                    <th>Lizenz-ID (GUID)</th><th>Plan</th><th>Seats</th><th>Kontakt</th><th>Server</th><th>Läuft ab</th><th>Status</th><th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(() => {
-                    const q = licQuery.trim().toLowerCase();
-                    const rows = (licenses || []).filter((l) => {
-                      if (!q) return true;
-                      const key = String(l.licenseKey || l.id || '').toLowerCase();
-                      const email = String(l.email || l.contactEmail || '').toLowerCase();
-                      const guilds = [...(l.linkedServerIds || []), ...(l.linkedServers || []).map((server) => server.name)].join(' ').toLowerCase();
-                      return key.includes(q) || email.includes(q) || guilds.includes(q);
-                    });
-                    if (rows.length === 0) {
-                      return <tr><td colSpan={8} style={{ textAlign: 'center', color: '#64748b', padding: 28 }}>{licQuery ? 'Keine Treffer' : 'Keine Lizenzen vorhanden'}</td></tr>;
-                    }
-                    return rows.map((l) => {
-                      const key = l.licenseKey || l.id;
-                      return (
-                        <tr key={key} data-testid={`license-row-${key}`}>
-                          <td className="oa-mono" style={{ fontSize: 12 }}>{key}</td>
-                          <td><span className={`oa-pill ${l.plan === 'ultimate' ? 'orange' : l.plan === 'pro' ? 'cyan' : 'slate'}`}>{l.planName}</span></td>
-                          <td>{l.seatsUsed}/{l.seats}</td>
-                          <td style={{ color: '#94a3b8' }}>{l.email || l.contactEmail || '—'}</td>
-                          <td style={{ color: '#94a3b8' }}>
-                            {(l.linkedServers || []).length ? (l.linkedServers || []).map((server) => (
-                              <div key={server.id} style={{ marginBottom: 3 }}>
-                                {server.discordUrl ? <a href={server.discordUrl} target="_blank" rel="noreferrer" style={{ color: server.valid === false ? '#ff8fab' : '#00e5ff' }}>{server.name}</a> : server.name}
-                                <span className="oa-mono" style={{ display: 'block', fontSize: 10, color: '#64748b' }}>{server.id}</span>
-                              </div>
-                            )) : '—'}
-                          </td>
-                          <td style={{ color: '#94a3b8' }}>{fmtDate(l.expiresAt)}{typeof l.daysLeft === 'number' && !l.expired && <span style={{ color: l.daysLeft <= 7 ? '#fbbf24' : '#64748b', marginLeft: 6, fontSize: 11 }}>({l.daysLeft}d)</span>}</td>
-                          <td><span className={`oa-pill ${l.expired ? 'red' : l.active ? 'green' : 'slate'}`}>{l.expired ? 'Abgelaufen' : l.active ? 'Aktiv' : 'Inaktiv'}</span></td>
-                          <td style={{ display: 'flex', gap: 6 }}>
-                            <button className="oa-btn ghost" style={{ height: 32, padding: '0 10px' }} onClick={() => openEditLicense(l)} data-testid={`license-edit-${key}`}><Pencil size={13} /></button>
-                            <button className="oa-btn ghost" style={{ height: 32, padding: '0 10px', color: '#ff8fab' }} onClick={() => deleteLicense(key)} data-testid={`license-delete-${key}`}><Trash2 size={13} /></button>
-                          </td>
-                        </tr>
-                      );
-                    });
-                  })()}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <OwnerLicenses
+            closeLicForm={closeLicForm}
+            createLicense={createLicense}
+            deleteLicense={deleteLicense}
+            knownGuilds={knownGuilds}
+            licBusy={licBusy}
+            licForm={licForm}
+            licMsg={licMsg}
+            licQuery={licQuery}
+            licenses={licenses}
+            openEditLicense={openEditLicense}
+            openNewLicense={openNewLicense}
+            patchLicense={patchLicense}
+            setLicForm={setLicForm}
+            setLicQuery={setLicQuery}
+          />
         )}
 
         {section === 'stations' && stations && (
-          <>
-            <div className="oa-grid cols-3">
-              <StatTile testid="station-stat-total" label="Stationen gesamt" value={stations.total} icon={ListMusic} accent="#ff6b00" />
-              <StatTile testid="station-stat-free" label="Free Stationen" value={stations.free} icon={Radio} accent="#64748b" />
-              <StatTile testid="station-stat-pro" label="Pro Stationen" value={stations.pro} icon={Music2} accent="#00e5ff" />
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '28px 0 14px' }}>
-              <div className="oa-section-title" style={{ margin: 0 }}><ListMusic size={15} /> Katalog verwalten ({stationList.length})</div>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button className="oa-btn ghost" style={{ height: 40 }} disabled={stHealthBusy || !stationList.length} onClick={() => checkStationHealth()} data-testid="station-check-all-button"><SignalHigh size={16} /> {stHealthBusy ? `Prüfe… ${stHealthProg ? `${stHealthProg.done}/${stHealthProg.total}` : ''}` : 'Live-Status prüfen'}</button>
-                <button className="oa-btn ghost" style={{ height: 40 }} disabled={stHealthBusy} title="Browser-Playability-Cache leeren (erzwingt neue Prüfung)" onClick={() => { writeBrowserCache({}); setStMsg({ ok: true, text: 'Browser-Cache geleert – nächste Prüfung testet alle Sender neu.' }); }} data-testid="station-cache-clear-button"><RefreshCw size={15} /></button>
-                <button className="oa-btn primary" style={{ height: 40 }} onClick={openNewStation} data-testid="station-add-button"><Plus size={16} /> Station hinzufügen</button>
-              </div>
-            </div>
-
-            <div data-testid="station-status-legend" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '0 0 6px', fontSize: 12, color: '#94a3b8' }}>
-              <span style={{ marginRight: 4 }}>Status:</span>
-              <span className="oa-pill green" style={{ padding: '2px 8px' }}>Discord = Bot kann streamen</span>
-              <span className="oa-pill cyan" style={{ padding: '2px 8px' }}>Browser = Website-Player spielbar</span>
-              <span className="oa-pill amber" style={{ padding: '2px 8px' }}>Nur Discord = Browser blockiert</span>
-              <span className="oa-pill red" style={{ padding: '2px 8px' }}>Offline = nicht erreichbar</span>
-            </div>
-
-            <div className="oa-card" style={{ margin: '12px 0 16px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }} data-testid="station-auto-health">
-              <span className={`oa-pill ${stHealthSummary?.automatic === false ? 'amber' : 'green'}`}><span className="oa-dot" /> Automatische Prüfung {stHealthSummary?.automatic === false ? 'deaktiviert' : 'aktiv'}</span>
-              <span style={{ color: '#94a3b8', fontSize: 12 }}>{stHealthSummary?.automatic === false ? 'Unter System-Konfiguration aktivierbar' : `Ressourcenschonend gestaffelt · ${stHealthSummary?.batchSize || 2} Sender alle ${Math.round((stHealthSummary?.intervalMs || 5000) / 1000)}s · Alarm nach zwei Fehlern · Recovery im Live-Log`}</span>
-              {stHealthSummary && <span className="oa-mono" style={{ marginLeft: 'auto', color: '#64748b', fontSize: 11 }}>{stHealthSummary.up || 0} UP · {stHealthSummary.down || 0} DOWN · {stHealthSummary.pending || 0} AUSSTEHEND</span>}
-            </div>
-
-            {stMsg && (
-              <div className={`oa-pill ${stMsg.ok ? 'green' : 'red'}`} style={{ marginBottom: 14 }} data-testid="station-message">
-                {stMsg.ok ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />} {stMsg.text}
-              </div>
-            )}
-
-            {stForm && (
-              <div className="oa-card oa-fade" style={{ marginBottom: 18, borderColor: 'rgba(255,107,0,0.35)' }} data-testid="station-form">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                  <div style={{ fontWeight: 700, fontFamily: "'Syne','Outfit',sans-serif", fontSize: 17 }}>{stForm._isNew ? 'Neue Station' : `Station bearbeiten: ${stForm.key}`}</div>
-                  <button className="oa-btn ghost" style={{ height: 34, padding: '0 12px' }} onClick={closeStationForm} data-testid="station-form-close"><CloseIcon size={15} /></button>
-                </div>
-                <div className="oa-grid cols-2" style={{ gap: 14 }}>
-                  <div>
-                    <label className="oa-stat-label">Key</label>
-                    <input className="oa-input" style={{ marginTop: 6 }} value={stForm.key} disabled={!stForm._isNew} placeholder="z.B. synthwave" onChange={(e) => setStForm({ ...stForm, key: e.target.value })} data-testid="station-input-key" />
-                  </div>
-                  <div>
-                    <label className="oa-stat-label">Name</label>
-                    <input className="oa-input" style={{ marginTop: 6, fontFamily: 'DM Sans' }} value={stForm.name} placeholder="Anzeigename" onChange={(e) => setStForm({ ...stForm, name: e.target.value })} data-testid="station-input-name" />
-                  </div>
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label className="oa-stat-label">Stream-URL</label>
-                    <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                      <input className="oa-input" value={stForm.url} placeholder="https://…/stream.mp3" onChange={(e) => { setStForm({ ...stForm, url: e.target.value }); setStTest(null); }} data-testid="station-input-url" />
-                      <button className="oa-btn ghost" style={{ height: 46, whiteSpace: 'nowrap' }} disabled={stBusy || !stForm.url} onClick={() => testStationUrl(stForm.url)} data-testid="station-test-button"><SignalHigh size={15} /> Test</button>
-                    </div>
-                    {stTest && (
-                      <div className={`oa-pill ${stTest.loading ? 'slate' : stTest.ok ? 'green' : 'amber'}`} style={{ marginTop: 10 }} data-testid="station-test-result">
-                        {stTest.loading ? <><Equalizer /> Teste Stream…</> : (
-                          <>{stTest.ok ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />} {stTest.message}{stTest.bitrate ? ` · ${stTest.bitrate} kbps` : ''}{typeof stTest.latencyMs === 'number' ? ` · ${stTest.latencyMs}ms` : ''}</>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <label className="oa-stat-label">Tier</label>
-                    <select className="oa-input" style={{ marginTop: 6 }} value={stForm.tier} onChange={(e) => setStForm({ ...stForm, tier: e.target.value })} data-testid="station-input-tier">
-                      <option value="free">Free</option><option value="pro">Pro</option><option value="ultimate">Ultimate</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="oa-stat-label">Genre</label>
-                    <input className="oa-input" style={{ marginTop: 6, fontFamily: 'DM Sans' }} value={stForm.genre} placeholder="z.B. Techno" onChange={(e) => setStForm({ ...stForm, genre: e.target.value })} data-testid="station-input-genre" />
-                  </div>
-                  <div>
-                    <label className="oa-stat-label">Land</label>
-                    <input className="oa-input" style={{ marginTop: 6 }} value={stForm.country} placeholder="z.B. DE" onChange={(e) => setStForm({ ...stForm, country: e.target.value })} data-testid="station-input-country" />
-                  </div>
-                  <div>
-                    <label className="oa-stat-label">Sprache</label>
-                    <input className="oa-input" style={{ marginTop: 6 }} value={stForm.language} placeholder="z.B. de" onChange={(e) => setStForm({ ...stForm, language: e.target.value })} data-testid="station-input-language" />
-                  </div>
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label className="oa-stat-label">Logo (https-Link)</label>
-                    <div style={{ display: 'flex', gap: 8, marginTop: 6, alignItems: 'center' }}>
-                      {stForm.logo && <img src={stForm.logo} alt="" width={40} height={40} style={{ borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />}
-                      <input className="oa-input" value={stForm.logo} placeholder="https://…/logo.png" onChange={(e) => setStForm({ ...stForm, logo: e.target.value })} data-testid="station-input-logo" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="oa-stat-label">Farbe (Akzent im Now-Playing-Panel)</label>
-                    <div style={{ display: 'flex', gap: 8, marginTop: 6, alignItems: 'center' }}>
-                      <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(stForm.color) ? stForm.color : '#FF6B00'} onChange={(e) => setStForm({ ...stForm, color: e.target.value.toUpperCase() })} style={{ width: 46, height: 46, border: 'none', background: 'none' }} data-testid="station-input-color-picker" />
-                      <input className="oa-input oa-mono" value={stForm.color} placeholder="#7C3AED" onChange={(e) => setStForm({ ...stForm, color: e.target.value })} data-testid="station-input-color" />
-                      <button type="button" className="oa-btn ghost" style={{ height: 46, whiteSpace: 'nowrap' }} disabled={!stForm.logo} onClick={suggestColorFromLogo} data-testid="station-color-from-logo">Aus Logo</button>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="oa-stat-label">Homepage (https-Link)</label>
-                    <input className="oa-input" style={{ marginTop: 6 }} value={stForm.homepage} placeholder="https://…" onChange={(e) => setStForm({ ...stForm, homepage: e.target.value })} data-testid="station-input-homepage" />
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
-                  <button className="oa-btn primary" disabled={stBusy} onClick={saveStation} data-testid="station-save-button"><Save size={16} /> {stForm._isNew ? 'Anlegen' : 'Speichern'}</button>
-                  <button className="oa-btn ghost" onClick={closeStationForm}>Abbrechen</button>
-                </div>
-              </div>
-            )}
-
-            <div className="oa-table-wrap oa-fade" data-testid="stations-table">
-              <table className="oa-table">
-                <thead><tr><th>Key</th><th>Name</th><th>Genre</th><th>Tier</th><th>Live-Status</th><th style={{ textAlign: 'right' }}>Aktionen</th></tr></thead>
-                <tbody>
-                  {stationList.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', color: '#64748b', padding: 24 }}>Lade Katalog…</td></tr>}
-                  {stationList.map((s, i) => {
-                    const h = stHealth[s.key];
-                    return (
-                    <tr key={s.key || i} data-testid={`station-row-${s.key}`}>
-                      <td className="oa-mono" style={{ fontSize: 12, color: '#94a3b8' }}>{s.key}{s.isDefault && <span className="oa-pill orange" style={{ marginLeft: 8, padding: '2px 7px' }}>default</span>}</td>
-                      <td style={{ fontWeight: 600 }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                          {s.logo
-                            ? <img src={s.logo} alt="" width={22} height={22} loading="lazy" style={{ borderRadius: 5, objectFit: 'cover' }} />
-                            : <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color || '#475569', display: 'inline-block' }} />}
-                          {s.name}
-                        </span>
-                      </td>
-                      <td style={{ color: '#94a3b8' }}>{s.genre || '—'}</td>
-                      <td><span className={`oa-pill ${s.tier === 'ultimate' ? 'orange' : s.tier === 'pro' ? 'cyan' : 'slate'}`}>{String(s.tier || 'free').toUpperCase()}</span></td>
-                      <td data-testid={`station-status-${s.key}`}>
-                        {!h && <span className="oa-pill slate" style={{ padding: '2px 8px' }}>—</span>}
-                        {h && h.checking && <span className="oa-pill slate" style={{ padding: '2px 8px' }}>Prüfe…</span>}
-                        {h && !h.checking && !h.reachable && <span className="oa-pill red" style={{ padding: '2px 8px' }}><XCircle size={11} /> Offline</span>}
-                        {h && !h.checking && h.reachable && !h.discordOk && !h.ok && <span className="oa-pill amber" style={{ padding: '2px 8px' }}><AlertTriangle size={11} /> Kein Audio</span>}
-                        {h && !h.checking && (h.discordOk || h.ok) && (
-                          <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
-                            <span className="oa-pill green" style={{ padding: '2px 8px' }} title="Server-seitig streambar – Discord-Bot kann diesen Sender abspielen"><CheckCircle2 size={11} /> Discord{typeof (h.latencyMs ?? h.responseTimeMs) === 'number' ? ` · ${h.latencyMs ?? h.responseTimeMs}ms` : ''}</span>
-                            {h.browserOk === true
-                              ? <span className="oa-pill cyan" style={{ padding: '2px 8px' }} title="Direkt im Website-Player abspielbar"><CheckCircle2 size={11} /> Browser</span>
-                              : h.browserOk === false
-                                ? <span className="oa-pill amber" style={{ padding: '2px 8px' }} title="Browser-Direktzugriff blockiert (z. B. 403/Hotlink). Im Discord-Bot funktioniert der Sender."><AlertTriangle size={11} /> Nur Discord</span>
-                                : <span className="oa-pill slate" style={{ padding: '2px 8px' }} title="Der automatische Server-Check prüft Discord-Tauglichkeit. Die Browser-Probe läuft beim manuellen Test.">Browser ungeprüft</span>}
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <button title="Einzeln prüfen" className="oa-btn ghost" style={{ height: 32, padding: '0 9px', marginLeft: 6 }} disabled={stHealthBusy} onClick={() => checkStationHealth([s.key])} data-testid={`station-row-test-${s.key}`}><SignalHigh size={14} /></button>
-                        <button title="Bearbeiten" className="oa-btn ghost" style={{ height: 32, padding: '0 9px', marginLeft: 6 }} onClick={() => openEditStation(s)} data-testid={`station-row-edit-${s.key}`}><Pencil size={14} /></button>
-                        <button title={s.isDefault ? 'Standard-Station' : 'Löschen'} className="oa-btn ghost" style={{ height: 32, padding: '0 9px', marginLeft: 6, color: '#ff8fab', opacity: s.isDefault ? 0.4 : 1 }} disabled={stBusy || s.isDefault} onClick={() => deleteStation(s.key)} data-testid={`station-row-delete-${s.key}`}><Trash2 size={14} /></button>
-                      </td>
-                    </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </>
+          <OwnerStations
+            checkStationHealth={checkStationHealth}
+            closeStationForm={closeStationForm}
+            deleteStation={deleteStation}
+            openEditStation={openEditStation}
+            openNewStation={openNewStation}
+            saveStation={saveStation}
+            setStForm={setStForm}
+            setStMsg={setStMsg}
+            setStTest={setStTest}
+            stBusy={stBusy}
+            stForm={stForm}
+            stHealth={stHealth}
+            stHealthBusy={stHealthBusy}
+            stHealthProg={stHealthProg}
+            stHealthSummary={stHealthSummary}
+            stMsg={stMsg}
+            stTest={stTest}
+            stationList={stationList}
+            stations={stations}
+            suggestColorFromLogo={suggestColorFromLogo}
+            testStationUrl={testStationUrl}
+          />
         )}
 
         {section === 'archive' && (
-          <div className="oa-card oa-fade" data-testid="data-archive">
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', marginBottom: 14 }}>
-              <div>
-                <div className="oa-section-title" style={{ margin: 0 }}><Database size={15} /> Wiederherstellbares Datenarchiv</div>
-                <div style={{ color: '#94a3b8', fontSize: 12.5, lineHeight: 1.6, marginTop: 8 }}>Lizenz-, Sender-, Event-, Berechtigungs- und Statistikdaten werden vor dem Entfernen hier gesichert. Eine Wiederherstellung überschreibt niemals neuere aktive Daten.</div>
-              </div>
-              <button className="oa-btn ghost" style={{ height: 36, flexShrink: 0 }} onClick={loadArchive} disabled={Boolean(archiveBusy)} data-testid="archive-refresh"><RefreshCw size={14} /> Aktualisieren</button>
-            </div>
-            {archiveMsg && <div className={`oa-pill ${archiveMsg.ok ? 'green' : 'red'}`} style={{ marginBottom: 12 }}>{archiveMsg.text}</div>}
-            {archiveRows.length === 0 && <div style={{ color: '#64748b', textAlign: 'center', padding: 28 }}>Noch keine archivierten Lösch- oder Reset-Vorgänge.</div>}
-            {archiveRows.map((row) => {
-              const restored = Number(row.restoredCount || 0) >= Number(row.recordCount || 0) && Number(row.recordCount || 0) > 0;
-              return (
-                <div className="oa-integration" key={row.operationId} data-testid={`archive-row-${row.operationId}`}>
-                  <span style={{ minWidth: 0 }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span className="oa-pill orange" style={{ fontFamily: 'JetBrains Mono' }}>{row.operation || 'delete'}</span>
-                      <strong style={{ fontSize: 13.5 }}>{row.target || '—'}</strong>
-                    </span>
-                    <span className="oa-mono" style={{ display: 'block', color: '#64748b', fontSize: 10.5, marginTop: 5, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {row.recordCount || 0} Datensätze · {(row.collections || []).join(', ')} · {relTime(row.archivedAt)} · {row.operationId}
-                    </span>
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 9, flexShrink: 0 }}>
-                    <span className={`oa-pill ${restored ? 'green' : 'amber'}`}>{restored ? 'Wiederhergestellt' : 'Archiviert'}</span>
-                    <button className="oa-btn ghost" style={{ height: 34 }} disabled={restored || Boolean(archiveBusy)} onClick={() => restoreArchiveOperation(row.operationId)} data-testid={`archive-restore-${row.operationId}`}><RefreshCw size={13} style={{ animation: archiveBusy === row.operationId ? 'spin 1s linear infinite' : 'none' }} /> Wiederherstellen</button>
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+          <OwnerArchive
+            archiveBusy={archiveBusy}
+            archiveMsg={archiveMsg}
+            archiveRows={archiveRows}
+            loadArchive={loadArchive}
+            restoreArchiveOperation={restoreArchiveOperation}
+          />
         )}
 
         {section === 'audit' && (
-          <div className="oa-card oa-fade" data-testid="audit-log">
-            <div className="oa-stat-label" style={{ marginBottom: 8 }}>Owner Audit-Log — jede Konfigurationsänderung wird protokolliert</div>
-            {auditLog.length === 0 && <div style={{ color: '#64748b', textAlign: 'center', padding: 24 }}>Noch keine Einträge</div>}
-            {auditLog.map((a, i) => {
-              const st = a.status === 'error' ? 'red' : a.status === 'warn' ? 'amber' : 'green';
-              return (
-                <div key={i} className="oa-integration" data-testid={`audit-row-${i}`}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-                    <span className="oa-pill orange" style={{ fontFamily: 'JetBrains Mono' }}>{a.action}</span>
-                    <span style={{ minWidth: 0 }}>
-                      <span style={{ fontSize: 13.5, display: 'block' }}>{a.target || '—'}</span>
-                      <span className="oa-mono" style={{ fontSize: 11, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', maxWidth: 520 }}>{a.detail || ''} · {a.actor} · {a.ip}</span>
-                    </span>
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span className={`oa-pill ${st}`}>{a.status}</span>
-                    <span className="oa-mono" style={{ fontSize: 11, color: '#64748b' }}>{relTime(a.at)}</span>
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+          <OwnerAudit auditLog={auditLog} />
         )}
 
         {section === 'activity' && (
-          <div className="oa-card oa-fade" data-testid="activity-log">
-            {activity.length === 0 && <div style={{ color: '#64748b', textAlign: 'center', padding: 24 }}>Keine Aktivität</div>}
-            {activity.map((a, i) => (
-              <div key={i} className="oa-integration" data-testid={`activity-row-${i}`}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(255,107,0,0.14)', color: '#ff6b00', display: 'grid', placeItems: 'center' }}><KeyRound size={15} /></span>
-                  <span>
-                    <span style={{ fontSize: 13.5, fontWeight: 600 }}>{a.label}</span>
-                    <span style={{ display: 'block', fontSize: 12, color: '#64748b' }} className="oa-mono">{a.detail}{a.meta?.seats ? ` · ${a.meta.seats} Seats` : ''}</span>
-                  </span>
-                </span>
-                <span className="oa-mono" style={{ fontSize: 11, color: '#64748b' }}>{relTime(a.at)}</span>
-              </div>
-            ))}
-          </div>
+          <OwnerActivity activity={activity} />
         )}
         {(systemPartOf(section) || ['company', 'plans', 'discord', 'marketing', 'access', 'discordShop'].includes(section)) && (
           <OwnerConfig section={systemPartOf(section) ? 'system' : section} part={systemPartOf(section)} apiGet={apiGet} apiSend={apiSend} token={token} />

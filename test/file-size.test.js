@@ -11,14 +11,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MAX_LINES = 800;
 const SOURCE_DIRS = ["src", "frontend/src"];
-const KNOWN_LONG_FILES = {
-  // #296 wave 2: one large component each, split into parts by hand.
-  "frontend/src/components/OwnerAdmin.js": 1491,
-  "frontend/src/components/DashboardSubscription.js": 1432,
-  "frontend/src/components/DashboardSettings.js": 1283,
-  "frontend/src/components/DashboardOverview.js": 907,
-  "frontend/src/components/DashboardEvents.js": 885,
-};
+const KNOWN_LONG_FILES = {};
 
 function listSourceFiles(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
