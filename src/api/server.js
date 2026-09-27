@@ -7,6 +7,7 @@ import fs from "node:fs";
 import { startOwnerSettingsRefresh } from "../lib/owner-settings-cache.js";
 import { forwardToRuntime, isRuntimePath } from "./runtime-forward.js";
 import { startOwnerStatusService } from "../services/owner-status/service.js";
+import { startStatusSampler } from "../services/status-page.js";
 import { startDiscordOauthSync } from "../lib/discord-oauth-settings.js";
 import { createAdminRoutesHandler } from "./routes/admin-routes.js";
 import { log, webDir, webRootSource, frontendBuildStamp } from "../lib/logging.js";
@@ -79,6 +80,7 @@ const SPA_ENTRY_PATHS = new Set([
   "/terms-of-service",
   "/nutzungsbedingungen",
   "/agb",
+  "/status",
 ]);
 
 function normalizeSpaPathname(pathname) {
@@ -161,6 +163,9 @@ function startWebServer(runtimes, { forwardRuntimeTo = "" } = {}) {
   }
   // Plan prices of the owner console (#289).
   startOwnerSettingsRefresh();
+  // The public status page measures every minute (#299); the public entry and
+  // the commander both do, a minute counts once.
+  startStatusSampler();
   const webInternalPort = Number(process.env.WEB_INTERNAL_PORT || "8080");
   const webPort = Number(process.env.WEB_PORT || "8081");
   const webBind = process.env.WEB_BIND || "0.0.0.0";

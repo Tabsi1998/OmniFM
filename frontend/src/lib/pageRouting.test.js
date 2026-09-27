@@ -8,9 +8,11 @@ describe('page routing', () => {
     // The Discord sign-in of the owner console comes back with ?page=admin (#283).
     expect(resolvePageFromUrl('https://omnifm.xyz/?page=admin&lang=de')).toBe('admin');
     expect(resolvePageFromUrl('https://omnifm.xyz/owner')).toBe('admin');
+    expect(resolvePageFromUrl('https://omnifm.xyz/status')).toBe('status');
   });
 
   it('builds links with the language', () => {
     expect(buildPageHref('en', 'privacy')).toBe('/privacy?lang=en');
+    expect(buildPageHref('de', 'status')).toBe('/status?lang=de');
   });
 });

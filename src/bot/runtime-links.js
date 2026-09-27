@@ -19,6 +19,9 @@ export function resolveDashboardUrl() {
 
 export const DASHBOARD_URL = resolveDashboardUrl();
 
+/** The public status page (#299): is OmniFM itself down, or only my server? */
+export const STATUS_PAGE_URL = `${String(WEBSITE_URL || "").replace(/\/+$/, "")}/status`;
+
 export function withLanguageParam(url, language) {
   const safeUrl = String(url || "").trim();
   if (!safeUrl) return safeUrl;

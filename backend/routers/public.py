@@ -249,6 +249,21 @@ def build_router(core):
         }
         return totals
 
+    @router.get("/api/status")
+    async def public_status():
+        """The public status page (#299) measures in the Node API only; this way
+        back says it measures nothing instead of showing numbers it has not."""
+        return {
+            "generatedAt": datetime.now(timezone.utc).isoformat(),
+            "timeZone": "Europe/Berlin",
+            "measuring": False,
+            "overall": "unknown",
+            "bots": [],
+            "current": [],
+            "maintenance": [],
+            "history": [],
+        }
+
     @router.get("/api/commands")
     async def get_commands():
         return {

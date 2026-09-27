@@ -31,6 +31,7 @@ import {
 } from './owner/ownerUi.js';
 import OwnerOverview from './owner/OwnerOverview.js';
 import OwnerMonitoring from './owner/OwnerMonitoring.js';
+import OwnerStatusNotices from './owner/OwnerStatusNotices.js';
 import OwnerLicenses from './owner/OwnerLicenses.js';
 import OwnerStations from './owner/OwnerStations.js';
 import OwnerSignIn from './owner/OwnerSignIn.js';
@@ -701,6 +702,10 @@ export default function OwnerAdmin() {
             setMonitorLogLevel={setMonitorLogLevel}
             setMonitorLogQuery={setMonitorLogQuery}
           />
+        )}
+
+        {section === 'statusPage' && (
+          <OwnerStatusNotices apiGet={apiGet} apiSend={apiSend} />
         )}
 
         {section === 'licenses' && (

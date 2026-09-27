@@ -31,6 +31,7 @@ export const OWNER_AREAS = Object.freeze([
     label: 'Bots & Discord',
     pages: [
       { id: 'monitoring', label: 'Live-Status', keywords: ['worker', 'nodes', 'cpu', 'ram', 'ping', 'logs', 'vorfälle'] },
+      { id: 'statusPage', label: 'Statusseite', keywords: ['statusseite', 'störung', 'wartung', 'verfügbarkeit', 'uptime', 'öffentlich'] },
       { id: 'discord', label: 'Bots & Tokens', keywords: ['commander', 'worker', 'token', 'client id', 'bot-logs'] },
       { id: 'cfg-directories', label: 'Bot-Listen', keywords: ['top.gg', 'discord bot list', 'bots.gg', 'votes', 'webhook secret'] },
     ],

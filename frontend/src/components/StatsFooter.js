@@ -91,6 +91,9 @@ function StatsFooter({ stats, legal }) {
             <a href={buildPageHref(locale, 'terms')} data-testid="footer-terms" style={{ color: '#71717A', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
               {copy.footer.links.terms}
             </a>
+            <a href={buildPageHref(locale, 'status')} data-testid="footer-status" style={{ color: '#71717A', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              {copy.footer.links.status}
+            </a>
             <a href="https://discord.gg/UeRkfGS43R" target="_blank" rel="noopener noreferrer" data-testid="footer-discord" style={{ color: '#5865F2', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
               {copy.footer.discord}
             </a>

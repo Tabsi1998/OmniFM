@@ -73,6 +73,7 @@ import nodemailer from "nodemailer";
 import { reloadPremiumStore } from "../../premium-store.js";
 import { SERVER_DATA_RETENTION_DAYS, listGuildDepartures } from "../../guild-departures-store.js";
 import { createAdminLicenseRoutes } from "./admin-license-routes.js";
+import { createAdminStatusRoutes } from "./admin-status-routes.js";
 import { createAdminStationRoutes, loadCatalogFileStations } from "./admin-station-routes.js";
 
 export function readRequestBody(req, limitBytes = 4096) {
@@ -316,6 +317,8 @@ export function createAdminRoutesHandler(deps) {
   const routeDeps = { sendJson, methodNotAllowed, auditOwnerAction, readRequestBody };
   const handleLicenseRoutes = createAdminLicenseRoutes(routeDeps);
   const handleStationRoutes = createAdminStationRoutes(routeDeps);
+  // The notices of the public status page (#299).
+  const handleStatusRoutes = createAdminStatusRoutes(routeDeps);
 
   return async function handleAdminRoutes(context) {
     const { req, res, requestUrl } = context;
@@ -684,6 +687,7 @@ export function createAdminRoutesHandler(deps) {
 
     // Licenses, activity and archive; the station catalogue (#293).
     if (await handleLicenseRoutes(context)) return true;
+    if (await handleStatusRoutes(context)) return true;
     return handleStationRoutes(context);
   };
 }
