@@ -11,11 +11,6 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MAX_LINES = 800;
 const KNOWN_LONG_FILES = {
   "src/bot/runtime.js": 1474,
-  "src/bot/runtime-recovery.js": 1357,
-  "src/bot/runtime-streams.js": 1200,
-  "src/bot/now-playing/now-playing-methods.js": 1161,
-  "src/bot/runtime-panels.js": 1141,
-  "src/bot/runtime-events.js": 1043,
   "src/premium-cli.js": 1007,
   "src/services/payment.js": 961,
   "src/bot/commands/playback-commands.js": 897,
