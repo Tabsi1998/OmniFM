@@ -6,6 +6,53 @@ folgt [SemVer](https://semver.org/lang/de/): Die erste Zahl steigt bei
 Funktionen, die dritte bei reinen Fehlerbehebungen. Wie ein Release entsteht,
 steht in `scripts/release.mjs`.
 
+## 3.4.0 – 2026-09-27
+
+Ein Backend statt zwei: Die Website, die Owner-Konsole, Premium und die
+Webhooks beantwortet jetzt die Node-API, dieselbe Technik wie der Bot.
+FastAPI bleibt zwei Wochen als Rückweg da. Dazu meldet sich der Owner mit
+Discord an, mit Rollen für Helfer, und der Checkout bucht den Preis, der in
+der Konsole steht.
+
+### Neu
+
+- **Owner-Anmeldung über Discord:** „Mit Discord anmelden“ auf der
+  Login-Seite der Owner-Konsole. Unter Einstellungen › Zugänge stehen die
+  Discord-Konten mit ihrer Rolle: Owner (alles), Support (alles sehen und
+  prüfen, nichts ändern) und Abrechnung (Lizenzen, Zahlungen, Preise). Das
+  Audit zeigt, wer etwas getan hat. Der Owner-Token bleibt für Skripte und
+  lässt sich abschalten, sobald ein Discord-Konto Owner ist. (#372)
+- **Sender in der Konsole ohne Neustart:** Neue oder geänderte Sender sind
+  sofort im Bot, nicht erst nach einem Neustart. (#368)
+
+### Geändert
+
+- **Ein öffentlicher Eingang:** Port 8001 beantwortet die Node-API. Das
+  Dashboard, der Discord-Login und das Cockpit laufen weiter im Bot; startet
+  der Bot neu, laufen Website und Owner-Konsole weiter. Rückweg auf FastAPI:
+  `OMNIFM_PUBLIC_BACKEND=fastapi` in `backend/.env`, dann `./update.sh`.
+  (#365, #366, #367, #368, #369, #371)
+- **Preise:** Der Checkout bucht den Monatspreis aus Einstellungen › Pläne &
+  Preise. Vorher zeigte die Website den Konsolen-Preis, Stripe buchte aber
+  den eingebauten. Solange dort die Standardpreise stehen, ändert sich für
+  Kunden nichts. Stripe-Schlüssel und Webhook-Secret kommen jetzt aus der
+  Konsole. (#370)
+- **Impressum, Datenschutz, Nutzungsbedingungen** kommen aus Einstellungen ›
+  Firma & Recht; Angaben aus `backend/.env` gelten weiter, wo die Konsole
+  leer ist. Als Website steht dort nie mehr eine Heimnetz-Adresse. (#368)
+- **Die alte Node-Adminseite ist weg** (Anmeldung per Cookie oder `?token=`
+  in der Adresse, `.env`-Editor, Skripte starten). Die Owner-Konsole ist die
+  einzige Stelle. (#369)
+
+### Behoben
+
+- **Erster Start auf einem neuen Server:** `start.sh` brach ab, weil die
+  Prüfung von FastAPI ihre Einstellungen nicht fand, und MongoDB startete
+  nicht, wo `systemctl` ohne laufendes systemd vorhanden ist (Container,
+  WSL). (#371)
+- **Doppelte Stripe-Webhooks:** Ein Test belegt jetzt, dass eine doppelt oder
+  gleichzeitig zugestellte Zahlung genau eine Lizenz ergibt. (#370)
+
 ## 3.3.0 – 2026-09-25
 
 Werkzeuge für Server-Teams und ein neuer Arbeitsplatz für den Betrieb:
