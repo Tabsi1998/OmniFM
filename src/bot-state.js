@@ -644,10 +644,14 @@ function getBotGuildChannelVolumes(botId, guildId) {
   return normalizeChannelVolumes(botState?.[normalizedGuildId]?.channelVolumes);
 }
 
-function clearBotGuild(botId, guildId) {
+/**
+ * Clears what a bot plays on a server. keepVolume: false when the bot left
+ * the server; then nothing of it stays, not even the volume (#285).
+ */
+function clearBotGuild(botId, guildId, { keepVolume = true } = {}) {
   if (mongoActive) {
     const botState = readBotData(botId);
-    const volumeOnlyEntry = buildVolumeOnlyEntry(botState[guildId]);
+    const volumeOnlyEntry = keepVolume ? buildVolumeOnlyEntry(botState[guildId]) : null;
     if (volumeOnlyEntry) botState[guildId] = volumeOnlyEntry;
     else delete botState[guildId];
     writeBotData(botId, botState);
@@ -656,7 +660,7 @@ function clearBotGuild(botId, guildId) {
   if (SPLIT_STATE_STORAGE_ENABLED) {
     const botState = loadSplitBotState(botId);
     const currentEntry = botState[guildId];
-    const volumeOnlyEntry = buildVolumeOnlyEntry(currentEntry);
+    const volumeOnlyEntry = keepVolume ? buildVolumeOnlyEntry(currentEntry) : null;
     if (volumeOnlyEntry) {
       botState[guildId] = volumeOnlyEntry;
     } else {
@@ -672,7 +676,7 @@ function clearBotGuild(botId, guildId) {
   const allState = loadState();
   if (allState[botId]) {
     const currentEntry = allState[botId][guildId];
-    const volumeOnlyEntry = buildVolumeOnlyEntry(currentEntry);
+    const volumeOnlyEntry = keepVolume ? buildVolumeOnlyEntry(currentEntry) : null;
     if (volumeOnlyEntry) {
       allState[botId][guildId] = volumeOnlyEntry;
     } else {
@@ -685,8 +689,24 @@ function clearBotGuild(botId, guildId) {
   }
 }
 
+/**
+ * Removes a server from every bot's state in MongoDB (#285: its data is
+ * deleted). Only this process's copies change in memory; each bot process
+ * writes its own document, so another bot's document is not written from here.
+ */
+async function forgetGuildInBotStates(guildId) {
+  const gid = String(guildId || "").trim();
+  if (!gid || !mongoActive) return 0;
+  for (const guilds of mongoCache.values()) delete guilds[gid];
+  for (const guilds of pendingWrites.values()) delete guilds[gid];
+  if (!isConnected()) return 0;
+  const result = await getDb().collection(COLLECTION).updateMany({ [`guilds.${gid}`]: { $exists: true } }, { $unset: { [`guilds.${gid}`]: "" } });
+  return result.modifiedCount || 0;
+}
+
 export {
   flushBotStateStore,
+  forgetGuildInBotStates,
   initBotStateStore,
   saveBotState,
   getBotState,

@@ -141,6 +141,14 @@ export async function updateGuildSettings(guildId, updates, { unset = [] } = {})
   }
 }
 
+/** Deletes the settings of a server (#285: OmniFM was removed 30 days ago). */
+export async function deleteGuildSettings(guildId) {
+  const normalizedGuildId = String(guildId || "").trim();
+  if (!normalizedGuildId || !isConnected() || !getDb()) return 0;
+  const result = await getDb().collection("guild_settings").deleteMany({ guildId: normalizedGuildId });
+  return result.deletedCount || 0;
+}
+
 export {
   normalizeGuildSettings,
 };
