@@ -6,6 +6,29 @@ folgt [SemVer](https://semver.org/lang/de/): Die erste Zahl steigt bei
 Funktionen, die dritte bei reinen Fehlerbehebungen. Wie ein Release entsteht,
 steht in `scripts/release.mjs`.
 
+## 3.4.1 – 2026-09-27
+
+Zwei Fehler im Server-Dashboard behoben, die schon länger live waren.
+
+### Behoben
+
+- **Im Dashboard ließ sich nichts speichern:** Eigene Sender, Rollenrechte,
+  Events und Abmelden scheiterten seit dem 24.09. mit „CSRF-Kopf fehlt“. Das
+  Dashboard schickt ihn jetzt bei jeder Änderung mit. (#374, #376)
+- **Dashboard-Einstellungen wieder da:** Panel-Designer, Bot-Aussehen,
+  Wochenrückblick, Failover-Kette, Voice Guard, Exporte und Webhooks waren
+  seit dem 25.08. nicht erreichbar. Sie stehen jetzt im Bereich
+  „Einstellungen“ des Server-Dashboards. (#375, #377)
+- Im deutschen Impressum fehlte die Überschrift, wenn Pflichtangaben fehlen.
+  (#377)
+
+### Intern
+
+- Frontend-Tests im lokalen Check: Übersetzungen, Owner-Anmeldung, jeder
+  Bereich des Server-Dashboards, ein Rundgang über die gebaute Website in
+  Chromium und Lighthouse für die Startseite. So fallen solche Fehler vor
+  dem Release auf. (#294, #377)
+
 ## 3.4.0 – 2026-09-27
 
 Ein Backend statt zwei: Die Website, die Owner-Konsole, Premium und die
