@@ -87,9 +87,11 @@ NODE_OWNER_CONTRACT_PORT = 18005
 NODE_RUNTIME_PORT = 18006
 NODE_PUBLIC_PORT = 18007
 # #294: the website under test, like production: serve, Node API, one address.
-SITE_API_PORT = 18010
-SITE_STATIC_PORT = 18011
-SITE_PORT = 18012
+# 18051-18053: the other runners on this machine use 18009-18015, 18021-18024,
+# 18031, 18042-18044 and 18121-18144, and may run at the same time.
+SITE_API_PORT = 18051
+SITE_STATIC_PORT = 18052
+SITE_PORT = 18053
 LIGHTHOUSE_GOAL = 90
 LIGHTHOUSE_TOLERANCE = 5
 API_TOKEN = "ci-owner-token"
