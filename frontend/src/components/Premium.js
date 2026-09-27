@@ -81,6 +81,10 @@ function normalizePricing(rawPricing, fallbackPricing) {
           oneTimePerEmail: raw.trial.oneTimePerEmail !== false,
         }
       : { ...fallbackPricing.trial },
+    // Premium is bought in Discord once the owner switched the shop on (#320).
+    discordShop: raw.discordShop?.enabled === true && /^https:\/\/discord\.com\//.test(String(raw.discordShop.storeUrl || ''))
+      ? { enabled: true, storeUrl: String(raw.discordShop.storeUrl) }
+      : { enabled: false, storeUrl: '' },
     tiers: {
       free: normalizeTier(rawTiers.free, fallbackTiers.free, fallbackTiers.free?.features),
       pro: normalizeTier(rawTiers.pro, fallbackTiers.pro, fallbackTiers.pro?.features),
@@ -114,6 +118,7 @@ function CheckoutModal(props) {
     tier,
     meta,
     trialConfig,
+    discordShop,
     onClose,
     copy,
     locale,
@@ -317,7 +322,7 @@ function CheckoutModal(props) {
           border: '1px solid rgba(88,101,242,0.25)',
         }}>
           <p style={{ margin: 0, fontSize: 12, color: '#C7CBFF', lineHeight: 1.5 }}>
-            {copy.premium.discordSoon}
+            {discordShop?.enabled ? copy.premium.discordShopOpen : copy.premium.discordSoon}
           </p>
         </div>
 
@@ -738,6 +743,34 @@ function Premium({ bots = [] }) {
                   </a>
                 ) : (
                   <>
+                    {pricing.discordShop?.enabled && (
+                      <a
+                        data-testid={`buy-discord-${planId}`}
+                        href={pricing.discordShop.storeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 8,
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '12px 0',
+                          marginBottom: 10,
+                          borderRadius: 10,
+                          background: '#5865F2',
+                          color: '#fff',
+                          fontWeight: 700,
+                          fontSize: 14,
+                          fontFamily: "'DM Sans', sans-serif",
+                          textDecoration: 'none',
+                        }}
+                      >
+                        {copy.premium.buyInDiscord({ name: tier.name })}
+                        <ArrowRight size={16} />
+                      </a>
+                    )}
                     <button
                       data-testid={`buy-btn-${planId}`}
                       onClick={() => setCheckoutPlan(planId)}
@@ -766,9 +799,11 @@ function Premium({ bots = [] }) {
                     >
                       {copy.premium.redeemCta}
                     </button>
-                    <p style={{ margin: '8px 0 0', fontSize: 11, color: '#71717A', textAlign: 'center' }}>
-                      {copy.premium.discordSoonShort}
-                    </p>
+                    {!pricing.discordShop?.enabled && (
+                      <p style={{ margin: '8px 0 0', fontSize: 11, color: '#71717A', textAlign: 'center' }}>
+                        {copy.premium.discordSoonShort}
+                      </p>
+                    )}
                     {trialEnabled && (
                       <button
                         data-testid="premium-pro-trial-open-btn"
@@ -873,12 +908,10 @@ function Premium({ bots = [] }) {
           planId={checkoutPlan}
           tier={pricing.tiers[checkoutPlan]}
           meta={PLAN_META[checkoutPlan]}
-          durations={pricing.durations}
-          seatOptions={pricing.seatOptions}
           trialConfig={pricing.trial}
+          discordShop={pricing.discordShop}
           onClose={closeCheckout}
           copy={copy}
-          formatDecimal={formatDecimal}
           locale={locale}
         />
       )}

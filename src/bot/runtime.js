@@ -21,6 +21,7 @@ import {
   handleCommanderGuildLeft,
   startServerDataRetention,
 } from "../services/server-data-retention.js";
+import { startDiscordShopSync } from "../premium/discord-shop.js";
 import { isRuntimeVoiceConnected } from "./runtime-live-state.js";
 import { handleRuntimeAutocomplete, handleRuntimeInteraction } from "./runtime-interactions.js";
 import { shouldHandleRuntimeIdleEvent } from "./runtime-streams.js";
@@ -96,6 +97,8 @@ class BotRuntime {
       if (this.role === "commander") {
         // Servers OmniFM left 30 days ago lose their data (#285).
         startServerDataRetention(this);
+        // Premium bought in Discord becomes the server's license (#320).
+        startDiscordShopSync(this);
         this.enforcePremiumGuildScope("startup").catch((err) => {
           log("ERROR", `[${this.config.name}] Premium-Guild-Scope Pruefung fehlgeschlagen: ${err?.message || err}`);
         });

@@ -86,6 +86,7 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
   const [plans, setPlans] = useState(null);
   const [discord, setDiscord] = useState(null);
   const [marketing, setMarketing] = useState(null);
+  const [discordShop, setDiscordShop] = useState(null);
   const [system, setSystem] = useState(null);
   const [access, setAccess] = useState(null);
   const [recoverySettings, setRecoverySettings] = useState([]);
@@ -101,14 +102,14 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
     setLoadError('');
     try {
       const d = await apiGet('/api/admin/config', token);
-      setCompany(d.company); setPlans(d.plans); setDiscord(d.discord); setMarketing(d.marketing); setSystem(d.system); setAccess(d.access || { accounts: [], tokenEnabled: true }); setRecoverySettings(Array.isArray(d.recoverySettings) ? d.recoverySettings : []);
-      setLoaded({ company: JSON.stringify(d.company), plans: JSON.stringify(d.plans), discord: JSON.stringify(d.discord), marketing: JSON.stringify(d.marketing), system: JSON.stringify(d.system), access: JSON.stringify(d.access || { accounts: [], tokenEnabled: true }) });
+      setCompany(d.company); setPlans(d.plans); setDiscord(d.discord); setMarketing(d.marketing); setDiscordShop(d.discordShop || { enabled: false, skus: { pro: '', ultimate: '' } }); setSystem(d.system); setAccess(d.access || { accounts: [], tokenEnabled: true }); setRecoverySettings(Array.isArray(d.recoverySettings) ? d.recoverySettings : []);
+      setLoaded({ company: JSON.stringify(d.company), plans: JSON.stringify(d.plans), discord: JSON.stringify(d.discord), marketing: JSON.stringify(d.marketing), discordShop: JSON.stringify(d.discordShop || { enabled: false, skus: { pro: '', ultimate: '' } }), system: JSON.stringify(d.system), access: JSON.stringify(d.access || { accounts: [], tokenEnabled: true }) });
     } catch (error) { setLoadError(error?.message || 'Konfiguration konnte nicht geladen werden.'); }
   }, [apiGet, token]);
 
   useEffect(() => { load(); }, [load]);
 
-  const current = { company, plans, discord, marketing, system, access };
+  const current = { company, plans, discord, marketing, system, access, discordShop };
   const isDirty = (sec) => current[sec] != null && loaded[sec] !== undefined && JSON.stringify(current[sec]) !== loaded[sec];
   const anyDirty = Object.keys(current).some(isDirty);
   // Leaving the page with unsaved changes asks first.
@@ -574,6 +575,38 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
           ))}
         </div>
         <SaveBar onSave={() => save('marketing', marketing)} saving={saving} msg={msg} testid="cfg-marketing-save" dirty={isDirty('marketing')} />
+      </div>
+    );
+  }
+
+  // ---------------- PREMIUM IN DISCORD (#320) ----------------
+  if (section === 'discordShop') {
+    if (!discordShop) return <div className="oa-sub">Lade Konfiguration…</div>;
+    const skus = discordShop.skus || {};
+    const setSku = (tier, value) => setDiscordShop((p) => ({ ...p, skus: { ...(p.skus || {}), [tier]: value.trim() } }));
+    const validSku = (value) => !value || /^\d{17,22}$/.test(String(value));
+    const ready = validSku(skus.pro) && validSku(skus.ultimate) && Boolean(skus.pro || skus.ultimate);
+    return (
+      <div className="oa-fade" data-testid="config-discord-shop">
+        <div className="oa-card" style={{ marginBottom: 18 }}>
+          <div className="oa-section-title">Premium in Discord</div>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14, lineHeight: 1.6 }}>
+            Premium wird direkt in Discord verkauft: als Abo pro Server, monatlich. Discord ist der Verkäufer, kassiert, führt die Umsatzsteuer ab und behält 15 %; du bekommst Auszahlungen.
+            Einschalten geht erst, wenn Discord die App freigibt: verifizierte App (ab 75 Servern) und Monetarisierung im Developer Portal eingerichtet.
+            Solange der Schalter aus ist, zeigt die Website „Kaufen bald direkt in Discord“ und <span className="oa-mono">/premium</span> hat keine Kaufknöpfe.
+          </div>
+          <Toggle label="Verkauf über Discord aktiv" checked={!!discordShop.enabled} onChange={(v) => setDiscordShop((p) => ({ ...p, enabled: v && ready }))} testid="cfg-shop-enabled" />
+          {!ready && <div className="oa-sub" style={{ marginTop: 8 }}>Erst mindestens eine gültige SKU-ID eintragen, dann lässt sich der Verkauf einschalten.</div>}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0 18px', marginTop: 14 }}>
+            <Field label="SKU-ID Pro" value={skus.pro || ''} onChange={(v) => setSku('pro', v)} placeholder="123456789012345678" testid="cfg-shop-sku-pro" />
+            <Field label="SKU-ID Ultimate" value={skus.ultimate || ''} onChange={(v) => setSku('ultimate', v)} placeholder="123456789012345678" testid="cfg-shop-sku-ultimate" />
+          </div>
+          <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.6 }}>
+            Die SKUs legst du im Developer Portal unter Monetization → Manage SKUs an: je ein Server-Abo (Guild Subscription) für Pro und Ultimate. Die ID kopierst du von dort.
+            Wer kauft, bekommt die Lizenz für seinen Server sofort; endet das Abo, bekommt der Server eine Lizenz von vorher zurück, solange sie noch gilt.
+          </div>
+        </div>
+        <SaveBar onSave={() => save('discordShop', discordShop)} saving={saving} msg={msg} testid="cfg-shop-save" dirty={isDirty('discordShop')} />
       </div>
     );
   }

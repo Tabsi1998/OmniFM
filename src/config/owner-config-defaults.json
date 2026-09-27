@@ -192,5 +192,12 @@
   "access": {
     "accounts": [],
     "tokenEnabled": true
+  },
+  "discordShop": {
+    "enabled": false,
+    "skus": {
+      "pro": "",
+      "ultimate": ""
+    }
   }
 }
