@@ -61,6 +61,11 @@ function useFormatters(intlLocale, s) {
       day: (key) => day.format(new Date(`${key}T12:00:00Z`)),
       duration,
       span: (from, to) => duration((Date.parse(to) - Date.parse(from)) / 60_000),
+      // "28.09.2026, 08:00 bis 08:30" when both ends are on the same day.
+      window: (from, to) => {
+        const sameDay = new Date(from).toDateString() === new Date(to).toDateString();
+        return s.window({ from: dateTime.format(new Date(from)), to: sameDay ? time.format(new Date(to)) : dateTime.format(new Date(to)) });
+      },
     };
   }, [intlLocale, s]);
 }
@@ -309,7 +314,7 @@ export default function StatusPage() {
                   {data.maintenance.map((entry) => (
                     <NoticeCard key={entry.id} testId="status-maintenance" tone="maintenance" Icon={Wrench}
                       kind={`${s.kinds.maintenance} · ${entry.active ? s.running : s.planned}`} title={entry.title} message={entry.message}
-                      meta={s.window({ from: fmt.dateTime(entry.startsAt), to: fmt.dateTime(entry.endsAt) })} />
+                      meta={fmt.window(entry.startsAt, entry.endsAt)} />
                   ))}
                 </div>
               </div>
@@ -335,7 +340,7 @@ export default function StatusPage() {
                           <span style={{ fontWeight: 700, color: '#F4F4F5' }}>{entry.type === 'outage' ? s.outageTitle({ bot: entry.bot }) : entry.title}</span>
                         </div>
                         <span style={{ color: '#71717A', fontSize: 13 }}>
-                          {s.window({ from: fmt.dateTime(entry.startedAt), to: fmt.dateTime(entry.endedAt) })} · {s.duration({ text: fmt.span(entry.startedAt, entry.endedAt) })}
+                          {fmt.window(entry.startedAt, entry.endedAt)} · {s.duration({ text: fmt.span(entry.startedAt, entry.endedAt) })}
                         </span>
                         {entry.message ? <span style={{ color: '#A1A1AA', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{entry.message}</span> : null}
                       </li>
