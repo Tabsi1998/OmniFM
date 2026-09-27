@@ -85,6 +85,12 @@ NODE_OWNER_CONTRACT_PORT = 18005
 # #290: the commander's Node API and the public Node entry in front of it.
 NODE_RUNTIME_PORT = 18006
 NODE_PUBLIC_PORT = 18007
+# #294: the website under test, like production: serve, Node API, one address.
+SITE_API_PORT = 18010
+SITE_STATIC_PORT = 18011
+SITE_PORT = 18012
+LIGHTHOUSE_GOAL = 90
+LIGHTHOUSE_TOLERANCE = 5
 API_TOKEN = "ci-owner-token"
 MASK = "•" * 8
 
@@ -1574,11 +1580,109 @@ def frontend_images(context: Context) -> str:
     return f"{note}; {len(images)} images, {total // 1024} KiB together"
 
 
+def frontend_unit(context: Context) -> str:
+    """#294: Vitest over the helpers, the translations and the dashboard with a mocked API.
+
+    A building block of the server dashboard that throws, a text that exists
+    in one language only, a sign-in page without its fields: each fails here.
+    """
+    completed = npm(context, "test", cwd=FRONTEND, check=False, timeout=900)
+    path = context.log("frontend-unit", completed.stdout + completed.stderr)
+    found = re.search(r"Tests\s+(\d+) passed", completed.stdout)
+    if completed.returncode != 0 or not found:
+        raise StepFailed(f"the frontend tests failed. Full output: {path}\n" + tail(completed, 30))
+    return f"{found.group(1)} frontend tests passed"
+
+
+def frontend_smoke(context: Context) -> str:
+    """#294: Playwright opens the built website in Chromium, as production serves it.
+
+    serve with serve.json for the pages, the Node API for /api, one address in
+    front like the reverse proxy. Home, stations, prices, the legal pages, the
+    dashboard (Discord login mocked, every area opened) and the owner console's
+    sign-in must show what they are for without a JavaScript error. Chromium
+    is installed on the first run.
+    """
+    for port in (SITE_API_PORT, SITE_STATIC_PORT, SITE_PORT):
+        if port_open(port):
+            raise StepSkipped(f"port {port} is taken; stop what uses it and run again")
+    node = node_of(context, NODE_MAJOR)
+    env = node_path_env(context, node)
+    install = context.run(node, ROOT / "node_modules" / "playwright" / "cli.js", "install", "chromium",
+                          env=env, check=False, timeout=1800)
+    if install.returncode != 0:
+        raise StepFailed("Chromium for Playwright could not be installed:\n" + tail(install))
+    scratch = Path(tempfile.mkdtemp(prefix="omnifm-site-"))
+    serve_bin = FRONTEND / "node_modules" / "serve" / "build" / "main.js"
+    start_process(context, "site-static", [node, serve_bin, "build", "--config", "../serve.json",
+                                           "-l", f"tcp://127.0.0.1:{SITE_STATIC_PORT}"],
+                  cwd=FRONTEND, env=env, url=f"http://127.0.0.1:{SITE_STATIC_PORT}/", seconds=60)
+    api_env = dict(env, **{
+        "WEB_SERVER_ENABLED": "1", "WEB_BIND": "127.0.0.1", "WEB_INTERNAL_PORT": str(SITE_API_PORT),
+        "PUBLIC_WEB_URL": f"http://127.0.0.1:{SITE_PORT}", "OMNIFM_RUNTIME_DATA_DIR": str(scratch),
+        "LOGS_DIR": str(scratch / "logs"), "API_RATE_LIMIT_MAX": "10000",
+    })
+    start_process(context, "site-api", [node, "scripts/serve-node-api.mjs"], cwd=ROOT, env=api_env,
+                  url=f"http://127.0.0.1:{SITE_API_PORT}/api/health", seconds=90)
+    start_process(context, "site-proxy", [node, "scripts/local-site-proxy.mjs", str(SITE_PORT),
+                                          f"http://127.0.0.1:{SITE_STATIC_PORT}", f"http://127.0.0.1:{SITE_API_PORT}"],
+                  cwd=ROOT, env=env, url=f"http://127.0.0.1:{SITE_PORT}/", seconds=30)
+    site = f"http://127.0.0.1:{SITE_PORT}"
+    completed = context.run(node, "scripts/frontend-smoke.mjs", site, env=env, check=False, timeout=600)
+    path = context.log("frontend-smoke", completed.stdout + completed.stderr)
+    if completed.returncode != 0:
+        broken = [line for line in completed.stdout.splitlines() if line.startswith("FEHLER")]
+        raise StepFailed("\n".join(broken[:10]) or f"the smoke did not run. Full output: {path}\n" + tail(completed))
+    context.cache["site:url"] = site
+    return completed.stdout.strip().splitlines()[-1]
+
+
+def frontend_lighthouse(context: Context) -> str:
+    """#294: Lighthouse on the home page, mobile, as a ratchet towards a performance of 90.
+
+    The recorded score is the floor; a run more than a few points below it
+    fails (Lighthouse varies a little from run to run). --record raises the
+    floor once the page got faster.
+    """
+    site = context.cache.get("site:url")
+    if not site or not port_open(SITE_PORT):
+        raise StepSkipped("the website of frontend/smoke is not running")
+    node = node_of(context, NODE_MAJOR)
+    env = node_path_env(context, node)
+    chromium = context.run(node, "-e", "import('playwright').then(({chromium})=>console.log(chromium.executablePath()))",
+                           cwd=ROOT, env=env, timeout=120).stdout.strip()
+    report = Path(tempfile.mkdtemp(prefix="omnifm-lighthouse-")) / "home.json"
+    completed = context.run(node, ROOT / "node_modules" / "lighthouse" / "cli" / "index.js", f"{site}/",
+                            "--only-categories=performance", "--output=json", f"--output-path={report}",
+                            "--chrome-flags=--headless=new --no-sandbox", "--quiet",
+                            env=dict(env, CHROME_PATH=chromium), check=False, timeout=600)
+    context.log("lighthouse", completed.stdout + completed.stderr)
+    try:
+        score = round(json.loads(report.read_text(encoding="utf-8"))["categories"]["performance"]["score"] * 100)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise StepFailed("Lighthouse produced no performance score:\n" + tail(completed)) from error
+    baseline = load_baseline()
+    floor = int((baseline.get("lighthouse-performance") or ["0"])[0])
+    if context.record:
+        baseline["lighthouse-performance"] = [str(score)]
+        save_baseline(baseline)
+        return f"performance {score}; recorded as the floor (goal {LIGHTHOUSE_GOAL})"
+    if score < floor - LIGHTHOUSE_TOLERANCE:
+        raise StepFailed(f"performance of the home page fell to {score}, the floor is {floor} (goal {LIGHTHOUSE_GOAL})")
+    note = f"performance {score} (floor {floor}, goal {LIGHTHOUSE_GOAL})"
+    if score >= floor + LIGHTHOUSE_TOLERANCE:
+        note += "; run --record to raise the floor"
+    return note
+
+
 def frontend_steps() -> list:
     return [
         Step("frontend", "npm-ci", "Locked install from frontend/package-lock.json", frontend_install),
         Step("frontend", "build", "The production build, and it is not empty", frontend_build, ("npm-ci",)),
         Step("frontend", "images", f"No image in the build over {IMAGE_LIMIT_KIB} KB", frontend_images, ("build",)),
+        Step("frontend", "unit", "Vitest: helpers, translations, dashboard", frontend_unit, ("npm-ci",)),
+        Step("frontend", "smoke", "Playwright opens the built website in Chromium", frontend_smoke,
+             ("build", "node/npm-ci")),
     ]
 
 
@@ -1774,6 +1878,8 @@ def extra_steps() -> list:
         Step("extra", "shellcheck", "ShellCheck over the deployment scripts", shellcheck),
         Step("extra", "voice-codec-linux", "The native Opus codec on Linux, like the server", voice_codec_linux),
         Step("extra", "semgrep", "Semgrep security analysis, in place of CodeQL", semgrep_scan),
+        Step("extra", "lighthouse", "Lighthouse on the home page (ratchet towards 90)", frontend_lighthouse,
+             ("frontend/smoke",)),
         Step("extra", "live-smoke", "The live smoke check of omnifm.xyz", live_smoke),
     ]
 

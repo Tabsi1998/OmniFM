@@ -47,6 +47,13 @@ export default defineConfig({
     port: 3000,
     strictPort: true,
   },
+  // Frontend tests (#294): helpers and translations in Node, components in jsdom.
+  test: {
+    include: ['src/**/*.test.js'],
+    environment: 'jsdom',
+    restoreMocks: true,
+    setupFiles: ['src/test/setup.js'],
+  },
   build: {
     // start.sh and the production static server intentionally keep using the
     // established frontend/build directory.
