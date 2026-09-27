@@ -228,6 +228,9 @@ export function ownerConfigResponse(raw, env = process.env) {
     payments: maskConfigSecrets(effectivePaymentsConfig(raw, env)),
     marketing: configSectionFrom(raw, "marketing"),
     system: maskConfigSecrets(effectiveSystemConfig(raw, env)),
+    // The Discord accounts of the owner console (#283). Without it the page
+    // showed none after a reload, and saving it again emptied the list.
+    access: configSectionFrom(raw, "access"),
     recoverySettings: RECOVERY_SETTINGS,
     env: { stripeEnvKey: Boolean(String(env.STRIPE_SECRET_KEY || env.STRIPE_API_KEY || "").trim()) },
   };
