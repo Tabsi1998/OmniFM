@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { getDb, isConnected } from "./lib/db.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { log, logStoreLoadError } from "./lib/logging.js";
@@ -93,6 +94,88 @@ function readStateFile(filePath) {
 
 function loadState() {
   return readStateFile(STATE_FILE) || readStateFile(STATE_BACKUP_FILE) || {};
+}
+
+// ---- MongoDB (#292) ----
+// Every bot process keeps what it plays (for the restore after a restart) and
+// its volume preferences. In MongoDB each bot is one document in bot_state;
+// only its own process writes it, so the whole document is replaced. Writes
+// are coalesced (250 ms) and flushBotStateStore() waits for them on shutdown,
+// so the state saved on SIGTERM reaches MongoDB before the process ends.
+// Without MongoDB the per-bot files stay, as before.
+const COLLECTION = "bot_state";
+let mongoActive = false;
+const mongoCache = new Map();
+const pendingWrites = new Map();
+let flushTimer = null;
+let mongoWriteQueue = Promise.resolve();
+
+function drainBotWrites() {
+  if (!pendingWrites.size) return mongoWriteQueue;
+  const batch = [...pendingWrites.entries()];
+  pendingWrites.clear();
+  mongoWriteQueue = mongoWriteQueue
+    .then(async () => {
+      if (!isConnected()) return;
+      const updatedAt = new Date().toISOString();
+      await getDb().collection(COLLECTION).bulkWrite(batch.map(([botId, guilds]) => ({
+        replaceOne: { filter: { _id: botId }, replacement: { guilds, updatedAt }, upsert: true },
+      })), { ordered: false });
+    })
+    .catch((err) => log("ERROR", `[bot-state] MongoDB-Speichern fehlgeschlagen: ${err?.message || err}`));
+  return mongoWriteQueue;
+}
+
+function readBotData(botId) {
+  return JSON.parse(JSON.stringify(mongoCache.get(String(botId)) || {}));
+}
+
+function writeBotData(botId, data) {
+  const guilds = hasStateEntries(data) ? JSON.parse(JSON.stringify(data)) : {};
+  mongoCache.set(String(botId), guilds);
+  pendingWrites.set(String(botId), guilds);
+  if (!flushTimer) {
+    flushTimer = setTimeout(() => { flushTimer = null; drainBotWrites(); }, 250);
+    flushTimer.unref?.();
+  }
+}
+
+/** Waits until every saved state is in MongoDB (shutdown). */
+async function flushBotStateStore() {
+  if (flushTimer) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  }
+  await drainBotWrites().catch(() => null);
+}
+
+/** MongoDB becomes the store; the states of the bot-state files are copied once. */
+async function initBotStateStore() {
+  if (!isConnected() || !getDb()) return { backend: "file" };
+  const collection = getDb().collection(COLLECTION);
+  const fromFiles = new Map();
+  for (const [botId, data] of Object.entries(loadState() || {})) {
+    if (hasStateEntries(data)) fromFiles.set(botId, data);
+  }
+  try {
+    if (fs.existsSync(SPLIT_STATE_DIR) && fs.statSync(SPLIT_STATE_DIR).isDirectory()) {
+      for (const name of fs.readdirSync(SPLIT_STATE_DIR)) {
+        if (!name.endsWith(".json")) continue;
+        const data = readStateFile(path.join(SPLIT_STATE_DIR, name));
+        // The per-bot file is newer than the shared legacy file (#226).
+        if (data && typeof data === "object") fromFiles.set(name.slice(0, -".json".length), data);
+      }
+    }
+  } catch (err) {
+    log("WARN", `[bot-state] Split-Dateien nicht lesbar: ${err?.message || err}`);
+  }
+  for (const [botId, guilds] of fromFiles) {
+    // eslint-disable-next-line no-await-in-loop -- a one-time copy
+    await collection.updateOne({ _id: botId }, { $setOnInsert: { guilds, updatedAt: new Date().toISOString() } }, { upsert: true });
+  }
+  for (const doc of await collection.find({}).toArray()) mongoCache.set(String(doc._id), doc.guilds || {});
+  mongoActive = true;
+  return { backend: "mongo", bots: mongoCache.size };
 }
 
 function sanitizeStateFileSegment(raw) {
@@ -440,6 +523,11 @@ function saveBotState(botId, guildStates) {
     botData[guildId] = entry;
   }
 
+  if (mongoActive) {
+    writeBotData(botId, botData);
+    return;
+  }
+
   if (SPLIT_STATE_STORAGE_ENABLED) {
     const filePath = getSplitBotStateFile(botId);
     const backupFilePath = getSplitBotBackupFile(botId);
@@ -459,6 +547,12 @@ function saveBotState(botId, guildStates) {
 }
 
 function getBotState(botId) {
+  if (mongoActive) {
+    const loaded = readBotData(botId);
+    const normalized = normalizeStoredBotStateMap(loaded);
+    if (JSON.stringify(loaded) !== JSON.stringify(normalized)) writeBotData(botId, normalized);
+    return normalized;
+  }
   if (SPLIT_STATE_STORAGE_ENABLED) {
     const loaded = loadSplitBotState(botId);
     const normalized = normalizeStoredBotStateMap(loaded);
@@ -482,6 +576,10 @@ function getBotState(botId) {
 }
 
 function saveResolvedBotState(botId, state) {
+  if (mongoActive) {
+    writeBotData(botId, state);
+    return;
+  }
   if (SPLIT_STATE_STORAGE_ENABLED) {
     const filePath = getSplitBotStateFile(botId);
     const backupFilePath = getSplitBotBackupFile(botId);
@@ -544,6 +642,14 @@ function getBotGuildChannelVolumes(botId, guildId) {
 }
 
 function clearBotGuild(botId, guildId) {
+  if (mongoActive) {
+    const botState = readBotData(botId);
+    const volumeOnlyEntry = buildVolumeOnlyEntry(botState[guildId]);
+    if (volumeOnlyEntry) botState[guildId] = volumeOnlyEntry;
+    else delete botState[guildId];
+    writeBotData(botId, botState);
+    return;
+  }
   if (SPLIT_STATE_STORAGE_ENABLED) {
     const botState = loadSplitBotState(botId);
     const currentEntry = botState[guildId];
@@ -577,6 +683,8 @@ function clearBotGuild(botId, guildId) {
 }
 
 export {
+  flushBotStateStore,
+  initBotStateStore,
   saveBotState,
   getBotState,
   clearBotGuild,

@@ -226,3 +226,72 @@ test("owner audit in production: MongoDB only, with the person and the address",
   assert.deepEqual([row?.actor, row?.ip], ["Olli (1)", "203.0.113.9"]);
   assert.equal(fs.existsSync(path.join(dataDir, "owner-audit.json")), false, "no owner-audit.json in production");
 });
+
+test("bot state: copied from the file once, saved to MongoDB, flushed before shutdown", { skip: !hasMongoConfig }, async (t) => {
+  const previousEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = "production";
+  // What a bot saved with the file store before the update.
+  fs.writeFileSync(path.join(dataDir, "bot-state.json"), JSON.stringify({
+    "bot-292": { "923456789012345611": { channelId: "823456789012345611", stationKey: "lounge", volume: 70, savedAt: "2026-09-27T00:00:00.000Z" } },
+  }));
+  const { connect, getDb } = await import("../src/lib/db.js");
+  await connect();
+  const states = getDb().collection("bot_state");
+  await states.deleteMany({ _id: { $in: ["bot-292", "bot-292b"] } });
+  const botState = await import("../src/bot-state.js");
+  t.after(async () => {
+    await botState.flushBotStateStore();
+    await states.deleteMany({ _id: { $in: ["bot-292", "bot-292b"] } });
+    process.env.NODE_ENV = previousEnv;
+  });
+  const fileBefore = fs.readFileSync(path.join(dataDir, "bot-state.json"), "utf8");
+  await botState.initBotStateStore();
+  assert.equal(botState.getBotState("bot-292")["923456789012345611"]?.stationKey, "lounge", "the file's state was copied");
+
+  botState.saveBotState("bot-292b", new Map([["923456789012345612", {
+    currentStationKey: "jazz", lastChannelId: "823456789012345612", volume: 55, volumePreferenceSet: true,
+  }]]));
+  botState.clearBotGuild("bot-292", "923456789012345611");
+  await botState.flushBotStateStore();
+
+  const saved = await states.findOne({ _id: "bot-292b" });
+  assert.equal(saved?.guilds?.["923456789012345612"]?.stationKey, "jazz");
+  const cleared = await states.findOne({ _id: "bot-292" });
+  assert.deepEqual([cleared?.guilds?.["923456789012345611"]?.stationKey, cleared?.guilds?.["923456789012345611"]?.volume], [undefined, 70], "stopped, the volume preference stays");
+  assert.equal(fs.readFileSync(path.join(dataDir, "bot-state.json"), "utf8"), fileBefore, "no bot-state write in production");
+  assert.equal(fs.existsSync(path.join(dataDir, "bot-state")), false, "no per-bot files in production");
+});
+
+test("song history: one document per song, /history reads MongoDB, duplicates stay out", { skip: !hasMongoConfig }, async (t) => {
+  const previousEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = "production";
+  const guildId = "923456789012345621";
+  const { connect, getDb } = await import("../src/lib/db.js");
+  await connect();
+  const songs = getDb().collection("song_history");
+  await songs.deleteMany({ guildId });
+  const history = await import("../src/song-history-store.js");
+  t.after(async () => {
+    await history.stopSongHistoryStore();
+    await songs.deleteMany({ guildId });
+    process.env.NODE_ENV = previousEnv;
+  });
+  await history.initSongHistoryStore();
+  const now = Date.now();
+  assert.equal(history.appendSongHistory(guildId, { displayTitle: "Artist - One", timestampMs: now - 60_000 }).saved, true);
+  assert.equal(history.appendSongHistory(guildId, { displayTitle: "Artist - One", timestampMs: now - 30_000 }).reason, "duplicate");
+  assert.equal(history.appendSongHistory(guildId, { displayTitle: "Artist - Two", timestampMs: now }).saved, true);
+  await history.stopSongHistoryStore();
+
+  assert.equal(await songs.countDocuments({ guildId }), 2);
+  assert.deepEqual((await history.readSongHistory(guildId, { limit: 5 })).map((row) => row.displayTitle), ["Artist - Two", "Artist - One"], "newest first");
+  assert.deepEqual(history.getSongHistory(guildId, { limit: 1 }).map((row) => row.displayTitle), ["Artist - Two"], "the panel reads the playing worker's memory");
+  assert.equal(fs.existsSync(path.join(dataDir, "song-history.json")), false, "no song-history.json in production");
+});
+
+// #292 acceptance: after every store above ran with production settings,
+// runtime-data holds only the two files this test put there itself.
+test("production wrote no store file at all", { skip: !hasMongoConfig }, () => {
+  const written = fs.readdirSync(dataDir).filter((name) => !["coupons.json", "bot-state.json", "logs"].includes(name));
+  assert.deepEqual(written, []);
+});
