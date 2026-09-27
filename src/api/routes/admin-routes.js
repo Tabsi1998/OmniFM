@@ -23,6 +23,21 @@ import fs from "node:fs";
 
 import { recordOwnerAudit } from "../../lib/owner-audit-store.js";
 import { syncDiscordOauthFromOwnerConfig } from "../../lib/discord-oauth-settings.js";
+import {
+  OWNER_ROLE_LABELS,
+  accessSettings,
+  accountForDiscordUser,
+  createOwnerSession,
+  csrfSatisfied,
+  deleteOwnerSession,
+  ownerSessionCookie,
+  ownerSessionTokenFrom,
+  resolveOwnerIdentity,
+  roleAllows,
+  roleMaySaveSection,
+  tokenLoginEnabled,
+  validateAccessSave,
+} from "../../lib/owner-access.js";
 import { refreshOwnerSettings } from "../../lib/owner-settings-cache.js";
 import { getClientIp, safeTokenEquals } from "../../lib/api-helpers.js";
 import { getDb, isConnected } from "../../lib/db.js";
@@ -164,6 +179,10 @@ export function createAdminRoutesHandler(deps) {
     sendJson,
     resolveAdminToken,
     getCommonSecurityHeaders,
+    // The Discord user of the dashboard session in this request, or null (#283).
+    readDashboardUser = () => null,
+    isSecureRequest = () => false,
+    isDiscordLoginConfigured = () => false,
   } = deps;
 
   function resolveConfiguredAdminToken() {
@@ -180,7 +199,7 @@ export function createAdminRoutesHandler(deps) {
 
   function isAdminTokenValue(token) {
     const adminToken = resolveConfiguredAdminToken();
-    return Boolean(adminToken) && safeTokenEquals(String(token || "").trim(), adminToken);
+    return Boolean(adminToken) && tokenLoginEnabled() && safeTokenEquals(String(token || "").trim(), adminToken);
   }
 
   function sendAdminJson(res, status, payload, extraHeaders = {}) {
@@ -321,8 +340,9 @@ export function createAdminRoutesHandler(deps) {
 
   function auditOwnerAction(req, event) {
     try {
+      // The person behind the request (#283): a Discord account, or "token" for scripts.
       return recordOwnerAudit({
-        actor: "owner",
+        actor: req.ownerIdentity?.actor || "owner",
         ...event,
         metadata: {
           ...getRequestAuditMeta(req),
@@ -361,14 +381,70 @@ export function createAdminRoutesHandler(deps) {
       return true;
     }
 
-    // ---- Only /api/admin/* from here, behind FastAPI's _admin_guard() ----
-    if (!pathname.startsWith("/api/admin/")) return false;
-    if (!resolveConfiguredAdminToken()) {
-      sendAdminJson(res, 503, { error: "Owner-API ist nicht konfiguriert (API_ADMIN_TOKEN fehlt)." });
+    // /api/admin/session: sign in with Discord, who is signed in, sign out (#283).
+    if (pathname === "/api/admin/session") {
+      if (req.method === "GET") {
+        const identity = await resolveOwnerIdentity(req, { adminToken: resolveConfiguredAdminToken() });
+        sendAdminJson(res, 200, identity
+          ? { authenticated: true, via: identity.via, role: identity.role, roleLabel: OWNER_ROLE_LABELS[identity.role], user: identity.user }
+          : { authenticated: false, discordLogin: Boolean(isDiscordLoginConfigured()) });
+        return true;
+      }
+      if (req.method === "DELETE") {
+        await deleteOwnerSession(ownerSessionTokenFrom(req));
+        sendAdminJson(res, 200, { ok: true }, { "Set-Cookie": ownerSessionCookie("", { secure: isSecureRequest(req) }) });
+        return true;
+      }
+      if (req.method !== "POST") { methodNotAllowed(res, ["GET", "POST", "DELETE"]); return true; }
+      // No foreign page may sign someone in: the header needs a script of this site.
+      if (!csrfSatisfied(req, { via: "discord" })) {
+        sendAdminJson(res, 403, { error: "CSRF-Schutz: Anmeldung nur aus der Owner-Konsole." });
+        return true;
+      }
+      const user = readDashboardUser(req);
+      if (!user?.id) {
+        sendAdminJson(res, 401, { error: "Nicht mit Discord angemeldet." });
+        return true;
+      }
+      const account = accountForDiscordUser(user.id);
+      if (!account) {
+        req.ownerIdentity = { actor: `${user.globalName || user.username || "Discord"} (${user.id})` };
+        auditOwnerAction(req, { action: "owner.login", status: "denied", target: String(user.id), summary: `Discord-Konto ${user.globalName || user.username || user.id} ohne Zugang` });
+        sendAdminJson(res, 403, { error: "Dieses Discord-Konto hat keinen Zugang zur Owner-Konsole." });
+        return true;
+      }
+      const session = await createOwnerSession({ discordId: account.discordId, name: account.name });
+      req.ownerIdentity = { via: "discord", role: account.role, actor: `${account.name} (${account.discordId})` };
+      auditOwnerAction(req, { action: "owner.login", status: "success", target: account.discordId, summary: `Anmeldung über Discord (${OWNER_ROLE_LABELS[account.role]})` });
+      sendAdminJson(res, 200, {
+        authenticated: true,
+        via: "discord",
+        role: account.role,
+        roleLabel: OWNER_ROLE_LABELS[account.role],
+        user: { id: account.discordId, name: account.name },
+      }, { "Set-Cookie": ownerSessionCookie(session.token, { secure: isSecureRequest(req) }) });
       return true;
     }
-    if (!isAdminTokenValue(getAdminTokenFromRequest(req))) {
-      sendAdminJson(res, 401, { error: "Nicht autorisiert. Gueltiger Owner-Token erforderlich." });
+
+    // ---- Only /api/admin/* from here: the script token or a Discord owner session (#283) ----
+    if (!pathname.startsWith("/api/admin/")) return false;
+    const identity = await resolveOwnerIdentity(req, { adminToken: resolveConfiguredAdminToken() });
+    if (!identity) {
+      if (!resolveConfiguredAdminToken() && !accessSettings().accounts.length) {
+        sendAdminJson(res, 503, { error: "Owner-API ist nicht konfiguriert (API_ADMIN_TOKEN fehlt)." });
+      } else {
+        sendAdminJson(res, 401, { error: "Nicht autorisiert. Gueltiger Owner-Token erforderlich." });
+      }
+      return true;
+    }
+    if (!csrfSatisfied(req, identity)) {
+      sendAdminJson(res, 403, { error: "CSRF-Schutz: Änderungen nur aus der Owner-Konsole." });
+      return true;
+    }
+    req.ownerIdentity = identity;
+    if (!roleAllows(identity.role, req.method, pathname)) {
+      auditOwnerAction(req, { action: "owner.denied", status: "denied", target: `${req.method} ${pathname}`, summary: `Rolle ${OWNER_ROLE_LABELS[identity.role]} darf das nicht` });
+      sendAdminJson(res, 403, { error: `Deine Rolle (${OWNER_ROLE_LABELS[identity.role]}) darf das nicht.` });
       return true;
     }
 
@@ -598,13 +674,26 @@ export function createAdminRoutesHandler(deps) {
         sendJson(res, 400, { error: "data muss ein Objekt oder eine Liste sein." });
         return true;
       }
+      if (!roleMaySaveSection(req.ownerIdentity?.role, section)) {
+        sendJson(res, 403, { error: `Deine Rolle (${OWNER_ROLE_LABELS[req.ownerIdentity?.role] || "?"}) darf diesen Bereich nicht speichern.` });
+        return true;
+      }
+      let saveData = data;
+      if (section === "access") {
+        const checked = validateAccessSave(data);
+        if (!checked.ok) {
+          sendJson(res, 400, { error: checked.error });
+          return true;
+        }
+        saveData = checked.access;
+      }
       if (!isConnected() || !getDb()) {
         sendJson(res, 503, { error: "Keine Datenbank verbunden \u2013 Speichern nicht m\u00f6glich." });
         return true;
       }
       try {
         const raw = await loadOwnerConfigRaw();
-        const next = mergedSectionForSave(raw, section, data);
+        const next = section === "access" ? saveData : mergedSectionForSave(raw, section, saveData);
         await getDb().collection("owner_config").updateOne({ _id: OWNER_CONFIG_ID }, { $set: { [section]: next } }, { upsert: true });
         // A new Discord login, Stripe key or plan price works at once, not only after the next sync.
         if (section === "system") await syncDiscordOauthFromOwnerConfig().catch(() => false);

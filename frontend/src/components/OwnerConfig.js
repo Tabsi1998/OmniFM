@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Save, Plus, Trash2, CheckCircle2, XCircle, Bot, CreditCard, Building2,
-  Tag, Terminal, ShieldCheck, Info, Star, Heart, Mail, Music2, History, Fingerprint, Globe2, BellRing,
+  Tag, Terminal, ShieldCheck, Info, Star, Heart, Mail, Music2, History, Fingerprint, Globe2, BellRing, Users, KeyRound,
 } from 'lucide-react';
 import { discordRedirectUriFor, secretInputValue } from '../lib/ownerConfigSecrets.js';
 
@@ -88,6 +88,7 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
   const [payments, setPayments] = useState(null);
   const [marketing, setMarketing] = useState(null);
   const [system, setSystem] = useState(null);
+  const [access, setAccess] = useState(null);
   const [recoverySettings, setRecoverySettings] = useState([]);
   const [env, setEnv] = useState({});
   const [logs, setLogs] = useState(null);
@@ -102,14 +103,14 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
     setLoadError('');
     try {
       const d = await apiGet('/api/admin/config', token);
-      setCompany(d.company); setPlans(d.plans); setDiscord(d.discord); setPayments(d.payments); setMarketing(d.marketing); setSystem(d.system); setRecoverySettings(Array.isArray(d.recoverySettings) ? d.recoverySettings : []); setEnv(d.env || {});
-      setLoaded({ company: JSON.stringify(d.company), plans: JSON.stringify(d.plans), discord: JSON.stringify(d.discord), payments: JSON.stringify(d.payments), marketing: JSON.stringify(d.marketing), system: JSON.stringify(d.system) });
+      setCompany(d.company); setPlans(d.plans); setDiscord(d.discord); setPayments(d.payments); setMarketing(d.marketing); setSystem(d.system); setAccess(d.access || { accounts: [], tokenEnabled: true }); setRecoverySettings(Array.isArray(d.recoverySettings) ? d.recoverySettings : []); setEnv(d.env || {});
+      setLoaded({ company: JSON.stringify(d.company), plans: JSON.stringify(d.plans), discord: JSON.stringify(d.discord), payments: JSON.stringify(d.payments), marketing: JSON.stringify(d.marketing), system: JSON.stringify(d.system), access: JSON.stringify(d.access || { accounts: [], tokenEnabled: true }) });
     } catch (error) { setLoadError(error?.message || 'Konfiguration konnte nicht geladen werden.'); }
   }, [apiGet, token]);
 
   useEffect(() => { load(); }, [load]);
 
-  const current = { company, plans, discord, payments, marketing, system };
+  const current = { company, plans, discord, payments, marketing, system, access };
   const isDirty = (sec) => current[sec] != null && loaded[sec] !== undefined && JSON.stringify(current[sec]) !== loaded[sec];
   const anyDirty = Object.keys(current).some(isDirty);
   // Leaving the page with unsaved changes asks first.
@@ -648,6 +649,54 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
           ))}
         </div>
         <SaveBar onSave={() => save('marketing', marketing)} saving={saving} msg={msg} testid="cfg-marketing-save" dirty={isDirty('marketing')} />
+      </div>
+    );
+  }
+
+  // ---------------- ACCESS: who may use the owner console (#283) ----------------
+  if (section === 'access') {
+    if (!access) return <div className="oa-sub">Lade Konfiguration…</div>;
+    const accounts = access.accounts || [];
+    const setAccount = (i, k, v) => setAccess((p) => ({ ...p, accounts: p.accounts.map((x, idx) => (idx === i ? { ...x, [k]: v } : x)) }));
+    const addAccount = () => setAccess((p) => ({ ...p, accounts: [...(p.accounts || []), { discordId: '', name: '', role: 'support' }] }));
+    const removeAccount = (i) => setAccess((p) => ({ ...p, accounts: p.accounts.filter((_, idx) => idx !== i) }));
+    const hasOwner = accounts.some((a) => a.role === 'owner' && /^\d{17,22}$/.test(String(a.discordId || '').trim()));
+    return (
+      <div className="oa-fade" data-testid="config-access">
+        <div className="oa-card" style={{ marginBottom: 18 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div className="oa-section-title" style={{ margin: 0 }}><Users size={15} /> Discord-Konten mit Zugang ({accounts.length})</div>
+            <button className="oa-btn ghost" onClick={addAccount} data-testid="cfg-access-add"><Plus size={15} /> Konto</button>
+          </div>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14, lineHeight: 1.5 }}>
+            Diese Konten melden sich mit „Mit Discord anmelden“ an. <b>Owner</b> darf alles. <b>Support</b> sieht alles und darf prüfen (Cockpit, Sender-Test), aber nichts ändern. <b>Abrechnung</b> sieht alles und darf Lizenzen, Zahlungen und Preise ändern.
+            Die Discord-ID findest du in Discord unter Einstellungen → Erweitert → Entwicklermodus, dann Rechtsklick auf das Profil → „ID kopieren“.
+          </div>
+          {accounts.map((a, i) => (
+            <div key={i} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr)) 44px', gap: '0 14px', alignItems: 'end', marginBottom: 6 }} data-testid={`cfg-access-${i}`}>
+              <Field label="Discord-ID" value={a.discordId} onChange={(v) => setAccount(i, 'discordId', v.trim())} placeholder="123456789012345678" testid={`cfg-access-${i}-id`} />
+              <Field label="Name" value={a.name} onChange={(v) => setAccount(i, 'name', v)} placeholder="Wer ist das?" testid={`cfg-access-${i}-name`} />
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>Rolle</label>
+                <select className="oa-input" value={a.role || 'support'} onChange={(e) => setAccount(i, 'role', e.target.value)} data-testid={`cfg-access-${i}-role`}>
+                  <option value="owner">Owner</option>
+                  <option value="support">Support</option>
+                  <option value="billing">Abrechnung</option>
+                </select>
+              </div>
+              <button className="oa-btn ghost" style={{ color: '#ff8fab', marginBottom: 14 }} onClick={() => removeAccount(i)} data-testid={`cfg-access-${i}-remove`}><Trash2 size={14} /></button>
+            </div>
+          ))}
+        </div>
+        <div className="oa-card" style={{ marginBottom: 18 }}>
+          <div className="oa-section-title"><KeyRound size={15} /> Owner-Token für Skripte</div>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12, lineHeight: 1.5 }}>
+            Der Token aus <span className="oa-mono">API_ADMIN_TOKEN</span> (backend/.env) ist für Skripte wie den Live-Check gedacht. Ausschalten geht erst, wenn mindestens ein Discord-Konto die Rolle Owner hat. Neuen Token: Wert in backend/.env ändern und <span className="oa-mono">./update.sh</span> ausführen.
+          </div>
+          <Toggle label="Token erlaubt" checked={access.tokenEnabled !== false} onChange={(v) => setAccess((p) => ({ ...p, tokenEnabled: v || !hasOwner }))} testid="cfg-access-token" />
+          {!hasOwner && access.tokenEnabled !== false && <div className="oa-sub" style={{ marginTop: 8 }}>Erst ein Owner-Konto eintragen, dann kann der Token aus.</div>}
+        </div>
+        <SaveBar onSave={() => save('access', access)} saving={saving} msg={msg} testid="cfg-access-save" dirty={isDirty('access')} />
       </div>
     );
   }
