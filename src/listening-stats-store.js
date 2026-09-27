@@ -2,6 +2,7 @@
 // OmniFM: Listening Stats Store (MongoDB + JSON Fallback)
 // ============================================================
 import fs from "node:fs";
+import { fileStoresAllowed } from "./lib/store-policy.js";
 import path from "node:path";
 import { getDb, isConnected } from "./lib/db.js";
 import { log } from "./lib/logging.js";
@@ -265,6 +266,8 @@ function ensureState() {
 }
 
 function saveStateToFile() {
+  // In production MongoDB is the only copy (#292).
+  if (isConnected() && getDb() && !fileStoresAllowed()) return;
   const state = ensureState();
   const tmpFile = `${STORE_FILE}.tmp-${process.pid}-${Date.now()}`;
   const payload = JSON.stringify(state, null, 2) + "\n";
@@ -649,9 +652,8 @@ async function mongoSafe(fn) {
   }
 }
 
-// ---- Write to both MongoDB + JSON ----
+// ---- Write to MongoDB, and to JSON outside production (#292) ----
 async function persistGuildStats(guildId, stats) {
-  // Always write JSON fallback
   saveStateToFile();
 
   // Write to MongoDB if available

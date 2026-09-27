@@ -3,6 +3,7 @@
 // ============================================================
 
 import fs from "node:fs";
+import { fileStoresAllowed } from "./lib/store-policy.js";
 import path from "node:path";
 import { PLANS } from "./config/plans.js";
 import { getDefaultLanguage, normalizeLanguage } from "./i18n.js";
@@ -101,6 +102,8 @@ function load() {
 }
 
 function saveFile(data) {
+  // In production MongoDB is the only copy (#292).
+  if (getDb() && !fileStoresAllowed()) return;
   const tmpFile = `${premiumFile}.tmp-${process.pid}-${Date.now()}`;
   try {
     if (fs.existsSync(premiumFile) && fs.statSync(premiumFile).isDirectory()) return;

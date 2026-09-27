@@ -75,9 +75,9 @@ export const STORE_CONCURRENCY_REGISTRY = [
     store: "coupons",
     files: ["coupons.json"],
     scope: "global billing/offers",
-    runtimeOwner: "commander/API or CLI maintenance",
-    splitSafety: "commander-owned",
-    protection: "checkout/admin mutations belong to the commander path",
+    runtimeOwner: "MongoDB shared by the public entry and the commander (#292)",
+    splitSafety: "mongo-source",
+    protection: "one document per offer and per redemption; JSON is one-time migration and local fallback",
   },
   {
     store: "provider-directory",

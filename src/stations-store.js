@@ -2,6 +2,7 @@
 // stations-store.js – MongoDB-basiert (mit JSON-Fallback)
 // ============================================================
 import fs from "node:fs";
+import { fileStoresAllowed } from "./lib/store-policy.js";
 import path from "node:path";
 import { getDb } from "./lib/db.js";
 import { withFileStoreLock, withFileWriteRetry } from "./lib/file-store-lock.js";
@@ -410,13 +411,16 @@ export async function saveStations(data) {
   }
 
   // Also save to the runtime copy as backup; the tracked seed stays untouched.
-  try {
-    fs.mkdirSync(path.dirname(stationsPath), { recursive: true });
-    const serialized = JSON.stringify(normalized, null, 2);
-    const tempPath = `${stationsPath}.tmp`;
-    fs.writeFileSync(tempPath, serialized);
-    try { fs.renameSync(tempPath, stationsPath); } catch { fs.writeFileSync(stationsPath, serialized); }
-  } catch {}
+  // With MongoDB the catalogue lives there; production writes no file copy (#292).
+  if (!c || fileStoresAllowed()) {
+    try {
+      fs.mkdirSync(path.dirname(stationsPath), { recursive: true });
+      const serialized = JSON.stringify(normalized, null, 2);
+      const tempPath = `${stationsPath}.tmp`;
+      fs.writeFileSync(tempPath, serialized);
+      try { fs.renameSync(tempPath, stationsPath); } catch { fs.writeFileSync(stationsPath, serialized); }
+    } catch {}
+  }
 
   return normalized;
 }
