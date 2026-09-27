@@ -34,7 +34,7 @@ import { EMPTY_COMMANDS_HASH, defaultCommandFingerprintStore } from "../discord/
 import { buildCommandBuilders } from "../commands.js";
 import { loadGuildSettings } from "../lib/guild-settings.js";
 import { buildResolvedVoiceGuardConfig, formatVoiceGuardDurationMs } from "../lib/voice-guard.js";
-import { handleCommanderGuildJoined, handleCommanderGuildLeft, startServerDataRetention } from "../lib/server-data-retention.js";
+import { handleCommanderGuildJoined, handleCommanderGuildLeft, startServerDataRetention } from "../services/server-data-retention.js";
 import { isRuntimePlaybackActive, isRuntimeVoiceConnected } from "./runtime-live-state.js";
 import { endOwnedStageInstance } from "./runtime-voice.js";
 import {

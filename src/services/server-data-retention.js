@@ -9,12 +9,12 @@
 // before that, nothing is deleted. Premium licenses stay (billing).
 import { ButtonBuilder, ButtonStyle, ActionRowBuilder } from "discord.js";
 
-import { getDb, isConnected } from "./db.js";
-import { log } from "./logging.js";
-import { languagePick } from "./language.js";
-import { buildInviteUrlForRuntime } from "./api-helpers.js";
-import { deleteGuildSettings } from "./guild-settings.js";
-import { recordOwnerAudit } from "./owner-audit-store.js";
+import { getDb, isConnected } from "../lib/db.js";
+import { log } from "../lib/logging.js";
+import { languagePick } from "../lib/language.js";
+import { buildInviteUrlForRuntime } from "../lib/api-helpers.js";
+import { deleteGuildSettings } from "../lib/guild-settings.js";
+import { recordOwnerAudit } from "../lib/owner-audit-store.js";
 import * as ui from "../discord/ui/index.js";
 import {
   SERVER_DATA_RETENTION_DAYS,

@@ -30,6 +30,7 @@ function fromDoc(doc) {
 /**
  * Notes that the commander left the server. `created` is true only the first
  * time, so the server owner hears about it once; the date stays the first one.
+ * @param {{ guildId: string, guildName?: string, now?: Date }} input
  */
 export async function recordGuildDeparture({ guildId, guildName = "", now = new Date() } = {}) {
   const gid = sanitizeId(guildId);

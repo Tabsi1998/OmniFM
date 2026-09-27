@@ -22,7 +22,7 @@ after(async () => {
     import("../src/bot-state.js").then((m) => m.flushBotStateStore),
   ]);
   await Promise.all(stops.map((stop) => Promise.resolve().then(() => stop?.()).catch(() => null)));
-  const { stopServerDataRetention } = await import("../src/lib/server-data-retention.js");
+  const { stopServerDataRetention } = await import("../src/services/server-data-retention.js");
   stopServerDataRetention();
   const { close } = await import("../src/lib/db.js");
   await close().catch(() => null);
@@ -61,7 +61,7 @@ function fakeCommander({ inGuilds = [] } = {}) {
 test("a server without data: no departure, no DM", { skip: !hasMongoConfig }, async () => {
   const { connect } = await import("../src/lib/db.js");
   await connect();
-  const { handleCommanderGuildLeft } = await import("../src/lib/server-data-retention.js");
+  const { handleCommanderGuildLeft } = await import("../src/services/server-data-retention.js");
   const commander = fakeCommander();
   const result = await handleCommanderGuildLeft(commander, { id: snowflake(), name: "Leer", ownerId: snowflake() });
   assert.equal(result.recorded, false);
@@ -120,7 +120,7 @@ test("removed: one DM, a return keeps it; 30 days later the server's data is gon
     && Boolean(await db.collection("guild_languages").findOne({ _id: guildId }))
     && Boolean(await db.collection("dashboard_telemetry").findOne({ _id: guildId }))), "seeded");
 
-  const { handleCommanderGuildLeft, handleCommanderGuildJoined, runServerDataRetention } = await import("../src/lib/server-data-retention.js");
+  const { handleCommanderGuildLeft, handleCommanderGuildJoined, runServerDataRetention } = await import("../src/services/server-data-retention.js");
   const { listGuildDepartures } = await import("../src/guild-departures-store.js");
   const leftAt = new Date(Date.now() - 31 * DAY_MS);
   const guild = { id: guildId, name: "Testserver", ownerId };
@@ -168,7 +168,7 @@ test("a due server the commander is back on is not deleted", { skip: !hasMongoCo
   await connect();
   const guildId = snowflake();
   await getDb().collection("guild_settings").insertOne({ guildId });
-  const { handleCommanderGuildLeft, runServerDataRetention } = await import("../src/lib/server-data-retention.js");
+  const { handleCommanderGuildLeft, runServerDataRetention } = await import("../src/services/server-data-retention.js");
   await handleCommanderGuildLeft(fakeCommander(), { id: guildId, name: "Zurück", ownerId: snowflake() }, { now: new Date(Date.now() - 40 * DAY_MS) });
   assert.deepEqual(await runServerDataRetention(fakeCommander({ inGuilds: [guildId] })), []);
   assert.ok(await getDb().collection("guild_settings").findOne({ guildId }));
