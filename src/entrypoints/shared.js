@@ -111,7 +111,7 @@ async function initializeSharedServices({ requireMongo = false } = {}) {
     if (!license) return null;
     return {
       plan: license.plan || license.tier || "free",
-      active: Boolean(license.active) && !Boolean(license.expired),
+      active: Boolean(license.active) && !license.expired,
       seats: Math.max(1, Number(license.seats || 1) || 1),
     };
   });

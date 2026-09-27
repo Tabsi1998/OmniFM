@@ -2248,6 +2248,7 @@ test("tryReconnect parks the target after repeated permission failures", async (
 
   let last = null;
   for (let attempt = 0; attempt < 6; attempt += 1) {
+    // eslint-disable-next-line no-await-in-loop -- the attempts happen in order
     last = await tryRuntimeReconnect(runtime, "guild-1");
   }
 
@@ -4453,6 +4454,7 @@ test("restartCurrentStation backs off every failed outbound stream start", async
   };
 
   for (let attempt = 1; attempt <= STREAM_ERROR_COOLDOWN_THRESHOLD; attempt += 1) {
+    // eslint-disable-next-line no-await-in-loop -- the attempts happen in order
     await restartRuntimeCurrentStation(runtime, state, "guild-1");
     const expectedBackoff = Math.min(
       STREAM_RESTART_MAX_MS,

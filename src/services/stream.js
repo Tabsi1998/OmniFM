@@ -60,7 +60,7 @@ async function createResource(url, volume, qualityPreset, botName, bitrateOverri
       "-flush_packets", profile.outputFlushPackets,
     ];
 
-    let inputType = StreamType.Raw;
+    let inputType;
     if (mode === "opus") {
       const bitrate = bitrateOverride || presetBitrate || String(process.env.OPUS_BITRATE || "192k");
       const vbr = String(process.env.OPUS_VBR || "on");
@@ -154,7 +154,7 @@ async function createResource(url, volume, qualityPreset, botName, bitrateOverri
   const DEMUX_TIMEOUT_MS = 15_000;
   const probe = await Promise.race([
     demuxProbe(stream),
-    new Promise((_, reject) =>
+    new Promise((_resolve, reject) =>
       setTimeout(
         () => reject(new Error(`demuxProbe Timeout nach ${DEMUX_TIMEOUT_MS}ms`)),
         DEMUX_TIMEOUT_MS

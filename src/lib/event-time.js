@@ -7,7 +7,6 @@ import {
   GuildScheduledEventRecurrenceRuleWeekday,
 } from "discord.js";
 import { normalizeLanguage, getDefaultLanguage } from "../i18n.js";
-import { parseEnvInt } from "./helpers.js";
 import { languagePick } from "./language.js";
 
 const REPEAT_MODES = new Set([
@@ -239,9 +238,9 @@ function parseEventDateInput(rawInput, language = "de", timeZone = EVENT_FALLBAC
   }
 
   const normalized = raw.replace(/\//g, ".").replace(/-/g, ".");
-  let year = 0;
-  let month = 0;
-  let day = 0;
+  let year;
+  let month;
+  let day;
 
   let match = normalized.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
   if (match) {

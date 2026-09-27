@@ -271,9 +271,11 @@ class WorkerManager {
       }
 
       const guild = worker.client.guilds.cache.get(normalizedGuildId)
+        // eslint-disable-next-line no-await-in-loop -- workers in slot order; the first one in that channel wins
         || await worker.client.guilds.fetch(normalizedGuildId).catch(() => null);
       if (!guild) continue;
 
+      // eslint-disable-next-line no-await-in-loop -- workers in slot order; the first one in that channel wins
       const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
       const activeChannelId = String(me?.voice?.channelId || "").trim();
       if (activeChannelId && activeChannelId === normalizedChannelId) {

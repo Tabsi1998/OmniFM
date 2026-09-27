@@ -82,10 +82,12 @@ async function confirmRuntimeBotVoiceChannel(
 
   const startedAt = Date.now();
   while ((Date.now() - startedAt) <= Math.max(intervalMs, timeoutMs)) {
+    // eslint-disable-next-line no-await-in-loop -- polls until the voice state settles
     const { channelId } = await runtime.fetchBotVoiceState(normalizedGuildId);
     if (String(channelId || "").trim() === normalizedChannelId) {
       return true;
     }
+    // eslint-disable-next-line no-await-in-loop -- polls until the voice state settles
     await waitMs(intervalMs);
   }
   return false;

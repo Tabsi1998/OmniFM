@@ -472,6 +472,7 @@ async function captureFingerprintFromStream(url) {
 
   for (let attempt = 1; attempt <= RECOGNITION_CAPTURE_RETRIES; attempt += 1) {
     try {
+      // eslint-disable-next-line no-await-in-loop -- attempts wait for each other
       return await captureFingerprintAttempt(url);
     } catch (error) {
       lastError = error;
@@ -481,6 +482,7 @@ async function captureFingerprintFromStream(url) {
       ) {
         throw error;
       }
+      // eslint-disable-next-line no-await-in-loop -- attempts wait for each other
       await waitMs(150 * attempt);
     }
   }
@@ -606,6 +608,7 @@ async function resolveCoverArtArchiveUrl(releaseId) {
   const fallback = `https://coverartarchive.org/release/${releaseId}/front`;
 
   for (const candidate of [preferred, fallback]) {
+    // eslint-disable-next-line no-await-in-loop -- the first source that answers wins
     const response = await fetch(candidate, {
       method: "HEAD",
       headers: { "User-Agent": USER_AGENT },

@@ -34,7 +34,9 @@ function emptyAuditState() {
 
 function sanitizeText(value, maxLen = MAX_TEXT_LENGTH) {
   return String(value ?? "")
+    // eslint-disable-next-line no-control-regex -- terminal colour codes start with ESC
     .replace(/\u001b\[[0-9;]*[A-Za-z]/g, "")
+    // eslint-disable-next-line no-control-regex -- line breaks and NUL become spaces
     .replace(/[\r\n\u0000]/g, " ")
     .trim()
     .slice(0, maxLen);

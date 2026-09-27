@@ -145,7 +145,7 @@ setLicenseProvider((serverId) => {
   if (!license) return null;
   return {
     plan: license.plan || license.tier || "free",
-    active: Boolean(license.active) && !Boolean(license.expired),
+    active: Boolean(license.active) && !license.expired,
     seats: Math.max(1, Number(license.seats || 1) || 1),
   };
 });
@@ -500,6 +500,7 @@ if (periodicGuildSyncIntervalMs > 0) {
         if (runtime.role !== "commander") continue;
         if (!runtime.client.isReady()) continue;
         if (!runtime.isGuildCommandSyncEnabled()) continue;
+        // eslint-disable-next-line no-await-in-loop -- one bot after the other, as Discord's rate limit wants
         await runtime.syncGuildCommands("periodic");
       }
     })()
@@ -555,6 +556,7 @@ setInterval(async () => {
           const warningSubject = emailLanguage === "de"
             ? `Premium ${tierName} laeuft in ${Math.max(1, daysUntilExpiry)} ${Math.max(1, daysUntilExpiry) === 1 ? "Tag" : "Tagen"} ab!`
             : `Premium ${tierName} expires in ${Math.max(1, daysUntilExpiry)} day${Math.max(1, daysUntilExpiry) === 1 ? "" : "s"}!`;
+          // eslint-disable-next-line no-await-in-loop -- one mail after the other, gentle on the mail server
           const result = await sendMail(contactEmail, warningSubject, html);
           if (result?.success) {
             patchLicenseById(licenseId, { [warningFlagField]: lic.expiresAt });
@@ -573,6 +575,7 @@ setInterval(async () => {
         const expiredSubject = emailLanguage === "de"
           ? `Premium ${tierName} abgelaufen`
           : `Premium ${tierName} expired`;
+        // eslint-disable-next-line no-await-in-loop -- one mail after the other, gentle on the mail server
         const result = await sendMail(contactEmail, expiredSubject, html);
         if (result?.success) {
           patchLicenseById(licenseId, { _expiredNotifiedForExpiryAt: lic.expiresAt, _expiredNotified: true });

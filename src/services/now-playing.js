@@ -41,12 +41,12 @@ function getNowPlayingSnapshotCacheStats() {
 let globalNowPlayingQueue = null; // Will be set by runtime.js
 const BLOCKED_TRACK_VALUES = new Set(["-", "--", "n/a", "na", "none", "null", "undefined", "unknown"]);
 const TRACK_PREFIX_PATTERNS = [
-  /^now playing\s*[:|\-]+\s*/i,
-  /^currently playing\s*[:|\-]+\s*/i,
-  /^playing now\s*[:|\-]+\s*/i,
-  /^on air\s*[:|\-]+\s*/i,
-  /^playing\s*[:|\-]+\s*/i,
-  /^np\s*[:|\-]+\s*/i,
+  /^now playing\s*[:|-]+\s*/i,
+  /^currently playing\s*[:|-]+\s*/i,
+  /^playing now\s*[:|-]+\s*/i,
+  /^on air\s*[:|-]+\s*/i,
+  /^playing\s*[:|-]+\s*/i,
+  /^np\s*[:|-]+\s*/i,
 ];
 const METADATA_TRACK_FIELDS = ["streamtitle", "title", "song", "track", "trackname"];
 const METADATA_ARTIST_FIELDS = ["artist", "streamartist", "creator"];
@@ -71,6 +71,7 @@ function extractIcyField(metadataText, fieldName) {
 
 function normalizeTrackText(raw) {
   let text = String(raw || "")
+    // eslint-disable-next-line no-control-regex -- ICY metadata pads with NUL bytes
     .replace(/\u0000/g, "")
     .replace(/[\u2010-\u2015]+/g, " - ")
     .replace(/\u00e2\u0080[\u0090-\u0095]/g, " - ")
@@ -82,7 +83,7 @@ function normalizeTrackText(raw) {
     text = text.replace(pattern, "").trim();
   }
 
-  text = text.replace(/^[-:|~\/\s]+/, "").replace(/[-:|~\/\s]+$/, "").trim();
+  text = text.replace(/^[-:|~/\s]+/, "").replace(/[-:|~/\s]+$/, "").trim();
   if (!text) return null;
 
   const lower = text.toLowerCase();
@@ -261,6 +262,7 @@ async function fetchCoverArtFromMusicBrainz(artist, title) {
       }
 
       for (const candidateUrl of candidateUrls) {
+        // eslint-disable-next-line no-await-in-loop -- the first address that answers wins
         const headResponse = await fetch(candidateUrl, {
           method: "HEAD",
           headers: { "User-Agent": "OmniFM/3.0 (+omnifm.radio)" },
@@ -341,11 +343,12 @@ async function fetchCoverArtForTrack(artist, title) {
   }
 
   const request = (async () => {
-    let artworkUrl = null;
+    let artworkUrl;
     
     try {
       // Versuch 1: iTunes (schnell & populär)
       for (const query of queries) {
+        // eslint-disable-next-line no-await-in-loop -- search queries in order, the first hit wins
         artworkUrl = await fetchCoverArtFromItunes(query);
         if (!artworkUrl) continue;
         nowPlayingCoverCache.set(cacheKey, {
@@ -459,6 +462,7 @@ async function fetchStreamSnapshotUncached(url, { allowRecognition = true } = {}
 
     const readAtLeast = async (requiredBytes) => {
       while (buffer.length < requiredBytes) {
+        // eslint-disable-next-line no-await-in-loop -- a stream is read in order
         const { done, value } = await reader.read();
         if (done) return false;
         if (value?.length) {
@@ -470,6 +474,7 @@ async function fetchStreamSnapshotUncached(url, { allowRecognition = true } = {}
 
     let track = null;
     for (let metadataBlock = 0; metadataBlock < 4; metadataBlock += 1) {
+      // eslint-disable-next-line no-await-in-loop -- a stream is read in order
       if (!(await readAtLeast(metaint + 1))) {
         break;
       }
@@ -481,6 +486,7 @@ async function fetchStreamSnapshotUncached(url, { allowRecognition = true } = {}
         continue;
       }
 
+      // eslint-disable-next-line no-await-in-loop -- a stream is read in order
       if (!(await readAtLeast(metadataLength))) {
         break;
       }
@@ -489,6 +495,7 @@ async function fetchStreamSnapshotUncached(url, { allowRecognition = true } = {}
       buffer = buffer.slice(metadataLength);
       const metadataText = new TextDecoder("utf-8")
         .decode(metadataChunk)
+        // eslint-disable-next-line no-control-regex -- ICY metadata pads with NUL bytes
         .replace(/\u0000+/g, "")
         .trim();
       const extractedTrack = extractTrackFromMetadataText(metadataText);

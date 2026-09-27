@@ -75,8 +75,8 @@ export async function buildRuntimeWorkersStatusPayload(runtime, interaction, { h
       : null;
     const tierLocked = ws.index > maxIndex;
 
-    let statusEmoji = "";
-    let statusText = "";
+    let statusEmoji;
+    let statusText;
     if (tierLocked) {
       statusEmoji = "🔒";
       statusText = t("(Upgrade erforderlich)", "(Upgrade required)");

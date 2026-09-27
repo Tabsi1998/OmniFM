@@ -114,7 +114,7 @@ async function handlePlayUrlCommand(runtime, interaction) {
   if (!rawUrl) return false; // Kein url-Parameter → nicht zuständig
 
   const guildId = interaction.guildId;
-  const { t, language } = runtime.createInteractionTranslator(interaction);
+  const { t } = runtime.createInteractionTranslator(interaction);
 
   // Feature-Check: Nur Ultimate
   const feature = requireFeature(guildId, "directStreamPlay");
@@ -181,7 +181,7 @@ async function handlePlayUrlCommand(runtime, interaction) {
   const { key, stationsData } = buildDirectStreamStation(urlValidation.url, label);
 
   // Worker auflösen
-  const { runtime: streamRuntime, state, reason } = await runtime.resolveStreamingRuntimeForInteraction(interaction);
+  const { runtime: streamRuntime, state } = await runtime.resolveStreamingRuntimeForInteraction(interaction);
 
   let targetRuntime = streamRuntime;
   let targetState = state;

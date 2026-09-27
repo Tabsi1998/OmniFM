@@ -171,6 +171,7 @@ async function replaceMapCollection(database, collectionName, idField, values) {
   const ids = [];
   for (const [id, value] of Object.entries(values || {})) {
     if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+    // eslint-disable-next-line no-await-in-loop -- one document after the other; the store is small
     await database.collection(collectionName).replaceOne(
       { [idField]: id },
       { ...value, [idField]: id },
@@ -195,6 +196,7 @@ async function writeMapDelta(database, collectionName, idField, beforeValues, ne
   for (const [id, value] of Object.entries(next)) {
     if (!value || typeof value !== "object" || Array.isArray(value)) continue;
     if (valuesEqual(before[id], value)) continue;
+    // eslint-disable-next-line no-await-in-loop -- one document after the other; the store is small
     await database.collection(collectionName).replaceOne(
       { [idField]: id },
       { ...value, [idField]: id },

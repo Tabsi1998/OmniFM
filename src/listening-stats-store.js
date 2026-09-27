@@ -460,7 +460,7 @@ export function getActiveSessionsForGuild(guildId) {
   if (!gid) return [];
   const result = [];
   const now = Date.now();
-  for (const [key, session] of activeSessions.entries()) {
+  for (const session of activeSessions.values()) {
     if (session.guildId === gid) {
       const summary = summarizeSessionListeners({
         samples: session.listenerSamples || [],
@@ -492,7 +492,6 @@ export function recordCommandUsage(guildId, commandName, timestampMs = Date.now(
 
   // Async MongoDB write
   mongoSafe(async (db) => {
-    const dateStr = todayDateString(timestampMs);
     const cmd = String(commandName || "").trim().toLowerCase();
     await db.collection("guild_stats").updateOne(
       { guildId: normalizeGuildId(guildId) },

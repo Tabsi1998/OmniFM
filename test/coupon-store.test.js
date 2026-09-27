@@ -39,10 +39,12 @@ test("direct grant offers require explicit plan, seats, and months", async (t) =
   ];
   const snapshots = new Map();
   for (const filePath of trackedFiles) {
+    // eslint-disable-next-line no-await-in-loop -- one file after the other
     snapshots.set(filePath, await snapshotFile(filePath));
   }
   t.after(async () => {
     for (const [filePath, snapshot] of snapshots.entries()) {
+      // eslint-disable-next-line no-await-in-loop -- one file after the other
       await restoreFile(filePath, snapshot);
     }
   });
@@ -63,10 +65,12 @@ test("direct grant offers preview as zero-charge license grants", async (t) => {
   ];
   const snapshots = new Map();
   for (const filePath of trackedFiles) {
+    // eslint-disable-next-line no-await-in-loop -- one file after the other
     snapshots.set(filePath, await snapshotFile(filePath));
   }
   t.after(async () => {
     for (const [filePath, snapshot] of snapshots.entries()) {
+      // eslint-disable-next-line no-await-in-loop -- one file after the other
       await restoreFile(filePath, snapshot);
     }
   });

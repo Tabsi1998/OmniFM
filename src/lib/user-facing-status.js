@@ -29,7 +29,7 @@ function normalizeRuntimeStatusInput(source = {}) {
   };
 }
 
-function buildUserFacingRuntimeStatus(source = {}, { t = (de, en) => de } = {}) {
+function buildUserFacingRuntimeStatus(source = {}, { t = (de, _en) => de } = {}) {
   const status = normalizeRuntimeStatusInput(source);
   const playbackBits = [];
   if (status.stationName) playbackBits.push(status.stationName);

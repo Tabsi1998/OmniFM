@@ -259,8 +259,10 @@ async function runHealthChecks(stations) {
       const station = queue.shift();
       if (!station) break;
       try {
+        // eslint-disable-next-line no-await-in-loop -- one station after the other, gentle on the stream hosts
         const result = await checkStation(station.key, station.name, station.url);
         healthReport.set(station.key, result);
+        // eslint-disable-next-line no-await-in-loop -- one station after the other, gentle on the stream hosts
         await persistHealthEntry(result);
       } catch (err) {
         log("WARN", `[StationHealth] Unerwarteter Fehler bei "${station.key}": ${err?.message || err}`);

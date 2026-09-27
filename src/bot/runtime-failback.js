@@ -143,6 +143,7 @@ async function probeRuntimeStreamUrl(url, { timeoutMs = STREAM_FAILBACK_PROBE_TI
   try {
     while (bytes < STREAM_FAILBACK_PROBE_BYTES && Date.now() < deadline) {
       let timer = null;
+      // eslint-disable-next-line no-await-in-loop -- the probe reads the stream chunk by chunk
       const chunk = await Promise.race([
         reader.read(),
         new Promise((resolve) => {
@@ -344,7 +345,7 @@ async function resolveReplacementStationForGuild(runtime, guildId, unavailableKe
     for (const key of chain) candidates.push({ key, source: "failover-chain" });
   } catch {}
 
-  let defaultKey = null;
+  let defaultKey;
   try {
     defaultKey = typeof runtime.getCatalogDefaultStationKey === "function"
       ? runtime.getCatalogDefaultStationKey()

@@ -255,6 +255,7 @@ async function observeRecoveringGuildVoicePresence(runtime, guildRows = []) {
     if (!guildId) continue;
     try {
       // Confirm against Discord before treating a missing local connection as a dead worker.
+      // eslint-disable-next-line no-await-in-loop -- one server after the other, gentle on Discord
       const voiceState = await runtime.fetchBotVoiceState(guildId);
       const actualChannelId = String(voiceState?.channelId || "").trim();
       if (!actualChannelId) continue;

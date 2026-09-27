@@ -67,10 +67,6 @@ function normalizeStoredTimestampMs(rawValue) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
-function hasSavedVolumePreference(entry) {
-  return normalizeStoredVolume(entry?.volume) !== null;
-}
-
 function isPersistableGuildState(state) {
   return Boolean(state?.currentStationKey && state?.lastChannelId);
 }

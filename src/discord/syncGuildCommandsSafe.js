@@ -162,7 +162,7 @@ async function putGuildCommandsWithTimeout({
     throw err;
   });
 
-  const timeoutPromise = new Promise((_, reject) => {
+  const timeoutPromise = new Promise((_resolve, reject) => {
     timeoutHandle = setTimeout(() => {
       didTimeout = true;
       if (controller) {
@@ -249,7 +249,7 @@ async function putGuildCommandsViaFetchWithTimeout({
     if (timeoutHandle) clearTimeout(timeoutHandle);
   }
 
-  let body = null;
+  let body;
   try {
     body = await response.json();
   } catch {
@@ -341,6 +341,7 @@ export async function syncGuildCommandsSafe({
 
   for (let attempt = 1; attempt <= maxTries; attempt++) {
     try {
+      // eslint-disable-next-line no-await-in-loop -- retries and pauses one after the other, as Discord's rate limit wants
       await ensureClientReady(client);
     } catch (err) {
       emit(
@@ -349,6 +350,7 @@ export async function syncGuildCommandsSafe({
         `[${label}] Command Sync ready wait failed (attempt=${attempt}/${maxTries}): ${err?.message || err}`
       );
       if (attempt < maxTries) {
+        // eslint-disable-next-line no-await-in-loop -- retries and pauses one after the other, as Discord's rate limit wants
         await waitMs(retryDelayMs);
         continue;
       }
@@ -358,6 +360,7 @@ export async function syncGuildCommandsSafe({
 
     let fetchedGuilds;
     try {
+      // eslint-disable-next-line no-await-in-loop -- retries and pauses one after the other, as Discord's rate limit wants
       fetchedGuilds = await client.guilds.fetch();
     } catch (err) {
       emit(
@@ -366,6 +369,7 @@ export async function syncGuildCommandsSafe({
         `[${label}] Guild fetch failed (attempt=${attempt}/${maxTries}): ${err?.message || err}`
       );
       if (attempt < maxTries) {
+        // eslint-disable-next-line no-await-in-loop -- retries and pauses one after the other, as Discord's rate limit wants
         await waitMs(retryDelayMs);
         continue;
       }
@@ -400,6 +404,7 @@ export async function syncGuildCommandsSafe({
         `[${label}] Command Sync blocked: applicationId missing (attempt=${attempt}/${maxTries})`
       );
       if (attempt < maxTries) {
+        // eslint-disable-next-line no-await-in-loop -- retries and pauses one after the other, as Discord's rate limit wants
         await waitMs(retryDelayMs);
         continue;
       }
@@ -415,6 +420,7 @@ export async function syncGuildCommandsSafe({
         `[${label}] Command Sync retry trigger: ${reason} (attempt=${attempt}/${maxTries})`
       );
       if (attempt < maxTries) {
+        // eslint-disable-next-line no-await-in-loop -- retries and pauses one after the other, as Discord's rate limit wants
         await waitMs(retryDelayMs);
         continue;
       }
@@ -441,11 +447,14 @@ export async function syncGuildCommandsSafe({
 
     if (verboseSyncLogs && syncDelayMs > 0) {
       emit(logFn, "INFO", `[${label}] Sync delay before command sync: ${syncDelayMs}ms (source=${syncSource})`);
+      // eslint-disable-next-line no-await-in-loop -- retries and pauses one after the other, as Discord's rate limit wants
       await waitMs(syncDelayMs);
     } else if (syncDelayMs > 0) {
+      // eslint-disable-next-line no-await-in-loop -- retries and pauses one after the other, as Discord's rate limit wants
       await waitMs(syncDelayMs);
     }
 
+    // eslint-disable-next-line no-await-in-loop -- retries and pauses one after the other, as Discord's rate limit wants
     const result = await runExclusive(async () => {
       let ok = 0;
       let failed = 0;
@@ -517,6 +526,7 @@ export async function syncGuildCommandsSafe({
         "INFO",
         `[${label}] Command Sync retry scheduled in ${retryDelayMs}ms (attempt=${attempt + 1}/${maxTries})`
       );
+      // eslint-disable-next-line no-await-in-loop -- retries and pauses one after the other, as Discord's rate limit wants
       await waitMs(retryDelayMs);
     }
   }

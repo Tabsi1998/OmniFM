@@ -56,13 +56,13 @@ export function buildRuntimeHealthNodes(runtimes, {
   return runtimes.map((rt) => {
     const client = rt?.client;
     const ready = !!client?.isReady?.();
-    let voice = 0;
+    let voice;
     try { voice = client?.voice?.adapters?.size || 0; } catch { voice = 0; }
-    let guilds = 0;
+    let guilds;
     try { guilds = ready ? client.guilds.cache.size : 0; } catch { guilds = 0; }
-    let guildIds = [];
+    let guildIds;
     try { guildIds = ready ? [...client.guilds.cache.keys()].map(String) : []; } catch { guildIds = []; }
-    let runtimeDetails = [];
+    let runtimeDetails;
     try { runtimeDetails = rt?.getDashboardStatus?.()?.guildDetails || []; } catch { runtimeDetails = []; }
     const runtimeDetailByGuild = new Map(runtimeDetails.map((detail) => [String(detail.guildId || detail.id || ""), detail]));
     let guildDetails = [];
@@ -70,8 +70,8 @@ export function buildRuntimeHealthNodes(runtimes, {
       try {
         guildDetails = [...client.guilds.cache.values()].map((guild) => {
           const includeDirectory = rt?.role === "commander";
-          let roles = [];
-          let channels = [];
+          let roles;
+          let channels;
           try {
             roles = includeDirectory ? [...(guild.roles?.cache?.values?.() || [])]
               .filter((role) => String(role.id) !== String(guild.id) && !role.managed)
@@ -129,9 +129,9 @@ export function buildRuntimeHealthNodes(runtimes, {
         });
       } catch { guildDetails = []; }
     }
-    let ping = null;
+    let ping;
     try { ping = ready ? Math.max(0, Math.round(client.ws.ping)) : null; } catch { ping = null; }
-    let stats = {};
+    let stats;
     try { stats = rt?.collectStats?.() || {}; } catch { stats = {}; }
     let runtimeMetrics = {};
     if (resourceModel === "split-processes") {

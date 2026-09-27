@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import path from "node:path";
 import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 import { getDb, isConnected } from "./lib/db.js";
 import { log } from "./lib/logging.js";

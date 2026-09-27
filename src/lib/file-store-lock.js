@@ -117,7 +117,7 @@ export function withFileStoreLock(filePath, fn, options = {}) {
       }
       if (Date.now() - startedAt >= timeoutMs) {
         const owner = readLockOwner(lockDir);
-        throw new Error(`Timed out waiting for file-store lock ${lockDir}${owner ? ` owner=${owner}` : ""}`);
+        throw new Error(`Timed out waiting for file-store lock ${lockDir}${owner ? ` owner=${owner}` : ""}`, { cause: err });
       }
       sleepSync(retryMs);
     }

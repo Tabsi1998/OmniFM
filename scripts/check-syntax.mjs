@@ -44,6 +44,7 @@ async function worker() {
     // Take the index before awaiting, or two workers parse the same file.
     const index = next;
     next += 1;
+    // eslint-disable-next-line no-await-in-loop -- one file after the other keeps the report in order
     const result = await parse(files[index]);
     if (result.code !== 0) failures.push(result);
   }

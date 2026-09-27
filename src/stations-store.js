@@ -74,6 +74,7 @@ export async function applyStationCatalogMigrations(stationsCollection, migratio
   const skipped = [];
 
   for (const migration of STATION_CATALOG_MIGRATIONS) {
+    // eslint-disable-next-line no-await-in-loop -- the migration steps run in order, each once
     const marker = await migrationsCollection.findOne(
       { _id: migration.id },
       { projection: { _id: 1 } }
@@ -83,6 +84,7 @@ export async function applyStationCatalogMigrations(stationsCollection, migratio
       continue;
     }
 
+    // eslint-disable-next-line no-await-in-loop -- the migration steps run in order, each once
     const updateResult = await stationsCollection.updateMany(
       { key: { $in: migration.keys }, url: migration.fromUrl },
       { $set: { url: migration.toUrl } }
@@ -103,6 +105,7 @@ export async function applyStationCatalogMigrations(stationsCollection, migratio
     };
 
     try {
+      // eslint-disable-next-line no-await-in-loop -- the migration steps run in order, each once
       const markerResult = await migrationsCollection.insertOne(markerDocument);
       if (markerResult?.acknowledged === false) {
         throw new Error(`Katalogmigration ${migration.id} konnte nicht als abgeschlossen markiert werden.`);

@@ -344,6 +344,7 @@ const nowPlayingMethods = {
     });
 
     for (const candidateId of uniqueCandidateIds) {
+      // eslint-disable-next-line no-await-in-loop -- the first channel that still exists wins
       const channel = await this.fetchGuildChannelById(guild, candidateId);
       if (this.canSendNowPlayingToChannel(channel, me)) {
         return channel;
