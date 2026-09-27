@@ -16,7 +16,9 @@ const COLLECTION = "provider_state";
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
 /**
- * @param {{ id: string, file: string, emptyState: () => object, normalize: (raw: any) => object }} options
+ * @template T
+ * @param {{ id: string, file: string, emptyState: () => T, normalize: (raw: any) => T }} options
+ * @returns {{ load: () => T, save: (state: T) => T, init: (options?: { refreshMs?: number }) => Promise<{ backend: string }>, stop: () => Promise<void> }}
  */
 export function createStateDocumentStore({ id, file, emptyState, normalize }) {
   let active = false;
@@ -81,7 +83,9 @@ export function createStateDocumentStore({ id, file, emptyState, normalize }) {
       writeFile(normalized);
       return normalized;
     }
+    /** @type {any} */
     const before = cache || emptyState();
+    /** @type {Record<string, any>} */
     const changed = {};
     for (const [key, value] of Object.entries(normalized)) {
       if (JSON.stringify(before[key]) !== JSON.stringify(value)) changed[key] = value;
