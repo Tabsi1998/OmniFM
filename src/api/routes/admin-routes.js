@@ -401,7 +401,7 @@ export function createAdminRoutesHandler(deps) {
         sendAdminJson(res, 403, { error: "CSRF-Schutz: Anmeldung nur aus der Owner-Konsole." });
         return true;
       }
-      const user = readDashboardUser(req);
+      const user = await readDashboardUser(req);
       if (!user?.id) {
         sendAdminJson(res, 401, { error: "Nicht mit Discord angemeldet." });
         return true;

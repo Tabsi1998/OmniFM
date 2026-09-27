@@ -15,6 +15,8 @@ import {
 import { setLicenseProvider } from "../core/entitlements.js";
 import { initCouponStore } from "../coupon-store.js";
 import { initProviderStores } from "../lib/provider-stores.js";
+import { initDashboardStore } from "../dashboard-store.js";
+import { initGuildLanguageStore } from "../guild-language-store.js";
 import { MONGO_REQUIRED_MESSAGE, fileStoresAllowed } from "../lib/store-policy.js";
 import { installOperatorIncidentRecorder, logRecentOperatorIncidentSummary } from "../operator-incidents-store.js";
 
@@ -85,8 +87,15 @@ async function initializeSharedServices({ requireMongo = false } = {}) {
   }
 
   await initPremiumStore();
-  await initCouponStore();
-  await initProviderStores();
+  // Every process speaks in the server's language, workers included (#292).
+  await initGuildLanguageStore();
+  // Checkout, bot lists, votes and dashboard logins belong to the commander;
+  // a worker only streams and needs none of their MongoDB refreshes (#292).
+  if (String(process.env.BOT_PROCESS_ROLE || "").trim().toLowerCase() !== "worker") {
+    await initCouponStore();
+    await initProviderStores();
+    await initDashboardStore();
+  }
   await initStationsStore();
   await logRecentOperatorIncidentSummary({
     label: "Owner summary on startup",

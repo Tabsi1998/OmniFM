@@ -196,6 +196,7 @@ import {
   popDashboardOauthState,
   setDashboardAuthSession,
   getDashboardAuthSession,
+  findDashboardAuthSession,
   deleteDashboardAuthSession,
   cleanupDashboardAuthState,
 } from "../dashboard-store.js";
@@ -2933,8 +2934,12 @@ const handleAdminRoutes = createAdminRoutesHandler({
   methodNotAllowed,
   sendJson,
   getCommonSecurityHeaders,
-  // Discord sign-in of the owner console (#283): the dashboard's login session.
-  readDashboardUser: (req) => getDashboardSession(req).session?.user || null,
+  // Discord sign-in of the owner console (#283): the dashboard's login session,
+  // straight from MongoDB, since the commander created it seconds ago (#292).
+  readDashboardUser: async (req) => {
+    const token = resolveDashboardSessionToken(req);
+    return token ? (await findDashboardAuthSession(token))?.user || null : null;
+  },
   isSecureRequest: (req) => isSecureCookieRequest(req, process.env.PUBLIC_WEB_URL),
   isDiscordLoginConfigured: () => isDiscordOauthConfigured(),
 });
