@@ -23,6 +23,7 @@ import fs from "node:fs";
 
 import { recordOwnerAudit } from "../../lib/owner-audit-store.js";
 import { syncDiscordOauthFromOwnerConfig } from "../../lib/discord-oauth-settings.js";
+import { refreshOwnerSettings } from "../../lib/owner-settings-cache.js";
 import { getClientIp, safeTokenEquals } from "../../lib/api-helpers.js";
 import { getDb, isConnected } from "../../lib/db.js";
 import {
@@ -605,8 +606,9 @@ export function createAdminRoutesHandler(deps) {
         const raw = await loadOwnerConfigRaw();
         const next = mergedSectionForSave(raw, section, data);
         await getDb().collection("owner_config").updateOne({ _id: OWNER_CONFIG_ID }, { $set: { [section]: next } }, { upsert: true });
-        // A new Discord login works at once, not only after the next sync.
+        // A new Discord login, Stripe key or plan price works at once, not only after the next sync.
         if (section === "system") await syncDiscordOauthFromOwnerConfig().catch(() => false);
+        await refreshOwnerSettings();
         auditOwnerAction(req, { action: "config.update", status: "success", target: section, summary: "aktualisiert" });
         sendJson(res, 200, { ok: true, section, data: sectionResponse({ ...raw, [section]: next }, section) });
       } catch (err) {

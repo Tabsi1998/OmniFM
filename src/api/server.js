@@ -34,6 +34,7 @@ import { createPremiumReadRoutesHandler } from "./routes/premium-read-routes.js"
 import { createPublicRoutesHandler } from "./routes/public-routes.js";
 import { legalNotice, privacyNotice, termsNotice } from "../lib/owner-public.js";
 import { loadOwnerConfigRaw } from "../lib/owner-config.js";
+import { startOwnerSettingsRefresh } from "../lib/owner-settings-cache.js";
 import { createShareRoutesHandler } from "./routes/share-routes.js";
 import { createStationLogoRoutesHandler } from "./routes/station-logo-routes.js";
 import { createOwnerStatusRoutesHandler } from "./routes/owner-status-routes.js";
@@ -102,6 +103,8 @@ import {
   resolvePublicWebsiteUrl,
   buildInviteOverviewForTier,
   getStripeSecretKey,
+  getStripeWebhookSecret,
+  isStripeCheckoutEnabled,
   resolveCheckoutReturnBase,
   getConfiguredPublicOrigin,
   isAllowedFrontendOrigin,
@@ -575,6 +578,7 @@ const handleDashboardLicenseRoute = createDashboardLicenseRouteHandler({
   getLicense,
   getLocalizedJsonBodyError,
   getStripeSecretKey,
+  isStripeCheckoutEnabled,
   isValidEmailAddress,
   languagePick,
   linkServerToLicense,
@@ -816,6 +820,8 @@ const handlePremiumBillingRoutes = createPremiumBillingRoutesHandler({
   getDefaultLanguage,
   getLocalizedJsonBodyError,
   getStripeSecretKey,
+  getStripeWebhookSecret,
+  isStripeCheckoutEnabled,
   isEventProcessed,
   isProTrialEnabled,
   isSessionProcessed,
@@ -2926,6 +2932,8 @@ const handleAdminRoutes = createAdminRoutesHandler({
 function startWebServer(runtimes) {
   // A new OAuth secret from the owner console works without a restart.
   startDiscordOauthSync();
+  // Stripe keys and plan prices of the owner console (#289).
+  startOwnerSettingsRefresh();
   // The owner cockpit checks every service every 5 minutes (#355).
   startOwnerStatusService(runtimes);
   const webInternalPort = Number(process.env.WEB_INTERNAL_PORT || "8080");
