@@ -6,6 +6,58 @@ folgt [SemVer](https://semver.org/lang/de/): Die erste Zahl steigt bei
 Funktionen, die dritte bei reinen Fehlerbehebungen. Wie ein Release entsteht,
 steht in `scripts/release.mjs`.
 
+## 3.7.0 – 2026-09-27
+
+Auf der Website wird nichts mehr verkauft: Stripe ist raus, Premium kommt
+direkt in Discord. Bis Discord verkaufen darf, gibt es Premium über
+Lizenzen und Gratis-Codes aus der Owner-Konsole und den Testmonat.
+
+### Neu
+
+- **Premium in Discord (vorbereitet):** In der Owner-Konsole unter
+  „Server & Lizenzen › Premium in Discord“ gibt es einen Schalter und die
+  SKU-IDs für Pro und Ultimate. Ist er an, wird ein Kauf in Discord sofort
+  zur Lizenz des Servers; Verlängerung, Kündigung und Rückerstattung ändern
+  sie mit, und eine Lizenz von vorher kommt nach dem Abo zurück, solange sie
+  gilt. `/premium` zeigt dann Discords Kaufknöpfe, die Website verlinkt auf
+  die Store-Seite. Eingeschaltet wird erst, wenn Discord die App freigibt
+  (ab 75 Servern). (#320, #393)
+
+### Geändert
+
+- **Kein Kauf mehr über Stripe:** Auf der Website und im Server-Dashboard
+  heißt der Knopf jetzt „Code einlösen“. Gratis-Codes und der Pro-Testmonat
+  funktionieren wie bisher; ein Kaufversuch bekommt die Antwort, dass
+  Premium bald direkt in Discord kommt. Stripe hat nur Einmalzahlungen
+  abgewickelt, es verlängert sich also nichts automatisch, und laufende
+  Lizenzen gelten bis zu ihrem Ende. (#321, #391)
+- **Owner-Konsole:** Die Seite „Zahlungen“ ist weg (Stripe-Schlüssel und
+  der PayPal-Platzhalter). Die Einstellungen für den Discord-Shop kommen mit
+  #320. Die Rolle „Abrechnung“ darf weiter Pläne und Preise ändern. (#391)
+- **Datenschutz und AGB:** sagen jetzt in einfachen Worten, dass auf der
+  Website nichts verkauft wird und Discord künftig der Verkäufer ist, der
+  Zahlung und Steuern abwickelt. (#391)
+
+### Behoben
+
+- **Zugänge in der Owner-Konsole:** Eingetragene Discord-Konten wurden
+  gespeichert, die Seite zeigte nach dem Neuladen aber 0 an. Wer dann noch
+  einmal speicherte, löschte sie wirklich. Die Seite zeigt sie jetzt an.
+  Falls Konten verloren gegangen sind: einmal neu eintragen. (#390)
+
+### Intern
+
+- Keine Datei in `src/` hat mehr als 800 Zeilen; zwölf große Dateien sind
+  nach Themen aufgeteilt, ein Test hält die Grenze fest. Dabei sind 34
+  alte ESLint-Hinweise weggefallen. (#295, #389)
+- Der lokale Check nutzt für die Website eigene Ports und stört sich nicht
+  mehr mit den Checks anderer Projekte auf demselben Rechner. (#393)
+
+### Nach dem Update
+
+- Die Stripe-Schlüssel liegen noch in der Datenbank, werden aber nicht mehr
+  gelesen. Bitte im Stripe-Dashboard widerrufen.
+
 ## 3.6.0 – 2026-09-27
 
 Datenschutz zum Selbstbedienen: Jede Person sieht, was OmniFM über sie
