@@ -8,6 +8,8 @@ let client = null;
 let db = null;
 let connectPromise = null;
 let initialized = false;
+// connect() was called: this process runs on MongoDB, not on the JSON files.
+let requested = false;
 
 // ---- Fix: Echter Verbindungsstatus-Check ----
 // db !== null reicht nicht – der Client kann disconnected sein ohne dass db null wird.
@@ -117,6 +119,7 @@ async function initCollections(database) {
 }
 
 async function connect() {
+  requested = true;
   // ---- Fix: Prüfe echten Verbindungsstatus, nicht nur db !== null ----
   if (db && isConnected()) return db;
 
@@ -193,4 +196,9 @@ async function close() {
   }
 }
 
-export { connect, getDb, isConnected, close };
+/** Did this process ask for MongoDB? Without it the JSON files are the store. */
+function isMongoRequested() {
+  return requested;
+}
+
+export { connect, getDb, isConnected, isMongoRequested, close };

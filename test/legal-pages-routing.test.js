@@ -142,20 +142,7 @@ test("pageRouting resolves aliases and localized legal paths", () => {
 
 test("startWebServer serves SPA entry for clean legal paths and exposes terms payload", async () => {
   const ownerEnvDir = await fs.mkdtemp(path.join(os.tmpdir(), "omnifm-admin-config-"));
-  const ownerEnvFile = path.join(ownerEnvDir, ".env");
   const ownerAuditFile = path.join(ownerEnvDir, "owner-audit.json");
-  const ownerLogsDir = path.join(ownerEnvDir, "logs");
-  await fs.writeFile(
-    ownerEnvFile,
-    "PUBLIC_WEB_URL=https://omnifm.xyz\nAPI_ADMIN_TOKEN=admin-route-token\nLOG_MAX_MB=5\n",
-    "utf8"
-  );
-  await fs.mkdir(ownerLogsDir, { recursive: true });
-  await fs.writeFile(
-    path.join(ownerLogsDir, "bot.log"),
-    "[2026-06-11T06:00:00.000Z] [INFO] owner test token=must-not-leak\n",
-    "utf8"
-  );
   const restoreEnv = setEnv({
     WEB_INTERNAL_PORT: "0",
     WEB_PORT: "0",
@@ -183,9 +170,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     OMNIFM_DEPLOYED_AT: "2026-06-10T18:00:00.000Z",
     OMNIFM_LAST_DEPLOY_STATUS: "success",
     OMNIFM_LAST_LIVE_SMOKE_STATUS: "success",
-    OMNIFM_ENV_FILE: ownerEnvFile,
     OMNIFM_OWNER_AUDIT_FILE: ownerAuditFile,
-    OMNIFM_OWNER_LOGS_DIR: ownerLogsDir,
     STRIPE_SECRET_KEY: undefined,
     SMTP_PASS: undefined,
     ADMIN_EMAIL: "owner@it-tabelander.at",
@@ -270,88 +255,35 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.equal(notFoundPageResponse.status, 404);
     assert.match(await notFoundPageResponse.text(), /404/);
 
-    const adminLoginResponse = await fetch(`http://127.0.0.1:${port}/admin`);
-    assert.equal(adminLoginResponse.status, 200);
-    assertCommonSecurityHeaders(adminLoginResponse.headers);
-    const adminLoginHtml = await adminLoginResponse.text();
-    assert.match(adminLoginHtml, /OMNIFM OWNER LOGIN/);
-    assert.match(adminLoginHtml, /adminTokenInput/);
+    // The owner console is the React app; the old HTML admin page, its cookie
+    // login and the ?token= address are gone (#288). /api/admin/* takes the
+    // owner token in a header only, like FastAPI.
+    const oldAdminPageResponse = await fetch(`http://127.0.0.1:${port}/admin?token=admin-route-token`, { redirect: "manual" });
+    assert.equal(oldAdminPageResponse.headers.get("set-cookie"), null);
+    assert.doesNotMatch(await oldAdminPageResponse.text(), /OMNIFM OWNER LOGIN|OMNIFM ADMIN/);
 
-    const adminOverviewUnauthorizedResponse = await fetch(`http://127.0.0.1:${port}/api/admin/overview`);
-    assert.equal(adminOverviewUnauthorizedResponse.status, 401);
-
-    const invalidAdminSessionResponse = await fetch(`http://127.0.0.1:${port}/api/admin/session`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ token: "wrong-token" }).toString(),
-      redirect: "manual",
+    const adminUnauthorizedResponse = await fetch(`http://127.0.0.1:${port}/api/admin/overview`);
+    assert.equal(adminUnauthorizedResponse.status, 401);
+    assert.equal((await adminUnauthorizedResponse.json()).error, "Nicht autorisiert. Gueltiger Owner-Token erforderlich.");
+    const refusedAttempts = [
+      { url: "/api/admin/overview?token=admin-route-token", headers: {} },
+      { url: "/api/admin/overview", headers: { Cookie: "omnifm_owner=admin-route-token" } },
+      { url: "/api/admin/overview", headers: { "X-Admin-Token": "wrong-token" } },
+    ];
+    const refusedResponses = await Promise.all(refusedAttempts.map((attempt) => (
+      fetch(`http://127.0.0.1:${port}${attempt.url}`, { headers: attempt.headers })
+    )));
+    refusedResponses.forEach((response, index) => {
+      const attempt = refusedAttempts[index];
+      assert.equal(response.status, 401, `${attempt.url} ${JSON.stringify(attempt.headers)} must not open the owner API`);
     });
-    assert.equal(invalidAdminSessionResponse.status, 401);
-
-    const oversizedAdminSessionResponse = await fetch(`http://127.0.0.1:${port}/api/admin/session`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: `token=${"x".repeat(4_100)}`,
-      redirect: "manual",
+    const ownerHeaders = { "X-Admin-Token": "admin-route-token" };
+    const bearerResponse = await fetch(`http://127.0.0.1:${port}/api/admin/workers`, {
+      headers: { Authorization: "Bearer admin-route-token" },
     });
-    assert.equal(oversizedAdminSessionResponse.status, 413);
-    assert.match((await oversizedAdminSessionResponse.json()).error, /body too large/i);
+    assert.equal(bearerResponse.status, 200);
 
-    const adminSessionResponse = await fetch(`http://127.0.0.1:${port}/api/admin/session`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ token: "admin-route-token" }).toString(),
-      redirect: "manual",
-    });
-    assert.equal(adminSessionResponse.status, 303);
-    assert.equal(adminSessionResponse.headers.get("location"), "/admin");
-    const adminCookie = adminSessionResponse.headers.get("set-cookie") || "";
-    assert.match(adminCookie, /omnifm_owner=admin-route-token/);
-    assert.match(adminCookie, /HttpOnly/);
-    assert.match(adminCookie, /SameSite=Strict/);
-    const adminCookieHeader = adminCookie.split(";")[0];
-
-    const proxiedAdminSessionResponse = await fetch(`http://127.0.0.1:${port}/api/admin/session`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Origin: "https://omnifm.xyz",
-      },
-      body: new URLSearchParams({ token: "admin-route-token" }).toString(),
-      redirect: "manual",
-    });
-    assert.equal(proxiedAdminSessionResponse.status, 303);
-    assert.equal(proxiedAdminSessionResponse.headers.get("location"), "/admin");
-
-    const adminPanelResponse = await fetch(`http://127.0.0.1:${port}/admin`, {
-      headers: { Cookie: adminCookieHeader },
-    });
-    assert.equal(adminPanelResponse.status, 200);
-    assertCommonSecurityHeaders(adminPanelResponse.headers);
-    const adminPanelHtml = await adminPanelResponse.text();
-    assert.match(adminPanelHtml, /OMNIFM ADMIN/);
-    assert.match(adminPanelHtml, /stationSearch/);
-    assert.match(adminPanelHtml, /copyText/);
-    assert.match(adminPanelHtml, /statRelease/);
-    assert.match(adminPanelHtml, /Diagnose/);
-    assert.match(adminPanelHtml, /Betrieb/);
-    assert.match(adminPanelHtml, /Einstellungen/);
-    assert.match(adminPanelHtml, /Aktionen/);
-    assert.match(adminPanelHtml, /Audit/);
-    assert.match(adminPanelHtml, /renderOperations/);
-    assert.match(adminPanelHtml, /renderConfig/);
-    assert.match(adminPanelHtml, /renderLegalReadiness/);
-    assert.match(adminPanelHtml, /saveSecrets/);
-    assert.match(adminPanelHtml, /sendSmtpTestMail/);
-    assert.match(adminPanelHtml, /renderJobs/);
-    assert.match(adminPanelHtml, /renderAudit/);
-    assert.match(adminPanelHtml, /renderLogs/);
-    assert.match(adminPanelHtml, /stationRoleBadge/);
-    assert.match(adminPanelHtml, /testStationStream/);
-
-    const adminOverviewResponse = await fetch(`http://127.0.0.1:${port}/api/admin/overview`, {
-      headers: { Cookie: adminCookieHeader },
-    });
+    const adminOverviewResponse = await fetch(`http://127.0.0.1:${port}/api/admin/overview`, { headers: ownerHeaders });
     assert.equal(adminOverviewResponse.status, 200);
     const adminOverview = await adminOverviewResponse.json();
     // The owner console's overview with FastAPI's contract (#288).
@@ -361,22 +293,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.equal(typeof adminOverview.bots.configured, "number");
     assert.equal(typeof adminOverview.integrations.mongo, "boolean");
 
-    const adminDiagnosticsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/diagnostics`, {
-      headers: { Cookie: adminCookieHeader },
-    });
-    assert.equal(adminDiagnosticsResponse.status, 200);
-    const adminDiagnostics = await adminDiagnosticsResponse.json();
-    assert.equal(adminDiagnostics.runtime.bots.total, 1);
-    assert.equal(adminDiagnostics.runtime.bots.online, 1);
-    assert.equal(adminDiagnostics.infrastructure.adminToken.configured, true);
-    assert.equal(typeof adminDiagnostics.infrastructure.mongo.configured, "boolean");
-    assert.equal(adminDiagnostics.release?.appVersion, PACKAGE_VERSION);
-    assert.ok(adminDiagnostics.stations.total > 0);
-    assert.ok(Array.isArray(adminDiagnostics.alerts));
-
-    const adminStationsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/stations`, {
-      headers: { Cookie: adminCookieHeader },
-    });
+    const adminStationsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/stations`, { headers: ownerHeaders });
     assert.equal(adminStationsResponse.status, 200);
     const adminStations = await adminStationsResponse.json();
     // FastAPI's summary (#288): counts by tier and a sample, from stations.json without MongoDB.
@@ -385,543 +302,32 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assert.ok(Array.isArray(adminStations.sample) && adminStations.sample.length > 0);
     assert.ok(adminStations.sample.every((station) => station.key && station.tier));
 
-    const missingStationTestResponse = await fetch(`http://127.0.0.1:${port}/api/admin/stations/not-existing/test`, {
-      method: "POST",
-      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    assert.equal(missingStationTestResponse.status, 404);
-    const missingStationTest = await missingStationTestResponse.json();
-    assert.match(missingStationTest.error, /Station nicht gefunden/);
-
-    const adminOperationsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/operations`, {
-      headers: { Cookie: adminCookieHeader },
-    });
-    assert.equal(adminOperationsResponse.status, 200);
-    const adminOperations = await adminOperationsResponse.json();
-    assert.equal(adminOperations.source, "update.sh");
-    assert.ok(adminOperations.total >= 20);
-    assert.ok(Array.isArray(adminOperations.operations));
-    assert.ok(adminOperations.operations.some((operation) => operation.cli === "./update.sh --update"));
-    assert.ok(adminOperations.operations.some((operation) => operation.cli === "./update.sh --settings admin"));
-    assert.ok(adminOperations.operations.some((operation) => operation.cli === "./update.sh --recognition-test <URL>"));
-    assert.ok(adminOperations.operations.some((operation) => (
-      operation.id === "settings-commands" && operation.webStatus === "available"
-    )));
-    assert.ok(adminOperations.operations.some((operation) => (
-      operation.id === "settings-legal" && operation.webStatus === "available"
-    )));
-    assert.ok(adminOperations.operations.some((operation) => (
-      operation.id === "recognition-test" && operation.webStatus === "available"
-    )));
-    assert.ok(adminOperations.operations.some((operation) => (
-      operation.id === "status"
-      && operation.webStatus === "available"
-      && operation.cli.includes("local-logs")
-      && operation.cli.includes("storage")
-      && !operation.cli.includes("containers")
-    )));
-    assert.ok(adminOperations.operations.some((operation) => (
-      operation.id === "bot-roles"
-      && operation.webStatus === "available"
-      && operation.cli === "./update.sh --show-roles"
-    )));
-    assert.ok(adminOperations.operations.some((operation) => (
-      operation.id === "offers"
-      && operation.webStatus === "partial"
-      && /Confirm/.test(operation.webEntry)
-      && /Audit/.test(operation.webEntry)
-    )));
-    assert.ok(adminOperations.summary.available >= 1);
-    assert.ok(adminOperations.summary.planned >= 1);
-
-    const adminOffersResponse = await fetch(`http://127.0.0.1:${port}/api/admin/offers`, {
-      headers: { Cookie: adminCookieHeader },
-    });
-    assert.equal(adminOffersResponse.status, 200);
-    const adminOffers = await adminOffersResponse.json();
-    assert.equal(typeof adminOffers.generatedAt, "string");
-    assert.ok(Array.isArray(adminOffers.offers));
-    assert.ok(Array.isArray(adminOffers.redemptions));
-    assert.equal(typeof adminOffers.summary.total, "number");
-    assert.equal(typeof adminOffers.summary.byFulfillment, "object");
-    assert.ok(adminOffers.offers.some((offer) => offer.code === "OWNERREAD" && offer.active === true));
-
-    const unconfirmedOfferActiveResponse = await fetch(`http://127.0.0.1:${port}/api/admin/offers/active`, {
-      method: "POST",
-      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({ code: "OWNERREAD", active: false }),
-    });
-    assert.equal(unconfirmedOfferActiveResponse.status, 400);
-    const unconfirmedOfferActive = await unconfirmedOfferActiveResponse.json();
-    assert.equal(unconfirmedOfferActive.requiresConfirmation, true);
-    assert.equal(unconfirmedOfferActive.confirmationValue, "OWNERREAD");
-
-    const confirmedOfferActiveResponse = await fetch(`http://127.0.0.1:${port}/api/admin/offers/active`, {
-      method: "POST",
-      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({ code: "OWNERREAD", active: false, confirm: "OWNERREAD" }),
-    });
-    assert.equal(confirmedOfferActiveResponse.status, 200);
-    const confirmedOfferActive = await confirmedOfferActiveResponse.json();
-    assert.equal(confirmedOfferActive.ok, true);
-    assert.equal(confirmedOfferActive.offer.code, "OWNERREAD");
-    assert.equal(confirmedOfferActive.offer.active, false);
-    assert.ok(confirmedOfferActive.snapshot.offers.some((offer) => offer.code === "OWNERREAD" && offer.active === false));
-
-    const unconfirmedOfferSaveResponse = await fetch(`http://127.0.0.1:${port}/api/admin/offers`, {
-      method: "POST",
-      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        code: "ownergift",
-        kind: "coupon",
-        fulfillmentMode: "direct_grant",
-        grantPlan: "pro",
-        grantSeats: 1,
-        grantMonths: 1,
-      }),
-    });
-    assert.equal(unconfirmedOfferSaveResponse.status, 400);
-    const unconfirmedOfferSave = await unconfirmedOfferSaveResponse.json();
-    assert.equal(unconfirmedOfferSave.requiresConfirmation, true);
-    assert.equal(unconfirmedOfferSave.confirmationValue, "OWNERGIFT");
-
-    const confirmedOfferSaveResponse = await fetch(`http://127.0.0.1:${port}/api/admin/offers`, {
-      method: "POST",
-      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        code: "ownergift",
-        kind: "coupon",
-        active: true,
-        fulfillmentMode: "direct_grant",
-        grantPlan: "pro",
-        grantSeats: 1,
-        grantMonths: 1,
-        ownerLabel: "Owner Gift",
-        note: "created through owner portal route",
-        confirm: "OWNERGIFT",
-      }),
-    });
-    assert.equal(confirmedOfferSaveResponse.status, 200);
-    const confirmedOfferSave = await confirmedOfferSaveResponse.json();
-    assert.equal(confirmedOfferSave.ok, true);
-    assert.equal(confirmedOfferSave.offer.code, "OWNERGIFT");
-    assert.equal(confirmedOfferSave.offer.fulfillmentMode, "direct_grant");
-    assert.equal(confirmedOfferSave.offer.grantPlan, "pro");
-    assert.ok(confirmedOfferSave.snapshot.offers.some((offer) => offer.code === "OWNERGIFT"));
-
-    const confirmedOfferEditResponse = await fetch(`http://127.0.0.1:${port}/api/admin/offers`, {
-      method: "PATCH",
-      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        code: "OWNERREAD",
-        note: "edited through owner portal route",
-        confirm: "OWNERREAD",
-      }),
-    });
-    assert.equal(confirmedOfferEditResponse.status, 200);
-    const confirmedOfferEdit = await confirmedOfferEditResponse.json();
-    assert.equal(confirmedOfferEdit.ok, true);
-    assert.equal(confirmedOfferEdit.offer.code, "OWNERREAD");
-    assert.equal(confirmedOfferEdit.offer.percentOff, 10);
-    assert.equal(confirmedOfferEdit.offer.note, "edited through owner portal route");
-
-    const offerPreviewResponse = await fetch(`http://127.0.0.1:${port}/api/admin/offers/preview`, {
-      method: "POST",
-      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        tier: "pro",
-        seats: 1,
-        months: 1,
-        email: "owner-preview@example.com",
-        couponCode: "ownergift",
-      }),
-    });
-    assert.equal(offerPreviewResponse.status, 200);
-    const offerPreview = await offerPreviewResponse.json();
-    assert.equal(offerPreview.ok, true);
-    assert.equal(offerPreview.preview.applied.code, "OWNERGIFT");
-    assert.equal(offerPreview.preview.applied.kind, "coupon");
-    assert.equal(offerPreview.preview.discountCents > 0, true);
-    assert.equal(offerPreview.pricing.finalAmountCents < offerPreview.pricing.baseAmountCents, true);
-    assert.equal(offerPreview.input.emailProvided, true);
-
-    const unconfirmedOfferDeleteResponse = await fetch(`http://127.0.0.1:${port}/api/admin/offers/delete`, {
-      method: "POST",
-      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({ code: "ownergift", confirm: "OWNERGIFT" }),
-    });
-    assert.equal(unconfirmedOfferDeleteResponse.status, 400);
-    const unconfirmedOfferDelete = await unconfirmedOfferDeleteResponse.json();
-    assert.equal(unconfirmedOfferDelete.requiresConfirmation, true);
-    assert.equal(unconfirmedOfferDelete.confirmationValue, "DELETE OWNERGIFT");
-
-    const confirmedOfferDeleteResponse = await fetch(`http://127.0.0.1:${port}/api/admin/offers/delete`, {
-      method: "POST",
-      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({ code: "ownergift", confirm: "DELETE OWNERGIFT" }),
-    });
-    assert.equal(confirmedOfferDeleteResponse.status, 200);
-    const confirmedOfferDelete = await confirmedOfferDeleteResponse.json();
-    assert.equal(confirmedOfferDelete.ok, true);
-    assert.equal(confirmedOfferDelete.code, "OWNERGIFT");
-    assert.equal(confirmedOfferDelete.snapshot.offers.some((offer) => offer.code === "OWNERGIFT"), false);
-
-    const adminLogFilesResponse = await fetch(`http://127.0.0.1:${port}/api/admin/log-files`, {
-      headers: { Cookie: adminCookieHeader },
-    });
-    assert.equal(adminLogFilesResponse.status, 200);
-    const adminLogFiles = await adminLogFilesResponse.json();
-    assert.equal(adminLogFiles.logsDir, ownerLogsDir);
-    assert.ok(adminLogFiles.files.some((file) => file.name === "bot.log"));
-
-    const adminLogFileResponse = await fetch(`http://127.0.0.1:${port}/api/admin/log-files/bot.log`, {
-      headers: { Cookie: adminCookieHeader },
-    });
-    assert.equal(adminLogFileResponse.status, 200);
-    const adminLogFile = await adminLogFileResponse.json();
-    assert.equal(adminLogFile.name, "bot.log");
-    assert.ok(adminLogFile.lines.some((line) => /owner test/.test(line.message)));
-    assert.doesNotMatch(JSON.stringify(adminLogFile), /must-not-leak/);
-
-    const invalidAdminLogFileResponse = await fetch(`http://127.0.0.1:${port}/api/admin/log-files/..%2F.env`, {
-      headers: { Cookie: adminCookieHeader },
-    });
-    assert.equal(invalidAdminLogFileResponse.status, 404);
-
-    const adminConfigResponse = await fetch(`http://127.0.0.1:${port}/api/admin/env`, {
-      headers: { Cookie: adminCookieHeader },
-    });
-    assert.equal(adminConfigResponse.status, 200);
-    const adminConfig = await adminConfigResponse.json();
-    assert.equal(adminConfig.envFile.path, ownerEnvFile);
-    assert.ok(adminConfig.groups.some((group) => group.id === "legal"));
-    assert.ok(adminConfig.groups.some((group) => group.id === "integrations"));
-    assert.ok(adminConfig.groups.some((group) => group.fields.some((field) => field.key === "PUBLIC_WEB_URL")));
-    assert.ok(adminConfig.groups.some((group) => group.fields.some((field) => field.key === "SMTP_HOST")));
-    assert.ok(adminConfig.groups.some((group) => group.fields.some((field) => field.key === "ADMIN_EMAIL")));
-    assert.ok(adminConfig.groups.some((group) => group.fields.some((field) => (
-      field.key === "SMTP_TLS_MODE" && field.values.includes("plain") && field.values.includes("smtps")
-    ))));
-    assert.ok(adminConfig.secrets.some((secret) => secret.key === "API_ADMIN_TOKEN" && secret.configured));
-    assert.ok(adminConfig.secrets.some((secret) => secret.key === "STRIPE_SECRET_KEY" && secret.writeOnly));
-
-    const adminLegalResponse = await fetch(`http://127.0.0.1:${port}/api/admin/legal`, {
-      headers: { Cookie: adminCookieHeader },
-    });
-    assert.equal(adminLegalResponse.status, 200);
-    const adminLegal = await adminLegalResponse.json();
-    assert.equal(adminLegal.configured, true);
-    assert.ok(adminLegal.sections.every((section) => section.configured));
-    assert.ok(adminLegal.sections.some((section) => section.id === "legal" && section.route === "/api/legal"));
-    assert.equal(adminLegal.preview.legal.providerName, "IT-Tabelander");
-    assert.equal(adminLegal.preview.privacy.contactEmail, "privacy@it-tabelander.at");
-    assert.equal(adminLegal.preview.terms.contactEmail, "terms@it-tabelander.at");
-    assert.doesNotMatch(JSON.stringify(adminLegal), /admin-route-token|sk_live_owner_test|smtp-owner-test/);
-
-    const adminMailResponse = await fetch(`http://127.0.0.1:${port}/api/admin/mail`, {
-      headers: { Cookie: adminCookieHeader },
-    });
-    assert.equal(adminMailResponse.status, 200);
-    const adminMail = await adminMailResponse.json();
-    assert.equal(adminMail.configured, false);
-    assert.equal(adminMail.defaultRecipient, "owner@it-tabelander.at");
-    assert.equal(adminMail.confirmationValue, "send-test-email");
-    assert.doesNotMatch(JSON.stringify(adminMail), /smtp-owner-test|admin-route-token/);
-
-    const unconfirmedMailTestResponse = await fetch(`http://127.0.0.1:${port}/api/admin/mail/test`, {
-      method: "POST",
-      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({ to: "owner@it-tabelander.at" }),
-    });
-    assert.equal(unconfirmedMailTestResponse.status, 400);
-    const unconfirmedMailTest = await unconfirmedMailTestResponse.json();
-    assert.equal(unconfirmedMailTest.requiresConfirmation, true);
-    assert.equal(unconfirmedMailTest.confirmationValue, "send-test-email");
-
-    const adminConfigPatchResponse = await fetch(`http://127.0.0.1:${port}/api/admin/env`, {
-      method: "POST",
-      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({ values: { PUBLIC_WEB_URL: "https://omnifm.xyz", DEFAULT_LANGUAGE: "de", API_ADMIN_TOKEN: "must-not-save" } }),
-    });
-    assert.equal(adminConfigPatchResponse.status, 400);
-
-    const adminConfigSaveResponse = await fetch(`http://127.0.0.1:${port}/api/admin/env`, {
-      method: "POST",
-      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({ values: { PUBLIC_WEB_URL: "https://omnifm.xyz", DEFAULT_LANGUAGE: "de", LOG_MAX_MB: "9" } }),
-    });
-    assert.equal(adminConfigSaveResponse.status, 200);
-    const adminConfigSave = await adminConfigSaveResponse.json();
-    assert.equal(adminConfigSave.ok, true);
-    assert.equal(adminConfigSave.restartRequired, true);
-    assert.ok(adminConfigSave.updatedKeys.includes("DEFAULT_LANGUAGE"));
-    assert.match(await fs.readFile(ownerEnvFile, "utf8"), /DEFAULT_LANGUAGE=de/);
-
-    const invalidSecretSaveResponse = await fetch(`http://127.0.0.1:${port}/api/admin/env/secrets`, {
-      method: "POST",
-      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({ values: { API_ADMIN_TOKEN: "must-not-save" } }),
-    });
-    assert.equal(invalidSecretSaveResponse.status, 400);
-
-    const secretSaveResponse = await fetch(`http://127.0.0.1:${port}/api/admin/env/secrets`, {
-      method: "POST",
-      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({ values: { STRIPE_SECRET_KEY: "sk_live_owner_test", SMTP_PASS: "smtp-owner-test", DISCORD_CLIENT_SECRET: "" } }),
-    });
-    assert.equal(secretSaveResponse.status, 200);
-    const secretSave = await secretSaveResponse.json();
-    assert.equal(secretSave.ok, true);
-    assert.ok(secretSave.updatedKeys.includes("STRIPE_SECRET_KEY"));
-    assert.ok(secretSave.secrets.some((secret) => secret.key === "STRIPE_SECRET_KEY" && secret.configured && !Object.hasOwn(secret, "value")));
-    const secretEnvContent = await fs.readFile(ownerEnvFile, "utf8");
-    assert.match(secretEnvContent, /STRIPE_SECRET_KEY=sk_live_owner_test/);
-    assert.match(secretEnvContent, /SMTP_PASS=smtp-owner-test/);
-
-    // The console's audit route answers with FastAPI's contract (#288); every
-    // owner action's details stay in the audit file, which is checked here.
-    const adminAuditResponse = await fetch(`http://127.0.0.1:${port}/api/admin/audit`, {
-      headers: { Cookie: adminCookieHeader },
-    });
-    assert.equal(adminAuditResponse.status, 200);
-    assert.ok(Array.isArray((await adminAuditResponse.json()).audit));
-    const { getOwnerAuditSnapshot } = await import("../src/lib/owner-audit-store.js");
-    const adminAudit = getOwnerAuditSnapshot({ limit: 500 });
-    assert.equal(adminAudit.file, ownerAuditFile);
-    assert.ok(adminAudit.events.some((event) => event.action === "owner.login" && event.status === "success"));
-    assert.ok(adminAudit.events.some((event) => (
-      event.action === "owner.mail.test"
-      && event.status === "denied"
-      && event.metadata.requiresConfirmation === true
-    )));
-    assert.ok(adminAudit.events.some((event) => (
-      event.action === "owner.offer.active"
-      && event.status === "denied"
-      && event.target === "OWNERREAD"
-      && event.metadata.requiresConfirmation === true
-    )));
-    assert.ok(adminAudit.events.some((event) => (
-      event.action === "owner.offer.active"
-      && event.status === "success"
-      && event.target === "OWNERREAD"
-      && event.metadata.active === false
-    )));
-    assert.ok(adminAudit.events.some((event) => (
-      event.action === "owner.offer.upsert"
-      && event.status === "denied"
-      && event.target === "OWNERGIFT"
-      && event.metadata.requiresConfirmation === true
-    )));
-    assert.ok(adminAudit.events.some((event) => (
-      event.action === "owner.offer.upsert"
-      && event.status === "success"
-      && event.target === "OWNERGIFT"
-      && event.metadata.fulfillmentMode === "direct_grant"
-    )));
-    assert.ok(adminAudit.events.some((event) => (
-      event.action === "owner.offer.upsert"
-      && event.status === "success"
-      && event.target === "OWNERREAD"
-      && event.metadata.partial === true
-    )));
-    assert.ok(adminAudit.events.some((event) => (
-      event.action === "owner.offer.preview"
-      && event.status === "success"
-      && event.target === "OWNERGIFT"
-      && event.metadata.appliedCode === "OWNERGIFT"
-      && event.metadata.emailProvided === true
-    )));
-    assert.ok(adminAudit.events.some((event) => (
-      event.action === "owner.offer.delete"
-      && event.status === "denied"
-      && event.target === "OWNERGIFT"
-      && event.metadata.confirmationValue === "DELETE OWNERGIFT"
-    )));
-    assert.ok(adminAudit.events.some((event) => (
-      event.action === "owner.offer.delete"
-      && event.status === "success"
-      && event.target === "OWNERGIFT"
-    )));
-    assert.ok(adminAudit.events.some((event) => event.action === "owner.config.update" && event.metadata.updatedKeys.includes("DEFAULT_LANGUAGE")));
-    assert.ok(adminAudit.events.some((event) => event.action === "owner.config.secrets.update" && event.metadata.updatedKeys.includes("STRIPE_SECRET_KEY")));
-    assert.doesNotMatch(JSON.stringify(adminAudit), /sk_live_owner_test|smtp-owner-test|admin-route-token/);
-
-    const adminJobsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
-      headers: { Cookie: adminCookieHeader },
-    });
-    assert.equal(adminJobsResponse.status, 200);
-    const adminJobs = await adminJobsResponse.json();
-    assert.ok(adminJobs.actions.some((action) => action.id === "rollback-plan"));
-    assert.ok(adminJobs.actions.some((action) => action.id === "status-quick" && action.requiresConfirmation === false));
-    for (const actionId of [
-      "status-health",
-      "status-local-logs",
-      "status-mongo",
-      "status-storage",
-    ]) {
-      assert.ok(adminJobs.actions.some((action) => action.id === actionId && action.requiresConfirmation === false));
-    }
-    assert.ok(adminJobs.actions.some((action) => action.id === "bot-config-show" && action.requiresConfirmation === false));
-    assert.ok(adminJobs.actions.some((action) => action.id === "bot-roles-show" && action.requiresConfirmation === false));
-    assert.ok(adminJobs.actions.some((action) => action.id === "cleanup-dry-run" && action.requiresConfirmation === false));
-    assert.ok(adminJobs.actions.some((action) => (
-      action.id === "cleanup-run"
-      && action.requiresConfirmation
-      && action.confirmationValue === "cleanup-run"
-    )));
-    assert.ok(adminJobs.actions.some((action) => action.id === "split-preflight"));
-    assert.equal(adminJobs.summary.totalActions, adminJobs.actions.length);
-    assert.ok(adminJobs.summary.byArea.Operations >= 1);
-    assert.deepEqual(adminJobs.summary.byStatus, { running: 0, succeeded: 0, failed: 0 });
-    assert.deepEqual(adminJobs.summary.outputTotals, { warnings: 0, errors: 0 });
-    assert.ok(adminJobs.actions.some((action) => (
-      action.id === "deploy-slash-commands"
-      && action.requiresConfirmation
-      && action.confirmationValue === "deploy-slash-commands"
-    )));
-    assert.ok(adminJobs.actions.some((action) => (
-      action.id === "system-doctor"
-      && action.requiresConfirmation
-      && action.confirmationValue === "system-doctor"
-    )));
-    assert.ok(adminJobs.actions.some((action) => (
-      action.id === "recognition-test"
-      && action.requiresConfirmation
-      && action.confirmationValue === "recognition-test"
-      && action.inputFields?.some((field) => field.key === "url" && field.type === "url")
-    )));
-
-    const invalidAdminJobResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
-      method: "POST",
-      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({ actionId: "rm-random-things" }),
-    });
-    assert.equal(invalidAdminJobResponse.status, 404);
-
-    const unconfirmedAdminJobResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
-      method: "POST",
-      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({ actionId: "system-doctor" }),
-    });
-    assert.equal(unconfirmedAdminJobResponse.status, 400);
-    const unconfirmedAdminJob = await unconfirmedAdminJobResponse.json();
-    assert.equal(unconfirmedAdminJob.requiresConfirmation, true);
-    assert.equal(unconfirmedAdminJob.confirmationValue, "system-doctor");
-
-    const unconfirmedCommandDeployResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
-      method: "POST",
-      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({ actionId: "deploy-slash-commands" }),
-    });
-    assert.equal(unconfirmedCommandDeployResponse.status, 400);
-    const unconfirmedCommandDeploy = await unconfirmedCommandDeployResponse.json();
-    assert.equal(unconfirmedCommandDeploy.requiresConfirmation, true);
-    assert.equal(unconfirmedCommandDeploy.confirmationValue, "deploy-slash-commands");
-
-    const unconfirmedRecognitionResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
-      method: "POST",
-      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({ actionId: "recognition-test", input: { url: "https://example.com/radio.mp3" } }),
-    });
-    assert.equal(unconfirmedRecognitionResponse.status, 400);
-    const unconfirmedRecognition = await unconfirmedRecognitionResponse.json();
-    assert.equal(unconfirmedRecognition.requiresConfirmation, true);
-    assert.equal(unconfirmedRecognition.confirmationValue, "recognition-test");
-
-    const unconfirmedCleanupResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
-      method: "POST",
-      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({ actionId: "cleanup-run" }),
-    });
-    assert.equal(unconfirmedCleanupResponse.status, 400);
-    const unconfirmedCleanup = await unconfirmedCleanupResponse.json();
-    assert.equal(unconfirmedCleanup.requiresConfirmation, true);
-    assert.equal(unconfirmedCleanup.confirmationValue, "cleanup-run");
-
-    const privateRecognitionResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
-      method: "POST",
-      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        actionId: "recognition-test",
-        confirm: "recognition-test",
-        input: { url: "http://localhost:9000/radio.mp3" },
-      }),
-    });
-    assert.equal(privateRecognitionResponse.status, 400);
-    const privateRecognition = await privateRecognitionResponse.json();
-    assert.match(privateRecognition.error, /lokales oder privates Ziel/);
-
-    const adminJobStartResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs`, {
-      method: "POST",
-      headers: { Cookie: adminCookieHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({ actionId: "rollback-plan" }),
-    });
-    assert.equal(adminJobStartResponse.status, 202);
-    const adminJobStart = await adminJobStartResponse.json();
-    assert.equal(adminJobStart.ok, true);
-    assert.equal(adminJobStart.job.actionId, "rollback-plan");
-
-    let adminJobResult = null;
-    for (let attempt = 0; attempt < 40; attempt += 1) {
-      const pollResponse = await fetch(`http://127.0.0.1:${port}/api/admin/jobs/${encodeURIComponent(adminJobStart.job.id)}`, {
-        headers: { Cookie: adminCookieHeader },
-      });
-      assert.equal(pollResponse.status, 200);
-      adminJobResult = await pollResponse.json();
-      if (adminJobResult.job.status !== "running") break;
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-    assert.equal(adminJobResult.job.status, "succeeded");
-    assert.match(adminJobResult.job.output, /Rollback plan:/);
-    assert.ok(adminJobResult.job.outputSummary.lines >= 1);
-    assert.equal(typeof adminJobResult.job.outputSummary.lastLine, "string");
-    assert.equal(adminJobResult.job.outputSummary.truncated, false);
-
-    // Details of the job starts live in the audit file (see above, #288).
-    const { getOwnerAuditSnapshot: readOwnerAudit } = await import("../src/lib/owner-audit-store.js");
-    const adminAuditAfterJob = readOwnerAudit({ limit: 500 });
-    assert.ok(adminAuditAfterJob.events.some((event) => event.action === "owner.job.start" && event.target === "rollback-plan"));
-    assert.ok(adminAuditAfterJob.events.some((event) => (
-      event.action === "owner.job.start"
-      && event.target === "system-doctor"
-      && event.status === "denied"
-      && event.metadata.requiresConfirmation === true
-    )));
-    assert.ok(adminAuditAfterJob.events.some((event) => (
-      event.action === "owner.job.start"
-      && event.target === "deploy-slash-commands"
-      && event.status === "denied"
-      && event.metadata.requiresConfirmation === true
-    )));
-    assert.ok(adminAuditAfterJob.events.some((event) => (
-      event.action === "owner.job.start"
-      && event.target === "recognition-test"
-      && event.status === "denied"
-      && event.metadata.requiresConfirmation === true
-    )));
-    assert.ok(adminAuditAfterJob.events.some((event) => (
-      event.action === "owner.job.start"
-      && event.target === "cleanup-run"
-      && event.status === "denied"
-      && event.metadata.requiresConfirmation === true
-    )));
-    assert.ok(adminAuditAfterJob.events.some((event) => (
-      event.action === "owner.job.finish"
-      && event.target === "rollback-plan"
-      && event.status === "success"
-      && event.metadata.jobId === adminJobStart.job.id
-      && event.metadata.exitCode === 0
-    )));
-
-    const adminGuildsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/guilds`, {
-      headers: { Cookie: adminCookieHeader },
-    });
+    const adminGuildsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/guilds`, { headers: ownerHeaders });
     assert.equal(adminGuildsResponse.status, 200);
     const adminGuilds = await adminGuildsResponse.json();
-    // FastAPI's contract (#288): the servers come from the bots' health document in MongoDB.
     assert.ok(Array.isArray(adminGuilds.guilds));
     assert.equal(adminGuilds.count, adminGuilds.guilds.length);
+
+    // Routes only the old page had: the .env editor, jobs that start scripts,
+    // log files, offers, the mail test. None of them exists any more.
+    const removedRoutes = [
+      ["POST", "/api/admin/session"], ["POST", "/api/admin/logout"], ["GET", "/api/admin/diagnostics"],
+      ["GET", "/api/admin/operations"], ["GET", "/api/admin/env"], ["POST", "/api/admin/env/secrets"],
+      ["GET", "/api/admin/jobs"], ["GET", "/api/admin/log-files"], ["GET", "/api/admin/logs"],
+      ["GET", "/api/admin/offers"], ["GET", "/api/admin/mail"], ["GET", "/api/admin/legal"],
+      ["POST", "/api/admin/stations/any-station/test"],
+    ];
+    const removedResponses = await Promise.all(removedRoutes.map(([method, route]) => (
+      fetch(`http://127.0.0.1:${port}${route}`, {
+        method,
+        headers: { ...ownerHeaders, "Content-Type": "application/json" },
+        body: method === "POST" ? "{}" : undefined,
+      })
+    )));
+    removedResponses.forEach((response, index) => {
+      const [method, route] = removedRoutes[index];
+      assert.equal(response.status, 404, `${method} ${route} should be gone`);
+    });
 
     const termsApiResponse = await fetch(`http://127.0.0.1:${port}/api/terms`);
     assert.equal(termsApiResponse.status, 200);

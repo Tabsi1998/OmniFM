@@ -1,8 +1,8 @@
 import fs from "node:fs";
-import { getDb, isConnected } from "../../lib/db.js";
+import { getDb, isConnected, isMongoRequested } from "../../lib/db.js";
 import { resolveRuntimeDataPath } from "../../lib/runtime-data-path.js";
 import { loadOwnerConfigRaw } from "../../lib/owner-config.js";
-import { loadConfiguredBots, readRuntimeHealthFresh } from "../../lib/owner-monitoring.js";
+import { loadConfiguredBots, readReleaseInfo, readRuntimeHealthFresh } from "../../lib/owner-monitoring.js";
 import {
   coverLookup,
   healthDocFromRuntimes,
@@ -10,6 +10,9 @@ import {
   publicBotsResponse,
   publicStatsResponse,
 } from "../../lib/owner-public.js";
+
+/** The API contract the owner console and start.sh expect; FastAPI's BACKEND_CONTRACT_VERSION. */
+export const BACKEND_CONTRACT_VERSION = "owner-live-v5";
 
 /**
  * The live numbers for the website, like FastAPI: the bots' health document
@@ -214,11 +217,21 @@ export function createPublicRoutesHandler(deps) {
         methodNotAllowed(res, ["GET"]);
         return true;
       }
+      // FastAPI's answer (contract, release, services, 503 when MongoDB is gone),
+      // plus the bots of this process. MongoDB counts when MONGO_URL names it
+      // and this process asked for it; a process on the JSON files stays ready.
       const readyBots = runtimes.filter((runtime) => runtime.client.isReady()).length;
-      sendJson(res, 200, {
-        ok: true,
-        status: "online",
+      const mongo = isConnected();
+      const mongoWanted = isMongoRequested() && Boolean(String(process.env.MONGO_URL || "").trim());
+      const ready = mongo || !mongoWanted;
+      sendJson(res, ready ? 200 : 503, {
+        ok: ready,
+        ready,
+        status: ready ? "online" : "degraded",
         brand: BRAND.name,
+        contractVersion: BACKEND_CONTRACT_VERSION,
+        release: readReleaseInfo(),
+        services: { api: true, mongo, dashboardBackend: "node" },
         timestamp: new Date().toISOString(),
         uptimeSec: Math.floor((Date.now() - appStartTime) / 1000),
         bots: runtimes.length,

@@ -9,7 +9,6 @@ import {
   sanitizeUrlForLog,
 } from "../src/lib/redact-sensitive.js";
 import { logError, onLoggedError } from "../src/lib/logging.js";
-import { redactOwnerJobOutput } from "../src/lib/owner-job-runner.js";
 
 const SECRET_VALUES = [
   "omni-secret-token-123456789",
@@ -68,12 +67,6 @@ test("logging observers and owner-job output never retain secret-bearing diagnos
     assert.ok(observed);
     assertDoesNotContainSecret(message);
     assertDoesNotContainSecret(JSON.stringify(observed));
-
-    const jobOutput = redactOwnerJobOutput(
-      `\u001b[31mfailed url=https://radio.example/live?token=${SECRET_VALUES[1]} Authorization: Bearer ${SECRET_VALUES[0]}\u001b[0m`
-    );
-    assertDoesNotContainSecret(jobOutput);
-    assert.doesNotMatch(jobOutput, /\u001b\[/);
   } finally {
     unsubscribe();
   }

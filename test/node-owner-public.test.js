@@ -110,3 +110,10 @@ test("the cover lookup asks iTunes once per song and keeps the answer", async ()
   assert.equal(calls, 1);
   assert.deepEqual(await pub.coverLookup({}, { fetchImpl }), { ok: false, error: "Kein Suchbegriff." });
 });
+
+test("Node announces the same API contract as FastAPI", async () => {
+  const fs = await import("node:fs");
+  const { BACKEND_CONTRACT_VERSION } = await import("../src/api/routes/public-routes.js");
+  const fastapi = fs.readFileSync(new URL("../backend/server.py", import.meta.url), "utf8");
+  assert.equal(fastapi.match(/^BACKEND_CONTRACT_VERSION = "([^"]+)"/m)?.[1], BACKEND_CONTRACT_VERSION);
+});

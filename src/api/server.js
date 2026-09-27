@@ -162,8 +162,6 @@ import {
   linkServerToLicense,
   unlinkServerFromLicense,
   listLicensesByContactEmail,
-  listLicenses,
-  patchLicenseById,
   listProcessedSessionsByEmail,
   updateLicenseContactEmail,
   isSessionProcessed,
@@ -182,7 +180,6 @@ import {
   upsertOffer,
   deleteOffer,
   setOfferActive,
-  previewCheckoutOffer,
   listRecentRedemptions,
   getOffer,
   getRedemptionBySession,
@@ -247,8 +244,6 @@ import {
   syncTopGGVotes,
 } from "../services/topgg.js";
 import { getVoteEventsState } from "../vote-events-store.js";
-import { getStationHealthReport } from "../services/station-health.js";
-import { getRecentOperatorIncidents } from "../operator-incidents-store.js";
 
 const appStartTime = Date.now();
 const webhookEventsInFlight = new Set();
@@ -2920,40 +2915,15 @@ function enforceDashboardMutationIntent(req, res, requestUrl) {
   return false;
 }
 
-// WICHTIG: _runtimes muss VOR createAdminRoutesHandler deklariert sein,
-// da der getter sonst in die TDZ (Temporal Dead Zone) läuft.
-let _runtimes = [];
-
 const handleAdminRoutes = createAdminRoutesHandler({
   resolveAdminToken: resolveAdminPanelToken,
-  getRuntimes: () => _runtimes,
-  getStationHealthReport,
-  listLicenses,
-  patchLicenseById,
-  loadStations,
   log,
   methodNotAllowed,
   sendJson,
-  getRecentOperatorIncidents,
   getCommonSecurityHeaders,
-  getReleaseInfo: () => buildReleaseInfo({ frontendBuildStamp, webRootSource }),
-  getBinaryHealthProbe: getHealthBinaryProbe,
-  buildPublicLegalNotice,
-  buildPublicPrivacyNotice,
-  buildPublicTermsNotice,
-  listOffers,
-  listRecentRedemptions,
-  deleteOffer,
-  previewCheckoutOffer,
-  calculatePrice,
-  normalizeDuration,
-  normalizeSeats,
-  setOfferActive,
-  upsertOffer,
 });
 
 function startWebServer(runtimes) {
-  _runtimes = runtimes;
   // A new OAuth secret from the owner console works without a restart.
   startDiscordOauthSync();
   // The owner cockpit checks every service every 5 minutes (#355).
