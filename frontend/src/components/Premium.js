@@ -97,12 +97,6 @@ function normalizePricing(rawPricing, fallbackPricing) {
   };
 }
 
-function mapTierToColor(tier) {
-  if (tier === 'ultimate') return '#ff2a5f';
-  if (tier === 'pro') return '#ff6b00';
-  return '#A1A1AA';
-}
-
 function formatEuroAmount(value, formatDecimal) {
   return `${formatDecimal(value)} EUR`;
 }
@@ -115,7 +109,7 @@ function buildPriceLabel(planId, tier, copy, formatDecimal) {
 }
 
 function Premium({ bots = [], planContext = {} }) {
-  const { copy, locale, formatDate, formatDecimal } = useI18n();
+  const { copy, locale, formatDecimal } = useI18n();
   const { freeStations, allStations } = planContext;
 
   // #413: what each plan brings, from the bot's plan file; the owner's own
@@ -134,11 +128,9 @@ function Premium({ bots = [], planContext = {} }) {
   const [rawPricing, setRawPricing] = useState(null);
   const pricing = useMemo(() => normalizePricing(rawPricing, fallbackPricing), [rawPricing, fallbackPricing]);
   const [pricingError, setPricingError] = useState('');
-  const [serverId, setServerId] = useState('');
-  const [result, setResult] = useState('');
-  const [resultColor, setResultColor] = useState('#52525B');
-  const [checkingStatus, setCheckingStatus] = useState(false);
   const [checkoutPlan, setCheckoutPlan] = useState(null);
+  // Who each plan is for, on its card: the one plan explanation of the start page (#435).
+  const planFit = (planId) => (copy.premium.positioning || []).find((item) => item.key === planId);
   const freeInviteUrl = resolvePrimaryInviteUrl(bots);
   const freeInviteIsExternal = freeInviteUrl.startsWith('http');
 
@@ -164,46 +156,6 @@ function Premium({ bots = [], planContext = {} }) {
     return () => controller.abort();
   }, [copy.premium.pricingFallback, locale]);
 
-  const checkStatus = async () => {
-    const normalizedServerId = serverId.trim();
-    if (!/^\d{17,22}$/.test(normalizedServerId)) {
-      setResult(copy.premium.serverIdInvalid);
-      setResultColor('#ff2a5f');
-      return;
-    }
-
-    setCheckingStatus(true);
-    try {
-      const response = await fetch(`${buildApiUrl('/api/premium/check')}?serverId=${encodeURIComponent(normalizedServerId)}`, { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok || payload?.error) {
-        setResult(payload?.error || copy.premium.checkFailed);
-        setResultColor('#ff2a5f');
-        return;
-      }
-
-      const tier = String(payload?.tier || 'free').toLowerCase();
-      const days = Number(payload?.license?.remainingDays ?? 0);
-      const expiresAt = payload?.license?.expiresAt
-        ? formatDate(payload.license.expiresAt, { year: 'numeric', month: 'short', day: 'numeric' })
-        : '-';
-      const bitrate = String(payload?.bitrate || '-');
-
-      setResult(copy.premium.statusResult({
-        tier: tier.toUpperCase(),
-        bitrate,
-        days,
-        expires: expiresAt,
-      }));
-      setResultColor(mapTierToColor(tier));
-    } catch {
-      setResult(copy.premium.checkFailed);
-      setResultColor('#ff2a5f');
-    } finally {
-      setCheckingStatus(false);
-    }
-  };
-
   const closeCheckout = useCallback(() => setCheckoutPlan(null), []);
 
   return (
@@ -224,45 +176,14 @@ function Premium({ bots = [], planContext = {} }) {
           </p>
           {pricingError && <p style={{ marginTop: 10, fontSize: 12, color: '#ff6b00' }}>{pricingError}</p>}
         </div>
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ fontSize: 12, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#71717A', marginBottom: 14 }}>
-            {copy.premium.positioningTitle}
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
-            {copy.premium.positioning.map((item) => {
-              const meta = PLAN_META[item.key] || PLAN_META.free;
-              return (
-                <div
-                  key={item.key}
-                  data-testid={`premium-positioning-${item.key}`}
-                  style={{
-                    padding: '18px 20px',
-                    borderRadius: 16,
-                    background: 'rgba(255,255,255,0.02)',
-                    border: `1px solid ${meta.color}20`,
-                  }}
-                >
-                  <div style={{ color: meta.color, fontFamily: "'Syne', sans-serif", fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', marginBottom: 8 }}>
-                    {(item.key || '').toUpperCase()}
-                  </div>
-                  <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>
-                    {item.title}
-                  </div>
-                  <p style={{ fontSize: 13, lineHeight: 1.65, color: '#A1A1AA' }}>
-                    {item.desc}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 20, marginBottom: 40 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 20 }}>
           {PLAN_ORDER.map((planId) => {
             const tier = pricing.tiers[planId];
             const meta = PLAN_META[planId];
             const Icon = meta.icon;
             const isPro = planId === 'pro';
             const trialEnabled = isPro && pricing.trial?.enabled !== false;
+            const fit = planFit(planId);
 
             return (
               <div
@@ -322,6 +243,13 @@ function Premium({ bots = [], planContext = {} }) {
                   </strong>
                 </div>
 
+                {fit && (
+                  <div data-testid={`plan-fit-${planId}`} style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{fit.title}</div>
+                    <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: '#A1A1AA' }}>{fit.desc}</p>
+                  </div>
+                )}
+
                 <div style={{ fontSize: 32, fontWeight: 800, marginBottom: 16, fontFamily: "'JetBrains Mono', monospace" }}>
                   {planId !== 'free' && (
                     <div
@@ -339,13 +267,13 @@ function Premium({ bots = [], planContext = {} }) {
                     </div>
                   )}
                   {buildPriceLabel(planId, tier, copy, formatDecimal)}
-                  <span style={{ fontSize: 13, color: '#52525B', fontWeight: 400, fontFamily: "'DM Sans', sans-serif" }}>
+                  <span style={{ fontSize: 13, color: '#8A8A93', fontWeight: 400, fontFamily: "'DM Sans', sans-serif" }}>
                     {copy.premium.perMonth}
                   </span>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }} data-testid={`premium-features-${planId}`}>
-                  {tier.intro ? <div style={{ fontSize: 13, color: '#71717A', fontWeight: 600 }}>{tier.intro}</div> : null}
+                  {tier.intro ? <div style={{ fontSize: 13, color: '#8A8A93', fontWeight: 600 }}>{tier.intro}</div> : null}
                   {tier.features.map((feature) => (
                     <div key={feature} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{ width: 5, height: 5, borderRadius: '50%', background: meta.color, flexShrink: 0 }} />
@@ -451,7 +379,7 @@ function Premium({ bots = [], planContext = {} }) {
                       {copy.premium.redeemCta}
                     </button>
                     {!pricing.discordShop?.enabled && (
-                      <p style={{ margin: '8px 0 0', fontSize: 11, color: '#71717A', textAlign: 'center' }}>
+                      <p style={{ margin: '8px 0 0', fontSize: 11, color: '#8A8A93', textAlign: 'center' }}>
                         {copy.premium.discordSoonShort}
                       </p>
                     )}
@@ -481,76 +409,6 @@ function Premium({ bots = [], planContext = {} }) {
               </div>
             );
           })}
-        </div>
-
-        <div style={{
-          maxWidth: 560,
-          padding: '24px 28px',
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 16,
-        }}>
-          <div style={{ fontSize: 12, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#A1A1AA', marginBottom: 12, fontWeight: 600 }}>
-            {copy.premium.statusTitle}
-          </div>
-          <p data-testid="premium-status-hint" style={{ margin: '0 0 14px', fontSize: 13, color: '#71717A', lineHeight: 1.65 }}>
-            {copy.premium.statusHint}
-          </p>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              data-testid="premium-server-id-input"
-              value={serverId}
-              onChange={(event) => setServerId(event.target.value)}
-              onKeyDown={(event) => { if (event.key === 'Enter') checkStatus(); }}
-              placeholder={copy.premium.serverIdPlaceholder}
-              style={{
-                flex: 1,
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: 10,
-                color: '#fff',
-                padding: '10px 14px',
-                fontFamily: "'JetBrains Mono', monospace",
-                fontSize: 13,
-                outline: 'none',
-                transition: 'border-color 0.2s',
-              }}
-              onFocus={(event) => { event.target.style.borderColor = 'rgba(0,229,255,0.3)'; }}
-              onBlur={(event) => { event.target.style.borderColor = 'rgba(255,255,255,0.12)'; }}
-            />
-            <button
-              data-testid="premium-check-btn"
-              onClick={checkStatus}
-              disabled={checkingStatus}
-              style={{
-                background: checkingStatus ? 'rgba(0,229,255,0.5)' : '#00e5ff',
-                border: 'none',
-                color: '#050505',
-                borderRadius: 10,
-                fontWeight: 700,
-                padding: '10px 18px',
-                cursor: checkingStatus ? 'default' : 'pointer',
-                transition: 'transform 0.15s',
-                fontFamily: "'DM Sans', sans-serif",
-              }}
-              onMouseEnter={(event) => { if (!checkingStatus) event.currentTarget.style.transform = 'scale(1.03)'; }}
-              onMouseLeave={(event) => { event.currentTarget.style.transform = 'scale(1)'; }}
-            >
-              {checkingStatus ? copy.premium.checkLoading : copy.premium.checkButton}
-            </button>
-          </div>
-          <div
-            data-testid="premium-check-result"
-            style={{
-              marginTop: 10,
-              minHeight: 18,
-              color: resultColor,
-              fontSize: 13,
-              fontFamily: "'JetBrains Mono', monospace",
-            }}
-          >
-            {result}
-          </div>
         </div>
       </div>
 

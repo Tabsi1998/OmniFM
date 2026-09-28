@@ -1,107 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
-import { SEASONS, SEASON_PREVIEWS, normalizeOwnerSeasons } from '../../../src/lib/seasons.js';
+import { normalizeOwnerSeasons } from '../../../src/lib/seasons.js';
 import {
-  Save, Plus, Trash2, CheckCircle2, XCircle, Bot, Building2,
+  Plus, Trash2, XCircle, Bot, Building2,
   Tag, Terminal, ShieldCheck, Info, Star, Heart, Mail, Music2, History, Fingerprint, Globe2, BellRing, Users, KeyRound,
 } from 'lucide-react';
 import { discordRedirectUriFor, secretInputValue } from '../lib/ownerConfigSecrets.js';
 import OwnerLegalChecklist from './owner/OwnerLegalChecklist.js';
-
-const labelStyle = {
-  fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase',
-  letterSpacing: '0.04em', marginBottom: 6, display: 'block',
-};
-
-function Field({ label, value, onChange, placeholder, type = 'text', textarea, testid, hint, width }) {
-  return (
-    <div style={{ marginBottom: 14, gridColumn: width === 'full' ? '1 / -1' : 'auto' }}>
-      <label style={labelStyle}>{label}</label>
-      {textarea ? (
-        <textarea
-          className="oa-input" data-testid={testid} value={value || ''} placeholder={placeholder}
-          onChange={(e) => onChange(e.target.value)}
-          style={{ height: 96, padding: '12px 14px', resize: 'vertical', lineHeight: 1.5 }}
-        />
-      ) : (
-        <input
-          className="oa-input" data-testid={testid} type={type} value={value || ''} placeholder={placeholder}
-          onChange={(e) => onChange(e.target.value)}
-        />
-      )}
-      {hint && <div style={{ fontSize: 11, color: '#64748b', marginTop: 5 }}>{hint}</div>}
-    </div>
-  );
-}
-
-function Toggle({ label, checked, onChange, testid }) {
-  return (
-    <button
-      type="button" data-testid={testid} onClick={() => onChange(!checked)}
-      className="oa-card" style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14,
-        cursor: 'pointer', padding: '12px 16px', marginBottom: 14, width: '100%', textAlign: 'left',
-        border: checked ? '1px solid #10b981' : '1px solid var(--oa-border-active)',
-      }}
-    >
-      <span style={{ fontWeight: 700, color: '#fff', fontSize: 14 }}>{label}</span>
-      <span style={{
-        width: 46, height: 26, borderRadius: 999, background: checked ? '#10b981' : '#2a3450',
-        position: 'relative', transition: 'background 0.2s ease', flexShrink: 0,
-      }}>
-        <span style={{
-          position: 'absolute', top: 3, left: checked ? 23 : 3, width: 20, height: 20,
-          borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease',
-        }} />
-      </span>
-    </button>
-  );
-}
-
-// Stays at the bottom of the page and says when something is not saved yet (#356).
-function SaveBar({ onSave, saving, msg, testid, dirty = false }) {
-  return (
-    <div data-testid={`${testid}-bar`} style={{ position: 'sticky', bottom: 0, zIndex: 5, display: 'flex', alignItems: 'center', gap: 14, marginTop: 8, padding: '10px 0', background: 'var(--oa-bg, #0b1120)', borderTop: dirty ? '1px solid #fab219' : '1px solid transparent' }}>
-      <button className="oa-btn primary" onClick={onSave} disabled={saving || !dirty} data-testid={testid}>
-        <Save size={16} /> {saving ? 'Speichert…' : 'Speichern'}
-      </button>
-      {dirty && !saving && (
-        <span data-testid={`${testid}-dirty`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: '#fab219' }}>
-          ! Ungespeicherte Änderungen
-        </span>
-      )}
-      {msg && (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: msg.ok ? '#10b981' : '#ff8fab' }}>
-          {msg.ok ? <CheckCircle2 size={15} /> : <XCircle size={15} />} {msg.text}
-        </span>
-      )}
-    </div>
-  );
-}
+import OwnerSeasonsConfig from './owner/OwnerSeasonsConfig.js';
+import { Field, SaveBar, Toggle, labelStyle } from './owner/configFields.js';
 
 const eur = (cents) => (Number(cents || 0) / 100).toString().replace('.', ',');
 
-// The seasonal decoration (#425): what the switches and the test looks are called.
-const SEASON_SWITCH_LABELS = {
-  easter: 'Ostern (Palmsonntag bis Ostermontag)',
-  halloween: 'Halloween (26. Oktober bis 1. November)',
-  advent: 'Advent (1. Adventsonntag bis 23. Dezember)',
-  christmas: 'Weihnachten (24. bis 30. Dezember)',
-  newyear: 'Silvester und Neujahr (31. Dezember und 1. Januar)',
-};
-const SEASON_PREVIEW_LABELS = {
-  'easter-soon': 'Ostern: „Bald ist Ostern“',
-  'easter-greeting': 'Ostern: „Frohe Ostern“',
-  'halloween-soon': 'Halloween: „Bald ist Halloween“',
-  'halloween-greeting': 'Halloween: „Happy Halloween“',
-  'advent-1': 'Advent: 1. Kerze',
-  'advent-2': 'Advent: 2. Kerze',
-  'advent-3': 'Advent: 3. Kerze',
-  'advent-4': 'Advent: 4. Kerze',
-  'christmas-greeting': 'Weihnachten: „Frohe Weihnachten“',
-  'christmas-winter': 'Weihnachten: Winter-Deko (27. bis 30.)',
-  'newyear-countdown': 'Silvester: Countdown bis Mitternacht',
-  'newyear-greeting': 'Neujahr: „Frohes neues Jahr“',
-};
 const toCents = (v) => Math.max(0, Math.round(parseFloat(String(v).replace(',', '.')) * 100) || 0);
 const featuresText = (arr) => (Array.isArray(arr) ? arr.join('\n') : '');
 const textToFeatures = (t) => String(t || '').split('\n').map((s) => s.trim()).filter(Boolean);
@@ -491,60 +400,7 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
 
   // ---------------- SEASONAL DECORATION (#425) ----------------
   if (section === 'seasons') {
-    if (!seasons) return <div className="oa-sub">Lade Konfiguration…</div>;
-    const test = seasons.test || { preview: '', guildIds: [] };
-    const setTest = (changes) => setSeasons((p) => ({ ...p, test: { ...(p.test || {}), ...changes } }));
-    return (
-      <div className="oa-fade" data-testid="config-seasons">
-        <div className="oa-card" style={{ marginBottom: 18 }}>
-          <div className="oa-section-title"><Star size={15} /> Saison-Deko: Hauptschalter</div>
-          <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 16 }}>
-            Schaltet eine Saison auf allen Servern ab, falls etwas klemmt. Sonst entscheidet jeder Server im Dashboard selbst; dort ist alles an, bis jemand etwas ausschaltet.
-          </div>
-          {SEASONS.map((key) => (
-            <Toggle
-              key={key}
-              label={SEASON_SWITCH_LABELS[key]}
-              checked={seasons.enabled?.[key] !== false}
-              onChange={(v) => setSeasons((p) => ({ ...p, enabled: { ...(p.enabled || {}), [key]: v } }))}
-              testid={`cfg-season-${key}`}
-            />
-          ))}
-        </div>
-
-        <div className="oa-card" style={{ marginBottom: 18 }}>
-          <div className="oa-section-title"><Info size={15} /> Testmodus: Saison erzwingen</div>
-          <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 16 }}>
-            Die genannten Server zeigen den gewählten Look sofort, egal welches Datum ist und was die Schalter sagen. So lässt sich alles vor dem Termin im eigenen Server prüfen. „Aus“ beendet den Test.
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 18px' }}>
-            <div style={{ marginBottom: 14 }}>
-              <label style={labelStyle} htmlFor="cfg-season-preview">Look</label>
-              <select id="cfg-season-preview" className="oa-input" data-testid="cfg-season-preview" value={test.preview || ''} onChange={(e) => setTest({ preview: e.target.value })}>
-                <option value="">Aus</option>
-                {SEASON_PREVIEWS.map((entry) => <option key={entry.id} value={entry.id}>{SEASON_PREVIEW_LABELS[entry.id] || entry.id}</option>)}
-              </select>
-              {test.preview ? (
-                <div style={{ fontSize: 11, color: '#64748b', marginTop: 5 }}>
-                  Auf der Website sieht den Look nur, wer diesen Link öffnet:{' '}
-                  <a href={`/?season=${test.preview}`} target="_blank" rel="noopener noreferrer" data-testid="cfg-season-website" style={{ color: '#00e5ff' }}>{`/?season=${test.preview}`}</a>
-                </div>
-              ) : null}
-            </div>
-            <Field
-              label="Server-IDs (eine pro Zeile)"
-              textarea
-              value={(test.guildIds || []).join('\n')}
-              onChange={(v) => setTest({ guildIds: v.split('\n') })}
-              placeholder="123456789012345678"
-              hint="Höchstens 25 Server. Beim Speichern bleiben nur gültige IDs übrig."
-              testid="cfg-season-guilds"
-            />
-          </div>
-        </div>
-        <SaveBar onSave={() => save('seasons', normalizeOwnerSeasons(seasons))} saving={saving} msg={msg} testid="cfg-seasons-save" dirty={isDirty('seasons')} />
-      </div>
-    );
+    return <OwnerSeasonsConfig seasons={seasons} setSeasons={setSeasons} onSave={(value) => save('seasons', value)} saving={saving} msg={msg} dirty={isDirty('seasons')} />;
   }
 
   // ---------------- PLANS / PRICING ----------------

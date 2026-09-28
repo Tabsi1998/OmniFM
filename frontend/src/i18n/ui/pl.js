@@ -600,7 +600,6 @@ export default {
   "light headers": "jasne nagłówki",
   "light pages": "jasne strony",
   "listeners": "słuchaczy",
-  "listening": "słucha",
   "members": "członków",
   "now": "teraz",
   "off": "wyłączony",

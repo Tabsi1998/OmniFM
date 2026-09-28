@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Play, Pause, Users, Headphones, X } from 'lucide-react';
+import { Play, Pause, Headphones, X } from 'lucide-react';
 import { resolvePrimaryInviteUrl } from '../lib/invite.js';
 import { useI18n } from '../i18n.js';
 import { useShowcaseStations } from '../lib/showcase.js';
@@ -10,14 +10,22 @@ const barCss = `
 @keyframes npbar-eq { 0%,100%{transform:scaleY(0.3);} 50%{transform:scaleY(1);} }
 @keyframes npbar-in { from{transform:translateY(120%);} to{transform:none;} }
 .npbar-hidemobile { }
-@media (max-width: 720px){ .npbar-hidemobile{ display:none !important; } }
+.npbar-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 720px){
+  .npbar-hidemobile{ display:none !important; }
+  .npbar-row{ gap:10px !important; padding:8px 12px !important; }
+  .npbar-name{ white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; }
+}
 `;
+
+// The bar's height, for the buttons that sit in the bottom corner (cookie settings).
+const BAR_HEIGHT = 74;
 
 const TIER_BITRATE = { free: '64 kbps', pro: '128 kbps', ultimate: '320 kbps' };
 
-function Bars({ active }) {
+function Bars({ active, className }) {
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'flex-end', gap: 2.5, height: 20 }} aria-hidden="true">
+    <span className={className} style={{ display: 'inline-flex', alignItems: 'flex-end', gap: 2.5, height: 20 }} aria-hidden="true">
       {[0, 1, 2, 3, 4].map((i) => (
         <span key={i} style={{ width: 3, height: `${40 + i * 12}%`, borderRadius: 2, background: 'linear-gradient(180deg,#ff6b00,#00e5ff)', transformOrigin: 'bottom', animationName: 'npbar-eq', animationDuration: `${0.7 + i * 0.12}s`, animationTimingFunction: 'ease-in-out', animationDelay: `${i * 0.09}s`, animationIterationCount: 'infinite', animationPlayState: active ? 'running' : 'paused', opacity: active ? 1 : 0.4 }} />
       ))}
@@ -25,8 +33,9 @@ function Bars({ active }) {
   );
 }
 
-export default function NowPlayingBar({ stats = {}, bots = [] }) {
-  const { t, formatNumber } = useI18n();
+// The listeners count stands once on the start page, in the bar under the hero (#435).
+export default function NowPlayingBar({ bots = [] }) {
+  const { t } = useI18n();
   const player = usePlayer();
   const showcase = useShowcaseStations(8);
   const [idx, setIdx] = useState(0);
@@ -47,7 +56,6 @@ export default function NowPlayingBar({ stats = {}, bots = [] }) {
   const err = (player.current && player.error) ? player.error : null;
   const bitrate = station.bitrate || TIER_BITRATE[String(station.tier || '').toLowerCase()] || null;
   const streamLabel = t('Live-Radio-Stream', 'Live radio stream');
-  const listeners = stats.listeners || 0;
 
   const stationName = station?.name || '';
   useEffect(() => {
@@ -60,6 +68,14 @@ export default function NowPlayingBar({ stats = {}, bots = [] }) {
     return () => { stop = true; };
   }, [stationName]);
 
+  // While the bar is there, the corner buttons move above it (#435).
+  useEffect(() => {
+    if (closed || typeof document === 'undefined') return undefined;
+    const root = document.documentElement;
+    root.style.setProperty('--omnifm-bottom-bar', `${BAR_HEIGHT}px`);
+    return () => root.style.removeProperty('--omnifm-bottom-bar');
+  }, [closed]);
+
   if (closed) return null;
 
   const onPlayClick = () => {
@@ -71,7 +87,7 @@ export default function NowPlayingBar({ stats = {}, bots = [] }) {
   return (
     <>
       <style>{barCss}</style>
-      <div style={{ height: 74 }} aria-hidden="true" />
+      <div style={{ height: BAR_HEIGHT }} aria-hidden="true" />
       <div
         data-testid="now-playing-bar"
         style={{
@@ -81,8 +97,8 @@ export default function NowPlayingBar({ stats = {}, bots = [] }) {
           animation: 'npbar-in 0.5s ease-out',
         }}
       >
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span data-testid="now-playing-bar-status" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '4px 9px', borderRadius: 999, border: `1px solid ${err ? 'rgba(255,168,0,0.45)' : (isPlaying ? 'rgba(255,42,95,0.4)' : '#2a3450')}`, background: err ? 'rgba(255,168,0,0.12)' : (isPlaying ? 'rgba(255,42,95,0.12)' : 'rgba(255,255,255,0.03)'), color: err ? '#ffcf80' : (isPlaying ? '#ffd9e2' : '#94a3b8'), fontSize: 10, fontWeight: 800, letterSpacing: '0.14em', fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 }}>
+        <div className="npbar-row" style={{ maxWidth: 1200, margin: '0 auto', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
+          <span data-testid="now-playing-bar-status" className="npbar-hidemobile" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '4px 9px', borderRadius: 999, border: `1px solid ${err ? 'rgba(255,168,0,0.45)' : (isPlaying ? 'rgba(255,42,95,0.4)' : '#2a3450')}`, background: err ? 'rgba(255,168,0,0.12)' : (isPlaying ? 'rgba(255,42,95,0.12)' : 'rgba(255,255,255,0.03)'), color: err ? '#ffcf80' : (isPlaying ? '#ffd9e2' : '#94a3b8'), fontSize: 10, fontWeight: 800, letterSpacing: '0.14em', fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: err ? '#ffa800' : (isPlaying ? '#ff2a5f' : '#64748b'), animation: isPlaying && !err ? 'onair-pulse 1.8s infinite' : 'none' }} /> {err ? t('FEHLER', 'ERROR') : (isPlaying ? 'LIVE' : (player.loading ? '…' : t('VORSCHAU', 'PREVIEW')))}
           </span>
           <button
@@ -97,21 +113,17 @@ export default function NowPlayingBar({ stats = {}, bots = [] }) {
             </span>
           </button>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div key={station.name} style={{ fontWeight: 700, fontSize: 14, fontFamily: "'Syne','Outfit',sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{station.name}</div>
-            <div className="npbar-hidemobile" data-testid="now-playing-bar-sub" style={{ color: err ? '#ffcf80' : '#94a3b8', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{err ? audioErrorText(err, t) : (isPlaying ? streamLabel : t('Play drücken zum Live-Hören', 'Tap play to listen live'))}</div>
+            <div key={station.name} data-testid="now-playing-bar-name" className="npbar-name" style={{ fontWeight: 700, fontSize: 14, fontFamily: "'Syne','Outfit',sans-serif" }}>{station.name}</div>
+            <div className={err ? undefined : 'npbar-hidemobile'} data-testid="now-playing-bar-sub" style={{ color: err ? '#ffcf80' : '#94a3b8', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{err ? audioErrorText(err, t) : (isPlaying ? streamLabel : t('Play drücken zum Live-Hören', 'Tap play to listen live'))}</div>
           </div>
-          {listeners > 0 && (
-            <span className="npbar-hidemobile" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#94a3b8', fontSize: 12, fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 }}>
-              <Users size={13} color="#ff6b00" /> {formatNumber(Number(listeners))}
-            </span>
-          )}
           {bitrate && <span className="npbar-hidemobile" style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, fontWeight: 700, color: '#ffb27a', background: 'rgba(255,107,0,0.14)', border: '1px solid rgba(255,107,0,0.3)', borderRadius: 999, padding: '3px 9px', flexShrink: 0 }}>{bitrate}</span>}
-          <Bars active={isPlaying} />
+          <Bars active={isPlaying} className="npbar-hidemobile" />
           <a
             href={invite}
             target={invite.startsWith('http') ? '_blank' : undefined}
             rel={invite.startsWith('http') ? 'noopener noreferrer' : undefined}
             data-testid="now-playing-bar-cta"
+            aria-label={t('In Discord starten', 'Start in Discord')}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 11, background: 'linear-gradient(135deg,#ff6b00,#ff2a5f)', color: '#08090d', fontWeight: 800, fontSize: 13, flexShrink: 0 }}
           >
             <Headphones size={15} /> <span className="npbar-hidemobile">{t('In Discord starten', 'Start in Discord')}</span>

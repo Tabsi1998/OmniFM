@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useI18n } from '../i18n.js';
+import { buildPageHref } from '../lib/pageRouting.js';
 
 export default function FaqSection() {
-  const { copy } = useI18n();
+  const { copy, locale } = useI18n();
   const [openKey, setOpenKey] = useState('start');
   const items = copy.faq.items;
 
@@ -81,6 +82,18 @@ export default function FaqSection() {
                 {isOpen && (
                   <div style={{ padding: '0 20px 18px', color: '#A1A1AA', fontSize: 14, lineHeight: 1.7 }}>
                     {item.answer}
+                    {item.link && (
+                      <>
+                        {' '}
+                        <a
+                          href={buildPageHref(locale, item.link.page)}
+                          data-testid={`faq-link-${item.key}`}
+                          style={{ color: '#00e5ff', fontWeight: 700 }}
+                        >
+                          {item.link.label}
+                        </a>
+                      </>
+                    )}
                   </div>
                 )}
               </div>

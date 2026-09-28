@@ -3,26 +3,25 @@
 const messages = {
   premium: {
     eyebrow: 'Premium',
-    title: 'Upgrade dein Setup',
-    subtitle: 'Mehr Worker, mehr Stationen, besserer Sound. Wähle den Plan, der zu deinem Server passt.',
-    positioningTitle: 'Welcher Plan passt zu deinem Server?',
+    title: 'Welcher Plan passt zu deinem Server?',
+    subtitle: 'Starte kostenlos. Pro und Ultimate bringen mehr Sender, mehr Sprachkanäle gleichzeitig und mehr im Dashboard.',
     positioning: [
-        {
-          key: 'free',
-          title: 'Free für schnellen Einstieg',
-          desc: 'Gut für kleine Server, die sofort 24/7 Radio wollen und ohne Reibung starten möchten.',
-        },
-        {
-          key: 'pro',
-          title: 'Pro für aktive Communities',
-          desc: 'Der richtige Schritt, wenn Dashboard, Events, Rollenrechte und Health wirklich im Alltag gebraucht werden.',
-        },
-        {
-          key: 'ultimate',
-          title: 'Ultimate für Operatoren und Power-User',
-          desc: 'Für Setups mit Custom Stations, stärkerer Zuverlässigkeit, tieferer Analyse und Automatisierungsbedarf.',
-        },
-      ],
+      {
+        key: 'free',
+        title: 'Für den schnellen Start',
+        desc: 'Für kleine Server, die sofort Radio rund um die Uhr wollen, ohne etwas einzurichten.',
+      },
+      {
+        key: 'pro',
+        title: 'Für aktive Communities',
+        desc: 'Wenn du Events planst, Rechte vergibst und im Dashboard sehen willst, was läuft und ob etwas ausfällt.',
+      },
+      {
+        key: 'ultimate',
+        title: 'Für eigene Radios und große Server',
+        desc: 'Mit eigenen Sendern, eigenem Bot-Aussehen, ausführlicher Statistik und Anbindung an eigene Tools.',
+      },
+    ],
     pricingFallback: 'Pricing-API nicht erreichbar, Fallback-Daten aktiv.',
     planPopular: 'Beliebt',
     perMonth: '/Monat',
@@ -53,26 +52,10 @@ const messages = {
     trialFailed: 'Testmonat konnte nicht aktiviert werden. Bitte später erneut versuchen.',
     trialWorking: 'Testmonat wird aktiviert...',
     trialActivatedDefault: 'Pro-Testmonat aktiviert.',
-    statusTitle: 'Premium-Status prüfen',
-    statusHint: 'Schon im Betrieb? Prüfe Tier, Bitrate und Ablauf direkt über deine Discord-Server-ID.',
-    serverIdPlaceholder: 'Discord Server ID',
-    serverIdInvalid: 'Server-ID muss 17-22 Ziffern haben.',
-    checkLoading: 'Prüfe...',
-    checkButton: 'Prüfen',
-    checkFailed: 'Premium-Status konnte nicht geladen werden.',
-    statusResult: ({ tier, bitrate, days, expires }) => `Tier: ${tier} | Bitrate: ${bitrate} | Resttage: ${days} | Ablauf: ${expires}`,
     priceFrom: 'ab',
     freePrice: '0 EUR',
   },
   footer: {
-    stats: {
-      servers: 'Server',
-      connections: 'Verbindungen',
-      listeners: 'Zuhörer',
-      bots: 'Bots',
-      stations: 'Stationen',
-    },
-    liveNote: 'Die öffentlichen Netzwerkzahlen werden live aus dem Produkt geladen und regelmäßig aktualisiert.',
     operatedBy: ({ operator }) => `Betrieben von ${operator}.`,
     links: {
       imprint: 'Impressum',

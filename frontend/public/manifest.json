@@ -2,7 +2,7 @@
   "id": "/",
   "name": "OmniFM",
   "short_name": "OmniFM",
-  "description": "24/7 Discord radio with worker-based reliability, dashboard control, and Premium audio.",
+  "description": "24/7 radio for your Discord voice channel: stations from every genre, a dashboard to control it and automatic reconnects.",
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",

@@ -1,120 +1,74 @@
-import { Layers3, LayoutDashboard, Radio, ShieldCheck } from 'lucide-react';
+import { Bot, Headphones, Radio, Server } from 'lucide-react';
 import { useI18n } from '../i18n.js';
 
+// The network's numbers, the only place on the start page that shows them
+// (#435). Live: App.js reloads /api/stats every 15 seconds.
 const ITEMS = [
+  { key: 'servers', icon: Server, color: '#ff6b00' },
   { key: 'stations', icon: Radio, color: '#00e5ff' },
-  { key: 'network', icon: Layers3, color: '#ff6b00' },
-  { key: 'dashboard', icon: LayoutDashboard, color: '#ff6b00' },
-  { key: 'reliability', icon: ShieldCheck, color: '#ff2a5f' },
+  { key: 'bots', icon: Bot, color: '#10b981' },
+  { key: 'listeners', icon: Headphones, color: '#ff4d7a' },
 ];
-
-function resolveValue(itemKey, stats, copy, formatNumber) {
-  if (itemKey === 'stations') return formatNumber(stats?.stations || 0);
-  if (itemKey === 'network') return formatNumber(stats?.connections || 0);
-  if (itemKey === 'dashboard') return copy.trustBar.values.dashboard;
-  if (itemKey === 'reliability') return copy.trustBar.values.reliability;
-  return '-';
-}
-
-function resolveSupport(itemKey, stats, copy, formatNumber) {
-  if (itemKey === 'stations') {
-    return copy.trustBar.support.stations({
-      free: formatNumber(stats?.freeStations || 0),
-      pro: formatNumber(stats?.proStations || 0),
-    });
-  }
-  if (itemKey === 'network') {
-    return copy.trustBar.support.network({
-      bots: formatNumber(stats?.bots || 0),
-      servers: formatNumber(stats?.servers || 0),
-    });
-  }
-  if (itemKey === 'dashboard') return copy.trustBar.support.dashboard;
-  if (itemKey === 'reliability') return copy.trustBar.support.reliability;
-  return '';
-}
 
 export default function TrustBar({ stats }) {
   const { copy, formatNumber } = useI18n();
+  // Until the first answer a dash, not a misleading 0.
+  const loaded = Boolean(stats) && Object.keys(stats).length > 0;
 
   return (
     <section
       data-testid="trust-bar"
-      style={{
-        position: 'relative',
-        zIndex: 2,
-        padding: '0 0 48px',
-      }}
+      aria-label={copy.trustBar.live}
+      style={{ position: 'relative', zIndex: 2, padding: '0 0 48px' }}
     >
       <div className="section-container">
         <div
+          className="trust-bar-grid"
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-            gap: 0,
-            padding: '18px 0',
             borderTop: '1px solid rgba(255,255,255,0.08)',
             borderBottom: '1px solid rgba(255,255,255,0.08)',
           }}
-          className="trust-bar-grid"
         >
-          {ITEMS.map((item, index) => {
+          {ITEMS.map((item) => {
             const Icon = item.icon;
+            const text = copy.trustBar.items[item.key];
+            const value = Number(stats?.[item.key] ?? 0);
             return (
-              <div
-                key={item.key}
-                data-testid={`trust-bar-card-${item.key}`}
-                style={{
-                  padding: '18px 18px 16px',
-                  borderRight: index < ITEMS.length - 1 ? '1px solid rgba(255,255,255,0.08)' : 'none',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                  <Icon size={16} color={item.color} />
-                  <span
-                    style={{
-                      fontSize: 10,
-                      color: item.color,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.14em',
-                      fontWeight: 800,
-                    }}
-                  >
-                    {copy.trustBar.items[item.key].label}
+              <div key={item.key} data-testid={`trust-bar-${item.key}`} className="trust-bar-cell" style={{ padding: '20px 18px 18px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <Icon size={15} color={item.color} aria-hidden="true" />
+                  <span style={{ fontSize: 11, color: '#A1A1AA', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 800 }}>
+                    {text.label}
                   </span>
                 </div>
                 <div
-                  style={{
-                    fontFamily: "'JetBrains Mono', monospace",
-                    fontSize: 24,
-                    fontWeight: 800,
-                    color: '#fff',
-                    marginBottom: 6,
-                  }}
+                  data-testid={`trust-bar-value-${item.key}`}
+                  style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 28, fontWeight: 800, color: item.color, lineHeight: 1.1 }}
                 >
-                  {resolveValue(item.key, stats, copy, formatNumber)}
+                  {loaded && Number.isFinite(value) ? formatNumber(value) : '–'}
                 </div>
-                <div style={{ fontSize: 11, color: '#71717A', fontWeight: 700, marginBottom: 8 }}>
-                  {resolveSupport(item.key, stats, copy, formatNumber)}
+                <div style={{ marginTop: 4, fontSize: 12, color: '#8A8A93', lineHeight: 1.5 }}>
+                  {text.detail}
                 </div>
-                <p style={{ margin: 0, fontSize: 13, color: '#A1A1AA', lineHeight: 1.6 }}>
-                  {copy.trustBar.items[item.key].detail}
-                </p>
               </div>
             );
           })}
         </div>
+        <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: '#8A8A93', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+          <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', background: '#ff2a5f' }} />
+          {copy.trustBar.live}
+        </div>
       </div>
 
       <style>{`
-        @media (max-width: 920px) {
-          .trust-bar-grid {
-            grid-template-columns: 1fr !important;
-          }
-
-          .trust-bar-grid > div {
-            border-right: none !important;
-          }
+        .trust-bar-cell + .trust-bar-cell { border-left: 1px solid rgba(255,255,255,0.08); }
+        @media (max-width: 720px) {
+          .trust-bar-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+          .trust-bar-cell { padding: 14px 12px !important; }
+          .trust-bar-cell:nth-child(3) { border-left: none; }
+          .trust-bar-cell:nth-child(n+3) { border-top: 1px solid rgba(255,255,255,0.08); }
         }
       `}</style>
     </section>

@@ -1,27 +1,35 @@
 import { useEffect, useState } from 'react';
-import { Cookie, Settings, ShieldCheck, X } from 'lucide-react';
+import { Cookie, Settings } from 'lucide-react';
 import { useI18n } from '../i18n.js';
+import { buildPageHref } from '../lib/pageRouting.js';
 import {
   applyConsent,
   readStoredConsent,
   writeStoredConsent,
 } from '../lib/analyticsConsent.js';
 
-function ConsentButton({ children, onClick, variant = 'secondary', testId }) {
+// The cookie notice as a slim bar at the bottom (#435): one short line and
+// the same choices as before (reject, accept all, or pick in the settings).
+// On a phone it stays under a quarter of the screen until the settings open.
+
+function ConsentButton({ children, onClick, variant = 'secondary', testId, expanded }) {
   const isPrimary = variant === 'primary';
   return (
     <button
       type="button"
       data-testid={testId}
       onClick={onClick}
+      aria-expanded={expanded}
       style={{
         minHeight: 40,
+        borderRadius: 10,
         border: isPrimary ? '1px solid rgba(0,229,255,0.5)' : '1px solid rgba(255,255,255,0.14)',
         background: isPrimary ? 'rgba(0,229,255,0.16)' : 'rgba(255,255,255,0.04)',
         color: '#F4F4F5',
-        padding: '10px 14px',
+        padding: '8px 14px',
         fontSize: 13,
         fontWeight: 800,
+        whiteSpace: 'nowrap',
         cursor: 'pointer',
       }}
     >
@@ -37,7 +45,7 @@ function ToggleRow({ title, body, checked, disabled, onChange, testId }) {
         display: 'grid',
         gridTemplateColumns: '1fr auto',
         gap: 14,
-        padding: '14px 0',
+        padding: '12px 0',
         borderTop: '1px solid rgba(255,255,255,0.08)',
         cursor: disabled ? 'default' : 'pointer',
       }}
@@ -59,8 +67,9 @@ function ToggleRow({ title, body, checked, disabled, onChange, testId }) {
 }
 
 export default function CookieConsent() {
-  const { copy } = useI18n();
+  const { copy, locale } = useI18n();
   const [visible, setVisible] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [analytics, setAnalytics] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const consentCopy = copy.cookieConsent;
@@ -83,6 +92,7 @@ export default function CookieConsent() {
     setAnalytics(stored.analytics);
     applyConsent(stored);
     setVisible(false);
+    setSettingsOpen(false);
   };
 
   if (!initialized) return null;
@@ -92,77 +102,53 @@ export default function CookieConsent() {
       {visible && (
         <div
           data-testid="cookie-consent-banner"
-          role="dialog"
-          aria-modal="false"
+          role="region"
           aria-label={consentCopy.title}
           style={{
             position: 'fixed',
             zIndex: 90,
-            left: 18,
-            right: 18,
-            bottom: 18,
-            display: 'flex',
-            justifyContent: 'center',
-            pointerEvents: 'none',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            maxHeight: '85vh',
+            overflowY: 'auto',
+            background: 'rgba(8,9,13,0.97)',
+            borderTop: '1px solid rgba(255,255,255,0.12)',
+            boxShadow: '0 -12px 40px rgba(0,0,0,0.5)',
           }}
         >
           <div
+            className="cookie-bar"
             style={{
-              width: 'min(980px, 100%)',
-              maxHeight: 'calc(100vh - 36px)',
-              overflow: 'auto',
-              pointerEvents: 'auto',
-              background: 'rgba(5,5,5,0.96)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              boxShadow: '0 24px 80px rgba(0,0,0,0.55)',
-              padding: 20,
+              maxWidth: 1200,
+              margin: '0 auto',
+              padding: '12px 20px',
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: '10px 18px',
             }}
           >
-            <div style={{ display: 'grid', gap: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                  <div
-                    style={{
-                      width: 38,
-                      height: 38,
-                      display: 'grid',
-                      placeItems: 'center',
-                      background: 'rgba(0,229,255,0.1)',
-                      border: '1px solid rgba(0,229,255,0.18)',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <ShieldCheck size={18} color="#00e5ff" />
-                  </div>
-                  <div>
-                    <h2 style={{ margin: 0, fontSize: 18, lineHeight: 1.25 }}>{consentCopy.title}</h2>
-                    <p style={{ margin: '7px 0 0', color: '#A1A1AA', fontSize: 14, lineHeight: 1.65 }}>
-                      {consentCopy.body}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  data-testid="cookie-consent-close"
-                  onClick={() => persist(false)}
-                  title={consentCopy.reject}
-                  style={{
-                    width: 34,
-                    height: 34,
-                    display: 'grid',
-                    placeItems: 'center',
-                    border: '1px solid rgba(255,255,255,0.12)',
-                    background: 'rgba(255,255,255,0.04)',
-                    color: '#F4F4F5',
-                    cursor: 'pointer',
-                    flexShrink: 0,
-                  }}
-                >
-                  <X size={16} />
-                </button>
-              </div>
+            <p data-testid="cookie-consent-text" style={{ flex: '1 1 340px', margin: 0, color: '#C4C4CC', fontSize: 13, lineHeight: 1.5 }}>
+              {consentCopy.short}{' '}
+              <a href={buildPageHref(locale, 'privacy')} style={{ color: '#00e5ff', fontWeight: 700 }}>
+                {consentCopy.privacyLink}
+              </a>
+            </p>
+            <div className="cookie-bar-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <ConsentButton testId="cookie-consent-reject" onClick={() => persist(false)}>
+                {consentCopy.reject}
+              </ConsentButton>
+              <ConsentButton testId="cookie-consent-settings" expanded={settingsOpen} onClick={() => setSettingsOpen((open) => !open)}>
+                {consentCopy.settings}
+              </ConsentButton>
+              <ConsentButton testId="cookie-consent-accept" variant="primary" onClick={() => persist(true)}>
+                {consentCopy.acceptAll}
+              </ConsentButton>
+            </div>
 
-              <div>
+            {settingsOpen && (
+              <div data-testid="cookie-consent-settings-panel" style={{ flexBasis: '100%' }}>
                 <ToggleRow
                   title={consentCopy.necessaryTitle}
                   body={consentCopy.necessaryBody}
@@ -177,20 +163,13 @@ export default function CookieConsent() {
                   onChange={setAnalytics}
                   testId="cookie-consent-analytics"
                 />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 10 }}>
+                  <ConsentButton testId="cookie-consent-save" onClick={() => persist(analytics)}>
+                    {consentCopy.save}
+                  </ConsentButton>
+                </div>
               </div>
-
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'flex-end' }}>
-                <ConsentButton testId="cookie-consent-reject" onClick={() => persist(false)}>
-                  {consentCopy.reject}
-                </ConsentButton>
-                <ConsentButton testId="cookie-consent-save" onClick={() => persist(analytics)}>
-                  {consentCopy.save}
-                </ConsentButton>
-                <ConsentButton testId="cookie-consent-accept" variant="primary" onClick={() => persist(true)}>
-                  {consentCopy.acceptAll}
-                </ConsentButton>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )}
@@ -199,12 +178,17 @@ export default function CookieConsent() {
         <button
           type="button"
           data-testid="cookie-consent-manage"
-          onClick={() => setVisible(true)}
+          onClick={() => {
+            setSettingsOpen(true);
+            setVisible(true);
+          }}
           title={consentCopy.manage}
+          aria-label={consentCopy.manage}
           style={{
             position: 'fixed',
             right: 16,
-            bottom: 16,
+            // Above the player bar while it is there (NowPlayingBar sets the height).
+            bottom: 'calc(var(--omnifm-bottom-bar, 0px) + 16px)',
             zIndex: 80,
             width: 42,
             height: 42,
@@ -222,6 +206,14 @@ export default function CookieConsent() {
           </span>
         </button>
       )}
+
+      <style>{`
+        @media (max-width: 520px) {
+          .cookie-bar { padding: 10px 14px !important; }
+          .cookie-bar-actions { width: 100%; }
+          .cookie-bar-actions > button { flex: 1 1 auto; padding: 8px 10px !important; }
+        }
+      `}</style>
     </>
   );
 }

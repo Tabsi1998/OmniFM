@@ -3,9 +3,8 @@ import Hero from './components/Hero.js';
 import TrustBar from './components/TrustBar.js';
 import WhyOmniFM from './components/WhyOmniFM.js';
 import StationBrowser from './components/StationBrowser.js';
-import UseCasesSection from './components/UseCasesSection.js';
 import Premium from './components/Premium.js';
-import StatsFooter from './components/StatsFooter.js';
+import SiteFooter from './components/SiteFooter.js';
 import Navbar from './components/Navbar.js';
 import DiscordShowcase from './components/DiscordShowcase.js';
 import HowToDiscord from './components/HowToDiscord.js';
@@ -199,10 +198,12 @@ function AppContent() {
       <div data-testid="app-root" style={{ position: 'relative', minHeight: '100vh' }}>
         <div className="noise-overlay" />
         <Navbar page={currentPage} />
-        <Suspense fallback={<PageLoading />}>
-          <ImpressumSection legal={legal} standalone />
-        </Suspense>
-        <StatsFooter stats={stats} bots={bots} legal={legal} />
+        <main>
+          <Suspense fallback={<PageLoading />}>
+            <ImpressumSection legal={legal} standalone />
+          </Suspense>
+        </main>
+        <SiteFooter legal={legal} />
         <CookieConsent />
       </div>
     );
@@ -213,10 +214,12 @@ function AppContent() {
       <div data-testid="app-root" style={{ position: 'relative', minHeight: '100vh' }}>
         <div className="noise-overlay" />
         <Navbar page={currentPage} />
-        <Suspense fallback={<PageLoading />}>
-          <PrivacySection legal={legal} privacy={privacy} standalone />
-        </Suspense>
-        <StatsFooter stats={stats} bots={bots} legal={legal} />
+        <main>
+          <Suspense fallback={<PageLoading />}>
+            <PrivacySection legal={legal} privacy={privacy} standalone />
+          </Suspense>
+        </main>
+        <SiteFooter legal={legal} />
         <CookieConsent />
       </div>
     );
@@ -227,10 +230,12 @@ function AppContent() {
       <div data-testid="app-root" style={{ position: 'relative', minHeight: '100vh' }}>
         <div className="noise-overlay" />
         <Navbar page={currentPage} />
-        <Suspense fallback={<PageLoading />}>
-          <TermsSection legal={legal} terms={terms} />
-        </Suspense>
-        <StatsFooter stats={stats} bots={bots} legal={legal} />
+        <main>
+          <Suspense fallback={<PageLoading />}>
+            <TermsSection legal={legal} terms={terms} />
+          </Suspense>
+        </main>
+        <SiteFooter legal={legal} />
         <CookieConsent />
       </div>
     );
@@ -241,10 +246,12 @@ function AppContent() {
       <div data-testid="app-root" style={{ position: 'relative', minHeight: '100vh' }}>
         <div className="noise-overlay" />
         <Navbar page={currentPage} />
-        <Suspense fallback={<PageLoading />}>
-          <StatusPage />
-        </Suspense>
-        <StatsFooter stats={stats} bots={bots} legal={legal} />
+        <main>
+          <Suspense fallback={<PageLoading />}>
+            <StatusPage />
+          </Suspense>
+        </main>
+        <SiteFooter legal={legal} />
         <CookieConsent />
       </div>
     );
@@ -255,10 +262,12 @@ function AppContent() {
       <div data-testid="app-root" style={{ position: 'relative', minHeight: '100vh' }}>
         <div className="noise-overlay" />
         <Navbar page={currentPage} />
-        <Suspense fallback={<PageLoading />}>
-          <ChartsPage />
-        </Suspense>
-        <StatsFooter stats={stats} bots={bots} legal={legal} />
+        <main>
+          <Suspense fallback={<PageLoading />}>
+            <ChartsPage />
+          </Suspense>
+        </main>
+        <SiteFooter legal={legal} />
         <CookieConsent />
       </div>
     );
@@ -318,19 +327,20 @@ function AppContent() {
     <div data-testid="app-root" style={{ position: 'relative', minHeight: '100vh' }}>
       <div className="noise-overlay" />
       <Navbar page={currentPage} />
-      <Hero stats={stats} bots={bots} />
-      <TrustBar stats={stats} />
-      <DiscordShowcase />
-      <HowToDiscord bots={bots} />
-      <StationBrowser stations={stations} loading={loading} />
-      <WhyOmniFM />
-      <UseCasesSection />
-      <Premium bots={bots} planContext={{ freeStations: stats.freeStations, allStations: stats.stations }} />
-      <CommunitySection />
-      <FaqSection />
+      <main>
+        <Hero stats={stats} bots={bots} />
+        <TrustBar stats={stats} />
+        <DiscordShowcase />
+        <HowToDiscord bots={bots} />
+        <StationBrowser stations={stations} loading={loading} />
+        <WhyOmniFM />
+        <Premium bots={bots} planContext={{ freeStations: stats.freeStations, allStations: stats.stations }} />
+        <CommunitySection />
+        <FaqSection />
+      </main>
       <SeasonLayer />
-      <StatsFooter stats={stats} bots={bots} legal={legal} />
-      <NowPlayingBar stats={stats} bots={bots} />
+      <SiteFooter legal={legal} />
+      <NowPlayingBar bots={bots} />
       <CookieConsent />
     </div>
   );

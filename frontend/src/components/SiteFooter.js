@@ -2,20 +2,15 @@ import { Heart } from 'lucide-react';
 import { useI18n } from '../i18n.js';
 import { buildPageHref } from '../lib/pageRouting.js';
 
-function StatsFooter({ stats, legal }) {
-  const { copy, locale, formatNumber } = useI18n();
+// The footer of every public page. The network's numbers are not here: they
+// stand once, in the bar under the hero (#435).
+function SiteFooter({ legal }) {
+  const { copy, locale } = useI18n();
   const operatorName = String(legal?.legal?.providerName || '').trim();
-
-  const footerStats = [
-    { label: copy.footer.stats.servers, value: stats.servers || 0, color: '#ff6b00' },
-    { label: copy.footer.stats.connections, value: stats.connections || 0, color: '#00e5ff' },
-    { label: copy.footer.stats.listeners, value: stats.listeners || 0, color: '#f59e0b' },
-    { label: copy.footer.stats.stations, value: stats.stations || 0, color: '#ff2a5f' },
-  ];
 
   return (
     <footer
-      data-testid="stats-footer"
+      data-testid="site-footer"
       style={{
         padding: '56px 0 28px',
         position: 'relative',
@@ -24,38 +19,6 @@ function StatsFooter({ stats, legal }) {
       }}
     >
       <div className="section-container">
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            gap: 32,
-            flexWrap: 'wrap',
-            padding: '22px 0',
-            borderTop: '1px solid rgba(255,255,255,0.08)',
-            borderBottom: '1px solid rgba(255,255,255,0.08)',
-            marginBottom: 18,
-          }}
-        >
-          {footerStats.map((item) => (
-            <div key={item.label} style={{ minWidth: 120 }}>
-              <div
-                data-testid={`stat-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-                style={{
-                  fontFamily: "'JetBrains Mono', monospace",
-                  fontSize: 24,
-                  fontWeight: 700,
-                  color: item.color,
-                }}
-              >
-                {formatNumber(item.value)}
-              </div>
-              <div style={{ marginTop: 4, fontSize: 11, color: '#8A8A93', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-                {item.label}
-              </div>
-            </div>
-          ))}
-        </div>
-
         <div
           style={{
             display: 'flex',
@@ -70,11 +33,8 @@ function StatsFooter({ stats, legal }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
               <img src="/brand/omnifm-wordmark-dark.png" alt="OmniFM" style={{ height: 30, width: 'auto', display: 'block' }} data-testid="footer-logo" />
             </div>
-            <p style={{ margin: 0, color: '#8A8A93', fontSize: 13, lineHeight: 1.7, maxWidth: 560 }}>
-              {copy.footer.liveNote}
-            </p>
             {operatorName && (
-              <p data-testid="footer-operator" style={{ margin: '6px 0 0', color: '#80808A', fontSize: 12, lineHeight: 1.6 }}>
+              <p data-testid="footer-operator" style={{ margin: 0, color: '#80808A', fontSize: 12, lineHeight: 1.6 }}>
                 {copy.footer.operatedBy({ operator: operatorName })}
               </p>
             )}
@@ -110,4 +70,4 @@ function StatsFooter({ stats, legal }) {
   );
 }
 
-export default StatsFooter;
+export default SiteFooter;

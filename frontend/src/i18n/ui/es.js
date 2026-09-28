@@ -600,7 +600,6 @@ export default {
   "light headers": "cabeceras claras",
   "light pages": "páginas claras",
   "listeners": "oyentes",
-  "listening": "escuchando",
   "members": "miembros",
   "now": "ahora",
   "off": "apagado",
