@@ -31,6 +31,12 @@ updates:
         update-types:
           - minor
           - patch
+    ignore:
+      # The Node types follow the Node major the bot runs (package.json
+      # engines: 22); types of a newer Node allow APIs the server lacks.
+      - dependency-name: "@types/node"
+        update-types:
+          - version-update:semver-major
     labels:
       - dependencies
       - npm
