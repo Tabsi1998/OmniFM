@@ -42,14 +42,22 @@ const DASHBOARD_ANSWERS = {
 const DASHBOARD_AREAS = ["overview", "stations", "events", "roles", "stats", "subscription", "settings"];
 
 const PAGES = [
-  { name: "Startseite", path: "/", shows: '[data-testid="hero-title"]' },
-  { name: "Sender", path: "/sender", shows: '[data-testid="station-browser"]' },
-  { name: "Preise", path: "/preise", shows: '[data-testid="premium-section"]' },
+  { name: "Startseite", path: "/", shows: '[data-testid="hero-title"]', lean: true },
+  { name: "Sender", path: "/sender", shows: '[data-testid="station-browser"]', lean: true },
+  { name: "Preise", path: "/preise", shows: '[data-testid="premium-section"]', lean: true },
   { name: "Impressum", path: "/impressum", shows: '[data-testid="impressum-section"]' },
   { name: "Datenschutz", path: "/datenschutz", shows: '[data-testid="privacy-section"]' },
   { name: "Nutzungsbedingungen", path: "/nutzungsbedingungen", shows: '[data-testid="terms-section"]' },
   { name: "Dashboard (angemeldet)", path: "/dashboard", shows: '[data-testid="guild-nav-overview"]', mockDashboard: true },
   { name: "Owner-Konsole (Login)", path: "/admin", shows: '[data-testid="admin-token-input"]' },
+];
+
+// #296: the public pages load neither the charts nor the dashboard nor the
+// owner console; each leaves a marker in its code that shows if it came along.
+const LEAN_MARKERS = [
+  ["recharts-wrapper", "Diagramm-Code"],
+  ["guild-perms-matrix", "Server-Dashboard"],
+  ["admin-token-input", "Owner-Konsole"],
 ];
 
 // Third-party resources (fonts, analytics) may fail offline; the page itself must not.
@@ -64,6 +72,10 @@ try {
     // eslint-disable-next-line no-await-in-loop
     const tab = await context.newPage();
     const errors = [];
+    const scripts = [];
+    tab.on("response", (response) => {
+      if (response.request().resourceType() === "script") scripts.push(response);
+    });
     tab.on("pageerror", (error) => errors.push(`JavaScript-Fehler: ${error.message}`));
     tab.on("console", (message) => {
       if (message.type() === "error" && !ignoredConsole(message.text())) errors.push(`Konsole: ${message.text().slice(0, 200)}`);
@@ -85,6 +97,15 @@ try {
       // A moment for effects that run after the first paint.
       // eslint-disable-next-line no-await-in-loop
       await tab.waitForTimeout(500);
+      if (page.lean) {
+        for (const script of scripts) {
+          // eslint-disable-next-line no-await-in-loop -- one script after the other
+          const code = await script.text().catch(() => "");
+          for (const [marker, what] of LEAN_MARKERS) {
+            if (code.includes(marker)) errors.push(`lädt ${what} mit (${new URL(script.url()).pathname})`);
+          }
+        }
+      }
       if (page.mockDashboard) {
         for (const area of DASHBOARD_AREAS) {
           // eslint-disable-next-line no-await-in-loop -- one area after the other, like a person clicks
