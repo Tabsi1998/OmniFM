@@ -135,5 +135,8 @@
   "Default": "Predefinito",
   "Allow": "Consenti",
   "Return": "Torna indietro",
-  "Disconnect": "Disconnetti"
+  "Disconnect": "Disconnetti",
+  "Report a problem with OmniFM to the team": "Segnalare al team un problema con OmniFM",
+  "Suggest an idea for OmniFM": "Proporre un'idea per OmniFM",
+  "Tell the OmniFM team what you think": "Dire al team di OmniFM cosa ne pensi"
 }

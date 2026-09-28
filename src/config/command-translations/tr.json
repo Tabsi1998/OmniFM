@@ -135,5 +135,8 @@
   "Default": "Varsayılan",
   "Allow": "İzin ver",
   "Return": "Geri dön",
-  "Disconnect": "Bağlantıyı kes"
+  "Disconnect": "Bağlantıyı kes",
+  "Report a problem with OmniFM to the team": "OmniFM ile ilgili bir sorunu ekibe bildir",
+  "Suggest an idea for OmniFM": "OmniFM için bir fikir öner",
+  "Tell the OmniFM team what you think": "OmniFM ekibine ne düşündüğünü söyle"
 }

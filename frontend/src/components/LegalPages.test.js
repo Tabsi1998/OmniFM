@@ -95,7 +95,7 @@ describe('legal pages', () => {
     render(<I18nProvider><PrivacySection legal={LEGAL} privacy={PRIVACY} /></I18nProvider>);
     const text = pageText('privacy-section');
 
-    expect(screen.getByTestId('legal-updated').textContent).toBe('Stand: 28. September 2026');
+    expect(screen.getByTestId('legal-updated').textContent).toBe('Stand: 29. September 2026');
     const toc = screen.getByTestId('legal-toc');
     expect(toc.querySelector('a[href="#privacy-transfers"]').textContent).toBe('Übermittlung in Länder außerhalb der EU');
     expect(document.getElementById('privacy-transfers').textContent).toContain('Data Privacy Framework');
@@ -123,7 +123,7 @@ describe('legal pages', () => {
     expect(text).not.toContain('Testmonat Aktiv');
     expect(text).not.toContain('Gültig ab');
     for (const phrase of OPERATOR_ONLY) expect(text).not.toContain(phrase);
-    expect(screen.getByTestId('legal-updated').textContent).toBe('Stand: 28. September 2026');
+    expect(screen.getByTestId('legal-updated').textContent).toBe('Stand: 29. September 2026');
     expect(screen.getByTestId('legal-toc')).toBeTruthy();
     unmount();
 

@@ -14,6 +14,7 @@ import { log } from "../../lib/logging.js";
 import { SAVED_SONGS_PREFIX } from "../saved-songs.js";
 import { PERSONAL_DATA_PREFIX } from "../personal-data-panel.js";
 import { YEAR_REVIEW_PREFIX } from "../year-review-panel.js";
+import { REPORT_PREFIX } from "../problem-report-messages.js";
 import { clipText } from "../../lib/helpers.js";
 import { getTier } from "../../core/entitlements.js";
 import { BRAND } from "../../config/plans.js";
@@ -624,6 +625,10 @@ const menuMethods = {
       }
       if (customId.startsWith(PERSONAL_DATA_PREFIX)) {
         return this.handlePersonalDataComponent(interaction);
+      }
+      // The team channel's buttons on a report (#436).
+      if (customId.startsWith(REPORT_PREFIX)) {
+        return this.handleReportComponent(interaction);
       }
       if (customId.startsWith(YEAR_REVIEW_PREFIX)) {
         return this.handleYearReviewComponent(interaction);

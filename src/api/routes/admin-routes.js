@@ -38,6 +38,7 @@ import {
 } from "../../lib/owner-access.js";
 import { refreshOwnerSettings } from "../../lib/owner-settings-cache.js";
 import { normalizeOwnerSeasons } from "../../lib/seasons.js";
+import { normalizeReportSettings } from "../../lib/problem-reports.js";
 import { getClientIp, safeTokenEquals } from "../../lib/api-helpers.js";
 import { getDb, isConnected } from "../../lib/db.js";
 import {
@@ -76,6 +77,7 @@ import { SERVER_DATA_RETENTION_DAYS, listGuildDepartures } from "../../guild-dep
 import { createAdminLicenseRoutes } from "./admin-license-routes.js";
 import { createAdminStatusRoutes } from "./admin-status-routes.js";
 import { createAdminSuggestionRoutes } from "./admin-suggestion-routes.js";
+import { createAdminReportRoutes } from "./admin-report-routes.js";
 import { createAdminStationRoutes, loadCatalogFileStations } from "./admin-station-routes.js";
 
 export function readRequestBody(req, limitBytes = 4096) {
@@ -323,6 +325,7 @@ export function createAdminRoutesHandler(deps) {
   const handleStatusRoutes = createAdminStatusRoutes(routeDeps);
   // The queue of station suggestions (#303).
   const handleSuggestionRoutes = createAdminSuggestionRoutes(routeDeps);
+  const handleReportRoutes = createAdminReportRoutes(routeDeps);
 
   return async function handleAdminRoutes(context) {
     const { req, res, requestUrl } = context;
@@ -671,6 +674,8 @@ export function createAdminRoutesHandler(deps) {
       }
       // Only valid looks and server IDs reach the database (#425).
       if (section === "seasons") saveData = normalizeOwnerSeasons(data);
+      // Channel IDs only (#436).
+      if (section === "reports") saveData = normalizeReportSettings(data);
       if (!isConnected() || !getDb()) {
         sendJson(res, 503, { error: "Keine Datenbank verbunden \u2013 Speichern nicht m\u00f6glich." });
         return true;
@@ -695,6 +700,7 @@ export function createAdminRoutesHandler(deps) {
     if (await handleLicenseRoutes(context)) return true;
     if (await handleStatusRoutes(context)) return true;
     if (await handleSuggestionRoutes(context)) return true;
+    if (await handleReportRoutes(context)) return true;
     return handleStationRoutes(context);
   };
 }

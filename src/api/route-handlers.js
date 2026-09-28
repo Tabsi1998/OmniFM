@@ -10,6 +10,7 @@ import { createDashboardEventsRouteHandler } from "./routes/dashboard-events.js"
 import { createDashboardExportsRouteHandler } from "./routes/dashboard-exports.js";
 import { createDashboardLicenseRouteHandler } from "./routes/dashboard-license.js";
 import { createDashboardPermsRouteHandler } from "./routes/dashboard-perms.js";
+import { createDashboardReportsRouteHandler } from "./routes/dashboard-reports.js";
 import { createDashboardBotProfileRouteHandler } from "./routes/dashboard-bot-profile.js";
 import { createDashboardPanelDesignRouteHandler } from "./routes/dashboard-panel-design.js";
 import { createDashboardRolesRouteHandler } from "./routes/dashboard-roles.js";
@@ -294,6 +295,17 @@ export const handleDashboardPermsRoute = createDashboardPermsRouteHandler({
   sendLocalizedError,
   serverHasCapability,
   setCommandRolePermission,
+});
+
+// "Problem melden" in the dashboard (#436).
+export const handleDashboardReportsRoute = createDashboardReportsRouteHandler({
+  getDashboardRequestTranslator,
+  getDashboardSession,
+  getLocalizedJsonBodyError,
+  methodNotAllowed,
+  resolveDashboardGuildForSession,
+  sendJson,
+  sendLocalizedError,
 });
 
 // Logos of the servers' own stations (#340).

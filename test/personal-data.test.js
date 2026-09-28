@@ -77,6 +77,7 @@ test("after 'delete everything' the Discord ID is in no collection", { skip: !ha
   const { initScheduledEventsStore, createScheduledEvent, getScheduledEvent } = await import("../src/scheduled-events-store.js");
   const { collectPersonalData, countPersonalData, erasePersonalData } = await import("../src/lib/personal-data.js");
   const { createStationSuggestion } = await import("../src/station-suggestions-store.js");
+  const { createProblemReport } = await import("../src/problem-reports-store.js");
   await Promise.all([
     initVoteEventsStore({ refreshMs: 60_000 }),
     initDiscordBotListStore({ refreshMs: 60_000 }),
@@ -114,6 +115,9 @@ test("after 'delete everything' the Discord ID is in no collection", { skip: !ha
   const suggestionUrl = `https://stream.example.com/suggested-${Math.random().toString(36).slice(2)}.mp3`;
   const suggested = await createStationSuggestion({ name: "Vorschlag FM", url: suggestionUrl }, { userId: person, userName: "person", guildId });
   assert.ok(suggested.suggestion, JSON.stringify(suggested));
+  // A report with "tell me" keeps the ID for the promised message (#437).
+  const reported = await createProblemReport({ kind: "idea", text: "Mehr Jazz bitte", consent: { notify: true }, reporter: { userId: person, name: "person" } });
+  assert.ok(reported.report, JSON.stringify(reported));
   assert.ok(await eventually(async () => (await listVoteEventsOfUser(person)).length === 1
     && Boolean(await db.collection("dashboard_auth_sessions").findOne({ "session.user.id": person }))
     && Boolean(await db.collection("scheduled_events").findOne({ createdByUserId: person }))), "seeded");
@@ -121,8 +125,9 @@ test("after 'delete everything' the Discord ID is in no collection", { skip: !ha
   const collected = await collectPersonalData(person);
   assert.equal(collected.ok, true);
   assert.deepEqual(countPersonalData(collected.data), {
-    savedSongs: 1, votes: 1, dashboardLogins: 1, ownerConsoleLogins: 1, pollsStarted: 1, eventsCreated: 1, dashboardChanges: 1, stationSuggestions: 1,
+    savedSongs: 1, votes: 1, dashboardLogins: 1, ownerConsoleLogins: 1, pollsStarted: 1, eventsCreated: 1, dashboardChanges: 1, stationSuggestions: 1, reports: 1,
   });
+  assert.equal(collected.data.reports[0].text, "Mehr Jazz bitte");
   assert.equal(collected.data.dashboardLogins[0].servers[0].name, "Mein Server");
   assert.ok(!JSON.stringify(collected.data).includes(`token-${person}`), "no login token in the file");
 
@@ -152,6 +157,12 @@ test("after 'delete everything' the Discord ID is in no collection", { skip: !ha
   assert.equal(kept?.name, "Vorschlag FM");
   assert.equal(kept?.submitter, undefined);
   await db.collection("station_suggestions").deleteOne({ _id: suggested.suggestion._id });
+  // The report stays with the team, without the person and without the message (#437).
+  const report = await db.collection("problem_reports").findOne({ _id: reported.report._id });
+  assert.equal(report?.text, "Mehr Jazz bitte");
+  assert.equal(report?.reporter, undefined);
+  assert.equal(report?.consent?.notify, false);
+  await db.collection("problem_reports").deleteOne({ _id: reported.report._id });
 
   // A sync reading the old vote again leaves it out; a new vote counts.
   assert.equal(mergeVoteEvents([{ provider: "topgg", userId: person, username: "person", votedAt: hourAgo }]).added, 0);

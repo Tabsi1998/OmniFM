@@ -123,6 +123,7 @@ export function buildHelpPayload(input) {
         t("**Bot kommt nicht in den Kanal?** OmniFM braucht dort *Verbinden* und *Sprechen*.", "**Bot does not join?** OmniFM needs *Connect* and *Speak* there."),
         t("**Sender still?** Wähle einen anderen; OmniFM wechselt bei Ausfällen auch selbst zum Ersatzsender.", "**Station silent?** Pick another; OmniFM also switches to a backup station on its own."),
         t("`/status` zeigt, was gerade los ist, `/diag` die Technik dahinter.", "`/status` shows what is going on, `/diag` the technical details."),
+        t("Mit `/problem`, `/idee` und `/feedback` schreibst du direkt dem OmniFM-Team.", "With `/report`, `/idea` and `/feedback` you write straight to the OmniFM team."),
       ],
       actions: [row(button(STATIONS_COMPONENT_ID_OPEN, t("Anderen Sender wählen", "Pick another station")), urls.support ? link(urls.support, "Support") : null)],
     },

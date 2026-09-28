@@ -11,13 +11,12 @@ import { processStationLogo, STATION_LOGO_MAX_BYTES } from "../../lib/station-lo
 import { saveStationLogo } from "../../station-logos-store.js";
 import { testOwnerStationStream } from "../../lib/owner-station-test.js";
 import { translateCustomStationErrorMessage } from "../../lib/language.js";
-import { recordRuntimeIncident } from "../../runtime-incidents-store.js";
 import { loadStations } from "../../stations-store.js";
-import { describePlaybackPhaseHistory } from "../playback-phase.js";
 import { buildNoticePayload } from "../commands/command-helpers.js";
 import { handleEventCommand } from "../runtime-event-command.js";
 import {
   EVENT_FORM_ID,
+  REPORT_FORM_PREFIX,
   STATION_FORM_ID,
   SUGGESTION_FORM_ID,
   buildProblemReportModal,
@@ -27,9 +26,6 @@ import {
   readProblemReport,
   readStationForm,
 } from "../forms.js";
-
-// One report per person and server within this time; more would only be noise.
-const PROBLEM_REPORT_COOLDOWN_MS = 5 * 60_000;
 
 function catalogGenres() {
   const stations = loadStations()?.stations || {};
@@ -153,6 +149,7 @@ ${t("Das Logo ist gespeichert und erscheint im Now-Playing-Panel und im Dashboar
     if (interaction.customId === STATION_FORM_ID) return this.handleStationFormSubmit(interaction);
     if (interaction.customId === SUGGESTION_FORM_ID) return this.handleSuggestionFormSubmit(interaction);
     if (interaction.customId === EVENT_FORM_ID) return this.handleEventFormSubmit(interaction);
+    if (interaction.customId.startsWith(REPORT_FORM_PREFIX)) return this.handleReportFormSubmit(interaction);
     return false;
   },
 
@@ -164,56 +161,25 @@ ${t("Das Logo ist gespeichert und erscheint im Now-Playing-Panel und im Dashboar
   },
 
   /**
-   * The report becomes a server incident for the owner console, with the
-   * station and the last playback phases (#210). Nobody's name is stored.
+   * The panel's report goes the way of every report (#436): to the private
+   * team channel with the station and the last playback phases, or, without
+   * one, to the owner console as before. The name only with "tell me".
    */
   async handleProblemReportSubmit(interaction, { now = Date.now() } = {}) {
     const { t, language } = this.createInteractionTranslator(interaction);
-    const guildId = interaction.guildId;
     const report = readProblemReport(interaction.fields);
     if (!report.ok) {
       await interaction.reply(buildNoticePayload({ t, language, tone: "warning", title: t("Bitte auswählen", "Please choose"), description: t("Wähle aus, was los ist.", "Choose what is wrong.") }));
       return true;
     }
-    if (!(this.problemReportTimes instanceof Map)) this.problemReportTimes = new Map();
-    const reporterKey = `${guildId}:${interaction.user?.id || ""}`;
-    const last = this.problemReportTimes.get(reporterKey) || 0;
-    if (now - last < PROBLEM_REPORT_COOLDOWN_MS) {
-      await interaction.reply(buildNoticePayload({
-        t, language, tone: "info", title: t("Schon gemeldet", "Already reported"),
-        description: t("Deine Meldung von eben ist angekommen. Danke!", "Your report from a moment ago has arrived. Thanks!"),
-      }));
-      return true;
-    }
-    this.problemReportTimes.set(reporterKey, now);
-
-    const state = this.guildState?.get?.(guildId) || null;
-    const guild = interaction.guild || this.client?.guilds?.cache?.get?.(guildId) || null;
-    await recordRuntimeIncident({
-      guildId,
-      guildName: guild?.name || "",
-      tier: getTier(guildId),
-      eventKey: "listener_report",
-      severity: "warning",
-      runtime: { id: this.config?.id || "", name: this.config?.name || "", role: this.role || "" },
-      payload: {
-        reason: report.reason,
-        detail: report.detail,
-        previousStationKey: state?.currentStationKey || "",
-        previousStationName: state?.currentStationName || "",
-        listenerCount: this.getCurrentListenerCount?.(guildId, state) || 0,
-        phaseHistory: describePlaybackPhaseHistory(state, { limit: 5 }).map((line) => line.replace(/<t:\d+:R>/g, "").trim()),
-      },
-    });
-    log("INFO", `[${this.config?.name}] Hörer-Meldung guild=${guildId} reason=${report.reason}`);
-    await interaction.reply(buildNoticePayload({
-      t, language, tone: "success", title: t("Danke für die Meldung", "Thanks for the report"),
-      description: t(
-        `„${problemReasonLabel(report.reason, t)}“ ist beim OmniFM-Team angekommen, zusammen mit dem Sender und dem Wiedergabe-Verlauf. Dein Name wird nicht gespeichert.`,
-        `“${problemReasonLabel(report.reason, t)}” has reached the OmniFM team, together with the station and the playback history. Your name is not stored.`
-      ),
-    }));
-    return true;
+    return this.submitReport(interaction, {
+      kind: "problem",
+      text: report.detail || problemReasonLabel(report.reason, t),
+      reason: report.reason,
+      consent: report.consent,
+      source: "panel",
+      withPlayback: true,
+    }, { now });
   },
 };
 

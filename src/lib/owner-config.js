@@ -222,6 +222,8 @@ export function ownerConfigResponse(raw, env = process.env) {
     charts: configSectionFrom(raw, "charts"),
     // The seasonal decoration (#425): a main switch per season and the test mode.
     seasons: configSectionFrom(raw, "seasons"),
+    // Reports from Discord (#436): the private team channel and a forum per kind.
+    reports: configSectionFrom(raw, "reports"),
     recoverySettings: RECOVERY_SETTINGS,
   };
 }

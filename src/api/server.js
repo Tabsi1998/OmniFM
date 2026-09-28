@@ -42,6 +42,7 @@ import {
   handleDashboardLicenseRoute,
   handleDashboardPanelDesignRoute,
   handleDashboardPermsRoute,
+  handleDashboardReportsRoute,
   handleDashboardRolesRoute,
   handleDashboardSettingsDigestRoute,
   handleDashboardSettingsRoute,
@@ -334,6 +335,9 @@ function startWebServer(runtimes, { forwardRuntimeTo = "" } = {}) {
     }
 
     if (await handleDashboardPermsRoute({ req, res, requestUrl, readJsonBody, runtimes })) {
+      return;
+    }
+    if (await handleDashboardReportsRoute({ req, res, requestUrl, readJsonBody, runtimes })) {
       return;
     }
     if (await handleDashboardChannelsRoute({ req, res, requestUrl, runtimes })) {

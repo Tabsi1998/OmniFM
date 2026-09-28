@@ -6,7 +6,7 @@ import { useI18n } from '../i18n.js';
 import LegalLanguageNote from './LegalLanguageNote.js';
 
 // When the legal texts in the language files last changed; shown as "Stand".
-export const LEGAL_TEXTS_UPDATED = '2026-09-28';
+export const LEGAL_TEXTS_UPDATED = '2026-09-29';
 
 const filled = (value) => String(value ?? '').trim() !== '';
 

@@ -3,7 +3,7 @@ import {
   Radio, LayoutDashboard, ListMusic, ShieldCheck, BarChart3, CreditCard, LogOut,
   Plus, Trash2, Check, Crown, Zap, Music2, Users, Clock, Lock, Server,
   ChevronRight, RefreshCw, AlertTriangle,
-  CalendarDays, Settings,
+  CalendarDays, Settings, MessageSquareWarning,
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -17,6 +17,7 @@ import { useI18n } from '../i18n.js';
 import DashboardEvents from './DashboardEvents.js';
 import DashboardSettings from './DashboardSettings.js';
 import GuildLiveView from './GuildLiveView.js';
+import DashboardReportDialog from './DashboardReportDialog.js';
 import { normalizeDashboardCapabilityPayload } from '../lib/dashboardCapabilities.js';
 import { PLAN_LIMITS, PLAN_NAMES } from '../../../src/config/plan-features.js';
 import PlanLock from './PlanLock.js';
@@ -255,6 +256,7 @@ export default function GuildDashboard() {
   const [eventForm, setEventForm] = useState(() => emptyEventForm());
   const [editingEventId, setEditingEventId] = useState('');
   const [msg, setMsg] = useState(null);
+  const [reportOpen, setReportOpen] = useState(false);
   const { locale, formatDate, t } = useI18n();
   const navLabel = useCallback((id) => ({
     overview: t('Übersicht', 'Overview'), stations: t('Sender', 'Stations'),
@@ -567,6 +569,8 @@ export default function GuildDashboard() {
           <div><h1 className="oa-h1 oa-display" data-testid="guild-section-title">{navLabel(section)}</h1><div className="oa-sub">{guild.name}{Number(guild.memberCount || guild.members) > 0 ? ` · ${fmtInt(guild.memberCount || guild.members)} ${t('Mitglieder', 'members')}` : ''} · <span className="oa-mono">Guild-ID {guild.id}</span></div></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>
             <button className="oa-btn ghost" onClick={() => loadGuild(guildId)} disabled={gdata.loading} title={t('Aktualisieren', 'Refresh')}><RefreshCw size={15} /></button>
+            {/* A problem, an idea or feedback for the OmniFM team (#436). */}
+            <button className="oa-btn ghost" onClick={() => setReportOpen(true)} title={t('Problem, Idee oder Feedback ans OmniFM-Team', 'A problem, an idea or feedback for the OmniFM team')} data-testid="guild-report-open"><MessageSquareWarning size={15} /> {t('Melden', 'Report')}</button>
             {/* The season's badge asks the server for the owner's switches; the preview asks nothing. */}
             {demo ? null : <SeasonBadge />}
             <span className="oa-pill" style={{ background: `${tm.color}22`, color: tm.color, border: `1px solid ${tm.color}55` }} data-testid="guild-active-tier"><tm.icon size={13} /> {tm.name}</span>
@@ -574,6 +578,7 @@ export default function GuildDashboard() {
           </div>
         </div>
         <div className="oa-mobile-nav">{NAV.map((item) => <button key={item.id} className={`oa-nav-btn ${section === item.id ? 'active' : ''}`} style={{ width: 'auto', whiteSpace: 'nowrap' }} onClick={() => setSection(item.id)} data-testid={`guild-mobile-nav-${item.id}`}><item.icon size={16} /> {navLabel(item.id)}</button>)}</div>
+        {reportOpen ? <DashboardReportDialog apiRequest={apiRequest} guildId={guildId} t={t} onClose={() => setReportOpen(false)} /> : null}
         {msg && <div className={`oa-pill ${msg.ok ? 'green' : 'red'}`} style={{ marginBottom: 16 }} data-testid="guild-message">{msg.ok ? <Check size={13} /> : <AlertTriangle size={13} />} {msg.text}</div>}
 
         {section === 'overview' && <>
