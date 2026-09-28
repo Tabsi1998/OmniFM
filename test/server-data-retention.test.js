@@ -82,7 +82,7 @@ test("removed: one DM, a return keeps it; 30 days later the server's data is gon
   await db.collection("guild_settings").insertOne({ guildId, nowPlayingChannelId: snowflake() });
   await db.collection("custom_stations").insertOne({ guildId, key: "mystation", name: "Mein Sender", url: "https://example.test/stream" });
   await db.collection("station_logos").insertOne({ guildId, key: "mystation", png: "x", updatedAt: new Date() });
-  for (const collection of ["daily_stats", "listening_sessions", "listener_snapshots", "connection_events", "guild_stats", "song_plays", "runtime_incidents"]) {
+  for (const collection of ["daily_stats", "listening_sessions", "listener_snapshots", "connection_events", "guild_stats", "song_plays", "runtime_incidents", "year_review_months"]) {
     // eslint-disable-next-line no-await-in-loop
     await db.collection(collection).insertOne({ guildId, at: new Date() });
   }

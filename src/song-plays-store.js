@@ -1,13 +1,16 @@
 // ============================================================
 // OmniFM: how often a song ran on a server, per day (#278)
 // ============================================================
-// Feeds "top songs of the week" in the weekly digest. One document per
-// server, day and song with a counter; no person is stored. MongoDB drops
-// the documents after 21 days on its own (TTL index on `day`).
+// Feeds "top songs of the week" in the weekly digest, the charts and the
+// months of the year review (#301). One document per server, day and song
+// with a counter; no person is stored. MongoDB drops the documents after 45
+// days on its own (TTL index on `day`), so a whole month is still there when
+// the year review counts it for the last time.
 import { getDb, isConnected } from "./lib/db.js";
+import { log } from "./lib/logging.js";
 
 export const SONG_PLAYS_COLLECTION = "song_plays";
-const RETENTION_SECONDS = 21 * 24 * 60 * 60;
+const RETENTION_SECONDS = 45 * 24 * 60 * 60;
 
 let indexesReady = null;
 
@@ -47,15 +50,30 @@ function collection() {
   return getDb().collection(SONG_PLAYS_COLLECTION);
 }
 
+/**
+ * The TTL index with the current time. Until #301 it was 21 days; MongoDB
+ * refuses the same index with another time, so an existing one is changed.
+ * Counting never stops over it: if the change fails, the next start tries again.
+ */
+async function ensureRetention(plays) {
+  try {
+    await plays.createIndex({ day: 1 }, { expireAfterSeconds: RETENTION_SECONDS, name: "day_ttl" });
+  } catch (error) {
+    if (error?.code !== 85 && error?.codeName !== "IndexOptionsConflict") throw error;
+    await getDb().command({ collMod: SONG_PLAYS_COLLECTION, index: { name: "day_ttl", expireAfterSeconds: RETENTION_SECONDS } })
+      .catch((err) => log("WARN", `[Song-Plays] Aufbewahrung nicht auf ${RETENTION_SECONDS / 86_400} Tage umgestellt: ${err?.message || err}`));
+  }
+}
+
 async function ensureIndexes(plays) {
   if (!indexesReady) {
-    indexesReady = Promise.all([
-      plays.createIndex({ guildId: 1, day: 1, trackKey: 1 }, { unique: true, name: "guild_day_track_unique" }),
-      plays.createIndex({ day: 1 }, { expireAfterSeconds: RETENTION_SECONDS, name: "day_ttl" }),
-    ]).catch((error) => {
-      indexesReady = null;
-      throw error;
-    });
+    // One index after the other: the TTL change does not run into the other build.
+    indexesReady = plays.createIndex({ guildId: 1, day: 1, trackKey: 1 }, { unique: true, name: "guild_day_track_unique" })
+      .then(() => ensureRetention(plays))
+      .catch((error) => {
+        indexesReady = null;
+        throw error;
+      });
   }
   return indexesReady;
 }

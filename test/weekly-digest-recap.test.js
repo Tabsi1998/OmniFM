@@ -221,5 +221,5 @@ test("song plays are counted per server and day in MongoDB", async (t) => {
     { displayTitle: "Bent - Magic Love", count: 1 },
   ]);
   const indexes = await database.collection(songPlays.SONG_PLAYS_COLLECTION).indexes();
-  assert.equal(indexes.find((index) => index.name === "day_ttl")?.expireAfterSeconds, 21 * 24 * 60 * 60, "documents expire after 21 days");
+  assert.equal(indexes.find((index) => index.name === "day_ttl")?.expireAfterSeconds, 45 * 24 * 60 * 60, "documents expire after 45 days (a whole month for the year review, #301)");
 });

@@ -392,6 +392,10 @@ function PrivacySection({ legal, privacy }) {
             body={copy.privacy.sections.chartsBody}
           />
           <PolicyBlock
+            title={copy.privacy.sections.yearReviewTitle}
+            body={copy.privacy.sections.yearReviewBody}
+          />
+          <PolicyBlock
             title={copy.privacy.sections.suggestionsTitle}
             body={copy.privacy.sections.suggestionsBody}
           />

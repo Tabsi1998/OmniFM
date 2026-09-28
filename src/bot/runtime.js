@@ -21,6 +21,7 @@ import {
   handleCommanderGuildLeft,
   startServerDataRetention,
 } from "../services/server-data-retention.js";
+import { startYearReviewService } from "../services/year-review.js";
 import { startDiscordShopSync } from "../premium/discord-shop.js";
 import { startChartsPostService } from "../services/charts.js";
 import { isRuntimeVoiceConnected } from "./runtime-live-state.js";
@@ -101,6 +102,8 @@ class BotRuntime {
       if (this.role === "commander") {
         // Servers OmniFM left 30 days ago lose their data (#285).
         startServerDataRetention(this);
+        // The months of the year review, before the sessions are gone (#301).
+        startYearReviewService();
         // Premium bought in Discord becomes the server's license (#320).
         startDiscordShopSync(this);
         // The weekly OmniFM charts go to the owner's channel (#300).

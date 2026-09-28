@@ -37,7 +37,7 @@ import { forgetGuildInBotStates } from "../bot-state.js";
 const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
 const FIRST_CHECK_MS = 10 * 60 * 1000;
 // Collections with a plain guildId field and nothing else to keep in step.
-const STATS_COLLECTIONS = ["daily_stats", "listening_sessions", "listener_snapshots", "connection_events", "guild_stats", "song_plays"];
+const STATS_COLLECTIONS = ["daily_stats", "listening_sessions", "listener_snapshots", "connection_events", "guild_stats", "song_plays", "year_review_months"];
 // Where a server's own settings live; one of them is enough to call it "has data".
 const DATA_PROBES = [
   ["guild_settings", "guildId"],
