@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Calendar, Shield, Save, Plus, ArrowUp, ArrowDown, X, Radio } from 'lucide-react';
+// The same renderer the bot uses, so the preview is exactly the status (#277).
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Save } from 'lucide-react';
 import { DASHBOARD_CAPABILITY_DEFAULTS } from '../lib/dashboardCapabilities.js';
 import {
   FAILOVER_CHAIN_LIMIT,
@@ -9,17 +10,13 @@ import {
   normalizeFailoverChain,
 } from '../lib/dashboardSettings.js';
 import {
-  DASHBOARD_EXPORT_WEBHOOK_EVENTS,
   normalizeDashboardExportsWebhookConfig,
   buildDashboardExportsWebhookSummary,
-  getDashboardExportWebhookEventLabel,
   buildDashboardExportDownloadName,
 } from '../lib/dashboardExports.js';
 import {
-  DASHBOARD_INCIDENT_ALERT_EVENTS,
   normalizeDashboardIncidentAlertsConfig,
   buildDashboardIncidentAlertsSummary,
-  getDashboardIncidentAlertEventLabel,
 } from '../lib/dashboardIncidentAlerts.js';
 import {
   buildDashboardExportsHint,
@@ -30,30 +27,16 @@ import {
   buildDashboardVoiceGuardSummary,
   normalizeDashboardVoiceGuardConfig,
 } from '../lib/dashboardVoiceGuard.js';
-import DashboardOnboardingHint from './DashboardOnboardingHint.js';
 import DashboardBotProfile from './DashboardBotProfile.js';
 import DashboardPanelDesigner from './DashboardPanelDesigner.js';
-// The same renderer the bot uses, so the preview is exactly the status (#277).
 import { renderVoiceStatusTemplate } from '../../../src/lib/voice-status-template.js';
-
-const VOICE_STATUS_SAMPLE = {
-  station: 'Groove Salad',
-  title: 'Cafe del Mar',
-  artist: 'Energy 52',
-  listeners: 5,
-  genre: 'Ambient',
-  bot: 'OmniFM',
-};
-
-const DAYS = [
-  { value: 0, de: 'Sonntag', en: 'Sunday' },
-  { value: 1, de: 'Montag', en: 'Monday' },
-  { value: 2, de: 'Dienstag', en: 'Tuesday' },
-  { value: 3, de: 'Mittwoch', en: 'Wednesday' },
-  { value: 4, de: 'Donnerstag', en: 'Thursday' },
-  { value: 5, de: 'Freitag', en: 'Friday' },
-  { value: 6, de: 'Samstag', en: 'Saturday' },
-];
+import { VOICE_STATUS_SAMPLE } from './settings/settingsShared.js';
+import SettingsWeeklyDigest from './settings/SettingsWeeklyDigest.js';
+import SettingsFailover from './settings/SettingsFailover.js';
+import SettingsVoiceStatus from './settings/SettingsVoiceStatus.js';
+import SettingsFavorites from './settings/SettingsFavorites.js';
+import SettingsExports from './settings/SettingsExports.js';
+import SettingsVoiceGuard from './settings/SettingsVoiceGuard.js';
 
 export default function DashboardSettings({
   apiRequest,
@@ -480,796 +463,94 @@ export default function DashboardSettings({
       {error && <div style={{ border: '1px solid rgba(252,165,165,0.25)', background: 'rgba(127,29,29,0.12)', padding: '10px 12px', color: '#FCA5A5', fontSize: 13 }}>{error}</div>}
       {message && <div style={{ border: '1px solid rgba(16,185,129,0.25)', background: 'rgba(6,95,70,0.12)', padding: '10px 12px', color: '#6EE7B7', fontSize: 13 }}>{message}</div>}
 
-      <div data-testid="settings-weekly-digest" style={{ background: '#0A0A0A', border: '1px solid #1A1A2E', padding: 16, opacity: canManageWeeklyDigest ? 1 : 0.6 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <Calendar size={18} color="#5865F2" />
-          <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20 }}>{t('Wöchentlicher Stats-Digest', 'Weekly stats digest')}</h3>
-          {!canManageWeeklyDigest && <span style={{ fontSize: 11, color: '#10B981', border: '1px solid rgba(16,185,129,0.3)', padding: '2px 8px' }}>PRO</span>}
-        </div>
-        <p style={{ color: '#52525B', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
-          {t(
-            'Automatisch ein Embed mit der Wochen-Zusammenfassung in einen Text-Channel posten.',
-            'Automatically post an embed with the weekly summary to a text channel.'
-          )}
-        </p>
-        {digestHint && (
-          <div style={{ marginBottom: 14 }}>
-            <DashboardOnboardingHint
-              hint={digestHint}
-              t={t}
-              dataTestId="settings-digest-onboarding-hint"
-            />
-          </div>
-        )}
+    <SettingsWeeklyDigest
+      canManageWeeklyDigest={canManageWeeklyDigest}
+      digestHint={digestHint}
+      digestPreview={digestPreview}
+      digestPreviewGeneratedLabel={digestPreviewGeneratedLabel}
+      digestPreviewLoading={digestPreviewLoading}
+      digestSummary={digestSummary}
+      digestTestSending={digestTestSending}
+      refreshDigestPreview={refreshDigestPreview}
+      sendDigestTest={sendDigestTest}
+      setSettings={setSettings}
+      t={t}
+      textChannels={textChannels}
+      wd={wd}
+    />
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginBottom: 14 }}>
-          <div data-testid="digest-status-card" style={{ border: `1px solid ${digestSummary.statusAccent}33`, background: `${digestSummary.statusAccent}14`, padding: '12px 14px' }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: digestSummary.statusAccent }}>
-              {t('Status', 'Status')}
-            </div>
-            <div style={{ marginTop: 6, fontSize: 18, fontWeight: 700, color: '#fff' }}>{digestSummary.statusLabel}</div>
-            <div style={{ marginTop: 6, fontSize: 12, color: '#A1A1AA', lineHeight: 1.6 }}>{digestSummary.description}</div>
-          </div>
+    <SettingsFailover
+      addFailoverStation={addFailoverStation}
+      availableFailoverStations={availableFailoverStations}
+      buildLocalFailoverPreview={buildLocalFailoverPreview}
+      canManageFallbackStation={canManageFallbackStation}
+      configuredFailoverChain={configuredFailoverChain}
+      failoverHint={failoverHint}
+      fallbackSummary={fallbackSummary}
+      moveFailoverStation={moveFailoverStation}
+      pendingFailoverStation={pendingFailoverStation}
+      removeFailoverStation={removeFailoverStation}
+      setPendingFailoverStation={setPendingFailoverStation}
+      settings={settings}
+      t={t}
+    />
 
-          <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
-              {t('Naechster Lauf', 'Next run')}
-            </div>
-            <div data-testid="digest-next-run" style={{ marginTop: 6, fontSize: 16, fontWeight: 600, color: '#D4D4D8' }}>
-              {digestSummary.nextRunLabel}
-            </div>
-          </div>
-
-          <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
-              {t('Letzte Sendung', 'Last delivery')}
-            </div>
-            <div data-testid="digest-last-sent" style={{ marginTop: 6, fontSize: 16, fontWeight: 600, color: '#D4D4D8' }}>
-              {digestSummary.lastSentLabel}
-            </div>
-            <div style={{ marginTop: 6, fontSize: 12, color: '#71717A' }}>
-              {t('Sprache', 'Language')}: {digestSummary.languageLabel}
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
-          <label data-testid="digest-enabled-toggle" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, padding: '10px 0' }}>
-            <input
-              type="checkbox"
-              disabled={!canManageWeeklyDigest}
-              checked={wd.enabled}
-              onChange={(e) => setSettings((current) => ({ ...(current || {}), weeklyDigest: { ...wd, enabled: e.target.checked } }))}
-              style={{ width: 16, height: 16, accentColor: '#5865F2' }}
-            />
-            {t('Aktiviert', 'Enabled')}
-          </label>
-
-          <div>
-            <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Channel', 'Channel')}</label>
-            <select
-              data-testid="digest-channel-select"
-              disabled={!canManageWeeklyDigest}
-              value={wd.channelId}
-              onChange={(e) => setSettings((current) => ({ ...(current || {}), weeklyDigest: { ...wd, channelId: e.target.value } }))}
-              style={{ width: '100%', height: 40, padding: '0 10px', border: '1px solid #1A1A2E', background: '#050505', color: '#fff', boxSizing: 'border-box', fontSize: 13 }}
-            >
-              <option value="">{t('Channel wählen...', 'Select channel...')}</option>
-              {textChannels.map((channel) => <option key={channel.id} value={channel.id}>#{channel.name}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Wochentag', 'Day')}</label>
-            <select
-              data-testid="digest-day-select"
-              disabled={!canManageWeeklyDigest}
-              value={wd.dayOfWeek}
-              onChange={(e) => setSettings((current) => ({ ...(current || {}), weeklyDigest: { ...wd, dayOfWeek: Number(e.target.value) } }))}
-              style={{ width: '100%', height: 40, padding: '0 10px', border: '1px solid #1A1A2E', background: '#050505', color: '#fff', boxSizing: 'border-box', fontSize: 13 }}
-            >
-              {DAYS.map((day) => <option key={day.value} value={day.value}>{t(day.de, day.en)}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Uhrzeit', 'Hour')}</label>
-            <select
-              data-testid="digest-hour-select"
-              disabled={!canManageWeeklyDigest}
-              value={wd.hour}
-              onChange={(e) => setSettings((current) => ({ ...(current || {}), weeklyDigest: { ...wd, hour: Number(e.target.value) } }))}
-              style={{ width: '100%', height: 40, padding: '0 10px', border: '1px solid #1A1A2E', background: '#050505', color: '#fff', boxSizing: 'border-box', fontSize: 13 }}
-            >
-              {Array.from({ length: 24 }, (_, hour) => <option key={hour} value={hour}>{String(hour).padStart(2, '0')}:00</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Sprache', 'Language')}</label>
-            <select
-              data-testid="digest-language-select"
-              disabled={!canManageWeeklyDigest}
-              value={wd.language || 'de'}
-              onChange={(e) => setSettings((current) => ({ ...(current || {}), weeklyDigest: { ...wd, language: e.target.value } }))}
-              style={{ width: '100%', height: 40, padding: '0 10px', border: '1px solid #1A1A2E', background: '#050505', color: '#fff', boxSizing: 'border-box', fontSize: 13 }}
-            >
-              <option value="de">Deutsch</option>
-              <option value="en">English</option>
-            </select>
-          </div>
-          <div>
-            <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Für wen', 'For whom')}</label>
-            <select
-              data-testid="digest-audience-select"
-              disabled={!canManageWeeklyDigest}
-              value={wd.audience === 'public' ? 'public' : 'team'}
-              onChange={(e) => setSettings((current) => ({ ...(current || {}), weeklyDigest: { ...wd, audience: e.target.value } }))}
-              style={{ width: '100%', height: 40, padding: '0 10px', border: '1px solid #1A1A2E', background: '#050505', color: '#fff', boxSizing: 'border-box', fontSize: 13 }}
-            >
-              <option value="team">{t('Team (mit Technik-Zahlen)', 'Team (with technical numbers)')}</option>
-              <option value="public">{t('Öffentlich (für die Community)', 'Public (for the community)')}</option>
-            </select>
-          </div>
-        </div>
-
-        <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            data-testid="digest-preview-btn"
-            disabled={!canManageWeeklyDigest || digestPreviewLoading}
-            onClick={refreshDigestPreview}
-            style={{
-              height: 40,
-              padding: '0 14px',
-              border: '1px solid rgba(88,101,242,0.3)',
-              background: 'rgba(37,99,235,0.16)',
-              color: canManageWeeklyDigest ? '#DBEAFE' : '#3F3F46',
-              cursor: canManageWeeklyDigest && !digestPreviewLoading ? 'pointer' : 'not-allowed',
-              fontSize: 13,
-              fontWeight: 600,
-            }}
-          >
-            {digestPreviewLoading ? t('Lade Vorschau...', 'Loading preview...') : t('Vorschau aktualisieren', 'Refresh preview')}
-          </button>
-          <button
-            type="button"
-            data-testid="digest-test-send-btn"
-            disabled={!canManageWeeklyDigest || !wd.channelId || digestTestSending}
-            onClick={sendDigestTest}
-            style={{
-              height: 40,
-              padding: '0 14px',
-              border: '1px solid rgba(16,185,129,0.3)',
-              background: 'rgba(6,95,70,0.16)',
-              color: canManageWeeklyDigest && wd.channelId ? '#BBF7D0' : '#3F3F46',
-              cursor: canManageWeeklyDigest && wd.channelId && !digestTestSending ? 'pointer' : 'not-allowed',
-              fontSize: 13,
-              fontWeight: 600,
-            }}
-          >
-            {digestTestSending ? t('Sende Test...', 'Sending test...') : t('Test-Digest senden', 'Send test digest')}
-          </button>
-        </div>
-
-        <div data-testid="digest-preview-card" style={{ marginTop: 14, border: '1px solid #1A1A2E', background: '#050505', padding: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-            <div>
-              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
-                {t('Preview', 'Preview')}
-              </div>
-              <div style={{ marginTop: 6, fontSize: 18, fontWeight: 700, color: '#F4F4F5' }}>
-                {digestPreview?.title || t('Noch keine Vorschau geladen', 'No preview loaded yet')}
-              </div>
-            </div>
-            <div style={{ fontSize: 12, color: '#71717A' }}>
-              {t('Erstellt', 'Generated')}: {digestPreviewGeneratedLabel}
-            </div>
-          </div>
-
-          <div style={{ marginTop: 10, fontSize: 13, color: '#A1A1AA', lineHeight: 1.6 }}>
-            {digestPreview?.description || t('Nutze die Vorschau, um den Weekly Digest vor dem Versand zu prüfen.', 'Use the preview to inspect the weekly digest before sending it.')}
-          </div>
-
-          <div style={{ marginTop: 12, fontSize: 12, color: '#71717A' }}>
-            {t('Ziel-Channel', 'Target channel')}: {digestPreview?.channelName ? `#${digestPreview.channelName}` : t('Noch keiner ausgewählt', 'None selected yet')}
-          </div>
-
-          <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
-            {(digestPreview?.fields || []).map((field) => (
-              <div key={`${field.name}-${field.value}`} style={{ border: '1px solid #1A1A2E', background: '#09090B', padding: '12px 14px' }}>
-                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>{field.name}</div>
-                <div style={{ marginTop: 6, fontSize: 14, color: '#F4F4F5', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{field.value}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {digestSummary.missingChannel && (
-          <div data-testid="digest-channel-warning" style={{ marginTop: 12, border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(127,29,29,0.12)', padding: '10px 12px', color: '#FCA5A5', fontSize: 13 }}>
-            {t(
-              'Der Weekly Digest ist aktiviert, aber es wurde noch kein Text-Channel ausgewählt.',
-              'The weekly digest is enabled, but no text channel has been selected yet.'
-            )}
-          </div>
-        )}
-      </div>
-
-      <div data-testid="settings-fallback-station" style={{ background: '#0A0A0A', border: '1px solid #1A1A2E', padding: 16, opacity: canManageFallbackStation ? 1 : 0.5 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <Shield size={18} color="#8B5CF6" />
-          <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20 }}>{t('Failover-Kette', 'Failover chain')}</h3>
-          {!canManageFallbackStation && <span style={{ fontSize: 11, color: '#8B5CF6', border: '1px solid rgba(139,92,246,0.3)', padding: '2px 8px' }}>ULTIMATE</span>}
-        </div>
-        <p style={{ color: '#52525B', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
-          {t(
-            'Wird automatisch verwendet, wenn eine Station nicht erreichbar ist. Anstatt dass gar nichts läuft, springt der Bot auf diese Station.',
-            'Automatically used when a station is unreachable. Instead of silence, the bot switches to this station.'
-          )}
-        </p>
-        {failoverHint && (
-          <div style={{ marginBottom: 14 }}>
-            <DashboardOnboardingHint
-              hint={failoverHint}
-              t={t}
-              dataTestId="settings-failover-onboarding-hint"
-            />
-          </div>
-        )}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginBottom: 14 }}>
-          <div data-testid="fallback-status-card" style={{ border: `1px solid ${fallbackSummary.statusAccent}33`, background: `${fallbackSummary.statusAccent}14`, padding: '12px 14px' }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: fallbackSummary.statusAccent }}>
-              {t('Status', 'Status')}
-            </div>
-            <div style={{ marginTop: 6, fontSize: 18, fontWeight: 700, color: '#fff' }}>{fallbackSummary.statusLabel}</div>
-            <div style={{ marginTop: 6, fontSize: 12, color: '#A1A1AA', lineHeight: 1.6 }}>{fallbackSummary.description}</div>
-          </div>
-
-          <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
-              {t('Aktuelle Station', 'Current station')}
-            </div>
-            <div data-testid="fallback-current-station" style={{ marginTop: 6, fontSize: 16, fontWeight: 600, color: '#D4D4D8' }}>
-              {fallbackSummary.stationLabel}
-            </div>
-            {fallbackSummary.badgeLabel && (
-              <div style={{ marginTop: 8, display: 'inline-flex', border: '1px solid rgba(139,92,246,0.3)', color: '#C4B5FD', padding: '2px 8px', fontSize: 11, letterSpacing: '0.08em' }}>
-                {fallbackSummary.badgeLabel}
-              </div>
-            )}
-          </div>
-
-          <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
-              {t('Kettenstatus', 'Chain status')}
-            </div>
-            <div data-testid="failover-chain-status" style={{ marginTop: 6, fontSize: 16, fontWeight: 600, color: '#D4D4D8' }}>
-              {fallbackSummary.chainLabel}
-            </div>
-            <div style={{ marginTop: 6, fontSize: 12, color: '#71717A' }}>
-              {t('Maximal 5 Stationen', 'Up to 5 stations')}
-            </div>
-          </div>
-        </div>
-        <div data-testid="failover-chain-list" style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
-          {configuredFailoverChain.length === 0 && (
-            <div style={{ border: '1px dashed #27272A', background: '#050505', padding: '12px 14px', color: '#71717A', fontSize: 13 }}>
-              {t(
-                'Noch keine Failover-Kette hinterlegt. Ohne Eintraege bleibt nur die normale Auto-Reconnect-Logik aktiv.',
-                'No failover chain has been configured yet. Without entries only the regular auto-reconnect logic remains active.'
-              )}
-            </div>
-          )}
-
-          {configuredFailoverChain.map((stationKey, index) => {
-            const preview = settings?.failoverChainPreview?.[index] || buildLocalFailoverPreview(stationKey);
-            const badgeLabel = preview?.isCustom
-              ? t('Custom', 'Custom')
-              : String(preview?.tier || 'ultimate').toUpperCase();
-            return (
-              <div
-                key={`${stationKey}-${index}`}
-                data-testid={`failover-chain-item-${index}`}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px', flexWrap: 'wrap' }}
-              >
-                <div style={{ minWidth: 0, flex: '1 1 220px' }}>
-                  <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
-                    {t('Schritt', 'Step')} {index + 1}
-                  </div>
-                  <div style={{ marginTop: 4, fontSize: 15, fontWeight: 600, color: '#F4F4F5' }}>
-                    {preview?.label || stationKey}
-                  </div>
-                  <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ display: 'inline-flex', border: '1px solid rgba(139,92,246,0.3)', color: '#C4B5FD', padding: '2px 8px', fontSize: 11, letterSpacing: '0.08em' }}>
-                      {badgeLabel}
-                    </span>
-                    {preview?.valid === false && (
-                      <span style={{ color: '#FCA5A5', fontSize: 12 }}>
-                        {t('Aktuell nicht verfügbar', 'Currently unavailable')}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <button
-                    type="button"
-                    disabled={!canManageFallbackStation || index === 0}
-                    onClick={() => moveFailoverStation(index, -1)}
-                    style={{ width: 34, height: 34, border: '1px solid #1A1A2E', background: '#09090B', color: canManageFallbackStation && index > 0 ? '#F4F4F5' : '#3F3F46', cursor: canManageFallbackStation && index > 0 ? 'pointer' : 'not-allowed' }}
-                  >
-                    <ArrowUp size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canManageFallbackStation || index === configuredFailoverChain.length - 1}
-                    onClick={() => moveFailoverStation(index, 1)}
-                    style={{ width: 34, height: 34, border: '1px solid #1A1A2E', background: '#09090B', color: canManageFallbackStation && index < configuredFailoverChain.length - 1 ? '#F4F4F5' : '#3F3F46', cursor: canManageFallbackStation && index < configuredFailoverChain.length - 1 ? 'pointer' : 'not-allowed' }}
-                  >
-                    <ArrowDown size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canManageFallbackStation}
-                    onClick={() => removeFailoverStation(index)}
-                    style={{ width: 34, height: 34, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(127,29,29,0.12)', color: canManageFallbackStation ? '#FCA5A5' : '#3F3F46', cursor: canManageFallbackStation ? 'pointer' : 'not-allowed' }}
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div style={{ display: 'flex', gap: 10, alignItems: 'stretch', flexWrap: 'wrap' }}>
-          <select
-            data-testid="failover-chain-add-select"
-            disabled={!canManageFallbackStation || configuredFailoverChain.length >= FAILOVER_CHAIN_LIMIT}
-            value={pendingFailoverStation}
-            onChange={(e) => setPendingFailoverStation(e.target.value)}
-            style={{
-              flex: '1 1 280px',
-              minWidth: 220,
-              height: 40,
-              padding: '0 10px',
-              border: '1px solid #1A1A2E',
-              background: '#050505',
-              color: canManageFallbackStation ? '#fff' : '#3F3F46',
-              boxSizing: 'border-box',
-              fontSize: 13,
-            }}
-          >
-            <option value="">{t('Station zur Kette hinzufuegen...', 'Add station to chain...')}</option>
-            {availableFailoverStations.map((station) => <option key={station.value} value={station.value}>{station.label}</option>)}
-          </select>
-
-          <button
-            type="button"
-            data-testid="failover-chain-add-btn"
-            disabled={!canManageFallbackStation || !pendingFailoverStation || configuredFailoverChain.length >= FAILOVER_CHAIN_LIMIT}
-            onClick={addFailoverStation}
-            style={{ height: 40, padding: '0 14px', border: '1px solid rgba(139,92,246,0.3)', background: 'rgba(91,33,182,0.18)', color: canManageFallbackStation && pendingFailoverStation ? '#DDD6FE' : '#3F3F46', cursor: canManageFallbackStation && pendingFailoverStation ? 'pointer' : 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600 }}
-          >
-            <Plus size={14} /> {t('Hinzufuegen', 'Add')}
-          </button>
-        </div>
-      </div>
-
-      <div data-testid={canManageVoiceGuard ? 'settings-voice-guard' : 'settings-voice-guard-locked'} style={{ background: '#0A0A0A', border: '1px solid #1A1A2E', padding: 16, opacity: canManageVoiceGuard ? 1 : 0.6 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <Shield size={18} color="#10B981" />
-          <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20 }}>{t('Voice Guard', 'Voice guard')}</h3>
-          {!canManageVoiceGuard && <span style={{ fontSize: 11, color: '#8B5CF6', border: '1px solid rgba(139,92,246,0.3)', padding: '2px 8px' }}>LOCKED</span>}
-        </div>
-        <p style={{ color: '#52525B', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
-          {canManageVoiceGuard
-            ? t(
-              'Steuert, wie OmniFM auf Fremdverschiebungen in andere Voice-Channels reagiert. Für bewusstes Umziehen gibt es zusätzlich `/voiceguard unlock`.',
-              'Controls how OmniFM reacts to foreign moves into other voice channels. For intentional moves you can additionally use `/voiceguard unlock`.'
-            )
-            : t(
-              'Voice Guard konnte fuer diesen Server gerade nicht freigeschaltet werden. Bitte pruefe den Capability-Status oder lade das Dashboard neu.',
-              'Voice guard could not be enabled for this server right now. Please verify the capability status or reload the dashboard.'
-            )}
-        </p>
-
-        {canManageVoiceGuard && (
-        <>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginBottom: 14 }}>
-          <div data-testid="voice-guard-status-card" style={{ border: `1px solid ${voiceGuardSummary.statusAccent}33`, background: `${voiceGuardSummary.statusAccent}14`, padding: '12px 14px' }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: voiceGuardSummary.statusAccent }}>
-              {t('Status', 'Status')}
-            </div>
-            <div style={{ marginTop: 6, fontSize: 18, fontWeight: 700, color: '#fff' }}>{voiceGuardSummary.statusLabel}</div>
-            <div style={{ marginTop: 6, fontSize: 12, color: '#A1A1AA', lineHeight: 1.6 }}>{voiceGuardSummary.description}</div>
-          </div>
-
-          <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
-              {t('Policy', 'Policy')}
-            </div>
-            <div data-testid="voice-guard-policy-summary" style={{ marginTop: 6, fontSize: 16, fontWeight: 600, color: '#D4D4D8' }}>
-              {voiceGuardSummary.policyLabel}
-            </div>
-            <div style={{ marginTop: 6, fontSize: 12, color: '#71717A' }}>
-              {t('Aktiv', 'Active')}: {voiceGuardSummary.effectiveLabel}
-            </div>
-          </div>
-
-          <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
-              {t('Guard-Regeln', 'Guard rules')}
-            </div>
-            <div data-testid="voice-guard-thresholds" style={{ marginTop: 6, fontSize: 13, color: '#D4D4D8', lineHeight: 1.7 }}>
-              {voiceGuardSummary.thresholdsLabel}
-            </div>
-            <div style={{ marginTop: 6, fontSize: 12, color: '#71717A' }}>
-              {voiceGuardSummary.escalationLabel}
-            </div>
-          </div>
-        </div>
-
-        <div style={{ maxWidth: 280 }}>
-          <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Server-Policy', 'Server policy')}</label>
-          <select
-            data-testid="voice-guard-policy-select"
-            value={voiceGuard.policy}
-            onChange={(e) => setSettings((current) => ({ ...(current || {}), voiceGuard: normalizeDashboardVoiceGuardConfig({ ...(current?.voiceGuard || {}), policy: e.target.value }) }))}
-            style={{ width: '100%', height: 40, padding: '0 10px', border: '1px solid #1A1A2E', background: '#050505', color: '#fff', boxSizing: 'border-box', fontSize: 13 }}
-          >
-            <option value="default">{t('Standard (globale Env)', 'Default (global env)')}</option>
-            <option value="allow">{t('Erlauben', 'Allow')}</option>
-            <option value="return">{t('Zurueckspringen', 'Return')}</option>
-            <option value="disconnect">Disconnect</option>
-          </select>
-        </div>
-        </>
-        )}
-      </div>
+    <SettingsVoiceGuard
+      canManageVoiceGuard={canManageVoiceGuard}
+      setSettings={setSettings}
+      t={t}
+      voiceGuard={voiceGuard}
+      voiceGuardSummary={voiceGuardSummary}
+    />
 
       {voiceStatus && (
-      <div data-testid="settings-voice-status" style={{ background: '#0A0A0A', border: '1px solid #1A1A2E', padding: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <Radio size={18} color="#FF6B00" />
-          <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20 }}>{t('Sprachkanal-Status', 'Voice channel status')}</h3>
-        </div>
-        <p style={{ color: '#52525B', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
-          {t(
-            'Der Text, den OmniFM oben im Sprachkanal anzeigt. Platzhalter werden live ersetzt; fehlt ein Wert (etwa zwischen zwei Songs), verschwindet er samt Trennzeichen. Teile in [eckigen Klammern] erscheinen nur, wenn alle Platzhalter darin einen Wert haben. Leer lassen = Standard.',
-            'The text OmniFM shows at the top of the voice channel. Placeholders are filled live; a missing value (between two songs, say) disappears together with its separator. Parts in [square brackets] only show when every placeholder in them has a value. Leave empty for the default.'
-          )}
-        </p>
-        <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Vorlage', 'Template')}</label>
-        <input
-          data-testid="voice-status-template-input"
-          value={voiceStatusTemplate}
-          maxLength={voiceStatus.maxLength || 120}
-          onChange={(e) => updateVoiceStatusTemplate(e.target.value)}
-          placeholder={voiceStatus.defaultTemplate}
-          style={{ width: '100%', height: 40, padding: '0 10px', border: '1px solid #1A1A2E', background: '#050505', color: '#fff', boxSizing: 'border-box', fontSize: 13 }}
-        />
-        <div data-testid="voice-status-placeholders" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '8px 0 14px' }}>
-          {(voiceStatus.placeholders || []).map((name) => (
-            <button
-              key={name}
-              type="button"
-              onClick={() => updateVoiceStatusTemplate(`${voiceStatusTemplate}${voiceStatusTemplate && !voiceStatusTemplate.endsWith(' ') ? ' ' : ''}{${name}}`)}
-              style={{ height: 28, padding: '0 10px', border: '1px solid rgba(255,107,0,0.3)', background: 'rgba(255,107,0,0.08)', color: '#FDBA74', cursor: 'pointer', fontSize: 12, fontFamily: 'monospace' }}
-            >
-              {`{${name}}`}
-            </button>
-          ))}
-          {voiceStatusTemplate && (
-            <button
-              type="button"
-              data-testid="voice-status-reset"
-              onClick={() => updateVoiceStatusTemplate('')}
-              style={{ height: 28, padding: '0 10px', border: '1px solid #1A1A2E', background: 'transparent', color: '#A1A1AA', cursor: 'pointer', fontSize: 12 }}
-            >
-              {t('Standard verwenden', 'Use the default')}
-            </button>
-          )}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
-          <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>{t('Vorschau mit Song', 'Preview with a song')}</div>
-            <div data-testid="voice-status-preview" style={{ marginTop: 6, fontSize: 14, color: '#fff', wordBreak: 'break-word' }}>{voiceStatusPreview}</div>
-          </div>
-          <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>{t('Zwischen zwei Songs', 'Between two songs')}</div>
-            <div data-testid="voice-status-preview-no-song" style={{ marginTop: 6, fontSize: 14, color: '#D4D4D8', wordBreak: 'break-word' }}>{voiceStatusPreviewNoSong}</div>
-          </div>
-        </div>
-      </div>
+    <SettingsVoiceStatus
+      t={t}
+      updateVoiceStatusTemplate={updateVoiceStatusTemplate}
+      voiceStatus={voiceStatus}
+      voiceStatusPreview={voiceStatusPreview}
+      voiceStatusPreviewNoSong={voiceStatusPreviewNoSong}
+      voiceStatusTemplate={voiceStatusTemplate}
+    />
       )}
 
       {favorites && (
-      <div data-testid="settings-favorites" style={{ background: '#0A0A0A', border: '1px solid #1A1A2E', padding: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <Radio size={18} color="#FACC15" />
-          <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20 }}>{t('Favoriten-Leiste', 'Favourite bar')}</h3>
-        </div>
-        <p style={{ color: '#52525B', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
-          {t(
-            `Bis zu ${favoriteLimit} Sender als Schnellknöpfe im Now-Playing-Panel (Free 3, Pro und Ultimate 5). Mit ⭐ im Sender-Browser geht es auch direkt in Discord. Bei einem kleineren Plan werden überzählige ausgeblendet, nicht gelöscht.`,
-            `Up to ${favoriteLimit} stations as quick buttons in the now-playing panel (Free 3, Pro and Ultimate 5). The ⭐ menu in the station browser works in Discord too. On a smaller plan extra ones are hidden, not deleted.`
-          )}
-        </p>
-        <div data-testid="favorites-list" style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
-          {favoriteStations.length === 0 && (
-            <div style={{ color: '#71717A', fontSize: 13 }}>{t('Noch keine Favoriten.', 'No favourites yet.')}</div>
-          )}
-          {favoriteStations.map((stationKey, index) => {
-            const preview = stationPreviewMap.get(String(stationKey).toLowerCase());
-            const hidden = index >= favoriteLimit;
-            return (
-              <div key={stationKey} style={{ display: 'flex', alignItems: 'center', gap: 10, border: '1px solid #1A1A2E', background: '#050505', padding: '8px 12px', opacity: hidden ? 0.55 : 1 }}>
-                <span style={{ color: '#FACC15', fontWeight: 700, width: 18 }}>{index + 1}</span>
-                <span style={{ flex: 1, color: '#E4E4E7', fontSize: 13 }}>{preview?.label || stationKey}</span>
-                {hidden && <span style={{ fontSize: 11, color: '#A1A1AA', border: '1px solid #27272A', padding: '2px 8px' }}>{t('ausgeblendet', 'hidden')}</span>}
-                <button type="button" onClick={() => moveFavorite(index, -1)} disabled={index === 0} style={{ border: 0, background: 'transparent', color: '#A1A1AA', cursor: index === 0 ? 'not-allowed' : 'pointer' }}><ArrowUp size={14} /></button>
-                <button type="button" onClick={() => moveFavorite(index, 1)} disabled={index === favoriteStations.length - 1} style={{ border: 0, background: 'transparent', color: '#A1A1AA', cursor: index === favoriteStations.length - 1 ? 'not-allowed' : 'pointer' }}><ArrowDown size={14} /></button>
-                <button type="button" data-testid={`favorite-remove-${index}`} onClick={() => setFavoriteStations(favoriteStations.filter((key) => key !== stationKey))} style={{ border: 0, background: 'transparent', color: '#FCA5A5', cursor: 'pointer' }}><X size={14} /></button>
-              </div>
-            );
-          })}
-        </div>
-        <select
-          data-testid="favorite-add-select"
-          value=""
-          disabled={favoriteStations.length >= favoriteLimit}
-          onChange={(e) => { if (e.target.value) setFavoriteStations([...favoriteStations, e.target.value]); }}
-          style={{ width: '100%', maxWidth: 420, height: 40, padding: '0 10px', border: '1px solid #1A1A2E', background: '#050505', color: '#fff', boxSizing: 'border-box', fontSize: 13 }}
-        >
-          <option value="">{favoriteStations.length >= favoriteLimit ? t(`Voll – höchstens ${favoriteLimit}`, `Full – at most ${favoriteLimit}`) : t('Sender als Favorit hinzufügen...', 'Add a station as favourite...')}</option>
-          {availableFavoriteStations.map((station) => <option key={station.value} value={station.value}>{station.label}</option>)}
-        </select>
-      </div>
+    <SettingsFavorites
+      availableFavoriteStations={availableFavoriteStations}
+      favoriteLimit={favoriteLimit}
+      favoriteStations={favoriteStations}
+      moveFavorite={moveFavorite}
+      setFavoriteStations={setFavoriteStations}
+      stationPreviewMap={stationPreviewMap}
+      t={t}
+    />
       )}
 
       <DashboardPanelDesigner apiRequest={apiRequest} selectedGuildId={selectedGuildId} t={t} />
 
       <DashboardBotProfile apiRequest={apiRequest} selectedGuildId={selectedGuildId} t={t} />
 
-      <div data-testid="settings-exports-webhooks" style={{ background: '#0A0A0A', border: '1px solid #1A1A2E', padding: 16, opacity: canManageExports ? 1 : 0.5 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <Shield size={18} color="#F59E0B" />
-          <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20 }}>{t('Exporte & Webhooks', 'Exports & webhooks')}</h3>
-          {!canManageExports && <span style={{ fontSize: 11, color: '#8B5CF6', border: '1px solid rgba(139,92,246,0.3)', padding: '2px 8px' }}>ULTIMATE</span>}
-        </div>
-        <p style={{ color: '#52525B', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
-          {t(
-            'Ultimate-Server können Stats und Custom-Stationen als JSON exportieren und zusätzlich Stall-, Recovery- sowie Failover-Ereignisse per Webhook oder Discord-Channel an Automationen und Operatoren melden.',
-            'Ultimate servers can export stats and custom stations as JSON and additionally send stall, recovery, and failover events to automations and operators via webhook or Discord channel.'
-          )}
-        </p>
-        {exportsHint && (
-          <div style={{ marginBottom: 14 }}>
-            <DashboardOnboardingHint
-              hint={exportsHint}
-              t={t}
-              dataTestId="settings-exports-onboarding-hint"
-            />
-          </div>
-        )}
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginBottom: 14 }}>
-          <div data-testid="exports-status-card" style={{ border: `1px solid ${exportsSummary.statusAccent}33`, background: `${exportsSummary.statusAccent}14`, padding: '12px 14px' }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: exportsSummary.statusAccent }}>
-              {t('Status', 'Status')}
-            </div>
-            <div style={{ marginTop: 6, fontSize: 18, fontWeight: 700, color: '#fff' }}>{exportsSummary.statusLabel}</div>
-            <div style={{ marginTop: 6, fontSize: 12, color: '#A1A1AA', lineHeight: 1.6 }}>{exportsSummary.description}</div>
-          </div>
-
-          <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
-              {t('Webhook-Ziel', 'Webhook target')}
-            </div>
-            <div data-testid="exports-webhook-url-label" style={{ marginTop: 6, fontSize: 14, fontWeight: 600, color: '#D4D4D8', wordBreak: 'break-all' }}>
-              {exportsWebhook.url || t('Noch keine URL hinterlegt', 'No URL configured yet')}
-            </div>
-          </div>
-
-          <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
-              {t('Ausloeser', 'Triggers')}
-            </div>
-            <div data-testid="exports-webhook-events-count" style={{ marginTop: 6, fontSize: 16, fontWeight: 600, color: '#D4D4D8' }}>
-              {exportsWebhook.events.length} / {DASHBOARD_EXPORT_WEBHOOK_EVENTS.length}
-            </div>
-            <div style={{ marginTop: 6, fontSize: 12, color: '#71717A' }}>
-              {exportsWebhook.secretConfigured ? t('Secret gesetzt', 'Secret configured') : t('Ohne Secret', 'No secret')}
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginBottom: 14 }}>
-          <label data-testid="exports-webhook-enabled-toggle" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, padding: '10px 0' }}>
-            <input
-              type="checkbox"
-              disabled={!canManageExports}
-              checked={exportsWebhook.enabled}
-              onChange={(e) => updateExportsWebhook({ enabled: e.target.checked })}
-              style={{ width: 16, height: 16, accentColor: '#F59E0B' }}
-            />
-            {t('Automatisch bei Exporten und Alerts senden', 'Send automatically on exports and alerts')}
-          </label>
-
-          <div>
-            <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Webhook-URL', 'Webhook URL')}</label>
-            <input
-              data-testid="exports-webhook-url-input"
-              disabled={!canManageExports}
-              value={exportsWebhook.url}
-              onChange={(e) => updateExportsWebhook({ url: e.target.value })}
-              placeholder="https://example.com/omnifm"
-              style={{ width: '100%', height: 40, padding: '0 10px', border: '1px solid #1A1A2E', background: '#050505', color: '#fff', boxSizing: 'border-box', fontSize: 13 }}
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Secret', 'Secret')}</label>
-            <input
-              data-testid="exports-webhook-secret-input"
-              disabled={!canManageExports}
-              value={webhookSecretInput}
-              onChange={(e) => updateExportsWebhook({ secret: e.target.value })}
-              placeholder={exportsWebhook.secretConfigured
-                ? t('Gespeichert – zum Ersetzen eingeben', 'Configured – enter to replace')
-                : t('Optional', 'Optional')}
-              style={{ width: '100%', height: 40, padding: '0 10px', border: '1px solid #1A1A2E', background: '#050505', color: '#fff', boxSizing: 'border-box', fontSize: 13 }}
-            />
-            {exportsWebhook.secretConfigured && (
-              <button
-                type="button"
-                data-testid="exports-webhook-secret-clear"
-                disabled={!canManageExports}
-                onClick={() => updateExportsWebhook({ secret: '' })}
-                style={{ marginTop: 7, border: 0, padding: 0, background: 'transparent', color: canManageExports ? '#FCA5A5' : '#52525B', cursor: canManageExports ? 'pointer' : 'not-allowed', fontSize: 12 }}
-              >
-                {t('Secret beim Speichern entfernen', 'Remove secret when saving')}
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div data-testid="exports-webhook-event-list" style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
-          {DASHBOARD_EXPORT_WEBHOOK_EVENTS.map((event) => (
-            <label key={event.key} style={{ display: 'flex', alignItems: 'center', gap: 10, color: canManageExports ? '#D4D4D8' : '#52525B', fontSize: 13 }}>
-              <input
-                type="checkbox"
-                disabled={!canManageExports}
-                checked={exportsWebhook.events.includes(event.key)}
-                onChange={() => toggleExportsWebhookEvent(event.key)}
-                style={{ width: 15, height: 15, accentColor: '#F59E0B' }}
-              />
-              {getDashboardExportWebhookEventLabel(event.key, t)}
-            </label>
-          ))}
-        </div>
-
-        <div style={{ margin: '18px 0 14px', borderTop: '1px solid #1A1A2E', paddingTop: 18 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <Shield size={15} color="#10B981" />
-            <strong style={{ color: '#F4F4F5', fontSize: 14 }}>{t('Discord-Incident-Alerts', 'Discord incident alerts')}</strong>
-          </div>
-          <p style={{ color: '#71717A', fontSize: 12, marginBottom: 14, lineHeight: 1.6 }}>
-            {t(
-              'Diese Alerts posten neue Stream-Stalls, Recoverys und Failover-Vorfaelle direkt in einen Discord-Text-Channel.',
-              'These alerts post new stream stalls, recoveries, and failover incidents directly into a Discord text channel.'
-            )}
-          </p>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginBottom: 14 }}>
-            <div data-testid="incident-alerts-status-card" style={{ border: `1px solid ${incidentAlertsSummary.statusAccent}33`, background: `${incidentAlertsSummary.statusAccent}14`, padding: '12px 14px' }}>
-              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: incidentAlertsSummary.statusAccent }}>
-                {t('Status', 'Status')}
-              </div>
-              <div style={{ marginTop: 6, fontSize: 18, fontWeight: 700, color: '#fff' }}>{incidentAlertsSummary.statusLabel}</div>
-              <div style={{ marginTop: 6, fontSize: 12, color: '#A1A1AA', lineHeight: 1.6 }}>{incidentAlertsSummary.description}</div>
-            </div>
-
-            <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
-                {t('Alert-Channel', 'Alert channel')}
-              </div>
-              <div data-testid="incident-alert-channel-label" style={{ marginTop: 6, fontSize: 14, fontWeight: 600, color: '#D4D4D8', wordBreak: 'break-word' }}>
-                {incidentAlertChannelLabel || t('Noch kein Channel gesetzt', 'No channel configured yet')}
-              </div>
-            </div>
-
-            <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
-                {t('Ausloeser', 'Triggers')}
-              </div>
-              <div data-testid="incident-alert-events-count" style={{ marginTop: 6, fontSize: 16, fontWeight: 600, color: '#D4D4D8' }}>
-                {incidentAlerts.events.length} / {DASHBOARD_INCIDENT_ALERT_EVENTS.length}
-              </div>
-              <div style={{ marginTop: 6, fontSize: 12, color: '#71717A' }}>
-                {incidentAlerts.enabled ? t('Automatisch aktiv', 'Automatic delivery enabled') : t('Noch nicht aktiviert', 'Not enabled yet')}
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginBottom: 14 }}>
-            <label data-testid="incident-alerts-enabled-toggle" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, padding: '10px 0' }}>
-              <input
-                type="checkbox"
-                disabled={!canManageExports}
-                checked={incidentAlerts.enabled}
-                onChange={(e) => updateIncidentAlerts({ enabled: e.target.checked })}
-                style={{ width: 16, height: 16, accentColor: '#10B981' }}
-              />
-              {t('Neue Incidents automatisch nach Discord senden', 'Send new incidents to Discord automatically')}
-            </label>
-
-            <div>
-              <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Text-Channel', 'Text channel')}</label>
-              <select
-                data-testid="incident-alert-channel-select"
-                disabled={!canManageExports}
-                value={incidentAlerts.channelId}
-                onChange={(e) => updateIncidentAlerts({ channelId: e.target.value })}
-                style={{ width: '100%', height: 40, padding: '0 10px', border: '1px solid #1A1A2E', background: '#050505', color: canManageExports ? '#fff' : '#3F3F46', boxSizing: 'border-box', fontSize: 13 }}
-              >
-                <option value="">{t('Kein Incident-Channel', 'No incident channel')}</option>
-                {textChannels.map((channel) => (
-                  <option key={channel.id} value={channel.id}>
-                    #{channel.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div data-testid="incident-alert-event-list" style={{ display: 'grid', gap: 8, marginBottom: 6 }}>
-            {DASHBOARD_INCIDENT_ALERT_EVENTS.map((event) => (
-              <label key={event.key} style={{ display: 'flex', alignItems: 'center', gap: 10, color: canManageExports ? '#D4D4D8' : '#52525B', fontSize: 13 }}>
-                <input
-                  type="checkbox"
-                  disabled={!canManageExports}
-                  checked={incidentAlerts.events.includes(event.key)}
-                  onChange={() => toggleIncidentAlertEvent(event.key)}
-                  style={{ width: 15, height: 15, accentColor: '#10B981' }}
-                />
-                {getDashboardIncidentAlertEventLabel(event.key, t)}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            data-testid="export-stats-btn"
-            disabled={!canManageExports || exportLoadingKey === 'stats'}
-            onClick={() => downloadDashboardExport('stats', `/api/dashboard/exports/stats?serverId=${encodeURIComponent(selectedGuildId)}&days=30`)}
-            style={{ height: 40, padding: '0 14px', border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(120,53,15,0.16)', color: canManageExports ? '#FDE68A' : '#3F3F46', cursor: canManageExports ? 'pointer' : 'not-allowed', fontSize: 13, fontWeight: 600 }}
-          >
-            {exportLoadingKey === 'stats' ? t('Exportiere Stats...', 'Exporting stats...') : t('Stats-Export laden', 'Download stats export')}
-          </button>
-          <button
-            type="button"
-            data-testid="export-custom-stations-btn"
-            disabled={!canManageExports || exportLoadingKey === 'custom-stations'}
-            onClick={() => downloadDashboardExport('custom-stations', `/api/dashboard/exports/custom-stations?serverId=${encodeURIComponent(selectedGuildId)}`)}
-            style={{ height: 40, padding: '0 14px', border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(120,53,15,0.16)', color: canManageExports ? '#FDE68A' : '#3F3F46', cursor: canManageExports ? 'pointer' : 'not-allowed', fontSize: 13, fontWeight: 600 }}
-          >
-            {exportLoadingKey === 'custom-stations' ? t('Exportiere Stationen...', 'Exporting stations...') : t('Stations-Export laden', 'Download stations export')}
-          </button>
-          <button
-            type="button"
-            data-testid="export-webhook-test-btn"
-            disabled={!canManageExports || !exportsWebhook.url || webhookTestSending}
-            onClick={sendWebhookTest}
-            style={{ height: 40, padding: '0 14px', border: '1px solid rgba(16,185,129,0.3)', background: 'rgba(6,95,70,0.16)', color: canManageExports && exportsWebhook.url ? '#BBF7D0' : '#3F3F46', cursor: canManageExports && exportsWebhook.url && !webhookTestSending ? 'pointer' : 'not-allowed', fontSize: 13, fontWeight: 600 }}
-          >
-            {webhookTestSending ? t('Sende Test...', 'Sending test...') : t('Webhook testen', 'Test webhook')}
-          </button>
-        </div>
-      </div>
+    <SettingsExports
+      canManageExports={canManageExports}
+      downloadDashboardExport={downloadDashboardExport}
+      exportLoadingKey={exportLoadingKey}
+      exportsHint={exportsHint}
+      exportsSummary={exportsSummary}
+      exportsWebhook={exportsWebhook}
+      incidentAlertChannelLabel={incidentAlertChannelLabel}
+      incidentAlerts={incidentAlerts}
+      incidentAlertsSummary={incidentAlertsSummary}
+      selectedGuildId={selectedGuildId}
+      sendWebhookTest={sendWebhookTest}
+      t={t}
+      textChannels={textChannels}
+      toggleExportsWebhookEvent={toggleExportsWebhookEvent}
+      toggleIncidentAlertEvent={toggleIncidentAlertEvent}
+      updateExportsWebhook={updateExportsWebhook}
+      updateIncidentAlerts={updateIncidentAlerts}
+      webhookSecretInput={webhookSecretInput}
+      webhookTestSending={webhookTestSending}
+    />
 
       <button
         data-testid="settings-save-btn"
