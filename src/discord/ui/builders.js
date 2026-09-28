@@ -130,7 +130,7 @@ export function notice(kind, { title, body = "", actions = [], footer = "", appl
  * A page of a longer list with back/next buttons. `customId(page)` builds
  * the button id; buttons outside the list are disabled.
  */
-export function list({ accent = UI_COLORS.brand, title, items = [], page = 0, pageSize = 10, customId, footer = "", t = (de) => de }) {
+export function list({ accent = UI_COLORS.brand, title, items = [], page = 0, pageSize = 10, customId, footer = "", t = (de, _en) => de }) {
   const pages = Math.max(1, Math.ceil(items.length / pageSize));
   const current = Math.min(Math.max(0, Number(page) || 0), pages - 1);
   const shown = items.slice(current * pageSize, (current + 1) * pageSize);
@@ -150,7 +150,7 @@ export function list({ accent = UI_COLORS.brand, title, items = [], page = 0, pa
 }
 
 /** A yes/no question with two buttons. */
-export function confirm({ title, body = "", confirmId, cancelId, confirmLabel, cancelLabel, danger = false, t = (de) => de }) {
+export function confirm({ title, body = "", confirmId, cancelId, confirmLabel, cancelLabel, danger = false, t = (de, _en) => de }) {
   return panel({
     accent: danger ? UI_COLORS.error : UI_COLORS.brand,
     title,

@@ -4,14 +4,15 @@ import { PLANS } from "../config/plans.js";
 import { getDefaultLanguage, normalizeLanguage } from "../i18n.js";
 import { PLAN_RANK, VALID_SEATS, load, save } from "../premium-store.js";
 
-export function isExpired(license) {
+/** @param {number} [now] the moment to judge at; the Discord shop passes its own (#298). */
+export function isExpired(license, now = Date.now()) {
   if (!license || !license.expiresAt) return false; // No expiry = perpetual (for now)
-  return new Date(license.expiresAt) <= new Date();
+  return new Date(license.expiresAt).getTime() <= now;
 }
 
 export function remainingDays(license) {
   if (!license || !license.expiresAt) return Infinity;
-  const diff = new Date(license.expiresAt) - new Date();
+  const diff = new Date(license.expiresAt).getTime() - Date.now();
   return Math.max(0, Math.ceil(diff / 86400000));
 }
 

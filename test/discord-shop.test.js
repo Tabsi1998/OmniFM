@@ -15,6 +15,7 @@ const shopModule = await import("../src/premium/discord-shop.js");
 const { applyDiscordEntitlement, reconcileDiscordEntitlements, discordShopSettings, tierForSku } = shopModule;
 const { getServerLicense, createLicense, linkServerToLicense } = await import("../src/premium-store.js");
 const { premiumPricing } = await import("../src/lib/owner-public.js");
+const { isExpired } = await import("../src/premium/licenses.js");
 
 let nextId = 100000000000000000n;
 const id = () => String(nextId++);
@@ -106,4 +107,11 @@ test("the website links to the app's store page only when the shop is on", () =>
   assert.deepEqual(premiumPricing(raw, { env: {} }).discordShop, { enabled: true, storeUrl: "https://discord.com/application-directory/123456789012345670/store" });
   assert.deepEqual(premiumPricing({ ...raw, discordShop: { enabled: false, skus: raw.discordShop.skus } }, { env: {} }).discordShop, { enabled: false });
   assert.deepEqual(premiumPricing({ discordShop: raw.discordShop }, { env: { BOT_1_CLIENT_ID: "123456789012345671" } }).discordShop.storeUrl, "https://discord.com/application-directory/123456789012345671/store", "the commander from the environment");
+});
+
+test("a license is judged at the moment the shop passes, not at the clock (#298)", () => {
+  const license = { expiresAt: "2026-10-01T00:00:00.000Z" };
+  assert.equal(isExpired(license, Date.parse("2026-09-30T23:59:59.000Z")), false);
+  assert.equal(isExpired(license, Date.parse("2026-10-01T00:00:00.000Z")), true);
+  assert.equal(isExpired({ expiresAt: null }, Date.parse("2099-01-01T00:00:00.000Z")), false, "without an end it never expires");
 });

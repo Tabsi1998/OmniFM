@@ -969,13 +969,14 @@ def syntax_checks(context: Context) -> str:
 
 
 def typecheck(context: Context) -> str:
-    """tsc --noEmit over src/lib and src/core with their JSDoc types (#211).
+    """tsc --noEmit over the folders tsconfig.json includes, with their JSDoc types (#211, #298).
 
     Green from the start, so a hard gate: every new type error fails.
     """
     completed = npm(context, "run", "--silent", "typecheck", check=False, timeout=900)
     npm_step_result(context, "typecheck", completed, "TypeScript found type errors")
-    return "no type errors in src/lib and src/core"
+    folders = [pattern.split("/**")[0] for pattern in json.loads((ROOT / "tsconfig.json").read_text(encoding="utf-8"))["include"]]
+    return f"no type errors in {', '.join(folders)}"
 
 
 def eslint_ratchet(context: Context) -> str:
@@ -1032,7 +1033,7 @@ def node_steps() -> list:
         Step("node", "npm-ci", "Locked install from package-lock.json", node_install, ("node-version",)),
         Step("node", "syntax", "The syntax gates of the CI", syntax_checks, ("npm-ci",)),
         Step("node", "eslint", "ESLint, new findings fail", eslint_ratchet, ("npm-ci",)),
-        Step("node", "typecheck", "TypeScript checks src/lib and src/core", typecheck, ("npm-ci",)),
+        Step("node", "typecheck", "TypeScript checks the folders tsconfig.json includes", typecheck, ("npm-ci",)),
         Step("node", "voice-codec", "Native Opus encode and decode", voice_codec, ("npm-ci",)),
         Step("node", "mongo-smoke", "The app connects to MongoDB", mongo_smoke, ("npm-ci",)),
         Step("node", "unit", "The unit suite against a real MongoDB", unit_tests, ("npm-ci",)),

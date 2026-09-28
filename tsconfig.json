@@ -10,5 +10,5 @@
     "types": ["node"],
     "skipLibCheck": true
   },
-  "include": ["src/lib/**/*.js", "src/core/**/*.js"]
+  "include": ["src/lib/**/*.js", "src/core/**/*.js", "src/discord/**/*.js", "src/premium/**/*.js"]
 }
