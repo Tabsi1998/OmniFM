@@ -10,6 +10,7 @@
 //
 // Exit 1 with one line per broken page.
 import { chromium } from "playwright";
+import { PLAN_CAPABILITIES } from "../src/config/plan-features.js";
 
 const base = String(process.argv[2] || "").replace(/\/+$/, "");
 if (!base) {
@@ -18,10 +19,8 @@ if (!base) {
 }
 
 const SERVER = "123456789012345678";
-const CAPABILITIES = Object.fromEntries([
-  "dashboardAccess", "eventScheduler", "rolePermissions", "weeklyDigest", "basicHealth", "customStationUrls",
-  "advancedAnalytics", "failoverRules", "licenseWorkspace", "exportsWebhooks", "voiceGuard",
-].map((key) => [key, true]));
+// Every capability of the plan file (#413), all switched on.
+const CAPABILITIES = Object.fromEntries(Object.values(PLAN_CAPABILITIES).map((entry) => [entry.apiKey, true]));
 const DASHBOARD_ANSWERS = {
   "/api/auth/session": {
     authenticated: true,

@@ -29,7 +29,6 @@ import {
 } from "../../premium-store.js";
 import { getRedemptionBySession } from "../../coupon-store.js";
 import { CAPABILITY_KEYS } from "../../config/plans.js";
-import { resolveDashboardGuildsForSession } from "./session.js";
 
 export function getTierConfig(guildId) {
   const config = getServerPlanConfig(guildId);
@@ -79,73 +78,7 @@ function getDashboardTierName(tier) {
   return "Free";
 }
 
-function buildDashboardLicenseWorkspace(license, guildInfo, sessionPayload, capabilityPayload) {
-  if (!license?.id || capabilityPayload?.capabilities?.licenseWorkspace !== true) {
-    return null;
-  }
-
-  const selectedGuildId = String(guildInfo?.id || "").trim();
-  const linkedServerIds = [...new Set(
-    (Array.isArray(license?.linkedServerIds) ? license.linkedServerIds : [])
-      .map((serverId) => String(serverId || "").trim())
-      .filter((serverId) => /^\d{17,22}$/.test(serverId))
-  )];
-  const sessionGuilds = resolveDashboardGuildsForSession(sessionPayload);
-  const sessionGuildMap = new Map(sessionGuilds.map((guild) => [guild.id, guild]));
-
-  const linkedServers = linkedServerIds
-    .map((serverId) => {
-      const sessionGuild = sessionGuildMap.get(serverId);
-      const assignedLicense = serverId === selectedGuildId
-        ? license
-        : getServerLicense(serverId);
-      const plan = String(assignedLicense?.plan || sessionGuild?.tier || "free").trim().toLowerCase();
-      return {
-        id: serverId,
-        name: sessionGuild?.name || serverId,
-        icon: sessionGuild?.icon || "",
-        accessible: Boolean(sessionGuild),
-        selected: serverId === selectedGuildId,
-        tier: plan,
-        tierName: getDashboardTierName(plan),
-        active: Boolean(assignedLicense?.active) && !assignedLicense?.expired,
-      };
-    })
-    .sort((a, b) => Number(Boolean(b.selected)) - Number(Boolean(a.selected)) || a.name.localeCompare(b.name));
-
-  const candidates = sessionGuilds
-    .filter((guild) => !linkedServerIds.includes(guild.id))
-    .map((guild) => {
-      const assignedLicense = getServerLicense(guild.id);
-      const foreignActiveLicense = Boolean(assignedLicense?.id)
-        && String(assignedLicense.id) !== String(license.id)
-        && Boolean(assignedLicense.active)
-        && !assignedLicense.expired;
-      const assignedPlan = String(assignedLicense?.plan || guild?.tier || "free").trim().toLowerCase();
-      return {
-        id: guild.id,
-        name: guild.name,
-        icon: guild.icon || "",
-        owner: Boolean(guild.owner),
-        tier: assignedPlan,
-        tierName: getDashboardTierName(assignedPlan),
-        reason: foreignActiveLicense ? "existing_active_license" : "",
-        canLink: !foreignActiveLicense,
-      };
-    })
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  return {
-    enabled: true,
-    canManage: Boolean(license.active) && !license.expired,
-    linkedServers,
-    availableServers: candidates.filter((candidate) => candidate.canLink),
-    blockedServers: candidates.filter((candidate) => !candidate.canLink),
-    hiddenLinkedServerCount: linkedServers.filter((server) => !server.accessible).length,
-  };
-}
-
-export function buildDashboardLicensePayload(guildInfo, sessionPayload = null) {
+export function buildDashboardLicensePayload(guildInfo) {
   const license = getLicense(guildInfo.id);
   const capabilityPayload = buildServerCapabilityPayload(guildInfo.id);
   const effectiveTier = String(license?.plan || guildInfo.tier || "free").trim().toLowerCase();
@@ -155,7 +88,6 @@ export function buildDashboardLicensePayload(guildInfo, sessionPayload = null) {
   const licenseEmail = String(license?.contactEmail || license?.email || "").trim().toLowerCase();
   const hasBillingEmail = isValidEmailAddress(licenseEmail);
   const linkedServers = Array.isArray(license?.linkedServerIds) ? license.linkedServerIds : [];
-  const workspace = buildDashboardLicenseWorkspace(license, guildInfo, sessionPayload, capabilityPayload);
 
   return {
     serverId: guildInfo.id,
@@ -206,10 +138,8 @@ export function buildDashboardLicensePayload(guildInfo, sessionPayload = null) {
       emailMasked: maskDashboardEmail(licenseEmail),
       hasBillingEmail,
       canUpdateEmail: true,
-      canManageWorkspace: workspace?.canManage === true,
       updatedAt: license.updatedAt || null,
       contactEmailDomain: hasBillingEmail ? licenseEmail.split("@")[1] : "",
-      workspace,
     } : null,
   };
 }

@@ -16,6 +16,7 @@ import DashboardEvents from './DashboardEvents.js';
 import DashboardSettings from './DashboardSettings.js';
 import GuildLiveView from './GuildLiveView.js';
 import { normalizeDashboardCapabilityPayload } from '../lib/dashboardCapabilities.js';
+import { PLAN_LIMITS, PLAN_NAMES } from '../../../src/config/plan-features.js';
 
 const NAV = [
   { id: 'overview', icon: LayoutDashboard },
@@ -28,10 +29,15 @@ const NAV = [
   { id: 'settings', icon: Settings },
 ];
 
+// Numbers from the bot's plan file (#413).
+const planMeta = (plan, color, icon) => ({
+  name: PLAN_NAMES[plan], color, icon,
+  customLimit: PLAN_LIMITS[plan].customStations, maxBots: PLAN_LIMITS[plan].maxBots, bitrate: PLAN_LIMITS[plan].bitrate,
+});
 const TIER_META = {
-  free: { name: 'Free', color: '#64748b', icon: Radio, customLimit: 0, maxBots: 2, bitrate: '64k' },
-  pro: { name: 'Pro', color: '#00e5ff', icon: Zap, customLimit: 0, maxBots: 8, bitrate: '128k' },
-  ultimate: { name: 'Ultimate', color: '#ff6b00', icon: Crown, customLimit: 50, maxBots: 16, bitrate: '320k' },
+  free: planMeta('free', '#64748b', Radio),
+  pro: planMeta('pro', '#00e5ff', Zap),
+  ultimate: planMeta('ultimate', '#ff6b00', Crown),
 };
 
 const COMMANDS = [

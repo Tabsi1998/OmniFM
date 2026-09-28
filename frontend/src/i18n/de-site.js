@@ -111,7 +111,7 @@ const messages = {
       },
       dashboard: {
         label: 'Dashboard',
-        detail: 'Events, Rollenrechte, Health und Server-Steuerung ab Pro.',
+        detail: 'Live-Ansicht, Statistik, Rollenrechte und Ausfall-Meldungen ab Pro.',
       },
       reliability: {
         label: 'Zuverlässigkeit',
@@ -488,17 +488,17 @@ const messages = {
       {
         key: 'dashboard',
         question: 'Brauche ich das Dashboard sofort?',
-        answer: 'Nein. Free funktioniert ohne Dashboard. Ab Pro wird es relevant, wenn du Events, Rollenrechte, Weekly Digest und Health zentral verwalten willst.',
+        answer: 'Nein. Free funktioniert ohne Dashboard, auch ein geplantes Event geht schon mit /event. Ab Pro verwaltest du im Dashboard Events, Rollenrechte, Wochenrückblick und Ausfall-Meldungen an einer Stelle.',
       },
       {
         key: 'pro',
         question: 'Wann lohnt sich Pro?',
-        answer: 'Pro lohnt sich, sobald du deinen Server aktiv verwalten willst: Dashboard, Event-Scheduler, Rollenrechte, Weekly Digest und Health sind die Kernargumente.',
+        answer: 'Sobald du deinen Server gestalten und verwalten willst: alle Sender des Katalogs, 8 Sprachkanäle gleichzeitig, das Dashboard mit Live-Ansicht, Events ohne Grenze, Rollenrechte und Ausfall-Meldungen in Discord.',
       },
       {
         key: 'ultimate',
         question: 'Wann brauche ich Ultimate?',
-        answer: 'Ultimate ist für Power-User und Betreiber gedacht, die Custom Stations, tiefere Analytics, Failover und Automatisierung benötigen.',
+        answer: 'Wenn du dein eigenes Radio betreibst: bis zu 50 eigene Sender mit Logo, ein eigenes Bot-Aussehen pro Server, eigene Ersatzsender-Ketten, Webhooks und die Detail-Statistik, dazu 16 Sprachkanäle gleichzeitig.',
       },
       {
         key: 'workers',

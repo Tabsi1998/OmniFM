@@ -97,8 +97,6 @@ import {
 } from "../custom-stations.js";
 import { getTier, serverHasCapability } from "../core/entitlements.js";
 import {
-  linkServerToLicense,
-  unlinkServerFromLicense,
   updateLicenseContactEmail,
 } from "../premium-store.js";
 import {
@@ -240,8 +238,6 @@ export const handleDashboardLicenseRoute = createDashboardLicenseRouteHandler({
   getLicense,
   getLocalizedJsonBodyError,
   isValidEmailAddress,
-  languagePick,
-  linkServerToLicense,
   log,
   maskDashboardEmail,
   methodNotAllowed,
@@ -255,8 +251,6 @@ export const handleDashboardLicenseRoute = createDashboardLicenseRouteHandler({
   sanitizeOfferCode,
   sendJson,
   sendLocalizedError,
-  serverHasCapability,
-  unlinkServerFromLicense,
   updateLicenseContactEmail,
 });
 

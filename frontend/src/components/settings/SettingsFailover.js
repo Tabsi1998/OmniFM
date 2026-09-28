@@ -23,13 +23,13 @@ export default function SettingsFailover({
     <div data-testid="settings-fallback-station" style={{ background: '#0A0A0A', border: '1px solid #1A1A2E', padding: 16, opacity: canManageFallbackStation ? 1 : 0.5 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
         <Shield size={18} color="#8B5CF6" />
-        <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20 }}>{t('Failover-Kette', 'Failover chain')}</h3>
+        <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20 }}>{t('Eigene Ersatzsender-Kette', 'Your own fallback chain')}</h3>
         {!canManageFallbackStation && <span style={{ fontSize: 11, color: '#8B5CF6', border: '1px solid rgba(139,92,246,0.3)', padding: '2px 8px' }}>ULTIMATE</span>}
       </div>
       <p style={{ color: '#52525B', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
         {t(
-          'Wird automatisch verwendet, wenn eine Station nicht erreichbar ist. Anstatt dass gar nichts läuft, springt der Bot auf diese Station.',
-          'Automatically used when a station is unreachable. Instead of silence, the bot switches to this station.'
+          'Fällt ein Stream aus, springt OmniFM auf jedem Plan von selbst auf einen Ersatzsender, zuerst aus demselben Genre, und wechselt zurück, sobald der Sender wieder läuft. Mit Ultimate legst du hier selbst fest, welche Sender zuerst drankommen.',
+          'When a stream fails, OmniFM switches to a fallback station on every plan by itself, from the same genre first, and switches back once the station plays again. With Ultimate you choose here which stations come first.'
         )}
       </p>
       {failoverHint && (
@@ -80,8 +80,8 @@ export default function SettingsFailover({
         {configuredFailoverChain.length === 0 && (
           <div style={{ border: '1px dashed #27272A', background: '#050505', padding: '12px 14px', color: '#71717A', fontSize: 13 }}>
             {t(
-              'Noch keine Failover-Kette hinterlegt. Ohne Eintraege bleibt nur die normale Auto-Reconnect-Logik aktiv.',
-              'No failover chain has been configured yet. Without entries only the regular auto-reconnect logic remains active.'
+              'Noch keine eigene Kette. Ohne Einträge wählt OmniFM den Ersatzsender selbst, zuerst aus demselben Genre.',
+              'No chain of your own yet. Without entries OmniFM picks the fallback station itself, from the same genre first.'
             )}
           </div>
         )}

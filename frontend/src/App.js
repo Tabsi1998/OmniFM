@@ -326,7 +326,7 @@ function AppContent() {
       <WhyOmniFM />
       <DashboardShowcase />
       <UseCasesSection />
-      <Premium bots={bots} />
+      <Premium bots={bots} planContext={{ freeStations: stats.freeStations, allStations: stats.stations }} />
       <CommunitySection />
       <FaqSection />
       <StatsFooter stats={stats} bots={bots} legal={legal} />

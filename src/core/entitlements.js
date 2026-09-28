@@ -5,13 +5,13 @@
 import {
   PLANS,
   PLAN_ORDER,
-  FEATURE_LABELS,
   BRAND,
   CAPABILITIES,
   CAPABILITY_KEYS,
   CAPABILITY_API_KEYS,
   CAPABILITY_LABELS,
 } from "../config/plans.js";
+import { planLimits } from "../config/plan-features.js";
 
 // --- License storage interface (injected) ---
 let _getLicenseForServer = null;
@@ -54,16 +54,6 @@ export function getServerSeats(serverId) {
   return Math.max(1, Number(license.seats || 1) || 1);
 }
 
-export function hasFeature(planId, featureKey) {
-  const plan = PLANS[planId];
-  if (!plan) return false;
-  return !!plan.features[featureKey];
-}
-
-export function serverHasFeature(serverId, featureKey) {
-  return hasFeature(getServerPlan(serverId), featureKey);
-}
-
 function normalizePlanId(planId) {
   return PLANS[planId] ? planId : "free";
 }
@@ -96,19 +86,19 @@ export function getServerCapabilities(serverId, options = {}) {
   return mapCapabilities(getServerPlan(serverId), options);
 }
 
+/** The numbers of a plan (#413): voice channels, audio, favourites, events (null = no limit), ... */
 export function getPlanLimits(planId) {
-  const plan = PLANS[normalizePlanId(planId)] || PLANS.free;
-  const limits = plan.limits || {};
-  return {
-    maxBots: Number(limits.maxBots || plan.maxBots || 0) || 0,
-    bitrate: String(limits.bitrate || plan.bitrate || ""),
-    bitrateNum: Number(limits.bitrateNum || plan.bitrateNum || 0) || 0,
-    reconnectMs: Number(limits.reconnectMs || plan.reconnectMs || 0) || 0,
-  };
+  return { ...planLimits(normalizePlanId(planId)) };
 }
 
 export function getServerPlanLimits(serverId) {
   return getPlanLimits(getServerPlan(serverId));
+}
+
+/** One number of the server's plan; null is no limit (#413). */
+export function getServerLimit(serverId, key) {
+  const value = getServerPlanLimits(serverId)[key];
+  return value === undefined ? null : value;
 }
 
 export function getCapabilityRequirementPlan(capabilityKey) {
@@ -146,22 +136,6 @@ export function requirePlan(serverId, minimumPlan) {
     currentPlan: current,
     requiredPlan: minimumPlan,
     message: `This feature requires ${BRAND.name} **${minConfig.name}** or higher. Your server is on the **${PLANS[current].name}** plan.`,
-  };
-}
-
-export function requireFeature(serverId, featureKey) {
-  const plan = getServerPlan(serverId);
-  if (hasFeature(plan, featureKey)) {
-    return { ok: true };
-  }
-  const label = FEATURE_LABELS[featureKey] || featureKey;
-  const needed = PLAN_ORDER.find(p => PLANS[p].features[featureKey]) || "pro";
-  return {
-    ok: false,
-    currentPlan: plan,
-    requiredPlan: needed,
-    featureKey,
-    message: `**${label}** requires ${BRAND.name} **${PLANS[needed].name}** or higher.`,
   };
 }
 
@@ -212,4 +186,3 @@ export function isBotAllowed(serverId, botIndex) {
 
 // Aliases for backward compatibility
 export const getTier = getServerPlan;
-export const checkFeatureAccess = serverHasFeature;

@@ -237,7 +237,8 @@ export async function dispatchRuntimeIncidentAlert(input, deps = {}) {
 
   const hasCapability = typeof deps.hasCapability === "function"
     ? deps.hasCapability
-    : (targetGuildId) => serverHasCapability(targetGuildId, "exports_webhooks");
+    // Outage alerts in a Discord channel come with Pro (#413); webhooks stay Ultimate.
+    : (targetGuildId) => serverHasCapability(targetGuildId, "incident_alerts");
   if (!hasCapability(guildId)) {
     return { attempted: false, delivered: false, skipped: "capability" };
   }

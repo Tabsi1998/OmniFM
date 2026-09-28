@@ -25,6 +25,7 @@ import {
   toOrigin,
 } from "./api-cors.js";
 import { enforceApiRateLimit, getClientIp } from "./api-rate-limit.js";
+import { COMMAND_PLANS } from "../config/plan-features.js";
 
 // ---- Security & HTTP ----
 
@@ -274,31 +275,9 @@ function sanitizeLicenseForApi(license, includeSensitive = false) {
 
 // ---- Command API ----
 const COMMAND_ARG_OPTION_TYPES = new Set([3, 4, 5, 6, 7, 8, 9, 10, 11]);
-const COMMAND_MIN_TIER = {
-  help: "free",
-  play: "free",
-  pause: "free",
-  resume: "free",
-  stop: "free",
-  stations: "free",
-  list: "free",
-  setvolume: "free",
-  status: "free",
-  health: "free",
-  diag: "free",
-  premium: "free",
-  language: "free",
-  license: "free",
-  invite: "free",
-  workers: "free",
-  now: "pro",
-  history: "pro",
-  event: "pro",
-  perm: "pro",
-  addstation: "ultimate",
-  removestation: "ultimate",
-  mystations: "ultimate",
-};
+// The plan of each slash command for the website: Free unless
+// src/config/plan-features.js names another (#413).
+const COMMAND_MIN_TIER = COMMAND_PLANS;
 
 function formatCommandArgToken(option) {
   const name = String(option?.name || "").trim();

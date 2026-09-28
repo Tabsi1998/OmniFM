@@ -2,17 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { I18nProvider } from '../i18n.js';
 import GuildDashboard from './GuildDashboard.js';
+import { PLAN_CAPABILITIES } from '../../../src/config/plan-features.js';
 
 // The server dashboard people use at /dashboard (#294, #375): a signed-in
 // Ultimate server, the API mocked with small but valid answers. Every area is
 // opened; an area that throws, or makes React report an error, fails the test.
 
 const SERVER = '123456789012345678';
-const ALL_CAPABILITIES = {
-  dashboardAccess: true, eventScheduler: true, rolePermissions: true, weeklyDigest: true, basicHealth: true,
-  customStationUrls: true, advancedAnalytics: true, failoverRules: true, licenseWorkspace: true,
-  exportsWebhooks: true, voiceGuard: true,
-};
+// Every capability of the plan file (#413), all switched on.
+const ALL_CAPABILITIES = Object.fromEntries(Object.values(PLAN_CAPABILITIES).map((entry) => [entry.apiKey, true]));
 
 function answerFor(url) {
   const route = String(url).replace(/^https?:\/\/[^/]+/, '').split('?')[0];

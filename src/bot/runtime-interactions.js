@@ -8,7 +8,7 @@ import {
 } from "../lib/event-time.js";
 import { loadStations, filterStationsByTier } from "../stations-store.js";
 import { getGuildStations } from "../custom-stations.js";
-import { getTier, requireFeature } from "../core/entitlements.js";
+import { getTier, requireCapability } from "../core/entitlements.js";
 import { recordCommandUsage } from "../listening-stats-store.js";
 import { listScheduledEvents } from "../scheduled-events-store.js";
 import { getDefaultLanguage } from "../i18n.js";
@@ -36,7 +36,7 @@ export async function handleRuntimeAutocomplete(runtime, interaction) {
       return;
     }
     if (interaction.commandName === "event") {
-      const feature = requireFeature(interaction.guildId, "scheduledEvents");
+      const feature = requireCapability(interaction.guildId, "event_scheduler");
       if (!feature.ok) {
         await interaction.respond([]);
         return;

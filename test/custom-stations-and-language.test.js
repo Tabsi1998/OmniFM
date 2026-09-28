@@ -148,8 +148,13 @@ test("language helper canonicalizes legacy ASCII store messages", () => {
     translatePermissionStoreMessage("Command wird nicht unterstuetzt.", "de"),
     "Command wird nicht unterst\u00fctzt."
   );
+  // #413: the words of the plan file.
   assert.equal(
-    getFeatureRequirementMessage({ ok: false, featureKey: "customStationURLs", requiredPlan: "ultimate" }, "de"),
-    "**Custom-Station-URLs** erfordert OmniFM **Ultimate** oder h\u00f6her."
+    getFeatureRequirementMessage({ ok: false, capabilityKey: "custom_station_urls", requiredPlan: "ultimate" }, "de"),
+    "**Eigene Sender** gibt es ab OmniFM **Ultimate**."
+  );
+  assert.equal(
+    getFeatureRequirementMessage({ ok: false, capabilityKey: "role_permissions", requiredPlan: "pro" }, "en"),
+    "**Role permissions** comes with OmniFM **Pro** and above."
   );
 });

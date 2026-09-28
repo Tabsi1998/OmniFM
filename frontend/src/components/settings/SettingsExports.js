@@ -5,10 +5,6 @@ import {
   DASHBOARD_EXPORT_WEBHOOK_EVENTS,
   getDashboardExportWebhookEventLabel,
 } from '../../lib/dashboardExports.js';
-import {
-  DASHBOARD_INCIDENT_ALERT_EVENTS,
-  getDashboardIncidentAlertEventLabel,
-} from '../../lib/dashboardIncidentAlerts.js';
 import DashboardOnboardingHint from '../DashboardOnboardingHint.js';
 
 export default function SettingsExports({
@@ -18,17 +14,11 @@ export default function SettingsExports({
   exportsHint,
   exportsSummary,
   exportsWebhook,
-  incidentAlertChannelLabel,
-  incidentAlerts,
-  incidentAlertsSummary,
   selectedGuildId,
   sendWebhookTest,
   t,
-  textChannels,
   toggleExportsWebhookEvent,
-  toggleIncidentAlertEvent,
   updateExportsWebhook,
-  updateIncidentAlerts,
   webhookSecretInput,
   webhookTestSending,
 }) {
@@ -149,96 +139,6 @@ export default function SettingsExports({
             {getDashboardExportWebhookEventLabel(event.key, t)}
           </label>
         ))}
-      </div>
-
-      <div style={{ margin: '18px 0 14px', borderTop: '1px solid #1A1A2E', paddingTop: 18 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-          <Shield size={15} color="#10B981" />
-          <strong style={{ color: '#F4F4F5', fontSize: 14 }}>{t('Discord-Incident-Alerts', 'Discord incident alerts')}</strong>
-        </div>
-        <p style={{ color: '#71717A', fontSize: 12, marginBottom: 14, lineHeight: 1.6 }}>
-          {t(
-            'Diese Alerts posten neue Stream-Stalls, Recoverys und Failover-Vorfaelle direkt in einen Discord-Text-Channel.',
-            'These alerts post new stream stalls, recoveries, and failover incidents directly into a Discord text channel.'
-          )}
-        </p>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginBottom: 14 }}>
-          <div data-testid="incident-alerts-status-card" style={{ border: `1px solid ${incidentAlertsSummary.statusAccent}33`, background: `${incidentAlertsSummary.statusAccent}14`, padding: '12px 14px' }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: incidentAlertsSummary.statusAccent }}>
-              {t('Status', 'Status')}
-            </div>
-            <div style={{ marginTop: 6, fontSize: 18, fontWeight: 700, color: '#fff' }}>{incidentAlertsSummary.statusLabel}</div>
-            <div style={{ marginTop: 6, fontSize: 12, color: '#A1A1AA', lineHeight: 1.6 }}>{incidentAlertsSummary.description}</div>
-          </div>
-
-          <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
-              {t('Alert-Channel', 'Alert channel')}
-            </div>
-            <div data-testid="incident-alert-channel-label" style={{ marginTop: 6, fontSize: 14, fontWeight: 600, color: '#D4D4D8', wordBreak: 'break-word' }}>
-              {incidentAlertChannelLabel || t('Noch kein Channel gesetzt', 'No channel configured yet')}
-            </div>
-          </div>
-
-          <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
-              {t('Ausloeser', 'Triggers')}
-            </div>
-            <div data-testid="incident-alert-events-count" style={{ marginTop: 6, fontSize: 16, fontWeight: 600, color: '#D4D4D8' }}>
-              {incidentAlerts.events.length} / {DASHBOARD_INCIDENT_ALERT_EVENTS.length}
-            </div>
-            <div style={{ marginTop: 6, fontSize: 12, color: '#71717A' }}>
-              {incidentAlerts.enabled ? t('Automatisch aktiv', 'Automatic delivery enabled') : t('Noch nicht aktiviert', 'Not enabled yet')}
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginBottom: 14 }}>
-          <label data-testid="incident-alerts-enabled-toggle" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, padding: '10px 0' }}>
-            <input
-              type="checkbox"
-              disabled={!canManageExports}
-              checked={incidentAlerts.enabled}
-              onChange={(e) => updateIncidentAlerts({ enabled: e.target.checked })}
-              style={{ width: 16, height: 16, accentColor: '#10B981' }}
-            />
-            {t('Neue Incidents automatisch nach Discord senden', 'Send new incidents to Discord automatically')}
-          </label>
-
-          <div>
-            <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Text-Channel', 'Text channel')}</label>
-            <select
-              data-testid="incident-alert-channel-select"
-              disabled={!canManageExports}
-              value={incidentAlerts.channelId}
-              onChange={(e) => updateIncidentAlerts({ channelId: e.target.value })}
-              style={{ width: '100%', height: 40, padding: '0 10px', border: '1px solid #1A1A2E', background: '#050505', color: canManageExports ? '#fff' : '#3F3F46', boxSizing: 'border-box', fontSize: 13 }}
-            >
-              <option value="">{t('Kein Incident-Channel', 'No incident channel')}</option>
-              {textChannels.map((channel) => (
-                <option key={channel.id} value={channel.id}>
-                  #{channel.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div data-testid="incident-alert-event-list" style={{ display: 'grid', gap: 8, marginBottom: 6 }}>
-          {DASHBOARD_INCIDENT_ALERT_EVENTS.map((event) => (
-            <label key={event.key} style={{ display: 'flex', alignItems: 'center', gap: 10, color: canManageExports ? '#D4D4D8' : '#52525B', fontSize: 13 }}>
-              <input
-                type="checkbox"
-                disabled={!canManageExports}
-                checked={incidentAlerts.events.includes(event.key)}
-                onChange={() => toggleIncidentAlertEvent(event.key)}
-                style={{ width: 15, height: 15, accentColor: '#10B981' }}
-              />
-              {getDashboardIncidentAlertEventLabel(event.key, t)}
-            </label>
-          ))}
-        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>

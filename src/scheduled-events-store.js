@@ -449,6 +449,20 @@ function listScheduledEvents({ guildId = null, botId = null, includeDisabled = t
     .sort((a, b) => a.runAtMs - b.runAtMs);
 }
 
+/**
+ * The events of a server that a plan with a limit keeps running (#413):
+ * the oldest first, so after a downgrade the first ones stay and the rest stop.
+ * @param {string} guildId
+ * @param {number | null} limit null is no limit
+ */
+function eventIdsWithinLimit(guildId, limit) {
+  const events = listScheduledEvents({ guildId });
+  if (limit === null || limit === undefined) return new Set(events.map((event) => event.id));
+  const oldestFirst = events.slice().sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || ""))
+    || String(a.id).localeCompare(String(b.id)));
+  return new Set(oldestFirst.slice(0, Math.max(0, limit)).map((event) => event.id));
+}
+
 function createScheduledEvent(input) {
   const state = loadRawState();
   const nowIso = new Date().toISOString();
@@ -571,6 +585,7 @@ export {
   updateEventRunAtMs,
   getEvent,
   listScheduledEvents,
+  eventIdsWithinLimit,
   createScheduledEvent,
   deleteScheduledEvent,
   patchScheduledEvent,

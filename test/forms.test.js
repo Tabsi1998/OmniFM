@@ -210,6 +210,44 @@ test("/event form only for server managers", async () => {
   assert.equal(manager.calls[0][0], "modal");
 });
 
+test("Free has one scheduled event: a second one is refused, a downgrade keeps the oldest (#413)", async () => {
+  const { handleEventCommand } = await import("../src/bot/runtime-event-command.js");
+  const { executeScheduledEvent } = await import("../src/bot/runtime-event-execution.js");
+  const { deleteScheduledEvent, getScheduledEvent } = await import("../src/scheduled-events-store.js");
+  const runtime = commander();
+  const { guild, voice } = eventServer();
+  for (const event of listScheduledEvents({ guildId: GUILD })) deleteScheduledEvent(event.id, { guildId: GUILD });
+  const eventForm = (name, start) => submit(forms.EVENT_FORM_ID, formFields({ text: { name, station: "groovesalad", start }, select: { repeat: ["none"] }, channels: { voice } }), { guild });
+
+  plan = "free";
+  await runtime.handleFormSubmit(eventForm("Abendshow", "02.10.2030 20:00"));
+  assert.equal(listScheduledEvents({ guildId: GUILD }).length, 1, "Free: the first one is saved");
+
+  const opening = submit("", null, { isModalSubmit: () => false, options: { getSubcommand: () => "form" } });
+  await handleEventCommand(runtime, opening);
+  assert.equal(opening.calls[0][0], "reply", "the form does not even open");
+  assert.match(allText(opening.calls[0][1]), /Ein Event hast du schon[\s\S]*Pro/);
+
+  const second = eventForm("Nachtshow", "03.10.2030 22:00");
+  await runtime.handleFormSubmit(second);
+  assert.match(allText(last(second)), /Ein Event hast du schon/);
+  assert.equal(listScheduledEvents({ guildId: GUILD }).length, 1);
+
+  // With Pro a second one; back on Free only the oldest keeps running.
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  plan = "pro";
+  await runtime.handleFormSubmit(eventForm("Nachtshow", "03.10.2030 22:00"));
+  const events = listScheduledEvents({ guildId: GUILD });
+  assert.equal(events.length, 2);
+  plan = "free";
+  runtime.client = { guilds: { cache: new Map([[GUILD, guild]]) } };
+  const newer = events.find((event) => event.name === "Nachtshow");
+  await executeScheduledEvent(runtime, newer);
+  assert.equal(getScheduledEvent(newer.id).enabled, false, "the newer one stops");
+  assert.equal(getScheduledEvent(events.find((event) => event.name === "Abendshow").id).enabled, true, "the oldest stays");
+  plan = "ultimate";
+});
+
 // ---- report a problem ----
 
 test("a problem report becomes a server incident with station and playback history", async () => {

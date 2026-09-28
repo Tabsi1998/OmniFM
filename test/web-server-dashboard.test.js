@@ -1223,7 +1223,7 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
   assert.equal(initialLicenseResponse.payload.license.seatsUsed, 1);
   assert.equal(initialLicenseResponse.payload.license.seatsAvailable, 1);
   assert.equal(initialLicenseResponse.payload.license.emailMasked, "ow***@example.com");
-  assert.equal(initialLicenseResponse.payload.license.workspace, null);
+  assert.equal("workspace" in initialLicenseResponse.payload.license, false, "no license workspace any more (#413)");
   assert.equal(initialLicenseResponse.payload.currentPlan.limits.maxBots, 8);
   assert.equal(initialLicenseResponse.payload.currentPlan.pricing.monthlyCents, 549);
   assert.equal(initialLicenseResponse.payload.recommendedUpgrade.tier, "ultimate");
@@ -1520,8 +1520,9 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
 
   // #276: the favourite bar
   assert.deepEqual(settingsAcceptLanguageResponse.payload.favorites.stations, []);
-  assert.equal(settingsAcceptLanguageResponse.payload.favorites.max, 5);
-  assert.ok([3, 5].includes(settingsAcceptLanguageResponse.payload.favorites.limit));
+  // #413: Free 3, Pro 5, Ultimate 10.
+  assert.equal(settingsAcceptLanguageResponse.payload.favorites.max, 10);
+  assert.ok([3, 5, 10].includes(settingsAcceptLanguageResponse.payload.favorites.limit));
   const favoritesPut = (stations) => requestJson(
     baseUrl,
     `/api/dashboard/settings?serverId=${GUILD_ID}`,
@@ -1587,8 +1588,9 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
       }),
     }
   );
-  assert.equal(invalidIncidentAlertSettings.status, 403);
-  assert.match(invalidIncidentAlertSettings.payload.error, /incident alert/i);
+  // #413: outage alerts come with Pro now, so a Pro server gets the channel check, not a refusal.
+  assert.equal(invalidIncidentAlertSettings.status, 400);
+  assert.match(invalidIncidentAlertSettings.payload.error, /text channel/i);
 
   const voiceGuardSettingsResponse = await requestJson(
     baseUrl,
@@ -1699,20 +1701,16 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
   activePlan = "ultimate";
   activeSeats = 2;
   upgradeLicenseForServer(GUILD_ID, "ultimate");
-  const workspaceLicenseResponse = await requestJson(
+  const ultimateLicenseResponse = await requestJson(
     baseUrl,
     `/api/dashboard/license?serverId=${GUILD_ID}`,
     { headers: authHeaders }
   );
-  assert.equal(workspaceLicenseResponse.status, 200);
-  assert.equal(workspaceLicenseResponse.payload.license.plan, "ultimate");
-  assert.equal(workspaceLicenseResponse.payload.license.canManageWorkspace, true);
-  assert.equal(workspaceLicenseResponse.payload.license.workspace.linkedServers.length, 1);
-  assert.equal(workspaceLicenseResponse.payload.license.workspace.linkedServers[0].id, GUILD_ID);
-  assert.equal(workspaceLicenseResponse.payload.license.workspace.availableServers.some((server) => server.id === SECOND_GUILD_ID), true);
-  assert.equal(workspaceLicenseResponse.payload.license.workspace.blockedServers.some((server) => server.id === BLOCKED_GUILD_ID), true);
-
-  const blockedWorkspaceMoveResponse = await requestJson(
+  assert.equal(ultimateLicenseResponse.status, 200);
+  assert.equal(ultimateLicenseResponse.payload.license.plan, "ultimate");
+  // #413: the license workspace is gone; a server joins a license with /license activate.
+  assert.equal("workspace" in ultimateLicenseResponse.payload.license, false);
+  const goneWorkspaceResponse = await requestJson(
     baseUrl,
     `/api/dashboard/license/workspace?serverId=${GUILD_ID}`,
     {
@@ -1721,57 +1719,10 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
         ...authHeaders,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        action: "link",
-        targetServerId: BLOCKED_GUILD_ID,
-      }),
+      body: JSON.stringify({ action: "link", targetServerId: SECOND_GUILD_ID }),
     }
   );
-  assert.equal(blockedWorkspaceMoveResponse.status, 409);
-  assert.match(blockedWorkspaceMoveResponse.payload.error, /another active license/i);
-
-  const workspaceLinkResponse = await requestJson(
-    baseUrl,
-    `/api/dashboard/license/workspace?serverId=${GUILD_ID}`,
-    {
-      method: "POST",
-      headers: {
-        ...authHeaders,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        action: "link",
-        targetServerId: SECOND_GUILD_ID,
-      }),
-    }
-  );
-  assert.equal(workspaceLinkResponse.status, 200);
-  assert.equal(workspaceLinkResponse.payload.success, true);
-  assert.equal(workspaceLinkResponse.payload.license.seatsUsed, 2);
-  assert.equal(workspaceLinkResponse.payload.license.seatsAvailable, 0);
-  assert.equal(workspaceLinkResponse.payload.license.workspace.linkedServers.some((server) => server.id === SECOND_GUILD_ID), true);
-  assert.equal(workspaceLinkResponse.payload.license.workspace.availableServers.length, 0);
-
-  const workspaceUnlinkResponse = await requestJson(
-    baseUrl,
-    `/api/dashboard/license/workspace?serverId=${GUILD_ID}`,
-    {
-      method: "POST",
-      headers: {
-        ...authHeaders,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        action: "unlink",
-        targetServerId: SECOND_GUILD_ID,
-      }),
-    }
-  );
-  assert.equal(workspaceUnlinkResponse.status, 200);
-  assert.equal(workspaceUnlinkResponse.payload.success, true);
-  assert.equal(workspaceUnlinkResponse.payload.license.seatsUsed, 1);
-  assert.equal(workspaceUnlinkResponse.payload.license.seatsAvailable, 1);
-  assert.equal(workspaceUnlinkResponse.payload.license.workspace.availableServers.some((server) => server.id === SECOND_GUILD_ID), true);
+  assert.equal(goneWorkspaceResponse.status, 404);
 
   const detailStatsResponse = await requestJson(
     baseUrl,

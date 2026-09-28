@@ -1,19 +1,19 @@
 // ============================================================
 // OmniFM: favourite stations of a server (#276)
 // ============================================================
-// Up to five stations as quick buttons in the now-playing panel. Free shows
-// three, Pro and Ultimate five. After a downgrade the extra ones are hidden,
-// never deleted: they come back with the plan.
+// Stations as quick buttons in the now-playing panel: Free shows three, Pro
+// five, Ultimate ten (src/config/plan-features.js, #413). After a downgrade
+// the extra ones are hidden, never deleted: they come back with the plan.
+import { PLAN_LIMITS, planLimits } from "../config/plan-features.js";
 
-export const FAVORITES_MAX = 5;
+export const FAVORITES_MAX = Math.max(...Object.values(PLAN_LIMITS).map((limits) => limits.favorites));
 
 /** How many favourites a plan shows. */
 export function favoriteLimitForTier(tier) {
-  const plan = String(tier || "free").toLowerCase();
-  return plan === "pro" || plan === "ultimate" ? FAVORITES_MAX : 3;
+  return planLimits(tier).favorites;
 }
 
-/** The stored list: station keys, each once, at most five. */
+/** The stored list: station keys, each once, at most FAVORITES_MAX. */
 export function normalizeFavoriteStations(value) {
   const list = [];
   for (const raw of Array.isArray(value) ? value : []) {

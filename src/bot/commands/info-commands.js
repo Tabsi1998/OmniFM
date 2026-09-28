@@ -8,8 +8,10 @@ import {
   ButtonStyle,
   MessageFlags,
 } from "discord.js";
-import { TIER_RANK, SONG_HISTORY_ENABLED, clipText } from "../../lib/helpers.js";
-import { getTier } from "../../core/entitlements.js";
+import { SONG_HISTORY_ENABLED, clipText } from "../../lib/helpers.js";
+import { getServerLimit, getTier } from "../../core/entitlements.js";
+import { PLAN_LIMITS, PLAN_NAMES } from "../../config/plan-features.js";
+import { catalogPlanContext, planBulletLines } from "../plan-texts.js";
 import { readSongHistory } from "../../song-history-store.js";
 import { recordCommandUsage } from "../../listening-stats-store.js";
 import { buildInviteUrl } from "../../bot-config.js";
@@ -222,22 +224,7 @@ async function handleListCommand({ runtime, interaction }) {
 
 /** /now */
 async function handleNowCommand({ runtime, interaction, t, language }) {
-  const guildTier = getTier(interaction.guildId);
-  if ((TIER_RANK[guildTier] ?? 0) < (TIER_RANK.pro ?? 1)) {
-    await interaction.reply(buildNoticePayload({
-      t,
-      language,
-      tone: "info",
-      title: t("💎 `/now` ist Pro", "💎 `/now` is Pro"),
-      description: t(
-        "`/now` ist ab **Pro** verfügbar.",
-        "`/now` is available with **Pro** and above."
-      ),
-      supportActions: { includeDashboard: true, includePremium: true, includeSupport: true },
-    }));
-    return;
-  }
-
+  // Every plan (#413): the panel shows in the channel on Free too.
   const playback = await runtime.resolveStreamingRuntimeForInteraction(interaction);
   if (!playback.runtime || !playback.state) {
     await interaction.reply(buildStreamingRuntimeSelectionPayload(runtime, interaction, playback, language));
@@ -285,22 +272,6 @@ async function handleNowCommand({ runtime, interaction, t, language }) {
 
 /** /history */
 async function handleHistoryCommand({ runtime, interaction, t, language }) {
-  const guildTier = getTier(interaction.guildId);
-  if ((TIER_RANK[guildTier] ?? 0) < (TIER_RANK.pro ?? 1)) {
-    await interaction.reply(buildNoticePayload({
-      t,
-      language,
-      tone: "info",
-      title: t("💎 Song-History ist Pro", "💎 Song history is Pro"),
-      description: t(
-        "Song-History ist ab **Pro** verfügbar.",
-        "Song history is available with **Pro** and above."
-      ),
-      supportActions: { includeDashboard: true, includePremium: true, includeSupport: true },
-    }));
-    return;
-  }
-
   if (!SONG_HISTORY_ENABLED) {
     await interaction.reply(buildNoticePayload({
       t,
@@ -317,7 +288,9 @@ async function handleHistoryCommand({ runtime, interaction, t, language }) {
 
   const playback = await runtime.resolveStreamingRuntimeForInteraction(interaction);
   const requestedLimit = interaction.options.getInteger("limit") || 10;
-  const limit = Math.max(1, Math.min(20, requestedLimit));
+  // Free shows the last 5 songs, Pro and Ultimate the last 20 (#413).
+  const planSongs = getServerLimit(interaction.guildId, "historySongs") || 5;
+  const limit = Math.max(1, Math.min(planSongs, requestedLimit));
   // Straight from MongoDB: the worker that plays the server wrote it (#292).
   const history = await readSongHistory(interaction.guildId, { limit });
 
@@ -337,7 +310,11 @@ async function handleHistoryCommand({ runtime, interaction, t, language }) {
   }
 
   const payload = runtime.buildSongHistoryEmbed(history, interaction.guildId, playback.runtime, language);
-  await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
+  const proSongs = PLAN_LIMITS.pro.historySongs;
+  const more = requestedLimit > planSongs && planSongs < proSongs
+    ? t(`Mit **Pro** siehst du die letzten ${proSongs} Songs.`, `With **Pro** you see the last ${proSongs} songs.`)
+    : "";
+  await interaction.reply({ ...payload, ...(more ? { content: more } : {}), flags: MessageFlags.Ephemeral });
   return;
 }
 
@@ -395,13 +372,12 @@ async function handlePremiumCommand({ runtime, interaction, t, language }) {
     tierConfig.tier !== "ultimate" ? shop.skus.ultimate : "",
   ].filter(Boolean);
   if (tierConfig.tier !== "ultimate") {
+    // #413: what the next plan adds, the same lines as on the website.
+    const next = tierConfig.tier === "free" ? "pro" : "ultimate";
     premiumEmbed.addFields({
-      name: t("Upgrade", "Upgrade"),
+      name: t(`Das bringt ${PLAN_NAMES[next]} dazu`, `What ${PLAN_NAMES[next]} adds`),
       value: [
-        t(
-          `Upgrade auf ${BRAND.name} Pro oder Ultimate fuer bessere Audioqualitaet, mehr Worker und schnellere Reconnects.`,
-          `Upgrade to ${BRAND.name} Pro or Ultimate for better audio quality, more workers, and faster reconnects.`
-        ),
+        planBulletLines(next, language, catalogPlanContext()),
         shop.enabled && buyable.length
           ? t("Kaufen geht direkt hier in Discord, mit den Knöpfen unten. Das Abo gilt für diesen Server.", "You buy it right here in Discord with the buttons below. The subscription is for this server.")
           : t("Kaufen geht bald direkt hier in Discord. Bis dahin: Testmonat oder Gratis-Code auf omnifm.xyz.", "Buying comes to Discord soon. Until then: the trial month or a free code on omnifm.xyz."),

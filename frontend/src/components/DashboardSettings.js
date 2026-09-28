@@ -36,6 +36,7 @@ import SettingsFailover from './settings/SettingsFailover.js';
 import SettingsVoiceStatus from './settings/SettingsVoiceStatus.js';
 import SettingsFavorites from './settings/SettingsFavorites.js';
 import SettingsExports from './settings/SettingsExports.js';
+import SettingsIncidentAlerts from './settings/SettingsIncidentAlerts.js';
 import SettingsVoiceGuard from './settings/SettingsVoiceGuard.js';
 
 export default function DashboardSettings({
@@ -160,7 +161,7 @@ export default function DashboardSettings({
       const body = {};
       if (capabilities.weeklyDigest === true && settings?.weeklyDigest) body.weeklyDigest = settings.weeklyDigest;
       if (capabilities.failoverRules === true) body.failoverChain = getConfiguredFailoverChain(settings);
-      if (capabilities.exportsWebhooks === true && settings?.incidentAlerts) body.incidentAlerts = settings.incidentAlerts;
+      if (capabilities.incidentAlerts === true && settings?.incidentAlerts) body.incidentAlerts = settings.incidentAlerts;
       if (capabilities.exportsWebhooks === true && settings?.exportsWebhook) body.exportsWebhook = settings.exportsWebhook;
       if (capabilities.voiceGuard === true && settings?.voiceGuard) body.voiceGuard = settings.voiceGuard;
       if (settings?.voiceStatus) body.voiceStatus = { template: settings.voiceStatus.template || '' };
@@ -211,6 +212,8 @@ export default function DashboardSettings({
   const canManageWeeklyDigest = capabilities.weeklyDigest === true;
   const canManageFallbackStation = capabilities.failoverRules === true;
   const canManageExports = capabilities.exportsWebhooks === true;
+  // #413: outage alerts in Discord come with Pro, webhooks and exports with Ultimate.
+  const canManageIncidentAlerts = capabilities.incidentAlerts === true;
   const canManageVoiceGuard = capabilities.voiceGuard === true;
   const configuredFailoverChain = getConfiguredFailoverChain(settings);
   const digestSummary = buildWeeklyDigestSummary(settings, t, formatDate);
@@ -530,6 +533,17 @@ export default function DashboardSettings({
 
       <DashboardBotProfile apiRequest={apiRequest} selectedGuildId={selectedGuildId} t={t} />
 
+    <SettingsIncidentAlerts
+      canManageIncidentAlerts={canManageIncidentAlerts}
+      incidentAlertChannelLabel={incidentAlertChannelLabel}
+      incidentAlerts={incidentAlerts}
+      incidentAlertsSummary={incidentAlertsSummary}
+      t={t}
+      textChannels={textChannels}
+      toggleIncidentAlertEvent={toggleIncidentAlertEvent}
+      updateIncidentAlerts={updateIncidentAlerts}
+    />
+
     <SettingsExports
       canManageExports={canManageExports}
       downloadDashboardExport={downloadDashboardExport}
@@ -537,17 +551,11 @@ export default function DashboardSettings({
       exportsHint={exportsHint}
       exportsSummary={exportsSummary}
       exportsWebhook={exportsWebhook}
-      incidentAlertChannelLabel={incidentAlertChannelLabel}
-      incidentAlerts={incidentAlerts}
-      incidentAlertsSummary={incidentAlertsSummary}
       selectedGuildId={selectedGuildId}
       sendWebhookTest={sendWebhookTest}
       t={t}
-      textChannels={textChannels}
       toggleExportsWebhookEvent={toggleExportsWebhookEvent}
-      toggleIncidentAlertEvent={toggleIncidentAlertEvent}
       updateExportsWebhook={updateExportsWebhook}
-      updateIncidentAlerts={updateIncidentAlerts}
       webhookSecretInput={webhookSecretInput}
       webhookTestSending={webhookTestSending}
     />
