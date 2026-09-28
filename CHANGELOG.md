@@ -25,7 +25,8 @@ Dazu zwei Fehler behoben, die still Daten betrafen.
   letzten Woche (nach Hörstunden, also wie lange Menschen zugehört haben),
   darunter die meistgespielten Songs, gezählt über alle Server. Hinein kommt
   nur, was auf mindestens 3 Servern lief, bei den Sendern nur Sender aus dem
-  OmniFM-Katalog; so lässt sich kein einzelner Server erkennen. Jeder Sender
+  OmniFM-Katalog mit mindestens einer Hörstunde; so lässt sich kein einzelner
+  Server erkennen. Jeder Sender
   lässt sich auf der Seite direkt anhören. Auf Wunsch postet der Commander die
   Charts jeden Montag ab 10 Uhr in einen Kanal deiner Wahl: Owner-Konsole ›
   „Bots & Discord › OmniFM-Charts“. (#300, #401)
