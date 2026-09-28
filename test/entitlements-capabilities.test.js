@@ -23,7 +23,7 @@ test("legacy tier-only licenses retain their paid plan", (t) => {
   assert.equal(getServerPlan("1342542257747923004"), "ultimate");
 });
 
-test("plan capabilities preserve free, pro, and ultimate package boundaries", () => {
+test("plan capabilities keep the free, pro and ultimate split of #413", () => {
   const freeCapabilities = getPlanCapabilities("free", { apiShape: true });
   const proCapabilities = getPlanCapabilities("pro", { apiShape: true });
   const ultimateCapabilities = getPlanCapabilities("ultimate", { apiShape: true });
@@ -38,6 +38,15 @@ test("plan capabilities preserve free, pro, and ultimate package boundaries", ()
   assert.equal(ultimateCapabilities.failoverRules, true);
   assert.equal(ultimateCapabilities.voiceGuard, true);
   assert.equal(freeCapabilities.voiceGuard, true);
+  // #413: one event on Free, outage alerts in Discord from Pro, webhooks stay Ultimate.
+  assert.equal(freeCapabilities.eventScheduler, true);
+  assert.equal(freeCapabilities.incidentAlerts, false);
+  assert.equal(proCapabilities.incidentAlerts, true);
+  assert.equal(proCapabilities.exportsWebhooks, false);
+  assert.equal(ultimateCapabilities.exportsWebhooks, true);
+  assert.deepEqual(["free", "pro", "ultimate"].map((plan) => getPlanLimits(plan).events), [1, null, null]);
+  assert.deepEqual(["free", "pro", "ultimate"].map((plan) => getPlanLimits(plan).favorites), [3, 5, 10]);
+  assert.deepEqual(["free", "pro", "ultimate"].map((plan) => getPlanLimits(plan).historySongs), [5, 20, 20]);
 });
 
 test("server capability payload derives seats from the active license", (t) => {
@@ -51,7 +60,7 @@ test("server capability payload derives seats from the active license", (t) => {
   const limits = getPlanLimits("ultimate");
 
   assert.equal(capabilities.dashboardAccess, true);
-  assert.equal(capabilities.licenseWorkspace, true);
+  assert.equal("licenseWorkspace" in capabilities, false, "the license workspace is gone (#413)");
   assert.equal(getServerSeats("guild-1"), 3);
   assert.equal(limits.maxBots, 16);
   assert.equal(limits.bitrateNum, 320);
@@ -87,12 +96,16 @@ test("dashboard blocked feature labels stay user-facing and deduplicated", () =>
     5
   );
 
-  assert.deepEqual(labels, ["Advanced analytics", "Custom stations"]);
+  // The words of the plan file (#413).
+  assert.deepEqual(labels, ["Detailed statistics", "Your own stations"]);
 });
 
 test("dashboard capability required tiers keep pro and ultimate package boundaries", () => {
   assert.equal(getDashboardCapabilityRequiredTier("dashboardAccess"), "pro");
-  assert.equal(getDashboardCapabilityRequiredTier("eventScheduler"), "pro");
+  assert.equal(getDashboardCapabilityRequiredTier("eventScheduler"), "free");
+  assert.equal(getDashboardCapabilityRequiredTier("incidentAlerts"), "pro");
+  assert.equal(getDashboardCapabilityRequiredTier("exportsWebhooks"), "ultimate");
+  assert.equal(getDashboardCapabilityRequiredTier("licenseWorkspace"), null);
   assert.equal(getDashboardCapabilityRequiredTier("customStationUrls"), "ultimate");
   assert.equal(getDashboardCapabilityRequiredTier("advancedAnalytics"), "ultimate");
   assert.equal(getDashboardCapabilityRequiredTier("voiceGuard"), "free");

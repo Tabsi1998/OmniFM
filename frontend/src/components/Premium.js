@@ -4,6 +4,7 @@ import { useI18n } from '../i18n.js';
 import { buildApiUrl } from '../lib/api.js';
 import { resolvePrimaryInviteUrl } from '../lib/invite.js';
 import { CheckoutModal } from './PremiumCodeModal.js';
+import { planCardLines } from '../../../src/config/plan-features.js';
 
 const PLAN_ORDER = ['free', 'pro', 'ultimate'];
 const PLAN_META = {
@@ -44,7 +45,7 @@ function parsePriceNumber(value) {
   return Number.isFinite(parsed) ? parsed : NaN;
 }
 
-function normalizeTier(rawTier, fallbackTier, fallbackFeatures) {
+function normalizeTier(rawTier, fallbackTier, fallbackFeatures, fallbackIntro = '') {
   const tier = rawTier && typeof rawTier === 'object' ? rawTier : {};
   const fallback = fallbackTier || {};
   const pick = (field) => {
@@ -59,6 +60,8 @@ function normalizeTier(rawTier, fallbackTier, fallbackFeatures) {
     pricePerMonth: Number.isFinite(Number(tier.pricePerMonth)) ? Number(tier.pricePerMonth) : Number(fallback.pricePerMonth || 0),
     startingAt: String(tier.startingAt || fallback.startingAt || '').trim(),
     features: apiFeatures.length > 0 ? apiFeatures : localizedFeatures,
+    // "Alles aus Free, dazu:" belongs to the generated lines only, not to the owner's own list.
+    intro: apiFeatures.length > 0 ? '' : String(fallbackIntro || ''),
     durationPricing: pick('durationPricing'),
     seatPricing: pick('seatPricing'),
   };
@@ -87,9 +90,9 @@ function normalizePricing(rawPricing, fallbackPricing) {
       ? { enabled: true, storeUrl: String(raw.discordShop.storeUrl) }
       : { enabled: false, storeUrl: '' },
     tiers: {
-      free: normalizeTier(rawTiers.free, fallbackTiers.free, fallbackTiers.free?.features),
-      pro: normalizeTier(rawTiers.pro, fallbackTiers.pro, fallbackTiers.pro?.features),
-      ultimate: normalizeTier(rawTiers.ultimate, fallbackTiers.ultimate, fallbackTiers.ultimate?.features),
+      free: normalizeTier(rawTiers.free, fallbackTiers.free, fallbackTiers.free?.features, fallbackTiers.free?.intro),
+      pro: normalizeTier(rawTiers.pro, fallbackTiers.pro, fallbackTiers.pro?.features, fallbackTiers.pro?.intro),
+      ultimate: normalizeTier(rawTiers.ultimate, fallbackTiers.ultimate, fallbackTiers.ultimate?.features, fallbackTiers.ultimate?.intro),
     },
   };
 }
@@ -111,19 +114,26 @@ function buildPriceLabel(planId, tier, copy, formatDecimal) {
   return formatEuroAmount(tier.pricePerMonth / 100, formatDecimal);
 }
 
-function Premium({ bots = [] }) {
+function Premium({ bots = [], planContext = {} }) {
   const { copy, locale, formatDate, formatDecimal } = useI18n();
+  const { freeStations, allStations } = planContext;
 
-  const fallbackPricing = useMemo(() => ({
-    ...BASE_FALLBACK_PRICING,
-    tiers: {
-      free: { ...BASE_FALLBACK_PRICING.tiers.free, features: copy.premium.fallbackFeatures.free },
-      pro: { ...BASE_FALLBACK_PRICING.tiers.pro, features: copy.premium.fallbackFeatures.pro },
-      ultimate: { ...BASE_FALLBACK_PRICING.tiers.ultimate, features: copy.premium.fallbackFeatures.ultimate },
-    },
-  }), [copy.premium.fallbackFeatures.free, copy.premium.fallbackFeatures.pro, copy.premium.fallbackFeatures.ultimate]);
+  // #413: what each plan brings, from the bot's plan file; the owner's own
+  // list from the owner console still wins.
+  const fallbackPricing = useMemo(() => {
+    const language = locale === 'de' ? 'de' : 'en';
+    const context = { freeStations, allStations };
+    const tierOf = (plan) => {
+      const card = planCardLines(plan, { language, context });
+      return { ...BASE_FALLBACK_PRICING.tiers[plan], features: card.lines, intro: card.intro || '' };
+    };
+    return { ...BASE_FALLBACK_PRICING, tiers: { free: tierOf('free'), pro: tierOf('pro'), ultimate: tierOf('ultimate') } };
+  }, [locale, freeStations, allStations]);
 
-  const [pricing, setPricing] = useState(() => normalizePricing(null, fallbackPricing));
+  // The API's answer as it came; the cards are built from it and the plan
+  // lines of the current language, so a language switch never mixes them up.
+  const [rawPricing, setRawPricing] = useState(null);
+  const pricing = useMemo(() => normalizePricing(rawPricing, fallbackPricing), [rawPricing, fallbackPricing]);
   const [pricingError, setPricingError] = useState('');
   const [serverId, setServerId] = useState('');
   const [result, setResult] = useState('');
@@ -134,10 +144,6 @@ function Premium({ bots = [] }) {
   const freeInviteIsExternal = freeInviteUrl.startsWith('http');
 
   useEffect(() => {
-    setPricing((current) => normalizePricing(current, fallbackPricing));
-  }, [fallbackPricing]);
-
-  useEffect(() => {
     const controller = new AbortController();
 
     const loadPricing = async () => {
@@ -146,18 +152,18 @@ function Premium({ bots = [] }) {
         const response = await fetch(pricingUrl, { cache: 'no-store', signal: controller.signal });
         const payload = await response.json();
         if (!response.ok || payload?.error) throw new Error(payload?.error || `HTTP ${response.status}`);
-        setPricing(normalizePricing(payload, fallbackPricing));
+        setRawPricing(payload);
         setPricingError('');
       } catch (error) {
         if (error?.name === 'AbortError') return;
-        setPricing(normalizePricing(null, fallbackPricing));
+        setRawPricing(null);
         setPricingError(copy.premium.pricingFallback);
       }
     };
 
     loadPricing();
     return () => controller.abort();
-  }, [copy.premium.pricingFallback, fallbackPricing, locale]);
+  }, [copy.premium.pricingFallback, locale]);
 
   const checkStatus = async () => {
     const normalizedServerId = serverId.trim();
@@ -339,7 +345,8 @@ function Premium({ bots = [] }) {
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }} data-testid={`premium-features-${planId}`}>
+                  {tier.intro ? <div style={{ fontSize: 13, color: '#71717A', fontWeight: 600 }}>{tier.intro}</div> : null}
                   {tier.features.map((feature) => (
                     <div key={feature} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{ width: 5, height: 5, borderRadius: '50%', background: meta.color, flexShrink: 0 }} />

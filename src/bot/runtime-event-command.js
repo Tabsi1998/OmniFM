@@ -3,9 +3,9 @@
 import { ChannelType, MessageFlags, PermissionFlagsBits } from "discord.js";
 import { log } from "../lib/logging.js";
 import { clipText } from "../lib/helpers.js";
-import { getFeatureRequirementMessage, translateScheduledEventStoreMessage } from "../lib/language.js";
+import { translateScheduledEventStoreMessage } from "../lib/language.js";
 import { isWorkdayInTimeZone, normalizeRepeatMode } from "../lib/event-time.js";
-import { getTier, requireFeature } from "../core/entitlements.js";
+import { getServerLimit, getTier } from "../core/entitlements.js";
 import {
   listScheduledEvents,
   createScheduledEvent,
@@ -45,12 +45,17 @@ async function handleEventCommand(runtime, interaction, { formInput = null } = {
     return;
   }
 
-  const feature = requireFeature(guildId, "scheduledEvents");
-  if (!feature.ok) {
+  const sub = formInput ? "create" : interaction.options.getSubcommand();
+  // Free has one scheduled event, Pro and Ultimate as many as they like (#413).
+  const eventLimit = getServerLimit(guildId, "events");
+  if ((sub === "create" || sub === "form") && eventLimit !== null && listScheduledEvents({ guildId }).length >= eventLimit) {
     await interaction.reply(buildEventNoticePayload(language, {
       tone: "info",
-      title: t("📅 Events sind nicht freigeschaltet", "📅 Events are not unlocked"),
-      description: getFeatureRequirementMessage(feature, language),
+      title: t("📅 Ein Event hast du schon", "📅 You already have an event"),
+      description: t(
+        `Mit Free geht ${eventLimit} geplantes Event. Lösch das vorhandene mit \`/event delete\` oder hol dir **Pro** für beliebig viele.`,
+        `Free comes with ${eventLimit} scheduled event. Delete the one you have with \`/event delete\`, or get **Pro** for as many as you like.`
+      ),
       fields: [
         {
           name: t("Upgrade", "Upgrade"),
@@ -64,8 +69,6 @@ async function handleEventCommand(runtime, interaction, { formInput = null } = {
     }));
     return;
   }
-
-  const sub = formInput ? "create" : interaction.options.getSubcommand();
   if (sub === "form") {
     await interaction.showModal(buildEventFormModal({ t, repeatChoices: buildRepeatChoices(), language }));
     return;

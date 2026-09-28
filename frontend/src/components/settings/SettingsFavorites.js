@@ -1,6 +1,7 @@
 // OmniFM: server dashboard settings: the favourite stations of the now-playing panel.
 // Split out of components/DashboardSettings.js (#296); its state stays there.
 import { ArrowUp, ArrowDown, X, Radio } from 'lucide-react';
+import { PLAN_LIMITS } from '../../../../src/config/plan-features.js';
 
 export default function SettingsFavorites({
   availableFavoriteStations,
@@ -19,8 +20,8 @@ export default function SettingsFavorites({
       </div>
       <p style={{ color: '#52525B', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
         {t(
-          `Bis zu ${favoriteLimit} Sender als Schnellknöpfe im Now-Playing-Panel (Free 3, Pro und Ultimate 5). Mit ⭐ im Sender-Browser geht es auch direkt in Discord. Bei einem kleineren Plan werden überzählige ausgeblendet, nicht gelöscht.`,
-          `Up to ${favoriteLimit} stations as quick buttons in the now-playing panel (Free 3, Pro and Ultimate 5). The ⭐ menu in the station browser works in Discord too. On a smaller plan extra ones are hidden, not deleted.`
+          `Bis zu ${favoriteLimit} Sender als Schnellknöpfe im Now-Playing-Panel (Free ${PLAN_LIMITS.free.favorites}, Pro ${PLAN_LIMITS.pro.favorites}, Ultimate ${PLAN_LIMITS.ultimate.favorites}). Mit ⭐ im Sender-Browser geht es auch direkt in Discord. Bei einem kleineren Plan werden überzählige ausgeblendet, nicht gelöscht.`,
+          `Up to ${favoriteLimit} stations as quick buttons in the now-playing panel (Free ${PLAN_LIMITS.free.favorites}, Pro ${PLAN_LIMITS.pro.favorites}, Ultimate ${PLAN_LIMITS.ultimate.favorites}). The ⭐ menu in the station browser works in Discord too. On a smaller plan extra ones are hidden, not deleted.`
         )}
       </p>
       <div data-testid="favorites-list" style={{ display: 'grid', gap: 8, marginBottom: 14 }}>

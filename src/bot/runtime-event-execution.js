@@ -14,11 +14,12 @@ import {
   normalizeEventTimeZone,
   renderStageTopic,
 } from "../lib/event-time.js";
-import { getTier, requireFeature } from "../core/entitlements.js";
+import { getServerLimit, getTier } from "../core/entitlements.js";
 import {
   listScheduledEvents,
   deleteScheduledEvent,
   patchScheduledEvent,
+  eventIdsWithinLimit,
 } from "../scheduled-events-store.js";
 import { pickScheduledEventWorker } from "./runtime-event-discord.js";
 
@@ -32,12 +33,13 @@ export async function executeScheduledEvent(runtime, event) {
     return;
   }
 
-  const feature = requireFeature(event.guildId, "scheduledEvents");
-  if (!feature.ok) {
+  // A plan with a limit (Free: one event, #413) runs the oldest events only.
+  const eventLimit = getServerLimit(event.guildId, "events");
+  if (eventLimit !== null && !eventIdsWithinLimit(event.guildId, eventLimit).has(event.id)) {
     patchScheduledEvent(event.id, { enabled: false, lastRunAtMs: now });
     log(
       "INFO",
-      `[${runtime.config.name}] Event deaktiviert (Plan zu niedrig): guild=${event.guildId} id=${event.id}`
+      `[${runtime.config.name}] Event deaktiviert (Plan erlaubt ${eventLimit}): guild=${event.guildId} id=${event.id}`
     );
     return;
   }

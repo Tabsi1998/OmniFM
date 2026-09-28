@@ -111,7 +111,7 @@ const messages = {
       },
       dashboard: {
         label: 'Dashboard',
-        detail: 'Events, permissions, health, and server control from Pro upward.',
+        detail: 'Live view, statistics, role permissions and outage alerts from Pro upward.',
       },
       reliability: {
         label: 'Reliability',
@@ -488,17 +488,17 @@ const messages = {
       {
         key: 'dashboard',
         question: 'Do I need the dashboard right away?',
-        answer: 'No. Free works without the dashboard. It starts to matter from Pro onward when you need events, role permissions, weekly digests, and health in one place.',
+        answer: 'No. Free works without the dashboard, and one scheduled event already works with /event. From Pro you manage events, role permissions, the weekly recap and outage alerts in one place.',
       },
       {
         key: 'pro',
         question: 'When is Pro worth it?',
-        answer: 'Pro becomes valuable as soon as you actively manage a server: dashboard access, event scheduling, role permissions, weekly digest, and health are the key reasons.',
+        answer: 'As soon as you want to shape and run your server: every catalogue station, 8 voice channels at once, the dashboard with live view, unlimited events, role permissions and outage alerts in Discord.',
       },
       {
         key: 'ultimate',
         question: 'When do I need Ultimate?',
-        answer: 'Ultimate is for power users and operators who need custom stations, deeper analytics, failover behavior, and automation options.',
+        answer: 'When you run your own radio: up to 50 stations of your own with logo, your own bot look per server, your own fallback chains, webhooks and detailed statistics, plus 16 voice channels at once.',
       },
       {
         key: 'workers',

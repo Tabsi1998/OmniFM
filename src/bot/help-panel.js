@@ -6,6 +6,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } from "discord.js";
 
 import * as ui from "../discord/ui/index.js";
+import { planSummaryLine } from "./plan-texts.js";
 import {
   INVITE_COMPONENT_ID_OPEN,
   PLAY_COMPONENT_ID_OPEN,
@@ -38,9 +39,11 @@ function row(...components) {
  * @param {string} [input.guildName]
  * @param {object} input.urls   { dashboard, website, support, premium }
  * @param {string|null} [input.applicationId]
+ * @param {object} [input.planContext] { freeStations, allStations } of the catalogue (#413)
  */
 export function buildHelpPayload(input) {
-  const { t, plan = {}, urls = {}, applicationId: appId = null } = input;
+  const { t, plan = {}, urls = {}, applicationId: appId = null, planContext = {} } = input;
+  const language = t("de", "en");
   const section = HELP_SECTIONS.includes(input.section) ? input.section : "overview";
   const labels = {
     overview: [t("Überblick", "Overview"), "info"],
@@ -106,8 +109,9 @@ export function buildHelpPayload(input) {
     },
     premium: {
       body: [
-        t("**Pro:** 8 Worker, 120 Sender, 128k-Audio, schnelleres Wiederverbinden, Rollenrechte, Events.", "**Pro:** 8 workers, 120 stations, 128k audio, faster reconnects, role permissions, events."),
-        t("**Ultimate:** 16 Worker, alle Sender, eigene Sender, 320k-Audio.", "**Ultimate:** 16 workers, every station, your own stations, 320k audio."),
+        // #413: the same lines as the website, from src/config/plan-features.js.
+        planSummaryLine("pro", language, planContext),
+        planSummaryLine("ultimate", language, planContext),
         t("`/premium` zeigt deinen Plan, `/license` verwaltet die Lizenz.", "`/premium` shows your plan, `/license` manages the license."),
       ],
       actions: urls.premium ? [row(link(urls.premium, t("Premium ansehen", "See Premium")))] : [],

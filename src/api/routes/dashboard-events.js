@@ -1,3 +1,5 @@
+import { getServerLimit } from "../../core/entitlements.js";
+
 export function createDashboardEventsRouteHandler(deps) {
   const {
     buildDashboardDiscordSyncPatch,
@@ -195,6 +197,21 @@ export function createDashboardEventsRouteHandler(deps) {
               });
               return true;
             }
+          }
+
+          // Free has one scheduled event, Pro and Ultimate as many as they like (#413).
+          const eventLimit = getServerLimit(guild.id, "events");
+          if (eventLimit !== null && listScheduledEvents({ guildId: guild.id }).length >= eventLimit) {
+            sendJson(res, 403, {
+              error: languagePick(
+                language,
+                `Mit Free geht ${eventLimit} geplantes Event. Lösch das vorhandene oder hol dir Pro für beliebig viele.`,
+                `Free comes with ${eventLimit} scheduled event. Delete the one you have, or get Pro for as many as you like.`
+              ),
+              code: "event_limit",
+              limit: eventLimit,
+            });
+            return true;
           }
 
           const result = createScheduledEvent({

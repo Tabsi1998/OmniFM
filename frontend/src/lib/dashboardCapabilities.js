@@ -1,44 +1,20 @@
-export const DASHBOARD_CAPABILITY_DEFAULTS = Object.freeze({
-  dashboardAccess: false,
-  eventScheduler: false,
-  rolePermissions: false,
-  weeklyDigest: false,
-  basicHealth: false,
-  customStationUrls: false,
-  advancedAnalytics: false,
-  failoverRules: false,
-  licenseWorkspace: false,
-  exportsWebhooks: false,
-  voiceGuard: false,
-});
+// What the dashboard may show per plan: from the bot's plan file (#413), so
+// the locks here and the checks in the API never differ.
+import { PLAN_CAPABILITIES } from '../../../src/config/plan-features.js';
 
-export const DASHBOARD_CAPABILITY_REQUIRED_TIERS = Object.freeze({
-  dashboardAccess: 'pro',
-  eventScheduler: 'pro',
-  rolePermissions: 'pro',
-  weeklyDigest: 'pro',
-  basicHealth: 'pro',
-  customStationUrls: 'ultimate',
-  advancedAnalytics: 'ultimate',
-  failoverRules: 'ultimate',
-  licenseWorkspace: 'ultimate',
-  exportsWebhooks: 'ultimate',
-  voiceGuard: 'free',
-});
+const CAPABILITY_ENTRIES = Object.values(PLAN_CAPABILITIES);
 
-const DASHBOARD_CAPABILITY_LABELS = Object.freeze({
-  dashboardAccess: { de: 'Dashboard-Zugriff', en: 'Dashboard access' },
-  eventScheduler: { de: 'Event-Planer', en: 'Event scheduler' },
-  rolePermissions: { de: 'Rollenrechte', en: 'Role permissions' },
-  weeklyDigest: { de: 'Wochen-Digest', en: 'Weekly digest' },
-  basicHealth: { de: 'Health-Übersicht', en: 'Health overview' },
-  customStationUrls: { de: 'Custom-Stationen', en: 'Custom stations' },
-  advancedAnalytics: { de: 'Advanced Analytics', en: 'Advanced analytics' },
-  failoverRules: { de: 'Failover-Regeln', en: 'Failover rules' },
-  licenseWorkspace: { de: 'Lizenz-Workspace', en: 'License workspace' },
-  exportsWebhooks: { de: 'Exporte & Webhooks', en: 'Exports & webhooks' },
-  voiceGuard: { de: 'Voice Guard', en: 'Voice guard' },
-});
+export const DASHBOARD_CAPABILITY_DEFAULTS = Object.freeze(
+  Object.fromEntries(CAPABILITY_ENTRIES.map((entry) => [entry.apiKey, false])),
+);
+
+export const DASHBOARD_CAPABILITY_REQUIRED_TIERS = Object.freeze(
+  Object.fromEntries(CAPABILITY_ENTRIES.map((entry) => [entry.apiKey, entry.minPlan])),
+);
+
+const DASHBOARD_CAPABILITY_LABELS = Object.freeze(
+  Object.fromEntries(CAPABILITY_ENTRIES.map((entry) => [entry.apiKey, { de: entry.de, en: entry.en }])),
+);
 
 export function getDashboardCapabilityRequiredTier(capabilityKey) {
   return DASHBOARD_CAPABILITY_REQUIRED_TIERS[String(capabilityKey || '').trim()] || null;

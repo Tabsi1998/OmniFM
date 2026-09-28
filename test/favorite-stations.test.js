@@ -41,11 +41,13 @@ function texts(node, out = []) {
 }
 const allText = (payload) => payload.components.flatMap((component) => texts(component)).join("\n");
 
-test("the plan decides how many favourites show: Free 3, Pro and Ultimate 5", () => {
+test("the plan decides how many favourites show: Free 3, Pro 5, Ultimate 10 (#413)", () => {
   assert.equal(favorites.favoriteLimitForTier("free"), 3);
   assert.equal(favorites.favoriteLimitForTier("pro"), 5);
-  assert.equal(favorites.favoriteLimitForTier("ultimate"), 5);
-  assert.deepEqual(favorites.normalizeFavoriteStations([" a ", "a", "", "b", "c", "d", "e", "f"]), ["a", "b", "c", "d", "e"]);
+  assert.equal(favorites.favoriteLimitForTier("ultimate"), 10);
+  assert.equal(favorites.FAVORITES_MAX, 10);
+  assert.deepEqual(favorites.normalizeFavoriteStations([" a ", "a", "", "b", "c", "d", "e", "f"]), ["a", "b", "c", "d", "e", "f"]);
+  assert.equal(favorites.normalizeFavoriteStations(Array.from({ length: 14 }, (_, index) => `s${index}`)).length, 10);
 });
 
 test("a downgrade hides the extra favourites but keeps them", () => {
@@ -62,7 +64,9 @@ test("new favourites only fit below the plan's limit", () => {
   assert.deepEqual(favorites.applyFavoriteChange(["a", "b", "c"], ["a", "b", "c", "n"], "free"), { ok: false, list: ["a", "b", "c"], refused: ["n"] });
   assert.deepEqual(favorites.applyFavoriteChange(["a", "b"], ["a", "b", "n"], "free"), { ok: true, list: ["a", "b", "n"], refused: [] });
   assert.equal(favorites.applyFavoriteChange(["a", "b", "c"], ["a", "b", "c", "n", "m"], "pro").ok, true);
-  assert.deepEqual(favorites.applyFavoriteChange([], ["a", "b", "c", "d", "e", "f"], "ultimate").refused, ["f"], "never more than five");
+  assert.deepEqual(favorites.applyFavoriteChange([], ["a", "b", "c", "d", "e", "f"], "pro").refused, ["f"], "Pro: five");
+  const eleven = Array.from({ length: 11 }, (_, index) => `s${index}`);
+  assert.deepEqual(favorites.applyFavoriteChange([], eleven, "ultimate").refused, ["s10"], "Ultimate: ten (#413)");
   // The star menu: the page's selection replaces the page's part only.
   assert.deepEqual(favorites.applyFavoritePageSelection(["a", "x"], { pageKeys: ["a", "b", "c"], selectedKeys: ["b"] }, "free").list, ["x", "b"]);
   assert.deepEqual(normalizeGuildSettings({ favoriteStations: ["a", "a", "b"] }).favoriteStations, ["a", "b"]);

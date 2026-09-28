@@ -12,6 +12,7 @@ import { STATIONS_COMPONENT_ID_OPEN } from "../runtime-links.js";
 import { colorSquare } from "../station-browser.js";
 import { NP_PREFIX } from "../runtime-shared.js";
 import { normalizePanelDesign } from "../../lib/panel-design.js";
+import { FAVORITES_MAX } from "../../lib/favorite-stations.js";
 
 function clip(value, max) {
   const textValue = String(value ?? "").trim();
@@ -135,12 +136,13 @@ export function buildNowPlayingPanel(input) {
     show.stations ? button(STATIONS_COMPONENT_ID_OPEN, { label: t("Sender", "Stations"), emoji: "radio", style: ButtonStyle.Primary, appId }) : null,
   ].filter(Boolean));
   const rows = [controls];
-  // #276: the server's favourite stations as quick buttons.
+  // #276: the server's favourite stations as quick buttons, five in a row
+  // (Discord's limit); Ultimate has ten, so two rows (#413).
   const favorites = (show.favorites ? input.favorites || [] : [])
     .filter((favorite) => favorite?.key && `${NP_PREFIX}fav:${favorite.key}`.length <= 100)
-    .slice(0, 5);
-  if (favorites.length) {
-    rows.push(new ActionRowBuilder().addComponents(...favorites.map((favorite) => {
+    .slice(0, FAVORITES_MAX);
+  for (let index = 0; index < favorites.length; index += 5) {
+    rows.push(new ActionRowBuilder().addComponents(...favorites.slice(index, index + 5).map((favorite) => {
       const onAir = favorite.key === station.key;
       return new ButtonBuilder()
         .setCustomId(`${NP_PREFIX}fav:${favorite.key}`)

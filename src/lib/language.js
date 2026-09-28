@@ -2,8 +2,7 @@
 // OmniFM: Language / i18n Helper Functions
 // ============================================================
 import { normalizeLanguage, getDefaultLanguage } from "../i18n.js";
-import { PLANS } from "../config/plans.js";
-import { TIERS } from "./helpers.js";
+import { planRequirementText } from "../config/plan-features.js";
 
 function resolveLanguageFromDiscordLocale(rawLocale, fallbackLanguage = getDefaultLanguage()) {
   const locale = String(rawLocale || "").trim().toLowerCase();
@@ -151,28 +150,12 @@ function translateCustomStationErrorMessage(message, language = "de") {
   return translateCatalogMessage(value, language, customStationCatalog);
 }
 
+/** Why a plan does not have something, in the reader's language (#413). */
 function getFeatureRequirementMessage(featureResult, language = "de") {
   if (!featureResult || featureResult.ok) return "";
-  if (normalizeLanguage(language, getDefaultLanguage()) !== "de") {
-    return String(featureResult.message || "Feature not available.");
-  }
-
-  const labels = {
-    hqAudio: "HQ Audio (128k Opus)",
-    ultraAudio: "Ultra HQ Audio (320k)",
-    priorityReconnect: "Priority Auto-Reconnect",
-    instantReconnect: "Instant Reconnect",
-    premiumStations: "100+ Premium-Stationen",
-    customStationURLs: "Custom-Station-URLs",
-    commandPermissions: "Rollenbasierte Command-Berechtigungen",
-    scheduledEvents: "Event-Scheduler mit Auto-Play",
-  };
-  const label = labels[featureResult.featureKey] || featureResult.featureKey || "Dieses Feature";
-  const requiredPlanName = PLANS[featureResult.requiredPlan]?.name || String(featureResult.requiredPlan || "Pro");
-  const planLabel = TIERS.free.name === "Free"
-    ? `OmniFM **${requiredPlanName}**`
-    : `**${requiredPlanName}**`;
-  return `**${label}** erfordert ${planLabel} oder höher.`;
+  const lang = normalizeLanguage(language, getDefaultLanguage()) === "de" ? "de" : "en";
+  if (featureResult.capabilityKey) return planRequirementText(featureResult.capabilityKey, lang);
+  return String(featureResult.message || (lang === "de" ? "Das gibt es in deinem Plan nicht." : "Not available on your plan."));
 }
 
 export {

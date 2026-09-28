@@ -205,8 +205,8 @@ export function createDashboardSettingsRouteHandler(deps) {
         }
 
         if (body?.incidentAlerts && typeof body.incidentAlerts === "object") {
-          if (!serverHasCapability(guildInfo.id, "exports_webhooks")) {
-            sendLocalizedError(res, 403, language, "Incident-Alerts sind nur fuer Ultimate verfuegbar.", "Incident alerts are only available for Ultimate.");
+          if (!serverHasCapability(guildInfo.id, "incident_alerts")) {
+            sendLocalizedError(res, 403, language, "Ausfall-Meldungen gibt es ab Pro.", "Outage alerts come with Pro.");
             return true;
           }
           const validatedIncidentAlerts = validateDashboardIncidentAlertsConfig(body.incidentAlerts);

@@ -8,6 +8,7 @@ import {
 import { clipText } from "../lib/helpers.js";
 import { getTier, getServerPlanConfig } from "../core/entitlements.js";
 import { PLANS, BRAND } from "../config/plans.js";
+import { catalogPlanContext } from "./plan-texts.js";
 import {
   DASHBOARD_URL,
   WEBSITE_URL,
@@ -43,6 +44,7 @@ export function buildRuntimeHelpMessage(runtime, interaction, section = "overvie
       premium: withLanguageParam(BRAND.upgradeUrl || WEBSITE_URL, language),
     },
     applicationId: interaction?.applicationId || runtime.client?.application?.id || null,
+    planContext: catalogPlanContext(),
   });
 }
 

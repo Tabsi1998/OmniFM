@@ -11,7 +11,7 @@ import {
   getFeatureRequirementMessage,
 } from "../../lib/language.js";
 import { clearBotGuild } from "../../bot-state.js";
-import { requireFeature } from "../../core/entitlements.js";
+import { requireCapability } from "../../core/entitlements.js";
 import {
   resetCommandPermissions,
   getGuildCommandPermissionRules,
@@ -90,7 +90,7 @@ const permissionMethods = {
 
     const { t } = this.createInteractionTranslator(interaction);
 
-    const feature = requireFeature(guildId, "commandPermissions");
+    const feature = requireCapability(guildId, "role_permissions");
     if (!feature.ok) {
       return { ok: true, enforced: false };
     }
@@ -145,7 +145,7 @@ const permissionMethods = {
       return;
     }
 
-    const feature = requireFeature(guildId, "commandPermissions");
+    const feature = requireCapability(guildId, "role_permissions");
     if (!feature.ok) {
       await interaction.reply({
         content: `${getFeatureRequirementMessage(feature, language)}\nUpgrade: ${BRAND.upgradeUrl || "https://discord.gg/UeRkfGS43R"}`,

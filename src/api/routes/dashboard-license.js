@@ -10,8 +10,6 @@ export function createDashboardLicenseRouteHandler(deps) {
     getLicense,
     getLocalizedJsonBodyError,
     isValidEmailAddress,
-    languagePick,
-    linkServerToLicense,
     maskDashboardEmail,
     methodNotAllowed,
     normalizeDuration,
@@ -22,8 +20,6 @@ export function createDashboardLicenseRouteHandler(deps) {
     resolveDashboardRequestLanguage,
     sendJson,
     sendLocalizedError,
-    serverHasCapability,
-    unlinkServerFromLicense,
     updateLicenseContactEmail,
   } = deps;
 
@@ -47,7 +43,7 @@ export function createDashboardLicenseRouteHandler(deps) {
       }
 
       if (req.method === "GET") {
-        sendJson(res, 200, buildDashboardLicensePayload(guildInfo, session));
+        sendJson(res, 200, buildDashboardLicensePayload(guildInfo));
         return true;
       }
 
@@ -92,7 +88,7 @@ export function createDashboardLicenseRouteHandler(deps) {
 
           sendJson(res, 200, {
             success: true,
-            ...buildDashboardLicensePayload(guildInfo, session),
+            ...buildDashboardLicensePayload(guildInfo),
           });
         } catch (err) {
           const status = Number(err?.status || 0);
@@ -119,211 +115,6 @@ export function createDashboardLicenseRouteHandler(deps) {
       }
 
       methodNotAllowed(res, ["GET", "PUT"]);
-      return true;
-    }
-
-    if (requestUrl.pathname === "/api/dashboard/license/workspace") {
-      const { language } = getDashboardRequestTranslatorCompat(resolveDashboardRequestLanguage, req, requestUrl);
-      if (req.method !== "POST") {
-        methodNotAllowed(res, ["POST"]);
-        return true;
-      }
-
-      const { session } = getDashboardSession(req);
-      if (!session) {
-        sendLocalizedError(res, 401, language, "Nicht eingeloggt.", "Not signed in.");
-        return true;
-      }
-
-      const guildInfo = resolveDashboardGuildForSession(session, requestUrl.searchParams.get("serverId"));
-      if (!guildInfo) {
-        sendLocalizedError(res, 403, language, "Kein Zugriff auf diesen Server.", "No access to this server.");
-        return true;
-      }
-
-      if (!serverHasCapability(guildInfo.id, "license_workspace")) {
-        sendLocalizedError(
-          res,
-          403,
-          language,
-          "Der Lizenz-Workspace ist nur fuer Ultimate verfuegbar.",
-          "The license workspace is only available for Ultimate."
-        );
-        return true;
-      }
-
-      const license = getLicense(guildInfo.id);
-      if (!license?.id) {
-        sendLocalizedError(
-          res,
-          404,
-          language,
-          "Fuer diesen Server wurde keine aktive Lizenz gefunden.",
-          "No active license was found for this server."
-        );
-        return true;
-      }
-      if (!license.active || license.expired) {
-        sendLocalizedError(
-          res,
-          409,
-          language,
-          "Abgelaufene oder inaktive Lizenzen koennen im Workspace nicht verwaltet werden.",
-          "Expired or inactive licenses cannot be managed in the workspace."
-        );
-        return true;
-      }
-
-      try {
-        const body = await readJsonBody();
-        const action = String(body?.action || "").trim().toLowerCase();
-        const targetServerId = String(body?.targetServerId || body?.guildId || "").trim();
-        const t = (de, en) => languagePick(language, de, en);
-
-        if (!["link", "unlink"].includes(action)) {
-          sendLocalizedError(
-            res,
-            400,
-            language,
-            "Ungueltige Workspace-Aktion.",
-            "Invalid workspace action."
-          );
-          return true;
-        }
-
-        if (!/^\d{17,22}$/.test(targetServerId)) {
-          sendLocalizedError(
-            res,
-            400,
-            language,
-            "Bitte einen gueltigen Server auswaehlen.",
-            "Please select a valid server."
-          );
-          return true;
-        }
-
-        const targetGuild = resolveDashboardGuildForSession(session, targetServerId);
-        if (!targetGuild) {
-          sendLocalizedError(
-            res,
-            403,
-            language,
-            "Kein Zugriff auf den ausgewaehlten Server.",
-            "No access to the selected server."
-          );
-          return true;
-        }
-
-        if (action === "link") {
-          const targetLicense = getLicense(targetGuild.id);
-          if (
-            targetLicense?.id
-            && String(targetLicense.id) !== String(license.id)
-            && targetLicense.active
-            && !targetLicense.expired
-          ) {
-            sendLocalizedError(
-              res,
-              409,
-              language,
-              "Dieser Server hat bereits eine andere aktive Lizenz. Entferne sie zuerst dort, bevor du ihn in diesen Workspace verschiebst.",
-              "This server already has another active license. Remove it there first before moving it into this workspace."
-            );
-            return true;
-          }
-
-          const result = linkServerToLicense(targetGuild.id, license.id);
-          if (!result.ok) {
-            const message = String(result.message || "");
-            if (/already linked/i.test(message)) {
-              sendJson(res, 200, {
-                success: true,
-                action,
-                message: t(
-                  `Server ${targetGuild.name} ist bereits mit dieser Lizenz verknuepft.`,
-                  `Server ${targetGuild.name} is already linked to this license.`
-                ),
-                ...buildDashboardLicensePayload(guildInfo, session),
-              });
-              return true;
-            }
-            if (/seat/i.test(message)) {
-              sendLocalizedError(
-                res,
-                409,
-                language,
-                "Alle Server-Slots dieser Lizenz sind belegt. Entferne zuerst einen Server oder upgrade auf mehr Seats.",
-                "All server seats of this license are occupied. Remove a server first or upgrade to more seats."
-              );
-              return true;
-            }
-            sendJson(res, 400, { error: message || t("Server konnte nicht verknuepft werden.", "Server could not be linked.") });
-            return true;
-          }
-
-          sendJson(res, 200, {
-            success: true,
-            action,
-            message: t(
-              `Server ${targetGuild.name} wurde dem Lizenz-Workspace hinzugefuegt.`,
-              `Server ${targetGuild.name} was added to the license workspace.`
-            ),
-            ...buildDashboardLicensePayload(guildInfo, session),
-          });
-          return true;
-        }
-
-        const targetLicense = getLicense(targetGuild.id);
-        if (!targetLicense?.id || String(targetLicense.id) !== String(license.id)) {
-          sendLocalizedError(
-            res,
-            400,
-            language,
-            "Dieser Server ist nicht mit der aktuellen Lizenz verknuepft.",
-            "This server is not linked to the current license."
-          );
-          return true;
-        }
-
-        const result = unlinkServerFromLicense(targetGuild.id, license.id);
-        if (!result.ok) {
-          sendJson(res, 400, {
-            error: result.message || t("Server konnte nicht entfernt werden.", "Server could not be removed."),
-          });
-          return true;
-        }
-
-        sendJson(res, 200, {
-          success: true,
-          action,
-          message: t(
-            `Server ${targetGuild.name} wurde aus dem Lizenz-Workspace entfernt.`,
-            `Server ${targetGuild.name} was removed from the license workspace.`
-          ),
-          ...buildDashboardLicensePayload(guildInfo, session),
-        });
-      } catch (err) {
-        const status = Number(err?.status || 0);
-        if (status === 400 || status === 413) {
-          sendJson(res, status, { error: getLocalizedJsonBodyError(language, status) });
-          return true;
-        }
-        logError("[DashboardLicenseWorkspace] Update failed", err, {
-          context: {
-            source: "dashboard-license-workspace",
-            route: "/api/dashboard/license/workspace",
-            guildId: guildInfo?.id || "",
-          },
-          includeStack: true,
-        });
-        sendLocalizedError(
-          res,
-          500,
-          language,
-          "Der Lizenz-Workspace konnte nicht aktualisiert werden.",
-          "The license workspace could not be updated."
-        );
-      }
       return true;
     }
 

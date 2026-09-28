@@ -127,11 +127,6 @@ const messages = {
     freePrice: '0 EUR',
     monthLabel: ({ count }) => count === 1 ? '1 Monat' : `${count} Monate`,
     seatsLabelInline: ({ count }) => count === 1 ? '1 Server' : `${count} Server`,
-    fallbackFeatures: {
-      free: ['Bis zu 2 Bots', '20 Free Stationen', 'Standard Audio (64k)', 'Standard Reconnect'],
-      pro: ['Bis zu 8 Bots', '120 Stationen (Free + Pro)', 'HQ Audio (128k Opus)', 'Priority Reconnect', 'Rollenbasierte Berechtigungen', 'Event-Scheduler'],
-      ultimate: ['Bis zu 16 Bots', 'Alle Stationen + Custom URLs', 'Ultra HQ Audio (320k)', 'Instant Reconnect', 'Rollenbasierte Berechtigungen'],
-    },
   },
   footer: {
     stats: {
