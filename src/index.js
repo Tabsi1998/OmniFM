@@ -532,7 +532,7 @@ setInterval(async () => {
       const tierName = TIERS[tierKey]?.name || tierKey;
       const emailLanguage = normalizeLanguage(lic.preferredLanguage || lic.language, getDefaultLanguage());
       const contactEmail = String(lic.contactEmail || "").trim().toLowerCase();
-      const daysUntilExpiry = Math.ceil((new Date(lic.expiresAt) - new Date()) / 86400000);
+      const daysUntilExpiry = Math.ceil((new Date(lic.expiresAt).getTime() - Date.now()) / 86400000);
 
       if (daysUntilExpiry > 0) {
         for (let idx = 0; idx < EXPIRY_REMINDER_DAYS.length; idx++) {

@@ -105,6 +105,14 @@ export function buildEventActionRows(language = "de", {
   return rows;
 }
 
+/**
+ * @param {string} language
+ * @param {{
+ *   tone?: string, title?: string, description?: string,
+ *   fields?: { name?: string, value?: any, inline?: boolean }[],
+ *   includePlayback?: boolean, includePremium?: boolean, includeSupport?: boolean,
+ * }} [options]
+ */
 export function buildEventNoticePayload(language, {
   tone = "info",
   title,

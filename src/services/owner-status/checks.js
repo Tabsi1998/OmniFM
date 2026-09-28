@@ -280,6 +280,7 @@ export async function checkStations({ report = [] }) {
  * against what has to be there. Yellow, not red: nothing is broken, and a
  * red check would page the operator.
  */
+/** @param {{ ownerConfig?: any, env?: NodeJS.ProcessEnv }} options */
 export function checkLegal({ ownerConfig = {}, env = process.env }) {
   const answers = { legal: legalNotice(ownerConfig, env), privacy: privacyNotice(ownerConfig, env), terms: termsNotice(ownerConfig, env) };
   const items = legalChecklist(answers, ownerConfig?.company?.legalNotApplicable);

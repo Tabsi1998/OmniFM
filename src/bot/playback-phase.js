@@ -110,7 +110,7 @@ function recordPlaybackPhase(runtime, guildId, state, reason = "") {
 }
 
 /** One line per recent transition, newest last, for /diag. */
-function describePlaybackPhaseHistory(state, { limit = 5, t = (de) => de } = {}) {
+function describePlaybackPhaseHistory(state, { limit = 5, t = (de, _en) => de } = {}) {
   const history = Array.isArray(state?.playbackPhaseHistory) ? state.playbackPhaseHistory.slice(-limit) : [];
   return history.map((entry) => {
     const when = `<t:${Math.floor(Number(entry.at || 0) / 1000)}:R>`;

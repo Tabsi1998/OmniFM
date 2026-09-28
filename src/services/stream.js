@@ -100,7 +100,7 @@ async function createResource(url, volume, qualityPreset, botName, bitrateOverri
       stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env, AV_LOG_FORCE_NOCOLOR: "1" }
     });
-    const source = Readable.fromWeb(streamResponse.body);
+    const source = Readable.fromWeb(/** @type {import("node:stream/web").ReadableStream} */ (streamResponse.body));
     source.once("error", (error) => {
       try {
         ffmpeg.stdin.destroy(error);
@@ -146,7 +146,7 @@ async function createResource(url, volume, qualityPreset, botName, bitrateOverri
     return { resource, process: ffmpeg };
   }
 
-  const stream = Readable.fromWeb(streamResponse.body);
+  const stream = Readable.fromWeb(/** @type {import("node:stream/web").ReadableStream} */ (streamResponse.body));
   networkRecoveryCoordinator.noteSuccess(`${botName} fetch-stream`, recoveryOptions);
 
   // ---- Fix: demuxProbe() kann bei kaputten Streams ewig haengen ----

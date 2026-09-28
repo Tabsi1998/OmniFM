@@ -277,6 +277,9 @@ async function observeRecoveringGuildVoicePresence(runtime, guildRows = []) {
   return observed;
 }
 
+/**
+ * @param {{ runtime?: any, shutdown?: Function | null, exit?: (code: number) => void, env?: NodeJS.ProcessEnv }} [options]
+ */
 function startWorkerAutohealMonitor({
   runtime,
   shutdown = null,

@@ -11,16 +11,6 @@
     "skipLibCheck": true
   },
   "include": [
-    "src/lib/**/*.js",
-    "src/core/**/*.js",
-    "src/discord/**/*.js",
-    "src/premium/**/*.js",
-    "src/*-store.js",
-    "src/bot-state.js",
-    "src/bot-config.js",
-    "src/custom-stations.js",
-    "src/email.js",
-    "src/i18n.js",
-    "src/stations-cli.js"
+    "src/**/*.js"
   ]
 }

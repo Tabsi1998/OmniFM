@@ -57,6 +57,11 @@ export function buildNewYearGreeting({ year, t, appId = null }) {
 /**
  * Sends the greeting if it is time, OmniFM plays and the channel is the
  * panel's; returns whether it went out.
+ * @param {any} runtime
+ * @param {{
+ *   guildId?: string, channel?: any, season?: any, now?: Date, db?: any,
+ *   isPlaying?: (runtime: any, guildId: string, state?: any) => boolean,
+ * }} [options]
  */
 export async function sendNewYearGreeting(runtime, {
   guildId,

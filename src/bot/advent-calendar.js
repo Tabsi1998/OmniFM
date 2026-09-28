@@ -26,6 +26,7 @@ const WINTRY_GENRES = /winter|christmas|xmas|chill|ambient|lounge|jazz|lo-?fi|cl
  * Which door is open today on this server (1-24), or null. The part and the
  * Advent switches of the owner and the server decide, the date counts in the
  * server's time zone; the owner's Advent or Christmas test opens one any day.
+ * @param {{ now?: Date, guildId?: string, settings?: any, owner?: any }} [options]
  */
 export function adventDoorFor({ now = new Date(), guildId = "", settings = {}, owner = {} } = {}) {
   const server = normalizeSeasonSettings(settings?.seasonDecor);
@@ -73,6 +74,7 @@ export function buildAdventDoor({ day, language = "en", tip = null, canPlay = fa
     `**${labels[door.kind]}** ${door.text[language] || door.text.en}`,
   ];
   if (door.answer) lines.push(`${labels.answer}: ||${door.answer[language] || door.answer.en}||`);
+  /** @type {any[]} the container's blocks: texts and sections */
   const blocks = [ui.text(lines.join("\n"))];
   if (tip) {
     const tipLine = `📻 **${labels.tip}:** ${tip.name}${tip.genre ? ` · ${tip.genre}` : ""}`;

@@ -178,7 +178,9 @@ function runProcess(command, args, { timeoutMs = 15_000, input = null } = {}) {
         resolve({ stdout, stderr });
         return;
       }
-      const error = new Error(`${command} exited with code ${code}: ${clipText(stderr || stdout, 300)}`);
+      const error = /** @type {Error & { code?: number, stdout?: string, stderr?: string, command?: string }} */ (
+        new Error(`${command} exited with code ${code}: ${clipText(stderr || stdout, 300)}`)
+      );
       error.code = code;
       error.stdout = stdout;
       error.stderr = stderr;
@@ -423,7 +425,7 @@ async function captureFingerprintAttempt(url) {
       }
       throw new Error(`stream request failed with status ${response.status}`);
     }
-    source = Readable.fromWeb(response.body);
+    source = Readable.fromWeb(/** @type {import("node:stream/web").ReadableStream} */ (response.body));
 
     await runProcess(
       "ffmpeg",

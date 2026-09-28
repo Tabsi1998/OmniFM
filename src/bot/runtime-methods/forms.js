@@ -110,11 +110,15 @@ const formMethods = {
    * Keeps the uploaded logo (#340): Discord's attachment link expires, so the
    * picture is fetched once, cut to 256x256 and stored. Returns a line for
    * the reply; the station is saved either way.
+   * @param {string} guildId
+   * @param {string} key
+   * @param {{ url?: string }} logo
+   * @param {{ t?: (de: string, en: string) => string, fetchLogo?: (url: string) => Promise<Buffer | null> }} [options]
    */
   async storeStationFormLogo(guildId, key, logo, { t, fetchLogo = fetchUploadedLogo } = {}) {
     const buffer = await fetchLogo(logo.url).catch(() => null);
     const processed = await processStationLogo(buffer);
-    if (!processed.ok) {
+    if (processed.ok === false) {
       const reason = processed.error === "too-large"
         ? t("es ist größer als 256 KB", "it is larger than 256 KB")
         : processed.error === "wrong-type"
@@ -123,8 +127,9 @@ const formMethods = {
       return `
 ${t(`Das Logo wurde nicht übernommen: ${reason}.`, `The logo was not taken: ${reason}.`)}`;
     }
-    const saved = await saveStationLogo(guildId, key, processed.png).catch((error) => ({ ok: false, error: error?.message || "save_failed" }));
-    if (!saved.ok) {
+    const saved = await saveStationLogo(guildId, key, processed.png)
+      .catch((error) => ({ ok: /** @type {const} */ (false), error: String(error?.message || "save_failed") }));
+    if (saved.ok === false) {
       log("WARN", `[${this.config?.name}] Logo nicht gespeichert guild=${guildId} key=${key}: ${saved.error}`);
       return `
 ${t("Das Logo konnte gerade nicht gespeichert werden.", "The logo could not be saved right now.")}`;

@@ -42,9 +42,9 @@ function tile(value, label, change = "") {
  * @param {object} input
  * @param {(de: string, en: string) => string} input.t
  * @param {string} input.guildName
- * @param {object} input.report     from buildWeeklyDigestReport()
+ * @param {ReturnType<typeof import("../lib/weekly-digest-report.js").buildWeeklyDigestReport>} input.report
  * @param {"team"|"public"} [input.audience]
- * @param {object} [input.urls]     { dashboard }
+ * @param {{ dashboard?: string }} [input.urls]
  */
 export function buildWeeklyDigestPayload({ t, guildName = "", report, audience = "team", urls = {} }) {
   const team = audience !== "public";
@@ -69,6 +69,7 @@ export function buildWeeklyDigestPayload({ t, guildName = "", report, audience =
   }
 
   const { week, changes } = report;
+  /** @type {any[]} the container's blocks: texts, sections, separators */
   const blocks = [
     head,
     ui.separator(),

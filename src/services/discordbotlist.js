@@ -174,6 +174,7 @@ function buildDiscordBotListHttpError(method, path, response, parsed, rawText) {
   return new Error(`${method} ${path} failed (${status}): ${detail}`);
 }
 
+/** @param {string} method @param {string} path @param {{ token?: string, body?: any, authMode?: string }} [options] */
 async function discordBotListRequest(method, path, { token, body, authMode = "raw" } = {}) {
   const endpoint = `${DISCORD_BOT_LIST_API_BASE}${path}`;
   const headers = {

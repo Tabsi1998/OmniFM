@@ -75,7 +75,7 @@ function normalizeLicense(license, fallbackId = null) {
   if (!license) return null;
   const expiresAt = license.expiresAt || null;
   const expired = expiresAt ? new Date(expiresAt) <= new Date() : false;
-  const remainingDays = expiresAt ? Math.max(0, Math.ceil((new Date(expiresAt) - new Date()) / 86400000)) : null;
+  const remainingDays = expiresAt ? Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86400000)) : null;
   return {
     ...license,
     id: license.id || fallbackId || null,
@@ -151,7 +151,7 @@ function buildInviteOverviewForTier(botConfigs, tier) {
 async function resolveRuntimeClientId(botConfig) {
   try {
     const rest = new REST({ version: "10" }).setToken(botConfig.token);
-    const me = await rest.get(Routes.user("@me"));
+    const me = /** @type {{ id?: string }} */ (await rest.get(Routes.user("@me")));
     const runtimeId = String(me?.id || "").trim();
     if (runtimeId && runtimeId !== String(botConfig.clientId || "").trim()) {
       info(`CLIENT_ID mismatch bei ${botConfig.name}: env=${botConfig.clientId}, runtime=${runtimeId}`);
@@ -420,7 +420,7 @@ async function run() {
         console.log("  " + "-".repeat(75));
         for (const [id, lic] of entries) {
           const expired = new Date(lic.expiresAt) <= new Date();
-          const daysLeft = Math.max(0, Math.ceil((new Date(lic.expiresAt) - new Date()) / 86400000));
+          const daysLeft = Math.max(0, Math.ceil((new Date(lic.expiresAt).getTime() - Date.now()) / 86400000));
           const status = expired ? "\x1b[31mABGELAUFEN\x1b[0m" : `${daysLeft}`;
           const tierStr = (lic.plan || "?").padEnd(10);
           const expStr = formatDate(lic.expiresAt).padEnd(20);

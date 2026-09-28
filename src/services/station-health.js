@@ -96,6 +96,11 @@ function reportTransition(previous, entry) {
  * @property {string|null} error
  * @property {number} consecutiveFailures
  * @property {number} consecutiveSuccesses
+ * @property {boolean} [ok]
+ * @property {boolean} [reachable]
+ * @property {boolean} [discordOk]
+ * @property {string | null} [streamName]      what the stream calls itself (icy-name), #325
+ * @property {{ from: string, to: string, at: number } | null} [streamNameChange]
  */
 
 const STREAM_NAME_CHANGE_KEEP_MS = 24 * 60 * 60_000;
@@ -200,6 +205,7 @@ async function checkStation(key, name, url) {
       // ignore
     }
 
+    /** @type {StationHealthEntry} */
     const entry = {
       key,
       name,
@@ -223,6 +229,7 @@ async function checkStation(key, name, url) {
     const isTimeout = err?.name === "AbortError" || String(err?.message || "").includes("abort");
     const errorMsg = isTimeout ? `Timeout nach ${STATION_HEALTH_TIMEOUT_MS}ms` : String(err?.message || err);
 
+    /** @type {StationHealthEntry} */
     const entry = {
       key,
       name,
@@ -293,6 +300,7 @@ function startStationHealthService(getStationsFn) {
     if (tickRunning || !isRunning) return;
     tickRunning = true;
     try {
+      /** @type {{ stations?: Record<string, { name: string, url: string }> }} */
       const stationsData = getStationsFn?.() || {};
       const stationEntries = Object.entries(stationsData?.stations || {})
         .filter(([, s]) => s?.url && typeof s.url === "string")

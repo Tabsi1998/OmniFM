@@ -75,7 +75,7 @@ async function buildWeeklyDigestMessage(guildId, { guildName = "", config = {}, 
     t,
     guildName,
     report,
-    audience: digest.audience,
+    audience: digest.audience === "public" ? "public" : "team",
     urls: { dashboard: withLanguageParam(DASHBOARD_URL, digest.language) },
   });
   return { report, payload };

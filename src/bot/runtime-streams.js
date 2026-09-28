@@ -184,6 +184,12 @@ export function classifyFfmpegExitDetail(line) {
   return null;
 }
 
+/**
+ * @param {{
+ *   reason?: string, earlyIdle?: boolean, recentProcessFailure?: boolean, recentNetworkFailure?: boolean,
+ *   lastProcessExitDetail?: any, idleRestartStreak?: number,
+ * }} [options]
+ */
 export function resolveStreamRestartReason({
   reason,
   earlyIdle = false,

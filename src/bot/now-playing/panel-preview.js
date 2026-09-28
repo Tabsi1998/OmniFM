@@ -15,6 +15,11 @@ const SAMPLE_FAVORITES = [
  * The input the preview hands the panel: a song playing, three listeners, a
  * few earlier songs. `sample` replaces parts of it (station, track,
  * playback), for the website's live demos (#431).
+ * @param {{
+ *   design?: any, language?: string, applicationId?: string | null, planTier?: string,
+ *   favorites?: { key: string, name?: string, color?: string | null }[] | null, workerName?: string,
+ *   sample?: Record<string, any>,
+ * }} [options]
  */
 export function buildPanelPreviewInput({ design, language = "de", applicationId = null, planTier = "pro", favorites = null, workerName = "OmniFM", sample = {} } = {}) {
   const t = (de, en) => (language === "de" ? de : en);

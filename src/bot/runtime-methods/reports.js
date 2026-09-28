@@ -68,6 +68,14 @@ export const reportMethods = {
    * commander, rung through by a worker. One report per person and five
    * minutes.
    */
+  /**
+   * @param {any} interaction
+   * @param {{
+   *   kind: string, text: string, reason?: string | null, consent?: { public?: boolean, notify?: boolean },
+   *   source?: string, withPlayback?: boolean,
+   * }} report
+   * @param {{ now?: number }} [options]
+   */
   async submitReport(interaction, { kind, text, reason = null, consent = {}, source = "command", withPlayback = false }, { now = Date.now() } = {}) {
     const { t, language } = this.createInteractionTranslator(interaction);
     const userId = String(interaction.user?.id || "");
@@ -95,7 +103,7 @@ export const reportMethods = {
     const created = settings.teamChannelId
       ? await createProblemReport(report, { now }).catch((err) => ({ error: String(err?.message || err) }))
       : { error: "unconfigured" };
-    if (!created.report) {
+    if (!("report" in created) || !created.report) {
       // Nothing goes to Discord, and nothing public: the owner console keeps it.
       await recordReportIncident(report, created.error);
       await interaction.reply(buildNoticePayload({

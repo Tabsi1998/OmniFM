@@ -181,7 +181,7 @@ const permissionMethods = {
         `${t("Rolle", "Role")} ${role.toString()} ${t("ist jetzt für", "is now")} \`/${command}\` ${sub === "allow" ? t("erlaubt", "allowed") : t("gesperrt", "blocked")}.\n` +
           `Allow: ${this.formatPermissionRoleMentions(result.rule.allowRoleIds)}\n` +
           `Deny: ${this.formatPermissionRoleMentions(result.rule.denyRoleIds)}`,
-        { flags: MessageFlags.Ephemeral }
+        { ephemeral: true }
       );
       return;
     }
@@ -199,7 +199,7 @@ const permissionMethods = {
         `${t("Regel für", "Rule for")} ${role.toString()} ${t("bei", "on")} \`/${command}\` ${result.changed ? t("entfernt", "removed") : t("war nicht gesetzt", "was not set")}.\n` +
           `Allow: ${this.formatPermissionRoleMentions(result.rule.allowRoleIds)}\n` +
           `Deny: ${this.formatPermissionRoleMentions(result.rule.denyRoleIds)}`,
-        { flags: MessageFlags.Ephemeral }
+        { ephemeral: true }
       );
       return;
     }
@@ -258,7 +258,7 @@ const permissionMethods = {
       const header = command
         ? t(`Regeln für \`/${command}\`:`, `Rules for \`/${command}\`:`)
         : t(`Aktive Command-Rollenregeln (${lines.length}):`, `Active command role rules (${lines.length}):`);
-      await this.respondLongInteraction(interaction, `${header}\n${lines.join("\n")}`, { flags: MessageFlags.Ephemeral });
+      await this.respondLongInteraction(interaction, `${header}\n${lines.join("\n")}`, { ephemeral: true });
       return;
     }
 

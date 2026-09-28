@@ -44,6 +44,7 @@ const SETUP_SESSION_TTL_MS = 30 * 60_000;
 
 // Channels meant for bots or the team. The welcome never lands in a
 // community channel such as #general (#271).
+/** @type {[string, number][]} */
 const ONBOARDING_CHANNEL_SCORES = [
   ["system", 400],
   ["setup", 380],

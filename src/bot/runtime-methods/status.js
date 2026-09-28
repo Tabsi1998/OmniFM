@@ -25,6 +25,7 @@ const statusMethods = {
     if (!normalizedGuildId) return [];
     const state = this.guildState.get(normalizedGuildId);
     if (!state?.currentStationKey || !isRuntimePlaybackActive(this, normalizedGuildId, state)) return [];
+    /** @type {{ stationKey?: string | null, stationName?: string | null, channelId?: string | null }} */
     const info = this.getGuildInfo(normalizedGuildId) || {};
     return [{
       runtime: this,

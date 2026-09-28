@@ -47,7 +47,7 @@ export function voiceChannelPermissions(channelType) {
 }
 
 /** The permissions from `needed` that `perms` lacks, as labels in the user's language. */
-export function missingPermissionLabels(perms, needed, t = (de) => de) {
+export function missingPermissionLabels(perms, needed, t = (de, _en) => de) {
   return needed
     .filter((name) => !perms?.has?.(PermissionFlagsBits[name]))
     .map((name) => t(...(PERMISSION_LABELS[name] || [name, name])));
@@ -67,7 +67,7 @@ export function parseSetupCustomId(customId) {
 }
 
 /** Text and announcement channels in server order, for step ③. */
-export function buildPanelChannelOptions(guild, selectedId = null, { t = (de) => de, canUse = null } = {}) {
+export function buildPanelChannelOptions(guild, selectedId = null, { t = (de, _en) => de, canUse = null } = {}) {
   const channels = Array.from(guild?.channels?.cache?.values?.() || [])
     .filter((channel) => channel && (channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement))
     .sort((left, right) => (Number(left?.rawPosition) || 0) - (Number(right?.rawPosition) || 0));
@@ -132,6 +132,7 @@ function linkButton(label, url) {
 /**
  * The public welcome after the invite: what OmniFM is, the three steps, and
  * the button that opens the private setup.
+ * @param {{ t: (de: string, en: string) => string, guildName?: string, urls?: { dashboard?: string, guide?: string, support?: string, permissionsHelp?: string }, applicationId?: string | null }} input
  */
 export function buildWelcomePayload({ t, guildName = "", urls = {}, applicationId = null }) {
   const steps = [
@@ -173,6 +174,10 @@ export function buildWelcomePayload({ t, guildName = "", urls = {}, applicationI
  * worker { ready, name, inviteUrl }, voice { options, selectedId,
  * missing }, station { options, selectedKey, selectedName }, panel
  * { options, selectedId, missing }, optional hint { kind, title, body }.
+ * @param {{
+ *   t: (de: string, en: string) => string, sessionId: string, guildName?: string, view: any,
+ *   urls?: { dashboard?: string, guide?: string, support?: string, permissionsHelp?: string }, applicationId?: string | null,
+ * }} input
  */
 export function buildSetupWizardPayload({ t, sessionId, guildName = "", view, urls = {}, applicationId = null }) {
   const { worker = {}, voice = {}, station = {}, panel = {}, hint = null } = view || {};
@@ -185,6 +190,7 @@ export function buildSetupWizardPayload({ t, sessionId, guildName = "", view, ur
     `${STEP_MARKS[panelState]} ③ ${t("Panel-Kanal", "Panel channel")}`,
   ].join("  →  ");
 
+  /** @type {any[]} the panel's blocks: texts, sections, separators, select rows */
   const body = [ui.text(progress)];
   if (hint) {
     const style = ui.NOTICE_KINDS[hint.kind] || ui.NOTICE_KINDS.info;
@@ -261,7 +267,14 @@ export function buildSetupWizardPayload({ t, sessionId, guildName = "", view, ur
   }));
 }
 
-/** The last view: the radio runs. */
+/**
+ * The last view: the radio runs.
+ * @param {{
+ *   t: (de: string, en: string) => string, workerName?: string, stationName?: string, voiceChannelId?: string,
+ *   panelChannelId?: string | null, recovering?: boolean, urls?: { dashboard?: string, guide?: string, support?: string, permissionsHelp?: string }, quickstartId?: string | null,
+ *   applicationId?: string | null,
+ * }} input
+ */
 export function buildSetupDonePayload({
   t,
   workerName = "",

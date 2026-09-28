@@ -6,10 +6,17 @@
 // says what the user reads and can do.
 
 /**
+ * A catalogued notice: its kind, the title and the body in German and
+ * English, and the button that fixes it.
+ * @typedef {{ kind: string, title: [string, string], body: (params?: any) => [string, string], fix: string | null }} CatalogNotice
+ */
+
+/**
  * code -> { kind, title: [de, en], body: (params) => [de, en], fix }
  * fix: "quickstart" | "stations" | "premium" | "permissions" | null
+ * @type {Record<string, CatalogNotice>}
  */
-export const NOTICE_CATALOG = Object.freeze({
+const CATALOG = {
   "guild-only": {
     kind: "warning",
     title: ["Nur auf Servern", "Servers only"],
@@ -97,6 +104,8 @@ export const NOTICE_CATALOG = Object.freeze({
     ],
     fix: null,
   },
-});
+};
+
+export const NOTICE_CATALOG = Object.freeze(CATALOG);
 
 export const NOTICE_CODES = Object.freeze(Object.keys(NOTICE_CATALOG));

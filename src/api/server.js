@@ -265,13 +265,14 @@ function startWebServer(runtimes, { forwardRuntimeTo = "" } = {}) {
     }
 
     // A route may allow a larger body, e.g. the bot look's pictures (#280).
+    /** @param {{ maxBytes?: number }} [options] */
     async function readJsonBody({ maxBytes } = {}) {
       const raw = await readRawBody(maxBytes);
       if (!raw.trim()) return {};
       try {
         return JSON.parse(raw);
       } catch {
-        const err = new Error("Invalid JSON");
+        const err = /** @type {Error & { status?: number }} */ (new Error("Invalid JSON"));
         err.status = 400;
         throw err;
       }

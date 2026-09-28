@@ -260,7 +260,7 @@ export function readProblemReport(fields) {
   };
 }
 
-export function problemReasonLabel(reason, t = (de) => de) {
+export function problemReasonLabel(reason, t = (de, _en) => de) {
   const entry = PROBLEM_REASONS.find((item) => item.value === reason);
   return entry ? t(entry.de, entry.en) : reason;
 }

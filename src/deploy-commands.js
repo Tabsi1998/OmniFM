@@ -35,7 +35,7 @@ for (const bot of bots) {
   try {
     const rest = new REST({ version: "10" }).setToken(bot.token);
     // eslint-disable-next-line no-await-in-loop -- one bot after the other, as Discord's rate limit wants
-    const me = await rest.get(Routes.user("@me"));
+    const me = /** @type {{ id?: string }} */ (await rest.get(Routes.user("@me")));
     const runtimeClientId = String(me?.id || bot.clientId || "").trim();
     if (!runtimeClientId) {
       throw new Error("Application ID konnte nicht aufgelöst werden.");

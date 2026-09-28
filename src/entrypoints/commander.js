@@ -374,7 +374,7 @@ setInterval(async () => {
       const tierName = TIERS[tierKey]?.name || tierKey;
       const emailLanguage = normalizeLanguage(license.preferredLanguage || license.language, getDefaultLanguage());
       const contactEmail = String(license.contactEmail || "").trim().toLowerCase();
-      const daysUntilExpiry = Math.ceil((new Date(license.expiresAt) - new Date()) / 86400000);
+      const daysUntilExpiry = Math.ceil((new Date(license.expiresAt).getTime() - Date.now()) / 86400000);
 
       if (daysUntilExpiry > 0) {
         for (let idx = 0; idx < EXPIRY_REMINDER_DAYS.length; idx += 1) {

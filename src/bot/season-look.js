@@ -45,7 +45,7 @@ export function seasonSignature(season) {
 
 /**
  * The panel's colour and top line, or null when the panel part is off.
- * @param {object} season  from seasonForServer
+ * @param {ReturnType<typeof import("../lib/seasons.js").seasonForServer>} season
  * @param {{ t: (de: string, en: string) => string, appId?: string|null, nowMs?: number }} options
  */
 export function seasonPanelLook(season, { t, appId = null, nowMs = Date.now() }) {

@@ -75,7 +75,7 @@ function scheduleRuntimeRestoreResume(runtime, guildId, data, stations, delayMs,
 
   const timer = setTimeout(() => {
     timers.delete(key);
-    restoreRuntimeGuildEntry(runtime, key, data, stations, { source: "restore-blocked-resume", reason }).catch((err) => {
+    restoreRuntimeGuildEntry(runtime, key, data, stations, { source: "restore-blocked-resume" }).catch((err) => {
       const state = runtime.guildState?.get?.(key);
       logError(`[${runtime.config.name}] Restore-Resume fehlgeschlagen`, err, {
         context: buildRuntimeLogContext(runtime, key, state, {
@@ -111,7 +111,7 @@ function scheduleRuntimeRestoreRetry(runtime, guildId, data, stations, reason = 
 
   const timer = setTimeout(() => {
     timers.delete(key);
-    restoreRuntimeGuildEntry(runtime, key, data, stations, { source: "restore-retry", reason }).catch((err) => {
+    restoreRuntimeGuildEntry(runtime, key, data, stations, { source: "restore-retry" }).catch((err) => {
       const state = runtime.guildState?.get?.(key);
       logError(`[${runtime.config.name}] Restore-Retry fehlgeschlagen`, err, {
         context: buildRuntimeLogContext(runtime, key, state, {

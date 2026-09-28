@@ -26,7 +26,7 @@ function normalizeRemoteVolume(value, fallback = 100) {
 /**
  * The commander's view of a worker's server, rebuilt from its status snapshot.
  * @param {Record<string, any>} [detail]
- * @returns {Partial<import("../lib/types.js").GuildPlaybackState>}
+ * @returns {Partial<import("../lib/types.js").GuildPlaybackState> & Record<string, any>}
  */
 function buildRemoteGuildState(detail = {}) {
   const channelId = String(detail?.channelId || "").trim();

@@ -39,9 +39,6 @@ import { sendNewYearGreeting } from "../season-greeting.js";
 import { adventDoorFor } from "../advent-calendar.js";
 import { eggSignature } from "../easter-eggs.js";
 import { ownerSettings } from "../../lib/owner-settings-cache.js";
-import { nowPlayingStatsMethods } from "./stats-methods.js";
-import { nowPlayingEmbedMethods } from "./embed-methods.js";
-import { nowPlayingControlMethods } from "./control-methods.js";
 
 // #266: the panel is a Components V2 container. NOW_PLAYING_LAYOUT=classic
 // keeps the old embed for one release as a way back.
@@ -77,9 +74,6 @@ export function httpsUrlOrNull(value) {
 }
 
 const nowPlayingMethods = {
-  ...nowPlayingStatsMethods,
-  ...nowPlayingEmbedMethods,
-  ...nowPlayingControlMethods,
   logNowPlayingIssue(guildId, state, message) {
     const now = Date.now();
     const cooldownMs = 120_000;

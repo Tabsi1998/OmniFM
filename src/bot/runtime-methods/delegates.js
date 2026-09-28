@@ -307,16 +307,16 @@ const runtimeDelegateMethods = {
     return executeScheduledEventStop(this, ...args);
   },
 
-  tickScheduledEvents(...args) {
-    return tickScheduledEvents(this, ...args);
+  tickScheduledEvents() {
+    return tickScheduledEvents(this);
   },
 
-  startEventScheduler(...args) {
-    return startEventScheduler(this, ...args);
+  startEventScheduler() {
+    return startEventScheduler(this);
   },
 
-  stopEventScheduler(...args) {
-    return stopEventScheduler(this, ...args);
+  stopEventScheduler() {
+    return stopEventScheduler(this);
   },
 
   handleEventCommand(...args) {

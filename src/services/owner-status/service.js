@@ -64,6 +64,11 @@ function withTimeout(promise, key) {
  * @param {object} options
  * @param {any[]} [options.runtimes]
  * @param {Record<string, Function>} [options.checks] key -> (context) => result, for tests
+ * @param {NodeJS.ProcessEnv} [options.env]
+ * @param {typeof globalThis.fetch} [options.fetchImpl]
+ * @param {() => any} [options.getOwnerConfig]
+ * @param {Function} [options.notify]
+ * @param {() => number} [options.now]
  */
 export function createOwnerStatusService({
   runtimes = [],
