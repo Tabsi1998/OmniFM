@@ -13,6 +13,10 @@ import {
   buildDashboardVoiceGuardSummary,
   normalizeDashboardVoiceGuardConfig,
 } from "../frontend/src/lib/dashboardVoiceGuard.js";
+import { translatorFor } from "../frontend/src/i18n/languages.js";
+
+// The dashboard's own translator in English: it fills {placeholders} (#306).
+const t = translatorFor("en");
 import { buildResolvedVoiceGuardConfig } from "../src/lib/voice-guard.js";
 
 test("computeWeeklyDigestNextRun follows the next matching weekly slot", () => {
@@ -40,7 +44,7 @@ test("buildWeeklyDigestSummary exposes channel warnings and localized labels", (
         lastSentAt: null,
       },
     },
-    (_de, en) => en,
+    t,
     (value) => `formatted:${String(value).slice(0, 10)}`
   );
 
@@ -63,7 +67,7 @@ test("buildFallbackStationSummary highlights configured fallback stations", () =
         isCustom: true,
       },
     },
-    (_de, en) => en
+    t
   );
 
   assert.equal(summary.statusLabel, "Ready");
@@ -118,7 +122,7 @@ test("buildFallbackStationSummary reflects additional failover steps", () => {
         },
       ],
     },
-    (_de, en) => en
+    t
   );
 
   assert.equal(summary.statusLabel, "Ready");
@@ -154,7 +158,7 @@ test("buildDashboardVoiceGuardSummary explains disconnect policy clearly", () =>
         escalationCooldownMs: 600000,
       },
     },
-    (_de, en) => en
+    t
   );
 
   assert.equal(summary.statusLabel, "Disconnect");
