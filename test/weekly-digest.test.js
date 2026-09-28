@@ -124,7 +124,7 @@ test("buildWeeklyDigestEmbedData maps preview fields into an embed payload", () 
 
   assert.equal(embed.color, 0xFF6B00);
   assert.equal(embed.footer.text, "OmniFM Weekly Digest");
-  assert.equal(embed.title, "Woechentlicher Radio-Report");
+  assert.equal(embed.title, "Wöchentlicher Radio-Report");
   assert.ok(Array.isArray(embed.fields));
   assert.equal(embed.fields.length, 7);
 });

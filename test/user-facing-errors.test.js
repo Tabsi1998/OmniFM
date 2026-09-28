@@ -7,10 +7,10 @@ import {
 } from "../src/lib/user-facing-errors.js";
 
 test("backend user-facing error helper keeps short actionable messages", () => {
-  assert.equal(isSafeUserFacingErrorMessage("Bitte eine gueltige Lizenz-E-Mail eingeben."), true);
+  assert.equal(isSafeUserFacingErrorMessage("Bitte eine gültige Lizenz-E-Mail eingeben."), true);
   assert.equal(
-    resolveUserFacingErrorMessage("de", new Error("Bitte eine gueltige Lizenz-E-Mail eingeben.")),
-    "Bitte eine gueltige Lizenz-E-Mail eingeben."
+    resolveUserFacingErrorMessage("de", new Error("Bitte eine gültige Lizenz-E-Mail eingeben.")),
+    "Bitte eine gültige Lizenz-E-Mail eingeben."
   );
 });
 

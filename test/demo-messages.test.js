@@ -24,6 +24,8 @@ test("the demos have the moments they need, in the bot's languages and the websi
     assert.match(invite, language === "de" ? /Worker-Bots einladen/ : /Invite worker bots/);
     assert.match(invite, /Invite OmniFM 1/);
     assert.doesNotMatch(invite, /BOT_\d/);
+    // No version or commit: the file must not change with every build.
+    assert.doesNotMatch(JSON.stringify(demo), /v\d+\.\d+\.\d+ · [0-9a-f]{7}/);
   }
   assert.deepEqual(Object.keys(demo.commands).sort(), ["de", "en", "es", "fr", "it", "nl", "pl", "pt", "tr"]);
   assert.equal(demo.commands.fr.play, "Lancer une radio dans ton salon vocal");

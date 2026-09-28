@@ -9,6 +9,7 @@
 // frontend/src/components/demo/demoMessages.json; a test fails when the
 // file and the bot drift apart.
 import { buildCommandsJson } from "../commands.js";
+import { versionTag } from "./brand-embed.js";
 import { buildPanelPreview } from "./now-playing/panel-preview.js";
 import { menuMethods } from "./runtime-methods/menus.js";
 
@@ -43,6 +44,13 @@ export const DEMO_PANEL_SAMPLES = {
 };
 
 const toJson = (part) => (typeof part?.toJSON === "function" ? part.toJSON() : part);
+
+// The footer names the running version and commit ("OmniFM · v3.12.0 · 6773a6f"); the demo shows
+// neither, so the website's copy stays the same from build to build and never shows an old version.
+function withoutVersion(payload) {
+  const tag = versionTag();
+  return tag ? JSON.parse(JSON.stringify(payload).split(`OmniFM · ${tag}`).join("OmniFM")) : payload;
+}
 
 /** The answer to /invite on a new Free server with two workers, built by the bot's own menu code. */
 async function inviteAnswer(language) {
@@ -84,10 +92,10 @@ export async function buildDemoMessages() {
   for (const language of DEMO_BOT_LANGUAGES) {
     panels[language] = Object.fromEntries(Object.entries(DEMO_PANEL_SAMPLES).map(([moment, sample]) => [
       moment,
-      buildPanelPreview({ language, sample, favorites: FAVORITES, workerName: "OmniFM 1", planTier: "free" }),
+      withoutVersion(buildPanelPreview({ language, sample, favorites: FAVORITES, workerName: "OmniFM 1", planTier: "free" })),
     ]));
     // eslint-disable-next-line no-await-in-loop -- two languages, one after the other
-    invite[language] = await inviteAnswer(language);
+    invite[language] = withoutVersion(await inviteAnswer(language));
   }
   return { panels, invite, commands: commandTexts() };
 }
