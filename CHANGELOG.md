@@ -6,6 +6,57 @@ folgt [SemVer](https://semver.org/lang/de/): Die erste Zahl steigt bei
 Funktionen, die dritte bei reinen Fehlerbehebungen. Wie ein Release entsteht,
 steht in `scripts/release.mjs`.
 
+## 3.9.0 – 2026-09-28
+
+Neu: Sender-Vorschläge aus der Community und eine Live-Ansicht im Dashboard.
+Außerdem hebt OmniFM ab jetzt Monatswerte für den Jahresrückblick im Dezember
+auf.
+
+### Neu
+
+- **Sender vorschlagen (`/sender-vorschlagen`):** Jeder kann einen Sender für
+  den Katalog vorschlagen. Der Stream wird sofort getestet; ein toter Link wird
+  gar nicht erst gespeichert. Was schon im Katalog steht oder schon
+  vorgeschlagen wurde, erkennt OmniFM an der Stream-Adresse, auch wenn sie
+  anders geschrieben ist. Pro Person sind höchstens 3 Vorschläge gleichzeitig
+  offen. Der Commander prüft jeden offenen Stream stündlich.
+  In der Owner-Konsole unter „Sender › Vorschläge“ siehst du die Warteschlange
+  mit der Erreichbarkeit der letzten 24 Stunden. „Annehmen“ nimmt den Sender
+  über dieselben Prüfungen wie das Sender-Formular in den Katalog, „Ablehnen“
+  geht mit Begründung. Wer den Sender vorgeschlagen hat, bekommt die
+  Entscheidung einmal per DM. Die Owner-Konsole zeigt nur den Namen, nie die
+  Discord-ID; `/meine-daten` zeigt die eigenen Vorschläge und löscht einen
+  daraus. (#303, #411)
+- **Live-Ansicht im Dashboard (Pro und Ultimate):** zeigt für einen Server,
+  was jeder Bot in den letzten 24 Stunden gespielt hat, mit Aussetzern und
+  Wiederverbindungen. Ein hängender Bot lässt sich dort neu starten oder neu
+  mit dem Sprachkanal verbinden. (#304, #409)
+- **Monatswerte für den Jahresrückblick:** MongoDB löscht Hör-Sitzungen nach
+  180 Tagen und gezählte Songs nach 21 Tagen; im Dezember fehlte sonst das
+  halbe Jahr. Deshalb hebt OmniFM jetzt pro Server und Monat auf:
+  - wie lange zugehört wurde,
+  - die meistgehörten Sender und Genres,
+  - die meistgespielten Songs,
+  - zu welchen Uhrzeiten gehört wurde,
+  - die längste Hör-Sitzung.
+
+  Personen stehen darin nicht. Die Monatswerte werden 400 Tage nach
+  Monatsende gelöscht, und gezählte Songs bleiben jetzt 45 statt 21 Tage. Die
+  Rückblick-Karten in Discord kommen mit dem nächsten Teil. Die
+  Datenschutzerklärung ist ergänzt. (#301, #412)
+
+### Intern
+
+- 6.500 Zeilen Frontend entfernt, die die Website nie geladen hat. (#410)
+
+### Nach dem Update
+
+- `/sender-vorschlagen` meldet sich beim Start bei Discord an; bis der Befehl
+  überall in der Befehlsliste steht, kann es ein paar Minuten dauern.
+- Drei Minuten nach dem Start zählt der Commander die Monate ab April nach
+  (Logzeile „[Jahresrückblick] Monate nachgezählt: …“). Je früher das Update
+  läuft, desto mehr vom April ist noch da.
+
 ## 3.8.0 – 2026-09-28
 
 Neu: eine öffentliche Statusseite, die OmniFM-Charts und OmniFM als App.
