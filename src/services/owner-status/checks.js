@@ -10,6 +10,8 @@
 // so the tests can feed valid, invalid and missing answers.
 import { resolveDiscordRedirectUri, publicWebsiteOrigin } from "../../lib/discord-oauth-settings.js";
 import { isPublicOrigin, originOf } from "../../lib/public-origin.js";
+import { legalNotice, privacyNotice, termsNotice } from "../../lib/owner-public.js";
+import { LEGAL_PAGES, legalChecklist } from "../../config/legal-requirements.js";
 
 const REQUEST_TIMEOUT_MS = 10_000;
 
@@ -273,6 +275,29 @@ export async function checkStations({ report = [] }) {
   return result("stations", "warn", parts.join(" "), detail);
 }
 
+/**
+ * The imprint, the privacy policy and the terms (#424): what visitors see,
+ * against what has to be there. Yellow, not red: nothing is broken, and a
+ * red check would page the operator.
+ */
+export function checkLegal({ ownerConfig = {}, env = process.env }) {
+  const answers = { legal: legalNotice(ownerConfig, env), privacy: privacyNotice(ownerConfig, env), terms: termsNotice(ownerConfig, env) };
+  const items = legalChecklist(answers, ownerConfig?.company?.legalNotApplicable);
+  const missing = items.filter((item) => item.state === "missing");
+  const open = items.filter((item) => item.state === "open");
+  const pageOf = (item) => LEGAL_PAGES.find((page) => page.key === item.page)?.label || item.page;
+  const detail = [...missing, ...open]
+    .map((item) => `${item.state === "missing" ? "✕ fehlt" : "? prüfen"}: ${item.label} (${pageOf(item)})`)
+    .join("\n") || null;
+  if (missing.length) {
+    return result("legal", "warn", `${missing.length} ${missing.length === 1 ? "Pflichtangabe fehlt" : "Pflichtangaben fehlen"}: ${missing.map((item) => item.label).join(", ")}.`, detail);
+  }
+  if (open.length) {
+    return result("legal", "warn", `${open.length} ${open.length === 1 ? "Punkt ist" : "Punkte sind"} offen: trifft das auf dich zu? Eintragen oder „Trifft nicht zu“ wählen.`, detail);
+  }
+  return result("legal", "ok", "Impressum, Datenschutzerklärung und Nutzungsbedingungen haben alles, was hinein muss.");
+}
+
 /** What the cockpit shows, in order, with the one page to fix it (frontend/src/lib/ownerNavigation.js). */
 export const OWNER_STATUS_CHECKS = Object.freeze([
   { key: "bots", label: "Bots", area: "monitoring" },
@@ -284,5 +309,6 @@ export const OWNER_STATUS_CHECKS = Object.freeze([
   { key: "operatorWebhook", label: "Alarm-Kanal", area: "cfg-alerts" },
   { key: "botLists", label: "Bot-Listen", area: "cfg-directories" },
   { key: "stations", label: "Sender", area: "stations" },
+  { key: "legal", label: "Rechtliches", area: "company" },
   { key: "version", label: "Version", area: null },
 ]);

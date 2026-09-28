@@ -11,7 +11,7 @@ const plansWith = (changes) => {
 };
 
 test("the imprint reads the company section first, then LEGAL_*; the tax note follows the switch", () => {
-  const raw = { company: { providerName: "Radio GmbH", streetAddress: "Gasse 1", postalCode: "1010", city: "Wien", email: "hi@radio.at" } };
+  const raw = { company: { providerName: "Radio GmbH", streetAddress: "Gasse 1", postalCode: "1010", city: "Wien", email: "hi@radio.at", mediaOwner: "Radio GmbH, Wien" } };
   const notice = pub.legalNotice(raw, { LEGAL_PROVIDER_NAME: "Env Name", LEGAL_PHONE: "+43 1" });
   assert.equal(notice.legal.providerName, "Radio GmbH");
   assert.equal(notice.legal.phone, "+43 1", "the environment fills what the owner left empty");
@@ -21,7 +21,7 @@ test("the imprint reads the company section first, then LEGAL_*; the tax note fo
 
   const off = pub.legalNotice({ company: { ...raw.company, kleinunternehmer: false } }, {});
   assert.deepEqual([off.legal.kleinunternehmer, off.legal.taxNote], [false, ""]);
-  assert.deepEqual(pub.legalNotice({}, {}).missingCoreFields, ["providerName", "streetAddress", "postalCode", "city", "email"]);
+  assert.deepEqual(pub.legalNotice({}, {}).missingCoreFields, ["providerName", "streetAddress", "postalCode", "city", "email", "mediaOwner"]);
 });
 
 test("the website fallback is never a LAN or example address", () => {
@@ -32,7 +32,7 @@ test("the website fallback is never a LAN or example address", () => {
 
 test("privacy and terms take the owner's company and integration settings", () => {
   const raw = {
-    company: { providerName: "Radio GmbH", email: "hi@radio.at", website: "https://radio.at", dpoName: "Data Person", governingLaw: "AT" },
+    company: { providerName: "Radio GmbH", email: "hi@radio.at", website: "https://radio.at", dpoName: "Data Person", governingLaw: "AT", effectiveDate: "01.10.2026" },
     system: { botDirectories: { topGG: { enabled: true, token: "t" }, discordBotList: { enabled: true, token: "t", botId: "abc" } } },
   };
   const privacy = pub.privacyNotice(raw, {});

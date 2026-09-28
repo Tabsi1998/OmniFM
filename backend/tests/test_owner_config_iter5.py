@@ -74,6 +74,8 @@ class TestCompanyConfig:
             "postalCode": "8010",
             "streetAddress": "Teststrasse 7",
             "email": "test_owner@omnifm.test",
+            # Required for the disclosure since #424 (src/config/legal-requirements.js).
+            "mediaOwner": "TEST_Max Mustermann e.U., Graz",
             "kleinunternehmer": True,
         })
         r = client.put(f"{BASE_URL}/api/admin/config", json={"section": "company", "data": data}, timeout=30)

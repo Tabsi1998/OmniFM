@@ -27,7 +27,8 @@
     "hostingProvider": "",
     "hostingLocation": "",
     "effectiveDate": "",
-    "governingLaw": "Österreichisches Recht"
+    "governingLaw": "Österreichisches Recht",
+    "legalNotApplicable": []
   },
   "plans": {
     "free": {

@@ -21,6 +21,7 @@ import { roundHalfEven } from "./helpers.js";
 import { isPublicOrigin, pickPublicOrigin, webDomainOrigin } from "./public-origin.js";
 import { safeFetch } from "./safe-outbound-http.js";
 import { discordShopSettings, discordStoreUrl } from "./discord-shop-settings.js";
+import { missingLegalFields } from "../config/legal-requirements.js";
 
 /** FastAPI's TIERS: the base the owner's plans are laid over. */
 export const BASE_TIERS = Object.freeze({
@@ -109,7 +110,8 @@ export function legalNotice(raw, env = process.env) {
     kleinunternehmer,
     taxNote: kleinunternehmer ? "Umsatzsteuerbefreit als Kleinunternehmer gemäß § 6 Abs. 1 Z 27 UStG (keine Umsatzsteuer, kein USt-Ausweis)." : "",
   };
-  const missingCoreFields = ["providerName", "streetAddress", "postalCode", "city", "email"].filter((field) => !legal[field]);
+  // What has to be there, from the one list the owner console checks too (#424).
+  const missingCoreFields = missingLegalFields({ legal: { legal } }, ["imprint", "disclosure"]);
   return {
     legal,
     missingCoreFields,
@@ -142,12 +144,11 @@ export function privacyNotice(raw, env = process.env) {
     email: envValue(env, "PRIVACY_CONTACT_EMAIL") || legal.email,
     phone: envValue(env, "PRIVACY_CONTACT_PHONE") || legal.phone,
   };
-  const missingCoreFields = [];
-  if (!controller.name) missingCoreFields.push("controllerName");
-  if (!controller.streetAddress) missingCoreFields.push("controllerStreetAddress");
-  if (!controller.postalCode) missingCoreFields.push("controllerPostalCode");
-  if (!controller.city) missingCoreFields.push("controllerCity");
-  if (!contact.email) missingCoreFields.push("contactEmail");
+  const authority = {
+    name: envValue(env, "PRIVACY_AUTHORITY_NAME") || "Österreichische Datenschutzbehörde",
+    website: envValue(env, "PRIVACY_AUTHORITY_WEBSITE") || "https://www.dsb.gv.at/",
+  };
+  const missingCoreFields = missingLegalFields({ privacy: { controller, contact, authority } }, ["privacy"]);
   return {
     controller,
     productName: legal.productName,
@@ -160,10 +161,7 @@ export function privacyNotice(raw, env = process.env) {
       provider: envValue(env, "PRIVACY_HOSTING_PROVIDER") || text(company.hostingProvider),
       location: envValue(env, "PRIVACY_HOSTING_LOCATION") || text(company.hostingLocation),
     },
-    authority: {
-      name: envValue(env, "PRIVACY_AUTHORITY_NAME") || "Österreichische Datenschutzbehörde",
-      website: envValue(env, "PRIVACY_AUTHORITY_WEBSITE") || "https://www.dsb.gv.at/",
-    },
+    authority,
     additionalRecipients: envValue(env, "PRIVACY_ADDITIONAL_RECIPIENTS"),
     customNote: envValue(env, "PRIVACY_CUSTOM_NOTE"),
     features: {
@@ -211,10 +209,7 @@ export function termsNotice(raw, env = process.env) {
     effectiveDate: envValue(env, "TERMS_EFFECTIVE_DATE") || text(company.effectiveDate),
     governingLaw: envValue(env, "TERMS_GOVERNING_LAW") || text(company.governingLaw),
   };
-  const missingCoreFields = [];
-  if (!operator.providerName) missingCoreFields.push("providerName");
-  if (!contact.email) missingCoreFields.push("contactEmail");
-  if (!contact.website) missingCoreFields.push("website");
+  const missingCoreFields = missingLegalFields({ terms: { operator, contact } }, ["terms"]);
   return {
     operator,
     productName: legal.productName,
