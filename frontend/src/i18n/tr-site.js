@@ -6,7 +6,6 @@ const messages = {
     links: [
       { key: 'flow', label: 'Nasıl çalışır', href: '#features' },
       { key: 'why', label: 'Neden OmniFM', href: '#why-omnifm' },
-      { key: 'dashboard', label: 'Panel', href: '#dashboard-showcase' },
       { key: 'stations', label: 'İstasyonlar', page: 'stations' },
       { key: 'pricing', label: 'Fiyatlar', page: 'premium' },
       { key: 'faq', label: 'SSS', page: 'faq' },
@@ -76,48 +75,26 @@ const messages = {
     subtitle: 'OmniFM en güçlü hâline müzik, güvenilirlik ve sunucu yönetimi birlikte çalıştığında ulaşır.',
     cards: {
       radio: {
+        label: 'Radyo',
         title: 'Hızlı başlangıç',
         desc: 'Commander’ı davet et, bir worker ekle, /play çalıştır ve hemen dinle. Keyfine varmadan önce ağır bir kurulum yok.',
       },
       workers: {
+        label: 'Worker’lar',
         title: 'Tek bir bottan fazlası',
         desc: 'Worker mimarisi yayınları düzgünce dağıtır ve büyük topluluklarda paralel kullanımı öngörülebilir kılar.',
       },
       control: {
+        label: 'Kontrol',
         title: 'Yöneticiler için kontrol',
         desc: 'Panel, etkinlikler, rol izinleri ve durum görünümleri Pro sunuculara yalnızca daha fazla istasyon değil, gerçek kontrol verir.',
       },
       growth: {
+        label: 'Büyüme',
         title: 'Sürtünmesiz büyüme',
         desc: 'Free, Pro ve Ultimate aynı çekirdeğe dayanır; hızlı başlangıçtan operatör seviyesindeki kuruluma kadar.',
       },
     },
-  },
-  dashboardShowcase: {
-    eyebrow: 'Panel ve işletim',
-    title: 'Pro ve Ultimate gerçek sunucu kontrolü ekler',
-    subtitle: 'OmniFM yalnızca yayın başlatan bir bot değil. Panel onu etkinlikler, izinler, durum, istatistikler ve otomasyon için yönetilebilir bir sisteme dönüştürür.',
-    cards: {
-      events: {
-        title: 'Etkinlik planlayıcı',
-        desc: 'Düzenli oturumlar, topluluk geceleri veya sabit müzik kuşakları için otomatik başlatmalar planla.',
-      },
-      permissions: {
-        title: 'Komut başına rol izinleri',
-        desc: 'Sunucunda /event, /perm ve diğer hassas komutları tam olarak kimin kullanabileceğini belirle.',
-      },
-      health: {
-        title: 'Durum ve istatistikler',
-        desc: 'Sunucu durumunu, temel rakamları ve Ultimate ile daha ayrıntılı istatistikleri takip et.',
-      },
-      automation: {
-        title: 'Kendi istasyonların ve webhook’lar',
-        desc: 'Ultimate, OmniFM’i ileri düzey kullanıcılar için kendi istasyonlar, dışa aktarmalar ve otomasyon webhook’larıyla genişletir.',
-      },
-    },
-    primaryCta: 'Paneli aç',
-    secondaryCta: 'Planları karşılaştır',
-    ctaNote: 'Her sunucuda temel işlevler var. Yükseltme ikinci bir ürün değil, daha fazla kontrol ekler.',
   },
   stations: {
     eyebrow: 'Canlı istasyon rehberi',
@@ -214,7 +191,7 @@ const messages = {
     titleLead: 'Senin ',
     titleAccent: 'ses kanalında',
     titleTail: ' çalar, eğik çizgi komutlarıyla yönetilir.',
-    body: 'Tarayıcı oynatıcısı yok, sitede çalma yok. OmniFM 24/7 doğrudan Discord ses kanalına yayın yapar — düzenli Now Playing mesajları, butonlar ve yeniden bağlanma ile.',
+    body: 'Sitede sadece kısaca dinlersin – OmniFM 24/7 doğrudan Discord ses kanalında çalar; Now Playing paneli, butonlar ve otomatik yeniden bağlanma ile.',
     cmds: [
       ['/play synthwave', 'Yayını ses kanalında başlatır'],
       ['/now', 'Canlı şarkıyı, kapağı ve dinleyicileri gösterir'],
@@ -228,7 +205,7 @@ const messages = {
   howTo: {
     eyebrow: 'Rehber · 60 saniyeden kısa',
     title: 'OmniFM Discord’da nasıl başlatılır',
-    subtitle: 'Tarayıcı oynatıcısı yok. Üç adım ve radyon 24/7 doğrudan ses kanalında çalar.',
+    subtitle: 'Üç adım ve radyon 24/7 doğrudan ses kanalında çalar.',
     steps: [
       { n: '01', cmd: 'Uygulama ekle', title: 'Commander’ı davet et', desc: 'OmniFM commander’ını sunucuna ekle. Tüm eğik çizgi komutlarını karşılar ve worker’larını yönetir.' },
       { n: '02', cmd: '/invite', title: 'Bir worker bot ekle', desc: 'En az bir worker davet et. Asıl ses yayınını o taşır — daha fazla worker = daha fazla paralel kanal.' },

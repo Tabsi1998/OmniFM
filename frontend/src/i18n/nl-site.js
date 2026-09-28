@@ -5,7 +5,6 @@ const messages = {
     links: [
       { key: 'flow', label: 'Zo werkt het', href: '#features' },
       { key: 'why', label: 'Waarom OmniFM', href: '#why-omnifm' },
-      { key: 'dashboard', label: 'Dashboard', href: '#dashboard-showcase' },
       { key: 'stations', label: 'Zenders', page: 'stations' },
       { key: 'pricing', label: 'Prijzen', page: 'premium' },
       { key: 'faq', label: 'FAQ', page: 'faq' },
@@ -75,48 +74,26 @@ const messages = {
     subtitle: 'OmniFM is op zijn sterkst als muziek, betrouwbaarheid en serverbeheer samenwerken.',
     cards: {
       radio: {
+        label: 'Radio',
         title: 'Snel van start',
         desc: 'Nodig de commander uit, voeg een worker toe, gebruik /play en luister meteen. Geen zware installatie voordat je ervan geniet.',
       },
       workers: {
+        label: 'Workers',
         title: 'Meer dan één bot',
         desc: 'De workerarchitectuur verdeelt streams netjes en maakt parallel gebruik in grote community’s voorspelbaar.',
       },
       control: {
+        label: 'Controle',
         title: 'Controle voor admins',
         desc: 'Dashboard, evenementen, rolrechten en statusweergaven geven Pro-servers echte controle, niet alleen meer zenders.',
       },
       growth: {
+        label: 'Groei',
         title: 'Groeien zonder gedoe',
         desc: 'Free, Pro en Ultimate bouwen op dezelfde kern, van een snelle start tot een opzet op operatorniveau.',
       },
     },
-  },
-  dashboardShowcase: {
-    eyebrow: 'Dashboard en beheer',
-    title: 'Pro en Ultimate voegen echte servercontrole toe',
-    subtitle: 'OmniFM is niet alleen een bot die streams start. Het dashboard maakt er een beheersbaar systeem van voor evenementen, rechten, status, statistieken en automatisering.',
-    cards: {
-      events: {
-        title: 'Evenementplanner',
-        desc: 'Plan automatische starts voor terugkerende sessies, communityavonden of vaste muziekblokken.',
-      },
-      permissions: {
-        title: 'Rolrechten per commando',
-        desc: 'Bepaal precies wie /event, /perm en andere gevoelige commando’s op je server mag gebruiken.',
-      },
-      health: {
-        title: 'Status en statistieken',
-        desc: 'Volg de serverstatus, de kerncijfers en met Ultimate ook uitgebreidere statistieken.',
-      },
-      automation: {
-        title: 'Eigen zenders en webhooks',
-        desc: 'Ultimate breidt OmniFM uit voor gevorderde gebruikers met eigen zenders, exports en webhooks voor automatisering.',
-      },
-    },
-    primaryCta: 'Dashboard openen',
-    secondaryCta: 'Abonnementen vergelijken',
-    ctaNote: 'Elke server heeft de basis. Upgraden voegt controle toe, geen tweede product.',
   },
   stations: {
     eyebrow: 'Overzicht van livezenders',
@@ -213,7 +190,7 @@ const messages = {
     titleLead: 'Speelt in je ',
     titleAccent: 'spraakkanaal',
     titleTail: ', bediend met slash-commando’s.',
-    body: 'Geen browserspeler, geen afspelen op de website. OmniFM streamt 24/7 direct in je Discord-spraakkanaal — met nette Now Playing-berichten, knoppen en herverbinding.',
+    body: 'Op de website luister je alleen even mee – OmniFM speelt 24/7 direct in je Discord-spraakkanaal, met Now Playing-paneel, knoppen en automatisch herverbinden.',
     cmds: [
       ['/play synthwave', 'Start de stream in je spraakkanaal'],
       ['/now', 'Toont het live nummer, de hoes en de luisteraars'],
@@ -227,7 +204,7 @@ const messages = {
   howTo: {
     eyebrow: 'Handleiding · in minder dan 60 seconden',
     title: 'Zo start je OmniFM in Discord',
-    subtitle: 'Geen browserspeler. Drie stappen en je radio speelt 24/7 direct in het spraakkanaal.',
+    subtitle: 'Drie stappen en je radio speelt 24/7 direct in het spraakkanaal.',
     steps: [
       { n: '01', cmd: 'App toevoegen', title: 'De commander uitnodigen', desc: 'Voeg de OmniFM-commander toe aan je server. Hij neemt alle slash-commando’s aan en beheert je workers.' },
       { n: '02', cmd: '/invite', title: 'Een workerbot toevoegen', desc: 'Nodig minstens één worker uit. Die draagt de eigenlijke spraakstream — meer workers = meer kanalen tegelijk.' },

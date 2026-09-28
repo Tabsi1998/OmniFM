@@ -2,7 +2,6 @@ import { Suspense, lazy, useState, useEffect, useCallback, useRef } from 'react'
 import Hero from './components/Hero.js';
 import TrustBar from './components/TrustBar.js';
 import WhyOmniFM from './components/WhyOmniFM.js';
-import DashboardShowcase from './components/DashboardShowcase.js';
 import StationBrowser from './components/StationBrowser.js';
 import UseCasesSection from './components/UseCasesSection.js';
 import Premium from './components/Premium.js';
@@ -324,7 +323,6 @@ function AppContent() {
       <HowToDiscord bots={bots} />
       <StationBrowser stations={stations} loading={loading} />
       <WhyOmniFM />
-      <DashboardShowcase />
       <UseCasesSection />
       <Premium bots={bots} planContext={{ freeStations: stats.freeStations, allStations: stats.stations }} />
       <CommunitySection />

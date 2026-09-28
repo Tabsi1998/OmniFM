@@ -1,6 +1,6 @@
 // OmniFM: owner console: the sign-in with Discord or the owner token.
 // Split out of components/OwnerAdmin.js (#296); its state stays there.
-import { Radio, ShieldCheck, Users, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, Users, AlertTriangle } from 'lucide-react';
 
 export default function OwnerSignIn({
   discordLogin,
@@ -16,7 +16,7 @@ export default function OwnerSignIn({
       <div className="oa-login">
         <form className="oa-login-card oa-fade" onSubmit={handleLogin} data-testid="admin-login-form">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-            <div className="oa-brand-logo"><Radio size={20} /></div>
+            <div className="oa-brand-logo"><img src="/brand/omnifm-mark.svg" alt="" width="28" height="28" /></div>
             <div>
               <div className="oa-display" style={{ fontSize: 20, fontWeight: 800 }}>OmniFM</div>
               <div className="oa-owner-badge">Super-Admin / Owner Engine</div>

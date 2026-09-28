@@ -5,7 +5,6 @@ const messages = {
     links: [
       { key: 'flow', label: 'Fonctionnement', href: '#features' },
       { key: 'why', label: 'Pourquoi OmniFM', href: '#why-omnifm' },
-      { key: 'dashboard', label: 'Tableau de bord', href: '#dashboard-showcase' },
       { key: 'stations', label: 'Stations', page: 'stations' },
       { key: 'pricing', label: 'Tarifs', page: 'premium' },
       { key: 'faq', label: 'FAQ', page: 'faq' },
@@ -75,48 +74,26 @@ const messages = {
     subtitle: 'OmniFM est à son meilleur quand la musique, la fiabilité et la gestion du serveur travaillent ensemble.',
     cards: {
       radio: {
+        label: 'Radio',
         title: 'Démarrage rapide',
         desc: 'Invite le commander, ajoute un worker, lance /play et écoute tout de suite. Pas de configuration lourde avant d’en profiter.',
       },
       workers: {
+        label: 'Workers',
         title: 'Plus qu’un seul bot',
         desc: 'L’architecture à workers répartit proprement les flux et rend l’utilisation en parallèle prévisible pour les grandes communautés.',
       },
       control: {
+        label: 'Contrôle',
         title: 'Le contrôle pour les admins',
         desc: 'Tableau de bord, événements, droits par rôle et vues d’état donnent aux serveurs Pro un vrai contrôle, pas seulement plus de stations.',
       },
       growth: {
+        label: 'Croissance',
         title: 'Grandir sans friction',
         desc: 'Free, Pro et Ultimate reposent sur le même cœur, du démarrage rapide jusqu’à l’installation de niveau opérateur.',
       },
     },
-  },
-  dashboardShowcase: {
-    eyebrow: 'Tableau de bord et exploitation',
-    title: 'Pro et Ultimate ajoutent un vrai contrôle du serveur',
-    subtitle: 'OmniFM n’est pas seulement un bot qui lance des flux. Le tableau de bord en fait un système maîtrisable pour les événements, les droits, l’état, les statistiques et l’automatisation.',
-    cards: {
-      events: {
-        title: 'Planificateur d’événements',
-        desc: 'Planifie des démarrages automatiques pour des sessions régulières, des soirées communautaires ou des créneaux musicaux fixes.',
-      },
-      permissions: {
-        title: 'Droits par rôle et par commande',
-        desc: 'Définis précisément qui peut utiliser /event, /perm et les autres commandes sensibles sur ton serveur.',
-      },
-      health: {
-        title: 'État et statistiques',
-        desc: 'Suis l’état du serveur, les chiffres clés et, avec Ultimate, des statistiques plus détaillées.',
-      },
-      automation: {
-        title: 'Stations personnelles et webhooks',
-        desc: 'Ultimate étend OmniFM pour les utilisateurs avancés avec des stations personnelles, des exports et des webhooks d’automatisation.',
-      },
-    },
-    primaryCta: 'Ouvrir le tableau de bord',
-    secondaryCta: 'Comparer les offres',
-    ctaNote: 'Chaque serveur a les bases. Passer à l’offre supérieure ajoute du contrôle, pas un second produit.',
   },
   stations: {
     eyebrow: 'Annuaire des stations en direct',
@@ -213,7 +190,7 @@ const messages = {
     titleLead: 'Joue dans ton ',
     titleAccent: 'salon vocal',
     titleTail: ', piloté par commandes slash.',
-    body: 'Pas de lecteur dans le navigateur, pas de lecture sur le site. OmniFM diffuse 24/7 directement dans ton salon vocal Discord — avec des messages Now Playing soignés, des boutons et la reconnexion.',
+    body: 'Sur le site, tu écoutes juste un extrait – OmniFM tourne 24/7 directement dans ton salon vocal Discord, avec panneau Now Playing, boutons et reconnexion automatique.',
     cmds: [
       ['/play synthwave', 'Lance le flux dans ton salon vocal'],
       ['/now', 'Affiche le titre en direct, la pochette et les auditeurs'],
@@ -227,7 +204,7 @@ const messages = {
   howTo: {
     eyebrow: 'Mode d’emploi · en moins de 60 secondes',
     title: 'Comment lancer OmniFM dans Discord',
-    subtitle: 'Pas de lecteur dans le navigateur. Trois étapes et ta radio tourne 24/7 directement dans le salon vocal.',
+    subtitle: 'Trois étapes et ta radio tourne 24/7 directement dans le salon vocal.',
     steps: [
       { n: '01', cmd: 'Ajouter l’app', title: 'Inviter le commander', desc: 'Ajoute le commander OmniFM à ton serveur. Il gère toutes les commandes slash et tes workers.' },
       { n: '02', cmd: '/invite', title: 'Ajouter un bot worker', desc: 'Invite au moins un worker. C’est lui qui diffuse le flux vocal — plus de workers = plus de salons en parallèle.' },

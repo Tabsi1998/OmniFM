@@ -6,7 +6,6 @@ const messages = {
     links: [
       { key: 'flow', label: 'Jak to działa', href: '#features' },
       { key: 'why', label: 'Dlaczego OmniFM', href: '#why-omnifm' },
-      { key: 'dashboard', label: 'Panel', href: '#dashboard-showcase' },
       { key: 'stations', label: 'Stacje', page: 'stations' },
       { key: 'pricing', label: 'Cennik', page: 'premium' },
       { key: 'faq', label: 'FAQ', page: 'faq' },
@@ -76,48 +75,26 @@ const messages = {
     subtitle: 'OmniFM jest najmocniejszy, gdy muzyka, niezawodność i zarządzanie serwerem działają razem.',
     cards: {
       radio: {
+        label: 'Radio',
         title: 'Szybki start',
         desc: 'Zaproś commandera, dodaj workera, użyj /play i od razu słuchaj. Bez ciężkiej konfiguracji na start.',
       },
       workers: {
+        label: 'Workery',
         title: 'Więcej niż jeden bot',
         desc: 'Architektura workerów porządnie rozkłada streamy i sprawia, że równoległe korzystanie w dużych społecznościach jest przewidywalne.',
       },
       control: {
+        label: 'Kontrola',
         title: 'Kontrola dla adminów',
         desc: 'Panel, wydarzenia, uprawnienia ról i widoki stanu dają serwerom Pro prawdziwą kontrolę, a nie tylko więcej stacji.',
       },
       growth: {
+        label: 'Rozwój',
         title: 'Rozwój bez tarcia',
         desc: 'Free, Pro i Ultimate opierają się na tym samym rdzeniu, od szybkiego startu po instalację na poziomie operatora.',
       },
     },
-  },
-  dashboardShowcase: {
-    eyebrow: 'Panel i obsługa',
-    title: 'Pro i Ultimate dają prawdziwą kontrolę nad serwerem',
-    subtitle: 'OmniFM to nie tylko bot, który uruchamia streamy. Panel zmienia go w system, którym da się zarządzać: wydarzenia, uprawnienia, stan, statystyki i automatyzacja.',
-    cards: {
-      events: {
-        title: 'Planer wydarzeń',
-        desc: 'Planuj automatyczne starty dla cyklicznych sesji, wieczorów społeczności albo stałych muzycznych pasm.',
-      },
-      permissions: {
-        title: 'Uprawnienia ról dla komend',
-        desc: 'Ustal dokładnie, kto może używać /event, /perm i innych wrażliwych komend na twoim serwerze.',
-      },
-      health: {
-        title: 'Stan i statystyki',
-        desc: 'Śledź stan serwera, kluczowe liczby, a w Ultimate także dokładniejsze statystyki.',
-      },
-      automation: {
-        title: 'Własne stacje i webhooki',
-        desc: 'Ultimate rozszerza OmniFM dla zaawansowanych o własne stacje, eksporty i webhooki do automatyzacji.',
-      },
-    },
-    primaryCta: 'Otwórz panel',
-    secondaryCta: 'Porównaj plany',
-    ctaNote: 'Każdy serwer ma podstawy. Wyższy plan dodaje kontrolę, a nie drugi produkt.',
   },
   stations: {
     eyebrow: 'Katalog stacji na żywo',
@@ -214,7 +191,7 @@ const messages = {
     titleLead: 'Gra na twoim ',
     titleAccent: 'kanale głosowym',
     titleTail: ', sterowane komendami ukośnika.',
-    body: 'Bez odtwarzacza w przeglądarce, bez odtwarzania na stronie. OmniFM nadaje 24/7 prosto na twój kanał głosowy na Discordzie — z czytelnymi wiadomościami Now Playing, przyciskami i ponownym łączeniem.',
+    body: 'Na stronie tylko posłuchasz próbki – OmniFM gra 24/7 prosto na twoim kanale głosowym na Discordzie, z panelem Now Playing, przyciskami i automatycznym ponownym łączeniem.',
     cmds: [
       ['/play synthwave', 'Uruchamia stream na twoim kanale głosowym'],
       ['/now', 'Pokazuje utwór na żywo, okładkę i słuchaczy'],
@@ -228,7 +205,7 @@ const messages = {
   howTo: {
     eyebrow: 'Poradnik · w mniej niż 60 sekund',
     title: 'Jak uruchomić OmniFM na Discordzie',
-    subtitle: 'Bez odtwarzacza w przeglądarce. Trzy kroki i twoje radio gra 24/7 prosto na kanale głosowym.',
+    subtitle: 'Trzy kroki i twoje radio gra 24/7 prosto na kanale głosowym.',
     steps: [
       { n: '01', cmd: 'Dodaj aplikację', title: 'Zaproś commandera', desc: 'Dodaj commandera OmniFM do swojego serwera. Obsługuje wszystkie komendy ukośnika i zarządza twoimi workerami.' },
       { n: '02', cmd: '/invite', title: 'Dodaj bota workera', desc: 'Zaproś co najmniej jednego workera. To on niesie stream głosowy — więcej workerów = więcej kanałów naraz.' },

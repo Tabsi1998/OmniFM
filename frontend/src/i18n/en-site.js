@@ -5,7 +5,6 @@ const messages = {
     links: [
       { key: 'flow', label: 'Flow', href: '#features' },
       { key: 'why', label: 'Why OmniFM', href: '#why-omnifm' },
-      { key: 'dashboard', label: 'Dashboard', href: '#dashboard-showcase' },
       { key: 'stations', label: 'Stations', page: 'stations' },
       { key: 'pricing', label: 'Pricing', page: 'premium' },
       { key: 'faq', label: 'FAQ', page: 'faq' },
@@ -75,48 +74,26 @@ const messages = {
     subtitle: 'OmniFM is strongest when music, reliability, and server management work together.',
     cards: {
       radio: {
+        label: 'Radio',
         title: 'Fast to start',
         desc: 'Invite the commander, add a worker, run /play, and start listening immediately. No heavy setup before the first real value appears.',
       },
       workers: {
+        label: 'Workers',
         title: 'More than a single bot',
         desc: 'The worker architecture distributes streams cleanly and makes parallel usage predictable for larger communities.',
       },
       control: {
+        label: 'Control',
         title: 'Control for admins',
         desc: 'Dashboard access, events, role permissions, and status views give Pro servers real control instead of only more stations.',
       },
       growth: {
+        label: 'Growth',
         title: 'Growth without friction',
         desc: 'Free, Pro, and Ultimate build on the same product core, from quick entry to operator-grade setup.',
       },
     },
-  },
-  dashboardShowcase: {
-    eyebrow: 'Dashboard and operations',
-    title: 'Pro and Ultimate add real server control',
-    subtitle: 'OmniFM is not only a bot that starts streams. The dashboard turns it into a manageable system for events, permissions, health, analytics, and automation.',
-    cards: {
-      events: {
-        title: 'Event scheduler',
-        desc: 'Plan automatic starts for recurring sessions, community nights, or fixed music slots.',
-      },
-      permissions: {
-        title: 'Role permissions per command',
-        desc: 'Define exactly who can use /event, /perm, and other sensitive commands on your server.',
-      },
-      health: {
-        title: 'Health and analytics',
-        desc: 'Track server status, core metrics, and in Ultimate also deeper analytics views.',
-      },
-      automation: {
-        title: 'Custom stations and webhooks',
-        desc: 'Ultimate expands OmniFM for power users with custom stations, exports, and automation hooks.',
-      },
-    },
-    primaryCta: 'Open dashboard',
-    secondaryCta: 'Compare plans',
-    ctaNote: 'Every server has the basics. Upgrading adds control, not a second product path.',
   },
   stations: {
     eyebrow: 'Live Station Directory',
@@ -213,7 +190,7 @@ const messages = {
     titleLead: 'Runs in your ',
     titleAccent: 'voice channel',
     titleTail: ', controlled by slash commands.',
-    body: 'No browser player, no playback on the website. OmniFM streams 24/7 straight into your Discord voice channel — with clean now-playing embeds, buttons and reconnect.',
+    body: 'On the website you just get a taste – OmniFM itself runs 24/7 right in your Discord voice channel, with a now-playing panel, buttons and automatic reconnect.',
     cmds: [
       ['/play synthwave', 'Starts the stream in your voice channel'],
       ['/now', 'Shows the live track, cover & listeners'],
@@ -227,7 +204,7 @@ const messages = {
   howTo: {
     eyebrow: 'How-To · in under 60 seconds',
     title: 'How to start OmniFM in Discord',
-    subtitle: 'No browser player. Three steps and your radio runs 24/7 straight in the voice channel.',
+    subtitle: 'Three steps and your radio runs 24/7 straight in your voice channel.',
     steps: [
       { n: '01', cmd: 'Add App', title: 'Invite the commander', desc: 'Add the OmniFM commander to your server. It handles every slash command and manages your workers.' },
       { n: '02', cmd: '/invite', title: 'Add a worker bot', desc: 'Invite at least one worker. It carries the actual voice stream — more workers = more parallel channels.' },

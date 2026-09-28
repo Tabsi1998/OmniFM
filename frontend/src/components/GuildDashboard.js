@@ -496,7 +496,7 @@ export default function GuildDashboard() {
 
   if (!session.authenticated) return (
     <div className="oa-root"><div className="oa-login"><div className="oa-login-card oa-fade" data-testid="guild-login-gate">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><div className="oa-brand-logo"><Radio size={20} /></div><div><div className="oa-display" style={{ fontSize: 20, fontWeight: 800 }}>OmniFM</div><div className="oa-owner-badge">Server Dashboard</div></div></div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><div className="oa-brand-logo"><img src="/brand/omnifm-mark.svg" alt="" width="28" height="28" /></div><div><div className="oa-display" style={{ fontSize: 20, fontWeight: 800 }}>OmniFM</div><div className="oa-owner-badge">Server Dashboard</div></div></div>
       <h1 className="oa-display" style={{ fontSize: 23, marginTop: 22 }}>{t('Verwalte deine Server', 'Manage your servers')}</h1>
       <p style={{ color: '#94a3b8', fontSize: 14, lineHeight: 1.55 }}>{t('Melde dich mit Discord an. Alle angezeigten Daten stammen live aus OmniFM und deiner Lizenz.', 'Sign in with Discord. All displayed data comes live from OmniFM and your license.')}</p>
       <a href={buildApiUrl('/api/auth/discord/login?redirect=1&nextPage=dashboard')} className="oa-btn primary" style={{ width: '100%', marginTop: 18, background: 'linear-gradient(135deg,#5865f2,#4752c4)', color: '#fff' }} data-testid="guild-discord-login">{t('Mit Discord anmelden', 'Continue with Discord')}</a>
@@ -517,7 +517,7 @@ export default function GuildDashboard() {
   return (
     <div className="oa-root" data-testid="guild-dashboard">
       <aside className="oa-sidebar">
-        <div className="oa-brand"><div className="oa-brand-logo"><Radio size={20} /></div><div><div className="oa-display" style={{ fontSize: 18, fontWeight: 800 }}>OmniFM</div><div className="oa-owner-badge">Server Dashboard</div></div></div>
+        <div className="oa-brand"><div className="oa-brand-logo"><img src="/brand/omnifm-mark.svg" alt="" width="28" height="28" /></div><div><div className="oa-display" style={{ fontSize: 18, fontWeight: 800 }}>OmniFM</div><div className="oa-owner-badge">Server Dashboard</div></div></div>
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
           {NAV.map((item) => <button key={item.id} className={`oa-nav-btn ${section === item.id ? 'active' : ''}`} onClick={() => setSection(item.id)} data-testid={`guild-nav-${item.id}`}><item.icon size={18} /> {navLabel(item.id)}</button>)}
         </nav>

@@ -165,11 +165,12 @@ a {
   height: 100vh;
 }
 .oa-brand { display: flex; align-items: center; gap: 12px; padding: 4px 8px 18px; }
+/* The OmniFM mark on a dark tile, like the logo tile of the brand kit. */
 .oa-brand-logo {
   width: 40px; height: 40px; border-radius: 11px;
-  background: linear-gradient(135deg, var(--oa-orange), var(--oa-red));
-  display: grid; place-items: center; color: #08090d;
-  box-shadow: 0 8px 24px rgba(255,107,0,0.35);
+  background: #0e111a; border: 1px solid #1b2133;
+  display: grid; place-items: center;
+  box-shadow: 0 8px 24px rgba(255,107,0,0.22);
 }
 .oa-owner-badge {
   font-size: 9.5px; font-weight: 700; letter-spacing: 0.18em;

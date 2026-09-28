@@ -5,7 +5,6 @@ const messages = {
     links: [
       { key: 'flow', label: 'Cómo funciona', href: '#features' },
       { key: 'why', label: 'Por qué OmniFM', href: '#why-omnifm' },
-      { key: 'dashboard', label: 'Panel', href: '#dashboard-showcase' },
       { key: 'stations', label: 'Emisoras', page: 'stations' },
       { key: 'pricing', label: 'Precios', page: 'premium' },
       { key: 'faq', label: 'FAQ', page: 'faq' },
@@ -75,48 +74,26 @@ const messages = {
     subtitle: 'OmniFM da lo mejor de sí cuando la música, la fiabilidad y la gestión del servidor funcionan juntas.',
     cards: {
       radio: {
+        label: 'Radio',
         title: 'Rápido de empezar',
         desc: 'Invita al commander, añade un worker, usa /play y escucha al instante. Sin configuraciones pesadas antes de disfrutarlo.',
       },
       workers: {
+        label: 'Workers',
         title: 'Más que un solo bot',
         desc: 'La arquitectura de workers reparte las transmisiones de forma limpia y hace predecible el uso en paralelo en comunidades grandes.',
       },
       control: {
+        label: 'Control',
         title: 'Control para los admins',
         desc: 'El panel, los eventos, los permisos por rol y las vistas de estado dan a los servidores Pro control real, no solo más emisoras.',
       },
       growth: {
+        label: 'Crecimiento',
         title: 'Crecer sin fricción',
         desc: 'Free, Pro y Ultimate se basan en el mismo núcleo, desde el inicio rápido hasta una instalación de nivel operador.',
       },
     },
-  },
-  dashboardShowcase: {
-    eyebrow: 'Panel y operación',
-    title: 'Pro y Ultimate añaden control real del servidor',
-    subtitle: 'OmniFM no es solo un bot que inicia transmisiones. El panel lo convierte en un sistema manejable para eventos, permisos, estado, estadísticas y automatización.',
-    cards: {
-      events: {
-        title: 'Planificador de eventos',
-        desc: 'Programa inicios automáticos para sesiones recurrentes, noches de comunidad o franjas musicales fijas.',
-      },
-      permissions: {
-        title: 'Permisos por rol y comando',
-        desc: 'Define exactamente quién puede usar /event, /perm y otros comandos delicados en tu servidor.',
-      },
-      health: {
-        title: 'Estado y estadísticas',
-        desc: 'Sigue el estado del servidor, las cifras clave y, con Ultimate, estadísticas más detalladas.',
-      },
-      automation: {
-        title: 'Emisoras propias y webhooks',
-        desc: 'Ultimate amplía OmniFM para usuarios avanzados con emisoras propias, exportaciones y webhooks de automatización.',
-      },
-    },
-    primaryCta: 'Abrir el panel',
-    secondaryCta: 'Comparar planes',
-    ctaNote: 'Cada servidor tiene lo básico. Mejorar el plan añade control, no un segundo producto.',
   },
   stations: {
     eyebrow: 'Directorio de emisoras en directo',
@@ -213,7 +190,7 @@ const messages = {
     titleLead: 'Suena en tu ',
     titleAccent: 'canal de voz',
     titleTail: ', controlado con comandos de barra.',
-    body: 'Sin reproductor en el navegador, sin reproducción en la web. OmniFM transmite 24/7 directamente a tu canal de voz de Discord — con mensajes Now Playing cuidados, botones y reconexión.',
+    body: 'En la web solo escuchas un adelanto – OmniFM suena 24/7 directamente en tu canal de voz de Discord, con panel Now Playing, botones y reconexión automática.',
     cmds: [
       ['/play synthwave', 'Inicia la transmisión en tu canal de voz'],
       ['/now', 'Muestra la canción en directo, la portada y los oyentes'],
@@ -227,7 +204,7 @@ const messages = {
   howTo: {
     eyebrow: 'Guía · en menos de 60 segundos',
     title: 'Cómo iniciar OmniFM en Discord',
-    subtitle: 'Sin reproductor en el navegador. Tres pasos y tu radio suena 24/7 directamente en el canal de voz.',
+    subtitle: 'Tres pasos y tu radio suena 24/7 directamente en el canal de voz.',
     steps: [
       { n: '01', cmd: 'Añadir app', title: 'Invitar al commander', desc: 'Añade el commander de OmniFM a tu servidor. Gestiona todos los comandos de barra y tus workers.' },
       { n: '02', cmd: '/invite', title: 'Añadir un bot worker', desc: 'Invita al menos un worker. Es el que lleva la transmisión de voz — más workers = más canales en paralelo.' },

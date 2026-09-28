@@ -117,7 +117,8 @@ function StationBrowser({ stations, loading }) {
   const muted = !!player.muted;
 
   const tierFilters = [
-    { id: null, label: copy.stations.filters.all, color: '#fff' },
+    // Six digits: the alpha suffix below makes eight (#ffffff12); "#fff12" is no colour.
+    { id: null, label: copy.stations.filters.all, color: '#ffffff' },
     { id: 'free', label: copy.stations.filters.free, color: '#00e5ff' },
     { id: 'pro', label: copy.stations.filters.pro, color: '#ff6b00' },
   ];
