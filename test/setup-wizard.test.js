@@ -68,14 +68,15 @@ test("missing permissions are named like in the Discord client; a stage needs no
 });
 
 test("the welcome is a public Components V2 message with the setup button", () => {
-  const payload = wizard.buildWelcomePayload({ t: de, guildName: "Club", urls: { dashboard: "https://omnifm.xyz/?page=dashboard", support: "https://discord.gg/x" } });
+  const payload = wizard.buildWelcomePayload({ t: de, guildName: "Club", urls: { dashboard: "https://omnifm.xyz/?page=dashboard", guide: "https://omnifm.xyz/start?lang=de", support: "https://discord.gg/x" } });
   assert.equal(payload.flags, MessageFlags.IsComponentsV2);
   const body = allText(payload);
   assert.match(body, /Danke für die Einladung/);
   assert.match(body, /① Sprachkanal wählen\n② Sender wählen\n③ Kanal fürs Now-Playing-Panel wählen/);
   assert.match(body, /Server verwalten/);
   const ids = buttons(payload).map((button) => button.custom_id || button.url);
-  assert.deepEqual(ids, [wizard.SETUP_COMPONENT_ID_OPEN, wizard.SETUP_COMPONENT_ID_HELP, "https://omnifm.xyz/?page=dashboard", "https://discord.gg/x"]);
+  assert.deepEqual(ids, [wizard.SETUP_COMPONENT_ID_OPEN, wizard.SETUP_COMPONENT_ID_HELP, "https://omnifm.xyz/?page=dashboard", "https://omnifm.xyz/start?lang=de", "https://discord.gg/x"]);
+  assert.equal(buttons(payload)[3].label, "Anleitung");
   assert.deepEqual(ui.checkDiscordLimits(payload).problems, []);
 });
 

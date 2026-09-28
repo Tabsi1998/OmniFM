@@ -365,6 +365,10 @@ const messages = {
         title: 'OmniFM | Kullanım koşulları',
         description: 'OmniFM sitesi, Discord botu, panel ve isteğe bağlı Premium işlevleri için koşullar.',
       },
+      start: {
+        title: 'OmniFM ile ilk adımlar | Discord için radyo kurulumu',
+        description: 'OmniFM nasıl kurulur: commander’ı davet et, bir worker ekle, /play ile radyoyu başlat, paneli kullan ve bir şey çalışmadığında ne yapacağını öğren.',
+      },
       charts: {
         title: 'OmniFM listeleri | Haftanın en çok dinlenen istasyonları ve şarkıları',
         description: 'Geçen haftanın OmniFM olan tüm Discord sunucularındaki en çok dinlenen radyo istasyonları ve en çok çalan şarkıları; kişi ya da sunucu tanınmadan.',

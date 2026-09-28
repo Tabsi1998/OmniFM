@@ -3,10 +3,11 @@
 const messages = {
   navbar: {
     links: [
-      { key: 'flow', label: 'Ablauf', href: '#features' },
+      { key: 'flow', label: 'Ablauf', href: '#how-to' },
       { key: 'why', label: 'Warum', href: '#why-omnifm' },
       { key: 'stations', label: 'Stationen', page: 'stations' },
       { key: 'pricing', label: 'Preise', page: 'premium' },
+      { key: 'start', label: 'Anleitung', page: 'start' },
       { key: 'faq', label: 'FAQ', page: 'faq' },
     ],
     discord: 'Discord Community',
@@ -105,6 +106,7 @@ const messages = {
         key: 'start',
         question: 'Wie starte ich OmniFM sauber?',
         answer: 'Im Normalfall in unter einer Minute: zuerst den Commander einladen, dann mindestens einen Worker hinzufügen, danach den Voice-Channel öffnen und /play nutzen.',
+        link: { label: 'Zur Anleitung', page: 'start' },
       },
       {
         key: 'workerRequired',
@@ -168,6 +170,7 @@ const messages = {
       { n: '03', cmd: '/play lofi', title: 'Radio starten', desc: 'Geh in einen Sprachkanal und wähle einen Sender. OmniFM spielt, zeigt ein Panel zum Steuern und verbindet sich bei Abbrüchen von selbst neu.' },
     ],
     addServer: 'Zum Server hinzufügen',
+    guideLink: 'Ausführliche Anleitung',
   },
   // The live demos of the first steps in Discord (demo/DemoScene.js, #431): Discord's own words.
   demos: {

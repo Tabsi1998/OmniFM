@@ -365,6 +365,10 @@ const messages = {
         title: 'OmniFM | Gebruiksvoorwaarden',
         description: 'Voorwaarden voor de OmniFM-website, de Discord-bot, het dashboard en de optionele Premium-functies.',
       },
+      start: {
+        title: 'Aan de slag met OmniFM | Radio voor Discord instellen',
+        description: 'Zo stel je OmniFM in: de commander uitnodigen, een worker toevoegen, met /play de radio starten, paneel en dashboard gebruiken, en wat helpt als iets niet werkt.',
+      },
       charts: {
         title: 'OmniFM-hitlijsten | De meest beluisterde zenders en nummers van de week',
         description: 'De meest beluisterde radiozenders en de meest gespeelde nummers van vorige week op alle Discord-servers met OmniFM, zonder herkenbare personen of servers.',

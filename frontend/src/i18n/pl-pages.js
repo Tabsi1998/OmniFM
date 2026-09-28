@@ -373,6 +373,10 @@ const messages = {
         title: 'OmniFM | Regulamin',
         description: 'Regulamin strony OmniFM, bota na Discordzie, panelu i opcjonalnych funkcji Premium.',
       },
+      start: {
+        title: 'Pierwsze kroki z OmniFM | Radio na Discordzie',
+        description: 'Jak skonfigurować OmniFM: zaprosić commandera, dodać workera, włączyć radio przez /play, korzystać z panelu, i co pomaga, gdy coś nie działa.',
+      },
       charts: {
         title: 'Listy przebojów OmniFM | Najczęściej słuchane stacje i utwory tygodnia',
         description: 'Najczęściej słuchane stacje radiowe i najczęściej grane utwory z zeszłego tygodnia na wszystkich serwerach Discorda z OmniFM, bez rozpoznawalnych osób i serwerów.',

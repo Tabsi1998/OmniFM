@@ -1,6 +1,7 @@
 import { useI18n } from '../i18n.js';
 import { resolvePrimaryInviteUrl } from '../lib/invite.js';
-import { Sparkles } from 'lucide-react';
+import { buildPageHref } from '../lib/pageRouting.js';
+import { ArrowRight, Sparkles } from 'lucide-react';
 import LiveDemo from './demo/LiveDemo.js';
 
 const css = `
@@ -25,7 +26,7 @@ function StepShell({ step, children }) {
 }
 
 export default function HowToDiscord({ bots = [] }) {
-  const { copy } = useI18n();
+  const { copy, locale } = useI18n();
   const s = copy.howTo;
   const inviteUrl = resolvePrimaryInviteUrl(bots);
 
@@ -60,6 +61,17 @@ export default function HowToDiscord({ bots = [] }) {
           <StepShell step={s.steps[2]}>
             <LiveDemo scene="play" />
           </StepShell>
+        </div>
+
+        {/* Every step in detail, with the panel, the dashboard and help (#434). */}
+        <div style={{ textAlign: 'center', marginTop: 34 }}>
+          <a
+            href={buildPageHref(locale, 'start')}
+            data-testid="howto-guide-link"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '11px 20px', borderRadius: 12, border: '1px solid #2a3450', color: '#fff', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}
+          >
+            {s.guideLink} <ArrowRight size={16} />
+          </a>
         </div>
       </div>
     </section>

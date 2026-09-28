@@ -364,6 +364,10 @@ const messages = {
         title: 'OmniFM | Terms of service',
         description: 'Terms for the OmniFM website, Discord bot, dashboard, and optional Premium features.',
       },
+      start: {
+        title: 'Getting started with OmniFM | Set up radio for Discord',
+        description: 'How to set up OmniFM: invite the commander, add a worker, start the radio with /play, use the panel and the dashboard, and what helps when something does not work.',
+      },
       charts: {
         title: 'OmniFM Charts | The most listened stations and songs of the week',
         description: 'The most listened radio stations and the most played songs of last week across every Discord server with OmniFM, without any person or server.',

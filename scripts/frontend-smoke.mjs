@@ -44,6 +44,7 @@ const PAGES = [
   { name: "Startseite", path: "/", shows: '[data-testid="hero-title"]', lean: true },
   { name: "Sender", path: "/sender", shows: '[data-testid="station-browser"]', lean: true },
   { name: "Preise", path: "/preise", shows: '[data-testid="premium-section"]', lean: true },
+  { name: "Erste Schritte", path: "/start", shows: '[data-testid="start-guide"]', lean: true },
   { name: "Impressum", path: "/impressum", shows: '[data-testid="impressum-section"]' },
   { name: "Datenschutz", path: "/datenschutz", shows: '[data-testid="privacy-section"]' },
   { name: "Nutzungsbedingungen", path: "/nutzungsbedingungen", shows: '[data-testid="terms-section"]' },

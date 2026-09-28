@@ -4,10 +4,11 @@
 const messages = {
   navbar: {
     links: [
-      { key: 'flow', label: 'Nasıl çalışır', href: '#features' },
+      { key: 'flow', label: 'Nasıl çalışır', href: '#how-to' },
       { key: 'why', label: 'Neden OmniFM', href: '#why-omnifm' },
       { key: 'stations', label: 'İstasyonlar', page: 'stations' },
       { key: 'pricing', label: 'Fiyatlar', page: 'premium' },
+      { key: 'start', label: 'Rehber', page: 'start' },
       { key: 'faq', label: 'SSS', page: 'faq' },
     ],
     discord: 'Discord topluluğu',
@@ -106,6 +107,7 @@ const messages = {
         key: 'start',
         question: 'OmniFM’e başlamanın en kolay yolu nedir?',
         answer: 'Genelde bir dakikadan kısa sürer: commander’ı davet et, en az bir worker ekle, bir ses kanalına gir, sonra /play çalıştırıp bir istasyon seç.',
+        link: { label: 'Rehbere git', page: 'start' },
       },
       {
         key: 'workerRequired',
@@ -169,6 +171,7 @@ const messages = {
       { n: '03', cmd: '/play lofi', title: 'Radyoyu başlat', desc: 'Bir ses kanalına gir ve bir istasyon seç. OmniFM çalar, kontrol için bir panel gösterir ve yayın koparsa kendiliğinden yeniden bağlanır.' },
     ],
     addServer: 'Sunucuya ekle',
+    guideLink: 'Tam rehber',
   },
   // The live demos of the first steps in Discord (demo/DemoScene.js, #431): Discord's own words.
   demos: {

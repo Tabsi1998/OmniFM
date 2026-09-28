@@ -3,10 +3,11 @@
 const messages = {
   navbar: {
     links: [
-      { key: 'flow', label: 'Zo werkt het', href: '#features' },
+      { key: 'flow', label: 'Zo werkt het', href: '#how-to' },
       { key: 'why', label: 'Waarom OmniFM', href: '#why-omnifm' },
       { key: 'stations', label: 'Zenders', page: 'stations' },
       { key: 'pricing', label: 'Prijzen', page: 'premium' },
+      { key: 'start', label: 'Handleiding', page: 'start' },
       { key: 'faq', label: 'FAQ', page: 'faq' },
     ],
     discord: 'Discord-community',
@@ -105,6 +106,7 @@ const messages = {
         key: 'start',
         question: 'Wat is de eenvoudigste manier om met OmniFM te beginnen?',
         answer: 'Meestal in minder dan een minuut: nodig de commander uit, voeg minstens één worker toe, ga naar een spraakkanaal, gebruik dan /play en kies een zender.',
+        link: { label: 'Naar de handleiding', page: 'start' },
       },
       {
         key: 'workerRequired',
@@ -168,6 +170,7 @@ const messages = {
       { n: '03', cmd: '/play lofi', title: 'De radio starten', desc: 'Ga een spraakkanaal in en kies een zender. OmniFM speelt, toont een paneel om alles te regelen en maakt zelf opnieuw verbinding als de stream wegvalt.' },
     ],
     addServer: 'Aan server toevoegen',
+    guideLink: 'Volledige handleiding',
   },
   // The live demos of the first steps in Discord (demo/DemoScene.js, #431): Discord's own words.
   demos: {

@@ -365,6 +365,10 @@ const messages = {
         title: 'OmniFM | Condizioni d’uso',
         description: 'Condizioni per il sito di OmniFM, il bot Discord, la dashboard e le funzioni Premium facoltative.',
       },
+      start: {
+        title: 'Primi passi con OmniFM | Configurare la radio su Discord',
+        description: 'Come configurare OmniFM: invitare il commander, aggiungere un worker, avviare la radio con /play, usare pannello e dashboard, e cosa fare se qualcosa non funziona.',
+      },
       charts: {
         title: 'Classifiche OmniFM | Le stazioni e i brani più ascoltati della settimana',
         description: 'Le stazioni radio più ascoltate e i brani più suonati della scorsa settimana su tutti i server Discord con OmniFM, senza persone né server riconoscibili.',

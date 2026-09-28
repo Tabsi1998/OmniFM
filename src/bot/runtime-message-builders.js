@@ -11,6 +11,7 @@ import { PLANS, BRAND } from "../config/plans.js";
 import { catalogPlanContext } from "./plan-texts.js";
 import {
   DASHBOARD_URL,
+  GUIDE_URL,
   WEBSITE_URL,
   SUPPORT_URL,
   INVITE_COMPONENT_ID_OPEN,
@@ -39,6 +40,7 @@ export function buildRuntimeHelpMessage(runtime, interaction, section = "overvie
     guildName: clipText(interaction?.guild?.name || "", 60),
     urls: {
       dashboard: withLanguageParam(DASHBOARD_URL, language),
+      guide: withLanguageParam(GUIDE_URL, language),
       website: withLanguageParam(WEBSITE_URL, language),
       support: SUPPORT_URL,
       premium: withLanguageParam(BRAND.upgradeUrl || WEBSITE_URL, language),

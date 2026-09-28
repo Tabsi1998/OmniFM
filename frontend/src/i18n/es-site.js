@@ -3,10 +3,11 @@
 const messages = {
   navbar: {
     links: [
-      { key: 'flow', label: 'Cómo funciona', href: '#features' },
+      { key: 'flow', label: 'Cómo funciona', href: '#how-to' },
       { key: 'why', label: 'Por qué OmniFM', href: '#why-omnifm' },
       { key: 'stations', label: 'Emisoras', page: 'stations' },
       { key: 'pricing', label: 'Precios', page: 'premium' },
+      { key: 'start', label: 'Guía', page: 'start' },
       { key: 'faq', label: 'FAQ', page: 'faq' },
     ],
     discord: 'Comunidad de Discord',
@@ -105,6 +106,7 @@ const messages = {
         key: 'start',
         question: '¿Cuál es la forma más sencilla de empezar con OmniFM?',
         answer: 'Normalmente en menos de un minuto: invita al commander, añade al menos un worker, entra en un canal de voz y luego usa /play y elige una emisora.',
+        link: { label: 'Ver la guía', page: 'start' },
       },
       {
         key: 'workerRequired',
@@ -168,6 +170,7 @@ const messages = {
       { n: '03', cmd: '/play lofi', title: 'Iniciar la radio', desc: 'Entra en un canal de voz y elige una emisora. OmniFM suena, muestra un panel para controlarlo y se reconecta solo si la emisión se corta.' },
     ],
     addServer: 'Añadir al servidor',
+    guideLink: 'Guía completa',
   },
   // The live demos of the first steps in Discord (demo/DemoScene.js, #431): Discord's own words.
   demos: {

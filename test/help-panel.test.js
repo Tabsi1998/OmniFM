@@ -17,7 +17,7 @@ const { INVITE_COMPONENT_ID_OPEN } = await import("../src/bot/runtime-links.js")
 
 const de = (german) => german;
 const en = (_german, english) => english;
-const urls = { dashboard: "https://omnifm.xyz/dashboard", website: "https://omnifm.xyz", support: "https://discord.gg/x", premium: "https://omnifm.xyz/premium" };
+const urls = { dashboard: "https://omnifm.xyz/dashboard", guide: "https://omnifm.xyz/start", website: "https://omnifm.xyz", support: "https://discord.gg/x", premium: "https://omnifm.xyz/premium" };
 
 function tree(payload) {
   return payload.components[0].toJSON();
@@ -37,7 +37,8 @@ test("every help topic is a private panel with a topic menu and a button that do
     assert.equal(select.custom_id, HELP_SECTION_SELECT_ID);
     assert.equal(select.options.length, HELP_SECTIONS.length);
     assert.equal(select.options.find((option) => option.default)?.value, section);
-    const actionButtons = components.filter((component) => component.type === 2 && component.label !== "Dashboard" && component.label !== "Website");
+    const actionButtons = components.filter((component) => component.type === 2 && !["Dashboard", "Anleitung", "Website"].includes(component.label));
+    assert.ok(components.some((component) => component.label === "Anleitung" && component.url === urls.guide), `${section}: the guide`);
     assert.ok(actionButtons.some((component) => component.custom_id || component.url), `${section}: a button that starts something`);
   }
 });
