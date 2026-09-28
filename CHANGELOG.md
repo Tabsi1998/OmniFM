@@ -6,6 +6,55 @@ folgt [SemVer](https://semver.org/lang/de/): Die erste Zahl steigt bei
 Funktionen, die dritte bei reinen Fehlerbehebungen. Wie ein Release entsteht,
 steht in `scripts/release.mjs`.
 
+## 3.10.0 – 2026-09-28
+
+Die Pläne neu aufgeteilt, damit jeder für sich lohnt:
+- **Free** ist ein vollständiges Radio mit Ausfallschutz und Dashboard.
+- **Pro** gestaltet und verwaltet den Server.
+- **Ultimate** betreibt das eigene Radio.
+
+### Neu
+
+- **Ersatzsender auf jedem Plan:** Fällt ein Stream aus, spielt OmniFM von
+  selbst einen anderen Sender. Zuerst kommt einer aus demselben Genre, dann
+  einer aus einem verwandten, sonst ein anderer Sender des Plans. Sender, die
+  gerade als ausgefallen bekannt sind, werden übersprungen. Sobald der eigene
+  Sender wieder läuft, geht es zurück; im Panel steht solange „Zurück zu …“.
+  Mit Ultimate legst du die Reihenfolge weiterhin selbst fest. (#413, #415)
+- **Dashboard für jeden Plan:** Auch mit Free siehst du, welcher Bot wo was
+  spielt, und kannst den Sender wechseln oder den Bot stoppen. Außerdem
+  stellst du die Sprache des Bots ein (bisher nur mit `/language`) und
+  verwaltest Voice Guard, Favoriten und ein Event. Was dein Plan nicht hat,
+  zeigt ein Schloss mit dem, was der nächste Plan bringt. (#413, #416)
+- **Free:** `/now`, `/history` mit den letzten 5 Songs und 1 geplantes Event.
+- **Pro:** Ausfall-Meldungen in einen Discord-Kanal (bisher nur Ultimate),
+  `/history` mit den letzten 20 Songs.
+- **Ultimate:** 10 Lieblingssender statt 5, im Panel in zwei Knopfreihen.
+- **Überall dieselben Angaben:** Die Preiskarten der Website, `/help`,
+  `/premium`, die Upgrade-Hinweise und das Dashboard nennen dieselben
+  Punkte, aus einer Datei. Die Angaben sind ehrlich: Es gibt keine
+  „Ultimate-Sender“, und 320k heißt „so gut wie der Sender liefert“. (#415)
+
+### Behoben
+
+- **Dashboard-Übersicht (Pro, Ultimate):** Die Liste „Aktive Streams“ war
+  seit dem Umstieg auf die Node-API am 24.09. immer leer, und die Uptime
+  zeigte „—“. Jetzt stehen dort alle laufenden Streams, mit Wechseln und
+  Stoppen. (#416)
+
+### Entfernt
+
+- Der „Lizenz-Workspace“ (Ultimate): Keine Seite hat ihn je aufgerufen. Ein
+  Server kommt weiter mit `/license activate` zu einer Lizenz.
+- Eine Befehlsdatei, die nie geladen wurde.
+
+### Nach dem Update
+
+- Nichts zu tun: Favoriten, Events und Einstellungen bleiben, wie sie sind.
+- Hat ein Free-Server noch mehrere Events (etwa nach abgelaufenem Pro), läuft
+  das älteste weiter. Die anderen werden zu ihrem nächsten Termin
+  ausgeschaltet.
+
 ## 3.9.0 – 2026-09-28
 
 Neu: Sender-Vorschläge aus der Community und eine Live-Ansicht im Dashboard.
