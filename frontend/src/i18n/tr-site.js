@@ -6,6 +6,7 @@ const messages = {
     links: [
       { key: 'flow', label: 'Nasıl çalışır', href: '#how-to' },
       { key: 'why', label: 'Neden OmniFM', href: '#why-omnifm' },
+      { key: 'demo', label: 'Demo', href: '#dashboard-demo' },
       { key: 'stations', label: 'İstasyonlar', page: 'stations' },
       { key: 'pricing', label: 'Fiyatlar', page: 'premium' },
       { key: 'start', label: 'Rehber', page: 'start' },
@@ -96,6 +97,26 @@ const messages = {
       free: 'Free',
       pro: 'Pro',
       ultimate: 'Ultimate',
+    },
+  },
+  // The start page's tour through the dashboard with example data (#432).
+  dashboardPreview: {
+    eyebrow: 'Web paneli',
+    title: 'Radyon bir bakışta, Discord dışında da',
+    subtitle: 'Örnek verilerle gerçek web paneli: hangi kanalda ne çaldığı, etkinlikler, istatistikler ve ayarlar. Etiket, bunun hangi planda olduğunu söyler.',
+    tryIt: 'Kendin dene',
+    tryNote: 'Giriş yok. Hiçbir şey kaydedilmez.',
+    frameTitle: 'Örnek verilerle web panelinde tur',
+    everyPlan: 'Her plan',
+    fromPlan: ({ plan }) => `${plan} ve üstü`,
+    steps: {
+      overview: 'Nerede ne çalıyor',
+      live: 'Son 24 saatin canlı görünümü',
+      stations: 'Kendi istasyonların',
+      events: 'Planlanmış etkinlikler',
+      stats: 'İstatistikler',
+      roles: 'Rol izinleri',
+      settings: 'Panel ve ayarlar',
     },
   },
   faq: {

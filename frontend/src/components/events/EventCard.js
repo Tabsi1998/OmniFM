@@ -27,7 +27,7 @@ import {
 } from './eventsShared.js';
 import { useI18n } from '../../i18n.js';
 
-export function EventCard({ event, onToggle, onDelete, onEdit, t, formatDate, voiceChannels, textChannels, serverEmojis }) {
+export function EventCard({ event, onToggle, onDelete, onEdit, t, formatDate, voiceChannels, textChannels, serverEmojis, stationNames }) {
   const { locale } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const isActive = event.enabled !== false;
@@ -35,9 +35,10 @@ export function EventCard({ event, onToggle, onDelete, onEdit, t, formatDate, vo
   const voiceName = voiceChannels?.find((channel) => channel.id === event.channelId)?.name || event.channelId || '-';
   const textName = textChannels?.find((channel) => channel.id === event.textChannelId)?.name || event.textChannelId || '';
   const syncState = getDiscordSyncState(event, t);
+  const stationName = event.stationName || stationNames?.[event.stationKey] || event.stationKey;
   const previewValues = buildEventPreviewValues({
     ...event,
-    stationName: event.stationName || event.stationKey,
+    stationName,
   }, voiceName, formatDate, t);
   const announcementPreview = renderEventTemplate(event.announceMessage, previewValues);
   const descriptionPreview = buildDiscordEventDescriptionPreview(event.description, previewValues.station, {
@@ -93,7 +94,7 @@ export function EventCard({ event, onToggle, onDelete, onEdit, t, formatDate, vo
       </div>
 
       <div style={{ marginTop: 8, display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 13, color: '#71717A' }}>
-        <span>{t('Station', 'Station')}: <span style={{ color: '#A1A1AA' }}>{event.stationKey || '-'}</span></span>
+        <span>{t('Station', 'Station')}: <span style={{ color: '#A1A1AA' }} data-testid={`event-station-${event.id}`}>{stationName || '-'}</span></span>
         <span><Hash size={11} style={{ verticalAlign: '-1px' }} /> <span style={{ color: '#A1A1AA' }}>{voiceName}</span></span>
         <span>
           <Clock size={11} style={{ verticalAlign: '-1px' }} />{' '}

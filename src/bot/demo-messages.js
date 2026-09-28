@@ -52,6 +52,11 @@ function withoutVersion(payload) {
   return tag ? JSON.parse(JSON.stringify(payload).split(`OmniFM · ${tag}`).join("OmniFM")) : payload;
 }
 
+/** The lofi moment with a design of the panel designer, as the dashboard preview shows it (#432). */
+export function buildDemoPanel(language, design = undefined) {
+  return withoutVersion(buildPanelPreview({ language, sample: DEMO_PANEL_SAMPLES.lofi, favorites: FAVORITES, workerName: "OmniFM 1", planTier: "free", design }));
+}
+
 /** The answer to /invite on a new Free server with two workers, built by the bot's own menu code. */
 async function inviteAnswer(language) {
   const t = (de, en) => (language === "de" ? de : en);

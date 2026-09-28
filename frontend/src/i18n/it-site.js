@@ -5,6 +5,7 @@ const messages = {
     links: [
       { key: 'flow', label: 'Come funziona', href: '#how-to' },
       { key: 'why', label: 'Perché OmniFM', href: '#why-omnifm' },
+      { key: 'demo', label: 'Demo', href: '#dashboard-demo' },
       { key: 'stations', label: 'Stazioni', page: 'stations' },
       { key: 'pricing', label: 'Prezzi', page: 'premium' },
       { key: 'start', label: 'Guida', page: 'start' },
@@ -95,6 +96,26 @@ const messages = {
       free: 'Free',
       pro: 'Pro',
       ultimate: 'Ultimate',
+    },
+  },
+  // The start page's tour through the dashboard with example data (#432).
+  dashboardPreview: {
+    eyebrow: 'Dashboard',
+    title: 'La tua radio a colpo d’occhio, anche fuori da Discord',
+    subtitle: 'La vera dashboard con dati di esempio: cosa suona in quale canale, eventi, statistiche e impostazioni. L’etichetta dice in quale piano c’è.',
+    tryIt: 'Provala tu',
+    tryNote: 'Senza accesso. Non si salva nulla.',
+    frameTitle: 'Giro della dashboard con dati di esempio',
+    everyPlan: 'Ogni piano',
+    fromPlan: ({ plan }) => `da ${plan}`,
+    steps: {
+      overview: 'Cosa suona e dove',
+      live: 'Vista live delle ultime 24 ore',
+      stations: 'Stazioni proprie',
+      events: 'Eventi programmati',
+      stats: 'Statistiche',
+      roles: 'Permessi per ruolo',
+      settings: 'Pannello e impostazioni',
     },
   },
   faq: {

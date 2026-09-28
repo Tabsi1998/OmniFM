@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { I18nProvider } from '../i18n.js';
 import { PlayerProvider } from '../lib/player.js';
 import CommunitySection from './CommunitySection.js';
+import DashboardPreview from './DashboardPreview.js';
 import FaqSection from './FaqSection.js';
 import Hero from './Hero.js';
 import HowToDiscord from './HowToDiscord.js';
@@ -140,6 +141,7 @@ describe('the ways to the guide', () => {
           <HowToDiscord bots={BOTS} />
           <StationBrowser stations={[]} loading={false} />
           <WhyOmniFM />
+          <DashboardPreview />
           <Premium bots={BOTS} planContext={{}} />
           <CommunitySection />
           <FaqSection />
