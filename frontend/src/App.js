@@ -28,6 +28,7 @@ const PrivacySection = lazy(() => import('./components/PrivacySection.js'));
 const TermsSection = lazy(() => import('./components/TermsSection.js'));
 const StatusPage = lazy(() => import('./components/StatusPage.js'));
 const ChartsPage = lazy(() => import('./components/ChartsPage.js'));
+const StartGuide = lazy(() => import('./components/StartGuide.js'));
 // One live demo alone, for recording clips (#431): /?demo=play
 const DemoStage = lazy(() => import('./components/demo/DemoStage.js'));
 const DEMO_SCENES = ['commander', 'worker', 'play', 'panel'];
@@ -277,6 +278,22 @@ function AppContent() {
         <main>
           <Suspense fallback={<PageLoading />}>
             <ChartsPage />
+          </Suspense>
+        </main>
+        <SiteFooter legal={legal} />
+        <CookieConsent />
+      </div>
+    );
+  }
+
+  if (currentPage === 'start') {
+    return (
+      <div data-testid="app-root" style={{ position: 'relative', minHeight: '100vh' }}>
+        <div className="noise-overlay" />
+        <Navbar page={currentPage} />
+        <main>
+          <Suspense fallback={<PageLoading />}>
+            <StartGuide bots={bots} />
           </Suspense>
         </main>
         <SiteFooter legal={legal} />

@@ -80,6 +80,7 @@ test("React SEO assets and base metadata are present", () => {
   assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/stations<\/loc>/);
   assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/premium<\/loc>/);
   assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/faq<\/loc>/);
+  assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/start<\/loc>/);
   assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/impressum<\/loc>/);
   assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/datenschutz<\/loc>/);
   assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/nutzungsbedingungen<\/loc>/);

@@ -83,6 +83,11 @@ const SPA_ENTRY_PATHS = new Set([
   "/agb",
   "/status",
   "/charts",
+  "/start",
+  "/guide",
+  "/anleitung",
+  "/erste-schritte",
+  "/getting-started",
 ]);
 
 function normalizeSpaPathname(pathname) {

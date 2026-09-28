@@ -23,6 +23,9 @@ function Navbar({ page = 'home' }) {
     if (link.page) return buildPageHref(locale, link.page);
     return page === 'home' ? link.href : buildHomeHref(locale, link.href);
   };
+  // The page you are on stays white and is announced as the current one.
+  const isCurrent = (link) => Boolean(link.page) && link.page === page;
+  const linkColor = (link) => (isCurrent(link) ? '#fff' : '#A1A1AA');
 
   return (
     <nav
@@ -82,8 +85,9 @@ function Navbar({ page = 'home' }) {
             key={link.key}
             href={resolveNavHref(link)}
             data-testid={`nav-link-${link.key}`}
+            aria-current={isCurrent(link) ? 'page' : undefined}
             style={{
-              color: '#A1A1AA',
+              color: linkColor(link),
               textDecoration: 'none',
               fontSize: 14,
               fontWeight: 500,
@@ -94,7 +98,7 @@ function Navbar({ page = 'home' }) {
               event.currentTarget.style.color = '#fff';
             }}
             onMouseLeave={(event) => {
-              event.currentTarget.style.color = '#A1A1AA';
+              event.currentTarget.style.color = linkColor(link);
             }}
           >
             {link.label}
@@ -199,8 +203,9 @@ function Navbar({ page = 'home' }) {
               key={link.key}
               href={resolveNavHref(link)}
               onClick={() => setOpen(false)}
+              aria-current={isCurrent(link) ? 'page' : undefined}
               style={{
-                color: '#A1A1AA',
+                color: linkColor(link),
                 textDecoration: 'none',
                 fontSize: 16,
                 fontWeight: 500,

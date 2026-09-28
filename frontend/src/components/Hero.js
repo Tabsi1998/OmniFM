@@ -199,7 +199,7 @@ function Hero({ stats, bots }) {
                 <Headphones size={18} /> {copy.hero.ctaInvite}
               </a>
               <a
-                href="#features"
+                href="#how-to"
                 data-testid="hero-cta-features"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 9, padding: '15px 30px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', color: '#fff', fontWeight: 600, fontSize: 15, border: '1px solid #2a3450', transition: 'background 0.2s, border-color 0.2s' }}
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#ff6b00'; e.currentTarget.style.background = 'rgba(255,107,0,0.06)'; }}

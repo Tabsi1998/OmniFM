@@ -130,10 +130,14 @@ test("pageRouting resolves aliases and localized legal paths", () => {
   assert.equal(resolvePageFromUrl("https://omnifm.xyz/premium"), "premium");
   assert.equal(resolvePageFromUrl("https://omnifm.xyz/pricing"), "premium");
   assert.equal(resolvePageFromUrl("https://omnifm.xyz/faq"), "faq");
+  assert.equal(resolvePageFromUrl("https://omnifm.xyz/start?lang=de"), "start");
+  assert.equal(resolvePageFromUrl("https://omnifm.xyz/anleitung"), "start");
+  assert.equal(resolvePageFromUrl("https://omnifm.xyz/?page=guide"), "start");
   assert.equal(getCanonicalPagePath("terms", "de"), "/nutzungsbedingungen");
   assert.equal(getCanonicalPagePath("stations", "de"), "/stations");
   assert.equal(getCanonicalPagePath("premium", "en"), "/premium");
   assert.equal(getCanonicalPagePath("faq", "de"), "/faq");
+  assert.equal(getCanonicalPagePath("start", "en"), "/start");
   assert.equal(buildPageHref("de", "terms"), "/nutzungsbedingungen?lang=de");
   assert.equal(buildPageHref("de", "stations"), "/stations?lang=de");
   assert.equal(buildPageHref("en", "premium"), "/premium?lang=en");
@@ -230,6 +234,10 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     const faqPageResponse = await fetch(`http://127.0.0.1:${port}/faq`);
     assert.equal(faqPageResponse.status, 200);
     assert.match(await faqPageResponse.text(), /legal-routing-marker/);
+
+    const guideResponse = await fetch(`http://127.0.0.1:${port}/start?lang=en`);
+    assert.equal(guideResponse.status, 200);
+    assert.match(await guideResponse.text(), /legal-routing-marker/);
 
     const robotsResponse = await fetch(`http://127.0.0.1:${port}/robots.txt`);
     assert.equal(robotsResponse.status, 200);

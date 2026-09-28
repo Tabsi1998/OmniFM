@@ -37,7 +37,7 @@ function row(...components) {
  * @param {string} [input.section]
  * @param {object} input.plan   { name, bitrate, maxBots }
  * @param {string} [input.guildName]
- * @param {object} input.urls   { dashboard, website, support, premium }
+ * @param {object} input.urls   { dashboard, guide, website, support, premium }
  * @param {string|null} [input.applicationId]
  * @param {object} [input.planContext] { freeStations, allStations } of the catalogue (#413)
  */
@@ -140,6 +140,7 @@ export function buildHelpPayload(input) {
 
   const links = row(
     urls.dashboard ? link(urls.dashboard, "Dashboard") : null,
+    urls.guide ? link(urls.guide, t("Anleitung", "Guide")) : null,
     urls.website ? link(urls.website, "Website") : null,
     urls.support ? link(urls.support, "Support") : null,
   );

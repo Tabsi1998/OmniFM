@@ -18,9 +18,9 @@ import {
 } from "../runtime-panels.js";
 import {
   DASHBOARD_URL,
+  GUIDE_URL,
   PLAY_COMPONENT_ID_OPEN,
   SUPPORT_URL,
-  WEBSITE_URL,
   withLanguageParam,
 } from "../runtime-links.js";
 import {
@@ -117,6 +117,7 @@ const onboardingMethods = {
       guildName: clipText(guild?.name || "", 80),
       urls: {
         dashboard: withLanguageParam(DASHBOARD_URL, language),
+        guide: withLanguageParam(GUIDE_URL, language),
         support: SUPPORT_URL,
       },
       applicationId: this.client?.application?.id || null,
@@ -231,7 +232,7 @@ const onboardingMethods = {
       },
       urls: {
         dashboard: withLanguageParam(DASHBOARD_URL, language),
-        permissionsHelp: withLanguageParam(`${String(WEBSITE_URL).replace(/\/+$/, "")}/faq`, language),
+        permissionsHelp: withLanguageParam(`${GUIDE_URL}#help`, language),
       },
       applicationId,
     });

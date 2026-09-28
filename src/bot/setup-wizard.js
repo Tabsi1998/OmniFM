@@ -148,6 +148,7 @@ export function buildWelcomePayload({ t, guildName = "", urls = {}, applicationI
         .setLabel(t("Einrichtung starten", "Start setup")),
       helpButton(t, applicationId),
       linkButton("Dashboard", urls.dashboard),
+      linkButton(t("Anleitung", "Guide"), urls.guide),
       linkButton("Support", urls.support),
     ].filter(Boolean)),
   ];

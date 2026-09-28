@@ -14,6 +14,7 @@ const PAGE_TYPES = {
   stations: 'website',
   premium: 'website',
   faq: 'article',
+  start: 'article',
   imprint: 'article',
   privacy: 'article',
   terms: 'article',
