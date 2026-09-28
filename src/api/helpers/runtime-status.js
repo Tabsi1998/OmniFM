@@ -166,6 +166,15 @@ export function collectGuildLiveDetails(runtimes, guildId) {
       voiceGuardMoveCount: Number(detail?.voiceGuardMoveCount || 0) || 0,
       voiceGuardReturnCount: Number(detail?.voiceGuardReturnCount || 0) || 0,
       voiceGuardDisconnectCount: Number(detail?.voiceGuardDisconnectCount || 0) || 0,
+      // What the stream list of the dashboard shows (#413).
+      failoverActive: detail?.failoverActive === true,
+      desiredStationKey: detail?.desiredStationKey || null,
+      desiredStationName: detail?.desiredStationName || null,
+      failoverFromStationName: detail?.failoverFromStationName || null,
+      failbackNextProbeAt: Number(detail?.failbackNextProbeAt || 0) || 0,
+      parkedReason: detail?.parkedReason || null,
+      serverMuted: detail?.serverMuted === true,
+      uptimeSec: Number(status?.uptimeSec || 0) || 0,
     });
   }
   return rows;

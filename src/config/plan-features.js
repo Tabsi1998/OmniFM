@@ -22,6 +22,9 @@ export const PLAN_LIMITS = Object.freeze({
  * apiKey is its name in API answers.
  */
 export const PLAN_CAPABILITIES = Object.freeze({
+  // #413: the dashboard's basics for every plan (what plays where, switch or
+  // stop, language, voice guard, favourites); the rest of it from Pro.
+  dashboard_basic: Object.freeze({ apiKey: "dashboardBasic", minPlan: "free", de: "Dashboard-Grundfunktionen", en: "Dashboard basics" }),
   dashboard_access: Object.freeze({ apiKey: "dashboardAccess", minPlan: "pro", de: "Dashboard", en: "Dashboard" }),
   event_scheduler: Object.freeze({ apiKey: "eventScheduler", minPlan: "free", de: "Geplante Events", en: "Scheduled events" }),
   role_permissions: Object.freeze({ apiKey: "rolePermissions", minPlan: "pro", de: "Rollenrechte", en: "Role permissions" }),
@@ -164,8 +167,12 @@ export const PLAN_FEATURES = Object.freeze([
   {
     key: "dashboard",
     highlight: true,
-    de: (plan) => (planAtLeast(plan, "pro") ? "Web-Dashboard mit Live-Ansicht, Statistik und Einstellungen" : null),
-    en: (plan) => (planAtLeast(plan, "pro") ? "Web dashboard with live view, statistics and settings" : null),
+    de: (plan) => (planAtLeast(plan, "pro")
+      ? "Web-Dashboard mit Live-Ansicht, Statistik und allen Einstellungen"
+      : "Web-Dashboard: was läuft wo, Sender wechseln oder stoppen, Sprache"),
+    en: (plan) => (planAtLeast(plan, "pro")
+      ? "Web dashboard with live view, statistics and every setting"
+      : "Web dashboard: what plays where, switch or stop the station, language"),
   },
   {
     key: "permissions",

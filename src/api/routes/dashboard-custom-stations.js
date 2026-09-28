@@ -44,7 +44,7 @@ export function createDashboardCustomStationsRouteHandler(deps) {
       sendLocalizedError(res, 403, language, "Kein Zugriff.", "No access.");
       return true;
     }
-    if (!serverHasCapability(guildInfo.id, "dashboard_access")) {
+    if (!serverHasCapability(guildInfo.id, "dashboard_basic")) {
       sendLocalizedError(res, 403, language, "Dashboard ist erst ab Pro verfügbar.", "Dashboard is only available from Pro.");
       return true;
     }
