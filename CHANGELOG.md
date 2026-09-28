@@ -6,6 +6,46 @@ folgt [SemVer](https://semver.org/lang/de/): Die erste Zahl steigt bei
 Funktionen, die dritte bei reinen Fehlerbehebungen. Wie ein Release entsteht,
 steht in `scripts/release.mjs`.
 
+## 3.14.0 – 2026-09-29
+
+Zeigen statt erklären: die ersten Schritte als Live-Demos, eine Anleitung
+mit Hilfe bei Problemen und das Dashboard zum Ausprobieren ohne Anmeldung.
+
+### Neu
+
+- **Live-Demos der ersten Schritte in Discord** auf der Startseite: Commander
+  einladen, Worker hinzufügen, mit `/play` starten und das Panel bedienen.
+  Die Szenen sind in der Seite gezeichnet (keine Videos), laufen nur, wenn
+  sie im Blick sind, lassen sich anhalten und zeigen mit „weniger Bewegung“
+  alle Schritte als Standbild. Was der Bot darin sagt, ist seine echte
+  Antwort, gebaut von seinem eigenen Code. (#431)
+- **Seite „Erste Schritte“** unter omnifm.xyz/start: Schritt für Schritt vom
+  Einladen bis zum Dashboard, jeder Schritt mit seiner Demo, dazu „Wenn
+  etwas nicht klappt“ mit den häufigsten Stolpersteinen. In allen neun
+  Sprachen; der Bot verlinkt sie in der Begrüßung, in `/help` und bei
+  fehlenden Rechten in der Einrichtung. (#434)
+- **Dashboard zum Ausprobieren** unter omnifm.xyz/dashboard?demo: drei
+  Beispiel-Server, einer pro Plan, mit allem, was das echte Dashboard zeigt.
+  Es geht nichts an den Server, und nichts wird gespeichert. Auf der
+  Startseite läuft eine Tour hindurch, mit den Plänen, ab denen es jeden
+  Teil gibt; im Menü heißt der Abschnitt „Demo“. (#432)
+- **Clips für Discord und Social Media:** Ein Skript nimmt jede Demo und die
+  Dashboard-Tour als Video auf. (#431, #432)
+
+### Behoben
+
+- **Echte Umlaute:** Viele deutsche Texte des Bots und des Dashboards
+  schrieben „ae“, „oe“, „ue“ („Naechster Schritt“, „Bitte pruefe“). Ein
+  Test verhindert das künftig. (#450, #454)
+- **Dashboard:** Die Event-Karten nennen den Sender beim Namen statt beim
+  internen Schlüssel; „Abo & Lizenz“ und der Ladebildschirm erscheinen in
+  der Sprache des Besuchers. (#432, #454)
+- **Startseite:** „Wie es funktioniert“ und der Menüpunkt „Ablauf“
+  sprangen ins Leere; die Einladen-Knöpfe taten nichts, solange die
+  Bot-Liste lud. (#434, #455)
+- **Menü:** Zwischen 769 und 1023 Pixel Breite brachen längere Menüpunkte in
+  zwei Zeilen um; dort kommt jetzt der Menü-Knopf. (#432)
+
 ## 3.13.0 – 2026-09-28
 
 Eine aufgeräumte Startseite und eine überarbeitete Saison-Deko: runde
