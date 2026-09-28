@@ -22,8 +22,13 @@ function isSet(value) {
   return String(value ?? "").trim().length > 0;
 }
 
-/** Owner values win over backend/.env; unset owner values leave the env alone. */
+/**
+ * Owner values win over backend/.env; unset owner values leave the env alone.
+ * @param {Record<string, any>} [operatorAlerts]
+ * @param {Record<string, string | undefined>} [env]
+ */
 export function applyOperatorAlertSettingsToEnv(operatorAlerts = {}, env = process.env) {
+  /** @type {Record<string, any>} */
   const settings = operatorAlerts && typeof operatorAlerts === "object" ? operatorAlerts : {};
   if (isSet(settings.webhookUrl)) env.OPERATOR_WEBHOOK_URL = String(settings.webhookUrl).trim();
   if (isSet(settings.mention)) env.OPERATOR_WEBHOOK_MENTION = String(settings.mention).trim();
@@ -36,13 +41,16 @@ export function applyOperatorAlertSettingsToEnv(operatorAlerts = {}, env = proce
 /**
  * owner_config.system.operatorAlerts, or null when MongoDB is not configured
  * or not reachable in time: an alert must never hang on the database.
+ * @param {{ mongoUrl?: string, dbName?: string, timeoutMs?: number }} [options]
  */
 export async function loadOwnerOperatorAlerts({ mongoUrl, dbName, timeoutMs = 5000 } = {}) {
   if (!isSet(mongoUrl) || !isSet(dbName)) return null;
   const client = new MongoClient(mongoUrl, { serverSelectionTimeoutMS: timeoutMs, connectTimeoutMS: timeoutMs });
   try {
     await client.connect();
-    const doc = await client.db(dbName).collection("owner_config").findOne(
+    // The owner document has the string id "global", not an ObjectId.
+    const ownerConfig = /** @type {import("mongodb").Collection<any>} */ (client.db(dbName).collection("owner_config"));
+    const doc = await ownerConfig.findOne(
       { _id: "global" },
       { projection: { "system.operatorAlerts": 1 } },
     );

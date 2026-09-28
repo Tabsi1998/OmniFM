@@ -41,7 +41,7 @@ function listStations(data) {
   return lines.join("\n");
 }
 
-function cmdAdd(data, nameRaw, rawUrl, keyRaw) {
+async function cmdAdd(data, nameRaw, rawUrl, keyRaw) {
   const name = String(nameRaw || "").trim();
   const url = parseUrl(rawUrl);
   const key = normalizeKey(keyRaw || name);
@@ -53,11 +53,11 @@ function cmdAdd(data, nameRaw, rawUrl, keyRaw) {
 
   data.stations[key] = { name, url };
   if (!data.defaultStationKey) data.defaultStationKey = key;
-  const updated = saveStations(data);
+  const updated = await saveStations(data);
   return { updated, message: `Station hinzugefuegt: ${name} (${key})` };
 }
 
-function cmdRemove(data, keyRaw) {
+async function cmdRemove(data, keyRaw) {
   const key = normalizeKey(keyRaw);
   if (!data.stations[key]) throw new Error(`Station nicht gefunden: ${key}`);
 
@@ -66,46 +66,46 @@ function cmdRemove(data, keyRaw) {
     data.defaultStationKey = Object.keys(data.stations)[0] || null;
   }
   data.fallbackKeys = (data.fallbackKeys || []).filter((k) => k !== key);
-  const updated = saveStations(data);
+  const updated = await saveStations(data);
   return { updated, message: `Station entfernt: ${key}` };
 }
 
-function cmdRename(data, keyRaw, nameRaw) {
+async function cmdRename(data, keyRaw, nameRaw) {
   const key = normalizeKey(keyRaw);
   const name = String(nameRaw || "").trim();
   if (!data.stations[key]) throw new Error(`Station nicht gefunden: ${key}`);
   if (!name) throw new Error("Neuer Name fehlt.");
 
   data.stations[key].name = name;
-  const updated = saveStations(data);
+  const updated = await saveStations(data);
   return { updated, message: `Station umbenannt: ${key} -> ${name}` };
 }
 
-function cmdSetDefault(data, keyRaw) {
+async function cmdSetDefault(data, keyRaw) {
   const key = normalizeKey(keyRaw);
   if (!data.stations[key]) throw new Error(`Station nicht gefunden: ${key}`);
 
   data.defaultStationKey = key;
-  const updated = saveStations(data);
+  const updated = await saveStations(data);
   return { updated, message: `Default gesetzt: ${key}` };
 }
 
-function cmdQuality(data, presetRaw) {
+async function cmdQuality(data, presetRaw) {
   const preset = String(presetRaw || "").toLowerCase();
   if (!isValidQualityPreset(preset)) {
     throw new Error("Ungueltiges preset. Erlaubt: low, medium, high, custom");
   }
 
   data.qualityPreset = preset;
-  const updated = saveStations(data);
+  const updated = await saveStations(data);
   return { updated, message: `Quality gesetzt: ${preset}` };
 }
 
-function cmdFallback(data, rawValue) {
+async function cmdFallback(data, rawValue) {
   const raw = String(rawValue || "").trim();
   if (raw.toLowerCase() === "clear") {
     data.fallbackKeys = [];
-    const updated = saveStations(data);
+    const updated = await saveStations(data);
     return { updated, message: "Fallback-Liste geleert." };
   }
 
@@ -120,7 +120,7 @@ function cmdFallback(data, rawValue) {
   }
 
   data.fallbackKeys = keys;
-  const updated = saveStations(data);
+  const updated = await saveStations(data);
   return { updated, message: `Fallback-Liste gesetzt: ${keys.join(", ")}` };
 }
 
@@ -196,7 +196,7 @@ async function runWizard() {
           const name = await rl.question("Name: ");
           const url = await rl.question("URL: ");
           const key = await rl.question("Key (optional): ");
-          const result = cmdAdd(data, name, url, key);
+          const result = await cmdAdd(data, name, url, key);
           data = result.updated;
           console.log(result.message);
           continue;
@@ -208,7 +208,7 @@ async function runWizard() {
             console.log("Station nicht gefunden.");
             continue;
           }
-          const result = cmdRemove(data, key);
+          const result = await cmdRemove(data, key);
           data = result.updated;
           console.log(result.message);
           continue;
@@ -221,7 +221,7 @@ async function runWizard() {
             continue;
           }
           const name = await rl.question("Neuer Name: ");
-          const result = cmdRename(data, key, name);
+          const result = await cmdRename(data, key, name);
           data = result.updated;
           console.log(result.message);
           continue;
@@ -233,7 +233,7 @@ async function runWizard() {
             console.log("Station nicht gefunden.");
             continue;
           }
-          const result = cmdSetDefault(data, key);
+          const result = await cmdSetDefault(data, key);
           data = result.updated;
           console.log(result.message);
           continue;
@@ -241,7 +241,7 @@ async function runWizard() {
 
         if (choice === "6") {
           const preset = await rl.question("Preset (low|medium|high|custom): ");
-          const result = cmdQuality(data, preset);
+          const result = await cmdQuality(data, preset);
           data = result.updated;
           console.log(result.message);
           continue;
@@ -250,7 +250,7 @@ async function runWizard() {
         if (choice === "7") {
           console.log("Fallback-Liste setzen: key1,key2,... oder 'clear'");
           const fallback = await rl.question("Fallback: ");
-          const result = cmdFallback(data, fallback);
+          const result = await cmdFallback(data, fallback);
           data = result.updated;
           console.log(result.message);
           continue;
@@ -294,7 +294,7 @@ async function run() {
 
     if (command === "add") {
       if (args.length < 2) throw new Error("add braucht: <name> <url> [key]");
-      const result = cmdAdd(data, args[0], args[1], args[2]);
+      const result = await cmdAdd(data, args[0], args[1], args[2]);
       data = result.updated;
       console.log(result.message);
       return 0;
@@ -302,7 +302,7 @@ async function run() {
 
     if (command === "remove") {
       if (args.length < 1) throw new Error("remove braucht: <key>");
-      const result = cmdRemove(data, args[0]);
+      const result = await cmdRemove(data, args[0]);
       data = result.updated;
       console.log(result.message);
       return 0;
@@ -310,7 +310,7 @@ async function run() {
 
     if (command === "rename") {
       if (args.length < 2) throw new Error("rename braucht: <key> <new-name>");
-      const result = cmdRename(data, args[0], args[1]);
+      const result = await cmdRename(data, args[0], args[1]);
       data = result.updated;
       console.log(result.message);
       return 0;
@@ -318,7 +318,7 @@ async function run() {
 
     if (command === "set-default") {
       if (args.length < 1) throw new Error("set-default braucht: <key>");
-      const result = cmdSetDefault(data, args[0]);
+      const result = await cmdSetDefault(data, args[0]);
       data = result.updated;
       console.log(result.message);
       return 0;
@@ -326,7 +326,7 @@ async function run() {
 
     if (command === "quality") {
       if (args.length < 1) throw new Error("quality braucht: <low|medium|high|custom>");
-      const result = cmdQuality(data, args[0]);
+      const result = await cmdQuality(data, args[0]);
       data = result.updated;
       console.log(result.message);
       return 0;
@@ -334,7 +334,7 @@ async function run() {
 
     if (command === "fallback") {
       if (args.length < 1) throw new Error("fallback braucht: <key1,key2,...|clear>");
-      const result = cmdFallback(data, args[0]);
+      const result = await cmdFallback(data, args[0]);
       data = result.updated;
       console.log(result.message);
       return 0;
@@ -346,6 +346,17 @@ async function run() {
     console.error(`Fehler: ${err.message}`);
     return 1;
   }
+}
+
+// The catalogue lives in MongoDB when the setup has one (#292): the CLI edits
+// the same stations as the bot and the owner console, not a file nobody reads.
+const { loadBackendEnv } = await import("./entrypoints/owner-env.mjs");
+loadBackendEnv();
+if (String(process.env.MONGO_URL || "").trim()) {
+  const { connect } = await import("./lib/db.js");
+  const { initStationsStore } = await import("./stations-store.js");
+  await connect();
+  await initStationsStore();
 }
 
 const code = await run();

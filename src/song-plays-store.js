@@ -33,7 +33,10 @@ export function songPlayKey({ artist = "", title = "", displayTitle = "" } = {})
   return key.slice(0, 300);
 }
 
-/** Midnight UTC of the day, the bucket a play is counted in. */
+/**
+ * Midnight UTC of the day, the bucket a play is counted in.
+ * @param {Date | number} [now]
+ */
 export function songPlayDay(now = new Date()) {
   const date = new Date(now);
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
@@ -84,7 +87,11 @@ export async function recordSongPlay(guildId, song = {}, { now = new Date() } = 
   }
 }
 
-/** The most played songs between two times, most plays first: [{ displayTitle, count }]. */
+/**
+ * The most played songs between two times, most plays first: [{ displayTitle, count }].
+ * @param {string} guildId
+ * @param {{ sinceMs?: number, untilMs?: number, limit?: number }} [options]
+ */
 export async function getTopSongPlays(guildId, { sinceMs, untilMs = Date.now(), limit = 5 } = {}) {
   const gid = sanitizeGuildId(guildId);
   const plays = collection();

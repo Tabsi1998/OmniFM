@@ -12,7 +12,7 @@
  * object; the fields below are the ones they rely on.
  *
  * @typedef {object} GuildPlaybackState
- * @property {any} player                    @discordjs/voice AudioPlayer
+ * @property {any} player                    the AudioPlayer of discord.js voice
  * @property {any} connection                VoiceConnection, null while not joined
  * @property {string | null} currentStationKey
  * @property {string | null} currentStationName
@@ -36,6 +36,21 @@
  * @property {number} parkedAt               epoch ms
  * @property {boolean} serverMuted           the bot is server-muted in its channel
  * @property {number} lastAudioHeardAt       epoch ms of the last audio packet
+ * @property {string | null} [failoverFromStationName]
+ * @property {string | null} [failoverFailureStationKey]  the station whose backups keep failing
+ * @property {number} [failoverFailureCount]
+ * @property {number} [failoverFailureStartedAt]  epoch ms
+ * @property {number} [failoverLastFailureAt]     epoch ms
+ * @property {string | null} [parkedDetail]
+ * @property {number} [sleepUntilMs]          epoch ms when /sleep stops playback
+ * @property {boolean} [volumePreferenceSet]  the server chose a volume that outlives a stop
+ * @property {Record<string, number>} [channelVolumes]  volume per voice channel
+ * @property {string | null} [activeScheduledEventId]
+ * @property {number} [activeScheduledEventStopAtMs]  epoch ms
+ * @property {number} [restoreBlockedUntil]   epoch ms; no automatic restore before
+ * @property {number} [restoreBlockedAt]      epoch ms
+ * @property {number} [restoreBlockCount]
+ * @property {string | null} [restoreBlockReason]
  */
 
 export {};

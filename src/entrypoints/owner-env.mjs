@@ -50,7 +50,9 @@ export async function loadOwnerConfig({ url, dbName }) {
   const client = new MongoClient(url, { serverSelectionTimeoutMS: 8000 });
   try {
     await client.connect();
-    return (await client.db(dbName).collection("owner_config").findOne({ _id: "global" })) || {};
+    // The owner document has the string id "global", not an ObjectId.
+    const ownerConfig = /** @type {import("mongodb").Collection<any>} */ (client.db(dbName).collection("owner_config"));
+    return (await ownerConfig.findOne({ _id: "global" })) || {};
   } finally {
     await client.close().catch(() => {});
   }
