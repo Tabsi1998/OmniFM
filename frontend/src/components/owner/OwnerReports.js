@@ -50,7 +50,8 @@ export default function OwnerReports({ apiGet, reports, setReports, onSave, savi
 
   const load = useCallback(async () => {
     try {
-      const data = await apiGet(`/api/admin/reports${showAll ? '?all=1' : ''}`);
+      // Two fixed addresses, so the route check knows both (scripts/check-api-routes.mjs).
+      const data = await apiGet(showAll ? '/api/admin/reports?all=1' : '/api/admin/reports');
       setRows(Array.isArray(data?.reports) ? data.reports : []);
       setError('');
     } catch (err) {
