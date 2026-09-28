@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Music, Pause, Play, Radio, Search, Volume2, VolumeX } from 'lucide-react';
 import { audioErrorText, usePlayer } from '../lib/player.js';
 import { useI18n } from '../i18n.js';
+import { useWebsiteSeason } from '../lib/seasonSite.js';
+import { stationSeasonFor } from '../../../src/lib/seasons.js';
 
 const STATION_COLORS = ['#00e5ff', '#ff6b00', '#EC4899', '#ff6b00', '#ff2a5f', '#ff2a5f'];
 
@@ -99,6 +101,10 @@ function StationCard({ station, index, isPlaying, onPlay, onStop, copy }) {
 function StationBrowser({ stations, loading }) {
   const { copy, formatNumber, t } = useI18n();
   const player = usePlayer();
+  // #430: in a season its stations get their own rubric above the list.
+  const { season } = useWebsiteSeason(true);
+  const seasonTag = stationSeasonFor(season);
+  const seasonStations = seasonTag ? stations.filter((station) => (station.seasons || []).includes(seasonTag)) : [];
   // A shared link (#279) lands on /stations?station=<key>: start with that station.
   const [search, setSearch] = useState(() => {
     try {
@@ -344,6 +350,31 @@ function StationBrowser({ stations, loading }) {
             {finalFilterSummaryText}
           </p>
         </div>
+
+        {!loading && seasonStations.length > 0 && (
+          <div data-testid="station-season-rubric" style={{ marginBottom: 22 }}>
+            <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, margin: '0 0 10px' }}>
+              {{
+                christmas: `🎄 ${t('Weihnachtsradio', 'Christmas radio')}`,
+                easter: `🐣 ${t('Osterradio', 'Easter radio')}`,
+                halloween: `🎃 ${t('Halloween-Radio', 'Halloween radio')}`,
+              }[seasonTag]}
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(340px, 100%), 1fr))', gap: 8 }}>
+              {seasonStations.map((station, index) => (
+                <StationCard
+                  key={`season-${station.key}`}
+                  station={station}
+                  index={index}
+                  isPlaying={playingKey === station.key}
+                  onPlay={handlePlay}
+                  onStop={handleStop}
+                  copy={copy}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div style={{ color: '#52525B', padding: 40 }}>{copy.stations.loading}</div>

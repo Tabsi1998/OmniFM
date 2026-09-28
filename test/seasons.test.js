@@ -49,6 +49,18 @@ test("Easter runs from Palm Sunday to Easter Monday; the greeting starts on East
   assert.equal(look("2024-04-01T12:00:00Z"), "easter:greeting");
 });
 
+test("Halloween: from 26 October, the greeting on the 31st and All Saints' Day (#443)", () => {
+  assert.equal(look("2026-10-25T12:00:00Z"), null);
+  assert.equal(look("2026-10-26T12:00:00Z"), "halloween:soon");
+  assert.equal(look("2026-10-30T12:00:00Z"), "halloween:soon");
+  assert.equal(look("2026-10-31T12:00:00Z"), "halloween:greeting");
+  assert.equal(look("2026-11-01T12:00:00Z"), "halloween:greeting");
+  assert.equal(look("2026-11-02T12:00:00Z"), null);
+  // 22:30 UTC on 1 November: already 2 November in Vienna, still All Saints' Day in New York.
+  assert.equal(look("2026-11-01T23:30:00Z"), null);
+  assert.equal(look("2026-11-01T23:30:00Z", "America/New_York"), "halloween:greeting");
+});
+
 test("Advent lights one more candle every Sunday until 23 December", () => {
   assert.equal(look("2026-11-28T12:00:00Z"), null);
   assert.equal(look("2026-11-29T12:00:00Z"), "advent:candles:1");
@@ -87,10 +99,11 @@ test("New Year counts down to the server's midnight and greets on 1 January, in 
 
 test("the next season to begin, for the dashboard", () => {
   const next = (iso) => seasons.nextSeasonStart(new Date(iso), "Europe/Vienna");
-  assert.deepEqual(next("2026-09-28T12:00:00Z"), { season: "advent", year: 2026, month: 11, day: 29 });
+  assert.deepEqual(next("2026-09-28T12:00:00Z"), { season: "halloween", year: 2026, month: 10, day: 26 });
+  assert.deepEqual(next("2026-10-26T12:00:00Z"), { season: "advent", year: 2026, month: 11, day: 29 });
   assert.deepEqual(next("2026-11-29T12:00:00Z"), { season: "christmas", year: 2026, month: 12, day: 24 }, "not the season that began today");
   assert.deepEqual(next("2026-12-31T12:00:00Z"), { season: "easter", year: 2027, month: 3, day: 21 });
-  assert.deepEqual(next("2027-04-06T12:00:00Z"), { season: "advent", year: 2027, month: 11, day: 28 });
+  assert.deepEqual(next("2027-04-06T12:00:00Z"), { season: "halloween", year: 2027, month: 10, day: 26 });
 });
 
 test("an unknown time zone counts as Vienna", () => {
@@ -110,7 +123,7 @@ test("the switches: everything on unless switched off, junk ignored", () => {
     enabled: { newyear: false },
     test: { preview: "advent-2", guildIds: ["123456789012345678", "123456789012345678", "nope", 42] },
   });
-  assert.deepEqual(owner.enabled, { easter: true, advent: true, christmas: true, newyear: false });
+  assert.deepEqual(owner.enabled, { easter: true, halloween: true, advent: true, christmas: true, newyear: false });
   assert.deepEqual(owner.test, { preview: "advent-2", guildIds: ["123456789012345678"] });
   assert.equal(seasons.normalizeOwnerSeasons({ test: { preview: "summer" } }).test.preview, "");
 });

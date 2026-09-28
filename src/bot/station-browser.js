@@ -46,11 +46,15 @@ export function colorSquare(hex) {
   return best[0];
 }
 
+/** The select value of the season rubric (#430), next to the genres. */
+export const SEASON_RUBRIC = "__season__";
+
 /**
  * Every official station with its lock state for the server's plan, plus the
- * server's own stations on Ultimate. Available ones first.
+ * server's own stations on Ultimate. Available ones first; in a season
+ * (seasonTag "christmas" or "easter", #430) the season's stations before them.
  */
-export function buildBrowserEntries({ stations = {}, guildTier = "free", customStations = [] }) {
+export function buildBrowserEntries({ stations = {}, guildTier = "free", customStations = [], seasonTag = null }) {
   const planRank = TIER_RANK[guildTier] ?? 0;
   const tierOrder = { free: 0, pro: 1, ultimate: 2 };
   const entries = Object.entries(stations).map(([key, station]) => {
@@ -63,11 +67,13 @@ export function buildBrowserEntries({ stations = {}, guildTier = "free", customS
       tier,
       locked: (TIER_RANK[tier] ?? 0) > planRank,
       source: "official",
+      seasonal: Boolean(seasonTag) && Array.isArray(station?.seasons) && station.seasons.includes(seasonTag),
     };
   });
   for (const custom of customStations) entries.push({ ...custom, locked: false, source: "custom" });
   return entries.sort((left, right) => {
     if (left.locked !== right.locked) return left.locked ? 1 : -1;
+    if (Boolean(left.seasonal) !== Boolean(right.seasonal)) return left.seasonal ? -1 : 1;
     const tierDelta = (tierOrder[left.tier] ?? 9) - (tierOrder[right.tier] ?? 9);
     if (tierDelta) return tierDelta;
     return left.name.localeCompare(right.name);
@@ -77,7 +83,9 @@ export function buildBrowserEntries({ stations = {}, guildTier = "free", customS
 export function filterBrowserEntries(entries, { genre = null, query = "" } = {}) {
   const needle = String(query || "").trim().toLowerCase();
   return entries.filter((entry) => {
-    if (genre && entry.genre !== genre) return false;
+    if (genre === SEASON_RUBRIC) {
+      if (!entry.seasonal) return false;
+    } else if (genre && entry.genre !== genre) return false;
     if (!needle) return true;
     return entry.name.toLowerCase().includes(needle) || entry.genre.toLowerCase().includes(needle);
   });
@@ -107,6 +115,7 @@ export function parsePickTarget(sessionPart) {
  * @param {string[]} [input.favorites]       the server's favourite keys (#276)
  * @param {boolean} [input.canEditFavorites] shows the star menu
  * @param {number} [input.favoriteLimit]
+ * @param {string} [input.seasonLabel]      "🎄 Weihnachtsradio": the season rubric (#430)
  */
 export function buildStationBrowserPayload(input) {
   const { t, prefix, session, entries, applicationId: appId = null } = input;
@@ -119,24 +128,29 @@ export function buildStationBrowserPayload(input) {
 
   const genres = [...new Set(entries.map((entry) => entry.genre))].sort((a, b) => a.localeCompare(b)).slice(0, 24);
   const genreColors = new Map(entries.map((entry) => [entry.genre, entry.color]));
+  // #430: in a season its stations get their own rubric, first in the list.
+  const seasonRubric = input.seasonLabel && entries.some((entry) => entry.seasonal)
+    ? [{ label: String(input.seasonLabel).slice(0, 100), value: SEASON_RUBRIC, default: genre === SEASON_RUBRIC }]
+    : [];
   const genreSelect = new StringSelectMenuBuilder()
     .setCustomId(`${prefix}genre:${session.id}`)
     .setPlaceholder(t("Genre wählen", "Choose a genre"))
     .addOptions([
       { label: t("Alle Genres", "All genres"), value: "__all__", default: !genre },
+      ...seasonRubric,
       ...genres.map((name) => ({ label: name.slice(0, 100), value: name.slice(0, 100), emoji: { name: colorSquare(genreColors.get(name)) }, default: genre === name })),
     ]);
 
   const subtitle = ui.statusLine([
     `${t("Plan", "Plan")}: **${input.planName}**`,
     t(`${shown.length} Sender`, `${shown.length} stations`),
-    genre ? `${colorSquare(genreColors.get(genre))} ${genre}` : null,
+    genre === SEASON_RUBRIC ? input.seasonLabel : (genre ? `${colorSquare(genreColors.get(genre))} ${genre}` : null),
     query ? `${t("Suche", "Search")}: „${query.slice(0, 40)}“` : null,
   ]);
 
   const rows = pageEntries.map((entry) => {
     const lines = [
-      `${colorSquare(entry.color)} **${entry.name.slice(0, 80)}**`,
+      `${colorSquare(entry.color)} **${entry.name.slice(0, 80)}**${entry.seasonal && input.seasonLabel ? ` · ${String(input.seasonLabel).split(" ")[0]}` : ""}`,
       ui.subtext(ui.statusLine([
         entry.genre,
         entry.source === "custom" ? t("Eigener Sender", "Your station") : (entry.tier !== "free" ? entry.tier.toUpperCase() : null),

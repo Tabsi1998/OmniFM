@@ -28,6 +28,8 @@ function buildPublicStationCatalog(stationsData) {
     name: station?.name || key,
     url: station?.url || "",
     tier: String(station?.tier || "free").toLowerCase(),
+    // #430: the website's season rubric.
+    ...(Array.isArray(station?.seasons) && station.seasons.length ? { seasons: station.seasons } : {}),
   }));
   const sorted = sortPublicStationEntries(entries);
   const publicKeys = new Set(sorted.map((station) => station.key));

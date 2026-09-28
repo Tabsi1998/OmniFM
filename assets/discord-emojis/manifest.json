@@ -75,6 +75,11 @@
       "file": "premium.png"
     },
     {
+      "name": "pumpkin",
+      "file": "pumpkin.gif",
+      "animated": true
+    },
+    {
       "name": "quality",
       "file": "quality.png"
     },
@@ -93,6 +98,11 @@
     {
       "name": "snowflake",
       "file": "snowflake.gif",
+      "animated": true
+    },
+    {
+      "name": "spider",
+      "file": "spider.gif",
       "animated": true
     },
     {

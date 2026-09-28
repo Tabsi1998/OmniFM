@@ -8,6 +8,7 @@ import { SEASONS, SEASON_PARTS, nextSeasonStart } from '../../../../src/lib/seas
 // Every text as { de, en }, so the language tables find it (scripts/extract-ui-strings.mjs).
 const SEASON_TEXT = {
   easter: { name: { de: 'Ostern', en: 'Easter' }, when: { de: 'Palmsonntag bis Ostermontag', en: 'Palm Sunday to Easter Monday' } },
+  halloween: { name: { de: 'Halloween', en: 'Halloween' }, when: { de: '26. Oktober bis 1. November', en: '26 October to 1 November' } },
   advent: { name: { de: 'Advent', en: 'Advent' }, when: { de: '1. Adventsonntag bis 23. Dezember, jeden Sonntag eine Kerze mehr', en: 'First Sunday of Advent to 23 December, one more candle every Sunday' } },
   christmas: { name: { de: 'Weihnachten', en: 'Christmas' }, when: { de: '24. bis 30. Dezember', en: '24 to 30 December' } },
   newyear: { name: { de: 'Silvester und Neujahr', en: 'New Year' }, when: { de: '31. Dezember und 1. Januar', en: '31 December and 1 January' } },
@@ -20,7 +21,7 @@ const PART_TEXT = {
   eggHunt: { name: { de: 'Ostereiersuche', en: 'Easter egg hunt' }, when: { de: 'Versteckte Ostereier im Panel, mit Bestenliste.', en: 'Hidden Easter eggs in the panel, with a leaderboard.' } },
   countdown: { name: { de: 'Silvester-Countdown', en: 'New Year countdown' }, when: { de: 'Am 31. Dezember zeigt das Panel die Zeit bis Mitternacht.', en: 'On 31 December the panel shows the time until midnight.' } },
   newYearGreeting: { name: { de: 'Neujahrsgruß', en: 'New Year greeting' }, when: { de: 'Um Mitternacht eine Nachricht mit Feuerwerk im Panel-Kanal, nur wenn OmniFM dort gerade spielt.', en: 'At midnight a message with fireworks in the panel’s channel, only while OmniFM plays there.' } },
-  seasonStations: { name: { de: 'Saison-Sender', en: 'Seasonal stations' }, when: { de: 'Eine Weihnachts- und eine Oster-Rubrik im Sender-Browser.', en: 'A Christmas and an Easter section in the station browser.' } },
+  seasonStations: { name: { de: 'Saison-Sender', en: 'Seasonal stations' }, when: { de: 'Zu Halloween, Weihnachten und Ostern eine eigene Rubrik im Sender-Browser.', en: 'A section of its own in the station browser at Halloween, Christmas and Easter.' } },
 };
 
 const say = (t, text) => t(text.de, text.en);
@@ -30,6 +31,7 @@ function currentLabel(current, t) {
   const name = say(t, SEASON_TEXT[current.season].name);
   if (current.season === 'advent') return t('{name}, {count}. Kerze', '{name}, candle {count}', { name, count: current.candles });
   if (current.season === 'easter' && current.phase === 'soon') return t('Bald ist Ostern', 'Easter is coming');
+  if (current.season === 'halloween' && current.phase === 'soon') return t('Bald ist Halloween', 'Halloween is coming');
   if (current.season === 'christmas' && current.phase === 'winter') return t('Winter-Deko nach Weihnachten', 'Winter look after Christmas');
   if (current.season === 'newyear' && current.phase === 'countdown') return t('Countdown bis {year}', 'Countdown to {year}', { year: current.year });
   return name;
@@ -69,8 +71,8 @@ export default function SettingsSeasons({ seasonDecor, timeZone, setSeasonDecor,
       </div>
       <p style={{ color: '#52525B', fontSize: 13, marginBottom: 12, lineHeight: 1.6 }}>
         {t(
-          'Zu Ostern, im Advent, zu Weihnachten und zu Silvester schmückt sich OmniFM von selbst, in jedem Plan. Schalte ab, was du nicht möchtest.',
-          'At Easter, in Advent, at Christmas and on New Year’s Eve OmniFM decorates itself, in every plan. Switch off what you do not want.'
+          'Zu Ostern, Halloween, im Advent, zu Weihnachten und zu Silvester schmückt sich OmniFM von selbst, in jedem Plan. Schalte ab, was du nicht möchtest.',
+          'At Easter, Halloween, in Advent, at Christmas and on New Year’s Eve OmniFM decorates itself, in every plan. Switch off what you do not want.'
         )}
       </p>
       <div data-testid="settings-seasons-now" style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '10px 12px', marginBottom: 14, fontSize: 13, color: '#D4D4D8' }}>

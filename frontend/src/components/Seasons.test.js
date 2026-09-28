@@ -9,9 +9,9 @@ import OwnerConfig from './OwnerConfig.js';
 // owner's main switches and test mode.
 
 const ALL_ON = {
-  seasons: { easter: true, advent: true, christmas: true, newyear: true },
+  seasons: { easter: true, halloween: true, advent: true, christmas: true, newyear: true },
   parts: { panel: true, voiceStatus: true, adventCalendar: true, eggHunt: true, countdown: true, newYearGreeting: true, seasonStations: true },
-  ownerEnabled: { easter: true, advent: true, christmas: true, newyear: true },
+  ownerEnabled: { easter: true, halloween: true, advent: true, christmas: true, newyear: true },
   current: null,
 };
 
@@ -42,7 +42,7 @@ describe('dashboard: seasonal decoration', () => {
     vi.setSystemTime(new Date('2026-09-28T12:00:00Z'));
     const formatDate = (value, options) => new Intl.DateTimeFormat('fr-FR', options).format(new Date(value));
     render(<SettingsSeasons seasonDecor={ALL_ON} setSeasonDecor={() => {}} t={translatorFor('fr')} timeZone="Europe/Vienna" formatDate={formatDate} />);
-    expect(screen.getByTestId('settings-seasons-now').textContent).toBe('Pas de saison en ce moment. Prochaine : Avent à partir du 29 novembre 2026.');
+    expect(screen.getByTestId('settings-seasons-now').textContent).toBe('Pas de saison en ce moment. Prochaine : Halloween à partir du 26 octobre 2026.');
   });
 
   it('the time zone offers the events’ zones and keeps an unusual one', () => {
@@ -74,7 +74,7 @@ describe('owner console: seasonal decoration', () => {
     expect(apiSend).toHaveBeenCalledWith('/api/admin/config', 'PUT', {
       section: 'seasons',
       data: {
-        enabled: { easter: true, advent: false, christmas: true, newyear: true },
+        enabled: { easter: true, halloween: true, advent: false, christmas: true, newyear: true },
         test: { preview: 'advent-2', guildIds: ['123456789012345678'] },
       },
     });

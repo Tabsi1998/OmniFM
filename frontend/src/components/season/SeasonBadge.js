@@ -4,7 +4,7 @@
 import { useI18n } from '../../i18n.js';
 import { useWebsiteSeason } from '../../lib/seasonSite.js';
 
-const COLORS = { easter: '#A3E635', advent: '#22C55E', christmas: '#EF4444', winter: '#7DD3FC', newyear: '#FBBF24' };
+const COLORS = { easter: '#A3E635', halloween: '#F97316', advent: '#22C55E', christmas: '#EF4444', winter: '#7DD3FC', newyear: '#FBBF24' };
 
 export default function SeasonBadge() {
   const { t } = useI18n();
@@ -21,6 +21,8 @@ export default function SeasonBadge() {
       label = '❄️';
       color = COLORS.winter;
     }
+  } else if (season.season === 'halloween') {
+    label = season.phase === 'greeting' ? `🎃 ${t('Happy Halloween!', 'Happy Halloween!')}` : `🕸️ ${t('Bald ist Halloween', 'Halloween is coming')}`;
   } else if (season.season === 'easter') {
     label = season.phase === 'greeting' ? `🐣 ${t('Frohe Ostern', 'Happy Easter')}` : `🌷 ${t('Bald ist Ostern', 'Easter is coming')}`;
   } else if (season.season === 'newyear') {

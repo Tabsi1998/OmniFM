@@ -33,6 +33,8 @@ const FALLBACK = Object.freeze({
   snowflake: "❄️",
   fireworks: "🎆",
   egg: "🥚",
+  pumpkin: "🎃",
+  spider: "🕷️",
 });
 
 export const ICON_NAMES = Object.freeze(Object.keys(FALLBACK));

@@ -383,10 +383,81 @@ def egg_frames(count=10):
     return frames
 
 
-def harden(image):
-    """GIF knows only see-through or not: a soft edge either counts or goes."""
-    red, green, blue, alpha = image.split()
-    return Image.merge("RGBA", (red, green, blue, alpha.point(lambda value: 255 if value >= 110 else 0)))
+# ---- Halloween emojis (#443) ----
+
+PUMPKIN = (249, 115, 22, 255)
+PUMPKIN_DARK = (194, 65, 12, 255)
+PUMPKIN_LIGHT = (253, 186, 116, 255)
+STEM = (77, 124, 15, 255)
+CARVED_DARK = (67, 20, 7, 255)
+SPIDER_BODY = (39, 33, 56, 255)
+SPIDER_RIM = (196, 181, 253, 255)
+SPIDER_EYE = (248, 113, 113, 255)
+THREAD = (226, 232, 240, 255)
+
+
+def pumpkin_frames(count=8):
+    frames = []
+    for index in range(count):
+        phase = 2 * math.pi * index / count
+        # The candle inside: its light flickers between deep orange and bright yellow.
+        glow = 0.5 + 0.5 * math.sin(phase) * math.cos(phase * 2.3)
+        light = (255, int(170 + 70 * glow), int(20 + 60 * glow), 255)
+        image, draw = canvas()
+        # The body: five ribs, the outer ones darker.
+        draw.ellipse([p(10), p(34), p(62), p(116)], fill=PUMPKIN_DARK)
+        draw.ellipse([p(66), p(34), p(118), p(116)], fill=PUMPKIN_DARK)
+        draw.ellipse([p(22), p(30), p(80), p(118)], fill=PUMPKIN)
+        draw.ellipse([p(48), p(30), p(106), p(118)], fill=PUMPKIN)
+        draw.ellipse([p(40), p(28), p(88), p(118)], fill=PUMPKIN)
+        draw.ellipse([p(52), p(38), p(62), p(70)], fill=PUMPKIN_LIGHT)
+        # The stem.
+        draw.polygon([(p(58), p(34)), (p(62), p(14)), (p(74), p(10)), (p(72), p(18)), (p(68), p(34))], fill=STEM)
+        # The face: triangle eyes, a nose and a jagged grin, lit from inside.
+        for eye in ((34, 58), (74, 58)):
+            x, y = eye
+            draw.polygon([(p(x), p(y + 16)), (p(x + 10), p(y)), (p(x + 20), p(y + 16))], fill=light)
+        draw.polygon([(p(59), p(82)), (p(64), p(74)), (p(69), p(82))], fill=light)
+        mouth = [(p(30), p(90)), (p(40), p(96)), (p(46), p(90)), (p(54), p(98)), (p(64), p(90)),
+                 (p(74), p(98)), (p(82), p(90)), (p(88), p(96)), (p(98), p(90)),
+                 (p(92), p(104)), (p(64), p(110)), (p(36), p(104))]
+        draw.polygon(mouth, fill=light)
+        # A carved tooth in the grin.
+        draw.polygon([(p(58), p(104)), (p(64), p(96)), (p(70), p(104))], fill=CARVED_DARK)
+        frames.append(finish(image))
+    return frames
+
+
+def spider(draw, cx, cy, wiggle):
+    # Eight legs, four a side, bent at the knee; they twitch with the wiggle.
+    for side in (-1, 1):
+        for leg in range(4):
+            spread = (-55, -25, 10, 40)[leg]
+            angle = math.radians(spread + wiggle * (1 if leg % 2 else -1) * 5)
+            hip = (cx, cy + 2)
+            knee = (hip[0] + side * 21 * math.cos(angle), hip[1] + 21 * math.sin(angle) - 9)
+            foot = (knee[0] + side * 10, knee[1] + 19)
+            draw.line([(p(hip[0]), p(hip[1])), (p(knee[0]), p(knee[1])), (p(foot[0]), p(foot[1]))], fill=SPIDER_RIM, width=round(p(4.2)), joint="curve")
+            draw.line([(p(hip[0]), p(hip[1])), (p(knee[0]), p(knee[1])), (p(foot[0]), p(foot[1]))], fill=SPIDER_BODY, width=round(p(2.2)), joint="curve")
+    # Abdomen and head with a light rim, so it reads on dark and light.
+    draw.ellipse([p(cx - 16), p(cy - 6), p(cx + 16), p(cy + 26)], fill=SPIDER_RIM)
+    draw.ellipse([p(cx - 14), p(cy - 4), p(cx + 14), p(cy + 24)], fill=SPIDER_BODY)
+    draw.ellipse([p(cx - 10), p(cy - 18), p(cx + 10), p(cy + 2)], fill=SPIDER_RIM)
+    draw.ellipse([p(cx - 8), p(cy - 16), p(cx + 8), p(cy)], fill=SPIDER_BODY)
+    for ex in (-4, 4):
+        draw.ellipse([p(cx + ex - 2.6), p(cy - 11), p(cx + ex + 2.6), p(cy - 5.8)], fill=SPIDER_EYE)
+
+
+def spider_frames(count=10):
+    frames = []
+    for index in range(count):
+        phase = 2 * math.pi * index / count
+        drop = 52 + 10 * math.sin(phase)
+        image, draw = canvas()
+        draw.line([(p(64), p(0)), (p(64), p(drop - 16))], fill=THREAD, width=round(p(1.6)))
+        spider(draw, 64, drop, math.sin(phase * 2))
+        frames.append(finish(image))
+    return frames
 
 
 def harden(image):
@@ -424,6 +495,8 @@ ANIMATED = {
     "snowflake": (snowflake_frames, 120),
     "fireworks": (fireworks_frames, 90),
     "egg": (egg_frames, 90),
+    "pumpkin": (pumpkin_frames, 120),
+    "spider": (spider_frames, 100),
 }
 
 

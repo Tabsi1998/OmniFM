@@ -209,6 +209,7 @@
   "seasons": {
     "enabled": {
       "easter": true,
+      "halloween": true,
       "advent": true,
       "christmas": true,
       "newyear": true

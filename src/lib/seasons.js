@@ -1,12 +1,13 @@
 // ============================================================
 // OmniFM: the seasons of the decorations (#425)
 // ============================================================
-// Easter, Advent, Christmas and New Year for any year, in a server's time
+// Easter, Halloween, Advent, Christmas and New Year for any year, in a server's time
 // zone. No imports: the bot, the dashboard and the website share this file
 // (frontend/vite.config.js), like src/config/plan-features.js.
 //
 //   season     from                       to                phases
 //   easter     Palm Sunday                Easter Monday     "soon" until Holy Saturday, "greeting" Sunday and Monday
+//   halloween  26 October                 1 November        "soon" until 30 October, "greeting" 31 October and 1 November (#443)
 //   advent     first Sunday of Advent     23 December       "candles", one more candle every Sunday (1-4)
 //   christmas  24 December                30 December       "greeting" 24-26, "winter" 27-30 (decoration, no greeting)
 //   newyear    31 December, 00:00         1 January, 23:59  "countdown" until midnight, then "greeting"
@@ -14,7 +15,7 @@
 // Easter Sunday comes from the Gregorian computus (Meeus/Jones/Butcher): it
 // holds for every year and needs no service that could fail.
 
-export const SEASONS = Object.freeze(["easter", "advent", "christmas", "newyear"]);
+export const SEASONS = Object.freeze(["easter", "halloween", "advent", "christmas", "newyear"]);
 
 /** The parts a server can switch off one by one (dashboard, "Saison-Deko"). */
 export const SEASON_PARTS = Object.freeze([
@@ -33,6 +34,8 @@ export const DEFAULT_SEASON_TIME_ZONE = "Europe/Vienna";
 export const SEASON_PREVIEWS = Object.freeze([
   { id: "easter-soon", season: "easter", phase: "soon", candles: 0 },
   { id: "easter-greeting", season: "easter", phase: "greeting", candles: 0 },
+  { id: "halloween-soon", season: "halloween", phase: "soon", candles: 0 },
+  { id: "halloween-greeting", season: "halloween", phase: "greeting", candles: 0 },
   { id: "advent-1", season: "advent", phase: "candles", candles: 1 },
   { id: "advent-2", season: "advent", phase: "candles", candles: 2 },
   { id: "advent-3", season: "advent", phase: "candles", candles: 3 },
@@ -146,6 +149,11 @@ export function seasonAt(moment = new Date(), timeZone = DEFAULT_SEASON_TIME_ZON
     return state("easter", today >= easterDay ? "greeting" : "soon", { year: local.year });
   }
 
+  // #443: the days before Halloween from the 26th, and All Saints' Day with it (Fabian's choice).
+  if ((local.month === 10 && local.day >= 26) || (local.month === 11 && local.day === 1)) {
+    return state("halloween", local.month === 10 && local.day < 31 ? "soon" : "greeting", { year: local.year });
+  }
+
   const advent = firstAdventSunday(local.year);
   const adventDay = dayNumber(advent.year, advent.month, advent.day);
   if (today >= adventDay && today <= dayNumber(local.year, 12, 23)) {
@@ -175,6 +183,7 @@ export function nextSeasonStart(moment = new Date(), timeZone = DEFAULT_SEASON_T
     const advent = firstAdventSunday(year);
     starts.push(
       { season: "easter", day: dayNumber(year, easter.month, easter.day) - 7 },
+      { season: "halloween", day: dayNumber(year, 10, 26) },
       { season: "advent", day: dayNumber(year, advent.month, advent.day) },
       { season: "christmas", day: dayNumber(year, 12, 24) },
       { season: "newyear", day: dayNumber(year, 12, 31) },
@@ -184,10 +193,37 @@ export function nextSeasonStart(moment = new Date(), timeZone = DEFAULT_SEASON_T
   return { season: next.season, ...dateOfDay(next.day) };
 }
 
+/** The seasons a catalogue station can suit (#430). */
+export const STATION_SEASONS = Object.freeze(["christmas", "easter", "halloween"]);
+
+/** The words /play understands for a season's stations (#430), in German and English. */
+export const SEASON_STATION_WORDS = Object.freeze({
+  christmas: Object.freeze(["weihnachten", "weihnachtsradio", "christmas", "xmas"]),
+  easter: Object.freeze(["ostern", "osterradio", "easter"]),
+  halloween: Object.freeze(["halloween", "gruselradio"]),
+});
+
+/** Which stations a season brings to the top: Christmas ones from Advent to 30 December, Easter and Halloween ones in theirs. */
+export function stationSeasonFor(current) {
+  if (!current) return null;
+  if (current.season === "advent" || current.season === "christmas") return "christmas";
+  if (current.season === "easter") return "easter";
+  if (current.season === "halloween") return "halloween";
+  return null;
+}
+
+/** "christmas" for "/play weihnachten", "easter" for "/play ostern", else null. */
+export function stationSeasonFromWord(word) {
+  const text = String(word ?? "").trim().toLowerCase();
+  if (!text) return null;
+  return STATION_SEASONS.find((season) => SEASON_STATION_WORDS[season].includes(text)) || null;
+}
+
 /** One emoji for a season and phase (voice channel status, dashboard preview); "" outside a season. */
 export function seasonEmoji(current) {
   if (!current) return "";
   if (current.season === "easter") return current.phase === "greeting" ? "🐣" : "🌷";
+  if (current.season === "halloween") return current.phase === "greeting" ? "🎃" : "🕸️";
   if (current.season === "advent") return "🕯️";
   if (current.season === "christmas") return current.phase === "greeting" ? "🎄" : "❄️";
   if (current.season === "newyear") return current.phase === "countdown" ? "🎆" : "🥂";

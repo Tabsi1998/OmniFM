@@ -53,6 +53,24 @@ export function prefersReducedMotion() {
 
 const currentSearch = () => (typeof window === 'undefined' ? '' : window.location.search);
 
+let switchesRequest = null;
+
+/** The owner's main switches, asked once per page; {} when the server does not answer. */
+export function loadOwnerSeasonSwitches() {
+  if (!switchesRequest) {
+    switchesRequest = fetch(buildApiUrl('/api/season'), { cache: 'no-store' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body) => body?.enabled || {})
+      .catch(() => ({}));
+  }
+  return switchesRequest;
+}
+
+/** For tests: forget the answer. */
+export function resetOwnerSeasonSwitches() {
+  switchesRequest = null;
+}
+
 /**
  * { season, hidden, setHidden, reducedMotion } for a page with decoration.
  * season is null outside a season, when the owner switched it off, or when
@@ -79,10 +97,7 @@ export function useWebsiteSeason(enabled = true) {
   useEffect(() => {
     if (!seasonName) return undefined;
     let alive = true;
-    fetch(buildApiUrl('/api/season'), { cache: 'no-store' })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((body) => { if (alive) setOwnerSwitches(body?.enabled || {}); })
-      .catch(() => { if (alive) setOwnerSwitches({}); });
+    loadOwnerSeasonSwitches().then((enabled) => { if (alive) setOwnerSwitches(enabled); });
     return () => { alive = false; };
   }, [seasonName]);
 

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useI18n } from '../../i18n.js';
+import Halloween from './Halloween.js';
 
 const css = `
 .season-bulb { width: 7px; height: 10px; border-radius: 50% 50% 45% 45%; margin-top: 4px; }
@@ -345,6 +346,10 @@ export default function SeasonDecor({ season, reducedMotion = false, onHide }) {
         <span>{t('{count}. Advent', 'Advent, week {count}', { count: season.candles })}</span>
       </>
     );
+  } else if (season.season === 'halloween') {
+    badge = season.phase === 'greeting'
+      ? <span>🎃 {t('Happy Halloween!', 'Happy Halloween!')}</span>
+      : <span>🕸️ {t('Bald ist Halloween', 'Halloween is coming')}</span>;
   } else if (season.season === 'christmas') {
     badge = season.phase === 'greeting' ? <span>🎄 {t('Frohe Weihnachten', 'Merry Christmas')}</span> : <span aria-hidden="true">❄️ ❄️ ❄️</span>;
   } else if (season.season === 'easter') {
@@ -362,6 +367,7 @@ export default function SeasonDecor({ season, reducedMotion = false, onHide }) {
       <style>{css}</style>
       {winter && animated ? <Snow /> : null}
       {winter ? <FairyLights animated={animated} /> : null}
+      {season.season === 'halloween' ? <Halloween animated={animated} /> : null}
       {badge && hero ? createPortal(
         <div className="season-badge" data-testid="season-badge">
           {badge}

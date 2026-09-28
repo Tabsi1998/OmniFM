@@ -309,7 +309,7 @@ def build_router(core):
         if rate_limited is not None:
             return rate_limited
         enabled = (core.get_config_section("seasons") or {}).get("enabled") or {}
-        return {"enabled": {key: enabled.get(key) is not False for key in ("easter", "advent", "christmas", "newyear")}}
+        return {"enabled": {key: enabled.get(key) is not False for key in ("easter", "halloween", "advent", "christmas", "newyear")}}
 
     @router.get("/api/marketing")
     async def get_marketing(request: Request):

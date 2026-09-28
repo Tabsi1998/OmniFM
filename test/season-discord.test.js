@@ -52,6 +52,8 @@ test("the panel's line and colour for every season", () => {
   const cases = [
     ["2026-03-29T12:00:00Z", "🌷 **Bald ist Ostern**", look.SEASON_COLORS.easter],
     ["2026-04-05T12:00:00Z", "🥚 **Frohe Ostern** 🌷", look.SEASON_COLORS.easter],
+    ["2026-10-27T12:00:00Z", "🕸️ **Bald ist Halloween** 🕷️", look.SEASON_COLORS.halloween],
+    ["2026-10-31T12:00:00Z", "🎃 **Happy Halloween!** 🕷️", look.SEASON_COLORS.halloween],
     ["2026-12-06T12:00:00Z", "🕯️🕯️⚪⚪ **2. Advent**", look.SEASON_COLORS.advent],
     ["2026-12-24T12:00:00Z", "🎄 **Frohe Weihnachten** ❄️", look.SEASON_COLORS.christmas],
     ["2026-12-28T12:00:00Z", "❄️ ❄️ ❄️", look.SEASON_COLORS.winter],
@@ -111,6 +113,8 @@ test("the voice channel status: the season's emoji in front, or where {season} s
   assert.equal(renderVoiceStatusTemplate("{station}[ · {season}]", { station: "Groove Salad" }), "Groove Salad");
   assert.equal(look.seasonVoiceEmoji(at("2026-12-24T12:00:00Z", { server: { parts: { voiceStatus: false } } })), "");
   assert.equal(look.seasonVoiceEmoji(at("2026-12-31T20:00:00Z")), "🎆");
+  assert.equal(look.seasonVoiceEmoji(at("2026-10-31T20:00:00Z")), "🎃");
+  assert.equal(look.seasonVoiceEmoji(at("2026-10-27T20:00:00Z")), "🕸️");
 });
 
 test("the bot's status: the season in front, the owner's main switch only", () => {
@@ -118,6 +122,7 @@ test("the bot's status: the season in front, the owner's main switch only", () =
   setOwnerSettingsForTests({});
   assert.equal(look.withSeasonPresence(activity, look.globalSeason(new Date("2026-12-24T12:00:00Z"))).name, "🎄 Merry Christmas · OmniFM radio | 3 listeners");
   assert.equal(look.withSeasonPresence(activity, look.globalSeason(new Date("2026-09-28T12:00:00Z"))), activity);
+  assert.equal(look.withSeasonPresence(activity, look.globalSeason(new Date("2026-10-31T12:00:00Z"))).name, "🎃 Happy Halloween · OmniFM radio | 3 listeners");
   setOwnerSettingsForTests({ seasons: { enabled: { christmas: false }, test: { preview: "advent-2", guildIds: [GUILD] } } });
   assert.equal(look.globalSeason(new Date("2026-12-24T12:00:00Z")), null, "switched off for everybody; the test mode never reaches the status");
   assert.equal(look.serverSeason(GUILD, {}, new Date("2026-09-28T12:00:00Z")).candles, 2, "the test mode reaches the server");

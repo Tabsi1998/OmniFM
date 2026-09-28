@@ -83,6 +83,7 @@ const eur = (cents) => (Number(cents || 0) / 100).toString().replace('.', ',');
 // The seasonal decoration (#425): what the switches and the test looks are called.
 const SEASON_SWITCH_LABELS = {
   easter: 'Ostern (Palmsonntag bis Ostermontag)',
+  halloween: 'Halloween (26. Oktober bis 1. November)',
   advent: 'Advent (1. Adventsonntag bis 23. Dezember)',
   christmas: 'Weihnachten (24. bis 30. Dezember)',
   newyear: 'Silvester und Neujahr (31. Dezember und 1. Januar)',
@@ -90,6 +91,8 @@ const SEASON_SWITCH_LABELS = {
 const SEASON_PREVIEW_LABELS = {
   'easter-soon': 'Ostern: „Bald ist Ostern“',
   'easter-greeting': 'Ostern: „Frohe Ostern“',
+  'halloween-soon': 'Halloween: „Bald ist Halloween“',
+  'halloween-greeting': 'Halloween: „Happy Halloween“',
   'advent-1': 'Advent: 1. Kerze',
   'advent-2': 'Advent: 2. Kerze',
   'advent-3': 'Advent: 3. Kerze',

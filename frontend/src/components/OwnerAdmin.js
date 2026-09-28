@@ -308,7 +308,7 @@ export default function OwnerAdmin() {
     if (section === 'archive') loadArchive();
   }, [authed, section, loadStations, loadAudit, loadArchive]);
 
-  const emptyCatalogFields = { country: '', language: '', color: '', logo: '', homepage: '' };
+  const emptyCatalogFields = { country: '', language: '', color: '', logo: '', homepage: '', seasons: [] };
   const openNewStation = () => { setStTest(null); setStMsg(null); setStForm({ key: '', name: '', url: '', tier: 'free', genre: '', ...emptyCatalogFields, _isNew: true }); };
   const openEditStation = (s) => {
     setStTest(null);
@@ -316,6 +316,7 @@ export default function OwnerAdmin() {
     setStForm({
       key: s.key, name: s.name, url: s.url, tier: s.tier, genre: s.genre || '',
       country: s.country || '', language: s.language || '', color: s.color || '', logo: s.logo || '', homepage: s.homepage || '',
+      seasons: Array.isArray(s.seasons) ? s.seasons : [],
       _isNew: false,
     });
   };
@@ -369,6 +370,7 @@ export default function OwnerAdmin() {
       await apiSend('/api/admin/stations', 'POST', {
         key: stForm.key, name: stForm.name, url: stForm.url, tier: stForm.tier, genre: stForm.genre,
         country: stForm.country, language: stForm.language, color: stForm.color, logo: stForm.logo, homepage: stForm.homepage,
+        seasons: stForm.seasons || [],
       });
       setStMsg({ ok: true, text: stForm._isNew ? 'Station angelegt.' : 'Station gespeichert.' });
       setStForm(null); setStTest(null);

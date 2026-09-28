@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { I18nProvider } from '../../i18n.js';
-import { DECOR_HIDDEN_KEY, visitorSeason } from '../../lib/seasonSite.js';
+import { DECOR_HIDDEN_KEY, resetOwnerSeasonSwitches, visitorSeason } from '../../lib/seasonSite.js';
 import SeasonLayer from './SeasonLayer.js';
 import { EGG_SPOTS } from './SeasonDecor.js';
 
@@ -37,6 +37,7 @@ function page() {
 
 beforeEach(() => {
   window.localStorage.clear();
+  resetOwnerSeasonSwitches();
   answerSeason();
 });
 

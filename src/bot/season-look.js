@@ -12,6 +12,7 @@ import { ownerSettings } from "../lib/owner-settings-cache.js";
 /** The panel's accent per look; a colour the server picked itself (#281) still wins. */
 export const SEASON_COLORS = Object.freeze({
   easter: 0xA3E635,
+  halloween: 0xF97316,
   advent: 0x15803D,
   christmas: 0xDC2626,
   winter: 0x7DD3FC,
@@ -55,6 +56,11 @@ export function seasonPanelLook(season, { t, appId = null, nowMs = Date.now() })
       ? { color: SEASON_COLORS.easter, line: `${icon("egg")} **${t("Frohe Ostern", "Happy Easter")}** 🌷` }
       : { color: SEASON_COLORS.easter, line: `🌷 **${t("Bald ist Ostern", "Easter is coming")}**` };
   }
+  if (season.season === "halloween") {
+    return season.phase === "greeting"
+      ? { color: SEASON_COLORS.halloween, line: `${icon("pumpkin")} **${t("Happy Halloween!", "Happy Halloween!")}** ${icon("spider")}` }
+      : { color: SEASON_COLORS.halloween, line: `🕸️ **${t("Bald ist Halloween", "Halloween is coming")}** ${icon("spider")}` };
+  }
   if (season.season === "advent") {
     const lit = Math.max(1, Math.min(4, season.candles || 1));
     const candles = `${icon("candle").repeat(lit)}${icon("candle_off").repeat(4 - lit)}`;
@@ -94,6 +100,7 @@ export function withSeasonPresence(activity, season) {
   if (!activity?.name || !season) return activity;
   const prefix = {
     easter: season.phase === "greeting" ? "🐣 Happy Easter" : "🌷",
+    halloween: season.phase === "greeting" ? "🎃 Happy Halloween" : "🕸️",
     advent: "🕯️ Advent",
     christmas: season.phase === "greeting" ? "🎄 Merry Christmas" : "❄️",
     newyear: season.phase === "greeting" ? `🥂 Happy New Year ${season.year}` : "🎆 New Year's Eve",
