@@ -16,7 +16,7 @@ function normalizeStationTestUrl(rawUrl) {
     parsed = new URL(value);
   } catch {
     /** @type {import("./types.js").HttpError} */
-    const error = new Error("Station hat keine gueltige Stream-URL.");
+    const error = new Error("Station hat keine gültige Stream-URL.");
     error.statusCode = 400;
     throw error;
   }
@@ -62,7 +62,7 @@ async function testOwnerStationStream(station, { timeoutMs = DEFAULT_TIMEOUT_MS,
   }
   if (typeof fetchImpl !== "function") {
     /** @type {import("./types.js").HttpError} */
-    const error = new Error("Fetch ist in dieser Runtime nicht verfuegbar.");
+    const error = new Error("Fetch ist in dieser Runtime nicht verfügbar.");
     error.statusCode = 500;
     throw error;
   }

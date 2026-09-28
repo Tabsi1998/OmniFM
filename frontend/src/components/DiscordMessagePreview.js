@@ -38,13 +38,14 @@ function TextBlock({ content }) {
   );
 }
 
-function Button({ data }) {
+function Button({ data, pressed }) {
   const colors = BUTTON_STYLE_COLORS[data.style] || BUTTON_STYLE_COLORS[2];
   const emoji = data.emoji;
+  const down = pressed && pressed === data.custom_id;
   return (
     <span
       data-testid={`preview-button-${data.custom_id || data.label}`}
-      style={{ ...colors, opacity: data.disabled ? 0.5 : 1, borderRadius: 4, padding: '4px 12px', fontSize: 13, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 24 }}
+      style={{ ...colors, opacity: data.disabled ? 0.5 : 1, borderRadius: 4, padding: '4px 12px', fontSize: 13, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 24, transform: down ? 'scale(0.95)' : 'none', filter: down ? 'brightness(0.85)' : 'none', transition: 'transform 0.12s, filter 0.12s' }}
     >
       {emoji?.id && <img src={emojiImageUrl(emoji.id, emoji.animated)} alt="" width={16} height={16} />}
       {emoji && !emoji.id && emoji.name && <span>{emoji.name}</span>}
@@ -54,20 +55,20 @@ function Button({ data }) {
   );
 }
 
-function Block({ node }) {
+function Block({ node, pressed }) {
   if (!node || typeof node !== 'object') return null;
   if (node.type === 10) return <TextBlock content={node.content} />;
   if (node.type === 14) return <hr style={{ border: 'none', borderTop: node.divider === false ? 'none' : '1px solid #3F4147', margin: '8px 0' }} />;
   if (node.type === 1) {
-    return <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{(node.components || []).map((child, index) => <Button key={index} data={child} />)}</div>;
+    return <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{(node.components || []).map((child, index) => <Button key={index} data={child} pressed={pressed} />)}</div>;
   }
   if (node.type === 9) {
     const accessory = node.accessory;
     return (
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>{(node.components || []).map((child, index) => <Block key={index} node={child} />)}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>{(node.components || []).map((child, index) => <Block key={index} node={child} pressed={pressed} />)}</div>
         {accessory?.type === 11 && accessory.media?.url && <img src={accessory.media.url} alt="" width={80} height={80} style={{ borderRadius: 8, objectFit: 'cover' }} />}
-        {accessory?.type === 2 && <Button data={accessory} />}
+        {accessory?.type === 2 && <Button data={accessory} pressed={pressed} />}
       </div>
     );
   }
@@ -75,17 +76,22 @@ function Block({ node }) {
     const accent = accentHex(node.accent_color);
     return (
       <div style={{ background: '#2B2D31', borderRadius: 8, borderLeft: `4px solid ${accent || '#4E5058'}`, padding: '12px 14px', display: 'grid', gap: 8 }}>
-        {(node.components || []).map((child, index) => <Block key={index} node={child} />)}
+        {(node.components || []).map((child, index) => <Block key={index} node={child} pressed={pressed} />)}
       </div>
     );
   }
   return null;
 }
 
-export default function DiscordMessagePreview({ payload }) {
+/**
+ * `pressed`: the custom_id of a button drawn as pressed (the website's live
+ * demos click through the panel, #431); `bare`: without its own background
+ * and padding, for a message drawn inside another frame.
+ */
+export default function DiscordMessagePreview({ payload, pressed = null, bare = false }) {
   return (
-    <div data-testid="discord-message-preview" style={{ background: '#313338', color: '#DBDEE1', padding: 14, fontFamily: "'gg sans', 'Noto Sans', Helvetica, Arial, sans-serif", fontSize: 15 }}>
-      {(payload?.components || []).map((component, index) => <Block key={index} node={component} />)}
+    <div data-testid="discord-message-preview" style={{ background: bare ? 'transparent' : '#313338', color: '#DBDEE1', padding: bare ? 0 : 14, fontFamily: "'gg sans', 'Noto Sans', Helvetica, Arial, sans-serif", fontSize: bare ? 14 : 15 }}>
+      {(payload?.components || []).map((component, index) => <Block key={index} node={component} pressed={pressed} />)}
     </div>
   );
 }

@@ -229,7 +229,7 @@ function buildResendEmailHtml({ license, tierName, inviteOverview, language }) {
         <table style="width:100%;border-collapse:collapse;margin:10px 0 18px">
           <tr><td style="color:#888;padding:7px 0">Plan</td><td style="text-align:right;padding:7px 0;color:${tierColor};font-weight:700">${escapeHtml(tierName)}</td></tr>
           <tr><td style="color:#888;padding:7px 0">${isDe ? "Server-Slots" : "Server seats"}</td><td style="text-align:right;padding:7px 0">${escapeHtml(linkedServerIds.length)}/${escapeHtml(seats)}</td></tr>
-          <tr><td style="color:#888;padding:7px 0">${isDe ? "Gueltig bis" : "Valid until"}</td><td style="text-align:right;padding:7px 0">${escapeHtml(expDate)}</td></tr>
+          <tr><td style="color:#888;padding:7px 0">${isDe ? "Gültig bis" : "Valid until"}</td><td style="text-align:right;padding:7px 0">${escapeHtml(expDate)}</td></tr>
           <tr><td style="color:#888;padding:7px 0">${isDe ? "Kontakt-E-Mail" : "Contact email"}</td><td style="text-align:right;padding:7px 0">${escapeHtml(license.contactEmail || "-")}</td></tr>
         </table>
 
@@ -285,9 +285,9 @@ export function formatDate(iso) {
 }
 
 async function wizardMenu() {
-  console.log("  Verfuegbare Aktionen:");
+  console.log("  Verfügbare Aktionen:");
   console.log("    \x1b[32m1\x1b[0m) Premium aktivieren (mit Laufzeit)");
-  console.log("    \x1b[33m2\x1b[0m) Premium verlaengern");
+  console.log("    \x1b[33m2\x1b[0m) Premium verlängern");
   console.log("    \x1b[35m3\x1b[0m) Upgrade (Pro -> Ultimate)");
   console.log("    \x1b[31m4\x1b[0m) Premium entfernen");
   console.log("    \x1b[36m5\x1b[0m) Alle Lizenzen anzeigen");
@@ -298,7 +298,7 @@ async function wizardMenu() {
   console.log("    10) Coupon/Referral Codes verwalten (inkl. Pro/Ultimate Schnellsetup)");
   console.log("    11) Beenden");
   console.log("");
-  return ask("Aktion waehlen");
+  return ask("Aktion wählen");
 }
 
 async function run() {
@@ -311,12 +311,12 @@ async function run() {
       // --- Aktivieren ---
       case "1": {
         const serverId = await ask("Server ID");
-        if (!/^\d{17,22}$/.test(serverId)) { fail("Ungueltige Server ID."); break; }
+        if (!/^\d{17,22}$/.test(serverId)) { fail("Ungültige Server ID."); break; }
 
         const existing = getServerLicense(serverId);
         if (existing && !existing.expired) {
-          info(`Server hat bereits ${(existing.plan || "free").toUpperCase()} (${existing.remainingDays} Tage uebrig).`);
-          info("Nutze Option 2 (Verlaengern) oder 3 (Upgrade).");
+          info(`Server hat bereits ${(existing.plan || "free").toUpperCase()} (${existing.remainingDays} Tage übrig).`);
+          info("Nutze Option 2 (Verlängern) oder 3 (Upgrade).");
           break;
         }
 
@@ -334,41 +334,41 @@ async function run() {
         break;
       }
 
-      // --- Verlaengern ---
+      // --- Verlängern ---
       case "2": {
         const serverId = await ask("Server ID");
-        if (!/^\d{17,22}$/.test(serverId)) { fail("Ungueltige Server ID."); break; }
+        if (!/^\d{17,22}$/.test(serverId)) { fail("Ungültige Server ID."); break; }
 
         const lic = getServerLicense(serverId);
         if (!lic || lic.expired) { fail("Keine aktive Lizenz. Nutze Option 1 zum Aktivieren."); break; }
 
-        info(`Aktiv: ${(lic.plan || "free").toUpperCase()} (${lic.remainingDays} Tage uebrig, bis ${formatDate(lic.expiresAt)})`);
+        info(`Aktiv: ${(lic.plan || "free").toUpperCase()} (${lic.remainingDays} Tage übrig, bis ${formatDate(lic.expiresAt)})`);
 
-        const months = parseInt(await ask("Zusaetzliche Monate")) || 1;
+        const months = parseInt(await ask("Zusätzliche Monate")) || 1;
         const price = calculatePrice(lic.plan, months);
-        info(`Preis: ${centsToEur(price)} fuer ${months} Monat${months > 1 ? "e" : ""}`);
+        info(`Preis: ${centsToEur(price)} für ${months} Monat${months > 1 ? "e" : ""}`);
 
         const updated = extendLicense(lic.id, months);
-        ok(`Laufzeit verlaengert bis ${formatDate(updated.expiresAt)}.`);
+        ok(`Laufzeit verlängert bis ${formatDate(updated.expiresAt)}.`);
         break;
       }
 
       // --- Upgrade ---
       case "3": {
         const serverId = await ask("Server ID");
-        if (!/^\d{17,22}$/.test(serverId)) { fail("Ungueltige Server ID."); break; }
+        if (!/^\d{17,22}$/.test(serverId)) { fail("Ungültige Server ID."); break; }
 
         const lic = getServerLicense(serverId);
         if (!lic || lic.expired) { fail("Keine aktive Lizenz."); break; }
         if (lic.plan === "ultimate") { fail("Bereits Ultimate."); break; }
 
         const upgrade = calculateUpgradePrice(serverId, "ultimate");
-        if (!upgrade) { fail("Upgrade nicht moeglich."); break; }
+        if (!upgrade) { fail("Upgrade nicht möglich."); break; }
 
-        info(`Aktiv: PRO (${upgrade.daysLeft} Tage uebrig)`);
-        info(`Upgrade-Preis: ${centsToEur(upgrade.upgradeCost)} (Aufpreis fuer Restlaufzeit)`);
+        info(`Aktiv: PRO (${upgrade.daysLeft} Tage übrig)`);
+        info(`Upgrade-Preis: ${centsToEur(upgrade.upgradeCost)} (Aufpreis für Restlaufzeit)`);
 
-        const confirm = (await ask("Upgrade durchfuehren? (j/n)")).toLowerCase();
+        const confirm = (await ask("Upgrade durchführen? (j/n)")).toLowerCase();
         if (confirm === "j" || confirm === "y") {
           upgradeLicenseForServer(serverId, "ultimate");
           ok(`Server ${serverId} auf ULTIMATE upgraded!`);
@@ -385,10 +385,10 @@ async function run() {
           const mode = modeRaw || "server";
 
           if (mode === "lizenz" || mode === "license") {
-            const confirmDelete = (await ask("Wirklich KOMPLETTE Lizenz loeschen? (j/n)")).trim().toLowerCase();
+            const confirmDelete = (await ask("Wirklich KOMPLETTE Lizenz löschen? (j/n)")).trim().toLowerCase();
             if (confirmDelete === "j" || confirmDelete === "y") {
               removeLicense(lic.id);
-              ok(`Komplette Lizenz ${lic.id} geloescht.`);
+              ok(`Komplette Lizenz ${lic.id} gelöscht.`);
             } else {
               info("Abgebrochen.");
             }
@@ -445,7 +445,7 @@ async function run() {
           info(`Abgelaufen am: ${formatDate(lic.expiresAt)}`);
         } else {
           ok(`Server ${serverId}: ${(lic.plan || "free").toUpperCase()}`);
-          info(`Laeuft ab: ${formatDate(lic.expiresAt)} (${lic.remainingDays} Tage uebrig)`);
+          info(`Läuft ab: ${formatDate(lic.expiresAt)} (${lic.remainingDays} Tage übrig)`);
           info(`Lizenz-ID: ${lic.id} | Seats: ${(lic.linkedServerIds || []).length}/${lic.seats || 1}`);
         }
         break;
@@ -456,7 +456,7 @@ async function run() {
         const tier = (await ask("Tier (pro/ultimate)")).toLowerCase();
         if (tier !== "pro" && tier !== "ultimate") { fail("Muss 'pro' oder 'ultimate' sein."); break; }
         console.log("");
-        console.log(`  Preistabelle fuer ${PLANS[tier].name}:`);
+        console.log(`  Preistabelle für ${PLANS[tier].name}:`);
         console.log("  " + "-".repeat(40));
         for (const m of [1, 3, 6, 12, 24]) {
           const price = calculatePrice(tier, m);
@@ -497,7 +497,7 @@ async function run() {
         }
 
         if (!["pro", "ultimate"].includes(String(license.plan || "").toLowerCase())) {
-          fail("Nur Pro/Ultimate Lizenzen koennen erneut versendet werden.");
+          fail("Nur Pro/Ultimate Lizenzen können erneut versendet werden.");
           break;
         }
 
@@ -505,7 +505,7 @@ async function run() {
         const tierName = PLANS[tier]?.name || tier;
         const defaultEmail = String(license.contactEmail || "").trim().toLowerCase();
         const emailPrompt = defaultEmail
-          ? `Ziel-E-Mail (Enter fuer ${defaultEmail})`
+          ? `Ziel-E-Mail (Enter für ${defaultEmail})`
           : "Ziel-E-Mail";
         const rawEmail = (await ask(emailPrompt)).trim().toLowerCase();
         const targetEmail = rawEmail || defaultEmail;
@@ -515,7 +515,7 @@ async function run() {
           break;
         }
         if (!isValidEmail(targetEmail)) {
-          fail("Ungueltige E-Mail-Adresse.");
+          fail("Ungültige E-Mail-Adresse.");
           break;
         }
 
@@ -562,7 +562,7 @@ async function run() {
         return 0;
 
       default:
-        fail("Ungueltige Auswahl.");
+        fail("Ungültige Auswahl.");
     }
     console.log("");
   }

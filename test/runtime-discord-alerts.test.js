@@ -117,6 +117,6 @@ test("incident alerts explain a backup station in plain German", async () => {
   const embed = message.embeds[0].data;
   assert.equal(embed.title, "Ersatzsender läuft");
   assert.match(embed.description, /Alpha FM ist gerade nicht erreichbar\. OmniFM spielt vorübergehend Beta FM/);
-  assert.doesNotMatch(`${embed.title} ${embed.description}`, /failover|verfuegbar|ausgeschoepft/i);
+  assert.doesNotMatch(`${embed.title} ${embed.description}`, /failover|verf(?:ue|ü)gbar|ausgesch(?:oe|ö)pft/i);
   assert.deepEqual(embed.fields.map((field) => field.name), ["Betroffener Sender", "Ersatzsender", "Hörer"]);
 });

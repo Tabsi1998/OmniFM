@@ -535,7 +535,7 @@ function createUnavailableRuntime({ chain = [], defaultKey = null } = {}) {
   const runtime = createFakeRuntime({
     resolveStationForGuild(guildId, key) {
       const station = STATIONS.stations[key];
-      if (!station) return { ok: false, message: `Station ${key} ist in deinem Plan nicht verfuegbar.` };
+      if (!station) return { ok: false, message: `Station ${key} ist in deinem Plan nicht verfügbar.` };
       return { ok: true, key, station, stations: STATIONS, isCustom: false };
     },
     async loadGuildSettingsCached() {

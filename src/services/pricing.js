@@ -78,7 +78,7 @@ export function getPricingOverview() {
       free: {
         name: "Free",
         price: formatPriceEUR(0),
-        tagline: "Zum Testen und fuer kleine Server.",
+        tagline: "Zum Testen und für kleine Server.",
         highlights: [
           "20 Free-Stationen",
           "Standard Audio (64k)",
@@ -90,7 +90,7 @@ export function getPricingOverview() {
         name: "Pro",
         recommended: true,
         startingAt: formatPriceEUR(getPricePerMonthCents("pro", 1) / 100) + "/Monat",
-        tagline: "Fuer aktive Communities.",
+        tagline: "Für aktive Communities.",
         highlights: [
           "20 Free + 100 Pro-Stationen",
           "HQ Audio (128k Opus)",
@@ -105,7 +105,7 @@ export function getPricingOverview() {
       ultimate: {
         name: "Ultimate",
         startingAt: formatPriceEUR(getPricePerMonthCents("ultimate", 1) / 100) + "/Monat",
-        tagline: "Fuer grosse Server und volle Kontrolle.",
+        tagline: "Für grosse Server und volle Kontrolle.",
         highlights: [
           "Alles aus Pro",
           "Ultra HQ Audio (320k)",

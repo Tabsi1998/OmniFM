@@ -47,14 +47,14 @@ async function cmdAdd(data, nameRaw, rawUrl, keyRaw) {
   const key = normalizeKey(keyRaw || name);
 
   if (!name) throw new Error("Name fehlt.");
-  if (!url) throw new Error("Ungueltige URL.");
-  if (!key) throw new Error("Ungueltiger Key.");
+  if (!url) throw new Error("Ungültige URL.");
+  if (!key) throw new Error("Ungültiger Key.");
   if (data.stations[key]) throw new Error(`Key existiert bereits: ${key}`);
 
   data.stations[key] = { name, url };
   if (!data.defaultStationKey) data.defaultStationKey = key;
   const updated = await saveStations(data);
-  return { updated, message: `Station hinzugefuegt: ${name} (${key})` };
+  return { updated, message: `Station hinzugefügt: ${name} (${key})` };
 }
 
 async function cmdRemove(data, keyRaw) {
@@ -93,7 +93,7 @@ async function cmdSetDefault(data, keyRaw) {
 async function cmdQuality(data, presetRaw) {
   const preset = String(presetRaw || "").toLowerCase();
   if (!isValidQualityPreset(preset)) {
-    throw new Error("Ungueltiges preset. Erlaubt: low, medium, high, custom");
+    throw new Error("Ungültiges preset. Erlaubt: low, medium, high, custom");
   }
 
   data.qualityPreset = preset;
@@ -114,7 +114,7 @@ async function cmdFallback(data, rawValue) {
     .map((part) => normalizeKey(part))
     .filter((k, idx, arr) => k && arr.indexOf(k) === idx);
 
-  if (!keys.length) throw new Error("Keine gueltigen Keys angegeben.");
+  if (!keys.length) throw new Error("Keine gültigen Keys angegeben.");
   for (const key of keys) {
     if (!data.stations[key]) throw new Error(`Station nicht gefunden: ${key}`);
   }
@@ -261,7 +261,7 @@ async function runWizard() {
           return 0;
         }
 
-        console.log("Ungueltige Auswahl.");
+        console.log("Ungültige Auswahl.");
       } catch (err) {
         console.error(`Fehler: ${err.message}`);
       }

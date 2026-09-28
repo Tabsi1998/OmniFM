@@ -99,7 +99,7 @@ export function handleRuntimeBotVoiceStateUpdate(runtime, oldState, newState) {
       if (issue.count === 1 || (issue.count % 5) === 0) {
         log(
           "WARN",
-          `[${runtime.config.name}] Unerwarteter Voice-Move erkannt guild=${guildId} expected=${expectedChannelId} actual=${newChannelId} - Kanal wird geschuetzt (${voiceGuardConfig.policy}).`
+          `[${runtime.config.name}] Unerwarteter Voice-Move erkannt guild=${guildId} expected=${expectedChannelId} actual=${newChannelId} - Kanal wird geschützt (${voiceGuardConfig.policy}).`
         );
       }
       runtime.queueVoiceStateReconcile(guildId, "voice-state-update-mismatch", 900);

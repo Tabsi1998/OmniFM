@@ -11,10 +11,14 @@ const SAMPLE_FAVORITES = [
   { key: "charts", name: "Charts", color: "#F59E0B" },
 ];
 
-/** The input the preview hands the panel: a song playing, three listeners, a few earlier songs. */
-export function buildPanelPreviewInput({ design, language = "de", applicationId = null, planTier = "pro", favorites = null, workerName = "OmniFM" } = {}) {
+/**
+ * The input the preview hands the panel: a song playing, three listeners, a
+ * few earlier songs. `sample` replaces parts of it (station, track,
+ * playback), for the website's live demos (#431).
+ */
+export function buildPanelPreviewInput({ design, language = "de", applicationId = null, planTier = "pro", favorites = null, workerName = "OmniFM", sample = {} } = {}) {
   const t = (de, en) => (language === "de" ? de : en);
-  return {
+  const input = {
     t,
     applicationId,
     workerName,
@@ -41,6 +45,13 @@ export function buildPanelPreviewInput({ design, language = "de", applicationId 
     pollSeconds: null,
     design,
   };
+  for (const part of ["station", "track", "playback"]) {
+    if (sample[part]) input[part] = { ...input[part], ...sample[part] };
+  }
+  for (const field of ["recent", "searchQuery"]) {
+    if (field in sample) input[field] = sample[field];
+  }
+  return input;
 }
 
 /** Discord's JSON of the example panel: { components, flags }. */

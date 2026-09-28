@@ -197,7 +197,7 @@ function ensureDirectoryForFile(filePath) {
   if (fs.existsSync(dir)) {
     try {
       if (!fs.statSync(dir).isDirectory()) {
-        log("WARN", `[bot-state] ${dir} ist keine Verzeichnisstruktur fuer Split-State.`);
+        log("WARN", `[bot-state] ${dir} ist keine Verzeichnisstruktur für Split-State.`);
         return false;
       }
     } catch {
@@ -340,7 +340,7 @@ function saveState(state) {
   const payload = JSON.stringify(state, null, 2);
   const tmpFile = `${STATE_FILE}.tmp-${process.pid}-${Date.now()}`;
   try {
-    // Docker-Mount: Wenn es ein Verzeichnis ist, NICHT versuchen zu loeschen
+    // Docker-Mount: Wenn es ein Verzeichnis ist, NICHT versuchen zu löschen
     // (schlaegt fehl mit "Device or resource busy")
     if (fs.existsSync(STATE_FILE) && fs.statSync(STATE_FILE).isDirectory()) {
       log("WARN", `[bot-state] ${STATE_FILE} ist ein Verzeichnis - State wird nur im Speicher gehalten.`);
@@ -378,7 +378,7 @@ function saveStateToFile(filePath, backupFilePath, state) {
   const tmpFile = `${filePath}.tmp-${process.pid}-${Date.now()}`;
   try {
     if (!ensureDirectoryForFile(filePath)) {
-      log("WARN", `[bot-state] Split-State-Verzeichnis ungueltig fuer ${filePath}.`);
+      log("WARN", `[bot-state] Split-State-Verzeichnis ungültig für ${filePath}.`);
       return;
     }
 
@@ -438,7 +438,7 @@ function loadSplitBotState(botId) {
   saveState(legacyState);
   log(
     "INFO",
-    `[bot-state] Legacy-State fuer ${botId} nach Split-Storage migriert (${Object.keys(legacyBotState).length} Guild(s)).`
+    `[bot-state] Legacy-State für ${botId} nach Split-Storage migriert (${Object.keys(legacyBotState).length} Guild(s)).`
   );
   return legacyBotState;
 }

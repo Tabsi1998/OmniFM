@@ -40,7 +40,7 @@ const commandSyncMethods = {
       if (this.isGuildCommandCleanupEnabled()) {
         log(
           "INFO",
-          `[${this.config.name}] CLEAN_GUILD_COMMANDS_ON_BOOT=1 erkannt, Cleanup wird im Schutzmodus uebersprungen. Es erfolgt ein direkter Voll-Sync.`
+          `[${this.config.name}] CLEAN_GUILD_COMMANDS_ON_BOOT=1 erkannt, Cleanup wird im Schutzmodus übersprungen. Es erfolgt ein direkter Voll-Sync.`
         );
       }
       await this.syncGuildCommands("startup");
@@ -109,7 +109,7 @@ const commandSyncMethods = {
     if (!this.isGlobalCommandSyncEnabled()) return;
     const applicationId = this.getApplicationId();
     if (!applicationId) {
-      log("ERROR", `[${this.config.name}] Global-Command-Sync uebersprungen: Application ID fehlt.`);
+      log("ERROR", `[${this.config.name}] Global-Command-Sync übersprungen: Application ID fehlt.`);
       return;
     }
     const payload = this.buildGuildCommandPayload();
@@ -148,7 +148,7 @@ const commandSyncMethods = {
       await this.rest.put(Routes.applicationGuildCommands(applicationId, guildId), { body: [] })
         .then(() => cleared.push(guildId))
         .catch((err) => {
-          log("WARN", `[${this.config.name}] Worker-Command-Cleanup fehlgeschlagen fuer Guild ${guildId}: ${err?.message || err}`);
+          log("WARN", `[${this.config.name}] Worker-Command-Cleanup fehlgeschlagen für Guild ${guildId}: ${err?.message || err}`);
         });
     }
     await fingerprints.save(applicationId, cleared, EMPTY_COMMANDS_HASH).catch(() => null);
@@ -165,7 +165,7 @@ const commandSyncMethods = {
     if (!this.isGuildCommandCleanupEnabled()) return;
     const applicationId = this.getApplicationId();
     if (!applicationId) {
-      log("ERROR", `[${this.config.name}] Guild-Command-Cleanup uebersprungen: Application ID fehlt.`);
+      log("ERROR", `[${this.config.name}] Guild-Command-Cleanup übersprungen: Application ID fehlt.`);
       return;
     }
 

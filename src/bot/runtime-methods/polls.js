@@ -162,7 +162,7 @@ const pollMethods = {
       || await this.client?.channels?.fetch?.(poll.channelId).catch(() => null);
     let message = await channel?.messages?.fetch?.(poll.messageId).catch(() => null);
     if (!message?.poll) {
-      log("INFO", `[${this.config?.name}] Umfrage geloescht oder nicht mehr erreichbar (guild=${guildId}); es bleibt alles, wie es ist.`);
+      log("INFO", `[${this.config?.name}] Umfrage gelöscht oder nicht mehr erreichbar (guild=${guildId}); es bleibt alles, wie es ist.`);
       return { outcome: { kind: "deleted" } };
     }
     if (!message.poll.resultsFinalized) {

@@ -100,7 +100,7 @@ function armRuntimeFailbackProbe(runtime, guildId, state, { delayMs = null } = {
     state.failbackTimer = null;
     state.failbackNextProbeAt = 0;
     runRuntimeFailbackProbe(runtime, guildId, state).catch((err) => {
-      log("WARN", `[${runtime.config.name}] Failback-Pruefung fehlgeschlagen guild=${guildId}: ${err?.message || err}`);
+      log("WARN", `[${runtime.config.name}] Failback-Prüfung fehlgeschlagen guild=${guildId}: ${err?.message || err}`);
       state.failbackAttempts = (Number(state.failbackAttempts || 0) || 0) + 1;
       armRuntimeFailbackProbe(runtime, guildId, state);
     });
@@ -111,7 +111,7 @@ function armRuntimeFailbackProbe(runtime, guildId, state, { delayMs = null } = {
   if (attempts === 0 || attempts % 5 === 0) {
     log(
       "INFO",
-      `[${runtime.config.name}] Failback-Pruefung geplant guild=${guildId} wunsch=${state.desiredStationKey} aktuell=${state.currentStationKey} in ${Math.round(delay / 1000)}s (versuch ${attempts + 1})`
+      `[${runtime.config.name}] Failback-Prüfung geplant guild=${guildId} wunsch=${state.desiredStationKey} aktuell=${state.currentStationKey} in ${Math.round(delay / 1000)}s (versuch ${attempts + 1})`
     );
   }
   return true;
@@ -210,7 +210,7 @@ async function runRuntimeFailbackProbe(runtime, guildId, state, {
     // nothing to return to, so the current station becomes the wanted one.
     log(
       "WARN",
-      `[${runtime.config.name}] Failback aufgegeben guild=${guildId}: Wunschsender ${desiredKey} ist nicht mehr verfuegbar (${resolved?.message || "unbekannt"}). ${currentKey} bleibt aktiv.`
+      `[${runtime.config.name}] Failback aufgegeben guild=${guildId}: Wunschsender ${desiredKey} ist nicht mehr verfügbar (${resolved?.message || "unbekannt"}). ${currentKey} bleibt aktiv.`
     );
     clearActiveFailover(state);
     state.desiredStationKey = currentKey;
@@ -293,7 +293,7 @@ async function runRuntimeFailbackProbe(runtime, guildId, state, {
     state.failbackSuccessCount = 0;
     state.failbackAttempts = (Number(state.failbackAttempts || 0) || 0) + 1;
     state.failbackLastResult = `switch-failed: ${message}`;
-    log("WARN", `[${runtime.config.name}] Failback zu ${desiredKey} fehlgeschlagen guild=${guildId}: ${message}. ${currentKey} laeuft weiter.`);
+    log("WARN", `[${runtime.config.name}] Failback zu ${desiredKey} fehlgeschlagen guild=${guildId}: ${message}. ${currentKey} läuft weiter.`);
     armRuntimeFailbackProbe(runtime, guildId, state);
     return { ok: false, switchError: message };
   } finally {
@@ -439,7 +439,7 @@ async function handleRuntimeStationUnavailable(runtime, guildId, state, { source
       });
       log(
         "WARN",
-        `[${runtime.config.name}] Sender ${previousStationKey} nicht mehr verfuegbar guild=${guildId} (${reason}); wechsle auf ${replacement.key} (${replacement.source}, source=${source}).`
+        `[${runtime.config.name}] Sender ${previousStationKey} nicht mehr verfügbar guild=${guildId} (${reason}); wechsle auf ${replacement.key} (${replacement.source}, source=${source}).`
       );
       await notifyRuntimeStationUnavailable(runtime, guildId, state, {
         previousStationKey,
@@ -460,7 +460,7 @@ async function handleRuntimeStationUnavailable(runtime, guildId, state, { source
 
   log(
     "WARN",
-    `[${runtime.config.name}] Sender ${previousStationKey} nicht mehr verfuegbar guild=${guildId} (${reason}) und kein Ersatz spielbar; Wiedergabe wird beendet (source=${source}).`
+    `[${runtime.config.name}] Sender ${previousStationKey} nicht mehr verfügbar guild=${guildId} (${reason}) und kein Ersatz spielbar; Wiedergabe wird beendet (source=${source}).`
   );
   await notifyRuntimeStationUnavailable(runtime, guildId, state, {
     previousStationKey,
@@ -503,7 +503,7 @@ function keepRuntimeFailoverStation(runtime, guildId, state) {
   clearRuntimeFailbackTimer(state);
   log(
     "INFO",
-    `[${runtime.config.name}] Ersatzsender uebernommen guild=${guildId}: ${state.currentStationKey} ersetzt ${previousDesiredStationKey} als Wunschsender.`
+    `[${runtime.config.name}] Ersatzsender übernommen guild=${guildId}: ${state.currentStationKey} ersetzt ${previousDesiredStationKey} als Wunschsender.`
   );
   runtime.persistState?.();
   return { ok: true, previousDesiredStationKey, stationKey: state.currentStationKey };

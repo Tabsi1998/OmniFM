@@ -336,7 +336,7 @@ function startWorkerAutohealMonitor({
     stopping = true;
     const blockedTargets = applyWorkerAutohealRecoveryBlock(runtime, evaluation.stuckGuilds, env, nowMs);
     const lines = [
-      `[${runtime?.config?.name || "Worker"}] Worker-Autoheal ausgeloest: ` +
+      `[${runtime?.config?.name || "Worker"}] Worker-Autoheal ausgelöst: ` +
       `${evaluation.stuckGuilds.length} Recovery-Ziel(e) seit >=${Math.round(options.unhealthyMs / 1000)}s ohne aktive Voice-Verbindung. ` +
       `Neustart des Workers wird angefordert.`,
       `summary workerIndex=${options.workerIndex} uptime=${Math.round((Number(evaluation.uptimeMs || 0) || 0) / 1000)}s ` +

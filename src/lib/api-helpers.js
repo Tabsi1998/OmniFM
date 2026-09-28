@@ -396,7 +396,7 @@ function buildInviteOverviewForTier(runtimes, tier) {
   const hasUltimate = normalizedTier === "ultimate";
   const overview = {
     freeWebsiteUrl: resolvePublicWebsiteUrl(),
-    freeInfo: "Free-Bots sind bereits enthalten. Hier sind nur zusaetzlich freigeschaltete Premium-Bots gelistet.",
+    freeInfo: "Free-Bots sind bereits enthalten. Hier sind nur zusätzlich freigeschaltete Premium-Bots gelistet.",
     proBots: [],
     ultimateBots: [],
   };

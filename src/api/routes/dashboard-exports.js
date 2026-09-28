@@ -53,7 +53,7 @@ export function createDashboardExportsRouteHandler(deps) {
         return true;
       }
       if (!serverHasCapability(guildInfo.id, "exports_webhooks")) {
-        sendLocalizedError(res, 403, language, "Exporte und Webhooks sind nur fuer Ultimate verfuegbar.", "Exports and webhooks are only available for Ultimate.");
+        sendLocalizedError(res, 403, language, "Exporte und Webhooks sind nur für Ultimate verfügbar.", "Exports and webhooks are only available for Ultimate.");
         return true;
       }
 
@@ -92,7 +92,7 @@ export function createDashboardExportsRouteHandler(deps) {
           payload: {
             message: languagePick(
               language,
-              "Dies ist ein manueller Dashboard-Test fuer OmniFM Exporte/Webhooks.",
+              "Dies ist ein manueller Dashboard-Test für OmniFM Exporte/Webhooks.",
               "This is a manual dashboard test for OmniFM exports/webhooks."
             ),
             enabled: validatedWebhook.config.enabled === true,
@@ -146,7 +146,7 @@ export function createDashboardExportsRouteHandler(deps) {
         return true;
       }
       if (!serverHasCapability(guild.id, "exports_webhooks")) {
-        sendLocalizedError(res, 403, language, "Exporte sind nur fuer Ultimate verfuegbar.", "Exports are only available for Ultimate.");
+        sendLocalizedError(res, 403, language, "Exporte sind nur für Ultimate verfügbar.", "Exports are only available for Ultimate.");
         return true;
       }
 
@@ -224,7 +224,7 @@ export function createDashboardExportsRouteHandler(deps) {
       return true;
     }
     if (!serverHasCapability(guild.id, "exports_webhooks")) {
-      sendLocalizedError(res, 403, language, "Exporte sind nur fuer Ultimate verfuegbar.", "Exports are only available for Ultimate.");
+      sendLocalizedError(res, 403, language, "Exporte sind nur für Ultimate verfügbar.", "Exports are only available for Ultimate.");
       return true;
     }
 

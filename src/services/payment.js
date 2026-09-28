@@ -161,7 +161,7 @@ async function activateOfferGrant({
       success: false,
       status: 400,
       message: t(
-        "Bitte eine gueltige E-Mail-Adresse eingeben.",
+        "Bitte eine gültige E-Mail-Adresse eingeben.",
         "Please enter a valid email address."
       ),
     };
@@ -183,7 +183,7 @@ async function activateOfferGrant({
       success: false,
       status: 400,
       message: t(
-        "Der Code ist unvollstaendig konfiguriert (Plan, Seats oder Monate fehlen).",
+        "Der Code ist unvollständig konfiguriert (Plan, Seats oder Monate fehlen).",
         "The code is not fully configured (plan, seats, or months are missing)."
       ),
     };

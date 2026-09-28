@@ -139,7 +139,7 @@ const playbackControlMethods = {
   async pauseInGuild(guildId) {
     return BotRuntime.prototype.runSerializedGuildOperation.call(this, guildId, "pause", async () => {
       const state = this.guildState.get(guildId);
-      if (!state?.currentStationKey) return { ok: false, error: "Es laeuft nichts." };
+      if (!state?.currentStationKey) return { ok: false, error: "Es läuft nichts." };
       state.player.pause(true);
       return { ok: true };
     });
@@ -151,7 +151,7 @@ const playbackControlMethods = {
   async resumeInGuild(guildId) {
     return BotRuntime.prototype.runSerializedGuildOperation.call(this, guildId, "resume", async () => {
       const state = this.guildState.get(guildId);
-      if (!state?.currentStationKey) return { ok: false, error: "Es laeuft nichts." };
+      if (!state?.currentStationKey) return { ok: false, error: "Es läuft nichts." };
       state.player.unpause();
       return { ok: true };
     });
@@ -164,7 +164,7 @@ const playbackControlMethods = {
     return BotRuntime.prototype.runSerializedGuildOperation.call(this, guildId, "set-volume", async () => {
       const parsedValue = Number.parseInt(String(value ?? ""), 10);
       if (!Number.isFinite(parsedValue)) {
-        return { ok: false, error: "Ungueltige Lautstaerke." };
+        return { ok: false, error: "Ungültige Lautstärke." };
       }
 
       const normalizedValue = Math.max(0, Math.min(100, parsedValue));
@@ -182,7 +182,7 @@ const playbackControlMethods = {
       if (state.currentStationKey && isRuntimePlaybackActive(this, guildId, state) && typeof this.updateNowPlayingEmbed === "function") {
         setTimeout(() => {
           this.updateNowPlayingEmbed(guildId, state, { force: true }).catch((err) => {
-            log("WARN", `[${this.config.name}] Now-Playing-Update nach Lautstaerkewechsel fehlgeschlagen: ${err?.message || err}`);
+            log("WARN", `[${this.config.name}] Now-Playing-Update nach Lautstärkewechsel fehlgeschlagen: ${err?.message || err}`);
           });
         }, 0);
       }

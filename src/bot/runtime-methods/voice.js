@@ -250,10 +250,10 @@ const voiceMethods = {
       );
     }
     if (!channel.isVoiceBased()) {
-      return sendError(t("Bitte waehle einen Voice- oder Stage-Channel.", "Please choose a voice or stage channel."));
+      return sendError(t("Bitte wähle einen Voice- oder Stage-Channel.", "Please choose a voice or stage channel."));
     }
     if (channel.guildId !== interaction.guildId) {
-      return sendError(t("Der ausgewaehlte Channel ist nicht in diesem Server.", "The selected channel is not in this server."));
+      return sendError(t("Der ausgewählte Channel ist nicht in diesem Server.", "The selected channel is not in this server."));
     }
 
     const guild = interaction.guild;

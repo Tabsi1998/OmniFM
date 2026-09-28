@@ -61,7 +61,7 @@ export function createDashboardStatsRouteHandler(deps) {
           res,
           403,
           language,
-          "Health-Ansicht ist erst ab Pro verfuegbar.",
+          "Health-Ansicht ist erst ab Pro verfügbar.",
           "Health view is only available from Pro."
         );
         return true;
@@ -144,7 +144,7 @@ export function createDashboardStatsRouteHandler(deps) {
         return true;
       }
       if (!serverHasCapability(guild.id, "dashboard_access")) {
-        sendLocalizedError(res, 403, language, "Dashboard ist erst ab Pro verfuegbar.", "Dashboard is only available from Pro.");
+        sendLocalizedError(res, 403, language, "Dashboard ist erst ab Pro verfügbar.", "Dashboard is only available from Pro.");
         return true;
       }
 
@@ -177,7 +177,7 @@ export function createDashboardStatsRouteHandler(deps) {
         return true;
       }
       if (!serverHasCapability(guild.id, "dashboard_access")) {
-        sendLocalizedError(res, 403, language, "Dashboard ist erst ab Pro verfuegbar.", "Dashboard is only available from Pro.");
+        sendLocalizedError(res, 403, language, "Dashboard ist erst ab Pro verfügbar.", "Dashboard is only available from Pro.");
         return true;
       }
 
@@ -210,7 +210,7 @@ export function createDashboardStatsRouteHandler(deps) {
         sendJson(res, 500, {
           error: languagePick(
             language,
-            "Statistiken konnten gerade nicht zurueckgesetzt werden.",
+            "Statistiken konnten gerade nicht zurückgesetzt werden.",
             "Statistics could not be reset right now."
           ),
         });
@@ -244,7 +244,7 @@ export function createDashboardStatsRouteHandler(deps) {
           res,
           403,
           language,
-          "Detaillierte Statistiken sind nur fuer Ultimate verfuegbar.",
+          "Detaillierte Statistiken sind nur für Ultimate verfügbar.",
           "Detailed statistics are only available for Ultimate."
         );
         return true;

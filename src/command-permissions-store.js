@@ -303,9 +303,9 @@ export function setCommandRolePermission(guildId, commandName, roleId, mode = "a
   const rid = normalizeRoleId(roleId);
   const normalizedMode = String(mode || "").trim().toLowerCase();
 
-  if (!gid) return { ok: false, message: "Ungueltige Guild-ID." };
-  if (!isPermissionManagedCommand(command)) return { ok: false, message: "Command wird nicht unterstuetzt." };
-  if (!rid) return { ok: false, message: "Ungueltige Rollen-ID." };
+  if (!gid) return { ok: false, message: "Ungültige Guild-ID." };
+  if (!isPermissionManagedCommand(command)) return { ok: false, message: "Command wird nicht unterstützt." };
+  if (!rid) return { ok: false, message: "Ungültige Rollen-ID." };
   if (normalizedMode !== "allow" && normalizedMode !== "deny") {
     return { ok: false, message: "Mode muss 'allow' oder 'deny' sein." };
   }
@@ -338,9 +338,9 @@ export function removeCommandRolePermission(guildId, commandName, roleId) {
   const command = normalizePermissionCommandName(commandName);
   const rid = normalizeRoleId(roleId);
 
-  if (!gid) return { ok: false, message: "Ungueltige Guild-ID." };
-  if (!isPermissionManagedCommand(command)) return { ok: false, message: "Command wird nicht unterstuetzt." };
-  if (!rid) return { ok: false, message: "Ungueltige Rollen-ID." };
+  if (!gid) return { ok: false, message: "Ungültige Guild-ID." };
+  if (!isPermissionManagedCommand(command)) return { ok: false, message: "Command wird nicht unterstützt." };
+  if (!rid) return { ok: false, message: "Ungültige Rollen-ID." };
 
   const data = load();
   const entry = ensureGuildEntry(data, gid);
@@ -366,7 +366,7 @@ export function removeCommandRolePermission(guildId, commandName, roleId) {
 
 export function resetCommandPermissions(guildId, commandName = null) {
   const gid = normalizeGuildId(guildId);
-  if (!gid) return { ok: false, message: "Ungueltige Guild-ID." };
+  if (!gid) return { ok: false, message: "Ungültige Guild-ID." };
 
   const data = load();
   const entry = data.guilds[gid];
@@ -375,7 +375,7 @@ export function resetCommandPermissions(guildId, commandName = null) {
   if (commandName) {
     const command = normalizePermissionCommandName(commandName);
     if (!isPermissionManagedCommand(command)) {
-      return { ok: false, message: "Command wird nicht unterstuetzt." };
+      return { ok: false, message: "Command wird nicht unterstützt." };
     }
     const changed = Boolean(entry.commands?.[command]);
     if (changed) delete entry.commands[command];

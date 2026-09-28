@@ -57,7 +57,7 @@ export function validateVoiceGuardSettings(rawConfig) {
   const config = normalizeVoiceGuardSettings(rawConfig);
   const rawPolicy = String(rawConfig?.policy || "").trim();
   if (rawPolicy && !["default", "allow", "return", "disconnect"].includes(rawPolicy.toLowerCase())) {
-    return { ok: false, error: "Voice-Guard-Policy ist ungueltig." };
+    return { ok: false, error: "Voice-Guard-Policy ist ungültig." };
   }
   return { ok: true, config };
 }

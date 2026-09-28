@@ -716,7 +716,7 @@ export function resetGuildStats(guildId) {
   }
 
   saveStateToFile();
-  log("INFO", `Stats fuer Guild ${gid} zurueckgesetzt (inkl. Fallback-Daten).`);
+  log("INFO", `Stats für Guild ${gid} zurückgesetzt (inkl. Fallback-Daten).`);
 }
 
 export function __resetListeningStatsStoreForTests({ deleteFiles = false } = {}) {

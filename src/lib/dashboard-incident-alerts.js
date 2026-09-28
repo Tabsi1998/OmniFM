@@ -49,7 +49,7 @@ function validateDashboardIncidentAlertsConfig(rawConfig) {
   const config = normalizeDashboardIncidentAlertsConfig(rawConfig);
   const rawChannelId = String(rawConfig?.channelId || "").trim();
   if (rawChannelId && !config.channelId) {
-    return { ok: false, error: "Text-Channel ist ungueltig." };
+    return { ok: false, error: "Text-Channel ist ungültig." };
   }
   return { ok: true, config };
 }

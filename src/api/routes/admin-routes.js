@@ -345,7 +345,7 @@ export function createAdminRoutesHandler(deps) {
       if (token && isAdminTokenValue(token)) {
         sendAdminJson(res, 200, { ok: true, role: "owner" });
       } else {
-        sendAdminJson(res, 401, { error: "Ungueltiger Owner-Token." });
+        sendAdminJson(res, 401, { error: "Ungültiger Owner-Token." });
       }
       return true;
     }
@@ -402,7 +402,7 @@ export function createAdminRoutesHandler(deps) {
       if (!resolveConfiguredAdminToken() && !accessSettings().accounts.length) {
         sendAdminJson(res, 503, { error: "Owner-API ist nicht konfiguriert (API_ADMIN_TOKEN fehlt)." });
       } else {
-        sendAdminJson(res, 401, { error: "Nicht autorisiert. Gueltiger Owner-Token erforderlich." });
+        sendAdminJson(res, 401, { error: "Nicht autorisiert. Gültiger Owner-Token erforderlich." });
       }
       return true;
     }
@@ -643,7 +643,7 @@ export function createAdminRoutesHandler(deps) {
         body = null;
       }
       if (!body || typeof body !== "object" || Array.isArray(body)) {
-        sendJson(res, 400, { error: "Ungueltiger Body." });
+        sendJson(res, 400, { error: "Ungültiger Body." });
         return true;
       }
       const section = String(body.section || "").trim();

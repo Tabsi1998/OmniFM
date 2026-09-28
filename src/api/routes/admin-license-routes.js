@@ -143,7 +143,7 @@ export function createAdminLicenseRoutes({ sendJson, methodNotAllowed, auditOwne
       const events = redemptions.slice(0, 50).map((row) => ({
         type: "redemption",
         at: row.processedAt || row.createdAt || null,
-        label: `${String(row.tier || "premium").replace(/^./, (c) => c.toUpperCase())} Lizenz eingeloest`,
+        label: `${String(row.tier || "premium").replace(/^./, (c) => c.toUpperCase())} Lizenz eingelöst`,
         detail: maskEmail(String(row.email || "")),
         meta: { seats: row.seats ?? null, sessionId: row.sessionId ?? null },
       }));

@@ -374,7 +374,7 @@ export async function monitoringResponse(db, { now = Date.now() } = {}) {
       affectedServers: [],
       incidents: [],
       logs: [],
-      message: "Warte auf Live-Daten vom OmniFM-Bot. Sobald der Node-Bot laeuft (echte Tokens im Owner-Menue) und Metriken meldet, erscheinen hier CPU/RAM/Ping, Voice, Guilds, Incidents und Live-Log in Echtzeit.",
+      message: "Warte auf Live-Daten vom OmniFM-Bot. Sobald der Node-Bot läuft (echte Tokens im Owner-Menü) und Metriken meldet, erscheinen hier CPU/RAM/Ping, Voice, Guilds, Incidents und Live-Log in Echtzeit.",
     };
   }
   const processInfo = doc.process || {};

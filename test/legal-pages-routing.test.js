@@ -263,7 +263,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
 
     const adminUnauthorizedResponse = await fetch(`http://127.0.0.1:${port}/api/admin/overview`);
     assert.equal(adminUnauthorizedResponse.status, 401);
-    assert.equal((await adminUnauthorizedResponse.json()).error, "Nicht autorisiert. Gueltiger Owner-Token erforderlich.");
+    assert.equal((await adminUnauthorizedResponse.json()).error, "Nicht autorisiert. Gültiger Owner-Token erforderlich.");
     const refusedAttempts = [
       { url: "/api/admin/overview?token=admin-route-token", headers: {} },
       { url: "/api/admin/overview", headers: { Cookie: "omnifm_owner=admin-route-token" } },

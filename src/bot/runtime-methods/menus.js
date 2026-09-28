@@ -126,10 +126,10 @@ const menuMethods = {
         ? "Auf diesem Server streamt gerade kein Worker. Starte zuerst `/play`."
         : "No worker is currently streaming on this server. Start `/play` first.",
       multiple: isDe
-        ? "Mehrere Worker streamen aktuell. Tritt dem Ziel-Voice-Channel bei, damit ich den richtigen Stream waehle."
+        ? "Mehrere Worker streamen aktuell. Tritt dem Ziel-Voice-Channel bei, damit ich den richtigen Stream wähle."
         : "Multiple workers are currently streaming. Join the target voice channel so I can select the correct stream.",
       multiple_in_channel: isDe
-        ? "In deinem Voice-Channel sind mehrere Worker aktiv. Stoppe einen davon oder waehle einen eindeutigen Ziel-Channel."
+        ? "In deinem Voice-Channel sind mehrere Worker aktiv. Stoppe einen davon oder wähle einen eindeutigen Ziel-Channel."
         : "Multiple workers are active in your voice channel. Stop one of them or choose a unique target channel.",
       requested_missing: isDe
         ? "Der gewählte Worker streamt aktuell nicht auf diesem Server."
@@ -389,7 +389,7 @@ const menuMethods = {
           inline: true,
         },
         {
-          name: t("Jetzt auswaehlbar", "Selectable now"),
+          name: t("Jetzt auswählbar", "Selectable now"),
           value: this.formatWorkerList(inviteState.selectableWorkers, 8, moreLabel),
           inline: true,
         },
@@ -402,12 +402,12 @@ const menuMethods = {
 
     if (selectedWorker) {
       embed.setFooter(brandFooter(t(
-        `Ausgewaehlt: ${selectedWorker.name} (${this.formatWorkerBadge(selectedWorker)})`,
+        `Ausgewählt: ${selectedWorker.name} (${this.formatWorkerBadge(selectedWorker)})`,
         `Selected: ${selectedWorker.name} (${this.formatWorkerBadge(selectedWorker)})`
       )));
     } else {
       embed.setFooter(brandFooter(t(
-        "Kein Worker auswaehlbar. Entweder schon eingeladen oder Plan-Limit erreicht.",
+        "Kein Worker auswählbar. Entweder schon eingeladen oder Plan-Limit erreicht.",
         "No worker is selectable. Workers are already invited or plan-limited."
       )));
     }
@@ -431,7 +431,7 @@ const menuMethods = {
     if (selectOptions.length > 0) {
       const selectMenu = new StringSelectMenuBuilder()
         .setCustomId(INVITE_COMPONENT_ID_SELECT)
-        .setPlaceholder(t("Worker-Bot auswaehlen", "Select worker bot"))
+        .setPlaceholder(t("Worker-Bot auswählen", "Select worker bot"))
         .addOptions(selectOptions);
       rows.push(new ActionRowBuilder().addComponents(selectMenu));
     }
@@ -467,7 +467,7 @@ const menuMethods = {
       new ButtonBuilder()
         .setCustomId(INVITE_COMPONENT_ID_CLOSE)
         .setStyle(ButtonStyle.Secondary)
-        .setLabel(t("Schliessen", "Close"))
+        .setLabel(t("Schließen", "Close"))
     );
     rows.push(buttons);
 
@@ -493,7 +493,7 @@ const menuMethods = {
 
     if (interaction.customId === INVITE_COMPONENT_ID_CLOSE) {
       await interaction.update({
-        content: t("Invite-Menue geschlossen.", "Invite menu closed."),
+        content: t("Invite-Menü geschlossen.", "Invite menu closed."),
         embeds: [],
         components: [],
       });

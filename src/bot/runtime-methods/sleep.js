@@ -123,7 +123,7 @@ const sleepMethods = {
   async setSleepTimerInGuild(guildId, minutes, { now = Date.now() } = {}) {
     const state = this.guildState?.get?.(guildId);
     const normalized = normalizeSleepMinutes(minutes);
-    if (normalized > 0 && !state?.currentStationKey) return { ok: false, error: "Es laeuft nichts." };
+    if (normalized > 0 && !state?.currentStationKey) return { ok: false, error: "Es läuft nichts." };
     if (!state) return { ok: true, sleepUntilMs: 0 };
     if (normalized === 0) {
       this.clearSleepTimer(guildId);

@@ -178,7 +178,7 @@ const permissionMethods = {
       }
       await this.respondLongInteraction(
         interaction,
-        `${t("Rolle", "Role")} ${role.toString()} ${t("ist jetzt fuer", "is now")} \`/${command}\` ${sub === "allow" ? t("erlaubt", "allowed") : t("gesperrt", "blocked")}.\n` +
+        `${t("Rolle", "Role")} ${role.toString()} ${t("ist jetzt für", "is now")} \`/${command}\` ${sub === "allow" ? t("erlaubt", "allowed") : t("gesperrt", "blocked")}.\n` +
           `Allow: ${this.formatPermissionRoleMentions(result.rule.allowRoleIds)}\n` +
           `Deny: ${this.formatPermissionRoleMentions(result.rule.denyRoleIds)}`,
         { flags: MessageFlags.Ephemeral }
@@ -196,7 +196,7 @@ const permissionMethods = {
       }
       await this.respondLongInteraction(
         interaction,
-        `${t("Regel fuer", "Rule for")} ${role.toString()} ${t("bei", "on")} \`/${command}\` ${result.changed ? t("entfernt", "removed") : t("war nicht gesetzt", "was not set")}.\n` +
+        `${t("Regel für", "Rule for")} ${role.toString()} ${t("bei", "on")} \`/${command}\` ${result.changed ? t("entfernt", "removed") : t("war nicht gesetzt", "was not set")}.\n` +
           `Allow: ${this.formatPermissionRoleMentions(result.rule.allowRoleIds)}\n` +
           `Deny: ${this.formatPermissionRoleMentions(result.rule.denyRoleIds)}`,
         { flags: MessageFlags.Ephemeral }
@@ -509,7 +509,7 @@ const permissionMethods = {
     if (mode !== "leave") {
       log(
         "WARN",
-        `[${this.config.name}] Guild-Zugriff verweigert fuer ${guild.name} (${guild.id}) - Runtime gestoppt, Auto-Leave deaktiviert (mode=${mode}; ${context}).`
+        `[${this.config.name}] Guild-Zugriff verweigert für ${guild.name} (${guild.id}) - Runtime gestoppt, Auto-Leave deaktiviert (mode=${mode}; ${context}).`
       );
       this.restrictGuildAccess(guild.id);
       return false;

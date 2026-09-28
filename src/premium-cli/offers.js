@@ -119,7 +119,7 @@ async function askOfferDiscount(existing, labelPrefix = "") {
 async function askOfferBenefitConfig(existing, labelPrefix = "") {
   const prefix = labelPrefix ? `${labelPrefix} ` : "";
   const modeRaw = (await askWithDefault(
-    `${prefix}Einloeselogik (discount/direct_grant)`,
+    `${prefix}Einlöselogik (discount/direct_grant)`,
     existing?.fulfillmentMode || "discount"
   )).toLowerCase();
   const fulfillmentMode = modeRaw === "direct_grant" ? "direct_grant" : "discount";
@@ -173,13 +173,13 @@ function parseAllowedSeatsInput(raw) {
 
 async function quickTierOfferSetup() {
   console.log("");
-  info("Schnellsetup: getrennte Codes fuer PRO und ULTIMATE mit Rabatt oder Gratis-Lizenz.");
+  info("Schnellsetup: getrennte Codes für PRO und ULTIMATE mit Rabatt oder Gratis-Lizenz.");
   info("Jeder Code wird automatisch auf sein Tier begrenzt (allowedTiers).");
   console.log("");
 
   const kindRaw = (await askWithDefault("Typ (coupon/referral)", "coupon")).toLowerCase();
   const kind = kindRaw === "referral" ? "referral" : "coupon";
-  const fulfillmentModeRaw = (await askWithDefault("Einloeselogik (discount/direct_grant)", "discount")).toLowerCase();
+  const fulfillmentModeRaw = (await askWithDefault("Einlöselogik (discount/direct_grant)", "discount")).toLowerCase();
   const fulfillmentMode = fulfillmentModeRaw === "direct_grant" ? "direct_grant" : "discount";
   const ownerLabel = await askWithDefault("Owner Label (optional)", "");
   const note = await askWithDefault("Notiz (optional)", "");
@@ -196,18 +196,18 @@ async function quickTierOfferSetup() {
   const startsAt = await askWithDefault("Startzeit ISO (leer=sofort)", "");
   const expiresAt = await askWithDefault("Ablaufzeit ISO (leer=kein Ablauf)", "");
   const sharedGrantSeats = fulfillmentMode === "direct_grant"
-    ? parseInt(await askWithDefault("Gratis-Seats fuer beide Codes (1/2/3/5)", "1"), 10)
+    ? parseInt(await askWithDefault("Gratis-Seats für beide Codes (1/2/3/5)", "1"), 10)
     : null;
   const sharedGrantMonths = fulfillmentMode === "direct_grant"
-    ? parseInt(await askWithDefault("Gratis-Monate fuer beide Codes", "1"), 10)
+    ? parseInt(await askWithDefault("Gratis-Monate für beide Codes", "1"), 10)
     : null;
 
   if (fulfillmentMode === "direct_grant" && ![1, 2, 3, 5].includes(sharedGrantSeats)) {
-    fail("Gratis-Seats muessen 1, 2, 3 oder 5 sein.");
+    fail("Gratis-Seats müssen 1, 2, 3 oder 5 sein.");
     return;
   }
   if (fulfillmentMode === "direct_grant" && (!Number.isFinite(sharedGrantMonths) || sharedGrantMonths <= 0)) {
-    fail("Gratis-Monate muessen groesser als 0 sein.");
+    fail("Gratis-Monate müssen größer als 0 sein.");
     return;
   }
 
@@ -219,10 +219,10 @@ async function quickTierOfferSetup() {
   let savedCount = 0;
   for (const entry of tiers) {
     console.log("");
-    const codeRaw = await askWithDefault(`Code fuer ${entry.label} (leer=ueberspringen)`, entry.codeDefault);
+    const codeRaw = await askWithDefault(`Code für ${entry.label} (leer=überspringen)`, entry.codeDefault);
     const code = normalizeCodeInput(codeRaw);
     if (!code) {
-      info(`${entry.label}: uebersprungen.`);
+      info(`${entry.label}: übersprungen.`);
       continue;
     }
 
@@ -238,7 +238,7 @@ async function quickTierOfferSetup() {
       }
       : await askOfferBenefitConfig(existing, `${entry.label}:`);
     if (!benefitConfig) {
-      fail(`${entry.label}: ungueltige Rabatt-/Gratis-Konfiguration, uebersprungen.`);
+      fail(`${entry.label}: ungültige Rabatt-/Gratis-Konfiguration, übersprungen.`);
       continue;
     }
 
@@ -287,9 +287,9 @@ export async function manageOffersMenu() {
     console.log("    2) Schnellsetup PRO + ULTIMATE Codes (Rabatt oder Gratis)");
     console.log("    3) Code anlegen/aktualisieren (erweitert inkl. Gratis-Lizenz)");
     console.log("    4) Code aktiv/inaktiv setzen");
-    console.log("    5) Code loeschen");
+    console.log("    5) Code löschen");
     console.log("    6) Letzte Redemptions anzeigen");
-    console.log("    7) Zurueck");
+    console.log("    7) Zurück");
     console.log("");
     const choice = (await ask("Aktion")).trim();
 
@@ -307,7 +307,7 @@ export async function manageOffersMenu() {
     if (choice === "3") {
       const code = normalizeCodeInput(await ask("Code (z.B. PRO10)"));
       if (!code) {
-        fail("Code fehlt oder ungueltig.");
+        fail("Code fehlt oder ungültig.");
         continue;
       }
 
@@ -317,7 +317,7 @@ export async function manageOffersMenu() {
       const kind = kindRaw === "referral" ? "referral" : "coupon";
       const benefitConfig = await askOfferBenefitConfig(existing);
       if (!benefitConfig) {
-        fail("Rabatt-/Gratis-Konfiguration ist ungueltig.");
+        fail("Rabatt-/Gratis-Konfiguration ist ungültig.");
         continue;
       }
 
@@ -391,7 +391,7 @@ export async function manageOffersMenu() {
         fail("Code fehlt.");
         continue;
       }
-      const confirm = (await ask("Wirklich loeschen? (j/n)")).trim().toLowerCase();
+      const confirm = (await ask("Wirklich löschen? (j/n)")).trim().toLowerCase();
       if (confirm !== "j" && confirm !== "y") {
         info("Abgebrochen.");
         continue;
@@ -400,7 +400,7 @@ export async function manageOffersMenu() {
       if (!deleted) {
         fail("Code nicht gefunden.");
       } else {
-        ok(`Code ${code} geloescht.`);
+        ok(`Code ${code} gelöscht.`);
       }
       continue;
     }
@@ -417,7 +417,7 @@ export async function manageOffersMenu() {
       return;
     }
 
-    fail("Ungueltige Auswahl.");
+    fail("Ungültige Auswahl.");
     console.log("");
   }
 }

@@ -60,7 +60,7 @@ const personalDataMethods = {
         await interaction.update(asUpdate(buildPersonalDataProblemPayload({ t, error: result.error, applicationId })));
         return true;
       }
-      log("INFO", `[${this.config?.name}] Personenbezogene Daten auf Wunsch geloescht (${Object.values(result.counts).reduce((a, b) => a + b, 0)} Eintraege)`);
+      log("INFO", `[${this.config?.name}] Personenbezogene Daten auf Wunsch gelöscht (${Object.values(result.counts).reduce((a, b) => a + b, 0)} Einträge)`);
       await interaction.update(asUpdate(buildPersonalDataErasedPayload({ t, counts: result.counts, applicationId })));
       return true;
     }

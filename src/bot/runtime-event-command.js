@@ -90,7 +90,7 @@ async function handleEventCommand(runtime, interaction, { formInput = null } = {
   const validateTextChannel = (channel) => {
     if (!channel) return null;
     if (channel.guildId !== guildId) {
-      return t("Der gewaehlte Text-Channel ist nicht in diesem Server.", "The selected text channel is not in this server.");
+      return t("Der gewählte Text-Channel ist nicht in diesem Server.", "The selected text channel is not in this server.");
     }
     const perms = channel.permissionsFor(me);
     if (!perms?.has(PermissionFlagsBits.ViewChannel) || !perms?.has(PermissionFlagsBits.SendMessages)) {
@@ -104,10 +104,10 @@ async function handleEventCommand(runtime, interaction, { formInput = null } = {
       return t("Voice- oder Stage-Channel fehlt.", "Voice or stage channel is missing.");
     }
     if (channel.guildId !== guildId) {
-      return t("Der gewaehlte Voice/Stage-Channel ist nicht in diesem Server.", "The selected voice/stage channel is not in this server.");
+      return t("Der gewählte Voice/Stage-Channel ist nicht in diesem Server.", "The selected voice/stage channel is not in this server.");
     }
     if (!channel.isVoiceBased() || (channel.type !== ChannelType.GuildVoice && channel.type !== ChannelType.GuildStageVoice)) {
-      return t("Bitte waehle einen Voice- oder Stage-Channel.", "Please choose a voice or stage channel.");
+      return t("Bitte wähle einen Voice- oder Stage-Channel.", "Please choose a voice or stage channel.");
     }
     if (stageTopic && channel.type !== ChannelType.GuildStageVoice) {
       return t("`stagetopic` funktioniert nur mit Stage-Channels.", "`stagetopic` only works with stage channels.");

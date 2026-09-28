@@ -53,7 +53,7 @@ test("user-facing runtime status explains a parked target in plain words", () =>
   }, { t });
   assert.equal(permissions.code, "parked");
   assert.match(permissions.summary, /Verbinden oder Sprechen/);
-  assert.match(permissions.nextStep, /kehrt der Bot von selbst zurueck/);
+  assert.match(permissions.nextStep, /kehrt der Bot von selbst zurück/);
   assert.match(permissions.playback, /Groove Salad/);
 
   const circuit = buildUserFacingRuntimeStatus({

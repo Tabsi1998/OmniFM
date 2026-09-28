@@ -130,19 +130,19 @@ function buildWeeklyDigestPreview({
     : t("Keine Daten", "No data");
 
   const fields = [
-    { name: t("Hoerzeit", "Listening time"), value: formatWeeklyDigestDuration(weekListeningMs), inline: true },
+    { name: t("Hörzeit", "Listening time"), value: formatWeeklyDigestDuration(weekListeningMs), inline: true },
     { name: t("Sessions", "Sessions"), value: String(weekSessions), inline: true },
     { name: t("Starts", "Starts"), value: String(weekStarts), inline: true },
-    { name: t("Peak-Zuhoerer", "Peak listeners"), value: String(weekPeak), inline: true },
-    { name: t("Gesamte Hoerzeit", "Total listening"), value: formatWeeklyDigestDuration(Number(safeStats.totalListeningMs || 0) || 0), inline: true },
+    { name: t("Peak-Zuhörer", "Peak listeners"), value: String(weekPeak), inline: true },
+    { name: t("Gesamte Hörzeit", "Total listening"), value: formatWeeklyDigestDuration(Number(safeStats.totalListeningMs || 0) || 0), inline: true },
     { name: t("Gesamt Sessions", "Total sessions"), value: String(Number(safeStats.totalSessions || 0) || 0), inline: true },
     { name: t("Top 5 Stationen", "Top 5 stations"), value: topStationsValue, inline: false },
   ];
 
   return {
-    title: t("Woechentlicher Radio-Report", "Weekly radio report"),
+    title: t("Wöchentlicher Radio-Report", "Weekly radio report"),
     description: t(
-      `Hier ist die Zusammenfassung der letzten 7 Tage fuer **${safeGuildName}**:`,
+      `Hier ist die Zusammenfassung der letzten 7 Tage für **${safeGuildName}**:`,
       `Here is the summary for the last 7 days on **${safeGuildName}**:`
     ),
     generatedAt: generatedAt.toISOString(),

@@ -484,7 +484,7 @@ class RemoteWorkerHandle {
     if (!this.isReady()) {
       return {
         ok: false,
-        error: "Worker ist offline oder kein Heartbeat verfuegbar.",
+        error: "Worker ist offline oder kein Heartbeat verfügbar.",
       };
     }
     try {

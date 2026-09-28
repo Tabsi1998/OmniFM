@@ -37,7 +37,7 @@ export function createDashboardPermsRouteHandler(deps) {
       return true;
     }
     if (!serverHasCapability(guildInfo.id, "role_permissions")) {
-      sendLocalizedError(res, 403, language, "Berechtigungen sind erst ab Pro verfuegbar.", "Permissions are only available from Pro.");
+      sendLocalizedError(res, 403, language, "Berechtigungen sind erst ab Pro verfügbar.", "Permissions are only available from Pro.");
       return true;
     }
 
@@ -68,7 +68,7 @@ export function createDashboardPermsRouteHandler(deps) {
         if (unresolved.length) {
           sendJson(res, 400, {
             error: language === "de"
-              ? `Folgende Rollen konnten nicht aufgeloest werden: ${unresolved.join(" | ")}`
+              ? `Folgende Rollen konnten nicht aufgelöst werden: ${unresolved.join(" | ")}`
               : `The following roles could not be resolved: ${unresolved.join(" | ")}`,
           });
           return true;

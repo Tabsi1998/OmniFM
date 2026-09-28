@@ -126,12 +126,12 @@ export async function delegatePlayToWorker(runtime, {
     });
     if (!check.ok) {
       const reasons = {
-        tier: t(`Worker ${requestedBotIndex} erfordert ein hoeheres Abo (max: ${check.maxIndex}).`, `Worker ${requestedBotIndex} requires a higher plan (max: ${check.maxIndex}).`),
+        tier: t(`Worker ${requestedBotIndex} erfordert ein höheres Abo (max: ${check.maxIndex}).`, `Worker ${requestedBotIndex} requires a higher plan (max: ${check.maxIndex}).`),
         not_configured: t(`Worker ${requestedBotIndex} ist nicht konfiguriert.`, `Worker ${requestedBotIndex} is not configured.`),
         offline: t(`Worker ${requestedBotIndex} ist offline.`, `Worker ${requestedBotIndex} is offline.`),
         not_invited: t(`Worker ${requestedBotIndex} ist nicht auf diesem Server. Nutze \`/invite worker:${requestedBotIndex}\` zum Einladen.`, `Worker ${requestedBotIndex} is not on this server. Use \`/invite worker:${requestedBotIndex}\` to invite.`),
       };
-      return { ok: false, message: reasons[check.reason] || t("Worker nicht verfuegbar.", "Worker not available.") };
+      return { ok: false, message: reasons[check.reason] || t("Worker nicht verfügbar.", "Worker not available.") };
     }
     worker = check.worker;
   } else {
@@ -182,7 +182,7 @@ export async function delegatePlayToWorker(runtime, {
       : {
         ok: false,
         message: t(
-          "Der Ziel-Channel konnte fuer den ausgewaehlten Worker gerade nicht geladen werden. Bitte versuche es erneut.",
+          "Der Ziel-Channel konnte für den ausgewählten Worker gerade nicht geladen werden. Bitte versuche es erneut.",
           "The target channel could not be loaded for the selected worker right now. Please try again."
         ),
       };
@@ -219,7 +219,7 @@ export async function executeRuntimePlay(runtime, interaction, {
   if (explicitVoiceChannel) {
     if (explicitVoiceChannel.guildId !== interaction.guildId) {
       await runtime.respondInteraction(interaction, {
-        content: t("Der gewaehlte Voice/Stage-Channel ist nicht in diesem Server.", "The selected voice/stage channel is not in this server."),
+        content: t("Der gewählte Voice/Stage-Channel ist nicht in diesem Server.", "The selected voice/stage channel is not in this server."),
         flags: MessageFlags.Ephemeral,
       });
       return;

@@ -178,7 +178,7 @@ export function createDashboardSettingsRouteHandler(deps) {
 
         if (body?.weeklyDigest && typeof body.weeklyDigest === "object") {
           if (!serverHasCapability(guildInfo.id, "weekly_digest")) {
-            sendLocalizedError(res, 403, language, "Woechentlicher Digest ist erst ab Pro verfuegbar.", "Weekly digest is only available from Pro.");
+            sendLocalizedError(res, 403, language, "Wöchentlicher Digest ist erst ab Pro verfügbar.", "Weekly digest is only available from Pro.");
             return true;
           }
           updates.weeklyDigest = normalizeWeeklyDigestConfig(body.weeklyDigest, language);
@@ -187,7 +187,7 @@ export function createDashboardSettingsRouteHandler(deps) {
               res,
               400,
               language,
-              "Fuer einen aktiven Digest muss ein Text-Channel ausgewaehlt werden.",
+              "Für einen aktiven Digest muss ein Text-Channel ausgewählt werden.",
               "An active digest requires a selected text channel."
             );
             return true;
@@ -196,7 +196,7 @@ export function createDashboardSettingsRouteHandler(deps) {
 
         if (body?.failoverChain !== undefined || body?.fallbackStation !== undefined) {
           if (!serverHasCapability(guildInfo.id, "failover_rules")) {
-            sendLocalizedError(res, 403, language, "Fallback-Station ist nur fuer Ultimate verfuegbar.", "Fallback station is only available for Ultimate.");
+            sendLocalizedError(res, 403, language, "Fallback-Station ist nur für Ultimate verfügbar.", "Fallback station is only available for Ultimate.");
             return true;
           }
           const rawFailoverInput = body?.failoverChain !== undefined
@@ -212,7 +212,7 @@ export function createDashboardSettingsRouteHandler(deps) {
               res,
               400,
               language,
-              "Die gewaehlte Fallback-Station ist fuer diesen Server nicht verfuegbar.",
+              "Die gewählte Fallback-Station ist für diesen Server nicht verfügbar.",
               "The selected fallback station is not available for this server."
             );
             return true;
@@ -223,7 +223,7 @@ export function createDashboardSettingsRouteHandler(deps) {
 
         if (body?.exportsWebhook && typeof body.exportsWebhook === "object") {
           if (!serverHasCapability(guildInfo.id, "exports_webhooks")) {
-            sendLocalizedError(res, 403, language, "Exporte und Webhooks sind nur fuer Ultimate verfuegbar.", "Exports and webhooks are only available for Ultimate.");
+            sendLocalizedError(res, 403, language, "Exporte und Webhooks sind nur für Ultimate verfügbar.", "Exports and webhooks are only available for Ultimate.");
             return true;
           }
           const candidateWebhook = mergeDashboardExportsWebhookConfigWithStoredSecret(
@@ -240,7 +240,7 @@ export function createDashboardSettingsRouteHandler(deps) {
               res,
               400,
               language,
-              "Fuer aktive Export-Webhooks muss eine URL hinterlegt werden.",
+              "Für aktive Export-Webhooks muss eine URL hinterlegt werden.",
               "An active export webhook requires a configured URL."
             );
             return true;
@@ -263,7 +263,7 @@ export function createDashboardSettingsRouteHandler(deps) {
               res,
               400,
               language,
-              "Fuer aktive Incident-Alerts muss ein Text-Channel ausgewaehlt werden.",
+              "Für aktive Incident-Alerts muss ein Text-Channel ausgewählt werden.",
               "An active incident alert requires a selected text channel."
             );
             return true;
@@ -273,7 +273,7 @@ export function createDashboardSettingsRouteHandler(deps) {
 
         if (body?.voiceGuard && typeof body.voiceGuard === "object") {
           if (!serverHasCapability(guildInfo.id, "voice_guard")) {
-            sendLocalizedError(res, 403, language, "Voice Guard ist auf diesem Server aktuell nicht verfuegbar.", "Voice guard is not currently available on this server.");
+            sendLocalizedError(res, 403, language, "Voice Guard ist auf diesem Server aktuell nicht verfügbar.", "Voice guard is not currently available on this server.");
             return true;
           }
           const validatedVoiceGuard = validateVoiceGuardSettings(body.voiceGuard);
@@ -357,7 +357,7 @@ export function createDashboardSettingsRouteHandler(deps) {
             res,
             503,
             language,
-            "Der Dienst ist gerade voruebergehend nicht verfuegbar.",
+            "Der Dienst ist gerade vorübergehend nicht verfügbar.",
             "The service is temporarily unavailable."
           );
           return true;

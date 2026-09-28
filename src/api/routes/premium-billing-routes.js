@@ -62,7 +62,7 @@ export function createPremiumBillingRoutesHandler(deps) {
           sendJson(res, 400, {
             success: false,
             message: t(
-              "Bitte eine gueltige E-Mail-Adresse eingeben.",
+              "Bitte eine gültige E-Mail-Adresse eingeben.",
               "Please enter a valid email address."
             ),
           });
@@ -142,7 +142,7 @@ export function createPremiumBillingRoutesHandler(deps) {
         if (!isValidEmailAddress(email)) {
           sendJson(res, 400, {
             error: t(
-              "Bitte eine gueltige E-Mail-Adresse eingeben.",
+              "Bitte eine gültige E-Mail-Adresse eingeben.",
               "Please enter a valid email address."
             ),
           });
@@ -174,7 +174,7 @@ export function createPremiumBillingRoutesHandler(deps) {
         if (basePriceInCents <= 0) {
           sendJson(res, 400, {
             error: t(
-              "Ungueltige Preisberechnung fuer die gewaehlte Kombination.",
+              "Ungültige Preisberechnung für die gewählte Kombination.",
               "Invalid price calculation for the selected combination."
             ),
           });
@@ -313,7 +313,7 @@ export function createPremiumBillingRoutesHandler(deps) {
           sendJson(res, 400, {
             success: false,
             error: t(
-              "Ungueltige Preisberechnung fuer die gewaehlte Kombination.",
+              "Ungültige Preisberechnung für die gewählte Kombination.",
               "Invalid price calculation for the selected combination."
             ),
           });

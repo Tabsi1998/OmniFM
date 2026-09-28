@@ -93,7 +93,7 @@ export async function handleRuntimeAutocomplete(runtime, interaction) {
       return;
     }
 
-    // Autocomplete fuer /removestation key
+    // Autocomplete für /removestation key
     if (focused.name === "key" && interaction.commandName === "removestation") {
       const guildId = interaction.guildId;
       const custom = getGuildStations(guildId);

@@ -65,7 +65,7 @@ async function ensureWorkerBridgeCollections() {
 
     const db = getDb();
     if (!db) {
-      throw new Error("MongoDB-Verbindung fuer Worker-Bridge nicht verfuegbar.");
+      throw new Error("MongoDB-Verbindung für Worker-Bridge nicht verfügbar.");
     }
 
     const existing = await db.listCollections().toArray();
@@ -104,7 +104,7 @@ async function getWorkerBridgeDb() {
   await ensureWorkerBridgeCollections();
   const db = getDb();
   if (!db) {
-    throw new Error("MongoDB-Verbindung fuer Worker-Bridge nicht verfuegbar.");
+    throw new Error("MongoDB-Verbindung für Worker-Bridge nicht verfügbar.");
   }
   return db;
 }
@@ -112,7 +112,7 @@ async function getWorkerBridgeDb() {
 async function publishWorkerSnapshot(workerId, snapshot = {}) {
   const normalizedWorkerId = String(workerId || "").trim();
   if (!normalizedWorkerId) {
-    throw new Error("Worker-ID fehlt fuer Snapshot.");
+    throw new Error("Worker-ID fehlt für Snapshot.");
   }
 
   const db = await getWorkerBridgeDb();
@@ -163,7 +163,7 @@ async function createWorkerCommand(workerId, type, payload = {}, options = {}) {
   const normalizedWorkerId = String(workerId || "").trim();
   const normalizedType = String(type || "").trim();
   if (!normalizedWorkerId || !normalizedType) {
-    throw new Error("Worker-Command benoetigt workerId und type.");
+    throw new Error("Worker-Command benötigt workerId und type.");
   }
 
   const db = await getWorkerBridgeDb();

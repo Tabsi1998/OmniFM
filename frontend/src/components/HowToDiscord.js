@@ -1,8 +1,7 @@
 import { useI18n } from '../i18n.js';
-import { useShowcaseStations } from '../lib/showcase.js';
-import LivePlaybackBar from './LivePlaybackBar.js';
 import { resolvePrimaryInviteUrl } from '../lib/invite.js';
-import { Volume2, Check, Plus, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
+import LiveDemo from './demo/LiveDemo.js';
 
 const css = `
 .htd-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:26px; }
@@ -20,17 +19,14 @@ function StepShell({ step, children }) {
         <h3 style={{ fontFamily: "'Syne','Outfit',sans-serif", fontWeight: 800, fontSize: 20, marginBottom: 8 }}>{step.title}</h3>
         <p style={{ color: '#94a3b8', fontSize: 14, lineHeight: 1.6, margin: 0 }}>{step.desc}</p>
       </div>
-      <div style={{ background: '#2b2d31', border: '1px solid #1e1f22', borderRadius: 12, padding: 14, marginTop: 'auto' }}>{children}</div>
+      <div style={{ marginTop: 'auto' }}>{children}</div>
     </div>
   );
 }
 
 export default function HowToDiscord({ bots = [] }) {
-  const { copy, t } = useI18n();
+  const { copy } = useI18n();
   const s = copy.howTo;
-  const showcase = useShowcaseStations(4);
-  const demoStation = showcase.length ? showcase[0].name : 'OmniFM Radio Network';
-  const streamLabel = t('Live-Radio-Stream', 'Live radio stream');
   const inviteUrl = resolvePrimaryInviteUrl(bots);
 
   return (
@@ -46,62 +42,23 @@ export default function HowToDiscord({ bots = [] }) {
           <p style={{ color: '#94a3b8', fontSize: 16, lineHeight: 1.6 }}>{s.subtitle}</p>
         </div>
 
+        {/* Each step as a live demo of what happens in Discord (#431). */}
         <div className="htd-grid">
-          {/* Step 1 — invite commander */}
-          <StepShell step={s.steps[0]} s={s}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-              <div style={{ width: 44, height: 44, borderRadius: '50%', overflow: 'hidden', background: '#08090d', flexShrink: 0 }}>
-                <img src="/brand/omnifm-discord-avatar-192.png" alt="OmniFM" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              </div>
-              <div>
-                <div style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>OmniFM</div>
-                <div style={{ color: '#949ba4', fontSize: 12 }}>{s.permsTitle}</div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 14 }}>
-              {s.perms.map((p) => (
-                <div key={p} style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#dbdee1', fontSize: 12.5 }}>
-                  <span style={{ width: 16, height: 16, borderRadius: 4, background: '#3ba55d', display: 'grid', placeItems: 'center', flexShrink: 0 }}><Check size={11} color="#fff" /></span>{p}
-                </div>
-              ))}
-            </div>
+          <StepShell step={s.steps[0]}>
+            <LiveDemo scene="commander" />
             <a
               href={inviteUrl}
               target={inviteUrl.startsWith('http') ? '_blank' : undefined}
               rel={inviteUrl.startsWith('http') ? 'noopener noreferrer' : undefined}
               data-testid="howto-commander-invite"
-              style={{ display: 'block', background: '#3ba55d', color: '#fff', textAlign: 'center', fontWeight: 700, fontSize: 13, borderRadius: 8, padding: '9px 0', textDecoration: 'none' }}
+              style={{ display: 'block', marginTop: 12, background: '#248046', color: '#fff', textAlign: 'center', fontWeight: 700, fontSize: 13, borderRadius: 8, padding: '9px 0', textDecoration: 'none' }}
             >{s.addServer}</a>
           </StepShell>
-
-          {/* Step 2 — add worker */}
-          <StepShell step={s.steps[1]} s={s}>
-            <div style={{ color: '#949ba4', fontSize: 11, fontFamily: "'JetBrains Mono',monospace", marginBottom: 10 }}>/invite → {s.workerHint}</div>
-            {[['OmniFM Worker 1', '#ff6b00'], ['OmniFM Worker 2', '#00e5ff'], ['OmniFM Worker 3', '#bd00ff']].map(([nm, c]) => (
-              <div key={nm} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid #1e1f22' }}>
-                <span style={{ width: 26, height: 26, borderRadius: '50%', background: c, display: 'grid', placeItems: 'center', flexShrink: 0 }}><Volume2 size={13} color="#08090d" /></span>
-                <span style={{ color: '#dbdee1', fontSize: 13, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nm}</span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#5865f2', color: '#fff', fontSize: 11, fontWeight: 700, borderRadius: 6, padding: '4px 9px', flexShrink: 0 }}><Plus size={11} /> {s.invite}</span>
-              </div>
-            ))}
+          <StepShell step={s.steps[1]}>
+            <LiveDemo scene="worker" />
           </StepShell>
-
-          {/* Step 3 — /play */}
-          <StepShell step={s.steps[2]} s={s}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#949ba4', fontSize: 12, marginBottom: 10 }}>
-              <Volume2 size={14} color="#3ba55d" /> <span style={{ color: '#dbdee1', fontWeight: 600 }}>voice-radio</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <div style={{ width: 30, height: 30, borderRadius: '50%', overflow: 'hidden', background: '#08090d', flexShrink: 0 }}>
-                <img src="/brand/omnifm-discord-avatar-192.png" alt="OmniFM" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ color: '#00a8fc', fontSize: 13, fontWeight: 600 }}>OmniFM · {s.connected}</div>
-                <div style={{ color: '#dbdee1', fontSize: 12.5 }}>{demoStation} — {streamLabel}</div>
-              </div>
-            </div>
-            <div style={{ color: '#b5bac1', fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>{s.nowPlaying}</div>
-            <LivePlaybackBar live resetKey="howto" />
+          <StepShell step={s.steps[2]}>
+            <LiveDemo scene="play" />
           </StepShell>
         </div>
       </div>

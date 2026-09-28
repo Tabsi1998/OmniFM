@@ -152,7 +152,7 @@ export async function handleDiagCommand({ runtime, interaction, t, language }) {
               : t("nein", "no")}`,
           `Failover: ${activeState.failoverActive === true
               ? `${t("aktiv", "active")} (${t("Wunschsender", "preferred")}: ${activeState.desiredStationName || activeState.desiredStationKey || "-"}${Number(activeState.failbackNextProbeAt || 0) > 0
-              ? `, ${t("naechste Pruefung", "next check")} <t:${Math.floor(Number(activeState.failbackNextProbeAt) / 1000)}:R>`
+              ? `, ${t("nächste Prüfung", "next check")} <t:${Math.floor(Number(activeState.failbackNextProbeAt) / 1000)}:R>`
               : ""})`
               : t("nein", "no")}`,
           `${t("Server-Stummschaltung", "Server mute")}: ${activeState.serverMuted === true ? t("ja", "yes") : t("nein", "no")}`,

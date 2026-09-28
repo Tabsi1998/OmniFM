@@ -28,6 +28,9 @@ const PrivacySection = lazy(() => import('./components/PrivacySection.js'));
 const TermsSection = lazy(() => import('./components/TermsSection.js'));
 const StatusPage = lazy(() => import('./components/StatusPage.js'));
 const ChartsPage = lazy(() => import('./components/ChartsPage.js'));
+// One live demo alone, for recording clips (#431): /?demo=play
+const DemoStage = lazy(() => import('./components/demo/DemoStage.js'));
+const DEMO_SCENES = ['commander', 'worker', 'play', 'panel'];
 
 // What shows for the moment a page's code is on its way.
 function PageLoading() {
@@ -192,6 +195,15 @@ function AppContent() {
       }
     };
   }, [fetchData, currentPage]);
+
+  const demoScene = typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('demo');
+  if (DEMO_SCENES.includes(demoScene)) {
+    return (
+      <Suspense fallback={<PageLoading />}>
+        <DemoStage scene={demoScene} />
+      </Suspense>
+    );
+  }
 
   if (currentPage === 'imprint') {
     return (

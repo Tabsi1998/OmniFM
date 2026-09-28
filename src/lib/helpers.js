@@ -23,7 +23,7 @@ const SEAT_PRICING_CENTS = {
 
 // ---- Fix: TIERS wird aus PLANS abgeleitet statt doppelt definiert ----
 // PLANS in config/plans.js ist die Single Source of Truth.
-// TIERS bleibt als Alias fuer Backward-Compatibility erhalten.
+// TIERS bleibt als Alias für Backward-Compatibility erhalten.
 const TIERS = Object.fromEntries(
   Object.entries(PLANS).map(([key, plan], index) => [
     key,
@@ -207,12 +207,12 @@ function translateOfferReason(reason, language = "de") {
     "coupon_not_found": lang === "de" ? "Gutscheincode nicht gefunden." : "Coupon code not found.",
     "coupon_inactive": lang === "de" ? "Gutscheincode ist nicht aktiv." : "Coupon code is not active.",
     "coupon_expired": lang === "de" ? "Gutscheincode ist abgelaufen." : "Coupon code has expired.",
-    "coupon_max_uses": lang === "de" ? "Gutscheincode wurde bereits zu oft eingeloest." : "Coupon code has already been redeemed too many times.",
-    "coupon_wrong_tier": lang === "de" ? "Gutscheincode gilt nicht fuer diesen Plan." : "Coupon code is not valid for this plan.",
+    "coupon_max_uses": lang === "de" ? "Gutscheincode wurde bereits zu oft eingelöst." : "Coupon code has already been redeemed too many times.",
+    "coupon_wrong_tier": lang === "de" ? "Gutscheincode gilt nicht für diesen Plan." : "Coupon code is not valid for this plan.",
     "referral_not_found": lang === "de" ? "Empfehlungscode nicht gefunden." : "Referral code not found.",
     "referral_inactive": lang === "de" ? "Empfehlungscode ist nicht aktiv." : "Referral code is not active.",
     "referral_self": lang === "de" ? "Eigenen Empfehlungscode kann man nicht nutzen." : "You cannot use your own referral code.",
-    "referral_wrong_tier": lang === "de" ? "Empfehlungscode gilt nicht fuer diesen Plan." : "Referral code is not valid for this plan.",
+    "referral_wrong_tier": lang === "de" ? "Empfehlungscode gilt nicht für diesen Plan." : "Referral code is not valid for this plan.",
   };
   return map[reason] || String(reason || "");
 }
@@ -334,7 +334,7 @@ function isLikelyNetworkFailureLine(line) {
     "no route to host",
     "could not resolve host",
     "host konnte nicht aufgelöst werden",
-    "host konnte nicht aufgeloest werden",
+    "host konnte nicht aufgelöst werden",
     "getaddrinfo",
     "enotfound",
     "eai_again",

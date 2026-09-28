@@ -60,7 +60,7 @@ export function createDashboardEventsRouteHandler(deps) {
         return true;
       }
       if (!serverHasCapability(guild.id, "event_scheduler")) {
-        sendLocalizedError(res, 403, language, "Events sind erst ab Pro verfuegbar.", "Events are only available from Pro.");
+        sendLocalizedError(res, 403, language, "Events sind erst ab Pro verfügbar.", "Events are only available from Pro.");
         return true;
       }
 
@@ -75,7 +75,7 @@ export function createDashboardEventsRouteHandler(deps) {
 
         const { runtime, guild: managedGuild } = resolveRuntimeForGuild(runtimes, guild.id);
         if (!runtime || !managedGuild) {
-          sendLocalizedError(res, 400, language, "Der Bot ist auf diesem Server aktuell nicht verfuegbar.", "The bot is currently unavailable on this server.");
+          sendLocalizedError(res, 400, language, "Der Bot ist auf diesem Server aktuell nicht verfügbar.", "The bot is currently unavailable on this server.");
           return true;
         }
 
@@ -149,7 +149,7 @@ export function createDashboardEventsRouteHandler(deps) {
         return true;
       }
       if (!serverHasCapability(guild.id, "event_scheduler")) {
-        sendLocalizedError(res, 403, language, "Events sind erst ab Pro verfuegbar.", "Events are only available from Pro.");
+        sendLocalizedError(res, 403, language, "Events sind erst ab Pro verfügbar.", "Events are only available from Pro.");
         return true;
       }
 
@@ -164,7 +164,7 @@ export function createDashboardEventsRouteHandler(deps) {
           const body = await readJsonBody();
           const { runtime, guild: managedGuild } = resolveRuntimeForGuild(runtimes, guild.id);
           if (!runtime || !managedGuild) {
-            sendLocalizedError(res, 400, language, "Der Bot ist auf diesem Server aktuell nicht verfuegbar.", "The bot is currently unavailable on this server.");
+            sendLocalizedError(res, 400, language, "Der Bot ist auf diesem Server aktuell nicht verfügbar.", "The bot is currently unavailable on this server.");
             return true;
           }
 
@@ -300,7 +300,7 @@ export function createDashboardEventsRouteHandler(deps) {
       return true;
     }
     if (!serverHasCapability(guild.id, "event_scheduler")) {
-      sendLocalizedError(res, 403, language, "Events sind erst ab Pro verfuegbar.", "Events are only available from Pro.");
+      sendLocalizedError(res, 403, language, "Events sind erst ab Pro verfügbar.", "Events are only available from Pro.");
       return true;
     }
 
@@ -321,7 +321,7 @@ export function createDashboardEventsRouteHandler(deps) {
         const body = await readJsonBody();
         const { runtime, guild: managedGuild } = resolveRuntimeForGuild(runtimes, guild.id);
         if (!runtime || !managedGuild) {
-          sendLocalizedError(res, 400, language, "Der Bot ist auf diesem Server aktuell nicht verfuegbar.", "The bot is currently unavailable on this server.");
+          sendLocalizedError(res, 400, language, "Der Bot ist auf diesem Server aktuell nicht verfügbar.", "The bot is currently unavailable on this server.");
           return true;
         }
 
@@ -477,7 +477,7 @@ export function createDashboardEventsRouteHandler(deps) {
       if (!result?.ok) {
         sendJson(res, result?.message === "Event nicht gefunden." ? 404 : 400, {
           error: translateScheduledEventStoreMessage(
-            result?.message || languagePick(language, "Event konnte nicht geloescht werden.", "Event could not be deleted."),
+            result?.message || languagePick(language, "Event konnte nicht gelöscht werden.", "Event could not be deleted."),
             language
           ),
         });
