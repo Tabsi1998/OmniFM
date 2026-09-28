@@ -35,13 +35,13 @@ function Bars({ active, className }) {
 
 // The listeners count stands once on the start page, in the bar under the hero (#435).
 export default function NowPlayingBar({ bots = [] }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const player = usePlayer();
   const showcase = useShowcaseStations(8);
   const [idx, setIdx] = useState(0);
   const [cover, setCover] = useState(null);
   const [closed, setClosed] = useState(() => (typeof window !== 'undefined' && window.sessionStorage.getItem('omnifm_npbar_closed') === '1'));
-  const invite = resolvePrimaryInviteUrl(bots);
+  const invite = resolvePrimaryInviteUrl(bots, locale);
 
   // Rotiert nur die Vorschau, solange NICHTS läuft.
   const playing = player.current;

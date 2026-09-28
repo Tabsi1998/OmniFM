@@ -15,6 +15,9 @@ const STEMS = [
   "[Vv]erlaenger", "[Vv]oruebergehend", "[Ww]oechentlich", "[Zz]usaetzlich", "[Bb]enoetig", "noetig", "[Gg]eloescht",
   "[Ll]oeschen", "[Gg]eschuetzt", "[Gg]roesser", "[Hh]inzugefuegt", "[Hh]oeher", "[Kk]oennen", "[Ll]aenger",
   "[Mm]oeglich", "[Mm]uessen", "[Uu]nterstuetz", "[Uu]nvollstaendig", "[Vv]erknuepf", "[Ww]aehrend",
+  // Found in the dashboard (#454).
+  "[Vv]orfaell", "[Aa]usloes", "[Ff]ehlschlaeg", "[Aa]nkuendig", "[Ss]chuetz", "[Rr]egulaer", "[Ww]uensch", "[Dd]uerf",
+  "[Aa]usgeschoepft", "[Aa]usfaell", "[Ff]uellt", "[Ff]uege", "[Ss]chliesse", "[Uu]eberg", "[Hh]oere\\b", "[Dd]afuer",
 ];
 const SUBSTITUTES = new RegExp(`\\b(?:${STEMS.join("|")})\\w*`);
 // File names stay plain ASCII on purpose, and so do the aliases that
@@ -30,9 +33,13 @@ function sourceFiles(directory) {
   });
 }
 
-test("German texts under src/ use real umlauts, no ae/oe/ue substitutes", () => {
+// The other languages' website texts are not German ("fuera" is Spanish).
+const OTHER_LANGUAGE_FILES = /[\\/]i18n[\\/](?:ui[\\/]|guide[\\/](?!de\.js)|(?:en|es|fr|it|nl|pl|pt|tr)-)/;
+
+test("German texts under src/ and frontend/src/ use real umlauts, no ae/oe/ue substitutes", () => {
   const found = [];
-  for (const file of sourceFiles("src")) {
+  const files = [...sourceFiles("src"), ...sourceFiles(path.join("frontend", "src")).filter((file) => !OTHER_LANGUAGE_FILES.test(file) && !file.endsWith(".test.js"))];
+  for (const file of files) {
     fs.readFileSync(file, "utf8").split("\n").forEach((line, index) => {
       if (LEGACY.test(line)) return;
       const cleaned = ALLOWED.reduce((text, keep) => text.split(keep).join(""), line);

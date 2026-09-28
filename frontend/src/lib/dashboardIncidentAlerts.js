@@ -1,10 +1,10 @@
 export const DASHBOARD_INCIDENT_ALERT_EVENTS = Object.freeze([
-  { key: 'stream_healthcheck_stalled', de: 'Stream-Healthcheck ausgeloest', en: 'Stream health check triggered' },
+  { key: 'stream_healthcheck_stalled', de: 'Stream-Healthcheck ausgelöst', en: 'Stream health check triggered' },
   { key: 'stream_recovered', de: 'Stream-Erholung', en: 'Stream recovered' },
   { key: 'stream_failover_activated', de: 'Failover aktiviert', en: 'Failover activated' },
-  { key: 'stream_failover_exhausted', de: 'Failover ausgeschoepft', en: 'Failover exhausted' },
+  { key: 'stream_failover_exhausted', de: 'Failover ausgeschöpft', en: 'Failover exhausted' },
   { key: 'stream_failback_completed', de: 'Wunschsender wieder aktiv', en: 'Preferred station restored' },
-  { key: 'station_unavailable', de: 'Sender nicht mehr verfuegbar', en: 'Station no longer available' },
+  { key: 'station_unavailable', de: 'Sender nicht mehr verfügbar', en: 'Station no longer available' },
 ]);
 
 export const DASHBOARD_INCIDENT_ALERTS_DEFAULTS = Object.freeze({
@@ -51,7 +51,7 @@ export function buildDashboardIncidentAlertsSummary(rawConfig, channelName, t) {
       statusLabel: t('Channel fehlt', 'Channel required'),
       statusAccent: '#EF4444',
       description: t(
-        'Waehle einen Text-Channel aus, damit OmniFM neue Reliability-Vorfaelle direkt in Discord posten kann.',
+        'Wähle einen Text-Channel aus, damit OmniFM neue Reliability-Vorfälle direkt in Discord posten kann.',
         'Select a text channel so OmniFM can post new reliability incidents directly into Discord.'
       ),
     };
@@ -62,7 +62,7 @@ export function buildDashboardIncidentAlertsSummary(rawConfig, channelName, t) {
       statusLabel: t('Nicht konfiguriert', 'Not configured'),
       statusAccent: '#71717A',
       description: t(
-        'Lege einen Text-Channel fest, um Stream-Stalls, Recoverys und Failover-Vorfaelle direkt in Discord zu sehen.',
+        'Lege einen Text-Channel fest, um Stream-Stalls, Recoverys und Failover-Vorfälle direkt in Discord zu sehen.',
         'Choose a text channel to see stream stalls, recoveries, and failover incidents directly in Discord.'
       ),
     };
@@ -73,7 +73,7 @@ export function buildDashboardIncidentAlertsSummary(rawConfig, channelName, t) {
       statusLabel: t('Aktiv', 'Active'),
       statusAccent: '#10B981',
       description: t(
-        'Neue Vorfaelle werden automatisch in {channel} gemeldet.',
+        'Neue Vorfälle werden automatisch in {channel} gemeldet.',
         'New incidents are posted automatically in {channel}.',
         { channel: channelName || 'Discord' }
       ),
@@ -82,10 +82,10 @@ export function buildDashboardIncidentAlertsSummary(rawConfig, channelName, t) {
 
   if (config.enabled) {
     return {
-      statusLabel: t('Ohne Ausloeser', 'No triggers selected'),
+      statusLabel: t('Ohne Auslöser', 'No triggers selected'),
       statusAccent: '#F59E0B',
       description: t(
-        'Der Channel ist gesetzt, aber ohne ausgewaehlte Ereignisse bleibt der Alert-Kanal still.',
+        'Der Channel ist gesetzt, aber ohne ausgewählte Ereignisse bleibt der Alert-Kanal still.',
         'The channel is configured, but without selected events the alert channel stays silent.'
       ),
     };
@@ -95,7 +95,7 @@ export function buildDashboardIncidentAlertsSummary(rawConfig, channelName, t) {
     statusLabel: t('Bereit', 'Ready'),
     statusAccent: '#8B5CF6',
     description: t(
-      'Der Channel {channel} ist gespeichert und kann bei Bedarf fuer Incident-Alerts aktiviert werden.',
+      'Der Channel {channel} ist gespeichert und kann bei Bedarf für Incident-Alerts aktiviert werden.',
       'The channel {channel} is saved and can be enabled for incident alerts when needed.',
       { channel: channelName || 'Discord' }
     ),

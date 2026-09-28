@@ -51,7 +51,7 @@ export default function SettingsIncidentAlerts({
 
         <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
           <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
-            {t('Ausloeser', 'Triggers')}
+            {t('Auslöser', 'Triggers')}
           </div>
           <div data-testid="incident-alert-events-count" style={{ marginTop: 6, fontSize: 16, fontWeight: 600, color: '#D4D4D8' }}>
             {incidentAlerts.events.length} / {DASHBOARD_INCIDENT_ALERT_EVENTS.length}

@@ -138,8 +138,8 @@ function NowPlayingConsole({ live }) {
 
 // The numbers of the network stand once, in the bar below (TrustBar, #435).
 function Hero({ stats, bots }) {
-  const { copy } = useI18n();
-  const inviteUrl = resolvePrimaryInviteUrl(bots);
+  const { copy, locale } = useI18n();
+  const inviteUrl = resolvePrimaryInviteUrl(bots, locale);
   const subtitleTail = String(copy.hero.subtitleTail || '').trim();
   const subtitleSpacer = subtitleTail && !/^[.,!?;:]/.test(subtitleTail) ? ' ' : '';
 

@@ -24,7 +24,7 @@ export default function SettingsVoiceGuard({
             'Controls how OmniFM reacts to foreign moves into other voice channels. For intentional moves you can additionally use `/voiceguard unlock`.'
           )
           : t(
-            'Voice Guard konnte fuer diesen Server gerade nicht freigeschaltet werden. Bitte pruefe den Capability-Status oder lade das Dashboard neu.',
+            'Voice Guard konnte für diesen Server gerade nicht freigeschaltet werden. Bitte prüfe den Capability-Status oder lade das Dashboard neu.',
             'Voice guard could not be enabled for this server right now. Please verify the capability status or reload the dashboard.'
           )}
       </p>
@@ -75,7 +75,7 @@ export default function SettingsVoiceGuard({
         >
           <option value="default">{t('Standard (globale Env)', 'Default (global env)')}</option>
           <option value="allow">{t('Erlauben', 'Allow')}</option>
-          <option value="return">{t('Zurueckspringen', 'Return')}</option>
+          <option value="return">{t('Zurückspringen', 'Return')}</option>
           <option value="disconnect">Disconnect</option>
         </select>
       </div>

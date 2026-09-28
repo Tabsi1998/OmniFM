@@ -71,7 +71,7 @@ export default function StartGuide({ bots = [] }) {
 }
 
 function Guide({ s, bots, locale }) {
-  const inviteUrl = resolvePrimaryInviteUrl(bots);
+  const inviteUrl = resolvePrimaryInviteUrl(bots, locale);
   const external = inviteUrl.startsWith('http');
   const [open, setOpen] = useState(s.help[0]?.key || '');
 

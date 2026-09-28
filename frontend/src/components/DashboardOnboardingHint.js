@@ -55,7 +55,7 @@ export default function DashboardOnboardingHint({
     }}>
       <div style={{ display: 'grid', gap: 6 }}>
         <div style={{ fontSize: 11, color: '#00e5ff', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-          {hint.eyebrow || t('Naechste Aktion', 'Next action')}
+          {hint.eyebrow || t('Nächste Aktion', 'Next action')}
         </div>
         <strong style={{ color: '#F4FDFF', fontSize: 16 }}>{hint.title}</strong>
         <p style={{ color: '#B6C8CC', fontSize: 13, lineHeight: 1.65, margin: 0 }}>

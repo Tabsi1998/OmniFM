@@ -52,17 +52,17 @@ function buildDashboardVoiceGuardSummary(rawConfig, t = (de, _en) => de) {
       ? t('Erlauben', 'Allow')
       : config.policy === 'disconnect'
         ? 'Disconnect'
-        : t('Zurueckspringen', 'Return');
+        : t('Zurückspringen', 'Return');
   const effectiveLabel = config.effectivePolicy === 'allow'
     ? t('Erlauben', 'Allow')
     : config.effectivePolicy === 'disconnect'
       ? 'Disconnect'
-      : t('Zurueckspringen', 'Return');
+      : t('Zurückspringen', 'Return');
 
   let statusLabel = t('Aktiv', 'Active');
   let statusAccent = '#10B981';
   let description = t(
-    'OmniFM schuetzt aktive Voice-Sessions vor ungewollten Verschiebungen.',
+    'OmniFM schützt aktive Voice-Sessions vor ungewollten Verschiebungen.',
     'OmniFM protects active voice sessions against unwanted moves.'
   );
 
@@ -77,7 +77,7 @@ function buildDashboardVoiceGuardSummary(rawConfig, t = (de, _en) => de) {
     statusLabel = 'Disconnect';
     statusAccent = '#EF4444';
     description = t(
-      'Bestätigte Fremdverschiebungen koennen die Session beenden.',
+      'Bestätigte Fremdverschiebungen können die Session beenden.',
       'Confirmed foreign moves can end the session.'
     );
   }

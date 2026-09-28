@@ -324,7 +324,7 @@ export default function DashboardEvents({
                     </div>
                     <div style={{ color: '#71717A', fontSize: 12, marginTop: 4 }}>
                       {t(
-                        'Fuellt Titel, Dauer, Discord-Nachricht und Beschreibung mit einer Vorlage.',
+                        'Füllt Titel, Dauer, Discord-Nachricht und Beschreibung mit einer Vorlage.',
                         'Fills title, duration, Discord message and description from a template.'
                       )}
                     </div>

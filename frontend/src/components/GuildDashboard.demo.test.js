@@ -66,6 +66,8 @@ describe('the dashboard preview', () => {
 
     await openArea('subscription');
     expect(screen.getByTestId('guild-license-details').textContent).toContain('1/2');
+    // Where the license comes from, in words and in the visitor's language (#454).
+    expect(screen.getByTestId('guild-license-source').textContent).toContain('Quelle: direkt für diesen Server');
 
     await openArea('settings');
     await screen.findByTestId('settings-panel-designer');
