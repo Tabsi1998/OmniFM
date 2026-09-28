@@ -8,6 +8,7 @@ import { archiveMongoRecords } from "../../lib/owner-archive.js";
 import {
   OwnerStationError,
   buildStationDocument,
+  upsertCatalogStation,
   runStationHealth,
   stationListResponse,
   testStationStream,
@@ -56,18 +57,10 @@ export function createAdminStationRoutes({ sendJson, methodNotAllowed, auditOwne
         sendJson(res, err.status, { error: err.message });
         return true;
       }
-      const stations = db.collection("stations");
-      const existing = await stations.findOne({ key: doc.key });
-      const now = new Date().toISOString();
-      doc.updated_at = now;
-      if (!existing) {
-        doc.created_at = now;
-        doc.is_default = false;
-      }
-      await stations.updateOne({ key: doc.key }, { $set: doc }, { upsert: true });
+      const { created, station } = await upsertCatalogStation(db, doc);
       await reloadStationsFromMongo();
-      auditOwnerAction(req, { action: existing ? "station.update" : "station.create", status: "success", target: doc.key, summary: `${doc.name} · ${doc.tier} · ${doc.url}` });
-      sendJson(res, 200, { ok: true, created: !existing, station: doc });
+      auditOwnerAction(req, { action: created ? "station.create" : "station.update", status: "success", target: doc.key, summary: `${doc.name} · ${doc.tier} · ${doc.url}` });
+      sendJson(res, 200, { ok: true, created, station });
       return true;
     }
 

@@ -22,6 +22,7 @@ import { STATION_LOGO_MAX_BYTES } from "../lib/station-logo-image.js";
 export const FORM_PREFIX = "omnifm:form:";
 export const STATION_FORM_ID = `${FORM_PREFIX}station`;
 export const EVENT_FORM_ID = `${FORM_PREFIX}event`;
+export const SUGGESTION_FORM_ID = `${FORM_PREFIX}suggest`;
 export const PROBLEM_REPORT_BUTTON_ID = `${NP_PREFIX}report`;
 export const PROBLEM_REPORT_FORM_ID = `${NP_PREFIX}reportform`;
 
@@ -142,6 +143,37 @@ export function readStationForm(fields) {
   const logo = readStationFormLogo(fields);
   if (logo?.error) return { ok: false, error: `logo-${logo.error}` };
   return { ok: true, station: { key, name, url: parsed.toString(), genre: genre === "__other__" ? "" : genre }, logo };
+}
+
+// ---- suggest a station for the catalogue (#303) ----
+
+export function buildSuggestionFormModal({ t }) {
+  return new ModalBuilder()
+    .setCustomId(SUGGESTION_FORM_ID)
+    .setTitle(t("Sender vorschlagen", "Suggest a station"))
+    .addLabelComponents(
+      label(t("Name", "Name"), t("So heißt der Sender", "What the station is called"))
+        .setTextInputComponent(text("name", { max: 60, min: 2, placeholder: t("z. B. Radio Paradise", "e.g. Radio Paradise") })),
+      label(t("Stream-URL", "Stream URL"), t("Der direkte Link zum Audio-Stream", "The direct link to the audio stream"))
+        .setTextInputComponent(text("url", { max: 500, min: 8, placeholder: "https://stream.example.com/live.mp3" })),
+      label(t("Genre (optional)", "Genre (optional)"))
+        .setTextInputComponent(text("genre", { required: false, max: 40, placeholder: t("z. B. Rock", "e.g. Rock") })),
+      label(t("Webseite (optional)", "Website (optional)"))
+        .setTextInputComponent(text("homepage", { required: false, max: 300, placeholder: "https://…" })),
+      label(t("Warum dieser Sender? (optional)", "Why this station? (optional)"))
+        .setTextInputComponent(text("note", { required: false, max: 300, style: TextInputStyle.Paragraph })),
+    );
+}
+
+/** The raw fields; src/lib/station-suggestions.js checks them. */
+export function readSuggestionForm(fields) {
+  return {
+    name: safeTextValue(fields, "name"),
+    url: safeTextValue(fields, "url"),
+    genre: safeTextValue(fields, "genre"),
+    homepage: safeTextValue(fields, "homepage"),
+    note: safeTextValue(fields, "note"),
+  };
 }
 
 // ---- plan an event ----

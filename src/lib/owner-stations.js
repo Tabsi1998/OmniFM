@@ -132,6 +132,26 @@ export async function buildStationDocument(body = {}) {
   return doc;
 }
 
+/**
+ * Stores a checked station document in the catalogue (new or changed) and
+ * returns whether it is new. The owner's station form and an accepted
+ * suggestion (#303) both go through here.
+ * @param {any} db
+ * @param {Record<string, any>} doc from buildStationDocument
+ */
+export async function upsertCatalogStation(db, doc, { now = new Date().toISOString() } = {}) {
+  const stations = db.collection("stations");
+  const existing = await stations.findOne({ key: doc.key });
+  /** @type {Record<string, any>} */
+  const stored = { ...doc, updated_at: now };
+  if (!existing) {
+    stored.created_at = now;
+    stored.is_default = false;
+  }
+  await stations.updateOne({ key: doc.key }, { $set: stored }, { upsert: true });
+  return { created: !existing, station: stored };
+}
+
 /** GET /api/admin/stations/list: the catalogue with each station's health. */
 export async function stationListResponse(db, stationHealthConfig = {}) {
   let rows = [];

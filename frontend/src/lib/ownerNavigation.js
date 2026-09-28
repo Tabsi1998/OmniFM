@@ -23,6 +23,7 @@ export const OWNER_AREAS = Object.freeze([
     label: 'Sender',
     pages: [
       { id: 'stations', label: 'Katalog', keywords: ['sender', 'stream', 'station', 'genre', 'logo', 'farbe', 'katalog'] },
+      { id: 'suggestions', label: 'Vorschläge', keywords: ['vorschlag', 'community', 'einreichen', 'warteschlange', 'neuer sender'] },
       { id: 'cfg-streams', label: 'Prüfung & Recovery', keywords: ['sender-überwachung', 'health', 'recovery', 'reconnect', 'failover', 'stabilität'] },
     ],
   },

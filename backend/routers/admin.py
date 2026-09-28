@@ -62,6 +62,22 @@ def build_router(core):
             return guard
         return {"notices": []}
 
+    @router.get("/api/admin/station-suggestions")
+    async def admin_station_suggestions(request: Request):
+        """Station suggestions (#303) live in the Node API only; this way back lists none."""
+        guard = core._admin_guard(request)
+        if guard is not None:
+            return guard
+        return {"suggestions": [], "pending": 0}
+
+    @router.post("/api/admin/station-suggestions/{suggestion_id}/{action}")
+    async def admin_station_suggestion_decide(request: Request, suggestion_id: str, action: str):
+        """Deciding a suggestion needs the Node API (#303)."""
+        guard = core._admin_guard(request)
+        if guard is not None:
+            return guard
+        return core.json_error(503, "Sender-Vorschläge laufen nur über die Node-API.")
+
     @router.post("/api/admin/status-notices")
     @router.patch("/api/admin/status-notices/{notice_id}")
     @router.delete("/api/admin/status-notices/{notice_id}")

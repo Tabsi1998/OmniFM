@@ -76,6 +76,7 @@ test("after 'delete everything' the Discord ID is in no collection", { skip: !ha
   const { saveActiveStationPoll } = await import("../src/station-polls-store.js");
   const { initScheduledEventsStore, createScheduledEvent, getScheduledEvent } = await import("../src/scheduled-events-store.js");
   const { collectPersonalData, countPersonalData, erasePersonalData } = await import("../src/lib/personal-data.js");
+  const { createStationSuggestion } = await import("../src/station-suggestions-store.js");
   await Promise.all([
     initVoteEventsStore({ refreshMs: 60_000 }),
     initDiscordBotListStore({ refreshMs: 60_000 }),
@@ -110,6 +111,9 @@ test("after 'delete everything' the Discord ID is in no collection", { skip: !ha
   });
   assert.ok(created?.ok, JSON.stringify(created));
   await db.collection("owner_audit").insertOne({ at: new Date().toISOString(), actor: `dashboard:${person}`, action: "guild.panelDesign.update", target: guildId, summary: "Panel-Design geändert" });
+  const suggestionUrl = `https://stream.example.com/suggested-${Math.random().toString(36).slice(2)}.mp3`;
+  const suggested = await createStationSuggestion({ name: "Vorschlag FM", url: suggestionUrl }, { userId: person, userName: "person", guildId });
+  assert.ok(suggested.suggestion, JSON.stringify(suggested));
   assert.ok(await eventually(async () => (await listVoteEventsOfUser(person)).length === 1
     && Boolean(await db.collection("dashboard_auth_sessions").findOne({ "session.user.id": person }))
     && Boolean(await db.collection("scheduled_events").findOne({ createdByUserId: person }))), "seeded");
@@ -117,7 +121,7 @@ test("after 'delete everything' the Discord ID is in no collection", { skip: !ha
   const collected = await collectPersonalData(person);
   assert.equal(collected.ok, true);
   assert.deepEqual(countPersonalData(collected.data), {
-    savedSongs: 1, votes: 1, dashboardLogins: 1, ownerConsoleLogins: 1, pollsStarted: 1, eventsCreated: 1, dashboardChanges: 1,
+    savedSongs: 1, votes: 1, dashboardLogins: 1, ownerConsoleLogins: 1, pollsStarted: 1, eventsCreated: 1, dashboardChanges: 1, stationSuggestions: 1,
   });
   assert.equal(collected.data.dashboardLogins[0].servers[0].name, "Mein Server");
   assert.ok(!JSON.stringify(collected.data).includes(`token-${person}`), "no login token in the file");
@@ -143,6 +147,11 @@ test("after 'delete everything' the Discord ID is in no collection", { skip: !ha
   assert.equal((await listSavedSongs(other)).length, 1);
   assert.equal((await listVoteEventsOfUser(other)).length, 1);
   assert.equal(await db.collection("owner_audit").countDocuments({ actor: "dashboard:gelöscht", target: guildId }), 1);
+  // The suggestion stays in the queue, without the person (#303).
+  const kept = await db.collection("station_suggestions").findOne({ _id: suggested.suggestion._id });
+  assert.equal(kept?.name, "Vorschlag FM");
+  assert.equal(kept?.submitter, undefined);
+  await db.collection("station_suggestions").deleteOne({ _id: suggested.suggestion._id });
 
   // A sync reading the old vote again leaves it out; a new vote counts.
   assert.equal(mergeVoteEvents([{ provider: "topgg", userId: person, username: "person", votedAt: hourAgo }]).added, 0);

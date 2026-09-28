@@ -174,6 +174,12 @@ export function buildCommandBuilders() {
     "Was OmniFM über dich speichert: ansehen, als Datei holen, löschen"
   );
 
+  const suggest = describe(
+    new SlashCommandBuilder().setName("suggest-station").setNameLocalizations(de("sender-vorschlagen")),
+    "Suggest a radio station for the OmniFM catalogue",
+    "Einen Radiosender für den OmniFM-Katalog vorschlagen"
+  );
+
   const poll = describe(
     new SlashCommandBuilder().setName("poll").setNameLocalizations(de("umfrage")),
     "Let the server vote which station plays next",
@@ -525,6 +531,7 @@ export function buildCommandBuilders() {
     history,
     saved,
     mydata,
+    suggest,
     poll,
     sleep,
     setvolume,

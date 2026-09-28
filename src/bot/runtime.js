@@ -48,6 +48,8 @@ import { commandSyncMethods } from "./runtime-methods/command-sync.js";
 import { runtimeDelegateMethods } from "./runtime-methods/delegates.js";
 import { playbackControlMethods } from "./runtime-methods/playback-control.js";
 import { liveViewMethods } from "./runtime-methods/live-view.js";
+import { suggestionMethods } from "./runtime-methods/suggestions.js";
+import { startStationSuggestionService } from "../services/station-suggestions.js";
 
 class BotRuntime {
   constructor(config, { role = "worker", workerManager = null } = {}) {
@@ -103,6 +105,8 @@ class BotRuntime {
         startDiscordShopSync(this);
         // The weekly OmniFM charts go to the owner's channel (#300).
         startChartsPostService(this);
+        // Station suggestions: hourly stream checks, answers to the senders (#303).
+        startStationSuggestionService(this);
         this.enforcePremiumGuildScope("startup").catch((err) => {
           log("ERROR", `[${this.config.name}] Premium-Guild-Scope Pruefung fehlgeschlagen: ${err?.message || err}`);
         });
@@ -574,6 +578,7 @@ Object.assign(
   pollMethods,
   botProfileMethods,
   liveViewMethods,
+  suggestionMethods,
 );
 
 export { BotRuntime };

@@ -74,6 +74,7 @@ import { reloadPremiumStore } from "../../premium-store.js";
 import { SERVER_DATA_RETENTION_DAYS, listGuildDepartures } from "../../guild-departures-store.js";
 import { createAdminLicenseRoutes } from "./admin-license-routes.js";
 import { createAdminStatusRoutes } from "./admin-status-routes.js";
+import { createAdminSuggestionRoutes } from "./admin-suggestion-routes.js";
 import { createAdminStationRoutes, loadCatalogFileStations } from "./admin-station-routes.js";
 
 export function readRequestBody(req, limitBytes = 4096) {
@@ -319,6 +320,8 @@ export function createAdminRoutesHandler(deps) {
   const handleStationRoutes = createAdminStationRoutes(routeDeps);
   // The notices of the public status page (#299).
   const handleStatusRoutes = createAdminStatusRoutes(routeDeps);
+  // The queue of station suggestions (#303).
+  const handleSuggestionRoutes = createAdminSuggestionRoutes(routeDeps);
 
   return async function handleAdminRoutes(context) {
     const { req, res, requestUrl } = context;
@@ -688,6 +691,7 @@ export function createAdminRoutesHandler(deps) {
     // Licenses, activity and archive; the station catalogue (#293).
     if (await handleLicenseRoutes(context)) return true;
     if (await handleStatusRoutes(context)) return true;
+    if (await handleSuggestionRoutes(context)) return true;
     return handleStationRoutes(context);
   };
 }
