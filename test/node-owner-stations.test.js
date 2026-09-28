@@ -63,7 +63,11 @@ test("station documents follow FastAPI's rules and keep the catalogue fields", a
   assert.deepEqual(doc, {
     key: "lounge.fm", name: "Lounge FM", url: PUBLIC_URL, tier: "pro", genre: "Radio",
     country: "AT", language: "", color: "#A1B2C3", logo: "https://cdn.example/logo.png", homepage: "",
+    seasons: [],
   });
+  // #430: the season rubric keeps only known seasons.
+  const seasonal = await stations.buildStationDocument({ key: "xmas", name: "Xmas", url: PUBLIC_URL, seasons: ["christmas", "summer", "halloween"] });
+  assert.deepEqual(seasonal.seasons, ["christmas", "halloween"]);
 
   const refused = async (body) => {
     try {

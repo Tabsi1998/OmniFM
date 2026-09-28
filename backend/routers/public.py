@@ -302,6 +302,15 @@ def build_router(core):
             ]
         }
 
+    @router.get("/api/season")
+    async def get_season(request: Request):
+        # The owner's main switch per season (#427); the website works out the date itself.
+        rate_limited = core.enforce_api_rate_limit(request, "read")
+        if rate_limited is not None:
+            return rate_limited
+        enabled = (core.get_config_section("seasons") or {}).get("enabled") or {}
+        return {"enabled": {key: enabled.get(key) is not False for key in ("easter", "halloween", "advent", "christmas", "newyear")}}
+
     @router.get("/api/marketing")
     async def get_marketing(request: Request):
         rate_limited = core.enforce_api_rate_limit(request, "read")

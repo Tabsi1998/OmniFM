@@ -7,6 +7,7 @@
 // safeFetch, which also refuses redirects into the local network.
 import { safeFetch, validateOutboundUrlWithDns } from "./safe-outbound-http.js";
 import { parseIntLike } from "./owner-licenses.js";
+import { normalizeStationSeasons } from "./station-fields.js";
 
 export const STATION_KEY = /^[a-z0-9][a-z0-9._-]{1,48}$/;
 export const VALID_STATION_TIERS = Object.freeze(["free", "pro", "ultimate"]);
@@ -129,6 +130,8 @@ export async function buildStationDocument(body = {}) {
   const doc = { key, name, url, tier, genre };
   // An emptied field is stored empty, like FastAPI.
   for (const field of ["country", "language", "color", "logo", "homepage"]) doc[field] = extra[field] || "";
+  // #430: Christmas or Easter; an emptied list is stored empty too.
+  doc.seasons = normalizeStationSeasons(body.seasons);
   return doc;
 }
 
@@ -164,7 +167,8 @@ export async function stationListResponse(db, stationHealthConfig = {}) {
       rows = stations.map((doc) => ({
         key: doc.key, name: doc.name, url: doc.url, tier: doc.tier || "free", genre: doc.genre || "Radio",
         country: doc.country || "", language: doc.language || "", color: doc.color || "", logo: doc.logo || "",
-        homepage: doc.homepage || "", isDefault: Boolean(doc.is_default), updatedAt: doc.updated_at ?? null,
+        homepage: doc.homepage || "", seasons: normalizeStationSeasons(doc.seasons),
+        isDefault: Boolean(doc.is_default), updatedAt: doc.updated_at ?? null,
         health: healthByKey.get(String(doc.key || "")) ?? null,
       }));
     } catch {

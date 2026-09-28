@@ -220,6 +220,11 @@ const nowPlayingEmbedMethods = {
       fallbackImageUrl: this.client?.user?.displayAvatarURL?.({ extension: "png", size: 256 }) || null,
       pollSeconds: Math.round(NOW_PLAYING_POLL_MS / 1000),
       design: this.getPanelDesign(guildId),
+      // #426: the server's season from its cached settings and the owner's switches.
+      season: this.getGuildSeason?.(guildId) ?? null,
+      // #428: from 1 to 24 December the door of the day.
+      adventDoor: this.getAdventDoor?.(guildId) ?? null,
+      nowMs: Date.now(),
     });
   },
 };

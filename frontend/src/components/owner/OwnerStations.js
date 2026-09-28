@@ -117,6 +117,23 @@ export default function OwnerStations({
               <input className="oa-input" style={{ marginTop: 6, fontFamily: 'DM Sans' }} value={stForm.genre} placeholder="z.B. Techno" onChange={(e) => setStForm({ ...stForm, genre: e.target.value })} data-testid="station-input-genre" />
             </div>
             <div>
+              {/* #430: in the season these stations get their own rubric at the top of the browser. */}
+              <span className="oa-stat-label">Saison-Rubrik</span>
+              <div style={{ display: 'flex', gap: 14, marginTop: 14, flexWrap: 'wrap' }}>
+                {[['halloween', '🎃 Halloween'], ['christmas', '🎄 Weihnachten'], ['easter', '🐣 Ostern']].map(([season, label]) => (
+                  <label key={season} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#e2e8f0', fontSize: 13, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      data-testid={`station-input-season-${season}`}
+                      checked={(stForm.seasons || []).includes(season)}
+                      onChange={(e) => setStForm({ ...stForm, seasons: e.target.checked ? [...new Set([...(stForm.seasons || []), season])] : (stForm.seasons || []).filter((entry) => entry !== season) })}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
               <label className="oa-stat-label">Land</label>
               <input className="oa-input" style={{ marginTop: 6 }} value={stForm.country} placeholder="z.B. DE" onChange={(e) => setStForm({ ...stForm, country: e.target.value })} data-testid="station-input-country" />
             </div>
@@ -167,6 +184,9 @@ export default function OwnerStations({
                       ? <img src={s.logo} alt="" width={22} height={22} loading="lazy" style={{ borderRadius: 5, objectFit: 'cover' }} />
                       : <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color || '#475569', display: 'inline-block' }} />}
                     {s.name}
+                    {(s.seasons || []).includes('christmas') && <span title="Weihnachts-Rubrik" data-testid={`station-season-${s.key}-christmas`}>🎄</span>}
+                    {(s.seasons || []).includes('easter') && <span title="Oster-Rubrik" data-testid={`station-season-${s.key}-easter`}>🐣</span>}
+                    {(s.seasons || []).includes('halloween') && <span title="Halloween-Rubrik" data-testid={`station-season-${s.key}-halloween`}>🎃</span>}
                   </span>
                 </td>
                 <td style={{ color: '#94a3b8' }}>{s.genre || '—'}</td>

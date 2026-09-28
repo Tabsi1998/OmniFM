@@ -4,12 +4,14 @@
 // One module for the bot and the dashboard preview (the frontend imports
 // this file), so the preview shows exactly what the bot sets.
 //
-// Placeholders: {station} {title} {artist} {listeners} {emoji} {bot}.
+// Placeholders: {station} {title} {artist} {listeners} {emoji} {bot} {season}.
+// In a season (#426) the season's emoji stands in front of the text, unless
+// the template places {season} itself.
 // A part in [square brackets] only shows when every placeholder in it has a
 // value: "{station}[ · {listeners} hören]". Empty placeholders elsewhere
 // disappear together with the separator next to them.
 
-export const VOICE_STATUS_PLACEHOLDERS = Object.freeze(["station", "title", "artist", "listeners", "emoji", "bot"]);
+export const VOICE_STATUS_PLACEHOLDERS = Object.freeze(["station", "title", "artist", "listeners", "emoji", "bot", "season"]);
 export const VOICE_STATUS_DEFAULT_TEMPLATE = "🔊 | 24/7 {station}";
 export const VOICE_STATUS_TEMPLATE_MAX_LENGTH = 120;
 export const VOICE_STATUS_TEXT_MAX_LENGTH = 100;
@@ -82,6 +84,7 @@ function valueMap(values = {}) {
     listeners: Number.isFinite(listeners) && listeners > 0 ? String(listeners) : "",
     emoji: String(values.emoji || "").trim() || emojiForGenre(values.genre),
     bot: clip(String(values.bot || "").trim(), 24),
+    season: clip(String(values.season || "").trim(), 4),
   };
 }
 
@@ -120,8 +123,10 @@ export function renderVoiceStatusTemplate(template, values = {}, {
   const map = valueMap(values);
   const fallback = normalizeVoiceStatusTemplate(fallbackTemplate) || VOICE_STATUS_DEFAULT_TEMPLATE;
   // Nothing left (a title-only template between two songs): the default instead of no status.
-  const text = renderOnce(normalizeVoiceStatusTemplate(template) || fallback, map)
+  const source = normalizeVoiceStatusTemplate(template) || fallback;
+  const text = renderOnce(source, map)
     || renderOnce(fallback, map)
     || renderOnce(VOICE_STATUS_DEFAULT_TEMPLATE, map);
-  return clip(text, Math.max(1, Math.min(VOICE_STATUS_TEXT_MAX_LENGTH, Number(maxLength) || VOICE_STATUS_TEXT_MAX_LENGTH)));
+  const seasonal = map.season && !/\{season\}/i.test(source) ? `${map.season} ${text}` : text;
+  return clip(seasonal, Math.max(1, Math.min(VOICE_STATUS_TEXT_MAX_LENGTH, Number(maxLength) || VOICE_STATUS_TEXT_MAX_LENGTH)));
 }

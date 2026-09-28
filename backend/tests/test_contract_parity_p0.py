@@ -58,6 +58,15 @@ def test_legal_privacy_and_terms_endpoints_return_200_json(api_client):
     assert "operator" in terms_data
 
 
+def test_season_switches_are_public(api_client):
+    # The owner's main switch per season for the website's decoration (#427).
+    response = api_client.get(f"{BASE_URL}/api/season", timeout=15)
+    assert response.status_code == 200
+    enabled = response.json().get("enabled")
+    assert set(enabled) == {"easter", "halloween", "advent", "christmas", "newyear"}
+    assert all(isinstance(value, bool) for value in enabled.values())
+
+
 def test_workers_include_bot_id_for_each_worker(api_client):
     response = api_client.get(f"{BASE_URL}/api/workers", timeout=15)
     assert response.status_code == 200

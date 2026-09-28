@@ -27,6 +27,7 @@ import { buildOmniEmbed, buildLinkRow } from "./discord-ui.js";
 import * as ui from "../discord/ui/index.js";
 import { normalizeFavoriteStations } from "../lib/favorite-stations.js";
 import { buildBrowserEntries, buildStationBrowserPayload } from "./station-browser.js";
+import { stationSeasonFor } from "../lib/seasons.js";
 
 const PANEL_TTL_MS = 15 * 60_000;
 const PLAY_STATION_OPTION_LIMIT = 25;
@@ -349,6 +350,9 @@ export function buildRuntimeStationsBrowserPayload(runtime, interaction, session
   const { t, language } = runtime.createInteractionTranslator(interaction);
   const guildId = String(interaction?.guildId || session?.guildId || "").trim();
   const guildTier = getTier(guildId);
+  // #430: in a season its stations get a rubric of their own, unless the server switched that off.
+  const guildSeason = runtime.getGuildSeason?.(guildId) || null;
+  const seasonTag = guildSeason?.parts?.seasonStations === false ? null : stationSeasonFor(guildSeason);
   const customStations = [];
   if (guildTier === "ultimate") {
     for (const [customKey, customStation] of Object.entries(getGuildStations(guildId))) {
@@ -367,7 +371,7 @@ export function buildRuntimeStationsBrowserPayload(runtime, interaction, session
     t,
     prefix: STATIONS_COMPONENT_PREFIX,
     session,
-    entries: buildBrowserEntries({ stations: loadStations().stations, guildTier, customStations }),
+    entries: buildBrowserEntries({ stations: loadStations().stations, guildTier, customStations, seasonTag }),
     planName: getTierConfig(guildId).name,
     premiumUrl: withLanguageParam(BRAND.upgradeUrl || WEBSITE_URL, language),
     applicationId: interaction?.applicationId || runtime.client?.application?.id || null,
@@ -375,6 +379,11 @@ export function buildRuntimeStationsBrowserPayload(runtime, interaction, session
     favorites: session?.data?.favorites || [],
     canEditFavorites: session?.data?.canEditFavorites === true,
     favoriteLimit: runtime.favoriteLimitForGuild?.(guildId) || 3,
+    seasonLabel: {
+      christmas: `🎄 ${t("Weihnachtsradio", "Christmas radio")}`,
+      easter: `🐣 ${t("Osterradio", "Easter radio")}`,
+      halloween: `🎃 ${t("Halloween-Radio", "Halloween radio")}`,
+    }[seasonTag] || "",
   });
 }
 

@@ -19,6 +19,7 @@ import { normalizeDashboardCapabilityPayload } from '../lib/dashboardCapabilitie
 import { PLAN_LIMITS, PLAN_NAMES } from '../../../src/config/plan-features.js';
 import PlanLock from './PlanLock.js';
 import GuildStreamControls from './overview/GuildStreamControls.js';
+import SeasonBadge from './season/SeasonBadge.js';
 
 const NAV = [
   { id: 'overview', icon: LayoutDashboard },
@@ -529,6 +530,7 @@ export default function GuildDashboard() {
           <div><h1 className="oa-h1 oa-display" data-testid="guild-section-title">{navLabel(section)}</h1><div className="oa-sub">{guild.name}{Number(guild.memberCount || guild.members) > 0 ? ` · ${fmtInt(guild.memberCount || guild.members)} ${t('Mitglieder', 'members')}` : ''} · <span className="oa-mono">Guild-ID {guild.id}</span></div></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>
             <button className="oa-btn ghost" onClick={() => loadGuild(guildId)} disabled={gdata.loading} title={t('Aktualisieren', 'Refresh')}><RefreshCw size={15} /></button>
+            <SeasonBadge />
             <span className="oa-pill" style={{ background: `${tm.color}22`, color: tm.color, border: `1px solid ${tm.color}55` }} data-testid="guild-active-tier"><tm.icon size={13} /> {tm.name}</span>
             <select className="oa-input" style={{ height: 40, width: 'auto', maxWidth: 'min(360px, 100%)', minWidth: 0 }} value={guildId} onChange={(event) => setGuildId(event.target.value)} data-testid="guild-switcher">{session.guilds.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.id}</option>)}</select>
           </div>

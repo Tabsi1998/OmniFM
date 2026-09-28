@@ -3,8 +3,22 @@
   "prefix": "omnifm",
   "emojis": [
     {
+      "name": "candle",
+      "file": "candle.gif",
+      "animated": true
+    },
+    {
+      "name": "candle_off",
+      "file": "candle_off.png"
+    },
+    {
       "name": "dashboard",
       "file": "dashboard.png"
+    },
+    {
+      "name": "egg",
+      "file": "egg.gif",
+      "animated": true
     },
     {
       "name": "equalizer",
@@ -14,6 +28,11 @@
     {
       "name": "error",
       "file": "error.png"
+    },
+    {
+      "name": "fireworks",
+      "file": "fireworks.gif",
+      "animated": true
     },
     {
       "name": "help",
@@ -56,6 +75,11 @@
       "file": "premium.png"
     },
     {
+      "name": "pumpkin",
+      "file": "pumpkin.gif",
+      "animated": true
+    },
+    {
       "name": "quality",
       "file": "quality.png"
     },
@@ -70,6 +94,16 @@
     {
       "name": "settings",
       "file": "settings.png"
+    },
+    {
+      "name": "snowflake",
+      "file": "snowflake.gif",
+      "animated": true
+    },
+    {
+      "name": "spider",
+      "file": "spider.gif",
+      "animated": true
     },
     {
       "name": "stop",

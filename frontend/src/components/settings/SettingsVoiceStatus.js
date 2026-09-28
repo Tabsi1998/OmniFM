@@ -57,6 +57,15 @@ export default function SettingsVoiceStatus({
           </button>
         )}
       </div>
+      {(voiceStatus.placeholders || []).includes('season') && (
+        <p data-testid="voice-status-season-hint" style={{ color: '#71717A', fontSize: 12, margin: '-6px 0 14px', lineHeight: 1.5 }}>
+          {t(
+            'In der Saison steht das Saison-Emoji vorne, außer du setzt {placeholder} selbst.',
+            'In a season the season’s emoji stands in front, unless you place {placeholder} yourself.',
+            { placeholder: '{season}' }
+          )}
+        </p>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
         <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
           <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>{t('Vorschau mit Song', 'Preview with a song')}</div>

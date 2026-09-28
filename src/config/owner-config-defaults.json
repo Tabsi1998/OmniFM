@@ -205,5 +205,18 @@
     "postEnabled": false,
     "channelId": "",
     "language": "de"
+  },
+  "seasons": {
+    "enabled": {
+      "easter": true,
+      "halloween": true,
+      "advent": true,
+      "christmas": true,
+      "newyear": true
+    },
+    "test": {
+      "preview": "",
+      "guildIds": []
+    }
   }
 }

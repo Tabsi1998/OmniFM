@@ -92,6 +92,11 @@ async function initCollections(database) {
       { key: { timestamp: 1 }, name: "ttl", expireAfterSeconds: 86400 * 30 },
     ]).catch(() => null);
 
+    // season_greetings: the New Year greeting's lock, one record per server and year (#426)
+    await database.collection("season_greetings").createIndexes([
+      { key: { sentAt: 1 }, name: "ttl", expireAfterSeconds: 86400 * 400 },
+    ]).catch(() => null);
+
     // guild_settings: per-guild settings (weekly digest, fallback station)
     if (!names.has("guild_settings")) {
       await database.createCollection("guild_settings");

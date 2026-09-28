@@ -7,6 +7,7 @@ import {
   PermissionFlagsBits,
 } from "discord.js";
 import { expandDiscordEmojiAliases } from "../lib/discord-emojis.js";
+import { stationSeasonFromWord } from "../lib/seasons.js";
 import { clipText } from "../lib/helpers.js";
 import { languagePick, translateCustomStationErrorMessage } from "../lib/language.js";
 import {
@@ -149,8 +150,31 @@ export function normalizeStationReference(runtime, rawStationKey) {
   };
 }
 
-export function resolveStationForGuild(runtime, guildId, rawStationKey, language = "de") {
+export function resolveStationForGuild(runtime, guildId, rawStationKey, language = "de", { random = Math.random } = {}) {
   const t = (de, en) => languagePick(language, de, en);
+  // #430: "/play weihnachten" picks one of the plan's Christmas stations.
+  const seasonWord = stationSeasonFromWord(rawStationKey);
+  if (seasonWord) {
+    const stations = loadStations();
+    const available = filterStationsByTier(stations.stations, getTier(guildId));
+    const keys = Object.keys(available).filter((key) => (available[key]?.seasons || []).includes(seasonWord));
+    if (!keys.length) {
+      const anyInCatalog = Object.values(stations.stations || {}).some((station) => (station?.seasons || []).includes(seasonWord));
+      const name = {
+        christmas: t("Weihnachtssender", "Christmas station"),
+        easter: t("Ostersender", "Easter station"),
+        halloween: t("Halloween-Sender", "Halloween station"),
+      }[seasonWord];
+      return {
+        ok: false,
+        message: anyInCatalog
+          ? t(`Dein Plan hat gerade keinen ${name}.`, `Your plan has no ${name} right now.`)
+          : t(`Im Katalog steht gerade kein ${name}.`, `The catalogue has no ${name} right now.`),
+      };
+    }
+    const key = keys[Math.min(keys.length - 1, Math.floor(random() * keys.length))];
+    return { ok: true, key, station: available[key], stations: buildScopedStationsData(stations, available), isCustom: false };
+  }
   const stationRef = runtime.normalizeStationReference(rawStationKey);
   if (!stationRef.key || !stationRef.lookupKey) {
     return { ok: false, message: t("Stations-Key ist ungültig.", "Station key is invalid.") };

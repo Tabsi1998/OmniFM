@@ -27,6 +27,14 @@ const FALLBACK = Object.freeze({
   warning: "⚠️",
   error: "⛔",
   link: "🔗",
+  // The seasonal decoration (#426).
+  candle: "🕯️",
+  candle_off: "⚪",
+  snowflake: "❄️",
+  fireworks: "🎆",
+  egg: "🥚",
+  pumpkin: "🎃",
+  spider: "🕷️",
 });
 
 export const ICON_NAMES = Object.freeze(Object.keys(FALLBACK));

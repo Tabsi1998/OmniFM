@@ -12,6 +12,8 @@ import {
 } from "../../lib/owner-public.js";
 import { statusResponse } from "../../services/status-page.js";
 import { weeklyChart } from "../../services/charts.js";
+import { normalizeOwnerSeasons } from "../../lib/seasons.js";
+import { ownerSettings } from "../../lib/owner-settings-cache.js";
 
 /** The API contract the owner console and start.sh expect; FastAPI's BACKEND_CONTRACT_VERSION. */
 export const BACKEND_CONTRACT_VERSION = "owner-live-v5";
@@ -203,6 +205,16 @@ export function createPublicRoutesHandler(deps) {
         return true;
       }
       sendJson(res, 200, await buildPublicLegalNotice());
+      return true;
+    }
+
+    // The owner's main switch per season (#427); the website works out the date itself.
+    if (requestUrl.pathname === "/api/season") {
+      if (req.method !== "GET") {
+        methodNotAllowed(res, ["GET"]);
+        return true;
+      }
+      sendJson(res, 200, { enabled: normalizeOwnerSeasons(ownerSettings()?.seasons).enabled });
       return true;
     }
 
