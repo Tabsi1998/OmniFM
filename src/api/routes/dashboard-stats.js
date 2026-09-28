@@ -186,8 +186,9 @@ export function createDashboardStatsRouteHandler(deps) {
       try {
         const db = getDb();
         if (db) {
-          for (const collectionName of ["daily_stats", "listening_sessions", "listener_snapshots"]) {
-            // eslint-disable-next-line no-await-in-loop -- three deletes, one after the other; each count goes into the answer
+          // The song plays and the months of the year review (#301) are statistics too.
+          for (const collectionName of ["daily_stats", "listening_sessions", "listener_snapshots", "song_plays", "year_review_months"]) {
+            // eslint-disable-next-line no-await-in-loop -- one delete after the other; each count goes into the answer
             const result = await db.collection(collectionName).deleteMany({ guildId });
             deletedCounts[collectionName] = result.deletedCount || 0;
           }
