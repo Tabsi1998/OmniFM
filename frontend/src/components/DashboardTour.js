@@ -2,9 +2,9 @@
 // with example data runs right in the page, drawn smaller and out of reach
 // for clicks, the keyboard and screen readers, and a pointer opens one area
 // after the other. Below, the steps with the plan each one needs, from the
-// plan file; a click on a step shows it. The dashboard loads when the tour
-// comes near the screen; the tour runs only while it is in view, and with
-// "less motion" not by itself. (A frame with /dashboard?demo would need the
+// plan file; a click on a step shows it. The dashboard's code loads only
+// once the tour is in view (the start page stays without it, #296); the
+// tour runs only while it is in view, and with "less motion" not by itself. (A frame with /dashboard?demo would need the
 // site to allow framing itself; it forbids that on purpose.)
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Pause, Play } from 'lucide-react';
@@ -98,20 +98,13 @@ export default function DashboardTour({ labels, stage = false }) {
       setVisible(true);
       return undefined;
     }
-    const element = holder.current;
-    const nearing = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
-        setNear(true);
-        nearing.disconnect();
-      }
-    }, { rootMargin: '400px 0px' });
-    const viewing = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { threshold: 0.25 });
-    nearing.observe(element);
-    viewing.observe(element);
-    return () => {
-      nearing.disconnect();
-      viewing.disconnect();
-    };
+    // Not sooner: jumping to the prices right below must not bring the dashboard along.
+    const viewing = new IntersectionObserver(([entry]) => {
+      setVisible(entry.isIntersecting);
+      if (entry.isIntersecting) setNear(true);
+    }, { threshold: 0.25 });
+    viewing.observe(holder.current);
+    return () => viewing.disconnect();
   }, [stage]);
 
   const size = tourScreen(width, { stage, phone });
@@ -203,7 +196,7 @@ export default function DashboardTour({ labels, stage = false }) {
             inert
             style={{ position: 'absolute', top: 0, left: size.left, width: size.width, height: size.height, overflowX: 'hidden', overflowY: 'auto', transform: size.scale === 1 ? undefined : `scale(${size.scale})`, transformOrigin: '0 0', pointerEvents: 'none' }}
           >
-            <Suspense fallback={null}>
+            <Suspense fallback={<div className="oa-root" style={{ display: 'grid', placeItems: 'center', height: '100%' }}><span className="oa-eq"><span /><span /><span /><span /><span /></span></div>}>
               <GuildDashboard />
             </Suspense>
           </div>

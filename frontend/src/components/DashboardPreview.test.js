@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { I18nProvider } from '../i18n.js';
 import { PLAN_CAPABILITIES, PLAN_NAMES } from '../../../src/config/plan-features.js';
@@ -9,6 +9,13 @@ import Navbar from './Navbar.js';
 // The start page's tour through the dashboard preview (#432).
 
 let serverAsked;
+
+// On the page the dashboard's code is its own download; here it is ready beforehand, so the
+// test does not wait on the transform of a large module while other test files run.
+beforeAll(async () => {
+  await import('./GuildDashboard.js');
+  await import('../lib/dashboardDemoApi.js');
+}, 60_000);
 
 beforeEach(() => {
   vi.spyOn(window.navigator, 'languages', 'get').mockReturnValue(['de-DE']);
