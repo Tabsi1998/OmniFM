@@ -49,6 +49,7 @@ import { commandSyncMethods } from "./runtime-methods/command-sync.js";
 import { runtimeDelegateMethods } from "./runtime-methods/delegates.js";
 import { playbackControlMethods } from "./runtime-methods/playback-control.js";
 import { liveViewMethods } from "./runtime-methods/live-view.js";
+import { yearReviewMethods } from "./runtime-methods/year-review.js";
 import { suggestionMethods } from "./runtime-methods/suggestions.js";
 import { startStationSuggestionService } from "../services/station-suggestions.js";
 
@@ -581,6 +582,7 @@ Object.assign(
   pollMethods,
   botProfileMethods,
   liveViewMethods,
+  yearReviewMethods,
   suggestionMethods,
 );
 

@@ -154,6 +154,12 @@ export const PLAN_FEATURES = Object.freeze([
     en: () => "Saved songs, polls, sleep timer and share card",
   },
   {
+    // #301: the cards for every plan; the picture and the channel post from Pro.
+    key: "yearReview",
+    de: (plan) => (planAtLeast(plan, "pro") ? "Jahresrückblick mit Bild und Beitrag im Kanal" : "Jahresrückblick zum Durchblättern"),
+    en: (plan) => (planAtLeast(plan, "pro") ? "Year in review with a picture and a channel post" : "Year in review to page through"),
+  },
+  {
     key: "voiceGuard",
     de: () => "Voice Guard: der Bot bleibt in seinem Kanal",
     en: () => "Voice guard: the bot stays in its channel",

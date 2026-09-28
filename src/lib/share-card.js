@@ -237,6 +237,28 @@ export function renderPageCard({ page, title, subtitle, color = BRAND_ORANGE, t 
   }));
 }
 
+/**
+ * The year review of a server as a picture to share (#301): the hours in
+ * big, top station, top song and the favourite hour.
+ */
+export function renderYearReviewCard({ guildName, year, hours, topStation, topSong, busiestHour, color = BRAND_ORANGE, t = (...parts) => parts[0] }) {
+  const numberFormat = new Intl.NumberFormat(t("de-DE", "en-GB"));
+  const lines = [
+    topStation ? t(`Top-Sender: ${topStation}`, `Top station: ${topStation}`) : null,
+    topSong ? t(`Top-Song: ${topSong}`, `Top song: ${topSong}`) : null,
+    Number.isInteger(busiestHour) ? t(`Am liebsten um ${busiestHour} Uhr`, `Most of all at ${busiestHour}:00`) : null,
+  ].filter(Boolean);
+  return cached(`review:${guildName}:${year}:${hours}:${topStation}:${topSong}:${busiestHour}:${t("de", "en")}`, async () => renderCard({
+    color,
+    image: null,
+    fallbackText: guildName || "O",
+    label: t(`Jahresrückblick ${year}`, `Year in review ${year}`),
+    title: t(`${numberFormat.format(hours)} Stunden Radio`, `${numberFormat.format(hours)} hours of radio`),
+    lines,
+    footer: String(guildName || t("24/7 Radio für Discord", "24/7 radio for Discord")).slice(0, 60),
+  }));
+}
+
 export function clearShareCardCacheForTests() {
   cardCache.clear();
 }
