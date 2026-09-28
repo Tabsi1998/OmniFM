@@ -69,8 +69,9 @@ const browser = await chromium.launch();
 const problems = [];
 try {
   for (const page of PAGES) {
+    // The page checks run without the service worker (#305); the app check below has it.
     // eslint-disable-next-line no-await-in-loop -- one page after the other, readable output
-    const context = await browser.newContext({ locale: "de-DE" });
+    const context = await browser.newContext({ locale: "de-DE", serviceWorkers: "block" });
     // eslint-disable-next-line no-await-in-loop
     const tab = await context.newPage();
     const errors = [];
@@ -124,6 +125,28 @@ try {
     // eslint-disable-next-line no-await-in-loop
     await context.close();
   }
+
+  // #305: Chrome's own check whether the site installs as an app, and the
+  // service worker that keeps the build files takes over.
+  const context = await browser.newContext({ locale: "de-DE" });
+  const tab = await context.newPage();
+  try {
+    await tab.goto(`${base}/`, { waitUntil: "load", timeout: 30_000 });
+    const worker = await tab.evaluate(() => Promise.race([
+      navigator.serviceWorker.ready.then((registration) => registration.active?.scriptURL || null),
+      new Promise((resolve) => { setTimeout(() => resolve(null), 15_000); }),
+    ]));
+    const cdp = await context.newCDPSession(tab);
+    const { installabilityErrors } = await cdp.send("Page.getInstallabilityErrors");
+    const errors = installabilityErrors.map((error) => error.errorId);
+    if (!worker) errors.push("kein Service-Worker aktiv");
+    if (errors.length) problems.push(`App (/): nicht installierbar: ${errors.join(", ")}`);
+    else console.log("ok  App (/): installierbar, Service-Worker aktiv");
+  } catch (error) {
+    problems.push(`App (/): ${String(error.message).split("\n")[0]}`);
+  } finally {
+    await context.close();
+  }
 } finally {
   await browser.close();
 }
@@ -132,4 +155,4 @@ if (problems.length) {
   for (const line of problems) console.log(`FEHLER  ${line}`);
   process.exit(1);
 }
-console.log(`${PAGES.length} Seiten geprüft, alle in Ordnung.`);
+console.log(`${PAGES.length} Seiten geprüft, alle in Ordnung; als App installierbar.`);
