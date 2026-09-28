@@ -168,7 +168,7 @@ test("the finder's answer is private and says the count; refusals say why", () =
   assert.match(won.content, /`\/ostereier`/);
   assert.match(eggAnswer({ t: de, result: { ok: true, count: 8 }, golden: true }).content, /goldenes Ei gefunden! Es zählt 5\. \(8 dieses Jahr\)/);
   assert.match(eggAnswer({ t: en, result: { ok: true, count: 1 } }).content, /You found an egg! \(1 this year\)/);
-  const refusals = { taken: /Zu spät/, gone: /Der Song ist schon vorbei/, song: /Für diesen Song hast du schon ein Ei/, over: /Ostereiersuche ist vorbei/, bot: /Bots suchen keine Eier/, error: /geht gerade nicht/ };
+  const refusals = { taken: /Zu spät/, mine: /Dieses Ei hast du schon gefunden/, gone: /Der Song ist schon vorbei/, song: /Für diesen Song hast du schon ein Ei/, over: /Ostereiersuche ist vorbei/, bot: /Bots suchen keine Eier/, error: /geht gerade nicht/ };
   for (const [reason, pattern] of Object.entries(refusals)) {
     assert.match(eggAnswer({ t: de, result: { ok: false, reason } }).content, pattern, reason);
   }
@@ -244,6 +244,7 @@ function click(guildId, userId, answers, { bot = false } = {}) {
     locale: "de",
     reply: record,
     deferReply: async () => {},
+    deferUpdate: async () => { answers.push({ userId, content: "(acknowledged)" }); },
     editReply: record,
   };
 }
@@ -268,14 +269,23 @@ test("ten people click one egg at once: exactly one gets it, the panel then says
   assert.ok(state.easterEgg.foundAt > 0);
   assert.deepEqual(refreshed.at(-1), { force: true }, "the panel is redrawn at once");
 
-  // Afterwards: too late; an old button: gone; a bot: no egg.
+  // Afterwards: the finder has it, others are too late; an old button: gone; a bot: no egg.
   const late = [];
-  await runtime.handleEasterEggClick(click(guildId, people[0], late), egg.id);
-  await runtime.handleEasterEggClick(click(guildId, people[0], late), "oldeggoldegg");
-  await runtime.handleEasterEggClick(click(guildId, people[0], late, { bot: true }), egg.id);
-  assert.match(late[0].content, /Zu spät/);
-  assert.match(late[1].content, /Der Song ist schon vorbei/);
-  assert.match(late[2].content, /Bots suchen keine Eier/);
+  const loser = people.find((userId) => userId !== winners[0].userId);
+  await runtime.handleEasterEggClick(click(guildId, winners[0].userId, late), egg.id);
+  await runtime.handleEasterEggClick(click(guildId, loser, late), egg.id);
+  await runtime.handleEasterEggClick(click(guildId, loser, late), "oldeggoldegg");
+  await runtime.handleEasterEggClick(click(guildId, loser, late, { bot: true }), egg.id);
+  assert.match(late[0].content, /Dieses Ei hast du schon gefunden/);
+  assert.match(late[1].content, /Zu spät/);
+  assert.match(late[2].content, /Der Song ist schon vorbei/);
+  assert.match(late[3].content, /Bots suchen keine Eier/);
+
+  // A double click on the next egg: one answer, the second click is only acknowledged.
+  const next = runtime.rollEasterEgg(guildId, state, "Artist - Next", { now, random: (max) => (max === 4 ? 1 : 0) });
+  const twice = [];
+  await Promise.all([0, 1].map(() => runtime.handleEasterEggClick(click(guildId, loser, twice), next.id)));
+  assert.deepEqual(twice.map((answer) => answer.content.split("\n")[0]).sort(), ["(acknowledged)", "🥚 Du hast ein Ei gefunden! (1 dieses Jahr)"]);
 
   // /ostereier: the winner is first.
   const boards = [];

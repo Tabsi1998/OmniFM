@@ -47,6 +47,7 @@ export function eggAnswer({ t, result, golden = false, appId = null }) {
   } else {
     content = {
       taken: t("Zu spät: Dieses Ei hat schon jemand gefunden.", "Too late: somebody found this egg already."),
+      mine: t("Dieses Ei hast du schon gefunden.", "You found this egg already."),
       gone: t("Dieses Ei ist weg: Der Song ist schon vorbei.", "This egg is gone: the song is over."),
       song: t("Für diesen Song hast du schon ein Ei. Das nächste gibt es bei einem anderen Song.", "You have an egg for this song already. The next one comes with another song."),
       over: t("Die Ostereiersuche ist vorbei.", "The Easter egg hunt is over."),

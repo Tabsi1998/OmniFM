@@ -37,7 +37,7 @@ export const easterEggMethods = {
   rollEasterEgg(guildId, state, title, { now = Date.now(), random = undefined } = {}) {
     const hunt = eggStoreAvailable() ? this.getEggHunt(guildId, { now: new Date(now) }) : null;
     const egg = hunt ? rollEgg({ test: hunt.test, random }) : null;
-    state.easterEgg = egg ? { ...egg, year: hunt.year, song: songKey(title), shownAt: now, foundAt: 0 } : null;
+    state.easterEgg = egg ? { ...egg, year: hunt.year, song: songKey(title), shownAt: now, foundAt: 0, finder: "" } : null;
     return state.easterEgg;
   },
 
@@ -48,35 +48,48 @@ export const easterEggMethods = {
     const guildId = interaction.guildId;
     const state = this.guildState.get(guildId);
     const egg = state?.easterEgg;
+    const userId = String(interaction.user?.id || "");
     let refused = null;
     if (interaction.user?.bot) refused = "bot";
     else if (!egg || egg.id !== eggId) refused = "gone";
-    else if (egg.foundAt) refused = "taken";
+    else if (egg.foundAt) refused = egg.finder === userId ? "mine" : "taken";
     else if (!this.getEggHunt(guildId)) refused = "over";
     if (refused) {
       await interaction.reply(eggAnswer({ t, result: { ok: false, reason: refused }, appId }));
       return true;
     }
-
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    const result = await claimEgg({
-      eggId: egg.id,
-      guildId,
-      guildName: interaction.guild?.name || "",
-      userId: interaction.user.id,
-      year: egg.year,
-      points: eggPoints(egg),
-      song: egg.song,
-    }).catch((err) => {
-      log("WARN", `[${this.config?.name}] Osterei nicht vergeben guild=${guildId}: ${err?.message || err}`);
-      return { ok: false, reason: "error" };
-    });
-    if (result.ok || result.reason === "taken") {
-      egg.foundAt = Date.now();
-      // The panel says "Found" at once, not only at its next round.
-      this.updateNowPlayingEmbed?.(guildId, state, { force: true })?.catch?.(() => null);
+    // A double click: the first one counts, the second is acknowledged without a message.
+    egg.clicking ||= new Set();
+    if (egg.clicking.has(userId)) {
+      await interaction.deferUpdate?.();
+      return true;
     }
-    await interaction.editReply(asEdit(eggAnswer({ t, result, golden: egg.golden, appId })));
+    egg.clicking.add(userId);
+
+    try {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      const result = await claimEgg({
+        eggId: egg.id,
+        guildId,
+        guildName: interaction.guild?.name || "",
+        userId,
+        year: egg.year,
+        points: eggPoints(egg),
+        song: egg.song,
+      }).catch((err) => {
+        log("WARN", `[${this.config?.name}] Osterei nicht vergeben guild=${guildId}: ${err?.message || err}`);
+        return { ok: false, reason: "error" };
+      });
+      if (result.ok) egg.finder = userId;
+      if (result.ok || result.reason === "taken") {
+        egg.foundAt ||= Date.now();
+        // The panel says "Found" at once, not only at its next round.
+        this.updateNowPlayingEmbed?.(guildId, state, { force: true })?.catch?.(() => null);
+      }
+      await interaction.editReply(asEdit(eggAnswer({ t, result, golden: egg.golden, appId })));
+    } finally {
+      egg.clicking.delete(userId);
+    }
     return true;
   },
 
