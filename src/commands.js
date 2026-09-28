@@ -1,5 +1,6 @@
 import { ChannelType, SlashCommandBuilder } from "discord.js";
 import { getPermissionCommandChoices } from "./config/command-permissions.js";
+import { commandLocalizations } from "./config/command-translations.js";
 
 const DE = "de";
 
@@ -7,17 +8,21 @@ function de(value) {
   return { [DE]: value };
 }
 
+// German next to the English here, the other languages from
+// src/config/command-translations/ (#306).
+const localized = commandLocalizations;
+
 function describe(target, english, german) {
   return target
     .setDescription(english)
-    .setDescriptionLocalizations(de(german));
+    .setDescriptionLocalizations(localized(english, german));
 }
 
 function choice(name, value, germanName = name) {
   return {
     name,
     value,
-    name_localizations: de(germanName),
+    name_localizations: localized(name, germanName),
   };
 }
 
@@ -26,7 +31,7 @@ function withStringOption(target, name, english, german, { required = false, aut
     option
       .setName(name)
       .setDescription(english)
-      .setDescriptionLocalizations(de(german))
+      .setDescriptionLocalizations(localized(english, german))
       .setRequired(required);
     if (autocomplete) option.setAutocomplete(true);
     return option;
@@ -37,7 +42,7 @@ function withIntegerOption(target, name, english, german, { required = false } =
   return target.addIntegerOption((option) => option
     .setName(name)
     .setDescription(english)
-    .setDescriptionLocalizations(de(german))
+    .setDescriptionLocalizations(localized(english, german))
     .setRequired(required));
 }
 
@@ -45,7 +50,7 @@ function withBooleanOption(target, name, english, german, { required = false } =
   return target.addBooleanOption((option) => option
     .setName(name)
     .setDescription(english)
-    .setDescriptionLocalizations(de(german))
+    .setDescriptionLocalizations(localized(english, german))
     .setRequired(required));
 }
 
@@ -53,7 +58,7 @@ function withRoleOption(target, name, english, german, { required = false } = {}
   return target.addRoleOption((option) => option
     .setName(name)
     .setDescription(english)
-    .setDescriptionLocalizations(de(german))
+    .setDescriptionLocalizations(localized(english, german))
     .setRequired(required));
 }
 
@@ -61,7 +66,7 @@ function withChannelOption(target, name, english, german, channelTypes, { requir
   return target.addChannelOption((option) => option
     .setName(name)
     .setDescription(english)
-    .setDescriptionLocalizations(de(german))
+    .setDescriptionLocalizations(localized(english, german))
     .addChannelTypes(...channelTypes)
     .setRequired(required));
 }
@@ -198,7 +203,7 @@ export function buildCommandBuilders() {
     .setName("count")
     .setNameLocalizations(de("anzahl"))
     .setDescription("How many stations from the genre (2-10)")
-    .setDescriptionLocalizations(de("Wie viele Sender aus dem Genre (2-10)"))
+    .setDescriptionLocalizations(localized("How many stations from the genre (2-10)", "Wie viele Sender aus dem Genre (2-10)"))
     .setMinValue(2)
     .setMaxValue(10)
     .setRequired(false));
@@ -206,7 +211,7 @@ export function buildCommandBuilders() {
     .setName("duration")
     .setNameLocalizations(de("dauer"))
     .setDescription("How long the vote runs")
-    .setDescriptionLocalizations(de("Wie lange abgestimmt wird"))
+    .setDescriptionLocalizations(localized("How long the vote runs", "Wie lange abgestimmt wird"))
     .setRequired(false)
     .addChoices(
       choice("5 min", "5"),
@@ -228,7 +233,7 @@ export function buildCommandBuilders() {
     .setName("duration")
     .setNameLocalizations(de("dauer"))
     .setDescription("When OmniFM turns off")
-    .setDescriptionLocalizations(de("Wann OmniFM ausschaltet"))
+    .setDescriptionLocalizations(localized("When OmniFM turns off", "Wann OmniFM ausschaltet"))
     .setRequired(true)
     .addChoices(
       choice("15 min", "15"),
@@ -293,7 +298,7 @@ export function buildCommandBuilders() {
       .addStringOption((option) => option
         .setName("value")
         .setDescription("Language")
-        .setDescriptionLocalizations(de("Sprache"))
+        .setDescriptionLocalizations(localized("Language", "Sprache"))
         .setRequired(true)
         .addChoices(
           choice("German", "de", "Deutsch"),
@@ -326,8 +331,8 @@ export function buildCommandBuilders() {
 
   const event = describe(
     new SlashCommandBuilder().setName("event"),
-    "[Pro] Schedule automatic radio events",
-    "[Pro] Event-Scheduler für automatische Starts"
+    "Schedule automatic radio events",
+    "Automatische Radio-Events planen"
   )
     .addSubcommand((sub) => describe(
       sub.setName("form").setNameLocalizations(de("formular")),
@@ -349,7 +354,7 @@ export function buildCommandBuilders() {
       sub.addStringOption((option) => option
         .setName("repeat")
         .setDescription("Repeat mode")
-        .setDescriptionLocalizations(de("Wiederholung"))
+        .setDescriptionLocalizations(localized("Repeat mode", "Wiederholung"))
         .setRequired(false)
         .addChoices(...repeatChoices));
       withChannelOption(sub, "text", "Optional text channel for the announcement", "Optionaler Text-Channel für die Ankündigung", [ChannelType.GuildText, ChannelType.GuildAnnouncement]);
@@ -375,7 +380,7 @@ export function buildCommandBuilders() {
       sub.addStringOption((option) => option
         .setName("repeat")
         .setDescription("New repeat mode")
-        .setDescriptionLocalizations(de("Neue Wiederholung"))
+        .setDescriptionLocalizations(localized("New repeat mode", "Neue Wiederholung"))
         .setRequired(false)
         .addChoices(...repeatChoices));
       withChannelOption(sub, "text", "New text channel for the announcement", "Neuer Text-Channel für die Ankündigung", [ChannelType.GuildText, ChannelType.GuildAnnouncement]);
@@ -417,7 +422,7 @@ export function buildCommandBuilders() {
       sub.addStringOption((option) => option
         .setName("command")
         .setDescription("Command without /")
-        .setDescriptionLocalizations(de("Command ohne /"))
+        .setDescriptionLocalizations(localized("Command without /", "Command ohne /"))
         .setRequired(true)
         .addChoices(...permissionChoices));
       withRoleOption(sub, "role", "Role that may use the command", "Rolle, die den Command nutzen darf", { required: true });
@@ -428,7 +433,7 @@ export function buildCommandBuilders() {
       sub.addStringOption((option) => option
         .setName("command")
         .setDescription("Command without /")
-        .setDescriptionLocalizations(de("Command ohne /"))
+        .setDescriptionLocalizations(localized("Command without /", "Command ohne /"))
         .setRequired(true)
         .addChoices(...permissionChoices));
       withRoleOption(sub, "role", "Role that should be blocked", "Rolle, die gesperrt werden soll", { required: true });
@@ -439,7 +444,7 @@ export function buildCommandBuilders() {
       sub.addStringOption((option) => option
         .setName("command")
         .setDescription("Command without /")
-        .setDescriptionLocalizations(de("Command ohne /"))
+        .setDescriptionLocalizations(localized("Command without /", "Command ohne /"))
         .setRequired(true)
         .addChoices(...permissionChoices));
       withRoleOption(sub, "role", "Role whose rule should be removed", "Rolle, deren Regel entfernt werden soll", { required: true });
@@ -450,7 +455,7 @@ export function buildCommandBuilders() {
       sub.addStringOption((option) => option
         .setName("command")
         .setDescription("Optional: show only one command")
-        .setDescriptionLocalizations(de("Optional: nur einen Command anzeigen"))
+        .setDescriptionLocalizations(localized("Optional: show only one command", "Optional: nur einen Command anzeigen"))
         .setRequired(false)
         .addChoices(...permissionChoices));
       return sub;
@@ -460,7 +465,7 @@ export function buildCommandBuilders() {
       sub.addStringOption((option) => option
         .setName("command")
         .setDescription("Optional: reset only this command")
-        .setDescriptionLocalizations(de("Optional: nur diesen Command zurücksetzen"))
+        .setDescriptionLocalizations(localized("Optional: reset only this command", "Optional: nur diesen Command zurücksetzen"))
         .setRequired(false)
         .addChoices(...permissionChoices));
       return sub;
@@ -481,7 +486,7 @@ export function buildCommandBuilders() {
   workers.addStringOption((option) => option
     .setName("view")
     .setDescription("Where to show the worker status")
-    .setDescriptionLocalizations(de("Wo der Worker-Status angezeigt werden soll"))
+    .setDescriptionLocalizations(localized("Where to show the worker status", "Wo der Worker-Status angezeigt werden soll"))
     .setRequired(false)
     .addChoices(
       choice("Private (ephemeral)", "private", "Privat (ephemeral)"),
@@ -503,7 +508,7 @@ export function buildCommandBuilders() {
       sub.addStringOption((option) => option
         .setName("value")
         .setDescription("Policy")
-        .setDescriptionLocalizations(de("Policy"))
+        .setDescriptionLocalizations(localized("Policy", "Policy"))
         .setRequired(true)
         .addChoices(
           choice("Default", "default", "Standard"),
