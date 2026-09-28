@@ -115,11 +115,6 @@ export function I18nProvider({ children }) {
     return new Intl.DateTimeFormat(intlLocale, options).format(date);
   }, [intlLocale]);
 
-  const translateCommandDescription = useCallback((commandName, fallbackText) => {
-    const normalizedName = String(commandName || '').replace(/^\//, '').trim().toLowerCase();
-    return copy?.commands?.descriptionMap?.[normalizedName] || fallbackText;
-  }, [copy]);
-
   useEffect(() => {
     if (typeof document === 'undefined') return;
     applySeoMetadata({ locale, url: window.location.href });
@@ -134,7 +129,6 @@ export function I18nProvider({ children }) {
     formatNumber,
     formatDecimal,
     formatDate,
-    translateCommandDescription,
   }), [
     copy,
     formatDate,
@@ -143,7 +137,6 @@ export function I18nProvider({ children }) {
     locale,
     setLocale,
     toggleLocale,
-    translateCommandDescription,
   ]);
 
   return (
