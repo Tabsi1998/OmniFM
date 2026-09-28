@@ -13,6 +13,7 @@ import {
 import { log } from "../../lib/logging.js";
 import { SAVED_SONGS_PREFIX } from "../saved-songs.js";
 import { PERSONAL_DATA_PREFIX } from "../personal-data-panel.js";
+import { YEAR_REVIEW_PREFIX } from "../year-review-panel.js";
 import { clipText } from "../../lib/helpers.js";
 import { getTier } from "../../core/entitlements.js";
 import { BRAND } from "../../config/plans.js";
@@ -623,6 +624,9 @@ const menuMethods = {
       }
       if (customId.startsWith(PERSONAL_DATA_PREFIX)) {
         return this.handlePersonalDataComponent(interaction);
+      }
+      if (customId.startsWith(YEAR_REVIEW_PREFIX)) {
+        return this.handleYearReviewComponent(interaction);
       }
       return false;
     } catch (err) {

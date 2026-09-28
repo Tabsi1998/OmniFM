@@ -176,6 +176,8 @@ const PRE_PERMISSION_COMMANDS = {
   // The person's own list (#272): no role rule and no plan in the way.
   saved: ({ runtime, interaction }) => runtime.handleSavedSongsCommand(interaction),
   mydata: ({ runtime, interaction }) => runtime.handlePersonalDataCommand(interaction),
+  // The server's year (#301): a personal view; the post in the channel checks for managers itself.
+  "year-review": ({ runtime, interaction }) => runtime.handleYearReviewCommand(interaction),
   // A suggestion for OmniFM's catalogue (#303), not a change of the server.
   "suggest-station": ({ runtime, interaction }) => runtime.openSuggestionForm(interaction),
   help: INFO_COMMANDS.help,
@@ -247,7 +249,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
 
   const { t, language } = runtime.createInteractionTranslator(interaction);
   // A person's own data is always theirs to see and delete (#272, #285).
-  const unrestrictedCommands = new Set(["help", "setup", "premium", "license", "language", "saved", "mydata", "suggest-station"]);
+  const unrestrictedCommands = new Set(["help", "setup", "premium", "license", "language", "saved", "mydata", "suggest-station", "year-review"]);
   if (!unrestrictedCommands.has(interaction.commandName)) {
     const access = runtime.getGuildAccess(interaction.guildId);
     if (!access.allowed) {

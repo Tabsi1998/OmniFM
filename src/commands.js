@@ -168,6 +168,13 @@ export function buildCommandBuilders() {
     "Deine gemerkten Songs: ansehen und löschen"
   );
 
+  // #301: the server's year as cards to page through.
+  const yearReview = describe(
+    new SlashCommandBuilder().setName("year-review").setNameLocalizations(de("jahresrueckblick")),
+    "Your server's year on OmniFM: hours, stations, songs",
+    "Euer Jahr auf OmniFM: Stunden, Sender, Songs"
+  );
+
   const mydata = describe(
     new SlashCommandBuilder().setName("mydata").setNameLocalizations(de("meine-daten")),
     "What OmniFM keeps about you: see it, get it as a file, delete it",
@@ -531,6 +538,7 @@ export function buildCommandBuilders() {
     history,
     saved,
     mydata,
+    yearReview,
     suggest,
     poll,
     sleep,

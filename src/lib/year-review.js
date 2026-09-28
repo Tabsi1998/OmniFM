@@ -226,6 +226,8 @@ export function buildYearReview(months, { year, dailyByMonth = null, top = 5 }) 
       .map(([genre, ms]) => ({ genre, share: genreTotal ? Math.round((ms / genreTotal) * 100) : 0 })),
     topSongs: [...songs.values()].sort((a, b) => b.plays - a.plays || String(a.title).localeCompare(String(b.title))).slice(0, top),
     busiestHour: hours[busiest] > 0 ? busiest : null,
+    // Listening time per German hour of the day, in hours (#301 part 2).
+    hoursOfDay: hours.map((ms) => Math.round((ms / HOUR_MS) * 10) / 10),
     longest: longest ? { hours: Math.round((longest.ms / HOUR_MS) * 10) / 10, stationName: longest.stationName, startedAt: longest.startedAt } : null,
     stationsFrom: mine.find((month) => (month.stations || []).length)?.month || null,
     songsFrom: mine.find((month) => (month.songs || []).length)?.songsFrom || null,
