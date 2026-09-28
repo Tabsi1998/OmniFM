@@ -209,6 +209,13 @@ export function buildCommandBuilders() {
     "Dem OmniFM-Team sagen, was du denkst"
   );
 
+  // #429: the Easter egg hunt's board.
+  const eggs = describe(
+    new SlashCommandBuilder().setName("eggs").setNameLocalizations(de("ostereier")),
+    "The server's Easter egg hunt leaderboard",
+    "Die Bestenliste der Ostereiersuche auf diesem Server"
+  );
+
   const poll = describe(
     new SlashCommandBuilder().setName("poll").setNameLocalizations(de("umfrage")),
     "Let the server vote which station plays next",
@@ -565,6 +572,7 @@ export function buildCommandBuilders() {
     report,
     idea,
     feedback,
+    eggs,
     poll,
     sleep,
     setvolume,

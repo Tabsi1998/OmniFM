@@ -15,6 +15,7 @@ import { normalizePanelDesign } from "../../lib/panel-design.js";
 import { FAVORITES_MAX } from "../../lib/favorite-stations.js";
 import { seasonPanelLook } from "../season-look.js";
 import { ADVENT_BUTTON_ID } from "../advent-calendar.js";
+import { eggButton } from "../easter-eggs.js";
 
 function clip(value, max) {
   const textValue = String(value ?? "").trim();
@@ -65,6 +66,7 @@ function linkButton(url, label, emoji, appId) {
  * @param {object|null} [input.season] the server's season (#426), see season-look.js
  * @param {number} [input.nowMs] now, for the New Year countdown
  * @param {number|null} [input.adventDoor] today's door of the Advent calendar (#428)
+ * @param {object|null} [input.easterEgg] the song's egg in the Easter egg hunt (#429): { id, golden, foundAt }
  */
 export function buildNowPlayingPanel(input) {
   const { t, applicationId: appId = null, station = {}, track = {}, playback = {}, notices = {} } = input;
@@ -167,6 +169,9 @@ export function buildNowPlayingPanel(input) {
         .setLabel(t(`Türchen ${input.adventDoor}`, `Door ${input.adventDoor}`)).setEmoji({ name: "🎁" }),
     ));
   }
+  // #429: an egg for whoever clicks first, then "Found".
+  const egg = eggButton(input.easterEgg, { t, appId });
+  if (egg) rows.push(new ActionRowBuilder().addComponents(egg));
   if (failover.active && failover.desiredName) {
     rows.push(new ActionRowBuilder().addComponents(
       button(`${NP_PREFIX}failback`, {

@@ -51,6 +51,8 @@
  * @property {number} [restoreBlockedAt]      epoch ms
  * @property {number} [restoreBlockCount]
  * @property {string | null} [restoreBlockReason]
+ * @property {{ id: string, golden: boolean, year: number, song: string, shownAt: number, foundAt: number, finder: string } | null} [easterEgg]
+ *   the song's egg in the Easter egg hunt (#429); lives in memory only
  */
 
 export {};

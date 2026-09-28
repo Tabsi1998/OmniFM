@@ -10,6 +10,7 @@
 //   running polls the person started      -> the poll runs on, the person is forgotten
 //   events the person created             -> the event stays with the server, the person is forgotten
 //   dashboard changes in the audit log    -> the entry stays, the person is replaced by "gelöscht"
+//   Easter eggs found (#429)              -> deleted
 // Not part of it: premium purchases and invoices (kept by law for tax), the
 // server settings (they belong to the server) and what the owner team did
 // in the owner console (their audit trail).
@@ -25,6 +26,7 @@ import { forgetStationPollCreator, listStationPollsOfCreator } from "../station-
 import { listScheduledEvents, patchScheduledEvent } from "../scheduled-events-store.js";
 import { forgetStationSuggestionSubmitter, listStationSuggestionsOfUser } from "../station-suggestions-store.js";
 import { forgetReporter, listReportsOfReporter } from "../problem-reports-store.js";
+import { forgetEggFinder, listEggsOfFinder } from "../easter-eggs-store.js";
 
 export const ERASED_ACTOR = "dashboard:gelöscht";
 // Another process may hold the vote list or a login in its cache for a few seconds.
@@ -55,7 +57,7 @@ export async function collectPersonalData(userId, { now = new Date() } = {}) {
   const id = cleanUserId(userId);
   if (!id) return { ok: false, error: "invalid_user" };
   if (!personalDataAvailable()) return { ok: false, error: "db_unavailable" };
-  const [savedSongs, votes, logins, ownerLogins, polls, changes, suggestions, reports] = await Promise.all([
+  const [savedSongs, votes, logins, ownerLogins, polls, changes, suggestions, reports, easterEggs] = await Promise.all([
     listSavedSongs(id),
     listVoteEventsOfUser(id),
     listDashboardSessionsOfUser(id),
@@ -64,6 +66,7 @@ export async function collectPersonalData(userId, { now = new Date() } = {}) {
     dashboardChangesOf(id),
     listStationSuggestionsOfUser(id),
     listReportsOfReporter(id),
+    listEggsOfFinder(id),
   ]);
   return {
     ok: true,
@@ -108,6 +111,15 @@ export async function collectPersonalData(userId, { now = new Date() } = {}) {
         public: report.consent?.public === true,
         createdAt: report.createdAt instanceof Date ? report.createdAt.toISOString() : report.createdAt,
       })),
+      // The Easter egg hunt (#429): per server and year, gone 30 days after Easter Monday.
+      easterEggs: easterEggs.map((entry) => ({
+        serverId: entry.guildId,
+        serverName: entry.guildName || null,
+        year: entry.year,
+        eggs: entry.count,
+        lastFoundAt: entry.lastFoundAt instanceof Date ? entry.lastFoundAt.toISOString() : entry.lastFoundAt || null,
+        lastSongKey: entry.lastSong || null,
+      })),
       notIncluded: [
         "Premium-Käufe und Rechnungen: Die müssen wir aus steuerlichen Gründen aufbewahren.",
         "Server-Einstellungen, eigene Sender und Events gehören dem Server, nicht einer Person.",
@@ -128,6 +140,7 @@ export function countPersonalData(data = {}) {
     dashboardChanges: data.dashboardChanges?.length || 0,
     stationSuggestions: data.stationSuggestions?.length || 0,
     reports: data.reports?.length || 0,
+    easterEggs: data.easterEggs?.length || 0,
   };
 }
 
@@ -152,6 +165,7 @@ async function eraseOnce(id) {
     stationSuggestions: await forgetStationSuggestionSubmitter(id),
     // The reports stay with the team, without the person and without the message.
     reports: await forgetReporter(id),
+    easterEggs: await forgetEggFinder(id),
   };
 }
 

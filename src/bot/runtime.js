@@ -52,6 +52,7 @@ import { liveViewMethods } from "./runtime-methods/live-view.js";
 import { yearReviewMethods } from "./runtime-methods/year-review.js";
 import { suggestionMethods } from "./runtime-methods/suggestions.js";
 import { reportMethods } from "./runtime-methods/reports.js";
+import { easterEggMethods } from "./runtime-methods/easter-eggs.js";
 import { startStationSuggestionService } from "../services/station-suggestions.js";
 import { startProblemReportService } from "../services/problem-reports.js";
 
@@ -589,6 +590,7 @@ Object.assign(
   yearReviewMethods,
   suggestionMethods,
   reportMethods,
+  easterEggMethods,
 );
 
 export { BotRuntime };
