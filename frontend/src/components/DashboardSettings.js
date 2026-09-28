@@ -38,6 +38,8 @@ import SettingsFavorites from './settings/SettingsFavorites.js';
 import SettingsExports from './settings/SettingsExports.js';
 import SettingsIncidentAlerts from './settings/SettingsIncidentAlerts.js';
 import SettingsLanguage from './settings/SettingsLanguage.js';
+import SettingsTimeZone from './settings/SettingsTimeZone.js';
+import SettingsSeasons from './settings/SettingsSeasons.js';
 import SettingsVoiceGuard from './settings/SettingsVoiceGuard.js';
 
 export default function DashboardSettings({
@@ -168,6 +170,9 @@ export default function DashboardSettings({
       // The channel status is Pro (#413); Free saves language, voice guard and favourites.
       if (capabilities.dashboardAccess === true && settings?.voiceStatus) body.voiceStatus = { template: settings.voiceStatus.template || '' };
       if (settings?.serverLanguage?.current) body.serverLanguage = settings.serverLanguage.current;
+      // Every plan: the time zone and the seasonal decoration (#425).
+      if (settings?.serverTimeZone?.current) body.serverTimeZone = settings.serverTimeZone.current;
+      if (settings?.seasonDecor) body.seasonDecor = { seasons: settings.seasonDecor.seasons || {}, parts: settings.seasonDecor.parts || {} };
       if (settings?.favorites) body.favorites = { stations: settings.favorites.stations || [] };
       const result = await apiRequest(`/api/dashboard/settings?serverId=${encodeURIComponent(selectedGuildId)}`, {
         method: 'PUT',
@@ -222,6 +227,14 @@ export default function DashboardSettings({
   const setServerLanguage = (value) => setSettings((current) => ({
     ...(current || {}),
     serverLanguage: { ...(current?.serverLanguage || {}), current: value },
+  }));
+  const setServerTimeZone = (value) => setSettings((current) => ({
+    ...(current || {}),
+    serverTimeZone: { ...(current?.serverTimeZone || {}), current: value },
+  }));
+  const setSeasonDecor = (value) => setSettings((current) => ({
+    ...(current || {}),
+    seasonDecor: { ...(current?.seasonDecor || {}), ...value },
   }));
   const configuredFailoverChain = getConfiguredFailoverChain(settings);
   const digestSummary = buildWeeklyDigestSummary(settings, t, formatDate);
@@ -475,6 +488,20 @@ export default function DashboardSettings({
 
       {settings?.serverLanguage && (
     <SettingsLanguage serverLanguage={settings.serverLanguage} setServerLanguage={setServerLanguage} t={t} />
+      )}
+
+      {settings?.serverTimeZone && (
+    <SettingsTimeZone serverTimeZone={settings.serverTimeZone} setServerTimeZone={setServerTimeZone} t={t} />
+      )}
+
+      {settings?.seasonDecor && (
+    <SettingsSeasons
+      formatDate={formatDate}
+      seasonDecor={settings.seasonDecor}
+      setSeasonDecor={setSeasonDecor}
+      t={t}
+      timeZone={settings.serverTimeZone?.current}
+    />
       )}
 
     <SettingsWeeklyDigest

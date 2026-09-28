@@ -41,6 +41,7 @@ export default defineConfig({
       allow: [
         searchForWorkspaceRoot(process.cwd()),
         fileURLToPath(new URL('../src/lib/voice-status-template.js', import.meta.url)),
+        fileURLToPath(new URL('../src/lib/seasons.js', import.meta.url)), // the season calendar (#425)
         fileURLToPath(new URL('../src/config/plan-features.js', import.meta.url)),
         fileURLToPath(new URL('../src/config/plan-feature-texts.js', import.meta.url)),
         fileURLToPath(new URL('../src/config/legal-requirements.js', import.meta.url)),

@@ -220,6 +220,8 @@ export function ownerConfigResponse(raw, env = process.env) {
     discordShop: configSectionFrom(raw, "discordShop"),
     // The weekly OmniFM charts post (#300): switch, channel, language.
     charts: configSectionFrom(raw, "charts"),
+    // The seasonal decoration (#425): a main switch per season and the test mode.
+    seasons: configSectionFrom(raw, "seasons"),
     recoverySettings: RECOVERY_SETTINGS,
   };
 }

@@ -16,6 +16,14 @@ import {
   favoriteLimitForTier,
   normalizeFavoriteStations,
 } from "../../lib/favorite-stations.js";
+import {
+  DEFAULT_SEASON_TIME_ZONE,
+  isValidTimeZone,
+  normalizeOwnerSeasons,
+  normalizeSeasonSettings,
+  seasonForServer,
+} from "../../lib/seasons.js";
+import { ownerSettings } from "../../lib/owner-settings-cache.js";
 
 // The favourite bar (#276): the stored stations and how many the plan shows.
 export function buildDashboardFavoritesResponse(settings = {}, tier = "free") {
@@ -43,6 +51,28 @@ export function buildDashboardVoiceStatusResponse(settings = {}) {
     defaultTemplate: VOICE_CHANNEL_STATUS_TEMPLATE,
     placeholders: [...VOICE_STATUS_PLACEHOLDERS],
     maxLength: VOICE_STATUS_TEMPLATE_MAX_LENGTH,
+  };
+}
+
+// The server's time zone (#425): the seasons and their midnight follow it.
+export function buildDashboardTimeZoneResponse(settings = {}) {
+  const stored = typeof settings.timeZone === "string" ? settings.timeZone.trim() : "";
+  return { current: isValidTimeZone(stored) ? stored : DEFAULT_SEASON_TIME_ZONE, default: DEFAULT_SEASON_TIME_ZONE };
+}
+
+// The seasonal decoration (#425), every plan: the server's switches, what the
+// owner switched off for everybody, and what the server shows right now.
+export function buildDashboardSeasonDecorResponse(guildId, settings = {}, { now = new Date(), owner = ownerSettings().seasons } = {}) {
+  return {
+    ...normalizeSeasonSettings(settings.seasonDecor),
+    ownerEnabled: normalizeOwnerSeasons(owner).enabled,
+    current: seasonForServer({
+      now,
+      guildId,
+      timeZone: buildDashboardTimeZoneResponse(settings).current,
+      server: settings.seasonDecor,
+      owner,
+    }),
   };
 }
 
@@ -127,6 +157,8 @@ export function createDashboardSettingsRouteHandler(deps) {
         voiceStatus: buildDashboardVoiceStatusResponse(settings),
         favorites: buildDashboardFavoritesResponse(settings, guildInfo.tier),
         serverLanguage: buildDashboardLanguageResponse(guildInfo.id),
+        serverTimeZone: buildDashboardTimeZoneResponse(settings),
+        seasonDecor: buildDashboardSeasonDecorResponse(guildInfo.id, settings),
       });
       return true;
     }
@@ -296,6 +328,21 @@ export function createDashboardSettingsRouteHandler(deps) {
           else unsets.push("favoriteStations");
         }
 
+        if (body?.serverTimeZone !== undefined) {
+          const zone = String(body.serverTimeZone || "").trim();
+          if (!isValidTimeZone(zone)) {
+            sendLocalizedError(res, 400, language, "Diese Zeitzone kennt OmniFM nicht.", "OmniFM does not know this time zone.");
+            return true;
+          }
+          if (zone === DEFAULT_SEASON_TIME_ZONE) unsets.push("timeZone");
+          else updates.timeZone = zone;
+        }
+
+        // Every plan may switch the seasonal decoration (#425).
+        if (body?.seasonDecor && typeof body.seasonDecor === "object") {
+          updates.seasonDecor = normalizeSeasonSettings(body.seasonDecor);
+        }
+
         let nextServerLanguage = null;
         if (body?.serverLanguage !== undefined) {
           nextServerLanguage = String(body.serverLanguage || "").trim().toLowerCase();
@@ -383,6 +430,12 @@ export function createDashboardSettingsRouteHandler(deps) {
             featureEnabled: serverHasCapability(guildInfo.id, "voice_guard"),
           });
 
+        // The time zone and the season switches as saved now: this save over the stored ones.
+        const seasonSource = {
+          timeZone: unsets.includes("timeZone") ? undefined : (updates.timeZone ?? savedSettings.timeZone),
+          seasonDecor: updates.seasonDecor ?? savedSettings.seasonDecor,
+        };
+
         sendJson(res, 200, {
           success: true,
           guildId: guildInfo.id,
@@ -411,6 +464,8 @@ export function createDashboardSettingsRouteHandler(deps) {
             guildInfo.tier
           ),
           serverLanguage: buildDashboardLanguageResponse(guildInfo.id),
+          serverTimeZone: buildDashboardTimeZoneResponse(seasonSource),
+          seasonDecor: buildDashboardSeasonDecorResponse(guildInfo.id, seasonSource),
         });
       } catch (err) {
         logError("[DashboardSettings] Save failed", err, {

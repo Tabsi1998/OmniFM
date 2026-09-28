@@ -151,6 +151,11 @@ test("a Free server's dashboard: what plays where, switch, stop, and the rest by
   assert.equal(settings.payload.capabilities.dashboardBasic, true);
   assert.equal(settings.payload.capabilities.dashboardAccess, false);
   assert.deepEqual(settings.payload.serverLanguage, { current: "auto", options: ["auto", "de", "en"] });
+  // #425: the time zone and the seasonal decoration, every plan, everything on at first.
+  assert.deepEqual(settings.payload.serverTimeZone, { current: "Europe/Vienna", default: "Europe/Vienna" });
+  assert.ok(Object.values(settings.payload.seasonDecor.seasons).every(Boolean));
+  assert.ok(Object.values(settings.payload.seasonDecor.parts).every(Boolean));
+  assert.ok(Object.values(settings.payload.seasonDecor.ownerEnabled).every(Boolean));
 
   if (!mongo) return;
   const german = await call("PUT", `/api/dashboard/settings?serverId=${GUILD}`, { serverLanguage: "de" });
@@ -168,4 +173,16 @@ test("a Free server's dashboard: what plays where, switch, stop, and the rest by
   const favorites = await call("PUT", `/api/dashboard/settings?serverId=${GUILD}`, { favorites: { stations: ["a", "b", "c", "d"] } });
   assert.equal(favorites.status, 400, "Free: three favourites");
   assert.equal((await call("PUT", `/api/dashboard/settings?serverId=${GUILD}`, { favorites: { stations: ["a", "b"] } })).status, 200);
+
+  const zone = await call("PUT", `/api/dashboard/settings?serverId=${GUILD}`, { serverTimeZone: "America/New_York" });
+  assert.equal(zone.status, 200, JSON.stringify(zone.payload));
+  assert.equal(zone.payload.serverTimeZone.current, "America/New_York");
+  assert.equal((await call("PUT", `/api/dashboard/settings?serverId=${GUILD}`, { serverTimeZone: "Mars/Olympus" })).status, 400);
+  const decor = await call("PUT", `/api/dashboard/settings?serverId=${GUILD}`, { seasonDecor: { seasons: { advent: false }, parts: { eggHunt: false } } });
+  assert.equal(decor.status, 200, "a Free server switches the decoration too");
+  assert.deepEqual([decor.payload.seasonDecor.seasons.advent, decor.payload.seasonDecor.seasons.easter, decor.payload.seasonDecor.parts.eggHunt], [false, true, false]);
+  assert.equal(decor.payload.serverTimeZone.current, "America/New_York", "saving the decoration keeps the time zone");
+  const again = await call("GET", `/api/dashboard/settings?serverId=${GUILD}`);
+  assert.deepEqual([again.payload.serverTimeZone.current, again.payload.seasonDecor.seasons.advent], ["America/New_York", false]);
+  assert.equal((await call("PUT", `/api/dashboard/settings?serverId=${GUILD}`, { serverTimeZone: "Europe/Vienna" })).payload.serverTimeZone.current, "Europe/Vienna");
 });

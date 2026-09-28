@@ -51,6 +51,7 @@ export const OWNER_AREAS = Object.freeze([
       { id: 'company', label: 'Firma & Recht', keywords: ['impressum', 'datenschutz', 'firma', 'uid', 'hosting', 'recht'] },
       { id: 'marketing', label: 'Listings & Partner', keywords: ['profilseite', 'listing', 'sponsor', 'partner', 'marketing'] },
       { id: 'brand', label: 'Brand Kit', keywords: ['logo', 'farben', 'marke', 'brand'] },
+      { id: 'seasons', label: 'Saison-Deko', keywords: ['saison', 'ostern', 'advent', 'weihnachten', 'silvester', 'neujahr', 'deko', 'testmodus'] },
     ],
   },
   {

@@ -768,7 +768,7 @@ export default function OwnerAdmin() {
         {section === 'activity' && (
           <OwnerActivity activity={activity} />
         )}
-        {(systemPartOf(section) || ['company', 'plans', 'discord', 'marketing', 'access', 'discordShop', 'charts'].includes(section)) && (
+        {(systemPartOf(section) || ['company', 'plans', 'discord', 'marketing', 'access', 'discordShop', 'charts', 'seasons'].includes(section)) && (
           <OwnerConfig section={systemPartOf(section) ? 'system' : section} part={systemPartOf(section)} apiGet={apiGet} apiSend={apiSend} token={token} />
         )}
         {section === 'brand' && (
