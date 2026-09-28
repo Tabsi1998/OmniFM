@@ -57,14 +57,57 @@ export function rankChart(rows = [], previousRows = [], { minServers = CHART_MIN
   return ranked(rows, { minServers, size }).map((row, index) => {
     const rank = index + 1;
     const before = previousRank.get(row.trackKey) ?? null;
-    let movement = "new";
-    if (before !== null) movement = before > rank ? "up" : before < rank ? "down" : "same";
     return {
       rank,
       displayTitle: String(row.displayTitle).trim(),
       plays: Number(row.plays),
       servers: Number(row.servers),
-      movement,
+      movement: movementOf(before, rank),
+      previousRank: before,
+    };
+  });
+}
+
+export const STATION_CHART_SIZE = 10;
+const HOUR_MS = 3_600_000;
+
+function movementOf(before, rank) {
+  if (before === null) return "new";
+  return before > rank ? "up" : before < rank ? "down" : "same";
+}
+
+function rankedStations(rows, catalog, { minServers, size }) {
+  return rows
+    .filter((row) => catalog[row?.stationKey] && Number(row?.servers) >= minServers && Number(row?.listeningMs) >= HOUR_MS / 60)
+    .sort((a, b) => b.listeningMs - a.listeningMs || b.servers - a.servers || String(a.stationKey).localeCompare(String(b.stationKey)))
+    .slice(0, size);
+}
+
+/**
+ * The most listened stations of a week from their rows ({ stationKey,
+ * listeningMs, servers }): listening time of people, not of a bot alone.
+ * Only stations of the public catalogue (`catalog`, key -> station) count,
+ * never a server's own stream; name, genre, colour and logo come from the
+ * catalogue, and the stream address when the website may play it.
+ */
+export function rankStations(rows = [], previousRows = [], catalog = {}, { minServers = CHART_MIN_SERVERS, size = STATION_CHART_SIZE } = {}) {
+  const previousRank = new Map(rankedStations(previousRows, catalog, { minServers, size }).map((row, index) => [row.stationKey, index + 1]));
+  return rankedStations(rows, catalog, { minServers, size }).map((row, index) => {
+    const rank = index + 1;
+    const station = catalog[row.stationKey];
+    const before = previousRank.get(row.stationKey) ?? null;
+    return {
+      rank,
+      key: row.stationKey,
+      name: String(station.name || row.stationKey),
+      genre: station.genre ? String(station.genre) : null,
+      color: /^#[0-9a-f]{6}$/i.test(String(station.color || "")) ? String(station.color) : null,
+      logo: /^https:\/\//.test(String(station.logo || "")) ? String(station.logo) : null,
+      tier: String(station.tier || "free"),
+      url: station.url ? String(station.url) : null,
+      hours: Math.round((Number(row.listeningMs) / HOUR_MS) * 10) / 10,
+      servers: Number(row.servers),
+      movement: movementOf(before, rank),
       previousRank: before,
     };
   });

@@ -589,9 +589,9 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
         <div className="oa-card" style={{ marginBottom: 18 }}>
           <div className="oa-section-title">OmniFM-Charts</div>
           <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14, lineHeight: 1.6 }}>
-            Die meistgespielten Songs der letzten Woche über alle Server stehen auf <a href="/charts" target="_blank" rel="noopener noreferrer" style={{ color: '#00e5ff' }}>omnifm.xyz/charts</a>.
-            Ein Song kommt nur hinein, wenn er auf mindestens 3 Servern lief; so lässt sich kein einzelner Server erkennen.
-            Ist der Post an, schickt der Commander die Charts jeden Montag ab 10 Uhr in den Kanal unten: die Top 3 mit Cover, Platz 4 bis 10 als Liste.
+            Die meistgehörten Sender und die meistgespielten Songs der letzten Woche über alle Server stehen auf <a href="/charts" target="_blank" rel="noopener noreferrer" style={{ color: '#00e5ff' }}>omnifm.xyz/charts</a>.
+            Hinein kommt nur, was auf mindestens 3 Servern lief, bei den Sendern nur solche aus dem OmniFM-Katalog; so lässt sich kein einzelner Server erkennen.
+            Ist der Post an, schickt der Commander die Charts jeden Montag ab 10 Uhr in den Kanal unten: die Top 5 Sender (die ersten drei mit Logo) und die Top 3 Songs.
           </div>
           <Toggle label="Charts jede Woche posten" checked={!!charts.postEnabled} onChange={(v) => setCharts((p) => ({ ...p, postEnabled: v && channelOk }))} testid="cfg-charts-enabled" />
           {!channelOk && <div className="oa-sub" style={{ marginTop: 8 }}>Erst die Kanal-ID eintragen, dann lässt sich der Post einschalten.</div>}
