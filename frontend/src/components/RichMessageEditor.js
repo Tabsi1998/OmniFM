@@ -24,13 +24,12 @@ function ToolbarButton({ icon: Icon, label, onClick, active, testId }) {
 function EmojiPicker({ serverEmojis, loading, onSelectUnicode, onSelectCustom, onClose, t }) {
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('server');
-  const isDE = t('de', 'en') === 'de';
 
   const hasServer = serverEmojis.length > 0;
 
   const tabs = [
     ...(hasServer ? [{ id: 'server', label: t('Server', 'Server') }] : []),
-    ...EMOJI_CATEGORIES.map(c => ({ id: c.id, label: isDE ? c.label.de : c.label.en })),
+    ...EMOJI_CATEGORIES.map(c => ({ id: c.id, label: t(c.label.de, c.label.en) })),
   ];
 
   // Set default tab

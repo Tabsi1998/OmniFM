@@ -233,13 +233,21 @@ export const PLAN_FEATURES = Object.freeze([
 ]);
 
 /**
+ * A language's own lines by feature key, plus intro(below) (#306): the
+ * website's other languages, plan-feature-texts.js.
+ * @typedef {Record<string, (...args: any[]) => (string | null)>} PlanTexts
+ */
+
+/**
  * @param {PlanFeature} feature
  * @param {string} plan
  * @param {string} language
  * @param {PlanContext} context
+ * @param {PlanTexts | null} [texts]
  */
-function lineOf(feature, plan, language, context) {
-  const text = (language === "en" ? feature.en : feature.de)(plan, context);
+function lineOf(feature, plan, language, context, texts = null) {
+  const write = texts?.[feature.key] || (language === "en" ? feature.en : feature.de);
+  const text = write(plan, context);
   return text ? String(text) : null;
 }
 
@@ -248,22 +256,24 @@ function lineOf(feature, plan, language, context) {
  * Ultimate list only what is new or better than the plan below, after
  * "Alles aus Free, dazu:".
  * @param {string} plan
- * @param {{ language?: string, context?: PlanContext, highlightsOnly?: boolean }} [options]
+ * texts: another language's lines (plan-feature-texts.js); what it leaves out
+ * comes in `language`.
+ * @param {{ language?: string, context?: PlanContext, highlightsOnly?: boolean, texts?: PlanTexts | null }} [options]
  * @returns {{ basedOn: string | null, intro: string | null, lines: string[] }}
  */
-export function planCardLines(plan, { language = "de", context = {}, highlightsOnly = false } = {}) {
+export function planCardLines(plan, { language = "de", context = {}, highlightsOnly = false, texts = null } = {}) {
   const current = normalizePlan(plan);
   const below = current === "free" ? null : PLAN_ORDER[planRank(current) - 1];
   const lines = [];
   for (const feature of PLAN_FEATURES) {
     if (highlightsOnly && !feature.highlight) continue;
-    const line = lineOf(feature, current, language, context);
+    const line = lineOf(feature, current, language, context, texts);
     if (!line) continue;
-    if (below && lineOf(feature, below, language, context) === line) continue;
+    if (below && lineOf(feature, below, language, context, texts) === line) continue;
     lines.push(line);
   }
-  const intro = below
-    ? (language === "en" ? `Everything in ${PLAN_NAMES[below]}, plus:` : `Alles aus ${PLAN_NAMES[below]}, dazu:`)
-    : null;
+  let intro = null;
+  if (below && texts?.intro) intro = texts.intro(PLAN_NAMES[below]);
+  else if (below) intro = language === "en" ? `Everything in ${PLAN_NAMES[below]}, plus:` : `Alles aus ${PLAN_NAMES[below]}, dazu:`;
   return { basedOn: below, intro, lines };
 }

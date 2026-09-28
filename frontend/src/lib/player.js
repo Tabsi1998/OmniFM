@@ -6,20 +6,18 @@ export const usePlayer = () => useContext(PlayerCtx) || {};
 // Übersetzt HTML5-Media-Fehlercodes in eine verständliche Meldung.
 // Wichtigster Fall: Code 4 (SRC_NOT_SUPPORTED) = Stream lehnt Browser-Zugriff
 // ab (z. B. 403/Hotlink-Schutz). Läuft im Discord-Bot trotzdem.
-// Sprache folgt dem Browser (wie die restliche Website – kein Umschalter).
-function isGermanLocale() {
-  if (typeof navigator === 'undefined') return false;
-  const lang = (navigator.languages && navigator.languages[0]) || navigator.language || 'en';
-  return String(lang).toLowerCase().startsWith('de');
+function describeAudioError(mediaError) {
+  const code = (mediaError && mediaError.code) || 0;
+  return { code, browserBlocked: code === 4 };
 }
 
-function describeAudioError(mediaError) {
-  const code = mediaError && mediaError.code;
-  const de = isGermanLocale();
-  if (code === 4) return { code, browserBlocked: true, message: de ? 'Dieser Sender lässt sich im Browser nicht abspielen (im Discord-Bot funktioniert er weiterhin).' : "This station can't be played in the browser (it still works in the Discord bot)." };
-  if (code === 2) return { code, browserBlocked: false, message: de ? 'Netzwerkfehler beim Laden des Streams.' : 'Network error while loading the stream.' };
-  if (code === 3) return { code, browserBlocked: false, message: de ? 'Stream konnte nicht dekodiert werden.' : 'The stream could not be decoded.' };
-  return { code: code || 0, browserBlocked: false, message: de ? 'Wiedergabe fehlgeschlagen.' : 'Playback failed.' };
+/** The player's error in the page's language (#306); t is the site's translator. */
+export function audioErrorText(error, t) {
+  if (!error) return '';
+  if (error.code === 4) return t('Dieser Sender lässt sich im Browser nicht abspielen (im Discord-Bot funktioniert er weiterhin).', "This station can't be played in the browser (it still works in the Discord bot).");
+  if (error.code === 2) return t('Netzwerkfehler beim Laden des Streams.', 'Network error while loading the stream.');
+  if (error.code === 3) return t('Stream konnte nicht dekodiert werden.', 'The stream could not be decoded.');
+  return t('Wiedergabe fehlgeschlagen.', 'Playback failed.');
 }
 
 // Globaler Radio-Player: EIN Audio-Element für die ganze Seite, damit
@@ -29,7 +27,7 @@ export function PlayerProvider({ children }) {
   const [current, setCurrent] = useState(null); // {key,name,url,tier}
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null); // {code,message,browserBlocked} | null
+  const [error, setError] = useState(null); // {code,browserBlocked} | null
   const [volume, setVolumeState] = useState(80);
   const [muted, setMuted] = useState(false);
 

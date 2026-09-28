@@ -20,8 +20,9 @@ export default function SettingsFavorites({
       </div>
       <p style={{ color: '#52525B', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
         {t(
-          `Bis zu ${favoriteLimit} Sender als Schnellknöpfe im Now-Playing-Panel (Free ${PLAN_LIMITS.free.favorites}, Pro ${PLAN_LIMITS.pro.favorites}, Ultimate ${PLAN_LIMITS.ultimate.favorites}). Mit ⭐ im Sender-Browser geht es auch direkt in Discord. Bei einem kleineren Plan werden überzählige ausgeblendet, nicht gelöscht.`,
-          `Up to ${favoriteLimit} stations as quick buttons in the now-playing panel (Free ${PLAN_LIMITS.free.favorites}, Pro ${PLAN_LIMITS.pro.favorites}, Ultimate ${PLAN_LIMITS.ultimate.favorites}). The ⭐ menu in the station browser works in Discord too. On a smaller plan extra ones are hidden, not deleted.`
+          'Bis zu {limit} Sender als Schnellknöpfe im Now-Playing-Panel (Free {free}, Pro {pro}, Ultimate {ultimate}). Mit ⭐ im Sender-Browser geht es auch direkt in Discord. Bei einem kleineren Plan werden überzählige ausgeblendet, nicht gelöscht.',
+          'Up to {limit} stations as quick buttons in the now-playing panel (Free {free}, Pro {pro}, Ultimate {ultimate}). The ⭐ menu in the station browser works in Discord too. On a smaller plan extra ones are hidden, not deleted.',
+          { limit: favoriteLimit, free: PLAN_LIMITS.free.favorites, pro: PLAN_LIMITS.pro.favorites, ultimate: PLAN_LIMITS.ultimate.favorites }
         )}
       </p>
       <div data-testid="favorites-list" style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
@@ -50,7 +51,7 @@ export default function SettingsFavorites({
         onChange={(e) => { if (e.target.value) setFavoriteStations([...favoriteStations, e.target.value]); }}
         style={{ width: '100%', maxWidth: 420, height: 40, padding: '0 10px', border: '1px solid #1A1A2E', background: '#050505', color: '#fff', boxSizing: 'border-box', fontSize: 13 }}
       >
-        <option value="">{favoriteStations.length >= favoriteLimit ? t(`Voll – höchstens ${favoriteLimit}`, `Full – at most ${favoriteLimit}`) : t('Sender als Favorit hinzufügen...', 'Add a station as favourite...')}</option>
+        <option value="">{favoriteStations.length >= favoriteLimit ? t('Voll – höchstens {limit}', 'Full – at most {limit}', { limit: favoriteLimit }) : t('Sender als Favorit hinzufügen...', 'Add a station as favourite...')}</option>
         {availableFavoriteStations.map((station) => <option key={station.value} value={station.value}>{station.label}</option>)}
       </select>
     </div>

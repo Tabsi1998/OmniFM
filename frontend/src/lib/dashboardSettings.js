@@ -162,7 +162,7 @@ function buildFallbackStationSummary(settings, t = (de, _en) => de) {
       badgeLabel: "",
       chainLength: configuredChain.length,
       chainLabel: remainingStations > 0
-        ? t(`+${remainingStations} weitere Schritte`, `+${remainingStations} more steps`)
+        ? t("+{count} weitere Schritte", "+{count} more steps", { count: remainingStations })
         : t("Nur Primär-Failover gesetzt", "Only the primary failover is configured"),
     };
   }
@@ -187,7 +187,7 @@ function buildFallbackStationSummary(settings, t = (de, _en) => de) {
     badgeLabel,
     chainLength: configuredChain.length,
     chainLabel: remainingStations > 0
-      ? t(`+${remainingStations} weitere Schritte`, `+${remainingStations} more steps`)
+      ? t("+{count} weitere Schritte", "+{count} more steps", { count: remainingStations })
       : t("1 Failover-Schritt", "1 failover step"),
   };
 }

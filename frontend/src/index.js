@@ -2,13 +2,18 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App.js';
+import { preloadLanguage } from './i18n.js';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+// A language other than German and English is its own download (#306); the
+// page waits for it instead of showing English first.
+preloadLanguage().then(() => {
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+});
 
 // The site as an app (#305): the service worker keeps the build files and the
 // start page, never an API answer. Only in the built site, after it loaded.

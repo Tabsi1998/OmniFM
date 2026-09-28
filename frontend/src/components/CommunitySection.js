@@ -4,8 +4,7 @@ import { buildApiUrl } from '../lib/api.js';
 import { useI18n } from '../i18n.js';
 
 export default function CommunitySection() {
-  const { locale } = useI18n();
-  const en = String(locale || 'de').startsWith('en');
+  const { t } = useI18n();
   const [data, setData] = useState({ sponsors: [], botListings: [] });
 
   useEffect(() => {
@@ -27,10 +26,10 @@ export default function CommunitySection() {
           <div data-testid="bot-listings" style={{ textAlign: 'center' }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderRadius: 999, background: 'rgba(0,229,255,0.08)', border: '1px solid rgba(0,229,255,0.28)', marginBottom: 18 }}>
               <Star size={14} color="#00e5ff" />
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#8be9ff' }}>{en ? 'Vote & Review' : 'Voten & Bewerten'}</span>
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#8be9ff' }}>{t('Voten & Bewerten', 'Vote & Review')}</span>
             </div>
-            <h2 style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 'clamp(24px,3.5vw,36px)', marginBottom: 12 }}>{en ? 'Find OmniFM on' : 'OmniFM findest du auf'}</h2>
-            <p style={{ color: '#94a3b8', fontSize: 15, maxWidth: 520, margin: '0 auto 28px' }}>{en ? 'Support us with a vote or a review on the big Discord bot lists.' : 'Unterstütze uns mit einem Vote oder einer Bewertung auf den großen Discord-Bot-Listen.'}</p>
+            <h2 style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 'clamp(24px,3.5vw,36px)', marginBottom: 12 }}>{t('OmniFM findest du auf', 'Find OmniFM on')}</h2>
+            <p style={{ color: '#94a3b8', fontSize: 15, maxWidth: 520, margin: '0 auto 28px' }}>{t('Unterstütze uns mit einem Vote oder einer Bewertung auf den großen Discord-Bot-Listen.', 'Support us with a vote or a review on the big Discord bot lists.')}</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 14 }}>
               {botListings.map((b, i) => (
                 <a
@@ -50,9 +49,9 @@ export default function CommunitySection() {
           <div data-testid="sponsor-wall" style={{ textAlign: 'center' }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderRadius: 999, background: 'rgba(255,42,95,0.08)', border: '1px solid rgba(255,42,95,0.28)', marginBottom: 18 }}>
               <Heart size={14} color="#ff2a5f" />
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#ff8fab' }}>{en ? 'Partners' : 'Partner'}</span>
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#ff8fab' }}>{t('Partner', 'Partners')}</span>
             </div>
-            <h2 style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 'clamp(24px,3.5vw,36px)', marginBottom: 28 }}>{en ? 'Supported by' : 'Unterstützt von'}</h2>
+            <h2 style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 'clamp(24px,3.5vw,36px)', marginBottom: 28 }}>{t('Unterstützt von', 'Supported by')}</h2>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: 24 }}>
               {sponsors.map((s, i) => {
                 const inner = s.logoUrl

@@ -1,165 +1,25 @@
 import { getCanonicalPagePath, normalizePageId, resolvePageFromUrl } from './pageRouting.js';
+import { LANGUAGE_CODES, WEBSITE_LANGUAGES, copyFor, normalizeLanguage } from '../i18n/languages.js';
 
 const SITE_ORIGIN = 'https://omnifm.xyz';
 // The same picture as the static og:image in index.html, so a link preview
 // looks the same whether or not the crawler runs JavaScript.
 const DEFAULT_IMAGE = `${SITE_ORIGIN}/brand/omnifm-banner.png`;
 
-const PAGE_SEO = {
-  home: {
-    type: 'website',
-    de: {
-      title: 'OmniFM | 24/7 Radio für Discord',
-      description: 'OmniFM bringt 24/7 Discord-Radio, Worker-Bots, Dashboard-Kontrolle und Premium-Audio auf deinen Server.',
-    },
-    en: {
-      title: 'OmniFM | 24/7 Radio for Discord',
-      description: 'OmniFM brings 24/7 Discord radio, worker bots, dashboard control, and Premium audio to your server.',
-    },
-  },
-  dashboard: {
-    type: 'website',
-    de: {
-      title: 'OmniFM Dashboard | Server verwalten',
-      description: 'Verwalte OmniFM-Server, Events, Rollenrechte, Statistiken und Premium-Funktionen im Dashboard.',
-    },
-    en: {
-      title: 'OmniFM Dashboard | Manage servers',
-      description: 'Manage OmniFM servers, events, role permissions, statistics, and Premium features in the dashboard.',
-    },
-  },
-  stations: {
-    type: 'website',
-    de: {
-      title: 'OmniFM Stationen | Discord Radio Sender',
-      description: 'Entdecke die OmniFM Sender fuer Discord-Radio: freie Stationen, Pro-Katalog und Ultimate-Optionen fuer 24/7 Musik im Voice-Channel.',
-    },
-    en: {
-      title: 'OmniFM Stations | Discord Radio Stations',
-      description: 'Explore OmniFM radio stations for Discord: free stations, the Pro catalog, and Ultimate options for 24/7 music in voice channels.',
-    },
-  },
-  premium: {
-    type: 'website',
-    de: {
-      title: 'OmniFM Preise | Free, Pro und Ultimate',
-      description: 'Vergleiche OmniFM Free, Pro und Ultimate fuer Discord-Radio, Worker-Bots, Dashboard, Audioqualitaet, Reconnect und Custom Stations.',
-    },
-    en: {
-      title: 'OmniFM Pricing | Free, Pro and Ultimate',
-      description: 'Compare OmniFM Free, Pro, and Ultimate for Discord radio, worker bots, dashboard access, audio quality, reconnect behavior, and custom stations.',
-    },
-  },
-  faq: {
-    type: 'article',
-    de: {
-      title: 'OmniFM FAQ | Discord Radio Bot Fragen',
-      description: 'Antworten zu OmniFM, Commander und Worker, Free/Pro/Ultimate, Dashboard, Stationen und 24/7 Discord-Radio.',
-    },
-    en: {
-      title: 'OmniFM FAQ | Discord Radio Bot Questions',
-      description: 'Answers about OmniFM, commander and workers, Free/Pro/Ultimate, dashboard, stations, and 24/7 Discord radio.',
-    },
-  },
-  imprint: {
-    type: 'article',
-    de: {
-      title: 'OmniFM | Impressum',
-      description: 'Pflichtangaben und Anbieterinformationen für den Webauftritt von OmniFM.',
-    },
-    en: {
-      title: 'OmniFM | Imprint',
-      description: 'Required provider details and operator information for the OmniFM website.',
-    },
-  },
-  privacy: {
-    type: 'article',
-    de: {
-      title: 'OmniFM | Datenschutzerklärung',
-      description: 'Datenschutzhinweise für Webseite, Discord-Bot-Betrieb, Dashboard, Premium, E-Mail und Support.',
-    },
-    en: {
-      title: 'OmniFM | Privacy policy',
-      description: 'Privacy notice for the website, Discord bot runtime, dashboard, Premium, email, and support.',
-    },
-  },
-  terms: {
-    type: 'article',
-    de: {
-      title: 'OmniFM | Nutzungsbedingungen',
-      description: 'Nutzungsbedingungen für die OmniFM-Webseite, den Discord-Bot, das Dashboard und Premium-Funktionen.',
-    },
-    en: {
-      title: 'OmniFM | Terms of service',
-      description: 'Terms for the OmniFM website, Discord bot, dashboard, and optional Premium features.',
-    },
-  },
-  charts: {
-    type: 'website',
-    de: {
-      title: 'OmniFM-Charts | Die meistgehörten Sender und Songs der Woche',
-      description: 'Die meistgehörten Radiosender und die meistgespielten Songs der letzten Woche auf allen Discord-Servern mit OmniFM, ohne Personen- und Serverbezug.',
-    },
-    en: {
-      title: 'OmniFM Charts | The most listened stations and songs of the week',
-      description: 'The most listened radio stations and the most played songs of last week across every Discord server with OmniFM, without any person or server.',
-    },
-  },
-  status: {
-    type: 'website',
-    de: {
-      title: 'OmniFM Status | Verfügbarkeit der Bots',
-      description: 'Läuft OmniFM? Jeder Bot mit Verfügbarkeit über 90 Tage, aktuelle Störungen und geplante Wartungen.',
-    },
-    en: {
-      title: 'OmniFM Status | Bot availability',
-      description: 'Is OmniFM running? Every bot with its availability over 90 days, current problems and planned maintenance.',
-    },
-  },
+// What kind of page each one is; the texts live in the language files
+// (i18n/<code>-pages.js, key seo), one place per language (#306).
+const PAGE_TYPES = {
+  home: 'website',
+  dashboard: 'website',
+  stations: 'website',
+  premium: 'website',
+  faq: 'article',
+  imprint: 'article',
+  privacy: 'article',
+  terms: 'article',
+  charts: 'website',
+  status: 'website',
 };
-
-const FAQ_ENTRIES = {
-  de: [
-    {
-      question: 'Was ist OmniFM?',
-      answer: 'OmniFM ist ein Discord Radio Bot fuer 24/7 Streams, Commander- und Worker-Bots, Dashboard-Kontrolle und Premium-Funktionen.',
-    },
-    {
-      question: 'Brauche ich fuer OmniFM einen Worker?',
-      answer: 'Ja. Der Commander nimmt Befehle an, waehrend ein Worker den eigentlichen Stream im Voice-Channel ausfuehrt.',
-    },
-    {
-      question: 'Was ist im Free-Plan enthalten?',
-      answer: 'Free startet mit dem Commander- und Worker-Ablauf, freien Stationen und den wichtigsten Befehlen. Pro und Ultimate erweitern Kontrolle, Stabilitaet und Audio-Optionen.',
-    },
-    {
-      question: 'Wer betreibt OmniFM?',
-      answer: 'OmniFM ist das Produkt. Betreiber und Anbieter ist IT-Tabelander.',
-    },
-  ],
-  en: [
-    {
-      question: 'What is OmniFM?',
-      answer: 'OmniFM is a Discord radio bot platform for 24/7 streams, commander and worker bots, dashboard control, and Premium features.',
-    },
-    {
-      question: 'Do I need an OmniFM worker?',
-      answer: 'Yes. The commander accepts commands, while a worker runs the actual stream in the voice channel.',
-    },
-    {
-      question: 'What is included in the Free plan?',
-      answer: 'Free starts with the commander and worker flow, free stations, and the core commands. Pro and Ultimate add more control, reliability, and audio options.',
-    },
-    {
-      question: 'Who operates OmniFM?',
-      answer: 'OmniFM is the product. IT-Tabelander is the operator and service provider.',
-    },
-  ],
-};
-
-function normalizeLocale(locale) {
-  return String(locale || 'en').trim().toLowerCase().startsWith('de') ? 'de' : 'en';
-}
 
 function absoluteUrl(pathname = '/') {
   const path = String(pathname || '/').startsWith('/') ? pathname : `/${pathname}`;
@@ -201,13 +61,19 @@ function upsertJsonLd(id, payload) {
   tag.textContent = JSON.stringify(payload);
 }
 
+/** The address of a page in a language: German and English keep theirs, every other language adds ?lang=. */
+function canonicalUrlFor(pageId, language) {
+  const path = getCanonicalPagePath(pageId, language);
+  return absoluteUrl(language === 'de' || language === 'en' ? path : `${path}?lang=${language}`);
+}
+
 export function getPageSeo(page, locale = 'en') {
   const pageId = normalizePageId(page, 'home');
-  const language = normalizeLocale(locale);
-  const config = PAGE_SEO[pageId] || PAGE_SEO.home;
-  const localized = config[language] || config.en;
+  const language = normalizeLanguage(locale);
+  const texts = copyFor(language).seo.pages;
+  const localized = texts[pageId] || texts.home;
   const canonicalPath = getCanonicalPagePath(pageId, language);
-  const canonicalUrl = absoluteUrl(canonicalPath);
+  const canonicalUrl = canonicalUrlFor(pageId, language);
   return {
     pageId,
     language,
@@ -216,14 +82,34 @@ export function getPageSeo(page, locale = 'en') {
     canonicalPath,
     canonicalUrl,
     image: DEFAULT_IMAGE,
-    type: config.type || 'website',
+    type: PAGE_TYPES[pageId] || 'website',
     robots: 'index,follow',
   };
 }
 
+/** hreflang -> address of the same page in every language, plus x-default (English). */
+export function getLanguageAlternates(page) {
+  const pageId = normalizePageId(page, 'home');
+  return [
+    ...WEBSITE_LANGUAGES.map((entry) => ({ hreflang: entry.hreflang, href: canonicalUrlFor(pageId, entry.code) })),
+    { hreflang: 'x-default', href: canonicalUrlFor(pageId, 'en') },
+  ];
+}
+
+function replaceAlternates(alternates) {
+  if (typeof document === 'undefined') return;
+  document.head.querySelectorAll('link[rel="alternate"][hreflang]').forEach((tag) => tag.remove());
+  for (const { hreflang, href } of alternates) {
+    const tag = document.createElement('link');
+    tag.setAttribute('rel', 'alternate');
+    tag.setAttribute('hreflang', hreflang);
+    tag.setAttribute('href', href);
+    document.head.appendChild(tag);
+  }
+}
+
 export function getFaqEntries(locale = 'en') {
-  const language = normalizeLocale(locale);
-  return FAQ_ENTRIES[language] || FAQ_ENTRIES.en;
+  return copyFor(normalizeLanguage(locale)).seo.faq;
 }
 
 export function buildStructuredData(seo) {
@@ -248,7 +134,7 @@ export function buildStructuredData(seo) {
         '@id': websiteId,
         name: 'OmniFM',
         url: SITE_ORIGIN,
-        inLanguage: ['de', 'en'],
+        inLanguage: [...LANGUAGE_CODES],
         publisher: { '@id': organizationId },
       },
       {
@@ -258,7 +144,7 @@ export function buildStructuredData(seo) {
         applicationCategory: 'MultimediaApplication',
         operatingSystem: 'Discord',
         url: SITE_ORIGIN,
-        description: PAGE_SEO.home.en.description,
+        description: copyFor('en').seo.pages.home.description,
         offers: {
           '@type': 'AggregateOffer',
           priceCurrency: 'EUR',
@@ -304,6 +190,8 @@ export function applySeoMetadata({ locale = 'en', url = null } = {}) {
   document.title = seo.title;
 
   upsertLink('canonical', seo.canonicalUrl);
+  // Every language of this page, so search engines find each one (#306).
+  replaceAlternates(getLanguageAlternates(page));
   upsertLink('manifest', '/manifest.json');
   upsertMeta('meta[name="description"]', { name: 'description', content: seo.description });
   upsertMeta('meta[name="robots"]', { name: 'robots', content: seo.robots });
@@ -313,7 +201,7 @@ export function applySeoMetadata({ locale = 'en', url = null } = {}) {
   upsertMeta('meta[property="og:description"]', { property: 'og:description', content: seo.description });
   upsertMeta('meta[property="og:url"]', { property: 'og:url', content: seo.canonicalUrl });
   upsertMeta('meta[property="og:image"]', { property: 'og:image', content: seo.image });
-  upsertMeta('meta[property="og:locale"]', { property: 'og:locale', content: seo.language === 'de' ? 'de_DE' : 'en_US' });
+  upsertMeta('meta[property="og:locale"]', { property: 'og:locale', content: WEBSITE_LANGUAGES.find((entry) => entry.code === seo.language).og });
   upsertMeta('meta[name="twitter:card"]', { name: 'twitter:card', content: 'summary_large_image' });
   upsertMeta('meta[name="twitter:title"]', { name: 'twitter:title', content: seo.title });
   upsertMeta('meta[name="twitter:description"]', { name: 'twitter:description', content: seo.description });

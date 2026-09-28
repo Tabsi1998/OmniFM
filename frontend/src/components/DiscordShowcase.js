@@ -5,39 +5,6 @@ import { useI18n } from '../i18n.js';
 import { useShowcaseStations } from '../lib/showcase.js';
 import LivePlaybackBar from './LivePlaybackBar.js';
 
-const STR = {
-  de: {
-    eyebrow: 'Direkt in Discord',
-    titleLead: 'Läuft im ',
-    titleAccent: 'Voice-Channel',
-    titleTail: ', gesteuert per Slash-Command.',
-    body: 'Kein Browser-Player, kein Abspielen auf der Website. OmniFM streamt 24/7 direkt in deinen Discord-Voice-Channel – mit sauberen Now-Playing-Embeds, Buttons und Reconnect.',
-    cmds: [
-      ['/play synthwave', 'Startet den Stream im Voice-Channel'],
-      ['/now', 'Zeigt Live-Titel, Cover & Hörer'],
-      ['/stations', 'Durchsuche 120+ kuratierte Sender'],
-    ],
-    nowPlaying: 'Now Playing', genre: 'Genre', bitrate: 'Bitrate', listeners: 'Hörer',
-    liveStream: 'Live-Radio-Stream', liveRadio: 'Live-Radio',
-    time: 'heute um 21:14',
-  },
-  en: {
-    eyebrow: 'Right in Discord',
-    titleLead: 'Runs in your ',
-    titleAccent: 'voice channel',
-    titleTail: ', controlled by slash commands.',
-    body: 'No browser player, no playback on the website. OmniFM streams 24/7 straight into your Discord voice channel — with clean now-playing embeds, buttons and reconnect.',
-    cmds: [
-      ['/play synthwave', 'Starts the stream in your voice channel'],
-      ['/now', 'Shows the live track, cover & listeners'],
-      ['/stations', 'Browse 120+ curated stations'],
-    ],
-    nowPlaying: 'Now Playing', genre: 'Genre', bitrate: 'Bitrate', listeners: 'Listeners',
-    liveStream: 'Live radio stream', liveRadio: 'Live radio',
-    time: 'today at 21:14',
-  },
-};
-
 const STATIONS_FALLBACK = { name: 'OmniFM Radio Network', tier: 'free', bitrate: 'Live' };
 
 const css = `
@@ -66,8 +33,8 @@ function DiscordButton({ icon: Icon, label, primary }) {
 }
 
 export default function DiscordShowcase() {
-  const { locale } = useI18n();
-  const L = STR[locale] || STR.de;
+  const { copy } = useI18n();
+  const L = copy.discordShowcase;
   const [i, setI] = useState(0);
   const [cover, setCover] = useState(null);
   const stations = useShowcaseStations(8);

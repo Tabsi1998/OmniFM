@@ -3,7 +3,7 @@ import { Play, Pause, Users, Headphones, X } from 'lucide-react';
 import { resolvePrimaryInviteUrl } from '../lib/invite.js';
 import { useI18n } from '../i18n.js';
 import { useShowcaseStations } from '../lib/showcase.js';
-import { usePlayer } from '../lib/player.js';
+import { audioErrorText, usePlayer } from '../lib/player.js';
 import { buildApiUrl } from '../lib/api.js';
 
 const barCss = `
@@ -26,7 +26,7 @@ function Bars({ active }) {
 }
 
 export default function NowPlayingBar({ stats = {}, bots = [] }) {
-  const { locale, formatNumber } = useI18n();
+  const { t, formatNumber } = useI18n();
   const player = usePlayer();
   const showcase = useShowcaseStations(8);
   const [idx, setIdx] = useState(0);
@@ -38,15 +38,15 @@ export default function NowPlayingBar({ stats = {}, bots = [] }) {
   const playing = player.current;
   useEffect(() => {
     if (playing || showcase.length < 2) return undefined;
-    const t = setInterval(() => setIdx((v) => (v + 1) % showcase.length), 4500);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setIdx((v) => (v + 1) % showcase.length), 4500);
+    return () => clearInterval(timer);
   }, [playing, showcase.length]);
 
   const station = player.current || (showcase.length ? showcase[idx % showcase.length] : { name: 'OmniFM Radio Network', bitrate: 'Live' });
   const isPlaying = !!player.playing;
   const err = (player.current && player.error) ? player.error : null;
   const bitrate = station.bitrate || TIER_BITRATE[String(station.tier || '').toLowerCase()] || null;
-  const streamLabel = locale === 'en' ? 'Live radio stream' : 'Live-Radio-Stream';
+  const streamLabel = t('Live-Radio-Stream', 'Live radio stream');
   const listeners = stats.listeners || 0;
 
   const stationName = station?.name || '';
@@ -83,7 +83,7 @@ export default function NowPlayingBar({ stats = {}, bots = [] }) {
       >
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
           <span data-testid="now-playing-bar-status" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '4px 9px', borderRadius: 999, border: `1px solid ${err ? 'rgba(255,168,0,0.45)' : (isPlaying ? 'rgba(255,42,95,0.4)' : '#2a3450')}`, background: err ? 'rgba(255,168,0,0.12)' : (isPlaying ? 'rgba(255,42,95,0.12)' : 'rgba(255,255,255,0.03)'), color: err ? '#ffcf80' : (isPlaying ? '#ffd9e2' : '#94a3b8'), fontSize: 10, fontWeight: 800, letterSpacing: '0.14em', fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: err ? '#ffa800' : (isPlaying ? '#ff2a5f' : '#64748b'), animation: isPlaying && !err ? 'onair-pulse 1.8s infinite' : 'none' }} /> {err ? (locale === 'en' ? 'ERROR' : 'FEHLER') : (isPlaying ? 'LIVE' : (player.loading ? '…' : (locale === 'en' ? 'PREVIEW' : 'VORSCHAU')))}
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: err ? '#ffa800' : (isPlaying ? '#ff2a5f' : '#64748b'), animation: isPlaying && !err ? 'onair-pulse 1.8s infinite' : 'none' }} /> {err ? t('FEHLER', 'ERROR') : (isPlaying ? 'LIVE' : (player.loading ? '…' : t('VORSCHAU', 'PREVIEW')))}
           </span>
           <button
             onClick={onPlayClick}
@@ -98,7 +98,7 @@ export default function NowPlayingBar({ stats = {}, bots = [] }) {
           </button>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div key={station.name} style={{ fontWeight: 700, fontSize: 14, fontFamily: "'Syne','Outfit',sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{station.name}</div>
-            <div className="npbar-hidemobile" data-testid="now-playing-bar-sub" style={{ color: err ? '#ffcf80' : '#94a3b8', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{err ? err.message : (isPlaying ? streamLabel : (locale === 'en' ? 'Tap play to listen live' : 'Play drücken zum Live-Hören'))}</div>
+            <div className="npbar-hidemobile" data-testid="now-playing-bar-sub" style={{ color: err ? '#ffcf80' : '#94a3b8', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{err ? audioErrorText(err, t) : (isPlaying ? streamLabel : t('Play drücken zum Live-Hören', 'Tap play to listen live'))}</div>
           </div>
           {listeners > 0 && (
             <span className="npbar-hidemobile" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#94a3b8', fontSize: 12, fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 }}>
@@ -114,7 +114,7 @@ export default function NowPlayingBar({ stats = {}, bots = [] }) {
             data-testid="now-playing-bar-cta"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 11, background: 'linear-gradient(135deg,#ff6b00,#ff2a5f)', color: '#08090d', fontWeight: 800, fontSize: 13, flexShrink: 0 }}
           >
-            <Headphones size={15} /> <span className="npbar-hidemobile">{locale === 'en' ? 'Start in Discord' : 'In Discord starten'}</span>
+            <Headphones size={15} /> <span className="npbar-hidemobile">{t('In Discord starten', 'Start in Discord')}</span>
           </a>
           <button
             onClick={() => { setClosed(true); try { window.sessionStorage.setItem('omnifm_npbar_closed', '1'); } catch { /* noop */ } }}

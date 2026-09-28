@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Music, Pause, Play, Radio, Search, Volume2, VolumeX } from 'lucide-react';
-import { usePlayer } from '../lib/player.js';
+import { audioErrorText, usePlayer } from '../lib/player.js';
 import { useI18n } from '../i18n.js';
 
 const STATION_COLORS = ['#00e5ff', '#ff6b00', '#EC4899', '#ff6b00', '#ff2a5f', '#ff2a5f'];
@@ -97,7 +97,7 @@ function StationCard({ station, index, isPlaying, onPlay, onStop, copy }) {
 }
 
 function StationBrowser({ stations, loading }) {
-  const { copy, formatNumber, locale } = useI18n();
+  const { copy, formatNumber, t } = useI18n();
   const player = usePlayer();
   // A shared link (#279) lands on /stations?station=<key>: start with that station.
   const [search, setSearch] = useState(() => {
@@ -179,7 +179,7 @@ function StationBrowser({ stations, loading }) {
 
   const searchPlaceholder = counts.ultimate > 0
     ? copy.stations.searchPlaceholder
-    : (String(locale || 'de').startsWith('de') ? 'Station suchen…' : 'Search station…');
+    : t('Station suchen…', 'Search station…');
 
   return (
     <section id="stations" data-testid="station-browser" style={{ padding: '80px 0', position: 'relative', zIndex: 1 }}>
@@ -227,14 +227,14 @@ function StationBrowser({ stations, loading }) {
 
             <div style={{ minWidth: 0, flex: '1 1 200px' }}>
               <div style={{ fontSize: 11, color: playerError ? '#ff8fab' : '#00e5ff', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
-                {playerError ? (locale && String(locale).startsWith('de') ? 'Nicht abspielbar' : 'Cannot play') : copy.stations.nowPlaying}
+                {playerError ? t('Nicht abspielbar', 'Cannot play') : copy.stations.nowPlaying}
               </div>
               <span style={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
                 {playingStation.name}
               </span>
               {playerError && (
                 <span data-testid="player-error-message" style={{ display: 'block', fontSize: 12, color: '#ff8fab', marginTop: 4, lineHeight: 1.4 }}>
-                  {playerError.message}
+                  {audioErrorText(playerError, t)}
                 </span>
               )}
             </div>

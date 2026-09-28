@@ -4,43 +4,6 @@ import LivePlaybackBar from './LivePlaybackBar.js';
 import { resolvePrimaryInviteUrl } from '../lib/invite.js';
 import { Volume2, Check, Plus, Sparkles } from 'lucide-react';
 
-const STR = {
-  de: {
-    eyebrow: 'How-To · in unter 60 Sekunden',
-    title: 'So startest du OmniFM in Discord',
-    subtitle: 'Kein Browser-Player. Drei Schritte, dann läuft dein Radio 24/7 direkt im Voice-Channel.',
-    steps: [
-      { n: '01', cmd: 'App hinzufügen', title: 'Commander einladen', desc: 'Füge den OmniFM Commander zu deinem Server hinzu. Er nimmt alle Slash-Commands entgegen und verwaltet deine Worker.' },
-      { n: '02', cmd: '/invite', title: 'Worker-Bot hinzufügen', desc: 'Lade mindestens einen Worker ein. Er übernimmt den eigentlichen Voice-Stream – mehr Worker = mehr parallele Channels.' },
-      { n: '03', cmd: '/play lofi', title: 'Radio starten', desc: 'Wähle eine Station und OmniFM verbindet sich in deinen Voice-Channel. Now-Playing-Embed, Buttons und Reconnect inklusive.' },
-    ],
-    permsTitle: 'Berechtigungen',
-    perms: ['Voice beitreten & sprechen', 'Nachrichten & Embeds senden', 'Slash-Commands nutzen'],
-    addServer: 'Zum Server hinzufügen',
-    workerHint: 'Worker bereit',
-    invite: 'Einladen',
-    connected: 'verbunden',
-    nowPlaying: 'Now Playing',
-  },
-  en: {
-    eyebrow: 'How-To · in under 60 seconds',
-    title: 'How to start OmniFM in Discord',
-    subtitle: 'No browser player. Three steps and your radio runs 24/7 straight in the voice channel.',
-    steps: [
-      { n: '01', cmd: 'Add App', title: 'Invite the commander', desc: 'Add the OmniFM commander to your server. It handles every slash command and manages your workers.' },
-      { n: '02', cmd: '/invite', title: 'Add a worker bot', desc: 'Invite at least one worker. It carries the actual voice stream — more workers = more parallel channels.' },
-      { n: '03', cmd: '/play lofi', title: 'Start the radio', desc: 'Pick a station and OmniFM joins your voice channel. Now-playing embed, buttons and reconnect included.' },
-    ],
-    permsTitle: 'Permissions',
-    perms: ['Join voice & speak', 'Send messages & embeds', 'Use slash commands'],
-    addServer: 'Add to server',
-    workerHint: 'Worker ready',
-    invite: 'Invite',
-    connected: 'connected',
-    nowPlaying: 'Now Playing',
-  },
-};
-
 const css = `
 .htd-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:26px; }
 @media (max-width: 940px){ .htd-grid{ grid-template-columns:1fr; max-width:520px; margin:0 auto; } }
@@ -63,11 +26,11 @@ function StepShell({ step, children }) {
 }
 
 export default function HowToDiscord({ bots = [] }) {
-  const { locale } = useI18n();
-  const s = STR[locale] || STR.de;
+  const { copy, t } = useI18n();
+  const s = copy.howTo;
   const showcase = useShowcaseStations(4);
   const demoStation = showcase.length ? showcase[0].name : 'OmniFM Radio Network';
-  const streamLabel = locale === 'en' ? 'Live radio stream' : 'Live-Radio-Stream';
+  const streamLabel = t('Live-Radio-Stream', 'Live radio stream');
   const inviteUrl = resolvePrimaryInviteUrl(bots);
 
   return (

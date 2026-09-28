@@ -24,83 +24,21 @@ const messages = {
       },
     ],
     pricingFallback: 'Pricing API unreachable, fallback pricing is active.',
-    proofTitle: 'Why the upgrade step feels safe',
-    proofCards: {
-      trial: {
-        title: 'Low-risk evaluation',
-        valueEnabled: ({ months }) => `${months} month${months === 1 ? '' : 's'} trial`,
-        valueDisabled: 'Direct start',
-        desc: 'Test Pro with dashboard control, events, and permissions before you fully roll it out on your server.',
-      },
-      seats: {
-        title: 'Multiple servers, one flow',
-        value: ({ min, max }) => `${min}-${max} server seats`,
-        desc: 'Seat bundles keep licensing and upgrades tidy as your community expands across more servers.',
-      },
-      activation: {
-        title: 'Discord-first activation',
-        value: '/license activate',
-        desc: 'Your license key arrives by email and is linked to the server directly inside the bot.',
-      },
-      tiers: {
-        title: 'Clear plan logic',
-        value: 'Free -> Pro -> Ultimate',
-        desc: 'Free stays the entry tier, Pro adds management, and Ultimate becomes the operator layer.',
-      },
-    },
-    flowNote: 'Every plan builds on the same bot core. Upgrades add control, reliability, and scale without forcing you into a new setup.',
     planPopular: 'Popular',
-    planFitLabel: 'Best for',
-    planUpgradeLabel: 'Upgrade when',
-    planOutcomes: {
-      free: {
-        note: 'The strong entry point for 24/7 radio without admin overhead.',
-        fit: 'Smaller communities, friend groups, and servers that want to get live fast.',
-        upgrade: 'you need dashboard control, event scheduling, or role-based command management.',
-      },
-      pro: {
-        note: 'The real management tier for active servers.',
-        fit: 'Community admins, event servers, and teams with recurring sessions and clear roles.',
-        upgrade: 'you need custom stations, deeper analytics, or stronger recovery and operator tooling.',
-      },
-      ultimate: {
-        note: 'The operator tier for maximum control and deeper operations.',
-        fit: 'Power users, multi-server setups, and larger communities with a higher reliability bar.',
-        upgrade: 'you want OmniFM to behave like managed infrastructure instead of only a radio bot.',
-      },
-    },
     perMonth: '/month',
     freeCta: 'Start with Free',
-    buy: ({ name }) => `Buy ${name}`,
     trialCta: ({ months }) => `Try ${months} month${months === 1 ? '' : 's'} for free`,
-    trialActivated: 'Pro trial activated.',
     emailLabel: 'Email address',
     emailHint: 'Your license key and invoice will be sent to this address.',
     emailPlaceholder: 'you@example.com',
     couponLabel: 'Discount code (optional)',
     couponPlaceholder: 'e.g. PRO10',
-    referralLabel: 'Referral code (optional)',
-    referralPlaceholder: 'e.g. CREATOR10',
-    referralHint: 'Referral links can prefill this code automatically.',
-    seatsLabel: 'Number of servers',
-    seatsSuffix: 'servers',
-    seatsMonthly: ({ amount }) => `${amount} / month`,
-    seatsHint: 'License multiple servers with one subscription. Larger bundles reduce the cost per server.',
-    durationLabel: 'Choose duration',
-    durationMonth: 'month',
-    durationMonths: 'months',
-    durationBonus: '+2 free',
-    bestValue: 'Best',
-    summary: ({ durationLabel, seatsLabel }) => `${durationLabel}${seatsLabel ? ` · ${seatsLabel}` : ''}`,
     licenseHintLead: 'After purchase you will receive your',
     licenseHintKey: 'license key',
     licenseHintMiddle: 'by email. Use',
     licenseHintCommand: '/license activate',
     licenseHintTail: 'inside Discord to link your server.',
-    checkoutRedirect: 'Redirecting...',
-    payButton: ({ amount }) => `Pay ${amount}`,
     cancel: 'Cancel',
-    checkoutTitle: ({ name }) => `OmniFM ${name}`,
     invalidEmail: 'Please enter a valid email address.',
     checkoutFailed: 'Checkout failed. Please try again later.',
     redeemTitle: ({ name }) => `OmniFM ${name}: redeem a code`,
@@ -125,13 +63,10 @@ const messages = {
     statusResult: ({ tier, bitrate, days, expires }) => `Tier: ${tier} | Bitrate: ${bitrate} | Days left: ${days} | Expires: ${expires}`,
     priceFrom: 'from',
     freePrice: '0 EUR',
-    monthLabel: ({ count }) => count === 1 ? '1 month' : `${count} months`,
-    seatsLabelInline: ({ count }) => count === 1 ? '1 server' : `${count} servers`,
   },
   footer: {
     stats: {
       servers: 'Servers',
-      users: 'Users',
       connections: 'Connections',
       listeners: 'Listeners',
       bots: 'Bots',
@@ -139,29 +74,6 @@ const messages = {
     },
     liveNote: 'Public network numbers are loaded from the live product and refreshed regularly.',
     operatedBy: ({ operator }) => `Operated by ${operator}.`,
-    proofTitle: 'Trust signals at the bottom',
-    proofCards: {
-      operations: {
-        title: 'Live network',
-        value: ({ readyBots, totalBots }) => `${readyBots}/${totalBots} bots ready`,
-        desc: 'Public numbers, active stations, and a running bot network show real operation instead of placeholder marketing.',
-      },
-      support: {
-        title: 'Direct support',
-        value: 'Discord Community',
-        desc: 'Questions, rollout help, and troubleshooting stay directly reachable.',
-      },
-      languages: {
-        title: 'Bilingual',
-        value: 'DE / EN',
-        desc: 'Website copy and product navigation remain available in German and English.',
-      },
-      legal: {
-        title: 'Legal basics',
-        value: 'Imprint + Privacy + Terms',
-        desc: 'Imprint, privacy, and terms pages stay directly linked from every page.',
-      },
-    },
     links: {
       imprint: 'Imprint',
       privacy: 'Privacy policy',
@@ -255,7 +167,6 @@ const messages = {
     hours: ({ count }) => `${count} h`,
   },
   legal: {
-    pageTitle: 'OmniFM | Imprint',
     eyebrow: 'Imprint',
     title: 'Imprint & disclosure',
     subtitle: 'Required provider details for the OmniFM website. The content is loaded from the server configuration and can be maintained from the setup menu.',
@@ -300,7 +211,6 @@ const messages = {
     basis: 'Legal basis: Section 5 ECG, Section 14 UGB, Section 63 GewO, and Section 25 MedienG.',
   },
   privacy: {
-    pageTitle: 'OmniFM | Privacy policy',
     eyebrow: 'Privacy policy',
     title: 'Privacy policy',
     subtitle: 'This notice explains which personal data OmniFM processes across the website, Discord bot runtime, and Premium, email, and support workflows.',
@@ -391,7 +301,6 @@ const messages = {
     basis: 'Legal basis: GDPR Article 13 and Articles 15 to 22. Austrian complaint authority: Austrian Data Protection Authority.',
   },
   terms: {
-    pageTitle: 'OmniFM | Terms of service',
     eyebrow: 'Terms of service',
     title: 'Terms of service',
     subtitle: 'These terms govern the use of the OmniFM website, Discord bot, dashboard, and optional Premium features.',
@@ -470,6 +379,74 @@ const messages = {
     noteTitle: 'Important note',
     note: 'These terms reflect the typical OmniFM product setup based on the current code and configuration. Depending on your business model, legal form, payment flow, or support commitments, additional legal review may still be advisable.',
     basis: 'Note: this page complements the imprint and privacy policy with the contractual usage framework of the service.',
+  },
+  // Search engines and link previews: title and description per page, the FAQ (lib/seo.js).
+  seo: {
+    pages: {
+      home: {
+        title: 'OmniFM | 24/7 Radio for Discord',
+        description: 'OmniFM brings 24/7 Discord radio, worker bots, dashboard control, and Premium audio to your server.',
+      },
+      dashboard: {
+        title: 'OmniFM Dashboard | Manage servers',
+        description: 'Manage OmniFM servers, events, role permissions, statistics, and Premium features in the dashboard.',
+      },
+      stations: {
+        title: 'OmniFM Stations | Discord Radio Stations',
+        description: 'Explore OmniFM radio stations for Discord: free stations, the Pro catalog, and Ultimate options for 24/7 music in voice channels.',
+      },
+      premium: {
+        title: 'OmniFM Pricing | Free, Pro and Ultimate',
+        description: 'Compare OmniFM Free, Pro, and Ultimate for Discord radio, worker bots, dashboard access, audio quality, reconnect behavior, and custom stations.',
+      },
+      faq: {
+        title: 'OmniFM FAQ | Discord Radio Bot Questions',
+        description: 'Answers about OmniFM, commander and workers, Free/Pro/Ultimate, dashboard, stations, and 24/7 Discord radio.',
+      },
+      imprint: {
+        title: 'OmniFM | Imprint',
+        description: 'Required provider details and operator information for the OmniFM website.',
+      },
+      privacy: {
+        title: 'OmniFM | Privacy policy',
+        description: 'Privacy notice for the website, Discord bot runtime, dashboard, Premium, email, and support.',
+      },
+      terms: {
+        title: 'OmniFM | Terms of service',
+        description: 'Terms for the OmniFM website, Discord bot, dashboard, and optional Premium features.',
+      },
+      charts: {
+        title: 'OmniFM Charts | The most listened stations and songs of the week',
+        description: 'The most listened radio stations and the most played songs of last week across every Discord server with OmniFM, without any person or server.',
+      },
+      status: {
+        title: 'OmniFM Status | Bot availability',
+        description: 'Is OmniFM running? Every bot with its availability over 90 days, current problems and planned maintenance.',
+      },
+    },
+    faq: [
+      {
+        question: 'What is OmniFM?',
+        answer: 'OmniFM is a Discord radio bot platform for 24/7 streams, commander and worker bots, dashboard control, and Premium features.',
+      },
+      {
+        question: 'Do I need an OmniFM worker?',
+        answer: 'Yes. The commander accepts commands, while a worker runs the actual stream in the voice channel.',
+      },
+      {
+        question: 'What is included in the Free plan?',
+        answer: 'Free starts with the commander and worker flow, free stations, and the core commands. Pro and Ultimate add more control, reliability, and audio options.',
+      },
+      {
+        question: 'Who operates OmniFM?',
+        answer: 'OmniFM is the product. IT-Tabelander is the operator and service provider.',
+      },
+    ],
+  },
+  // Above the legal pages in every language but German (LegalLanguageNote.js).
+  legalNote: {
+    text: 'This page is a translation. Only the German version is legally binding.',
+    link: 'Read the German version',
   },
 };
 

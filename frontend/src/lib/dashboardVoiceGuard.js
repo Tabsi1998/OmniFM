@@ -89,11 +89,17 @@ function buildDashboardVoiceGuardSummary(rawConfig, t = (de, _en) => de) {
     statusAccent,
     description,
     thresholdsLabel: t(
-      `${config.defaults.moveConfirmations} Bestätigungen | ${formatDurationMs(config.defaults.returnCooldownMs)} Cooldown | ${config.defaults.maxMovesPerWindow} Moves / ${formatDurationMs(config.defaults.moveWindowMs)}`,
-      `${config.defaults.moveConfirmations} confirmations | ${formatDurationMs(config.defaults.returnCooldownMs)} cooldown | ${config.defaults.maxMovesPerWindow} moves / ${formatDurationMs(config.defaults.moveWindowMs)}`
+      '{confirmations} Bestätigungen | {cooldown} Cooldown | {moves} Moves / {window}',
+      '{confirmations} confirmations | {cooldown} cooldown | {moves} moves / {window}',
+      {
+        confirmations: config.defaults.moveConfirmations,
+        cooldown: formatDurationMs(config.defaults.returnCooldownMs),
+        moves: config.defaults.maxMovesPerWindow,
+        window: formatDurationMs(config.defaults.moveWindowMs),
+      }
     ),
     escalationLabel: config.defaults.escalation === 'cooldown'
-      ? t(`Danach Cooldown (${formatDurationMs(config.defaults.escalationCooldownMs)})`, `Then cooldown (${formatDurationMs(config.defaults.escalationCooldownMs)})`)
+      ? t('Danach Cooldown ({duration})', 'Then cooldown ({duration})', { duration: formatDurationMs(config.defaults.escalationCooldownMs) })
       : t('Danach Disconnect', 'Then disconnect'),
   };
 }

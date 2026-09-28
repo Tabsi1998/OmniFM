@@ -41,8 +41,7 @@ export function dayTone(uptime) {
 
 function useFormatters(intlLocale, s) {
   return useMemo(() => {
-    const german = intlLocale.startsWith('de');
-    const pct = new Intl.NumberFormat(intlLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const pct = new Intl.NumberFormat(intlLocale, { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const dateTime = new Intl.DateTimeFormat(intlLocale, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     const time = new Intl.DateTimeFormat(intlLocale, { hour: '2-digit', minute: '2-digit' });
     // A day key is a calendar day already; formatted in UTC it stays that day.
@@ -55,7 +54,7 @@ function useFormatters(intlLocale, s) {
       return rest ? `${s.hours({ count: hours })} ${s.minutes({ count: rest })}` : s.hours({ count: hours });
     };
     return {
-      percent: (value) => `${pct.format(value)}${german ? ' %' : '%'}`,
+      percent: (value) => pct.format(Number(value) / 100),
       dateTime: (iso) => dateTime.format(new Date(iso)),
       time: (iso) => time.format(new Date(iso)),
       day: (key) => day.format(new Date(`${key}T12:00:00Z`)),

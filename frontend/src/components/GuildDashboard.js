@@ -73,17 +73,18 @@ const EMPTY_DATA = Object.freeze({
 function fmtInt(value) { return Number(value || 0).toLocaleString(); }
 
 const PARKED_REASON_LABELS = {
-  permissions: ['dem Bot fehlen Rechte im Voice-Kanal', 'the bot lacks permissions in the voice channel'],
-  circuit: ['zu viele Fehlversuche beim Verbinden', 'too many failed connection attempts'],
-  'voice-ready': ['die Voice-Verbindung kommt nicht zustande', 'the voice connection does not come up'],
-  'voice-confirmation': ['Discord bestätigt die Voice-Verbindung nicht', 'Discord does not confirm the voice connection'],
+  permissions: { de: 'dem Bot fehlen Rechte im Voice-Kanal', en: 'the bot lacks permissions in the voice channel' },
+  circuit: { de: 'zu viele Fehlversuche beim Verbinden', en: 'too many failed connection attempts' },
+  'voice-ready': { de: 'die Voice-Verbindung kommt nicht zustande', en: 'the voice connection does not come up' },
+  'voice-confirmation': { de: 'Discord bestätigt die Voice-Verbindung nicht', en: 'Discord does not confirm the voice connection' },
 };
+const PARKED_REASON_FALLBACK = { de: 'Verbindung scheitert wiederholt', en: 'connection keeps failing' };
 
 // One line under the station name that says what is going on (#216).
 function streamStateLine(stream, t) {
   if (stream.parkedReason) {
-    const [de, en] = PARKED_REASON_LABELS[stream.parkedReason] || ['Verbindung scheitert wiederholt', 'connection keeps failing'];
-    return t(`Pausiert: ${de}. Neuer Versuch alle 15 Minuten.`, `Paused: ${en}. Next try every 15 minutes.`);
+    const reason = PARKED_REASON_LABELS[stream.parkedReason] || PARKED_REASON_FALLBACK;
+    return t('Pausiert: {reason}. Neuer Versuch alle 15 Minuten.', 'Paused: {reason}. Next try every 15 minutes.', { reason: t(reason.de, reason.en) });
   }
   if (stream.serverMuted) {
     return t('Der Bot ist auf dem Server stummgeschaltet.', 'The bot is server-muted.');
@@ -92,9 +93,9 @@ function streamStateLine(stream, t) {
     const desired = stream.desiredStationName || stream.failoverFromStationName || stream.desiredStationKey;
     const next = Number(stream.failbackNextProbeAt || 0);
     const nextText = next > Date.now()
-      ? t(` · nächster Versuch ${new Date(next).toLocaleTimeString()}`, ` · next try ${new Date(next).toLocaleTimeString()}`)
+      ? t(' · nächster Versuch {time}', ' · next try {time}', { time: new Date(next).toLocaleTimeString() })
       : '';
-    return t(`Ersatz für ${desired}${nextText}`, `Backup for ${desired}${nextText}`);
+    return t('Ersatz für {station}{next}', 'Backup for {station}{next}', { station: desired, next: nextText });
   }
   return '';
 }
@@ -218,8 +219,7 @@ export default function GuildDashboard() {
   const [eventForm, setEventForm] = useState(() => emptyEventForm());
   const [editingEventId, setEditingEventId] = useState('');
   const [msg, setMsg] = useState(null);
-  const { locale, formatDate } = useI18n();
-  const t = useCallback((de, en) => (String(locale || 'de').startsWith('de') ? de : en), [locale]);
+  const { locale, formatDate, t } = useI18n();
   const navLabel = useCallback((id) => ({
     overview: t('Übersicht', 'Overview'), stations: t('Sender', 'Stations'),
     events: t('Events', 'Events'),
@@ -572,7 +572,7 @@ export default function GuildDashboard() {
           {guildCapabilities?.basicHealth && <GuildLiveView apiRequest={apiRequest} guildId={guildId} t={t} locale={locale} />}
         </>}
 
-        {section === 'events' && <>{tier === 'free' ? <div className="oa-sub" style={{ marginBottom: 12 }} data-testid="guild-events-free-note">{t(`Mit Free geht ${PLAN_LIMITS.free.events} geplantes Event, mit Pro beliebig viele.`, `Free comes with ${PLAN_LIMITS.free.events} scheduled event, Pro with as many as you like.`)}</div> : null}<>
+        {section === 'events' && <>{tier === 'free' ? <div className="oa-sub" style={{ marginBottom: 12 }} data-testid="guild-events-free-note">{t('Mit Free geht {count} geplantes Event, mit Pro beliebig viele.', 'Free comes with {count} scheduled event, Pro with as many as you like.', { count: PLAN_LIMITS.free.events })}</div> : null}<>
           <DashboardEvents
             events={gdata.events}
             eventForm={eventForm}

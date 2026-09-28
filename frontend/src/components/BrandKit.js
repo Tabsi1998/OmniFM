@@ -6,7 +6,7 @@ import { useI18n } from '../i18n.js';
 const bgFor = (bg) => bg === 'light' ? '#f3f4f8' : bg === 'discord' ? '#313338' : 'linear-gradient(135deg,#0e111a,#08090d)';
 
 function CopyBtn({ text, testid }) {
-  const { locale } = useI18n();
+  const { t } = useI18n();
   const [done, setDone] = useState(false);
   const doCopy = async () => {
     let ok = false;
@@ -29,14 +29,13 @@ function CopyBtn({ text, testid }) {
   };
   return (
     <button className="oa-btn ghost" style={{ height: 38 }} data-testid={testid} onClick={doCopy}>
-      {done ? <Check size={15} color="#4ade80" /> : <Copy size={15} />} {done ? (locale === 'en' ? 'Copied' : 'Kopiert') : (locale === 'en' ? 'Copy' : 'Kopieren')}
+      {done ? <Check size={15} color="#4ade80" /> : <Copy size={15} />} {done ? t('Kopiert', 'Copied') : t('Kopieren', 'Copy')}
     </button>
   );
 }
 
 export default function BrandKit({ embedded = false }) {
-  const { locale } = useI18n();
-  const t = (de, en) => (String(locale || 'de').startsWith('de') ? de : en);
+  const { t } = useI18n();
   const origin = siteOrigin();
   const html = sponsorEmbedHtml(origin);
   const md = sponsorEmbedMarkdown(origin);
@@ -69,11 +68,11 @@ export default function BrandKit({ embedded = false }) {
           {BRAND_ASSETS.map((a) => (
             <div className="oa-card hoverable" key={a.slug} data-testid={`brand-asset-${a.slug}`}>
               <div style={{ height: 150, borderRadius: 12, background: bgFor(a.bg), display: 'grid', placeItems: 'center', overflow: 'hidden', marginBottom: 14, border: '1px solid #1b2133' }}>
-                <img src={a.file} alt={locale === 'en' ? (a.labelEn || a.label) : a.label} style={{ maxWidth: '82%', maxHeight: '82%', objectFit: 'contain' }} />
+                <img src={a.file} alt={t(a.label.de, a.label.en)} style={{ maxWidth: '82%', maxHeight: '82%', objectFit: 'contain' }} />
               </div>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>{locale === 'en' ? (a.labelEn || a.label) : a.label}</div>
-              <div style={{ color: '#94a3b8', fontSize: 13, margin: '4px 0 6px', lineHeight: 1.45 }}>{locale === 'en' ? (a.descEn || a.desc) : a.desc}</div>
-              <div className="oa-mono" style={{ fontSize: 10.5, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>{locale === 'en' ? (a.useEn || a.use) : a.use}</div>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>{t(a.label.de, a.label.en)}</div>
+              <div style={{ color: '#94a3b8', fontSize: 13, margin: '4px 0 6px', lineHeight: 1.45 }}>{t(a.desc.de, a.desc.en)}</div>
+              <div className="oa-mono" style={{ fontSize: 10.5, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>{t(a.use.de, a.use.en)}</div>
               <a className="oa-btn primary" style={{ width: '100%', height: 40, textDecoration: 'none' }} href={a.file} download data-testid={`brand-download-${a.slug}`}>
                 <Download size={15} /> Download
               </a>

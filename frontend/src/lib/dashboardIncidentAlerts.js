@@ -73,8 +73,9 @@ export function buildDashboardIncidentAlertsSummary(rawConfig, channelName, t) {
       statusLabel: t('Aktiv', 'Active'),
       statusAccent: '#10B981',
       description: t(
-        `Neue Vorfaelle werden automatisch in ${channelName || 'Discord'} gemeldet.`,
-        `New incidents are posted automatically in ${channelName || 'Discord'}.`
+        'Neue Vorfaelle werden automatisch in {channel} gemeldet.',
+        'New incidents are posted automatically in {channel}.',
+        { channel: channelName || 'Discord' }
       ),
     };
   }
@@ -94,8 +95,9 @@ export function buildDashboardIncidentAlertsSummary(rawConfig, channelName, t) {
     statusLabel: t('Bereit', 'Ready'),
     statusAccent: '#8B5CF6',
     description: t(
-      `Der Channel ${channelName || 'Discord'} ist gespeichert und kann bei Bedarf fuer Incident-Alerts aktiviert werden.`,
-      `The channel ${channelName || 'Discord'} is saved and can be enabled for incident alerts when needed.`
+      'Der Channel {channel} ist gespeichert und kann bei Bedarf fuer Incident-Alerts aktiviert werden.',
+      'The channel {channel} is saved and can be enabled for incident alerts when needed.',
+      { channel: channelName || 'Discord' }
     ),
   };
 }
