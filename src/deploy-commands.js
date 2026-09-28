@@ -38,7 +38,7 @@ for (const bot of bots) {
     const me = await rest.get(Routes.user("@me"));
     const runtimeClientId = String(me?.id || bot.clientId || "").trim();
     if (!runtimeClientId) {
-      throw new Error("Application ID konnte nicht aufgeloest werden.");
+      throw new Error("Application ID konnte nicht aufgelöst werden.");
     }
     if (runtimeClientId !== String(bot.clientId || "").trim()) {
       console.warn(`[WARN] ${bot.name}: CLIENT_ID mismatch (env=${bot.clientId}, runtime=${runtimeClientId}). Nutze runtime-ID.`);
@@ -51,14 +51,14 @@ for (const bot of bots) {
         await rest.put(Routes.applicationCommands(runtimeClientId), { body: [] });
         console.log(`Worker ${bot.name}: globale Slash-Commands entfernt.`);
       } else {
-        console.log(`Worker ${bot.name}: globale Slash-Commands bleiben unveraendert (Cleanup deaktiviert).`);
+        console.log(`Worker ${bot.name}: globale Slash-Commands bleiben unverändert (Cleanup deaktiviert).`);
       }
       console.log("Fertig.");
       continue;
     }
 
     if (syncGlobalCommands) {
-      console.log(`Registriere globale Slash-Commands fuer Commander ${bot.name} (${runtimeClientId})...`);
+      console.log(`Registriere globale Slash-Commands für Commander ${bot.name} (${runtimeClientId})...`);
       // eslint-disable-next-line no-await-in-loop -- one bot after the other, as Discord's rate limit wants
       await rest.put(Routes.applicationCommands(runtimeClientId), { body: commands });
     } else if (cleanGlobalCommands) {
@@ -66,7 +66,7 @@ for (const bot of bots) {
       await rest.put(Routes.applicationCommands(runtimeClientId), { body: [] });
       console.log(`Commander ${bot.name}: globale Slash-Commands bereinigt (Modus ${commandRegistrationMode}).`);
     } else {
-      console.log(`Ueberspringe globale Slash-Commands fuer Commander ${bot.name} (${runtimeClientId}) (Modus ${commandRegistrationMode}).`);
+      console.log(`Überspringe globale Slash-Commands für Commander ${bot.name} (${runtimeClientId}) (Modus ${commandRegistrationMode}).`);
     }
     console.log("Fertig.");
   } catch (err) {
@@ -76,14 +76,14 @@ for (const bot of bots) {
 }
 
 if (syncGuildCommands && syncGlobalCommands) {
-  console.log("Hybrid-Modus aktiv: globale Commands fuer den Commander registriert, Guild-Sync bleibt beim Bot-Start aktiv.");
+  console.log("Hybrid-Modus aktiv: globale Commands für den Commander registriert, Guild-Sync bleibt beim Bot-Start aktiv.");
 } else if (syncGuildCommands) {
-  console.log("Global-Command-Deploy uebersprungen (Guild-Modus). Nur der Commander synchronisiert Guild-Commands beim Bot-Start.");
+  console.log("Global-Command-Deploy übersprungen (Guild-Modus). Nur der Commander synchronisiert Guild-Commands beim Bot-Start.");
 } else {
-  console.log("Globale Commands fuer Commander registriert (Global-Modus, Worker haben keine Commands).");
+  console.log("Globale Commands für Commander registriert (Global-Modus, Worker haben keine Commands).");
 }
 
 if (failedBots.length > 0) {
-  console.error(`[WARN] Command-Deploy unvollstaendig. Fehlgeschlagen fuer: ${failedBots.join(", ")}`);
+  console.error(`[WARN] Command-Deploy unvollständig. Fehlgeschlagen für: ${failedBots.join(", ")}`);
   process.exitCode = 1;
 }

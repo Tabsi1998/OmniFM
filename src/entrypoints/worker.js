@@ -85,6 +85,6 @@ setInterval(() => {
 setInterval(() => {
   if (!runtime.client.isReady()) return;
   runtime.enforcePremiumGuildScope("periodic").catch((err) => {
-    log("ERROR", `[${runtime.config.name}] Periodische Premium-Guild-Scope Pruefung fehlgeschlagen: ${err?.message || err}`);
+    log("ERROR", `[${runtime.config.name}] Periodische Premium-Guild-Scope Prüfung fehlgeschlagen: ${err?.message || err}`);
   });
 }, 10 * 60 * 1000);

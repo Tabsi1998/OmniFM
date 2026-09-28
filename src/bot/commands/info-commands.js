@@ -161,7 +161,7 @@ async function handleInviteCommand({ runtime, interaction, t, language }) {
       new ButtonBuilder()
         .setCustomId(INVITE_COMPONENT_ID_OPEN)
         .setStyle(ButtonStyle.Secondary)
-        .setLabel(t("Anderen Worker waehlen", "Select another worker"))
+        .setLabel(t("Anderen Worker wählen", "Select another worker"))
     );
     await interaction.reply(buildNoticePayload({
       t,
@@ -183,7 +183,7 @@ async function handleInviteCommand({ runtime, interaction, t, language }) {
       new ButtonBuilder()
         .setCustomId(INVITE_COMPONENT_ID_OPEN)
         .setStyle(ButtonStyle.Secondary)
-        .setLabel(t("Menue", "Menu"))
+        .setLabel(t("Menü", "Menu"))
     );
     await interaction.reply(buildNoticePayload({
       t,
@@ -328,7 +328,7 @@ async function handlePremiumCommand({ runtime, interaction, t, language }) {
   if (license && !license.expired) {
     const expDate = new Date(license.expiresAt).toLocaleDateString(t("de-DE", "en-US"));
     licenseSummary = t(
-      `Aktiv bis ${expDate} (${license.remainingDays} Tage uebrig)`,
+      `Aktiv bis ${expDate} (${license.remainingDays} Tage übrig)`,
       `Active until ${expDate} (${license.remainingDays} day${license.remainingDays === 1 ? "" : "s"} left)`
     );
   } else if (license && license.expired) {

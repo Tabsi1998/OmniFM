@@ -35,7 +35,7 @@ export function createDashboardRolesRouteHandler(deps) {
       return true;
     }
     if (!serverHasCapability(guildInfo.id, "role_permissions")) {
-      sendLocalizedError(res, 403, language, "Berechtigungen sind erst ab Pro verfuegbar.", "Permissions are only available from Pro.");
+      sendLocalizedError(res, 403, language, "Berechtigungen sind erst ab Pro verfügbar.", "Permissions are only available from Pro.");
       return true;
     }
 

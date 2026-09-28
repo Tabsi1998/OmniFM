@@ -205,7 +205,7 @@ ${t("Das Logo ist gespeichert und erscheint im Now-Playing-Panel und im Dashboar
         phaseHistory: describePlaybackPhaseHistory(state, { limit: 5 }).map((line) => line.replace(/<t:\d+:R>/g, "").trim()),
       },
     });
-    log("INFO", `[${this.config?.name}] Hoerer-Meldung guild=${guildId} reason=${report.reason}`);
+    log("INFO", `[${this.config?.name}] Hörer-Meldung guild=${guildId} reason=${report.reason}`);
     await interaction.reply(buildNoticePayload({
       t, language, tone: "success", title: t("Danke für die Meldung", "Thanks for the report"),
       description: t(

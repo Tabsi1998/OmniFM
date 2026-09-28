@@ -266,7 +266,7 @@ async function handleLicenseCommand({ runtime, interaction, t, language }) {
           tone: "warning",
           title: t("🛠 Lizenz-Rechte fehlen", "🛠 License permission missing"),
           description: t(
-            "Du brauchst die Berechtigung `Server verwalten`, um Lizenz-Aktionen auszufuehren.",
+            "Du brauchst die Berechtigung `Server verwalten`, um Lizenz-Aktionen auszuführen.",
             "You need the `Manage Server` permission to execute license actions."
           ),
         }),
@@ -325,7 +325,7 @@ async function handleLicenseCommand({ runtime, interaction, t, language }) {
     const result = linkServerToLicense(guildId, resolvedKey);
     if (!result.ok) {
       const msg = result.message.includes("already linked")
-        ? t("Dieser Server ist bereits mit dieser Lizenz verknuepft.", "This server is already linked to this license.")
+        ? t("Dieser Server ist bereits mit dieser Lizenz verknüpft.", "This server is already linked to this license.")
         : result.message.includes("seat")
           ? t(
             `Alle ${lic.seats} Server-Slots sind belegt. Entferne zuerst einen Server mit \`/license remove\` oder upgrade auf mehr Seats.`,
@@ -494,7 +494,7 @@ async function handleVoiceguardCommand({ runtime, interaction, t, language }) {
           tone: "info",
           title: t("🛡 Voice Guard gesperrt", "🛡 Voice guard locked"),
           description: t(
-            "Voice Guard ist auf diesem Server aktuell nicht verfuegbar.",
+            "Voice Guard ist auf diesem Server aktuell nicht verfügbar.",
             "Voice guard is not currently available on this server."
           ),
         }),
@@ -511,7 +511,7 @@ async function handleVoiceguardCommand({ runtime, interaction, t, language }) {
           tone: "warning",
           title: t("🛠 Voice-Guard-Rechte fehlen", "🛠 Voice guard permission missing"),
           description: t(
-            "Du brauchst die Berechtigung `Server verwalten`, um den Voice-Guard zu aendern.",
+            "Du brauchst die Berechtigung `Server verwalten`, um den Voice-Guard zu ändern.",
             "You need the `Manage Server` permission to manage the voice guard."
           ),
         }),
@@ -548,7 +548,7 @@ async function handleVoiceguardCommand({ runtime, interaction, t, language }) {
             tone: "danger",
             title: t("✖ Voice Guard konnte nicht gespeichert werden", "✖ Could not save voice guard"),
             description: t(
-              "Voice-Guard-Policy konnte nicht gespeichert werden. Bitte versuche es spaeter erneut oder nutze das Dashboard.",
+              "Voice-Guard-Policy konnte nicht gespeichert werden. Bitte versuche es später erneut oder nutze das Dashboard.",
               "The voice guard policy could not be saved. Please try again later or use the dashboard."
             ),
           }),
@@ -719,7 +719,7 @@ async function handleVoiceguardCommand({ runtime, interaction, t, language }) {
             tone: "info",
             title: t("🛡 Voice Guard zurückgesetzt", "🛡 Voice guard reset"),
             description: t(
-              "Keine aktive Stream-Runtime gefunden. Temporaere Unlocks wurden fuer diesen Server zurueckgesetzt, falls vorhanden.",
+              "Keine aktive Stream-Runtime gefunden. Temporäre Unlocks wurden für diesen Server zurückgesetzt, falls vorhanden.",
               "No active stream runtime found. Temporary unlocks were reset for this server where present."
             ),
           }),

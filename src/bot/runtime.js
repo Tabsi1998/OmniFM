@@ -112,7 +112,7 @@ class BotRuntime {
         // Station suggestions: hourly stream checks, answers to the senders (#303).
         startStationSuggestionService(this);
         this.enforcePremiumGuildScope("startup").catch((err) => {
-          log("ERROR", `[${this.config.name}] Premium-Guild-Scope Pruefung fehlgeschlagen: ${err?.message || err}`);
+          log("ERROR", `[${this.config.name}] Premium-Guild-Scope Prüfung fehlgeschlagen: ${err?.message || err}`);
         });
         this.refreshCommandsOnReady().catch((err) => {
           log("ERROR", `[${this.config.name}] Command-Registrierung fehlgeschlagen: ${err?.message || err}`);
@@ -362,7 +362,7 @@ class BotRuntime {
       });
 
       // Erholung nach Fehler: wenn nach einem Stream-Fehler wieder abgespielt wird,
-      // ein aufgeloestes "recovered"-Incident melden (einmalig pro Fehler).
+      // ein aufgelöstes "recovered"-Incident melden (einmalig pro Fehler).
       player.on(AudioPlayerStatus.Playing, () => {
         if (this.shuttingDown) return;
         if (!state.lastStreamErrorAt) return;
@@ -467,7 +467,7 @@ class BotRuntime {
     }
   }
 
-  // === State Persistence: Speichert aktuellen Zustand fuer Auto-Reconnect nach Restart ===
+  // === State Persistence: Speichert aktuellen Zustand für Auto-Reconnect nach Restart ===
   persistState({ forceLog = false } = {}) {
     const persistableCount = [...this.guildState.entries()].filter(
       ([_, s]) => isPersistableGuildState(s)

@@ -267,7 +267,7 @@ async function restartRuntimeCurrentStationAttempt(runtime, state, guildId) {
     if (fallbackCandidates.length > 0 && !failoverDecision.eligible) {
       log(
         "INFO",
-        `[${runtime.config.name}] Failover fuer ${resolvedStation.key} bleibt gesperrt ` +
+        `[${runtime.config.name}] Failover für ${resolvedStation.key} bleibt gesperrt ` +
         `(Grund=${failoverDecision.reason}, Fehler=${failoverDecision.failureCount}/${failoverDecision.requiredFailures}, ` +
         `instabil=${Math.round(failoverDecision.unstableForMs / 1000)}s/${Math.round(failoverDecision.requiredUnstableMs / 1000)}s, ` +
         `ohneAudio=${Math.round(failoverDecision.silentForMs / 1000)}s).`
@@ -355,7 +355,7 @@ async function restartRuntimeCurrentStationAttempt(runtime, state, guildId) {
     if (isPermanentStreamRestartError(err) && fallbackCandidates.length === 0) {
       log(
         "ERROR",
-        `[${runtime.config.name}] Permanenter Stream-Restartfehler fuer ${resolvedStation.key}; Wiedergabe wird beendet: ${errorMessage}`
+        `[${runtime.config.name}] Permanenter Stream-Restartfehler für ${resolvedStation.key}; Wiedergabe wird beendet: ${errorMessage}`
       );
       if (typeof runtime.stopInGuild === "function") {
         try {
@@ -382,7 +382,7 @@ async function restartRuntimeCurrentStationAttempt(runtime, state, guildId) {
     if (isRuntimeVoiceConnected(runtime, guildId, state, { includeObserved: true })) {
       log(
         "INFO",
-        `[${runtime.config.name}] Stream-Retry nach Restart-Fehler fuer ${resolvedStation.key} in ${Math.round(retryDelay)}ms ` +
+        `[${runtime.config.name}] Stream-Retry nach Restart-Fehler für ${resolvedStation.key} in ${Math.round(retryDelay)}ms ` +
         `(Fehlerreihe ${retry.errorCount}${retry.cooldownActive ? ", Cooldown aktiv" : ""})`
       );
       runtime.scheduleStreamRestart(guildId, state, retryDelay, "restart-error");
@@ -393,7 +393,7 @@ async function restartRuntimeCurrentStationAttempt(runtime, state, guildId) {
     if (state.lastChannelId) {
       log(
         "INFO",
-        `[${runtime.config.name}] Voice-Reconnect nach Restart-Fehler fuer guild=${guildId} wird geplant.`
+        `[${runtime.config.name}] Voice-Reconnect nach Restart-Fehler für guild=${guildId} wird geplant.`
       );
       runtime.scheduleReconnect?.(guildId, {
         resetAttempts: recoverableRestartError,

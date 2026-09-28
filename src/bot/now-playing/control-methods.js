@@ -35,7 +35,7 @@ const nowPlayingControlMethods = {
     const { t } = this.createInteractionTranslator(interaction);
     const guildId = interaction.guildId;
     if (!guildId) {
-      await interaction.reply({ content: t("Nur in Servern verfuegbar.", "Only available in servers."), flags: MessageFlags.Ephemeral });
+      await interaction.reply({ content: t("Nur in Servern verfügbar.", "Only available in servers."), flags: MessageFlags.Ephemeral });
       return true;
     }
     const action = String(interaction.customId || "").slice(NP_PREFIX.length);
@@ -92,7 +92,7 @@ const nowPlayingControlMethods = {
       const cur = Number(state?.volume ?? 100);
       const next = Math.max(0, Math.min(100, cur + (action === "volup" ? 10 : -10)));
       result = await this.setVolumeInGuild(guildId, next);
-      msg = `\u{1f50a} ${t("Lautstaerke", "Volume")}: ${next}%`;
+      msg = `\u{1f50a} ${t("Lautstärke", "Volume")}: ${next}%`;
     } else if (action === "failback") {
       const desiredName = state?.desiredStationName || state?.desiredStationKey || "-";
       if (!state || state.failoverActive !== true) {

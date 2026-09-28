@@ -88,7 +88,7 @@ function normalizeWhitespace(value) {
 function readStationsFile(filePath) {
   if (!fs.existsSync(filePath)) return null;
   if (fs.statSync(filePath).isDirectory()) {
-    log("WARN", `[custom-stations] ${filePath} ist ein Verzeichnis - ueberspringe.`);
+    log("WARN", `[custom-stations] ${filePath} ist ein Verzeichnis - überspringe.`);
     return null;
   }
   const raw = fs.readFileSync(filePath, "utf8");
@@ -154,7 +154,7 @@ function save(data) {
   const tmpFile = `${CUSTOM_FILE}.tmp-${process.pid}-${Date.now()}`;
   try {
     if (fs.existsSync(CUSTOM_FILE) && fs.statSync(CUSTOM_FILE).isDirectory()) {
-      log("WARN", `[custom-stations] ${CUSTOM_FILE} ist ein Verzeichnis - Speichern uebersprungen.`);
+      log("WARN", `[custom-stations] ${CUSTOM_FILE} ist ein Verzeichnis - Speichern übersprungen.`);
       return;
     }
 
@@ -173,7 +173,7 @@ function save(data) {
       const code = String(renameErr?.code || "");
       if (["EBUSY", "EPERM", "EACCES", "EXDEV"].includes(code)) {
         fs.writeFileSync(CUSTOM_FILE, JSON.stringify(data, null, 2) + "\n", "utf8");
-        log("WARN", `[custom-stations] Atomic rename nicht moeglich (${code}), nutze direkten Write-Fallback.`);
+        log("WARN", `[custom-stations] Atomic rename nicht möglich (${code}), nutze direkten Write-Fallback.`);
       } else {
         throw renameErr;
       }

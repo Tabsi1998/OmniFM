@@ -39,7 +39,7 @@ export function createDashboardSettingsDigestRouteHandler(deps) {
         return true;
       }
       if (!serverHasCapability(guildInfo.id, "weekly_digest")) {
-        sendLocalizedError(res, 403, language, "Woechentlicher Digest ist erst ab Pro verfuegbar.", "Weekly digest is only available from Pro.");
+        sendLocalizedError(res, 403, language, "Wöchentlicher Digest ist erst ab Pro verfügbar.", "Weekly digest is only available from Pro.");
         return true;
       }
 
@@ -89,7 +89,7 @@ export function createDashboardSettingsDigestRouteHandler(deps) {
       return true;
     }
     if (!serverHasCapability(guildInfo.id, "weekly_digest")) {
-      sendLocalizedError(res, 403, language, "Woechentlicher Digest ist erst ab Pro verfuegbar.", "Weekly digest is only available from Pro.");
+      sendLocalizedError(res, 403, language, "Wöchentlicher Digest ist erst ab Pro verfügbar.", "Weekly digest is only available from Pro.");
       return true;
     }
 
@@ -101,7 +101,7 @@ export function createDashboardSettingsDigestRouteHandler(deps) {
           res,
           400,
           language,
-          "Fuer einen Test-Digest muss ein Text-Channel ausgewaehlt werden.",
+          "Für einen Test-Digest muss ein Text-Channel ausgewählt werden.",
           "A text channel is required for a test digest."
         );
         return true;
@@ -125,7 +125,7 @@ export function createDashboardSettingsDigestRouteHandler(deps) {
           res,
           400,
           language,
-          "Der ausgewaehlte Text-Channel ist nicht verfuegbar.",
+          "Der ausgewählte Text-Channel ist nicht verfügbar.",
           "The selected text channel is not available."
         );
         return true;

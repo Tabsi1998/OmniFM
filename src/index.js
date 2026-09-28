@@ -71,7 +71,7 @@ installOperatorIncidentRecorder({
   entry: path.basename(process.argv[1] || "index.js"),
 });
 
-// ---- Voice-Dependencies pruefen ----
+// ---- Voice-Dependencies prüfen ----
 try {
   const { generateDependencyReport } = await import("@discordjs/voice");
   const report = generateDependencyReport();
@@ -88,7 +88,7 @@ if (mongoEnabled) {
   try {
     await connectDb();
     mongoConnected = true;
-    log("INFO", "MongoDB-Verbindung fuer Node.js Bot hergestellt.");
+    log("INFO", "MongoDB-Verbindung für Node.js Bot hergestellt.");
     // Migrate legacy JSON data to MongoDB
     const { migrateJsonToMongo } = await import("./listening-stats-store.js");
     const migration = await migrateJsonToMongo();
@@ -139,7 +139,7 @@ await logRecentOperatorIncidentSummary({
   label: "Owner summary on startup",
 }).catch(() => null);
 
-// ---- Lizenz-Provider fuer Entitlements verbinden ----
+// ---- Lizenz-Provider für Entitlements verbinden ----
 setLicenseProvider((serverId) => {
   const license = getServerLicense(serverId);
   if (!license) return null;
@@ -159,7 +159,7 @@ try {
   process.exit(1);
 }
 
-// Commander per BOT_N waehlen (COMMANDER_BOT_INDEX=N), fallback auf ersten konfigurierten Bot.
+// Commander per BOT_N wählen (COMMANDER_BOT_INDEX=N), fallback auf ersten konfigurierten Bot.
 const configuredCommander = Number.parseInt(String(process.env.COMMANDER_BOT_INDEX || "1"), 10);
 const commanderIndex = Number.isFinite(configuredCommander) && configuredCommander >= 1
   ? botConfigs.findIndex((cfg) => Number(cfg?.index || 0) === configuredCommander)
@@ -253,7 +253,7 @@ if (!webServerEnabled) {
   log("INFO", "Node-Webserver deaktiviert; FastAPI ist das produktive HTTP-Backend.");
 }
 
-// ---- Runtime Health Reporter (echte Metriken -> MongoDB fuer Owner-Dashboard) ----
+// ---- Runtime Health Reporter (echte Metriken -> MongoDB für Owner-Dashboard) ----
 startRuntimeHealthReporter(runtimes, {
   intervalMs: parseInt(process.env.RUNTIME_HEALTH_INTERVAL_MS || "5000", 10),
 });
@@ -517,8 +517,8 @@ if (periodicGuildSyncIntervalMs > 0) {
   log("INFO", "Periodischer Guild-Command-Sync deaktiviert (PERIODIC_GUILD_COMMAND_SYNC_MS=0).");
 }
 
-// Lizenz-Ablauf pruefen (alle 6 Stunden)
-log("INFO", `Lizenz-Reminder aktiv fuer: ${EXPIRY_REMINDER_DAYS.join(", ")} Tage vor Ablauf + abgelaufen.`);
+// Lizenz-Ablauf prüfen (alle 6 Stunden)
+log("INFO", `Lizenz-Reminder aktiv für: ${EXPIRY_REMINDER_DAYS.join(", ")} Tage vor Ablauf + abgelaufen.`);
 setInterval(async () => {
   if (!isEmailConfigured()) return;
   try {
@@ -554,15 +554,15 @@ setInterval(async () => {
             language: emailLanguage,
           });
           const warningSubject = emailLanguage === "de"
-            ? `Premium ${tierName} laeuft in ${Math.max(1, daysUntilExpiry)} ${Math.max(1, daysUntilExpiry) === 1 ? "Tag" : "Tagen"} ab!`
+            ? `Premium ${tierName} läuft in ${Math.max(1, daysUntilExpiry)} ${Math.max(1, daysUntilExpiry) === 1 ? "Tag" : "Tagen"} ab!`
             : `Premium ${tierName} expires in ${Math.max(1, daysUntilExpiry)} day${Math.max(1, daysUntilExpiry) === 1 ? "" : "s"}!`;
           // eslint-disable-next-line no-await-in-loop -- one mail after the other, gentle on the mail server
           const result = await sendMail(contactEmail, warningSubject, html);
           if (result?.success) {
             patchLicenseById(licenseId, { [warningFlagField]: lic.expiresAt });
-            log("INFO", `[Email] Ablauf-Warnung (${reminderDay}d) gesendet an ${contactEmail} fuer Lizenz ${licenseId} (Server ${serverId})`);
+            log("INFO", `[Email] Ablauf-Warnung (${reminderDay}d) gesendet an ${contactEmail} für Lizenz ${licenseId} (Server ${serverId})`);
           } else {
-            log("ERROR", `[Email] Ablauf-Warnung (${reminderDay}d) fehlgeschlagen fuer Lizenz ${licenseId}: ${result?.error || "Unbekannter Fehler"}`);
+            log("ERROR", `[Email] Ablauf-Warnung (${reminderDay}d) fehlgeschlagen für Lizenz ${licenseId}: ${result?.error || "Unbekannter Fehler"}`);
           }
           break;
         }
@@ -579,9 +579,9 @@ setInterval(async () => {
         const result = await sendMail(contactEmail, expiredSubject, html);
         if (result?.success) {
           patchLicenseById(licenseId, { _expiredNotifiedForExpiryAt: lic.expiresAt, _expiredNotified: true });
-          log("INFO", `[Email] Ablauf-Benachrichtigung gesendet an ${contactEmail} fuer Lizenz ${licenseId} (Server ${serverId})`);
+          log("INFO", `[Email] Ablauf-Benachrichtigung gesendet an ${contactEmail} für Lizenz ${licenseId} (Server ${serverId})`);
         } else {
-          log("ERROR", `[Email] Ablauf-Benachrichtigung fehlgeschlagen fuer Lizenz ${licenseId}: ${result?.error || "Unbekannter Fehler"}`);
+          log("ERROR", `[Email] Ablauf-Benachrichtigung fehlgeschlagen für Lizenz ${licenseId}: ${result?.error || "Unbekannter Fehler"}`);
         }
       }
     }
@@ -595,7 +595,7 @@ setInterval(() => {
   for (const runtime of runtimes) {
     if (!runtime.client.isReady()) continue;
     runtime.enforcePremiumGuildScope("periodic").catch((err) => {
-      log("ERROR", `[${runtime.config.name}] Periodische Premium-Guild-Scope Pruefung fehlgeschlagen: ${err?.message || err}`);
+      log("ERROR", `[${runtime.config.name}] Periodische Premium-Guild-Scope Prüfung fehlgeschlagen: ${err?.message || err}`);
     });
   }
 }, 10 * 60 * 1000);
@@ -618,7 +618,7 @@ async function shutdown(signal) {
     await notifyShutdown(signal).catch(() => null);
   }
 
-  log("INFO", "Speichere Bot-State fuer Auto-Reconnect...");
+  log("INFO", "Speichere Bot-State für Auto-Reconnect...");
   for (const runtime of runtimes) {
     runtime.beginShutdown?.();
     runtime.persistState();

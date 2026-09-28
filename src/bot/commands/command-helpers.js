@@ -292,6 +292,6 @@ export function formatVoiceGuardPolicyLabel(policy, t) {
   const normalized = String(policy || "default").trim().toLowerCase();
   if (normalized === "allow") return t("Erlauben", "Allow");
   if (normalized === "disconnect") return t("Disconnect", "Disconnect");
-  if (normalized === "return") return t("Zurueckspringen", "Return");
+  if (normalized === "return") return t("Zurückspringen", "Return");
   return t("Standard", "Default");
 }

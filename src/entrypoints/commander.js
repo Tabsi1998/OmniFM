@@ -360,7 +360,7 @@ if (periodicGuildSyncIntervalMs > 0) {
   log("INFO", "Periodischer Guild-Command-Sync deaktiviert (PERIODIC_GUILD_COMMAND_SYNC_MS=0).");
 }
 
-log("INFO", `Lizenz-Reminder aktiv fuer: ${EXPIRY_REMINDER_DAYS.join(", ")} Tage vor Ablauf + abgelaufen.`);
+log("INFO", `Lizenz-Reminder aktiv für: ${EXPIRY_REMINDER_DAYS.join(", ")} Tage vor Ablauf + abgelaufen.`);
 setInterval(async () => {
   if (!isEmailConfigured()) return;
   try {
@@ -395,15 +395,15 @@ setInterval(async () => {
             language: emailLanguage,
           });
           const warningSubject = emailLanguage === "de"
-            ? `Premium ${tierName} laeuft in ${Math.max(1, daysUntilExpiry)} ${Math.max(1, daysUntilExpiry) === 1 ? "Tag" : "Tagen"} ab!`
+            ? `Premium ${tierName} läuft in ${Math.max(1, daysUntilExpiry)} ${Math.max(1, daysUntilExpiry) === 1 ? "Tag" : "Tagen"} ab!`
             : `Premium ${tierName} expires in ${Math.max(1, daysUntilExpiry)} day${Math.max(1, daysUntilExpiry) === 1 ? "" : "s"}!`;
           // eslint-disable-next-line no-await-in-loop -- one mail after the other, gentle on the mail server
           const result = await sendMail(contactEmail, warningSubject, html);
           if (result?.success) {
             patchLicenseById(licenseId, { [warningFlagField]: license.expiresAt });
-            log("INFO", `[Email] Ablauf-Warnung (${reminderDay}d) gesendet an ${contactEmail} fuer Lizenz ${licenseId} (Server ${serverId})`);
+            log("INFO", `[Email] Ablauf-Warnung (${reminderDay}d) gesendet an ${contactEmail} für Lizenz ${licenseId} (Server ${serverId})`);
           } else {
-            log("ERROR", `[Email] Ablauf-Warnung (${reminderDay}d) fehlgeschlagen fuer Lizenz ${licenseId}: ${result?.error || "Unbekannter Fehler"}`);
+            log("ERROR", `[Email] Ablauf-Warnung (${reminderDay}d) fehlgeschlagen für Lizenz ${licenseId}: ${result?.error || "Unbekannter Fehler"}`);
           }
           break;
         }
@@ -419,9 +419,9 @@ setInterval(async () => {
         const result = await sendMail(contactEmail, expiredSubject, html);
         if (result?.success) {
           patchLicenseById(licenseId, { _expiredNotifiedForExpiryAt: license.expiresAt, _expiredNotified: true });
-          log("INFO", `[Email] Ablauf-Benachrichtigung gesendet an ${contactEmail} fuer Lizenz ${licenseId} (Server ${serverId})`);
+          log("INFO", `[Email] Ablauf-Benachrichtigung gesendet an ${contactEmail} für Lizenz ${licenseId} (Server ${serverId})`);
         } else {
-          log("ERROR", `[Email] Ablauf-Benachrichtigung fehlgeschlagen fuer Lizenz ${licenseId}: ${result?.error || "Unbekannter Fehler"}`);
+          log("ERROR", `[Email] Ablauf-Benachrichtigung fehlgeschlagen für Lizenz ${licenseId}: ${result?.error || "Unbekannter Fehler"}`);
         }
       }
     }
@@ -433,7 +433,7 @@ setInterval(async () => {
 setInterval(() => {
   if (!commanderRuntime.client.isReady()) return;
   commanderRuntime.enforcePremiumGuildScope("periodic").catch((err) => {
-    log("ERROR", `[${commanderRuntime.config.name}] Periodische Premium-Guild-Scope Pruefung fehlgeschlagen: ${err?.message || err}`);
+    log("ERROR", `[${commanderRuntime.config.name}] Periodische Premium-Guild-Scope Prüfung fehlgeschlagen: ${err?.message || err}`);
   });
 }, 10 * 60 * 1000);
 

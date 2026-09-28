@@ -145,7 +145,7 @@ const savedSongMethods = {
         await interaction.update(asUpdate(buildNoticePayload({ t, language, tone: "error", title: t("Nicht gelöscht", "Not deleted"), description: storeProblem(t, result.error) })));
         return true;
       }
-      log("INFO", `[${this.config?.name}] Merkliste geloescht: ${result.deleted} Songs`);
+      log("INFO", `[${this.config?.name}] Merkliste gelöscht: ${result.deleted} Songs`);
       await interaction.update(asUpdate(buildSavedSongsClearedPayload({ t, deleted: result.deleted, applicationId })));
       return true;
     }

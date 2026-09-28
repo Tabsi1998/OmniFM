@@ -421,7 +421,7 @@ function handleDiscordBotListVoteWebhook(headers = {}, rawBody = {}) {
 
   const recorded = recordDiscordBotListVote(rawBody, { source: "webhook" });
   if (!recorded.ok) {
-    return { ok: false, status: 400, error: "Ungueltiger Vote-Payload." };
+    return { ok: false, status: 400, error: "Ungültiger Vote-Payload." };
   }
   const normalizedVote = normalizeDiscordBotListVoteEvent(rawBody, { source: "webhook", botId: config.botId });
   if (normalizedVote) {

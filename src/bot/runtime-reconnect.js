@@ -149,7 +149,7 @@ export async function tryRuntimeReconnect(runtime, guildId) {
     if (!guild) {
       if (isPermanentRestoreResourceError(guildError, "guild")) {
         clearTransientVoiceIssue(state, "reconnect-guild-missing");
-        log("INFO", `[${runtime.config.name}] Reconnect-Ziel Guild ${guildId} ist nicht mehr verfuegbar. Verwerfe Playback-Target.`);
+        log("INFO", `[${runtime.config.name}] Reconnect-Ziel Guild ${guildId} ist nicht mehr verfügbar. Verwerfe Playback-Target.`);
         runtime.resetVoiceSession(guildId, state, { preservePlaybackTarget: false, clearLastChannel: true });
         return { attempted: false, retryRecommended: false, reason: "guild-missing-permanent" };
       }
@@ -161,7 +161,7 @@ export async function tryRuntimeReconnect(runtime, guildId) {
       if (shouldLogRecurringTransientIssue(issue)) {
         log(
           "WARN",
-          `[${runtime.config.name}] Reconnect kann Guild noch nicht aufloesen guild=${guildId} ` +
+          `[${runtime.config.name}] Reconnect kann Guild noch nicht auflösen guild=${guildId} ` +
           `(${issue.count}/${VOICE_RECONNECT_RESOURCE_CONFIRMATIONS}, detail=${getRuntimeErrorMessage(guildError)}) - retry folgt.`
         );
       }
@@ -320,7 +320,7 @@ export async function tryRuntimeReconnect(runtime, guildId) {
       if (state.connection === connection) {
         state.connection = null;
       }
-      logRuntimeRecoveryState(runtime, "WARN", "Reconnect bestaetigt lokalen Ready-State, aber Discord-Voice-State fehlt", guildId, state, {
+      logRuntimeRecoveryState(runtime, "WARN", "Reconnect bestätigt lokalen Ready-State, aber Discord-Voice-State fehlt", guildId, state, {
         reason: "voice-confirmation-failed",
         actualChannelId: channel.id,
       });
@@ -490,8 +490,8 @@ export function scheduleRuntimeReconnect(runtime, guildId, options = {}) {
       nextCircuitOpenUntil = nowMs + delay;
       logLevel = "WARN";
       logMessage =
-        `[${runtime.config.name}] Reconnect-Circuit aktiv fuer guild=${guildId}: ` +
-        `${displayAttempt - 1} Fehlversuche erreicht. Pausiere weitere Retries fuer ${Math.round(delay)}ms ` +
+        `[${runtime.config.name}] Reconnect-Circuit aktiv für guild=${guildId}: ` +
+        `${displayAttempt - 1} Fehlversuche erreicht. Pausiere weitere Retries für ${Math.round(delay)}ms ` +
         `(reason=${reason}, trip=${circuitTripCount}).`;
       eventDetails =
         `attempt>${VOICE_RECONNECT_CIRCUIT_BREAKER_ATTEMPTS} reason=${reason} ` +
@@ -505,7 +505,7 @@ export function scheduleRuntimeReconnect(runtime, guildId, options = {}) {
     logMessage = shouldCountAttempt
       ? `[${runtime.config.name}] Reconnecting guild=${guildId} in ${Math.round(delay)}ms ` +
         `(attempt ${displayAttempt}, plan=${tierConfig.tier}, reason=${reason})`
-      : `[${runtime.config.name}] Reconnect-Pruefung guild=${guildId} in ${Math.round(delay)}ms ` +
+      : `[${runtime.config.name}] Reconnect-Prüfung guild=${guildId} in ${Math.round(delay)}ms ` +
         `(attempt ${Math.max(0, currentAttempts)}, plan=${tierConfig.tier}, reason=${reason})`;
   }
 

@@ -70,7 +70,7 @@ function scheduleRuntimeRestoreResume(runtime, guildId, data, stations, delayMs,
   const safeDelayMs = Math.max(1_000, Number(delayMs || 0) || 1_000);
   log(
     "WARN",
-    `[${runtime.config.name}] Restore fuer guild=${key} pausiert (${reason}) - retry in ${Math.round(safeDelayMs)}ms.`
+    `[${runtime.config.name}] Restore für guild=${key} pausiert (${reason}) - retry in ${Math.round(safeDelayMs)}ms.`
   );
 
   const timer = setTimeout(() => {
@@ -106,7 +106,7 @@ function scheduleRuntimeRestoreRetry(runtime, guildId, data, stations, reason = 
   const { attempt, delay } = getRestoreRetryDelay(runtime, key);
   log(
     "WARN",
-    `[${runtime.config.name}] Restore fuer guild=${key} verschoben (${reason}) - retry in ${Math.round(delay)}ms (attempt ${attempt}).`
+    `[${runtime.config.name}] Restore für guild=${key} verschoben (${reason}) - retry in ${Math.round(delay)}ms (attempt ${attempt}).`
   );
 
   const timer = setTimeout(() => {
@@ -165,7 +165,7 @@ async function restoreRuntimeGuildEntry(runtime, guildId, data, stations, { sour
   const sleepUntilMs = parseStoredTimestampMs(data.sleepUntilMs);
   if (sleepUntilMs > 0 && sleepUntilMs <= nowMs) {
     clearRuntimeRestoreRetry(runtime, guildId);
-    log("INFO", `[${runtime.config.name}] Sleep-Timer lief waehrend des Neustarts ab (guild=${guildId}); Stream bleibt aus.`);
+    log("INFO", `[${runtime.config.name}] Sleep-Timer lief während des Neustarts ab (guild=${guildId}); Stream bleibt aus.`);
     clearBotGuild(runtime.config.id, guildId);
     return { ok: false, permanent: true, resource: "sleep" };
   }
@@ -174,13 +174,13 @@ async function restoreRuntimeGuildEntry(runtime, guildId, data, stations, { sour
   if (!guild) {
     if (isPermanentRestoreResourceError(guildError, "guild")) {
       clearRuntimeRestoreRetry(runtime, guildId);
-      log("INFO", `[${runtime.config.name}] Guild ${guildId} ist nicht mehr verfuegbar. Entferne gespeicherten Restore-State.`);
+      log("INFO", `[${runtime.config.name}] Guild ${guildId} ist nicht mehr verfügbar. Entferne gespeicherten Restore-State.`);
       clearBotGuild(runtime.config.id, guildId);
       return { ok: false, permanent: true, resource: "guild" };
     }
     log(
       "WARN",
-      `[${runtime.config.name}] Guild ${guildId} fuer Restore derzeit nicht aufloesbar: ${guildError?.message || "unbekannter Fehler"}`
+      `[${runtime.config.name}] Guild ${guildId} für Restore derzeit nicht auflösbar: ${guildError?.message || "unbekannter Fehler"}`
     );
     scheduleRuntimeRestoreRetry(runtime, guildId, data, stations, "guild-unresolved");
     return { ok: false, transient: true, resource: "guild" };
@@ -202,7 +202,7 @@ async function restoreRuntimeGuildEntry(runtime, guildId, data, stations, { sour
     }
     log(
       "WARN",
-      `[${runtime.config.name}] Channel ${data.channelId} in ${guild.name} fuer Restore derzeit nicht aufloesbar: ${channelError?.message || "unbekannter Fehler"}`
+      `[${runtime.config.name}] Channel ${data.channelId} in ${guild.name} für Restore derzeit nicht auflösbar: ${channelError?.message || "unbekannter Fehler"}`
     );
     scheduleRuntimeRestoreRetry(runtime, guildId, data, stations, "channel-unresolved");
     return { ok: false, transient: true, resource: "channel" };
@@ -222,7 +222,7 @@ async function restoreRuntimeGuildEntry(runtime, guildId, data, stations, { sour
     const replacement = await resolveReplacementStationForGuild(runtime, guildId, data.stationKey);
     if (!replacement.ok) {
       clearRuntimeRestoreRetry(runtime, guildId);
-      log("INFO", `[${runtime.config.name}] Station ${data.stationKey} nicht mehr vorhanden und kein Ersatz verfuegbar: ${unavailableMessage}`);
+      log("INFO", `[${runtime.config.name}] Station ${data.stationKey} nicht mehr vorhanden und kein Ersatz verfügbar: ${unavailableMessage}`);
       void notifyRuntimeStationUnavailable(runtime, guildId, null, {
         previousStationKey: data.stationKey,
         previousStationName: data.stationName || data.stationKey,
@@ -235,7 +235,7 @@ async function restoreRuntimeGuildEntry(runtime, guildId, data, stations, { sour
     }
     log(
       "WARN",
-      `[${runtime.config.name}] Station ${data.stationKey} nicht mehr verfuegbar (${unavailableMessage}); Restore nutzt ${replacement.key} (${replacement.source}).`
+      `[${runtime.config.name}] Station ${data.stationKey} nicht mehr verfügbar (${unavailableMessage}); Restore nutzt ${replacement.key} (${replacement.source}).`
     );
     replacedStation = {
       previousStationKey: data.stationKey,

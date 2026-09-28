@@ -116,7 +116,7 @@ export function buildCommandBuilders() {
     "Voice- oder Stage-Channel (optional)",
     [ChannelType.GuildVoice, ChannelType.GuildStageVoice]
   );
-  withIntegerOption(play, "bot", "OmniFM worker number (for example 2 for OmniFM 2, optional)", "OmniFM-Worker-Nummer (z. B. 2 fuer OmniFM 2, optional)");
+  withIntegerOption(play, "bot", "OmniFM worker number (for example 2 for OmniFM 2, optional)", "OmniFM-Worker-Nummer (z. B. 2 für OmniFM 2, optional)");
 
   const pause = describe(
     new SlashCommandBuilder().setName("pause"),
@@ -500,7 +500,7 @@ export function buildCommandBuilders() {
   )
     .addSubcommand((sub) => {
       describe(sub.setName("status"), "Show the current voice guard status", "Aktuellen Voice-Guard-Status anzeigen");
-      withIntegerOption(sub, "bot", "Optional worker slot for split mode", "Optionaler Worker-Slot fuer Split-Mode", { required: false });
+      withIntegerOption(sub, "bot", "Optional worker slot for split mode", "Optionaler Worker-Slot für Split-Mode", { required: false });
       return sub;
     })
     .addSubcommand((sub) => {
@@ -521,12 +521,12 @@ export function buildCommandBuilders() {
     .addSubcommand((sub) => {
       describe(sub.setName("unlock"), "Temporarily allow intentional voice moves", "Bewusste Voice-Moves temporär erlauben");
       withIntegerOption(sub, "minutes", "Unlock duration in minutes", "Unlock-Dauer in Minuten", { required: false });
-      withIntegerOption(sub, "bot", "Optional worker slot for split mode", "Optionaler Worker-Slot fuer Split-Mode", { required: false });
+      withIntegerOption(sub, "bot", "Optional worker slot for split mode", "Optionaler Worker-Slot für Split-Mode", { required: false });
       return sub;
     })
     .addSubcommand((sub) => {
       describe(sub.setName("lock"), "End a temporary unlock immediately", "Temporären Unlock sofort beenden");
-      withIntegerOption(sub, "bot", "Optional worker slot for split mode", "Optionaler Worker-Slot fuer Split-Mode", { required: false });
+      withIntegerOption(sub, "bot", "Optional worker slot for split mode", "Optionaler Worker-Slot für Split-Mode", { required: false });
       return sub;
     });
 

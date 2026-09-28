@@ -66,7 +66,7 @@ const botProfileMethods = {
       });
       reset.push(row.guildId);
     }
-    if (reset.length) log("INFO", `[${this.config?.name}] Bot-Aussehen nach Downgrade zurueckgesetzt: ${reset.length} Server`);
+    if (reset.length) log("INFO", `[${this.config?.name}] Bot-Aussehen nach Downgrade zurückgesetzt: ${reset.length} Server`);
     return reset;
   },
 
@@ -74,7 +74,7 @@ const botProfileMethods = {
     if (this.botProfileDowngradeTimer) return;
     this.botProfileDowngradeTimer = setInterval(() => {
       this.resetBotProfilesAfterDowngrade().catch((err) => {
-        log("WARN", `[${this.config?.name}] Bot-Aussehen-Pruefung fehlgeschlagen: ${err?.message || err}`);
+        log("WARN", `[${this.config?.name}] Bot-Aussehen-Prüfung fehlgeschlagen: ${err?.message || err}`);
       });
     }, DOWNGRADE_CHECK_MS);
     this.botProfileDowngradeTimer.unref?.();

@@ -90,7 +90,7 @@ export async function applyStationCatalogMigrations(stationsCollection, migratio
       { $set: { url: migration.toUrl } }
     );
     if (updateResult?.acknowledged === false) {
-      throw new Error(`Katalogmigration ${migration.id} wurde von MongoDB nicht bestaetigt.`);
+      throw new Error(`Katalogmigration ${migration.id} wurde von MongoDB nicht bestätigt.`);
     }
 
     const markerDocument = {

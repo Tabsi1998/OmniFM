@@ -710,7 +710,7 @@ function handleTopGGWebhook(headers = {}, rawBody = "") {
     botId: config.botId,
   });
   if (!normalizedVote) {
-    return { ok: false, status: 400, error: "Ungueltiger Vote-Payload." };
+    return { ok: false, status: 400, error: "Ungültiger Vote-Payload." };
   }
 
   const recorded = recordVoteEvent(normalizedVote);

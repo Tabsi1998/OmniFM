@@ -187,7 +187,7 @@ const nowPlayingMethods = {
     const isDe = language === "de";
     const rows = [];
 
-    // Steuerungs-Row (immer sichtbar): Pause/Weiter · Stop · Lautstaerke -/+ · Sender wechseln.
+    // Steuerungs-Row (immer sichtbar): Pause/Weiter · Stop · Lautstärke -/+ · Sender wechseln.
     const state = this.guildState.get(guildId);
     const status = state?.player?.state?.status;
     const paused = status === "paused" || status === "autopaused";
@@ -505,7 +505,7 @@ const nowPlayingMethods = {
     if (!isRuntimePlaybackActive(this, guildId, state)) return;
     const channel = await this.resolveNowPlayingChannel(guildId, state);
     if (!channel) {
-      this.logNowPlayingIssue(guildId, state, "Kein geeigneter Kanal fuer die Live-Einbettung gefunden.");
+      this.logNowPlayingIssue(guildId, state, "Kein geeigneter Kanal für die Live-Einbettung gefunden.");
       return;
     }
 

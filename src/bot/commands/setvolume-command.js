@@ -28,7 +28,7 @@ export async function handleSetvolumeCommand({ runtime, interaction, t, language
       const check = runtime.workerManager.canUseWorker(requestedBot, interaction.guildId, guildTier, { prefer: "slot", strict: true });
       if (!check.ok) {
         const reasons = {
-          tier: t(`Worker ${requestedBot} erfordert ein hoeheres Abo (max: ${check.maxIndex}).`, `Worker ${requestedBot} requires a higher plan (max: ${check.maxIndex}).`),
+          tier: t(`Worker ${requestedBot} erfordert ein höheres Abo (max: ${check.maxIndex}).`, `Worker ${requestedBot} requires a higher plan (max: ${check.maxIndex}).`),
           not_configured: t(`Worker ${requestedBot} ist nicht konfiguriert.`, `Worker ${requestedBot} is not configured.`),
           offline: t(`Worker ${requestedBot} ist offline.`, `Worker ${requestedBot} is offline.`),
           not_invited: t(`Worker ${requestedBot} ist nicht auf diesem Server eingeladen.`, `Worker ${requestedBot} is not invited on this server.`),

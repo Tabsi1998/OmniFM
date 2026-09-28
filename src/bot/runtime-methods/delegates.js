@@ -341,7 +341,7 @@ const runtimeDelegateMethods = {
         recordRuntimeIncident({
           severity: "warning",
           source: this.config.name,
-          message: `Voice-Reconnect wird ausgefuehrt (Guild ${guildId})${options?.reason ? ` – ${options.reason}` : ""}.`,
+          message: `Voice-Reconnect wird ausgeführt (Guild ${guildId})${options?.reason ? ` – ${options.reason}` : ""}.`,
           resolved: false,
         }).catch(() => {});
       }

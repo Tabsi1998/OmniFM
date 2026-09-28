@@ -227,7 +227,7 @@ async function deliverDashboardWebhook(rawConfig, eventKey, payload) {
       attempted: true,
       delivered: false,
       error: err?.name === "AbortError"
-        ? "Webhook-Zeitlimit ueberschritten."
+        ? "Webhook-Zeitlimit überschritten."
         : (err instanceof SafeOutboundError
           ? err.message
           : "Webhook konnte nicht zugestellt werden."),

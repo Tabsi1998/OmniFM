@@ -176,7 +176,7 @@ async function reconcileRuntimeGuildVoiceState(runtime, guildId, { reason = "per
     clearTransientVoiceIssue(state, "voice-state-missing");
     log(
       "WARN",
-      `[${runtime.config.name}] Voice-State abweichung bestaetigt (guild=${guildId}, expected=${expectedChannelId || "-"}, reason=${reason}).`
+      `[${runtime.config.name}] Voice-State abweichung bestätigt (guild=${guildId}, expected=${expectedChannelId || "-"}, reason=${reason}).`
     );
     state.voiceDisconnectObservedAt = state.voiceDisconnectObservedAt || Date.now();
     runtime.resetVoiceSession(guildId, state, {
@@ -221,7 +221,7 @@ async function reconcileRuntimeGuildVoiceState(runtime, guildId, { reason = "per
       });
       log(
         "WARN",
-        `[${runtime.config.name}] Fremdverschiebung bestaetigt guild=${guildId} expected=${expectedChannelId} actual=${actualChannelId} - Policy=${movePolicy}.`
+        `[${runtime.config.name}] Fremdverschiebung bestätigt guild=${guildId} expected=${expectedChannelId} actual=${actualChannelId} - Policy=${movePolicy}.`
       );
       if (moveSummary.exceededWindow) {
         state.voiceGuardEscalationCount = (Number(state.voiceGuardEscalationCount || 0) || 0) + 1;
@@ -333,7 +333,7 @@ async function reconcileRuntimeGuildVoiceState(runtime, guildId, { reason = "per
         logRuntimeRecoveryState(
           runtime,
           "WARN",
-          "Stale local voice state bestaetigt - Discord sieht den Bot noch im Channel, lokaler Handle fehlt",
+          "Stale local voice state bestätigt - Discord sieht den Bot noch im Channel, lokaler Handle fehlt",
           guildId,
           state,
           {

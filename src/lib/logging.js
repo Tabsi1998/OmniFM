@@ -19,7 +19,7 @@ const allowLegacyWebFallback = String(process.env.WEB_ALLOW_LEGACY_FALLBACK ?? "
 const strictFrontendBuild = String(process.env.WEB_STRICT_FRONTEND_BUILD ?? "0") === "1";
 if (!hasFrontendBuild && strictFrontendBuild && !(allowLegacyWebFallback && hasLegacyWeb)) {
   throw new Error(
-    "frontend/build/index.html fehlt. Bitte React-Frontend bauen oder nur fuer Notfaelle WEB_ALLOW_LEGACY_FALLBACK=1 setzen."
+    "frontend/build/index.html fehlt. Bitte React-Frontend bauen oder nur für Notfälle WEB_ALLOW_LEGACY_FALLBACK=1 setzen."
   );
 }
 const webDir = hasFrontendBuild

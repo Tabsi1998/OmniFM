@@ -162,14 +162,14 @@ export async function ensureRuntimeVoiceConnectionForChannel(runtime, guildId, c
   if (!channel) throw new Error("Voice- oder Stage-Channel nicht gefunden.");
 
   const me = await runtime.resolveBotMember(guild);
-  if (!me) throw new Error("Bot-Mitglied nicht aufloesbar.");
+  if (!me) throw new Error("Bot-Mitglied nicht auflösbar.");
 
   const perms = channel.permissionsFor(me);
   if (!perms?.has(PermissionFlagsBits.Connect)) {
-    throw new Error(`Keine Connect-Berechtigung fuer ${channel.toString()}.`);
+    throw new Error(`Keine Connect-Berechtigung für ${channel.toString()}.`);
   }
   if (channel.type !== ChannelType.GuildStageVoice && !perms?.has(PermissionFlagsBits.Speak)) {
-    throw new Error(`Keine Speak-Berechtigung fuer ${channel.toString()}.`);
+    throw new Error(`Keine Speak-Berechtigung für ${channel.toString()}.`);
   }
 
   const previousChannelId = String(state.connection?.joinConfig?.channelId || state.lastChannelId || "").trim();
@@ -266,7 +266,7 @@ export async function ensureRuntimeVoiceConnectionForChannel(runtime, guildId, c
       state.connection = null;
     }
     try { connection.destroy(); } catch {}
-    throw new Error("Voice-Verbindung wurde waehrend des Aufbaus abgebrochen.");
+    throw new Error("Voice-Verbindung wurde während des Aufbaus abgebrochen.");
   }
 
   connection.subscribe(state.player);

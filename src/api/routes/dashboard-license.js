@@ -56,7 +56,7 @@ export function createDashboardLicenseRouteHandler(deps) {
               res,
               404,
               language,
-              "Fuer diesen Server wurde keine bearbeitbare Lizenz gefunden.",
+              "Für diesen Server wurde keine bearbeitbare Lizenz gefunden.",
               "No editable license was found for this server."
             );
             return true;
@@ -68,7 +68,7 @@ export function createDashboardLicenseRouteHandler(deps) {
               res,
               400,
               language,
-              "Bitte eine gueltige Lizenz-E-Mail eingeben.",
+              "Bitte eine gültige Lizenz-E-Mail eingeben.",
               "Please enter a valid license email."
             );
             return true;
@@ -149,7 +149,7 @@ export function createDashboardLicenseRouteHandler(deps) {
           sendJson(res, 404, {
             success: false,
             error: t(
-              "Fuer diesen Server wurde keine aktive oder abgelaufene Lizenz gefunden.",
+              "Für diesen Server wurde keine aktive oder abgelaufene Lizenz gefunden.",
               "No active or expired license was found for this server."
             ),
           });
@@ -161,7 +161,7 @@ export function createDashboardLicenseRouteHandler(deps) {
           sendJson(res, 400, {
             success: false,
             error: t(
-              "Bitte eine gueltige Abrechnungs-E-Mail eingeben.",
+              "Bitte eine gültige Abrechnungs-E-Mail eingeben.",
               "Please enter a valid billing email address."
             ),
           });
@@ -180,7 +180,7 @@ export function createDashboardLicenseRouteHandler(deps) {
           sendJson(res, 400, {
             success: false,
             error: t(
-              "Dieses Dashboard kann nur bestehende Pro- oder Ultimate-Abos verlaengern.",
+              "Dieses Dashboard kann nur bestehende Pro- oder Ultimate-Abos verlängern.",
               "This dashboard can only renew existing Pro or Ultimate subscriptions."
             ),
           });
@@ -190,7 +190,7 @@ export function createDashboardLicenseRouteHandler(deps) {
         if (!["pro", "ultimate"].includes(requestedTier)) {
           sendJson(res, 400, {
             success: false,
-            error: t("Ungueltiger Zielplan.", "Invalid target plan."),
+            error: t("Ungültiger Zielplan.", "Invalid target plan."),
           });
           return true;
         }
@@ -211,7 +211,7 @@ export function createDashboardLicenseRouteHandler(deps) {
           sendJson(res, 400, {
             success: false,
             error: t(
-              "Ungueltige Preisberechnung fuer die gewaehlte Verlaengerung.",
+              "Ungültige Preisberechnung für die gewählte Verlängerung.",
               "Invalid price calculation for the selected renewal."
             ),
           });

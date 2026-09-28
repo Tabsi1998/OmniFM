@@ -213,7 +213,7 @@ function recoverCorruptFile(raw, reason) {
   }
 
   const backupHint = backupPath ? ` Backup: ${backupPath}` : "";
-  log("WARN", `[scheduled-events] Datei war ungueltig und wurde auf leeren State zurueckgesetzt.${backupHint}`);
+  log("WARN", `[scheduled-events] Datei war ungültig und wurde auf leeren State zurückgesetzt.${backupHint}`);
 }
 
 function sanitizeId(raw) {
@@ -377,7 +377,7 @@ function loadRawState() {
     const parsed = tryParseState(raw);
     if (parsed.recovered) {
       saveRawState(parsed.state);
-      log("WARN", `[scheduled-events] Ungueltiges JSON erkannt und automatisch repariert (${parsed.reason || "unknown"}).`);
+      log("WARN", `[scheduled-events] Ungültiges JSON erkannt und automatisch repariert (${parsed.reason || "unknown"}).`);
     }
     return parsed.state;
   } catch (err) {
@@ -476,7 +476,7 @@ function createScheduledEvent(input) {
   });
 
   if (!event) {
-    return { ok: false, message: "Event ist ungueltig." };
+    return { ok: false, message: "Event ist ungültig." };
   }
 
   state.events.push(event);
@@ -523,7 +523,7 @@ function patchScheduledEvent(id, patch) {
     botId: current.botId,
     updatedAt: new Date().toISOString(),
   });
-  if (!next) return { ok: false, message: "Event-Update ist ungueltig." };
+  if (!next) return { ok: false, message: "Event-Update ist ungültig." };
 
   state.events[index] = next;
   saveRawState(state);

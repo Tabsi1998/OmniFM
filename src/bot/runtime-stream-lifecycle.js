@@ -288,7 +288,7 @@ export function armRuntimePlaybackRecovery(
     state.shouldReconnect = false;
     log(
       "ERROR",
-      `[${runtime.config.name}] Permanenter Stream-Startfehler fuer ${key}; automatische Wiederherstellung wird beendet: ${errorMessage}`
+      `[${runtime.config.name}] Permanenter Stream-Startfehler für ${key}; automatische Wiederherstellung wird beendet: ${errorMessage}`
     );
     runtime.persistState();
     return {

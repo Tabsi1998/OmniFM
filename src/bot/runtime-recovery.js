@@ -438,7 +438,7 @@ export function parkRuntimeReconnectTarget(runtime, guildId, state, reason, deta
   logRuntimeRecoveryState(
     runtime,
     logLevel,
-    `Reconnect geparkt (${code}): ${text || "-"} - Ziel bleibt gespeichert, naechster Versuch in ${Math.round(VOICE_PARKED_RETRY_MS / 1000)}s`,
+    `Reconnect geparkt (${code}): ${text || "-"} - Ziel bleibt gespeichert, nächster Versuch in ${Math.round(VOICE_PARKED_RETRY_MS / 1000)}s`,
     guildId,
     state,
     { reason: `parked-${code}` }
@@ -562,7 +562,7 @@ export function confirmTransientVoiceIssue(runtime, guildId, state, code, detail
   if (!confirmed) {
     log(
       "WARN",
-      `[${runtime.config.name}] ${logMessage} guild=${guildId} (${issue.count}/${needed}) - warte auf Bestaetigung.`
+      `[${runtime.config.name}] ${logMessage} guild=${guildId} (${issue.count}/${needed}) - warte auf Bestätigung.`
     );
     runtime.queueVoiceStateReconcile(guildId, recheckReason || code, VOICE_TRANSIENT_RECHECK_MS);
   }

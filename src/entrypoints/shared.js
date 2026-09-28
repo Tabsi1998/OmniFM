@@ -61,7 +61,7 @@ async function initializeSharedServices({ requireMongo = false } = {}) {
     try {
       await connectDb();
       mongoConnected = true;
-      log("INFO", "MongoDB-Verbindung fuer Node.js Bot hergestellt.");
+      log("INFO", "MongoDB-Verbindung für Node.js Bot hergestellt.");
       const { migrateJsonToMongo } = await import("../listening-stats-store.js");
       const migration = await migrateJsonToMongo();
       if (migration.migrated) {
@@ -81,7 +81,7 @@ async function initializeSharedServices({ requireMongo = false } = {}) {
   });
 
   if (requireMongo && !mongoConnected) {
-    throw new Error("Split-Commander/Worker benoetigt eine aktive MongoDB-Verbindung.");
+    throw new Error("Split-Commander/Worker benötigt eine aktive MongoDB-Verbindung.");
   }
   // Production keeps its data in MongoDB only (#292); no silent fall back to files.
   if (!mongoConnected && !fileStoresAllowed()) {
@@ -127,7 +127,7 @@ function resolveBotTopology(env = process.env) {
   const commanderSelection = getCommanderSelection(botConfigs, env);
   const commanderConfig = commanderSelection.commanderConfig;
   if (!commanderConfig) {
-    throw new Error("Commander-Bot konnte nicht aufgeloest werden.");
+    throw new Error("Commander-Bot konnte nicht aufgelöst werden.");
   }
 
   if (commanderSelection.commanderIndex >= 0) {
@@ -148,7 +148,7 @@ function resolveBotTopology(env = process.env) {
 function resolveWorkerConfig(botConfigs = [], workerIndex) {
   const normalizedIndex = Number.parseInt(String(workerIndex || ""), 10);
   if (!Number.isFinite(normalizedIndex) || normalizedIndex < 1) {
-    throw new Error("BOT_PROCESS_INDEX fuer Worker fehlt oder ist ungueltig.");
+    throw new Error("BOT_PROCESS_INDEX für Worker fehlt oder ist ungültig.");
   }
 
   const workerConfig = botConfigs.find((config) => Number(config?.index || 0) === normalizedIndex) || null;

@@ -35,7 +35,7 @@ export function createDashboardChannelsRouteHandler(deps) {
       return true;
     }
     if (!serverHasCapability(guildInfo.id, "dashboard_basic")) {
-      sendLocalizedError(res, 403, language, "Dashboard ist erst ab Pro verfuegbar.", "Dashboard is only available from Pro.");
+      sendLocalizedError(res, 403, language, "Dashboard ist erst ab Pro verfügbar.", "Dashboard is only available from Pro.");
       return true;
     }
 
