@@ -45,7 +45,7 @@ function ChartRow({ entry, s, formatNumber }) {
     <li
       data-testid={`charts-entry-${entry.rank}`}
       style={{
-        display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px', borderRadius: 16,
+        display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px', borderRadius: 16, minWidth: 0,
         background: top ? 'rgba(0,229,255,0.05)' : 'rgba(255,255,255,0.03)',
         border: `1px solid ${top ? 'rgba(0,229,255,0.18)' : 'rgba(255,255,255,0.07)'}`,
       }}
@@ -63,9 +63,11 @@ function ChartRow({ entry, s, formatNumber }) {
         </span>
       )}
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontWeight: 700, color: '#F4F4F5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
-        <div style={{ color: '#A1A1AA', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {artist ? `${artist} · ` : ''}{s.plays({ count: formatNumber(entry.plays) })} · {s.servers({ count: formatNumber(entry.servers) })}
+        {/* Titles wrap on a phone instead of losing their end; the numbers keep their own line. */}
+        <div style={{ fontWeight: 700, color: '#F4F4F5', overflowWrap: 'anywhere', lineHeight: 1.3 }}>{title}</div>
+        {artist ? <div style={{ color: '#D4D4D8', fontSize: 13, overflowWrap: 'anywhere' }}>{artist}</div> : null}
+        <div style={{ color: '#71717A', fontSize: 12, marginTop: 2 }}>
+          {s.plays({ count: formatNumber(entry.plays) })} · {s.servers({ count: formatNumber(entry.servers) })}
         </div>
       </div>
     </li>
@@ -115,7 +117,7 @@ export default function ChartsPage() {
             {data && !data.measuring ? <p style={{ color: '#A1A1AA' }}>{s.notMeasuring}</p> : null}
             {data?.measuring && !entries.length ? <p data-testid="charts-empty" style={{ color: '#A1A1AA' }}>{s.empty}</p> : null}
             {entries.length ? (
-              <ol data-testid="charts-list" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
+              <ol data-testid="charts-list" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 8 }}>
                 {entries.map((entry) => <ChartRow key={entry.rank} entry={entry} s={s} formatNumber={formatNumber} />)}
               </ol>
             ) : null}
