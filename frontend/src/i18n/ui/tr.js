@@ -600,7 +600,6 @@ export default {
   "light headers": "açık başlıklar",
   "light pages": "açık sayfalar",
   "listeners": "dinleyici",
-  "listening": "dinliyor",
   "members": "üye",
   "now": "şimdi",
   "off": "kapalı",

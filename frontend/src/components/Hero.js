@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Headphones, Radio, Volume2, Play, SkipForward, Users } from 'lucide-react';
+import { Headphones, Radio, Volume2, Play, SkipForward } from 'lucide-react';
 import { useI18n } from '../i18n.js';
 import { resolvePrimaryInviteUrl } from '../lib/invite.js';
 import { buildApiUrl } from '../lib/api.js';
@@ -32,8 +32,8 @@ function Equalizer({ bars = 14, height = 44, colorful = true }) {
   );
 }
 
-function NowPlayingConsole({ listeners, live }) {
-  const { formatNumber, t } = useI18n();
+function NowPlayingConsole({ live }) {
+  const { t } = useI18n();
   const stations = useShowcaseStations(8);
   const [idx, setIdx] = useState(0);
   const [cover, setCover] = useState(null);
@@ -82,11 +82,6 @@ function NowPlayingConsole({ listeners, live }) {
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: live ? '#ff2a5f' : '#00e5ff', animation: 'onair-pulse 1.8s infinite' }} />
           {live ? 'ON AIR' : t('VORSCHAU', 'PREVIEW')}
         </span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#94a3b8', fontSize: 12.5, fontFamily: "'JetBrains Mono', monospace" }}>
-          {Number(listeners) > 0
-            ? <><Users size={13} color="#ff6b00" /> {formatNumber(Number(listeners))} {t('hören zu', 'listening')}</>
-            : <><span style={{ width: 7, height: 7, borderRadius: '50%', background: live ? '#ff2a5f' : '#00e5ff' }} /> {live ? 'LIVE' : 'DEMO'}</>}
-        </span>
       </div>
 
       <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
@@ -122,7 +117,7 @@ function NowPlayingConsole({ listeners, live }) {
         <div style={{ height: 6, borderRadius: 999, background: '#1c2235', overflow: 'hidden' }}>
           <div style={{ height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, #ff6b00, #00e5ff)', animation: 'np-progress 30s linear infinite' }} />
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, color: '#64748b', fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, color: '#8A8A93', fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>
           <span>{live ? 'LIVE STREAM' : t('SENDER-VORSCHAU', 'STATION PREVIEW')}</span><span>24 / 7</span>
         </div>
       </div>
@@ -140,17 +135,12 @@ function NowPlayingConsole({ listeners, live }) {
   );
 }
 
+// The numbers of the network stand once, in the bar below (TrustBar, #435).
 function Hero({ stats, bots }) {
-  const { copy, formatNumber } = useI18n();
+  const { copy } = useI18n();
   const inviteUrl = resolvePrimaryInviteUrl(bots);
   const subtitleTail = String(copy.hero.subtitleTail || '').trim();
   const subtitleSpacer = subtitleTail && !/^[.,!?;:]/.test(subtitleTail) ? ' ' : '';
-  const heroStats = [
-    { label: copy.hero.stats.servers, value: stats.servers || 0, color: '#ff6b00' },
-    { label: copy.hero.stats.stations, value: stats.stations || 0, color: '#00e5ff' },
-    { label: copy.hero.stats.bots, value: stats.bots || 0, color: '#10b981' },
-  ];
-  const listeners = stats.listeners || 0;
 
   return (
     <section
@@ -195,7 +185,7 @@ function Hero({ stats, bots }) {
               {subtitleTail ? `${subtitleSpacer}${subtitleTail}` : ''}
             </p>
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 46, animation: 'hero-fade-in 0.6s ease-out 0.3s both' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, animation: 'hero-fade-in 0.6s ease-out 0.3s both' }}>
               <a
                 href={inviteUrl}
                 data-testid="hero-cta-invite"
@@ -218,22 +208,10 @@ function Hero({ stats, bots }) {
               </a>
             </div>
 
-            <div data-testid="hero-quick-stats" style={{ display: 'flex', gap: 44, flexWrap: 'wrap', animation: 'hero-fade-in 0.6s ease-out 0.4s both' }}>
-              {heroStats.map((item) => (
-                <div key={item.label}>
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 30, fontWeight: 700, color: item.color, textShadow: `0 0 22px ${item.color}33` }}>
-                    {formatNumber(item.value)}
-                  </div>
-                  <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: 5 }}>
-                    {item.label}
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
 
           <div className="hero-np">
-            <NowPlayingConsole listeners={listeners} live={Boolean(stats.live)} />
+            <NowPlayingConsole live={Boolean(stats.live)} />
           </div>
         </div>
       </div>

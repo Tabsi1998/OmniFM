@@ -13,13 +13,15 @@ const messages = {
   },
   cookieConsent: {
     title: 'Cookies et statistiques',
-    body: 'OmniFM utilise le stockage nécessaire pour la langue, la sécurité et les sessions du tableau de bord. La balise Google est active avec le mode consentement ; le stockage pour les statistiques n’est autorisé que si tu y consens.',
+    short: 'Nous ne stockons que ce dont le site a besoin (langue, connexion). Google Analytics ne dépose des cookies qu’avec ton accord.',
+    privacyLink: 'Confidentialité',
     necessaryTitle: 'Nécessaires',
-    necessaryBody: 'Indispensables pour la langue choisie, les sessions sécurisées du tableau de bord et le fonctionnement technique. Cette catégorie ne peut pas être désactivée.',
-    analyticsTitle: 'Statistiques',
-    analyticsBody: 'Autorise Google Analytics 4 avec le mode consentement pour mesurer de façon globale les pages vues et l’utilisation. Sans consentement, le stockage pour les statistiques reste refusé.',
+    necessaryBody: 'Pour ta langue, la connexion sécurisée au tableau de bord et le bon fonctionnement du site. Impossible à désactiver.',
+    analyticsTitle: 'Statistiques (Google Analytics)',
+    analyticsBody: 'Compte en gros quelles pages sont visitées, pour que nous puissions améliorer le site. Sans ton accord, Google Analytics ne dépose aucun cookie.',
     acceptAll: 'Tout accepter',
     reject: 'Refuser',
+    settings: 'Paramètres',
     save: 'Enregistrer la sélection',
     manage: 'Réglages des cookies',
   },
@@ -28,50 +30,24 @@ const messages = {
     titleLead: 'Ta radio',
     titleAccent: 'Discord.',
     titleTail: '24/7 en direct.',
-    subtitleLead: 'Radio Discord 24/7 avec plus de 120 stations, la fiabilité des workers, le contrôle par tableau de bord et une reconnexion propre. Invite le commander, ajoute un worker et lance',
+    subtitleLead: 'La radio 24 h/24 dans ton salon vocal Discord : des stations de tous les genres, un tableau de bord pour tout piloter, et si un flux coupe, OmniFM se reconnecte tout seul. Invite le commander, ajoute un worker et lance',
     subtitleTail: '.',
     ctaInvite: 'Inviter le commander',
     ctaFlow: 'Comment ça marche',
-    stats: {
-      servers: 'Serveurs',
-      stations: 'Stations',
-      bots: 'Bots',
-    },
   },
   trustBar: {
+    live: 'Chiffres en direct',
     items: {
-      stations: {
-        label: 'Stations',
-        detail: 'Catalogue en direct pour Free et Pro, avec aperçu directement sur le site.',
-      },
-      network: {
-        label: 'Activité en direct',
-        detail: 'Des flux actifs et un réseau de bots prêt montrent qu’OmniFM tourne vraiment en production, pas seulement sur une page d’accueil.',
-      },
-      dashboard: {
-        label: 'Tableau de bord',
-        detail: 'Vue en direct, statistiques, droits par rôle et alertes de panne à partir de Pro.',
-      },
-      reliability: {
-        label: 'Fiabilité',
-        detail: 'Reconnexion, offres claires et un chemin d’évolution simple pour les serveurs qui grandissent.',
-      },
-    },
-    values: {
-      dashboard: 'Free+',
-      reliability: '24/7',
-    },
-    support: {
-      stations: ({ free, pro }) => `${free} free · ${pro} pro`,
-      network: ({ bots, servers }) => `${bots} bots · ${servers} serveurs`,
-      dashboard: 'Événements · droits · état',
-      reliability: 'Reconnexion · workers · offres claires',
+      servers: { label: 'Serveurs', detail: 'utilisent OmniFM' },
+      stations: { label: 'Stations', detail: 'à écouter, aussi ici' },
+      bots: { label: 'Bots', detail: 'prêts à jouer' },
+      listeners: { label: 'À l’écoute', detail: 'sur tous les serveurs' },
     },
   },
   whyOmniFM: {
     eyebrow: 'Pourquoi OmniFM',
-    title: 'Pas juste un bot radio, mais une vraie installation Discord bien rodée',
-    subtitle: 'OmniFM est à son meilleur quand la musique, la fiabilité et la gestion du serveur travaillent ensemble.',
+    title: 'Plus qu’un bot radio',
+    subtitle: 'De la musique qui tourne sans accroc, et tout ce qu’il faut pour gérer ton serveur.',
     cards: {
       radio: {
         label: 'Radio',
@@ -81,17 +57,17 @@ const messages = {
       workers: {
         label: 'Workers',
         title: 'Plus qu’un seul bot',
-        desc: 'L’architecture à workers répartit proprement les flux et rend l’utilisation en parallèle prévisible pour les grandes communautés.',
+        desc: 'Plusieurs bots se partagent le travail : chaque worker joue dans son propre salon vocal, ainsi un grand serveur peut diffuser plusieurs stations en même temps.',
       },
       control: {
         label: 'Contrôle',
         title: 'Le contrôle pour les admins',
-        desc: 'Tableau de bord, événements, droits par rôle et vues d’état donnent aux serveurs Pro un vrai contrôle, pas seulement plus de stations.',
+        desc: 'Le tableau de bord montre ce qui joue et où, règle la langue et planifie les événements. Pro ajoute la vue en direct, les statistiques, les droits par rôle et les alertes de panne.',
       },
       growth: {
         label: 'Croissance',
         title: 'Grandir sans friction',
-        desc: 'Free, Pro et Ultimate reposent sur le même cœur, du démarrage rapide jusqu’à l’installation de niveau opérateur.',
+        desc: 'Free, Pro et Ultimate s’emboîtent : quand tu passes au niveau supérieur, tout reste configuré et tu obtiens simplement plus.',
       },
     },
   },
@@ -123,7 +99,7 @@ const messages = {
   faq: {
     eyebrow: 'FAQ',
     title: 'Les questions essentielles avant de commencer',
-    subtitle: 'Le premier lancement doit être rapide, l’évolution claire et l’architecture compréhensible.',
+    subtitle: 'En bref : comment démarrer, ce qu’apportent les offres et comment fonctionne OmniFM.',
     items: [
       {
         key: 'start',
@@ -138,7 +114,7 @@ const messages = {
       {
         key: 'free',
         question: 'Que comprend l’offre Free ?',
-        answer: 'Free couvre un vrai point de départ : jusqu’à 2 bots, 20 stations gratuites, les commandes essentielles et tout le déroulé commander plus worker.',
+        answer: 'Free suffit pour démarrer : jusqu’à 2 bots, 20 stations et toutes les commandes pour écouter la radio.',
       },
       {
         key: 'dashboard',
@@ -156,33 +132,17 @@ const messages = {
         answer: 'Quand tu fais tourner ta propre radio : jusqu’à 50 stations à toi avec logo, une apparence du bot propre à chaque serveur, tes propres chaînes de secours, des webhooks et des statistiques détaillées, plus 16 salons vocaux en même temps.',
       },
       {
+        key: 'planStatus',
+        question: 'Comment savoir quelle offre a mon serveur ?',
+        answer: 'Dans le tableau de bord : connecte-toi avec Discord, choisis ton serveur et ouvre « Abonnement et licence ». Tu y vois l’offre et jusqu’à quand elle court. Dans Discord, la commande /premium l’affiche aussi.',
+        link: { label: 'Ouvrir le tableau de bord', page: 'dashboard' },
+      },
+      {
         key: 'workers',
         question: 'Comment fonctionnent le commander et les workers ?',
-        answer: 'Le commander gère les commandes et les invitations des workers. Les workers diffusent les flux. OmniFM peut ainsi répartir proprement plusieurs flux en parallèle et les garder stables.',
+        answer: 'Le commander reçoit tes commandes ; /invite te donne les liens pour les workers. Les workers jouent la radio dans les salons vocaux. Ainsi, un serveur peut écouter plusieurs stations en même temps.',
       },
     ],
-  },
-  useCases: {
-    eyebrow: 'Pour qui est OmniFM ?',
-    title: 'Chaque offre a un rôle clair',
-    subtitle: 'Pas seulement des prix : quelle offre convient vraiment à quel serveur.',
-    cards: {
-      free: {
-        title: 'Free pour une radio communautaire rapide',
-        desc: 'Si tu veux une radio 24/7 sur un petit serveur ou un serveur privé, Free est le point de départ le plus simple.',
-        fit: 'Idéal pour les petites communautés, les groupes d’amis et une première installation sans charge d’administration.',
-      },
-      pro: {
-        title: 'Pro pour les admins de communauté',
-        desc: 'Dès que les événements, les droits et le tableau de bord font partie du quotidien, Pro devient la vraie offre de gestion.',
-        fit: 'Idéal pour les serveurs d’événements, les communautés de taille moyenne et les équipes avec des sessions régulières et des rôles clairs.',
-      },
-      ultimate: {
-        title: 'Ultimate pour les installations d’opérateur',
-        desc: 'Quand les outils de fiabilité, les stations personnelles, les statistiques détaillées et l’automatisation comptent, Ultimate est la bonne offre.',
-        fit: 'Idéal pour les grandes communautés, les utilisateurs avancés et les opérateurs qui veulent qu’OmniFM se comporte comme un système géré.',
-      },
-    },
   },
   // The Discord preview on the start page (DiscordShowcase.js).
   discordShowcase: {

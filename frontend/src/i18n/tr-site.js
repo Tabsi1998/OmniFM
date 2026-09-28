@@ -14,13 +14,15 @@ const messages = {
   },
   cookieConsent: {
     title: 'Çerezler ve istatistikler',
-    body: 'OmniFM dil, güvenlik ve panel oturumları için gerekli depolamayı kullanır. Google etiketi izin modu ile çalışır; istatistik depolamasına yalnızca izin verirsen izin verilir.',
+    short: 'Yalnızca sitenin ihtiyaç duyduğunu saklıyoruz (dil, giriş). Google Analytics çerezleri ancak sen onay verirsen kullanır.',
+    privacyLink: 'Gizlilik',
     necessaryTitle: 'Gerekli',
-    necessaryBody: 'Dil tercihi, güvenli panel oturumları ve teknik işleyiş için gereklidir. Bu kategori kapatılamaz.',
-    analyticsTitle: 'İstatistikler',
-    analyticsBody: 'Sayfa görüntülemelerini ve kullanımı genel olarak ölçmek için izin modlu Google Analytics 4’e izin verir. İzin olmadan istatistik depolaması reddedilmiş kalır.',
+    necessaryBody: 'Dil seçimin, panele güvenli giriş ve sitenin çalışması için. Kapatılamaz.',
+    analyticsTitle: 'İstatistikler (Google Analytics)',
+    analyticsBody: 'Siteyi iyileştirebilmemiz için hangi sayfaların ziyaret edildiğini kabaca sayar. Onayın olmadan Google Analytics çerez kullanmaz.',
     acceptAll: 'Tümünü kabul et',
     reject: 'Reddet',
+    settings: 'Ayarlar',
     save: 'Seçimi kaydet',
     manage: 'Çerez ayarları',
   },
@@ -29,50 +31,24 @@ const messages = {
     titleLead: 'Discord',
     titleAccent: 'radyon.',
     titleTail: '24/7 canlı.',
-    subtitleLead: '120’den fazla istasyon, worker’larla güvenilirlik, panelden kontrol ve temiz yeniden bağlanma ile 24/7 Discord radyosu. Commander’ı davet et, bir worker ekle ve şunu çalıştır:',
+    subtitleLead: 'Discord ses kanalında günün her saati radyo: her türden istasyon, her şeyi yönetmek için bir panel ve bir yayın koparsa OmniFM kendiliğinden yeniden bağlanır. Commander’ı davet et, bir worker ekle ve şunu çalıştır:',
     subtitleTail: '.',
     ctaInvite: 'Commander’ı davet et',
     ctaFlow: 'Nasıl çalışır',
-    stats: {
-      servers: 'Sunucular',
-      stations: 'İstasyonlar',
-      bots: 'Botlar',
-    },
   },
   trustBar: {
+    live: 'Canlı rakamlar',
     items: {
-      stations: {
-        label: 'İstasyonlar',
-        detail: 'Free ve Pro için canlı katalog, doğrudan sitede önizlemeyle.',
-      },
-      network: {
-        label: 'Canlı etkinlik',
-        detail: 'Aktif yayınlar ve hazır bir bot ağı, OmniFM’in yalnızca bir tanıtım sayfasında değil gerçekten canlıda çalıştığını gösterir.',
-      },
-      dashboard: {
-        label: 'Panel',
-        detail: 'Pro’dan itibaren canlı görünüm, istatistikler, rol izinleri ve kesinti bildirimleri.',
-      },
-      reliability: {
-        label: 'Güvenilirlik',
-        detail: 'Yeniden bağlanma, net planlar ve büyüyen sunucular için kolay bir geçiş yolu.',
-      },
-    },
-    values: {
-      dashboard: 'Free+',
-      reliability: '24/7',
-    },
-    support: {
-      stations: ({ free, pro }) => `${free} free · ${pro} pro`,
-      network: ({ bots, servers }) => `${bots} bot · ${servers} sunucu`,
-      dashboard: 'Etkinlikler · izinler · durum',
-      reliability: 'Yeniden bağlanma · worker · net planlar',
+      servers: { label: 'Sunucu', detail: 'OmniFM kullanıyor' },
+      stations: { label: 'İstasyon', detail: 'dinlemek için, burada da' },
+      bots: { label: 'Bot', detail: 'çalmaya hazır' },
+      listeners: { label: 'Şu an dinleyen', detail: 'tüm sunucularda' },
     },
   },
   whyOmniFM: {
     eyebrow: 'Neden OmniFM',
-    title: 'Sadece bir radyo botu değil, düzgün kurulmuş bir Discord sistemi',
-    subtitle: 'OmniFM en güçlü hâline müzik, güvenilirlik ve sunucu yönetimi birlikte çalıştığında ulaşır.',
+    title: 'Bir radyo botundan fazlası',
+    subtitle: 'Kesintisiz çalan müzik ve sunucunu yönetmek için ihtiyacın olan her şey.',
     cards: {
       radio: {
         label: 'Radyo',
@@ -82,17 +58,17 @@ const messages = {
       workers: {
         label: 'Worker’lar',
         title: 'Tek bir bottan fazlası',
-        desc: 'Worker mimarisi yayınları düzgünce dağıtır ve büyük topluluklarda paralel kullanımı öngörülebilir kılar.',
+        desc: 'Birden fazla bot işi paylaşır: her worker kendi ses kanalında çalar, böylece büyük bir sunucuda aynı anda birden fazla istasyon çalabilir.',
       },
       control: {
         label: 'Kontrol',
         title: 'Yöneticiler için kontrol',
-        desc: 'Panel, etkinlikler, rol izinleri ve durum görünümleri Pro sunuculara yalnızca daha fazla istasyon değil, gerçek kontrol verir.',
+        desc: 'Panel neyin nerede çaldığını gösterir, dili ayarlar ve etkinlikleri planlar. Pro ile canlı görünüm, istatistikler, rol yetkileri ve kesinti bildirimleri gelir.',
       },
       growth: {
         label: 'Büyüme',
         title: 'Sürtünmesiz büyüme',
-        desc: 'Free, Pro ve Ultimate aynı çekirdeğe dayanır; hızlı başlangıçtan operatör seviyesindeki kuruluma kadar.',
+        desc: 'Free, Pro ve Ultimate birbirinin üzerine kurulur: üst plana geçtiğinde her şey ayarlı kalır, sadece daha fazlası eklenir.',
       },
     },
   },
@@ -124,7 +100,7 @@ const messages = {
   faq: {
     eyebrow: 'SSS',
     title: 'Başlamadan önce en önemli sorular',
-    subtitle: 'İlk kullanım hızlı, yükseltme yolu net ve mimari anlaşılır olmalı.',
+    subtitle: 'Kısaca: nasıl başlarsın, planlar neler sunar ve OmniFM nasıl çalışır.',
     items: [
       {
         key: 'start',
@@ -139,7 +115,7 @@ const messages = {
       {
         key: 'free',
         question: 'Free planında neler var?',
-        answer: 'Free sağlam bir başlangıç sunar: en fazla 2 bot, 20 ücretsiz istasyon, temel komutlar ve commander ile worker akışının tamamı.',
+        answer: 'Başlamak için Free yeterli: en fazla 2 bot, 20 istasyon ve radyo dinlemek için gereken tüm komutlar.',
       },
       {
         key: 'dashboard',
@@ -157,33 +133,17 @@ const messages = {
         answer: 'Kendi radyonu işletiyorsan: logosuyla birlikte en fazla 50 kendi istasyonun, her sunucu için kendi bot görünümü, kendi yedek istasyon zincirlerin, webhook’lar ve ayrıntılı istatistikler, ayrıca aynı anda 16 ses kanalı.',
       },
       {
+        key: 'planStatus',
+        question: 'Sunucumun hangi planda olduğunu nasıl görürüm?',
+        answer: 'Panelde: Discord ile giriş yap, sunucunu seç ve “Abonelik ve lisans” bölümünü aç. Orada planı ve ne zamana kadar geçerli olduğunu görürsün. Discord’da /premium komutu da gösterir.',
+        link: { label: 'Panele git', page: 'dashboard' },
+      },
+      {
         key: 'workers',
         question: 'Commander ve worker’lar nasıl çalışır?',
-        answer: 'Commander komutları ve worker davetlerini yönetir. Worker’lar yayınları çalıştırır. Böylece OmniFM birden fazla paralel yayını düzgünce dağıtıp kararlı tutabilir.',
+        answer: 'Commander komutlarını alır; /invite sana worker’ların bağlantılarını verir. Worker’lar radyoyu ses kanallarında çalar. Böylece bir sunucu aynı anda birden fazla istasyon dinleyebilir.',
       },
     ],
-  },
-  useCases: {
-    eyebrow: 'OmniFM kimin için?',
-    title: 'Her planın net bir görevi var',
-    subtitle: 'Sadece fiyatlar değil: hangi plan hangi sunucuya gerçekten uyar.',
-    cards: {
-      free: {
-        title: 'Hızlı topluluk radyosu için Free',
-        desc: 'Küçük veya özel bir sunucuda 24/7 radyo istiyorsan, Free en kolay başlangıç noktasıdır.',
-        fit: 'Küçük topluluklar, arkadaş grupları ve yönetim yükü olmadan ilk kurulum için ideal.',
-      },
-      pro: {
-        title: 'Topluluk yöneticileri için Pro',
-        desc: 'Etkinlikler, izinler ve panel günlük işin parçası olduğunda Pro gerçek yönetim planına dönüşür.',
-        fit: 'Etkinlik sunucuları, orta büyüklükteki topluluklar ve düzenli oturumları ile net rolleri olan ekipler için ideal.',
-      },
-      ultimate: {
-        title: 'Operatör kurulumları için Ultimate',
-        desc: 'Güvenilirlik araçları, kendi istasyonlar, ayrıntılı istatistikler ve otomasyon önemliyse doğru plan Ultimate’tır.',
-        fit: 'Büyük topluluklar, ileri düzey kullanıcılar ve OmniFM’in yönetilen bir sistem gibi çalışmasını isteyen operatörler için ideal.',
-      },
-    },
   },
   // The Discord preview on the start page (DiscordShowcase.js).
   discordShowcase: {

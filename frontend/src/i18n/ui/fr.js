@@ -600,7 +600,6 @@ export default {
   "light headers": "en-têtes clairs",
   "light pages": "pages claires",
   "listeners": "auditeurs",
-  "listening": "à l'écoute",
   "members": "membres",
   "now": "maintenant",
   "off": "arrêté",

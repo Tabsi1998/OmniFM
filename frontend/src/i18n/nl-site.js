@@ -13,13 +13,15 @@ const messages = {
   },
   cookieConsent: {
     title: 'Cookies en statistieken',
-    body: 'OmniFM gebruikt noodzakelijke opslag voor taal, beveiliging en dashboardsessies. De Google-tag werkt met de toestemmingsmodus; opslag voor statistieken is alleen toegestaan als je daarmee instemt.',
+    short: 'We bewaren alleen wat de site nodig heeft (taal, inloggen). Google Analytics plaatst pas cookies als je toestemming geeft.',
+    privacyLink: 'Privacy',
     necessaryTitle: 'Noodzakelijk',
-    necessaryBody: 'Nodig voor je taalkeuze, veilige dashboardsessies en de technische werking. Deze categorie kan niet worden uitgeschakeld.',
-    analyticsTitle: 'Statistieken',
-    analyticsBody: 'Staat Google Analytics 4 met toestemmingsmodus toe om paginaweergaven en gebruik op hoofdlijnen te meten. Zonder toestemming blijft opslag voor statistieken geweigerd.',
+    necessaryBody: 'Voor je taal, het veilige inloggen op het dashboard en om de site te laten werken. Kan niet worden uitgezet.',
+    analyticsTitle: 'Statistieken (Google Analytics)',
+    analyticsBody: 'Telt globaal welke pagina’s worden bezocht, zodat we de site kunnen verbeteren. Zonder je toestemming plaatst Google Analytics geen cookies.',
     acceptAll: 'Alles accepteren',
     reject: 'Weigeren',
+    settings: 'Instellingen',
     save: 'Keuze opslaan',
     manage: 'Cookie-instellingen',
   },
@@ -28,50 +30,24 @@ const messages = {
     titleLead: 'Jouw Discord-',
     titleAccent: 'radio.',
     titleTail: '24/7 live.',
-    subtitleLead: '24/7 Discord-radio met meer dan 120 zenders, betrouwbaarheid dankzij workers, bediening via het dashboard en nette herverbinding. Nodig de commander uit, voeg een worker toe en gebruik',
+    subtitleLead: 'Radio de klok rond in je Discord-spraakkanaal: zenders in elk genre, een dashboard om alles te regelen, en valt een stream weg, dan maakt OmniFM zelf opnieuw verbinding. Nodig de commander uit, voeg een worker toe en gebruik',
     subtitleTail: '.',
     ctaInvite: 'Commander uitnodigen',
     ctaFlow: 'Zo werkt het',
-    stats: {
-      servers: 'Servers',
-      stations: 'Zenders',
-      bots: 'Bots',
-    },
   },
   trustBar: {
+    live: 'Live cijfers',
     items: {
-      stations: {
-        label: 'Zenders',
-        detail: 'Livecatalogus voor Free en Pro, met een voorbeeld direct op de website.',
-      },
-      network: {
-        label: 'Live-activiteit',
-        detail: 'Actieve streams en een klaarstaand botnetwerk laten zien dat OmniFM echt in productie draait, niet alleen op een landingspagina.',
-      },
-      dashboard: {
-        label: 'Dashboard',
-        detail: 'Liveweergave, statistieken, rolrechten en storingsmeldingen vanaf Pro.',
-      },
-      reliability: {
-        label: 'Betrouwbaarheid',
-        detail: 'Herverbinding, duidelijke abonnementen en een eenvoudig pad voor groeiende servers.',
-      },
-    },
-    values: {
-      dashboard: 'Free+',
-      reliability: '24/7',
-    },
-    support: {
-      stations: ({ free, pro }) => `${free} free · ${pro} pro`,
-      network: ({ bots, servers }) => `${bots} bots · ${servers} servers`,
-      dashboard: 'Evenementen · rechten · status',
-      reliability: 'Herverbinding · workers · duidelijke abonnementen',
+      servers: { label: 'Servers', detail: 'gebruiken OmniFM' },
+      stations: { label: 'Zenders', detail: 'om te luisteren, ook hier' },
+      bots: { label: 'Bots', detail: 'klaar om te spelen' },
+      listeners: { label: 'Luisteren nu', detail: 'op alle servers samen' },
     },
   },
   whyOmniFM: {
     eyebrow: 'Waarom OmniFM',
-    title: 'Niet zomaar een radiobot, maar een goed ingerichte Discord-opzet',
-    subtitle: 'OmniFM is op zijn sterkst als muziek, betrouwbaarheid en serverbeheer samenwerken.',
+    title: 'Meer dan een radiobot',
+    subtitle: 'Muziek die blijft spelen, en alles wat je nodig hebt om je server te beheren.',
     cards: {
       radio: {
         label: 'Radio',
@@ -81,17 +57,17 @@ const messages = {
       workers: {
         label: 'Workers',
         title: 'Meer dan één bot',
-        desc: 'De workerarchitectuur verdeelt streams netjes en maakt parallel gebruik in grote community’s voorspelbaar.',
+        desc: 'Meerdere bots verdelen het werk: elke worker speelt in een eigen spraakkanaal, zodat een grote server meerdere zenders tegelijk kan draaien.',
       },
       control: {
         label: 'Controle',
         title: 'Controle voor admins',
-        desc: 'Dashboard, evenementen, rolrechten en statusweergaven geven Pro-servers echte controle, niet alleen meer zenders.',
+        desc: 'Het dashboard laat zien wat waar speelt, stelt de taal in en plant events. Pro voegt de liveweergave, statistieken, rolrechten en storingsmeldingen toe.',
       },
       growth: {
         label: 'Groei',
         title: 'Groeien zonder gedoe',
-        desc: 'Free, Pro en Ultimate bouwen op dezelfde kern, van een snelle start tot een opzet op operatorniveau.',
+        desc: 'Free, Pro en Ultimate bouwen op elkaar voort: stap je over naar een hoger abonnement, dan blijft alles ingesteld en krijg je er gewoon meer bij.',
       },
     },
   },
@@ -123,7 +99,7 @@ const messages = {
   faq: {
     eyebrow: 'FAQ',
     title: 'De belangrijkste vragen voordat je begint',
-    subtitle: 'De eerste start moet snel gaan, de weg naar een upgrade duidelijk zijn en de architectuur begrijpelijk blijven.',
+    subtitle: 'Kort beantwoord: hoe je begint, wat de abonnementen bieden en hoe OmniFM werkt.',
     items: [
       {
         key: 'start',
@@ -138,7 +114,7 @@ const messages = {
       {
         key: 'free',
         question: 'Wat zit er in Free?',
-        answer: 'Free is een stevige start: tot 2 bots, 20 gratis zenders, de basiscommando’s en de volledige commander-plus-workerflow.',
+        answer: 'Free is genoeg om te beginnen: tot 2 bots, 20 zenders en alle commando’s die je nodig hebt om radio te luisteren.',
       },
       {
         key: 'dashboard',
@@ -156,33 +132,17 @@ const messages = {
         answer: 'Als je je eigen radio runt: tot 50 eigen zenders met logo, een eigen uiterlijk van de bot per server, eigen ketens van reservezenders, webhooks en gedetailleerde statistieken, plus 16 spraakkanalen tegelijk.',
       },
       {
+        key: 'planStatus',
+        question: 'Hoe zie ik welk abonnement mijn server heeft?',
+        answer: 'In het dashboard: log in met Discord, kies je server en open ‘Abonnement en licentie’. Daar zie je het abonnement en hoe lang het loopt. In Discord laat het commando /premium het ook zien.',
+        link: { label: 'Naar het dashboard', page: 'dashboard' },
+      },
+      {
         key: 'workers',
         question: 'Hoe werken de commander en de workers?',
-        answer: 'De commander regelt de commando’s en de uitnodigingen van workers. De workers verzorgen de streams. Zo kan OmniFM meerdere parallelle streams netjes verdelen en stabiel houden.',
+        answer: 'De commander neemt je commando’s aan; /invite geeft je de links voor de workers. De workers spelen de radio in de spraakkanalen. Zo kan één server meerdere zenders tegelijk laten horen.',
       },
     ],
-  },
-  useCases: {
-    eyebrow: 'Voor wie is OmniFM?',
-    title: 'Elk abonnement heeft een duidelijke taak',
-    subtitle: 'Niet alleen prijzen: welk abonnement echt bij welke server past.',
-    cards: {
-      free: {
-        title: 'Free voor snelle communityradio',
-        desc: 'Wil je 24/7 radio op een kleine of privéserver, dan is Free het eenvoudigste startpunt.',
-        fit: 'Ideaal voor kleinere community’s, vriendengroepen en de eerste opzet zonder beheerlast.',
-      },
-      pro: {
-        title: 'Pro voor communitybeheerders',
-        desc: 'Zodra evenementen, rechten en het dashboard bij het dagelijkse werk horen, wordt Pro het echte beheerabonnement.',
-        fit: 'Ideaal voor eventservers, middelgrote community’s en teams met terugkerende sessies en duidelijke rollen.',
-      },
-      ultimate: {
-        title: 'Ultimate voor operatoropzetten',
-        desc: 'Als betrouwbaarheidstools, eigen zenders, gedetailleerde statistieken en automatisering tellen, is Ultimate het juiste abonnement.',
-        fit: 'Ideaal voor grote community’s, gevorderde gebruikers en operators die willen dat OmniFM zich gedraagt als een beheerd systeem.',
-      },
-    },
   },
   // The Discord preview on the start page (DiscordShowcase.js).
   discordShowcase: {

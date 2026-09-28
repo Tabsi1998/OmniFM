@@ -46,6 +46,20 @@ describe('plan cards', () => {
     expect(`${free}${pro}${ultimate}`).not.toMatch(/Ultimate-Sender|Ultimate stations/);
   });
 
+  it('says on each card who the plan is for; no second row of plan cards, no server-ID check (#435)', async () => {
+    answer(PRICING);
+    render(<I18nProvider><Premium bots={[]} /></I18nProvider>);
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
+    for (const plan of ['free', 'pro', 'ultimate']) {
+      expect(screen.getByTestId(`plan-fit-${plan}`).textContent.length, plan).toBeGreaterThan(30);
+    }
+    expect(screen.queryByTestId('premium-positioning-free')).toBeNull();
+    expect(screen.queryByTestId('premium-server-id-input')).toBeNull();
+    expect(screen.queryByTestId('premium-check-btn')).toBeNull();
+    // Only the pricing is fetched; nothing asks /api/premium/check any more.
+    expect(globalThis.fetch.mock.calls.every(([url]) => String(url).includes('/api/premium/pricing'))).toBe(true);
+  });
+
   it('keeps the owner console list and then shows no generated intro', async () => {
     answer({ ...PRICING, tiers: { ...PRICING.tiers, pro: { ...PRICING.tiers.pro, features: ['Eigene Zeile vom Owner'] } } });
     render(<I18nProvider><Premium bots={[]} /></I18nProvider>);

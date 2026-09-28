@@ -30,7 +30,7 @@ const css = `
 `;
 
 // Where webs and pumpkins may sit: sections of the start page, at their edges.
-export const WEB_SECTIONS = ['station-browser', 'why-omnifm-section', 'use-cases-section', 'premium-section', 'community-section', 'faq-section'];
+export const WEB_SECTIONS = ['station-browser', 'why-omnifm-section', 'premium-section', 'community-section', 'faq-section'];
 export const CORNERS = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
 
 function pick(list, count, random) {

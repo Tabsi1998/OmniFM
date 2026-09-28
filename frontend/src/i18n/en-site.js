@@ -12,14 +12,16 @@ const messages = {
     discord: 'Discord Community',
   },
   cookieConsent: {
-    title: 'Cookies and analytics',
-    body: 'OmniFM uses necessary storage for language, security, and dashboard sessions. The Google tag is active with Consent Mode; analytics storage is allowed only when you consent to analytics.',
+    title: 'Cookies and statistics',
+    short: 'We only store what the site needs (language, sign-in). Google Analytics sets cookies only after you agree.',
+    privacyLink: 'Privacy',
     necessaryTitle: 'Necessary',
-    necessaryBody: 'Required for language preferences, secure dashboard sessions, and technical operation. This category cannot be disabled.',
-    analyticsTitle: 'Analytics',
-    analyticsBody: 'Allows Google Analytics 4 with Consent Mode to measure page views and usage at a high level. Without consent, analytics storage remains denied.',
+    necessaryBody: 'For your language, the secure dashboard sign-in and for the site to work. Cannot be switched off.',
+    analyticsTitle: 'Statistics (Google Analytics)',
+    analyticsBody: 'Roughly counts which pages are visited so we can improve the site. Without your consent, Google Analytics sets no cookies.',
     acceptAll: 'Accept all',
     reject: 'Reject',
+    settings: 'Settings',
     save: 'Save selection',
     manage: 'Cookie settings',
   },
@@ -28,50 +30,24 @@ const messages = {
     titleLead: 'Your Discord',
     titleAccent: 'Radio.',
     titleTail: '24/7 Live.',
-    subtitleLead: '24/7 Discord radio with 120+ stations, worker-based reliability, dashboard control, and clean reconnect behavior. Invite the commander, add a worker, and run',
+    subtitleLead: 'Radio around the clock in your Discord voice channel: stations from every genre, a dashboard to control it, and if a stream drops, OmniFM reconnects on its own. Invite the commander, add a worker, and run',
     subtitleTail: '.',
     ctaInvite: 'Invite commander',
     ctaFlow: 'How it works',
-    stats: {
-      servers: 'Servers',
-      stations: 'Stations',
-      bots: 'Bots',
-    },
   },
   trustBar: {
+    live: 'Live numbers',
     items: {
-      stations: {
-        label: 'Stations',
-        detail: 'Live catalog for Free and Pro, with direct preview on the website.',
-      },
-      network: {
-        label: 'Live activity',
-        detail: 'Active streams and a ready bot network show that OmniFM is operating in production, not only on a landing page.',
-      },
-      dashboard: {
-        label: 'Dashboard',
-        detail: 'Live view, statistics, role permissions and outage alerts from Pro upward.',
-      },
-      reliability: {
-        label: 'Reliability',
-        detail: 'Reconnect, clear tiers, and a clean upgrade path for growing servers.',
-      },
-    },
-    values: {
-      dashboard: 'Free+',
-      reliability: '24/7',
-    },
-    support: {
-      stations: ({ free, pro }) => `${free} free · ${pro} pro`,
-      network: ({ bots, servers }) => `${bots} bots · ${servers} servers`,
-      dashboard: 'Events · permissions · health',
-      reliability: 'Reconnect · workers · clear tiers',
+      servers: { label: 'Servers', detail: 'use OmniFM' },
+      stations: { label: 'Stations', detail: 'to listen to, also right here' },
+      bots: { label: 'Bots', detail: 'ready to play' },
+      listeners: { label: 'Listening now', detail: 'across all servers' },
     },
   },
   whyOmniFM: {
     eyebrow: 'Why OmniFM',
-    title: 'Not just a radio bot, but a clean Discord operating setup',
-    subtitle: 'OmniFM is strongest when music, reliability, and server management work together.',
+    title: 'More than a radio bot',
+    subtitle: 'Music that keeps playing, and everything you need to run your server.',
     cards: {
       radio: {
         label: 'Radio',
@@ -81,17 +57,17 @@ const messages = {
       workers: {
         label: 'Workers',
         title: 'More than a single bot',
-        desc: 'The worker architecture distributes streams cleanly and makes parallel usage predictable for larger communities.',
+        desc: 'Several bots share the work: each worker plays in its own voice channel, so big servers can run several stations at once.',
       },
       control: {
         label: 'Control',
         title: 'Control for admins',
-        desc: 'Dashboard access, events, role permissions, and status views give Pro servers real control instead of only more stations.',
+        desc: 'The dashboard shows what plays where, sets the language and plans events. Pro adds the live view, statistics, role permissions and outage alerts.',
       },
       growth: {
         label: 'Growth',
         title: 'Growth without friction',
-        desc: 'Free, Pro, and Ultimate build on the same product core, from quick entry to operator-grade setup.',
+        desc: 'Free, Pro and Ultimate build on each other: when you move up, everything stays set up and you simply get more.',
       },
     },
   },
@@ -123,7 +99,7 @@ const messages = {
   faq: {
     eyebrow: 'FAQ',
     title: 'The most important questions before you start',
-    subtitle: 'The first run should be fast, the upgrade path should be clear, and the architecture should stay understandable.',
+    subtitle: 'Short answers: how to start, what the plans bring and how OmniFM works.',
     items: [
       {
         key: 'start',
@@ -138,7 +114,7 @@ const messages = {
       {
         key: 'free',
         question: 'What is included in the Free plan?',
-        answer: 'Free covers the strong entry point: up to 2 bots, 20 free stations, core commands, and the full commander-plus-worker entry flow.',
+        answer: 'Free is enough to get started: up to 2 bots, 20 stations and every command you need to listen to radio.',
       },
       {
         key: 'dashboard',
@@ -156,33 +132,17 @@ const messages = {
         answer: 'When you run your own radio: up to 50 stations of your own with logo, your own bot look per server, your own fallback chains, webhooks and detailed statistics, plus 16 voice channels at once.',
       },
       {
+        key: 'planStatus',
+        question: 'How do I see which plan my server has?',
+        answer: 'In the dashboard: sign in with Discord, pick your server and open “Subscription & License”. It shows the plan and how long it runs. In Discord, the /premium command shows it too.',
+        link: { label: 'Open the dashboard', page: 'dashboard' },
+      },
+      {
         key: 'workers',
         question: 'How do commander and workers work?',
-        answer: 'The commander handles commands and worker invites. Workers execute the streams. That allows OmniFM to distribute multiple parallel streams cleanly and keep them stable.',
+        answer: 'The commander takes your commands; /invite gives you the links for the workers. The workers play the radio in the voice channels. That way one server can listen to several stations at once.',
       },
     ],
-  },
-  useCases: {
-    eyebrow: 'Who is OmniFM for?',
-    title: 'Each plan has a clear job',
-    subtitle: 'Not just prices: which plan really fits which kind of server.',
-    cards: {
-      free: {
-        title: 'Free for fast community radio',
-        desc: 'If you want 24/7 radio on a small or private server, Free gives you the cleanest possible starting point.',
-        fit: 'Ideal for smaller communities, friend groups, and the first live setup without admin overhead.',
-      },
-      pro: {
-        title: 'Pro for community admins',
-        desc: 'As soon as events, permissions, and dashboard control become part of normal operation, Pro turns into the real management plan.',
-        fit: 'Ideal for event servers, mid-sized communities, and teams with recurring sessions and clear roles.',
-      },
-      ultimate: {
-        title: 'Ultimate for operator setups',
-        desc: 'When reliability tooling, custom stations, deeper analytics, and automation matter, Ultimate is the right tier.',
-        fit: 'Ideal for larger communities, power users, and operators who want OmniFM to behave like a managed system.',
-      },
-    },
   },
   // The Discord preview on the start page (DiscordShowcase.js).
   discordShowcase: {

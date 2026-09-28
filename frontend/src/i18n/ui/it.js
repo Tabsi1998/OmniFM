@@ -600,7 +600,6 @@ export default {
   "light headers": "header chiari",
   "light pages": "pagine chiare",
   "listeners": "ascoltatori",
-  "listening": "in ascolto",
   "members": "membri",
   "now": "ora",
   "off": "spento",

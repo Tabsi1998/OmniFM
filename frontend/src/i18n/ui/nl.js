@@ -600,7 +600,6 @@ export default {
   "light headers": "lichte headers",
   "light pages": "lichte pagina's",
   "listeners": "luisteraars",
-  "listening": "luisteren",
   "members": "leden",
   "now": "nu",
   "off": "uit",
