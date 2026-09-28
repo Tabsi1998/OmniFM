@@ -6,6 +6,61 @@ folgt [SemVer](https://semver.org/lang/de/): Die erste Zahl steigt bei
 Funktionen, die dritte bei reinen Fehlerbehebungen. Wie ein Release entsteht,
 steht in `scripts/release.mjs`.
 
+## 3.11.0 – 2026-09-28
+
+Website und Dashboard in neun Sprachen, neue Rechtsseiten mit einer
+Checkliste im Owner-Menü, und der Jahresrückblick als Karten in Discord.
+
+### Neu
+
+- **Website und Dashboard in neun Sprachen:** Deutsch, Englisch,
+  Französisch, Spanisch, Italienisch, Polnisch, Türkisch, Portugiesisch
+  (Brasilien) und Niederländisch. Die Sprache folgt dem Browser; `?lang=fr`
+  im Link legt sie fest. Suchmaschinen finden jede Sprache. Bei den
+  Rechtsseiten bleibt die deutsche Fassung verbindlich. (#306, #420)
+- **Slash-Befehle in sieben weiteren Sprachen:** Discord zeigt Beschreibungen
+  und Auswahlen in der App-Sprache der Person. Was man eintippt, bleibt
+  gleich. (#306, #419)
+- **Jahresrückblick als Karten:** `/jahresrueckblick` (`/year-review`) zeigt
+  das Jahr des Servers in fünf Karten zum Durchblättern: Stunden, Sender,
+  Songs, Uhrzeiten und Teilen. Vor Dezember ist es „euer Jahr bisher“. Ab Pro
+  gibt es das Bild und den Beitrag im Kanal (Dezember und Januar). (#301, #418)
+- **Neue Rechtsseiten:** Impressum, Datenschutzerklärung und
+  Nutzungsbedingungen zeigen nur, was eingetragen ist, einspaltig mit
+  Inhaltsverzeichnis und „Stand“, und drucken sauber. Hinweise, die nur für
+  den Betreiber gedacht waren, stehen nicht mehr öffentlich. Die
+  Datenschutzerklärung ist in Alltagssprache und nennt jetzt die Übermittlung
+  in die USA (Discord; Google Analytics nur mit Einwilligung), die
+  Einwilligung als Rechtsgrundlage, dass Angaben freiwillig sind und dass
+  keine automatischen Entscheidungen fallen. (#422, #423, #439)
+- **Owner-Menü „Firma & Recht“:** eine Checkliste mit Ampel für Impressum,
+  Offenlegung, Datenschutz und Nutzungsbedingungen. Zu jedem Punkt steht ein
+  Satz, warum er da ist; „Trifft nicht zu“ gibt es für das, was nur manchmal
+  gilt, und „Vorschau“ öffnet die öffentliche Seite. Neue Felder für
+  Gewerbe, Firmenbuch und Medieninhaber. Das Cockpit hat den Punkt
+  „Rechtliches“. (#424, #440)
+
+### Behoben
+
+- **Startseite:** Der Filter „Alle“ bei den Sendern ist wieder lesbar, die
+  Karten „Warum OmniFM“ haben deutsche Überschriften, die Logos im Brand Kit
+  sind ganz zu sehen, und Dashboard und Owner-Menü zeigen das OmniFM-Logo.
+  Der veraltete Block „Dashboard und Betrieb“ ist weg. (#421, #438)
+- **Barrierefreiheit:** Der Menüknopf am Handy hat einen Namen für
+  Bildschirmleser, und die Fußzeile ist besser lesbar. Die Rechtsseiten
+  erreichen in der Lighthouse-Barrierefreiheit 100 Punkte. (#439)
+
+### Nach dem Update
+
+- **Owner-Menü → Firma & Recht:** „Medieninhaber mit Wohnort bzw. Sitz“ und
+  „Nutzungsbedingungen gültig ab“ eintragen, dann bei allem, was nicht auf
+  dich zutrifft (etwa UID-Nummer oder Firmenbuch), „Trifft nicht zu“ wählen.
+  Bis dahin zeigt das Cockpit „Rechtliches“ gelb.
+- Dort auch den Hosting-Anbieter eintragen und beim Hosting-Standort
+  „Österreuch |EU“ zu „Österreich | EU“ korrigieren.
+- Die Slash-Befehle werden beim nächsten Start neu angemeldet; das geschieht
+  von selbst.
+
 ## 3.10.0 – 2026-09-28
 
 Die Pläne neu aufgeteilt, damit jeder für sich lohnt:
