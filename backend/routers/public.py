@@ -264,6 +264,13 @@ def build_router(core):
             "history": [],
         }
 
+    @router.get("/api/charts")
+    async def public_charts():
+        """The OmniFM charts (#300) are counted in the Node API only; this way
+        back shows none instead of numbers it has not."""
+        return {"week": None, "minServers": 3, "size": 20, "measuring": False, "entries": [],
+                "generatedAt": datetime.now(timezone.utc).isoformat()}
+
     @router.get("/api/commands")
     async def get_commands():
         return {
