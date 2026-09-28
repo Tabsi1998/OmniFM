@@ -1,6 +1,7 @@
 // OmniFM API: every route handler of the Node API, wired with its helpers.
 // Split out of src/api/server.js (#293).
 import { createDashboardChannelsRouteHandler } from "./routes/dashboard-channels.js";
+import { createDashboardPlaybackRouteHandler } from "./routes/dashboard-playback.js";
 import { createAuthRoutesHandler } from "./routes/auth-routes.js";
 import { createDashboardCustomStationsRouteHandler } from "./routes/dashboard-custom-stations.js";
 import { createDashboardAccessRouteHandler } from "./routes/dashboard-access.js";
@@ -592,6 +593,17 @@ export const handleDashboardChannelsRoute = createDashboardChannelsRouteHandler(
   methodNotAllowed,
   resolveDashboardGuildForSession,
   resolveRuntimeForGuild,
+  sendJson,
+  sendLocalizedError,
+  serverHasCapability,
+});
+
+// The live view of a server (#304).
+export const handleDashboardPlaybackRoute = createDashboardPlaybackRouteHandler({
+  getDashboardRequestTranslator,
+  getDashboardSession,
+  methodNotAllowed,
+  resolveDashboardGuildForSession,
   sendJson,
   sendLocalizedError,
   serverHasCapability,

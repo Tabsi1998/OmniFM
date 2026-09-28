@@ -108,6 +108,11 @@ class WorkerBridgeService {
         return this.runtime.resumeInGuild(guildId);
       case "setSleepTimer":
         return this.runtime.setSleepTimerInGuild(guildId, payload.minutes);
+      // The live view's buttons in the dashboard (#304).
+      case "restartStation":
+        return this.runtime.restartStationFromDashboard(guildId);
+      case "reconnectVoice":
+        return this.runtime.reconnectVoiceFromDashboard(guildId);
       case "setGuildProfile":
         return this.runtime.applyGuildBotProfile(guildId, payload.changes || {});
       case "setVolume": {

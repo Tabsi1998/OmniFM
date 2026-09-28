@@ -14,6 +14,7 @@ import { dashboardApiRequest } from '../lib/dashboardApi.js';
 import { useI18n } from '../i18n.js';
 import DashboardEvents from './DashboardEvents.js';
 import DashboardSettings from './DashboardSettings.js';
+import GuildLiveView from './GuildLiveView.js';
 import { normalizeDashboardCapabilityPayload } from '../lib/dashboardCapabilities.js';
 
 const NAV = [
@@ -495,10 +496,10 @@ export default function GuildDashboard() {
       <main className="oa-main">
         <div className="oa-topbar">
           <div><h1 className="oa-h1 oa-display" data-testid="guild-section-title">{navLabel(section)}</h1><div className="oa-sub">{guild.name}{Number(guild.memberCount || guild.members) > 0 ? ` · ${fmtInt(guild.memberCount || guild.members)} ${t('Mitglieder', 'members')}` : ''} · <span className="oa-mono">Guild-ID {guild.id}</span></div></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>
             <button className="oa-btn ghost" onClick={() => loadGuild(guildId)} disabled={gdata.loading} title={t('Aktualisieren', 'Refresh')}><RefreshCw size={15} /></button>
             <span className="oa-pill" style={{ background: `${tm.color}22`, color: tm.color, border: `1px solid ${tm.color}55` }} data-testid="guild-active-tier"><tm.icon size={13} /> {tm.name}</span>
-            <select className="oa-input" style={{ height: 40, width: 'auto', maxWidth: 360 }} value={guildId} onChange={(event) => setGuildId(event.target.value)} data-testid="guild-switcher">{session.guilds.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.id}</option>)}</select>
+            <select className="oa-input" style={{ height: 40, width: 'auto', maxWidth: 'min(360px, 100%)', minWidth: 0 }} value={guildId} onChange={(event) => setGuildId(event.target.value)} data-testid="guild-switcher">{session.guilds.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.id}</option>)}</select>
           </div>
         </div>
         <div className="oa-mobile-nav">{NAV.map((item) => <button key={item.id} className={`oa-nav-btn ${section === item.id ? 'active' : ''}`} style={{ width: 'auto', whiteSpace: 'nowrap' }} onClick={() => setSection(item.id)}><item.icon size={16} /> {navLabel(item.id)}</button>)}</div>
@@ -531,6 +532,8 @@ export default function GuildDashboard() {
               <button className="oa-btn ghost" style={{ width: '100%', marginTop: 14 }} onClick={() => setSection('stations')}><ListMusic size={15} /> {t('Senderkatalog', 'Station catalog')}</button>
             </div>
           </div>
+          {/* The playback of every bot over the last 24 hours (#304), from Pro on like the health view. */}
+          {guildCapabilities?.basicHealth && <GuildLiveView apiRequest={apiRequest} guildId={guildId} t={t} locale={locale} />}
         </>}
 
         {section === 'events' && <>{tier === 'free' ? <div className="oa-card" style={{ display: 'flex', alignItems: 'center', gap: 14 }}><Lock size={22} /><div><b>{t('Automatische Radio-Events sind ab Pro verfügbar.', 'Scheduled radio events are available from Pro.')}</b></div><button className="oa-btn primary" style={{ marginLeft: 'auto' }} onClick={() => setSection('subscription')}>Upgrade</button></div> : <>

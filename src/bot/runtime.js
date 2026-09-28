@@ -47,6 +47,7 @@ import { guildSettingsMethods } from "./runtime-methods/guild-settings.js";
 import { commandSyncMethods } from "./runtime-methods/command-sync.js";
 import { runtimeDelegateMethods } from "./runtime-methods/delegates.js";
 import { playbackControlMethods } from "./runtime-methods/playback-control.js";
+import { liveViewMethods } from "./runtime-methods/live-view.js";
 
 class BotRuntime {
   constructor(config, { role = "worker", workerManager = null } = {}) {
@@ -572,6 +573,7 @@ Object.assign(
   sleepMethods,
   pollMethods,
   botProfileMethods,
+  liveViewMethods,
 );
 
 export { BotRuntime };
