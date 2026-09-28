@@ -180,6 +180,10 @@ const PRE_PERMISSION_COMMANDS = {
   "year-review": ({ runtime, interaction }) => runtime.handleYearReviewCommand(interaction),
   // A suggestion for OmniFM's catalogue (#303), not a change of the server.
   "suggest-station": ({ runtime, interaction }) => runtime.openSuggestionForm(interaction),
+  // Problems, ideas and feedback for the OmniFM team (#436), from anybody.
+  report: ({ runtime, interaction }) => runtime.openReportForm(interaction, "problem"),
+  idea: ({ runtime, interaction }) => runtime.openReportForm(interaction, "idea"),
+  feedback: ({ runtime, interaction }) => runtime.openReportForm(interaction, "feedback"),
   help: INFO_COMMANDS.help,
   setup: INFO_COMMANDS.setup,
   language: INFO_COMMANDS.language,
@@ -249,7 +253,7 @@ export async function handleRuntimeInteraction(runtime, interaction) {
 
   const { t, language } = runtime.createInteractionTranslator(interaction);
   // A person's own data is always theirs to see and delete (#272, #285).
-  const unrestrictedCommands = new Set(["help", "setup", "premium", "license", "language", "saved", "mydata", "suggest-station", "year-review"]);
+  const unrestrictedCommands = new Set(["help", "setup", "premium", "license", "language", "saved", "mydata", "suggest-station", "year-review", "report", "idea", "feedback"]);
   if (!unrestrictedCommands.has(interaction.commandName)) {
     const access = runtime.getGuildAccess(interaction.guildId);
     if (!access.allowed) {

@@ -51,7 +51,9 @@ import { playbackControlMethods } from "./runtime-methods/playback-control.js";
 import { liveViewMethods } from "./runtime-methods/live-view.js";
 import { yearReviewMethods } from "./runtime-methods/year-review.js";
 import { suggestionMethods } from "./runtime-methods/suggestions.js";
+import { reportMethods } from "./runtime-methods/reports.js";
 import { startStationSuggestionService } from "../services/station-suggestions.js";
+import { startProblemReportService } from "../services/problem-reports.js";
 
 class BotRuntime {
   constructor(config, { role = "worker", workerManager = null } = {}) {
@@ -111,6 +113,8 @@ class BotRuntime {
         startChartsPostService(this);
         // Station suggestions: hourly stream checks, answers to the senders (#303).
         startStationSuggestionService(this);
+        // Problems, ideas and feedback go to the private team channel (#436).
+        startProblemReportService(this);
         this.enforcePremiumGuildScope("startup").catch((err) => {
           log("ERROR", `[${this.config.name}] Premium-Guild-Scope Prüfung fehlgeschlagen: ${err?.message || err}`);
         });
@@ -584,6 +588,7 @@ Object.assign(
   liveViewMethods,
   yearReviewMethods,
   suggestionMethods,
+  reportMethods,
 );
 
 export { BotRuntime };

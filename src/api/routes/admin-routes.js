@@ -38,6 +38,7 @@ import {
 } from "../../lib/owner-access.js";
 import { refreshOwnerSettings } from "../../lib/owner-settings-cache.js";
 import { normalizeOwnerSeasons } from "../../lib/seasons.js";
+import { normalizeReportSettings } from "../../lib/problem-reports.js";
 import { getClientIp, safeTokenEquals } from "../../lib/api-helpers.js";
 import { getDb, isConnected } from "../../lib/db.js";
 import {
@@ -671,6 +672,8 @@ export function createAdminRoutesHandler(deps) {
       }
       // Only valid looks and server IDs reach the database (#425).
       if (section === "seasons") saveData = normalizeOwnerSeasons(data);
+      // Channel IDs only (#436).
+      if (section === "reports") saveData = normalizeReportSettings(data);
       if (!isConnected() || !getDb()) {
         sendJson(res, 503, { error: "Keine Datenbank verbunden \u2013 Speichern nicht m\u00f6glich." });
         return true;

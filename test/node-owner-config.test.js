@@ -10,7 +10,7 @@ test("the defaults are the same file FastAPI reads", () => {
   assert.deepEqual(Object.keys(config.DEFAULT_OWNER_CONFIG), Object.keys(shared));
   assert.deepEqual(config.DEFAULT_OWNER_CONFIG.company, shared.company);
   assert.ok(config.DEFAULT_OWNER_CONFIG.system.streamRecovery.stableResetMs > 0, "streamRecovery comes from the recovery settings");
-  assert.deepEqual(config.OWNER_CONFIG_SECTIONS, ["company", "plans", "discord", "system", "marketing", "access", "discordShop", "charts", "seasons"]);
+  assert.deepEqual(config.OWNER_CONFIG_SECTIONS, ["company", "plans", "discord", "system", "marketing", "access", "discordShop", "charts", "seasons", "reports"]);
 });
 
 test("secrets leave masked, and a mask sent back never replaces the stored secret", () => {

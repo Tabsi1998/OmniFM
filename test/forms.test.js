@@ -250,7 +250,7 @@ test("Free has one scheduled event: a second one is refused, a downgrade keeps t
 
 // ---- report a problem ----
 
-test("a problem report becomes a server incident with station and playback history", async () => {
+test("without a team channel, a problem report stays a server incident with station and playback history (#436)", async () => {
   const worker = Object.create(BotRuntime.prototype);
   worker.config = { id: "bot-2", name: "OmniFM 1" };
   worker.role = "worker";
@@ -275,7 +275,8 @@ test("a problem report becomes a server incident with station and playback histo
 
   const report = submit("np:reportform", formFields({ select: { reason: ["no_sound"] }, text: { detail: "Seit 5 Minuten   still" } }));
   await worker.handleNowPlayingControl(report);
-  assert.match(allText(last(report)), /Danke für die Meldung[\s\S]*Kein Ton[\s\S]*Dein Name wird nicht gespeichert/);
+  // Nothing reaches Discord without the team channel; the person hears so, the owner console keeps it.
+  assert.match(allText(last(report)), /Melden über Discord geht gerade nicht[\s\S]*trotzdem beim OmniFM-Team angekommen/);
 
   const [incident] = await getRecentRuntimeIncidents(GUILD, 5);
   assert.equal(incident.eventKey, "listener_report");

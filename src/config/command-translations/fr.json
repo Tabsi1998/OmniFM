@@ -135,5 +135,8 @@
   "Default": "Par défaut",
   "Allow": "Autoriser",
   "Return": "Revenir",
-  "Disconnect": "Déconnecter"
+  "Disconnect": "Déconnecter",
+  "Report a problem with OmniFM to the team": "Signaler un problème avec OmniFM à l'équipe",
+  "Suggest an idea for OmniFM": "Proposer une idée pour OmniFM",
+  "Tell the OmniFM team what you think": "Dire à l'équipe OmniFM ce que tu en penses"
 }

@@ -218,6 +218,10 @@ export function describeRuntimeIncident(eventKey, payload = {}, guildLabel = "")
     case "voice_server_unmuted":
       return `${prefix}Server-Stummschaltung aufgehoben`;
     case "listener_report": {
+      // Ideas and feedback land here too when Discord cannot take them (#436).
+      if (p.kind === "idea" || p.kind === "feedback") {
+        return `${prefix}${p.kind === "idea" ? "Idee" : "Feedback"} von einem Hörer${p.detail ? `: ${p.detail}` : ""}`;
+      }
       const reasons = { no_sound: "kein Ton", wrong_station: "falscher Sender", stuck: "hängt", other: "Problem" };
       const station = p.previousStationName || p.previousStationKey || "Sender";
       return `${prefix}Hörer meldet ${reasons[p.reason] || "Problem"} bei ${station}${p.detail ? `: ${p.detail}` : ""}`;

@@ -1,10 +1,11 @@
 // ============================================================
 // OmniFM: forms in Discord (#273)
 // ============================================================
-// Three forms instead of long slash options: add a station, plan an event,
-// report a problem. Here the forms and what is read from them; the runtime
-// side is runtime-methods/forms.js. A closed form sends nothing, so
-// "cancel" needs no code: nothing is saved before a submit.
+// Forms instead of long slash options: add a station, plan an event, report
+// a problem, an idea or feedback (#436). Here the forms and what is read from
+// them; the runtime side is runtime-methods/forms.js and reports.js. A closed
+// form sends nothing, so "cancel" needs no code: nothing is saved before a
+// submit.
 import {
   ChannelSelectMenuBuilder,
   ChannelType,
@@ -18,6 +19,15 @@ import {
 
 import { NP_PREFIX } from "./runtime-shared.js";
 import { STATION_LOGO_MAX_BYTES } from "../lib/station-logo-image.js";
+import {
+  REPORT_OPTION_NOTIFY,
+  REPORT_OPTION_PUBLIC,
+  REPORT_TEXT_MAX,
+  REPORT_TEXT_MIN,
+  cleanReportText,
+  isReportKind,
+  readConsents,
+} from "../lib/problem-reports.js";
 
 export const FORM_PREFIX = "omnifm:form:";
 export const STATION_FORM_ID = `${FORM_PREFIX}station`;
@@ -25,6 +35,9 @@ export const EVENT_FORM_ID = `${FORM_PREFIX}event`;
 export const SUGGESTION_FORM_ID = `${FORM_PREFIX}suggest`;
 export const PROBLEM_REPORT_BUTTON_ID = `${NP_PREFIX}report`;
 export const PROBLEM_REPORT_FORM_ID = `${NP_PREFIX}reportform`;
+// /problem, /idee, /feedback (#436): the form's ID carries the kind.
+export const REPORT_FORM_PREFIX = `${FORM_PREFIX}report:`;
+export const reportFormId = (kind) => `${REPORT_FORM_PREFIX}${kind}`;
 
 export const PROBLEM_REASONS = Object.freeze([
   { value: "no_sound", de: "Kein Ton", en: "No sound" },
@@ -231,17 +244,75 @@ export function buildProblemReportModal({ t }) {
           .addOptions(PROBLEM_REASONS.map((reason) => ({ label: t(reason.de, reason.en), value: reason.value })))),
       label(t("Mehr dazu (optional)", "More about it (optional)"), t("Was hast du gehört oder gesehen?", "What did you hear or see?"))
         .setTextInputComponent(text("detail", { style: TextInputStyle.Paragraph, required: false, max: 500 })),
+      label(t("Optionen", "Options")).setStringSelectMenuComponent(reportOptionsMenu(t)),
     );
 }
 
-/** { ok, reason, detail } - reason is one of PROBLEM_REASONS. */
+/** { ok, reason, detail, consent } - reason is one of PROBLEM_REASONS. */
 export function readProblemReport(fields) {
   const reason = safeSelectValues(fields, "reason")[0] || "";
-  if (!PROBLEM_REASONS.some((entry) => entry.value === reason)) return { ok: false, reason: "", detail: "" };
-  return { ok: true, reason, detail: safeTextValue(fields, "detail").replace(/\s+/g, " ").slice(0, 500) };
+  if (!PROBLEM_REASONS.some((entry) => entry.value === reason)) return { ok: false, reason: "", detail: "", consent: readConsents([]) };
+  return {
+    ok: true,
+    reason,
+    detail: safeTextValue(fields, "detail").replace(/\s+/g, " ").slice(0, 500),
+    consent: readConsents(safeSelectValues(fields, "options")),
+  };
 }
 
 export function problemReasonLabel(reason, t = (de) => de) {
   const entry = PROBLEM_REASONS.find((item) => item.value === reason);
   return entry ? t(entry.de, entry.en) : reason;
+}
+
+// ---- problems, ideas and feedback (#436) ----
+
+/** The two voluntary ticks, the same in every report form. */
+export function reportOptionsMenu(t) {
+  return new StringSelectMenuBuilder()
+    .setCustomId("options")
+    .setRequired(false)
+    .setMinValues(0)
+    .setMaxValues(2)
+    .setPlaceholder(t("Freiwillig, gern leer lassen", "Voluntary, fine to leave empty"))
+    .addOptions(
+      {
+        label: t("Darf öffentlich im Forum stehen", "May be shown in the public forum"),
+        value: REPORT_OPTION_PUBLIC,
+        description: t("Nur der Text, Sender und Plan; kein Server, kein Name", "Only the text, station and plan; no server, no name"),
+      },
+      {
+        label: t("Gib mir Bescheid, wenn es erledigt ist", "Tell me when it is done"),
+        value: REPORT_OPTION_NOTIFY,
+        description: t("Per Direktnachricht; dafür merken wir uns deine Discord-ID", "By direct message; for that we keep your Discord ID"),
+      },
+    );
+}
+
+const REPORT_FORM_TEXTS = {
+  problem: (t) => [t("Problem melden", "Report a problem"), t("Was ist passiert?", "What happened?"), t("Was hast du gehört oder gesehen, und wann?", "What did you hear or see, and when?")],
+  idea: (t) => [t("Idee vorschlagen", "Suggest an idea"), t("Deine Idee", "Your idea"), t("Was sollte OmniFM können?", "What should OmniFM be able to do?")],
+  feedback: (t) => [t("Feedback geben", "Give feedback"), t("Dein Feedback", "Your feedback"), t("Was gefällt dir, was nicht?", "What do you like, what not?")],
+};
+
+/** /problem, /idee and /feedback: the text and the two ticks. */
+export function buildReportModal({ t, kind }) {
+  const [title, heading, hint] = (REPORT_FORM_TEXTS[kind] || REPORT_FORM_TEXTS.problem)(t);
+  return new ModalBuilder()
+    .setCustomId(reportFormId(isReportKind(kind) ? kind : "problem"))
+    .setTitle(title)
+    .addLabelComponents(
+      label(heading, hint).setTextInputComponent(text("text", { style: TextInputStyle.Paragraph, min: REPORT_TEXT_MIN, max: REPORT_TEXT_MAX })),
+      label(t("Optionen", "Options")).setStringSelectMenuComponent(reportOptionsMenu(t)),
+    );
+}
+
+/** { kind, text, consent } of a submitted report form; kind is null for any other ID. */
+export function readReportForm(customId, fields) {
+  const kind = String(customId || "").startsWith(REPORT_FORM_PREFIX) ? String(customId).slice(REPORT_FORM_PREFIX.length) : "";
+  return {
+    kind: isReportKind(kind) ? kind : null,
+    text: cleanReportText(safeTextValue(fields, "text")),
+    consent: readConsents(safeSelectValues(fields, "options")),
+  };
 }

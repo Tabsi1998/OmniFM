@@ -192,6 +192,23 @@ export function buildCommandBuilders() {
     "Einen Radiosender für den OmniFM-Katalog vorschlagen"
   );
 
+  // #436: straight to the OmniFM team, first privately.
+  const report = describe(
+    new SlashCommandBuilder().setName("report").setNameLocalizations(de("problem")),
+    "Report a problem with OmniFM to the team",
+    "Ein Problem mit OmniFM ans Team melden"
+  );
+  const idea = describe(
+    new SlashCommandBuilder().setName("idea").setNameLocalizations(de("idee")),
+    "Suggest an idea for OmniFM",
+    "Eine Idee für OmniFM vorschlagen"
+  );
+  const feedback = describe(
+    new SlashCommandBuilder().setName("feedback"),
+    "Tell the OmniFM team what you think",
+    "Dem OmniFM-Team sagen, was du denkst"
+  );
+
   const poll = describe(
     new SlashCommandBuilder().setName("poll").setNameLocalizations(de("umfrage")),
     "Let the server vote which station plays next",
@@ -545,6 +562,9 @@ export function buildCommandBuilders() {
     mydata,
     yearReview,
     suggest,
+    report,
+    idea,
+    feedback,
     poll,
     sleep,
     setvolume,
