@@ -6,6 +6,47 @@ folgt [SemVer](https://semver.org/lang/de/): Die erste Zahl steigt bei
 Funktionen, die dritte bei reinen Fehlerbehebungen. Wie ein Release entsteht,
 steht in `scripts/release.mjs`.
 
+## 3.13.0 – 2026-09-28
+
+Eine aufgeräumte Startseite und eine überarbeitete Saison-Deko: runde
+Spinnennetze, echtes Feuerwerk und wirklich versteckte Ostereier.
+
+### Neu
+
+- **Startseite gestrafft:** Die Pläne werden nur noch einmal erklärt, direkt
+  auf den Plan-Karten („Für wen“). Die Zahlen des Netzwerks stehen nur noch
+  einmal, live und klar beschriftet: Server, Sender, Bots und „hören gerade
+  zu“. Die Texte sind in allen neun Sprachen in Alltagssprache statt mit
+  Fachwörtern. „Premium-Status prüfen“ ist weg; die FAQ sagt, wo das
+  Dashboard den Plan zeigt, mit Link. (#435)
+- **Cookie-Hinweis als schlanker Balken** unten statt eines großen Fensters
+  (am Handy 15 % statt 76 % des Bildschirms), mit denselben Wahlmöglichkeiten.
+  Der Cookie-Knopf liegt jetzt über der Player-Leiste. (#435)
+- **Player-Leiste am Handy:** Der Sendername bekommt zwei Zeilen, statt
+  abgeschnitten zu werden. (#435)
+- **Barrierefreiheit:** Die öffentlichen Seiten haben einen Hauptbereich für
+  Bildschirmleser; Lighthouse-Barrierefreiheit der Startseite 92 → 96. (#435)
+
+### Behoben
+
+- **Saison-Deko überarbeitet:** Die Deko misst jetzt die echte Seite, statt
+  an festen Stellen zu kleben – auf jedem Bildschirm, auch sehr breit.
+  - **Halloween:** runde Spinnennetze in freien Flächen, mit Fäden an den
+    Karten festgemacht, nie abgeschnitten und nie über Text; Kürbisse sitzen
+    auf den Kanten der Karten; die Spinne seilt sich aus einem Netz ab.
+    Anzahl, Größe, Stellen und Richtungen sind bei jedem Besuch anders.
+  - **Silvester:** echtes Feuerwerk mit aufsteigenden Raketen, Kugeln,
+    Ringen, Goldregen und Knistern – hinter dem Inhalt wie ein Nachthimmel,
+    nicht mehr über dem ganzen Bildschirm.
+  - **Ostern:** Die Eier lugen hinter Karten hervor oder stecken am Ende
+    einer Textzeile; das Abzeichen zählt die gefundenen Eier.
+  - **Advent und Weihnachten:** Die Lichterkette hängt an einem Draht.
+  (#448)
+- **Startseite am Handy:** Sie sprang alle paar Sekunden um eine Zeile, weil
+  wechselnde Sendernamen unterschiedlich lang sind. (#448)
+- **Owner-Menü:** Die Einstellungen sind intern aufgeteilt; sichtbar ändert
+  sich nichts. (#435)
+
 ## 3.12.0 – 2026-09-28
 
 Die Saison-Deko: Halloween, Advent, Weihnachten, Silvester und Ostern in
