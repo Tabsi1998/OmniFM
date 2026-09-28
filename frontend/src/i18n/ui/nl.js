@@ -621,6 +621,7 @@ export default {
   "{bot} reconnects.": "{bot} verbindt opnieuw.",
   "{bot} restarts the station.": "{bot} herstart de zender.",
   "{confirmations} confirmations | {cooldown} cooldown | {moves} moves / {window}": "{confirmations} bevestigingen | {cooldown} pauze | {moves} verplaatsingen / {window}",
+  "{found} of {total} eggs found": "{found} van {total} eieren gevonden",
   "{name}, candle {count}": "{name}, kaars {count}",
   "{time} until {year}": "Nog {time} tot {year}",
   "“Powered by omnifm” for linking.": "'Powered by omnifm' om naar te linken.",

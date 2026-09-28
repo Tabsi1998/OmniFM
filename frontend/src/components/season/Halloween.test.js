@@ -3,12 +3,28 @@ import { act, cleanup, render, screen } from '@testing-library/react';
 import { I18nProvider } from '../../i18n.js';
 import { PlayerProvider } from '../../lib/player.js';
 import { resetOwnerSeasonSwitches } from '../../lib/seasonSite.js';
-import Halloween, { CORNERS, halloweenLayout } from './Halloween.js';
+import Halloween, { halloweenLayout, halloweenSizes, webShape } from './Halloween.js';
+import { isFree, seeded } from './pageSpots.js';
 import SeasonLayer from './SeasonLayer.js';
 import StationBrowser from '../StationBrowser.js';
 
-// Halloween on the website (#443) and the season rubric of the station
-// browser (#430): at random each visit, never in the way, still for "less motion".
+// Halloween on the website (#443, #448) and the season rubric of the station
+// browser (#430): at random each visit, tied to the page, never in the way,
+// still for "less motion".
+
+// A start page as rectangles: a hero text, a card, a title and three cards with text.
+function samplePage(width = 1400) {
+  const obstacles = [
+    { id: 0, kind: 'text', x: 100, y: 120, w: 500, h: 180 },
+    { id: 1, kind: 'box', framed: true, x: 800, y: 140, w: 360, h: 220 },
+    { id: 2, kind: 'text', x: 100, y: 700, w: 700, h: 60 },
+    { id: 3, kind: 'box', framed: true, x: 100, y: 820, w: 320, h: 300 },
+    { id: 4, kind: 'box', framed: true, x: 440, y: 820, w: 320, h: 300 },
+    { id: 5, kind: 'box', framed: true, x: 780, y: 820, w: 320, h: 300 },
+    { id: 6, kind: 'text', x: 120, y: 850, w: 960, h: 200 },
+  ];
+  return { width, height: 1600, top: 84, bottom: 96, obstacles, lines: [] };
+}
 
 function sequence(...values) {
   let index = 0;
@@ -29,27 +45,41 @@ afterEach(() => {
 });
 
 describe('Halloween', () => {
-  it('places webs and pumpkins at random on every visit, only in corners and at edges', () => {
-    const one = halloweenLayout(sequence(0.01, 0.4, 0.7));
-    const two = halloweenLayout(sequence(0.99, 0.2, 0.5));
-    expect(one).not.toEqual(two);
-    for (const layout of [one, two]) {
-      expect(layout.screenWebs).toHaveLength(2);
-      expect(layout.screenWebs.every((web) => CORNERS.includes(web.corner))).toBe(true);
-      expect(new Set(layout.screenWebs.map((web) => web.corner)).size).toBe(2);
-      expect(layout.pumpkins).toHaveLength(3);
+  it('round webs in open space and pumpkins on cards, different on every visit', () => {
+    const page = samplePage();
+    const seen = new Set();
+    for (let seed = 1; seed <= 20; seed += 1) {
+      const layout = halloweenLayout(page, seeded(seed));
+      seen.add(JSON.stringify([layout.webs.map((web) => Math.round(web.cx)), layout.pumpkins.map((spot) => Math.round(spot.x))]));
+      expect(layout.webs.length).toBeLessThanOrEqual(halloweenSizes(1400).webs.max);
+      for (const web of layout.webs) {
+        expect(isFree({ x: web.cx - web.r, y: web.cy - web.r, w: 2 * web.r, h: 2 * web.r }, page, { pad: 14 })).toBe(true);
+        expect(web.shape.spokes.length).toBeGreaterThanOrEqual(11);
+      }
+      for (const pumpkin of layout.pumpkins) {
+        expect(page.obstacles.some((card) => card.framed && card.y === pumpkin.y)).toBe(true);
+        expect(pumpkin.size).toBeLessThanOrEqual(halloweenSizes(1400).pumpkins.size);
+      }
+      expect(layout.resting).toBeLessThan(Math.max(1, layout.webs.length));
     }
-    const phone = halloweenLayout(sequence(0.5, 0.2), { narrow: true });
-    expect(phone.screenWebs).toHaveLength(1);
-    expect(phone.screenWebs[0].corner.startsWith('top')).toBe(true);
-    expect(phone.sectionWebs).toEqual([]);
+    expect(seen.size).toBeGreaterThan(12);
   });
 
-  it('never takes a click: the whole layer lets clicks through', () => {
+  it('a phone gets few, small webs; a wide screen more and bigger ones', () => {
+    expect(halloweenSizes(390).webs.max).toBeLessThanOrEqual(2);
+    expect(halloweenSizes(390).webs.maxRadius).toBeLessThanOrEqual(32);
+    expect(halloweenSizes(2560).webs.max).toBeGreaterThan(halloweenSizes(1400).webs.max);
+    const shape = webShape(seeded(3), 50);
+    expect(shape.squash).toBeGreaterThan(0.85);
+    expect(shape.squash).toBeLessThan(1.07);
+    expect(shape.spokes.every((spoke) => spoke.length <= 50 && spoke.length >= 43)).toBe(true);
+  });
+
+  it('never takes a click: the whole layer lets clicks through, and the page measure skips it', () => {
     render(<Halloween animated={false} random={sequence(0.3, 0.6)} />);
     const layer = screen.getByTestId('season-halloween');
     expect(window.getComputedStyle(layer).pointerEvents).toBe('none');
-    expect(screen.getAllByTestId('hw-screen-web')).toHaveLength(2);
+    expect(layer.hasAttribute('data-season-skip')).toBe(true);
   });
 
   it('now and then a spider or bats come by; with "less motion" never', () => {
