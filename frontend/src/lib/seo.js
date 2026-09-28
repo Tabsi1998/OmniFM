@@ -94,6 +94,17 @@ const PAGE_SEO = {
       description: 'Terms for the OmniFM website, Discord bot, dashboard, and optional Premium features.',
     },
   },
+  status: {
+    type: 'website',
+    de: {
+      title: 'OmniFM Status | Verfügbarkeit der Bots',
+      description: 'Läuft OmniFM? Jeder Bot mit Verfügbarkeit über 90 Tage, aktuelle Störungen und geplante Wartungen.',
+    },
+    en: {
+      title: 'OmniFM Status | Bot availability',
+      description: 'Is OmniFM running? Every bot with its availability over 90 days, current problems and planned maintenance.',
+    },
+  },
 };
 
 const FAQ_ENTRIES = {

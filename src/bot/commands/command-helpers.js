@@ -13,6 +13,7 @@ import {
   DASHBOARD_URL,
   WEBSITE_URL,
   SUPPORT_URL,
+  STATUS_PAGE_URL,
   INVITE_COMPONENT_ID_OPEN,
   PLAY_COMPONENT_ID_OPEN,
   STATIONS_COMPONENT_ID_OPEN,
@@ -80,6 +81,7 @@ export function buildSupportRow(language, {
   includePremium = false,
   includeSupport = true,
   includeWebsite = false,
+  includeStatusPage = false,
 } = {}) {
   const components = [];
   if (includeDashboard) {
@@ -112,6 +114,14 @@ export function buildSupportRow(language, {
         .setStyle(ButtonStyle.Link)
         .setLabel("🌐 Website")
         .setURL(withLanguageParam(WEBSITE_URL, language))
+    );
+  }
+  if (includeStatusPage) {
+    components.push(
+      new ButtonBuilder()
+        .setStyle(ButtonStyle.Link)
+        .setLabel(String(language || "").startsWith("de") ? "📡 Statusseite" : "📡 Status page")
+        .setURL(withLanguageParam(STATUS_PAGE_URL, language))
     );
   }
   if (!components.length) return null;

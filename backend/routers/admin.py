@@ -53,6 +53,25 @@ def build_router(core):
             return guard
         return {"retentionDays": 30, "pending": [], "count": 0}
 
+    @router.get("/api/admin/status-notices")
+    async def admin_status_notices(request: Request):
+        """The notices of the public status page (#299) live in the Node API
+        only; this way back lists none."""
+        guard = core._admin_guard(request)
+        if guard is not None:
+            return guard
+        return {"notices": []}
+
+    @router.post("/api/admin/status-notices")
+    @router.patch("/api/admin/status-notices/{notice_id}")
+    @router.delete("/api/admin/status-notices/{notice_id}")
+    async def admin_status_notice_write(request: Request, notice_id: str = ""):
+        """Writing a status page notice needs the Node API (#299)."""
+        guard = core._admin_guard(request)
+        if guard is not None:
+            return guard
+        return core.json_error(503, "Die Statusseite läuft nur über die Node-API.")
+
     @router.post("/api/admin/login")
     async def admin_login(request: Request, body: dict = None):
         if not core.ADMIN_API_TOKEN:

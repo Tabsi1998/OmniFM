@@ -47,6 +47,9 @@ function answerFor(url) {
   if (route === '/api/admin/audit') return { audit: [], entries: [] };
   if (route === '/api/admin/archive') return { archive: [], count: 0 };
   if (route === '/api/admin/server-retention') return { retentionDays: 30, pending: [], count: 0 };
+  if (route === '/api/admin/status-notices') {
+    return { notices: [{ id: 'a1b2c3d4e5f60718', kind: 'maintenance', title: 'Server-Update', message: '', impact: 'maintenance', startsAt: '2026-09-28T08:00:00.000Z', endsAt: '2026-09-28T09:00:00.000Z', resolvedAt: null }] };
+  }
   if (route === '/api/owner/status') return { checks: [], checkedAt: null };
   if (route === '/api/admin/config') return {};
   return {};

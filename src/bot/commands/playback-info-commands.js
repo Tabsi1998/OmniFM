@@ -88,7 +88,7 @@ export async function handleStatusCommand({ runtime, interaction, t, language })
         includeStations: true,
         includeWorkers: runtime.role === "commander" && Boolean(runtime.workerManager),
       }),
-      buildSupportRow(language, { includeDashboard: true, includePremium: false, includeSupport: true }),
+      buildSupportRow(language, { includeDashboard: true, includePremium: false, includeSupport: true, includeStatusPage: true }),
     ],
     footer: "/status",
   })));

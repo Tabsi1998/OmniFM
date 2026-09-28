@@ -10,6 +10,7 @@ import {
   publicBotsResponse,
   publicStatsResponse,
 } from "../../lib/owner-public.js";
+import { statusResponse } from "../../services/status-page.js";
 
 /** The API contract the owner console and start.sh expect; FastAPI's BACKEND_CONTRACT_VERSION. */
 export const BACKEND_CONTRACT_VERSION = "owner-live-v5";
@@ -26,6 +27,20 @@ async function readPublicLiveDoc(runtimes) {
     if (doc) return doc;
   }
   return runtimes.some((runtime) => runtime.client?.isReady?.()) ? healthDocFromRuntimes(runtimes) : null;
+}
+
+// GET /api/status is public: one answer for 15 seconds, so a crowd on the
+// status page during an outage costs MongoDB one read (#299).
+const STATUS_CACHE_MS = 15_000;
+let statusCache = { at: 0, body: null };
+
+async function cachedStatusResponse() {
+  const now = Date.now();
+  if (!statusCache.body || now - statusCache.at >= STATUS_CACHE_MS) {
+    const db = isConnected() ? getDb() : null;
+    statusCache = { at: now, body: await statusResponse(db, await loadOwnerConfigRaw({ db }), process.env, { now }) };
+  }
+  return statusCache.body;
 }
 
 /** The configured bots (environment, else owner console); a lone process without either lists its own. */
@@ -124,6 +139,15 @@ export function createPublicRoutesHandler(deps) {
           ultimate: { maxWorkers: Number(TIERS.ultimate?.maxBots || 16) },
         },
       });
+      return true;
+    }
+
+    if (requestUrl.pathname === "/api/status") {
+      if (req.method !== "GET") {
+        methodNotAllowed(res, ["GET"]);
+        return true;
+      }
+      sendJson(res, 200, await cachedStatusResponse());
       return true;
     }
 

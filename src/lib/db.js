@@ -110,6 +110,16 @@ async function initCollections(database) {
     await database.collection("command_permissions").createIndex({ _guildId: 1 }, { name: "command_permissions_guild", unique: true, sparse: true }).catch(() => null);
     await database.collection("scheduled_events").createIndex({ _eventId: 1 }, { name: "scheduled_event_id", unique: true }).catch(() => null);
     await database.collection("scheduled_events").createIndex({ guildId: 1, runAtMs: 1 }, { name: "scheduled_guild_time" }).catch(() => null);
+    // The public status page (#299): minutes per bot and day, outages and notices, gone after 96 days.
+    await database.collection("status_uptime").createIndexes([
+      { key: { day: 1 }, name: "day" },
+      { key: { updatedAt: 1 }, name: "ttl", expireAfterSeconds: 86400 * 96 },
+    ]).catch(() => null);
+    await database.collection("status_outages").createIndexes([
+      { key: { bot: 1, endedAt: 1 }, name: "bot_open" },
+      { key: { expiresAt: 1 }, name: "ttl", expireAfterSeconds: 0 },
+    ]).catch(() => null);
+    await database.collection("status_notices").createIndex({ expiresAt: 1 }, { name: "ttl", expireAfterSeconds: 0 }).catch(() => null);
 
     initialized = true;
     log("INFO", "MongoDB Kollektionen und Indizes initialisiert.");
