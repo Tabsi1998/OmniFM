@@ -22,7 +22,7 @@ export default function DashboardPreview() {
           <h2 style={{ fontFamily: "'Syne','Outfit',sans-serif", fontWeight: 800, fontSize: 'clamp(28px,4vw,42px)', lineHeight: 1.1, letterSpacing: '-0.02em', marginBottom: 14 }}>{s.title}</h2>
           <p style={{ color: '#94a3b8', fontSize: 16, lineHeight: 1.6 }}>{s.subtitle}</p>
         </div>
-        <DashboardTour locale={locale} labels={labels} />
+        <DashboardTour labels={labels} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, flexWrap: 'wrap', marginTop: 28 }}>
           <a
             href={buildPageHref(locale, 'dashboard', { demo: '1' })}

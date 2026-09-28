@@ -7,12 +7,12 @@ import DashboardTour, { TOUR_ROUND_MS } from '../DashboardTour.js';
 import DemoScene from './DemoScene.js';
 
 export default function DemoStage({ scene }) {
-  const { copy, locale } = useI18n();
+  const { copy } = useI18n();
   if (scene === 'dashboard') {
     return (
       <div data-testid="demo-stage" style={{ width: 1280, height: 720, overflow: 'hidden', background: '#08090d' }}>
         <div data-testid="demo-dashboard" data-round-ms={TOUR_ROUND_MS}>
-          <DashboardTour stage locale={locale} labels={{ ...copy.dashboardPreview, pause: copy.demos.pause, play: copy.demos.play }} />
+          <DashboardTour stage labels={{ ...copy.dashboardPreview, pause: copy.demos.pause, play: copy.demos.play }} />
         </div>
       </div>
     );
