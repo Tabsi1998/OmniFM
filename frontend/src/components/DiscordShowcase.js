@@ -98,7 +98,7 @@ export default function DiscordShowcase() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: '#f2f3f5', fontWeight: 700, fontSize: 15 }}>
                           <EqMini /> {L.nowPlaying}
                         </div>
-                        <div key={s.name} style={{ color: '#00a8fc', fontWeight: 600, fontSize: 15, marginTop: 6 }}>{s.name}</div>
+                        <div key={s.name} style={{ color: '#00a8fc', fontWeight: 600, fontSize: 15, marginTop: 6, lineHeight: 1.3, height: '2.6em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{s.name}</div>
                         <div style={{ color: '#dbdee1', fontSize: 13.5, marginTop: 3 }}>{L.liveStream}</div>
                         <div style={{ display: 'flex', gap: 22, marginTop: 12, flexWrap: 'wrap' }}>
                           <div><div style={{ color: '#b5bac1', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>{L.genre}</div><div style={{ color: '#dbdee1', fontSize: 13, marginTop: 2 }}>{L.liveRadio}</div></div>

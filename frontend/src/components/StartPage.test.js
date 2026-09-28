@@ -12,8 +12,7 @@ import Hero from './Hero.js';
 import Navbar from './Navbar.js';
 import NowPlayingBar from './NowPlayingBar.js';
 import Premium from './Premium.js';
-import { WEB_SECTIONS } from './season/Halloween.js';
-import { EGG_SPOTS } from './season/SeasonDecor.js';
+import { EGG_FALLBACK_SECTIONS } from './season/EasterEggs.js';
 import SiteFooter from './SiteFooter.js';
 import StationBrowser from './StationBrowser.js';
 import TrustBar from './TrustBar.js';
@@ -114,7 +113,7 @@ describe('the tighter start page (#435)', () => {
     expect(link.textContent).toBe('Zum Dashboard');
   });
 
-  it('keeps every section the seasonal decoration hangs its webs, pumpkins and eggs on', async () => {
+  it('keeps the hero for the season badge and the sections the Easter eggs fall back to', async () => {
     // The community section shows only with a sponsor or a bot listing.
     const marketing = { sponsors: [{ name: 'Sponsor', url: 'https://example.org' }], botListings: [] };
     vi.stubGlobal('fetch', vi.fn(async (url) => ({
@@ -135,7 +134,7 @@ describe('the tighter start page (#435)', () => {
       </I18nProvider>
     );
     await screen.findByTestId('community-section');
-    for (const id of new Set([...WEB_SECTIONS, ...EGG_SPOTS.map(([section]) => section)])) {
+    for (const id of new Set(['hero-section', ...EGG_FALLBACK_SECTIONS])) {
       expect(document.querySelector(`[data-testid="${id}"]`), id).not.toBeNull();
     }
   });

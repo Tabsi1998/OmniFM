@@ -98,7 +98,8 @@ function NowPlayingConsole({ live }) {
           </div>
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div key={track.name} style={{ fontWeight: 800, fontSize: 19, fontFamily: "'Syne','Outfit',sans-serif", animation: 'hero-fade-in 0.5s ease-out both' }}>
+          {/* Always room for two lines: a long station name must not make the page below jump every few seconds. */}
+          <div key={track.name} style={{ fontWeight: 800, fontSize: 19, lineHeight: 1.2, height: '2.4em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', fontFamily: "'Syne','Outfit',sans-serif", animation: 'hero-fade-in 0.5s ease-out both' }}>
             {track.name}
           </div>
           <div style={{ color: '#94a3b8', fontSize: 13, marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>

@@ -621,6 +621,7 @@ export default {
   "{bot} reconnects.": "{bot} yeniden bağlanıyor.",
   "{bot} restarts the station.": "{bot} istasyonu yeniden başlatıyor.",
   "{confirmations} confirmations | {cooldown} cooldown | {moves} moves / {window}": "{confirmations} onay | {cooldown} bekleme | {moves} taşıma / {window}",
+  "{found} of {total} eggs found": "{total} yumurtadan {found} tanesi bulundu",
   "{name}, candle {count}": "{name}, {count}. mum",
   "{time} until {year}": "{year} yılına {time} kaldı",
   "“Powered by omnifm” for linking.": "Bağlantı için \"Powered by omnifm\".",

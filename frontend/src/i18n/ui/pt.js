@@ -621,6 +621,7 @@ export default {
   "{bot} reconnects.": "{bot} se reconecta.",
   "{bot} restarts the station.": "{bot} reinicia a estação.",
   "{confirmations} confirmations | {cooldown} cooldown | {moves} moves / {window}": "{confirmations} confirmações | {cooldown} de pausa | {moves} movimentos / {window}",
+  "{found} of {total} eggs found": "{found} de {total} ovos encontrados",
   "{name}, candle {count}": "{name}, vela {count}",
   "{time} until {year}": "Faltam {time} para {year}",
   "“Powered by omnifm” for linking.": "\"Powered by omnifm\" para links.",
