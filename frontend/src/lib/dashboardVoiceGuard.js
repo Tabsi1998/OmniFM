@@ -44,7 +44,7 @@ function normalizeDashboardVoiceGuardConfig(rawConfig) {
   };
 }
 
-function buildDashboardVoiceGuardSummary(rawConfig, t = (de, en) => de) {
+function buildDashboardVoiceGuardSummary(rawConfig, t = (de, _en) => de) {
   const config = normalizeDashboardVoiceGuardConfig(rawConfig);
   const policyLabel = config.policy === 'default'
     ? t('Standard', 'Default')

@@ -1,5 +1,4 @@
-import React from 'react';
-import { Heart, Radio } from 'lucide-react';
+import { Heart } from 'lucide-react';
 import { useI18n } from '../i18n.js';
 import { buildPageHref } from '../lib/pageRouting.js';
 

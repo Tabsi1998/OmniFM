@@ -1,4 +1,3 @@
-import React from 'react';
 import { useI18n } from '../i18n.js';
 import { useShowcaseStations } from '../lib/showcase.js';
 import LivePlaybackBar from './LivePlaybackBar.js';
@@ -47,7 +46,7 @@ const css = `
 @media (max-width: 940px){ .htd-grid{ grid-template-columns:1fr; max-width:520px; margin:0 auto; } }
 `;
 
-function StepShell({ step, s, children }) {
+function StepShell({ step, children }) {
   return (
     <div className="oa-fade" style={{ background: 'linear-gradient(180deg,rgba(20,22,30,0.9),rgba(12,13,18,0.9))', border: '1px solid #23252e', borderRadius: 18, padding: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

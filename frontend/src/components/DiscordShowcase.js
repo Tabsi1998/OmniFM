@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Hash, Play, Pause, SkipForward, Square, Heart, ListMusic, Radio } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Pause, SkipForward, Square, Heart, ListMusic } from 'lucide-react';
 import { buildApiUrl } from '../lib/api.js';
 import { useI18n } from '../i18n.js';
 import { useShowcaseStations } from '../lib/showcase.js';

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Crown, Shield, Zap } from 'lucide-react';
 import { useI18n } from '../i18n.js';
 

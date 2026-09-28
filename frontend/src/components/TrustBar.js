@@ -1,4 +1,3 @@
-import React from 'react';
 import { Layers3, LayoutDashboard, Radio, ShieldCheck } from 'lucide-react';
 import { useI18n } from '../i18n.js';
 
