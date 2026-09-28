@@ -77,7 +77,8 @@ export async function readPlaybackTimeline(guildId, { now = Date.now(), limit = 
   if (!timeline || !/^\d{17,22}$/.test(gid)) return [];
   const rows = await timeline
     .find({ guildId: gid, at: { $gte: new Date(now - PLAYBACK_TIMELINE_KEEP_MS) } }, { projection: { _id: 0, guildId: 0, expiresAt: 0 } })
-    .sort({ at: -1 })
+    // Two changes in the same millisecond keep their order: _id grows with each insert.
+    .sort({ at: -1, _id: -1 })
     .limit(Math.max(1, Math.min(5000, Number(limit) || 2000)))
     .toArray();
   return rows.reverse();
