@@ -1,0 +1,1219 @@
+{
+  "panels": {
+    "de": {
+      "lofi": {
+        "flags": 32768,
+        "components": [
+          {
+            "type": 17,
+            "accent_color": 10980346,
+            "components": [
+              {
+                "type": 9,
+                "components": [
+                  {
+                    "type": 10,
+                    "content": "-# 🎶 LIVE · Jetzt auf Sendung · OmniFM 1\n## Rainy Window\nMellow Hours"
+                  }
+                ],
+                "accessory": {
+                  "type": 11,
+                  "media": {
+                    "url": "https://omnifm.xyz/demo/cover-lofi.svg"
+                  }
+                }
+              },
+              {
+                "type": 10,
+                "content": "📻 **Lofi Café** · Lofi\n🎧 3 hören · 🎚️ 128k · 🔊 80%\n-# 💿 Late Study"
+              },
+              {
+                "type": 10,
+                "content": "-# 📜 Zuletzt: Kairo – Blue Hour · Aurora – Soft Light · Mellow – Late Night"
+              },
+              {
+                "type": 14,
+                "divider": true,
+                "spacing": 1
+              },
+              {
+                "type": 1,
+                "components": [
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "⏸️"
+                    },
+                    "custom_id": "np:toggle",
+                    "style": 2,
+                    "label": "Pause"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "⏹️"
+                    },
+                    "custom_id": "np:stop",
+                    "style": 4,
+                    "label": "Stop"
+                  },
+                  {
+                    "type": 2,
+                    "custom_id": "np:voldown",
+                    "style": 2,
+                    "label": "−"
+                  },
+                  {
+                    "type": 2,
+                    "custom_id": "np:volup",
+                    "style": 2,
+                    "label": "+"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "📻"
+                    },
+                    "custom_id": "omnifm:stations:open",
+                    "style": 1,
+                    "label": "Sender"
+                  }
+                ]
+              },
+              {
+                "type": 1,
+                "components": [
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🟪"
+                    },
+                    "custom_id": "np:fav:lofi",
+                    "style": 3,
+                    "label": "Lofi Café",
+                    "disabled": true
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🟧"
+                    },
+                    "custom_id": "np:fav:lounge",
+                    "style": 2,
+                    "label": "Lounge",
+                    "disabled": false
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🟥"
+                    },
+                    "custom_id": "np:fav:charts",
+                    "style": 2,
+                    "label": "Charts",
+                    "disabled": false
+                  }
+                ]
+              },
+              {
+                "type": 1,
+                "components": [
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "💾"
+                    },
+                    "custom_id": "np:save",
+                    "style": 2,
+                    "label": "Merken"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🔗"
+                    },
+                    "custom_id": "np:share",
+                    "style": 2,
+                    "label": "Teilen"
+                  },
+                  {
+                    "type": 2,
+                    "style": 5,
+                    "url": "https://open.spotify.com/search/Mellow%20Hours%20Rainy%20Window",
+                    "label": "Spotify"
+                  },
+                  {
+                    "type": 2,
+                    "style": 5,
+                    "url": "https://www.youtube.com/results?search_query=Mellow%20Hours%20Rainy%20Window",
+                    "label": "YouTube"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "⚠️"
+                    },
+                    "custom_id": "np:report",
+                    "style": 2,
+                    "label": "Problem melden"
+                  }
+                ]
+              },
+              {
+                "type": 10,
+                "content": "-# OmniFM · v3.12.0 · 6773a6f · Titel vom Sender"
+              }
+            ]
+          }
+        ]
+      },
+      "paused": {
+        "flags": 32768,
+        "components": [
+          {
+            "type": 17,
+            "accent_color": 10980346,
+            "components": [
+              {
+                "type": 9,
+                "components": [
+                  {
+                    "type": 10,
+                    "content": "-# ⏸️ Pausiert · OmniFM 1\n## Rainy Window\nMellow Hours"
+                  }
+                ],
+                "accessory": {
+                  "type": 11,
+                  "media": {
+                    "url": "https://omnifm.xyz/demo/cover-lofi.svg"
+                  }
+                }
+              },
+              {
+                "type": 10,
+                "content": "📻 **Lofi Café** · Lofi\n🎧 3 hören · 🎚️ 128k · 🔊 80%\n-# 💿 Late Study"
+              },
+              {
+                "type": 10,
+                "content": "-# 📜 Zuletzt: Kairo – Blue Hour · Aurora – Soft Light · Mellow – Late Night"
+              },
+              {
+                "type": 14,
+                "divider": true,
+                "spacing": 1
+              },
+              {
+                "type": 1,
+                "components": [
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "▶️"
+                    },
+                    "custom_id": "np:toggle",
+                    "style": 3,
+                    "label": "Weiter"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "⏹️"
+                    },
+                    "custom_id": "np:stop",
+                    "style": 4,
+                    "label": "Stop"
+                  },
+                  {
+                    "type": 2,
+                    "custom_id": "np:voldown",
+                    "style": 2,
+                    "label": "−"
+                  },
+                  {
+                    "type": 2,
+                    "custom_id": "np:volup",
+                    "style": 2,
+                    "label": "+"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "📻"
+                    },
+                    "custom_id": "omnifm:stations:open",
+                    "style": 1,
+                    "label": "Sender"
+                  }
+                ]
+              },
+              {
+                "type": 1,
+                "components": [
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🟪"
+                    },
+                    "custom_id": "np:fav:lofi",
+                    "style": 3,
+                    "label": "Lofi Café",
+                    "disabled": true
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🟧"
+                    },
+                    "custom_id": "np:fav:lounge",
+                    "style": 2,
+                    "label": "Lounge",
+                    "disabled": false
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🟥"
+                    },
+                    "custom_id": "np:fav:charts",
+                    "style": 2,
+                    "label": "Charts",
+                    "disabled": false
+                  }
+                ]
+              },
+              {
+                "type": 1,
+                "components": [
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "💾"
+                    },
+                    "custom_id": "np:save",
+                    "style": 2,
+                    "label": "Merken"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🔗"
+                    },
+                    "custom_id": "np:share",
+                    "style": 2,
+                    "label": "Teilen"
+                  },
+                  {
+                    "type": 2,
+                    "style": 5,
+                    "url": "https://open.spotify.com/search/Mellow%20Hours%20Rainy%20Window",
+                    "label": "Spotify"
+                  },
+                  {
+                    "type": 2,
+                    "style": 5,
+                    "url": "https://www.youtube.com/results?search_query=Mellow%20Hours%20Rainy%20Window",
+                    "label": "YouTube"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "⚠️"
+                    },
+                    "custom_id": "np:report",
+                    "style": 2,
+                    "label": "Problem melden"
+                  }
+                ]
+              },
+              {
+                "type": 10,
+                "content": "-# OmniFM · v3.12.0 · 6773a6f · Titel vom Sender"
+              }
+            ]
+          }
+        ]
+      },
+      "lounge": {
+        "flags": 32768,
+        "components": [
+          {
+            "type": 17,
+            "accent_color": 16096779,
+            "components": [
+              {
+                "type": 9,
+                "components": [
+                  {
+                    "type": 10,
+                    "content": "-# 🎶 LIVE · Jetzt auf Sendung · OmniFM 1\n## Sunset Drive\nNightwave"
+                  }
+                ],
+                "accessory": {
+                  "type": 11,
+                  "media": {
+                    "url": "https://omnifm.xyz/demo/cover-lounge.svg"
+                  }
+                }
+              },
+              {
+                "type": 10,
+                "content": "📻 **Lounge** · Chillout\n🎧 3 hören · 🎚️ 128k · 🔊 80%\n-# 💿 Coastline"
+              },
+              {
+                "type": 10,
+                "content": "-# 📜 Zuletzt: Rainy Window – Mellow Hours · Kairo – Blue Hour · Aurora – Soft Light"
+              },
+              {
+                "type": 14,
+                "divider": true,
+                "spacing": 1
+              },
+              {
+                "type": 1,
+                "components": [
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "⏸️"
+                    },
+                    "custom_id": "np:toggle",
+                    "style": 2,
+                    "label": "Pause"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "⏹️"
+                    },
+                    "custom_id": "np:stop",
+                    "style": 4,
+                    "label": "Stop"
+                  },
+                  {
+                    "type": 2,
+                    "custom_id": "np:voldown",
+                    "style": 2,
+                    "label": "−"
+                  },
+                  {
+                    "type": 2,
+                    "custom_id": "np:volup",
+                    "style": 2,
+                    "label": "+"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "📻"
+                    },
+                    "custom_id": "omnifm:stations:open",
+                    "style": 1,
+                    "label": "Sender"
+                  }
+                ]
+              },
+              {
+                "type": 1,
+                "components": [
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🟪"
+                    },
+                    "custom_id": "np:fav:lofi",
+                    "style": 2,
+                    "label": "Lofi Café",
+                    "disabled": false
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🟧"
+                    },
+                    "custom_id": "np:fav:lounge",
+                    "style": 3,
+                    "label": "Lounge",
+                    "disabled": true
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🟥"
+                    },
+                    "custom_id": "np:fav:charts",
+                    "style": 2,
+                    "label": "Charts",
+                    "disabled": false
+                  }
+                ]
+              },
+              {
+                "type": 1,
+                "components": [
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "💾"
+                    },
+                    "custom_id": "np:save",
+                    "style": 2,
+                    "label": "Merken"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🔗"
+                    },
+                    "custom_id": "np:share",
+                    "style": 2,
+                    "label": "Teilen"
+                  },
+                  {
+                    "type": 2,
+                    "style": 5,
+                    "url": "https://open.spotify.com/search/Nightwave%20Sunset%20Drive",
+                    "label": "Spotify"
+                  },
+                  {
+                    "type": 2,
+                    "style": 5,
+                    "url": "https://www.youtube.com/results?search_query=Nightwave%20Sunset%20Drive",
+                    "label": "YouTube"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "⚠️"
+                    },
+                    "custom_id": "np:report",
+                    "style": 2,
+                    "label": "Problem melden"
+                  }
+                ]
+              },
+              {
+                "type": 10,
+                "content": "-# OmniFM · v3.12.0 · 6773a6f · Titel vom Sender"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "en": {
+      "lofi": {
+        "flags": 32768,
+        "components": [
+          {
+            "type": 17,
+            "accent_color": 10980346,
+            "components": [
+              {
+                "type": 9,
+                "components": [
+                  {
+                    "type": 10,
+                    "content": "-# 🎶 LIVE · On air now · OmniFM 1\n## Rainy Window\nMellow Hours"
+                  }
+                ],
+                "accessory": {
+                  "type": 11,
+                  "media": {
+                    "url": "https://omnifm.xyz/demo/cover-lofi.svg"
+                  }
+                }
+              },
+              {
+                "type": 10,
+                "content": "📻 **Lofi Café** · Lofi\n🎧 3 listening · 🎚️ 128k · 🔊 80%\n-# 💿 Late Study"
+              },
+              {
+                "type": 10,
+                "content": "-# 📜 Earlier: Kairo – Blue Hour · Aurora – Soft Light · Mellow – Late Night"
+              },
+              {
+                "type": 14,
+                "divider": true,
+                "spacing": 1
+              },
+              {
+                "type": 1,
+                "components": [
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "⏸️"
+                    },
+                    "custom_id": "np:toggle",
+                    "style": 2,
+                    "label": "Pause"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "⏹️"
+                    },
+                    "custom_id": "np:stop",
+                    "style": 4,
+                    "label": "Stop"
+                  },
+                  {
+                    "type": 2,
+                    "custom_id": "np:voldown",
+                    "style": 2,
+                    "label": "−"
+                  },
+                  {
+                    "type": 2,
+                    "custom_id": "np:volup",
+                    "style": 2,
+                    "label": "+"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "📻"
+                    },
+                    "custom_id": "omnifm:stations:open",
+                    "style": 1,
+                    "label": "Stations"
+                  }
+                ]
+              },
+              {
+                "type": 1,
+                "components": [
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🟪"
+                    },
+                    "custom_id": "np:fav:lofi",
+                    "style": 3,
+                    "label": "Lofi Café",
+                    "disabled": true
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🟧"
+                    },
+                    "custom_id": "np:fav:lounge",
+                    "style": 2,
+                    "label": "Lounge",
+                    "disabled": false
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🟥"
+                    },
+                    "custom_id": "np:fav:charts",
+                    "style": 2,
+                    "label": "Charts",
+                    "disabled": false
+                  }
+                ]
+              },
+              {
+                "type": 1,
+                "components": [
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "💾"
+                    },
+                    "custom_id": "np:save",
+                    "style": 2,
+                    "label": "Save"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🔗"
+                    },
+                    "custom_id": "np:share",
+                    "style": 2,
+                    "label": "Share"
+                  },
+                  {
+                    "type": 2,
+                    "style": 5,
+                    "url": "https://open.spotify.com/search/Mellow%20Hours%20Rainy%20Window",
+                    "label": "Spotify"
+                  },
+                  {
+                    "type": 2,
+                    "style": 5,
+                    "url": "https://www.youtube.com/results?search_query=Mellow%20Hours%20Rainy%20Window",
+                    "label": "YouTube"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "⚠️"
+                    },
+                    "custom_id": "np:report",
+                    "style": 2,
+                    "label": "Report a problem"
+                  }
+                ]
+              },
+              {
+                "type": 10,
+                "content": "-# OmniFM · v3.12.0 · 6773a6f · Title from the station"
+              }
+            ]
+          }
+        ]
+      },
+      "paused": {
+        "flags": 32768,
+        "components": [
+          {
+            "type": 17,
+            "accent_color": 10980346,
+            "components": [
+              {
+                "type": 9,
+                "components": [
+                  {
+                    "type": 10,
+                    "content": "-# ⏸️ Paused · OmniFM 1\n## Rainy Window\nMellow Hours"
+                  }
+                ],
+                "accessory": {
+                  "type": 11,
+                  "media": {
+                    "url": "https://omnifm.xyz/demo/cover-lofi.svg"
+                  }
+                }
+              },
+              {
+                "type": 10,
+                "content": "📻 **Lofi Café** · Lofi\n🎧 3 listening · 🎚️ 128k · 🔊 80%\n-# 💿 Late Study"
+              },
+              {
+                "type": 10,
+                "content": "-# 📜 Earlier: Kairo – Blue Hour · Aurora – Soft Light · Mellow – Late Night"
+              },
+              {
+                "type": 14,
+                "divider": true,
+                "spacing": 1
+              },
+              {
+                "type": 1,
+                "components": [
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "▶️"
+                    },
+                    "custom_id": "np:toggle",
+                    "style": 3,
+                    "label": "Resume"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "⏹️"
+                    },
+                    "custom_id": "np:stop",
+                    "style": 4,
+                    "label": "Stop"
+                  },
+                  {
+                    "type": 2,
+                    "custom_id": "np:voldown",
+                    "style": 2,
+                    "label": "−"
+                  },
+                  {
+                    "type": 2,
+                    "custom_id": "np:volup",
+                    "style": 2,
+                    "label": "+"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "📻"
+                    },
+                    "custom_id": "omnifm:stations:open",
+                    "style": 1,
+                    "label": "Stations"
+                  }
+                ]
+              },
+              {
+                "type": 1,
+                "components": [
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🟪"
+                    },
+                    "custom_id": "np:fav:lofi",
+                    "style": 3,
+                    "label": "Lofi Café",
+                    "disabled": true
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🟧"
+                    },
+                    "custom_id": "np:fav:lounge",
+                    "style": 2,
+                    "label": "Lounge",
+                    "disabled": false
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🟥"
+                    },
+                    "custom_id": "np:fav:charts",
+                    "style": 2,
+                    "label": "Charts",
+                    "disabled": false
+                  }
+                ]
+              },
+              {
+                "type": 1,
+                "components": [
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "💾"
+                    },
+                    "custom_id": "np:save",
+                    "style": 2,
+                    "label": "Save"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🔗"
+                    },
+                    "custom_id": "np:share",
+                    "style": 2,
+                    "label": "Share"
+                  },
+                  {
+                    "type": 2,
+                    "style": 5,
+                    "url": "https://open.spotify.com/search/Mellow%20Hours%20Rainy%20Window",
+                    "label": "Spotify"
+                  },
+                  {
+                    "type": 2,
+                    "style": 5,
+                    "url": "https://www.youtube.com/results?search_query=Mellow%20Hours%20Rainy%20Window",
+                    "label": "YouTube"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "⚠️"
+                    },
+                    "custom_id": "np:report",
+                    "style": 2,
+                    "label": "Report a problem"
+                  }
+                ]
+              },
+              {
+                "type": 10,
+                "content": "-# OmniFM · v3.12.0 · 6773a6f · Title from the station"
+              }
+            ]
+          }
+        ]
+      },
+      "lounge": {
+        "flags": 32768,
+        "components": [
+          {
+            "type": 17,
+            "accent_color": 16096779,
+            "components": [
+              {
+                "type": 9,
+                "components": [
+                  {
+                    "type": 10,
+                    "content": "-# 🎶 LIVE · On air now · OmniFM 1\n## Sunset Drive\nNightwave"
+                  }
+                ],
+                "accessory": {
+                  "type": 11,
+                  "media": {
+                    "url": "https://omnifm.xyz/demo/cover-lounge.svg"
+                  }
+                }
+              },
+              {
+                "type": 10,
+                "content": "📻 **Lounge** · Chillout\n🎧 3 listening · 🎚️ 128k · 🔊 80%\n-# 💿 Coastline"
+              },
+              {
+                "type": 10,
+                "content": "-# 📜 Earlier: Rainy Window – Mellow Hours · Kairo – Blue Hour · Aurora – Soft Light"
+              },
+              {
+                "type": 14,
+                "divider": true,
+                "spacing": 1
+              },
+              {
+                "type": 1,
+                "components": [
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "⏸️"
+                    },
+                    "custom_id": "np:toggle",
+                    "style": 2,
+                    "label": "Pause"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "⏹️"
+                    },
+                    "custom_id": "np:stop",
+                    "style": 4,
+                    "label": "Stop"
+                  },
+                  {
+                    "type": 2,
+                    "custom_id": "np:voldown",
+                    "style": 2,
+                    "label": "−"
+                  },
+                  {
+                    "type": 2,
+                    "custom_id": "np:volup",
+                    "style": 2,
+                    "label": "+"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "📻"
+                    },
+                    "custom_id": "omnifm:stations:open",
+                    "style": 1,
+                    "label": "Stations"
+                  }
+                ]
+              },
+              {
+                "type": 1,
+                "components": [
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🟪"
+                    },
+                    "custom_id": "np:fav:lofi",
+                    "style": 2,
+                    "label": "Lofi Café",
+                    "disabled": false
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🟧"
+                    },
+                    "custom_id": "np:fav:lounge",
+                    "style": 3,
+                    "label": "Lounge",
+                    "disabled": true
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🟥"
+                    },
+                    "custom_id": "np:fav:charts",
+                    "style": 2,
+                    "label": "Charts",
+                    "disabled": false
+                  }
+                ]
+              },
+              {
+                "type": 1,
+                "components": [
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "💾"
+                    },
+                    "custom_id": "np:save",
+                    "style": 2,
+                    "label": "Save"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "🔗"
+                    },
+                    "custom_id": "np:share",
+                    "style": 2,
+                    "label": "Share"
+                  },
+                  {
+                    "type": 2,
+                    "style": 5,
+                    "url": "https://open.spotify.com/search/Nightwave%20Sunset%20Drive",
+                    "label": "Spotify"
+                  },
+                  {
+                    "type": 2,
+                    "style": 5,
+                    "url": "https://www.youtube.com/results?search_query=Nightwave%20Sunset%20Drive",
+                    "label": "YouTube"
+                  },
+                  {
+                    "type": 2,
+                    "emoji": {
+                      "name": "⚠️"
+                    },
+                    "custom_id": "np:report",
+                    "style": 2,
+                    "label": "Report a problem"
+                  }
+                ]
+              },
+              {
+                "type": 10,
+                "content": "-# OmniFM · v3.12.0 · 6773a6f · Title from the station"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "invite": {
+    "de": {
+      "embeds": [
+        {
+          "color": 58879,
+          "author": {
+            "name": "OmniFM",
+            "icon_url": "https://omnifm.xyz/brand/omnifm-mark-white.png"
+          },
+          "title": "Worker-Bots einladen",
+          "description": "Plan: **Free** | Verfügbare Worker: **1-2**\nWähle einen Worker unten aus und nutze den Invite-Button.",
+          "fields": [
+            {
+              "name": "Bereits eingeladen",
+              "value": "-",
+              "inline": true
+            },
+            {
+              "name": "Jetzt auswählbar",
+              "value": "`#1` OmniFM 1\n`#2` OmniFM 2",
+              "inline": true
+            },
+            {
+              "name": "Gesperrt durch Plan",
+              "value": "-",
+              "inline": false
+            }
+          ],
+          "footer": {
+            "text": "Ausgewählt: OmniFM 1 (#1)",
+            "icon_url": "https://omnifm.xyz/brand/omnifm-mark-white.png"
+          }
+        }
+      ],
+      "components": [
+        {
+          "type": 1,
+          "components": [
+            {
+              "type": 3,
+              "custom_id": "omnifm:invite:select",
+              "placeholder": "Worker-Bot auswählen",
+              "options": [
+                {
+                  "label": "OmniFM 1",
+                  "value": "1",
+                  "description": "#1 - Free",
+                  "default": true
+                },
+                {
+                  "label": "OmniFM 2",
+                  "value": "2",
+                  "description": "#2 - Free",
+                  "default": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": 1,
+          "components": [
+            {
+              "type": 2,
+              "style": 5,
+              "label": "Invite OmniFM 1",
+              "url": "https://discord.com/oauth2/authorize?client_id=100000000000000001"
+            },
+            {
+              "type": 2,
+              "custom_id": "omnifm:invite:refresh",
+              "style": 2,
+              "label": "Aktualisieren"
+            },
+            {
+              "type": 2,
+              "custom_id": "omnifm:invite:close",
+              "style": 2,
+              "label": "Schließen"
+            }
+          ]
+        }
+      ]
+    },
+    "en": {
+      "embeds": [
+        {
+          "color": 58879,
+          "author": {
+            "name": "OmniFM",
+            "icon_url": "https://omnifm.xyz/brand/omnifm-mark-white.png"
+          },
+          "title": "Invite worker bots",
+          "description": "Plan: **Free** | Available workers: **1-2**\nSelect a worker below and use the invite button.",
+          "fields": [
+            {
+              "name": "Already invited",
+              "value": "-",
+              "inline": true
+            },
+            {
+              "name": "Selectable now",
+              "value": "`#1` OmniFM 1\n`#2` OmniFM 2",
+              "inline": true
+            },
+            {
+              "name": "Locked by plan",
+              "value": "-",
+              "inline": false
+            }
+          ],
+          "footer": {
+            "text": "Selected: OmniFM 1 (#1)",
+            "icon_url": "https://omnifm.xyz/brand/omnifm-mark-white.png"
+          }
+        }
+      ],
+      "components": [
+        {
+          "type": 1,
+          "components": [
+            {
+              "type": 3,
+              "custom_id": "omnifm:invite:select",
+              "placeholder": "Select worker bot",
+              "options": [
+                {
+                  "label": "OmniFM 1",
+                  "value": "1",
+                  "description": "#1 - Free",
+                  "default": true
+                },
+                {
+                  "label": "OmniFM 2",
+                  "value": "2",
+                  "description": "#2 - Free",
+                  "default": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": 1,
+          "components": [
+            {
+              "type": 2,
+              "style": 5,
+              "label": "Invite OmniFM 1",
+              "url": "https://discord.com/oauth2/authorize?client_id=100000000000000001"
+            },
+            {
+              "type": 2,
+              "custom_id": "omnifm:invite:refresh",
+              "style": 2,
+              "label": "Refresh"
+            },
+            {
+              "type": 2,
+              "custom_id": "omnifm:invite:close",
+              "style": 2,
+              "label": "Close"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "commands": {
+    "de": {
+      "play": "Startet einen Radio-Stream in deinem Voice-Channel",
+      "station": "Stationsname oder ID",
+      "invite": "Worker-Bot für diesen Server auswählen oder einladen"
+    },
+    "en": {
+      "play": "Start a radio stream in your voice channel",
+      "station": "Station name or ID",
+      "invite": "Invite or select a worker bot for this server"
+    },
+    "fr": {
+      "play": "Lancer une radio dans ton salon vocal",
+      "station": "Nom ou ID de la station",
+      "invite": "Inviter ou choisir un bot worker pour ce serveur"
+    },
+    "es": {
+      "play": "Iniciar una radio en tu canal de voz",
+      "station": "Nombre o ID de la emisora",
+      "invite": "Invitar o elegir un bot worker para este servidor"
+    },
+    "it": {
+      "play": "Avvia una radio nel tuo canale vocale",
+      "station": "Nome o ID della stazione",
+      "invite": "Invita o scegli un bot worker per questo server"
+    },
+    "pl": {
+      "play": "Włącz radio na swoim kanale głosowym",
+      "station": "Nazwa lub ID stacji",
+      "invite": "Zaproś lub wybierz bota workera dla tego serwera"
+    },
+    "tr": {
+      "play": "Ses kanalında bir radyo yayını başlat",
+      "station": "İstasyon adı veya ID",
+      "invite": "Bu sunucu için bir worker bot davet et veya seç"
+    },
+    "pt": {
+      "play": "Iniciar uma rádio no seu canal de voz",
+      "station": "Nome ou ID da estação",
+      "invite": "Convidar ou escolher um bot worker para este servidor"
+    },
+    "nl": {
+      "play": "Een radiostream starten in je spraakkanaal",
+      "station": "Naam of ID van de zender",
+      "invite": "Een workerbot voor deze server uitnodigen of kiezen"
+    }
+  }
+}

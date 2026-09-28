@@ -467,7 +467,7 @@ const menuMethods = {
       new ButtonBuilder()
         .setCustomId(INVITE_COMPONENT_ID_CLOSE)
         .setStyle(ButtonStyle.Secondary)
-        .setLabel(t("Schliessen", "Close"))
+        .setLabel(t("Schließen", "Close"))
     );
     rows.push(buttons);
 
