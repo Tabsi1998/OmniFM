@@ -6,6 +6,68 @@ folgt [SemVer](https://semver.org/lang/de/): Die erste Zahl steigt bei
 Funktionen, die dritte bei reinen Fehlerbehebungen. Wie ein Release entsteht,
 steht in `scripts/release.mjs`.
 
+## 3.12.0 – 2026-09-28
+
+Die Saison-Deko: Halloween, Advent, Weihnachten, Silvester und Ostern in
+Discord, auf der Website und im Dashboard, dazu ein Adventskalender und
+Saison-Sender.
+
+### Neu
+
+- **Saison-Deko nach Kalender:** OmniFM schmückt sich zu Ostern (Palmsonntag
+  bis Ostermontag), zu Halloween (26. Oktober bis 1. November), im Advent
+  (ab dem ersten Adventssonntag), zu Weihnachten (24. bis 30. Dezember) und zu
+  Silvester (31. Dezember und 1. Januar). Jeder Server hat dafür eine eigene
+  Zeitzone (Standard: Europe/Vienna). Im Dashboard lässt sich jede Saison und
+  jeder Teil einzeln abschalten; für alle Pläne ist von Anfang an alles an.
+  (#425)
+- **In Discord:** Das Panel „Läuft gerade“ bekommt eine Saison-Zeile und die
+  Farbe der Saison (eine eigene Farbe aus dem Panel-Designer gewinnt), im
+  Advent den Kranz mit den Kerzen der Woche, zu Silvester einen Countdown, der
+  in jedem Discord live mitzählt. Der Status im Sprachkanal bekommt das
+  Saison-Emoji, der Bot-Status grüßt („🎃 Happy Halloween“). Um Mitternacht
+  schickt OmniFM einmal pro Server einen Neujahrsgruß, nur in den Kanal des
+  Panels und nur, wenn dort gerade gespielt wird. Neue bewegte Emojis: Kerze,
+  Schneeflocke, Feuerwerk, Osterei, Kürbis und Spinne. (#426)
+- **Auf der Website und im Dashboard:** leiser Schnee und eine Lichterkette im
+  Advent und zu Weihnachten, der Adventskranz, Feuerwerk zu Silvester, fünf
+  versteckte Ostereier zum Suchen, und zu Halloween Spinnennetze, leuchtende
+  Kürbisse, Spinnen und Fledermäuse, bei jedem Besuch anders verteilt. Die
+  Deko lädt nur in der Saison, bleibt bei „weniger Bewegung“ still und lässt
+  sich mit einem Klick ausblenden. Die Rechtsseiten bleiben ohne Deko.
+  (#427, #443)
+- **Adventskalender:** Vom 1. bis 24. Dezember hat das Panel einen Knopf
+  „🎁 Türchen 5“. Dahinter stecken, nur für die Person, die öffnet, ein
+  Musik-Fakt, ein Spruch oder ein Rätsel (in neun Sprachen) und der Sender-Tipp
+  des Tages zum direkten Abspielen. (#428)
+- **Saison-Sender:** Sender im Katalog lassen sich Halloween, Weihnachten oder
+  Ostern zuordnen. In der Saison stehen sie in einer eigenen Rubrik im
+  Sender-Browser, in Discord und auf der Website, und `/play weihnachten`,
+  `/play halloween` oder `/play ostern` spielt einen davon. (#430)
+- **Owner-Menü „Saison-Deko“:** ein Hauptschalter pro Saison für alle Server
+  und ein Testmodus, der einen Look (etwa „Halloween: Happy Halloween“) auf
+  bis zu 25 Servern zeigt. Auf der Website zeigt `?season=…` jeden Look an
+  jedem Tag, etwa `?season=halloween-greeting`. (#425)
+
+### Behoben
+
+- **Datenschutzerklärung und Nutzungsbedingungen:** Was im Owner-Menü steht,
+  gewinnt jetzt immer gegen alte Einträge in der `.env` des Servers. Vorher
+  gewann die `.env`, etwa beim Hosting-Standort („Österreuch |EU“). (#444)
+
+### Nach dem Update
+
+- **Owner-Menü → Firma & Recht:** Hosting-Anbieter und Hosting-Standort
+  eintragen, falls noch leer. Wo ein Feld im Owner-Menü leer bleibt, gilt
+  weiter der alte Eintrag aus der `.env`.
+- **Owner-Menü → Sender:** Im November die Weihnachtssender von SomaFM
+  anlegen und bei „Saison-Rubrik“ Weihnachten ankreuzen (Christmas Lounge,
+  Xmas in Frisko, Jolly Ol' Soul; die Adressen stehen in #441).
+- **Anschauen:** `https://omnifm.xyz/?season=halloween-greeting`, dazu
+  `halloween-soon`, `advent-1` bis `advent-4`, `christmas-greeting`,
+  `christmas-winter`, `newyear-countdown`, `newyear-greeting`, `easter-soon`
+  und `easter-greeting`. In Discord über den Testmodus im Owner-Menü.
+
 ## 3.11.0 – 2026-09-28
 
 Website und Dashboard in neun Sprachen, neue Rechtsseiten mit einer
