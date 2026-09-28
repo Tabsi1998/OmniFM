@@ -40,6 +40,7 @@ import SettingsIncidentAlerts from './settings/SettingsIncidentAlerts.js';
 import SettingsLanguage from './settings/SettingsLanguage.js';
 import SettingsTimeZone from './settings/SettingsTimeZone.js';
 import SettingsSeasons from './settings/SettingsSeasons.js';
+import { seasonEmoji } from '../../../src/lib/seasons.js';
 import SettingsVoiceGuard from './settings/SettingsVoiceGuard.js';
 
 export default function DashboardSettings({
@@ -205,10 +206,13 @@ export default function DashboardSettings({
   const voiceStatus = settings?.voiceStatus || null;
   const voiceStatusTemplate = voiceStatus?.template || '';
   const voiceStatusRenderOptions = { fallbackTemplate: voiceStatus?.defaultTemplate || '' };
-  const voiceStatusPreview = renderVoiceStatusTemplate(voiceStatusTemplate, VOICE_STATUS_SAMPLE, voiceStatusRenderOptions);
+  // #426: in a season the bot puts its emoji in front, unless the part is off.
+  const seasonNow = settings?.seasonDecor?.current || null;
+  const voiceStatusSample = { ...VOICE_STATUS_SAMPLE, season: seasonNow && seasonNow.parts?.voiceStatus !== false ? seasonEmoji(seasonNow) : '' };
+  const voiceStatusPreview = renderVoiceStatusTemplate(voiceStatusTemplate, voiceStatusSample, voiceStatusRenderOptions);
   const voiceStatusPreviewNoSong = renderVoiceStatusTemplate(
     voiceStatusTemplate,
-    { ...VOICE_STATUS_SAMPLE, title: '', artist: '', listeners: 0 },
+    { ...voiceStatusSample, title: '', artist: '', listeners: 0 },
     voiceStatusRenderOptions
   );
   const updateVoiceStatusTemplate = (template) => setSettings((current) => ({

@@ -13,6 +13,7 @@ import { colorSquare } from "../station-browser.js";
 import { NP_PREFIX } from "../runtime-shared.js";
 import { normalizePanelDesign } from "../../lib/panel-design.js";
 import { FAVORITES_MAX } from "../../lib/favorite-stations.js";
+import { seasonPanelLook } from "../season-look.js";
 
 function clip(value, max) {
   const textValue = String(value ?? "").trim();
@@ -60,6 +61,8 @@ function linkButton(url, label, emoji, appId) {
  * @param {string|null} [input.fallbackImageUrl] bot avatar when neither cover nor logo exists
  * @param {number} [input.pollSeconds]
  * @param {object} [input.design] the server's panel look (#281), see panel-design.js
+ * @param {object|null} [input.season] the server's season (#426), see season-look.js
+ * @param {number} [input.nowMs] now, for the New Year countdown
  */
 export function buildNowPlayingPanel(input) {
   const { t, applicationId: appId = null, station = {}, track = {}, playback = {}, notices = {} } = input;
@@ -67,12 +70,14 @@ export function buildNowPlayingPanel(input) {
   const design = normalizePanelDesign(input.design);
   const show = design.buttons;
 
-  // Accent: the server's own colour (#281), else the station's (#267), else
-  // the plan colour; without a recognised title amber, like the old embed.
-  const accent = design.accentColor ?? (Number.isInteger(station.color) ? station.color
+  // Accent: the server's own colour (#281), else the season's (#426), else the
+  // station's (#267), else the plan colour; without a recognised title amber.
+  const season = seasonPanelLook(input.season, { t, appId, nowMs: input.nowMs ?? Date.now() });
+  const accent = design.accentColor ?? season?.color ?? (Number.isInteger(station.color) ? station.color
     : (track.hasTrack ? tierColor(input.planTier) : ui.UI_COLORS.warning));
 
   const headLines = [
+    season?.line || null,
     ui.subtext(`${phaseLabel(playback.phase, playback.paused, t, appId)} · ${clip(input.workerName || "OmniFM", 60)}`),
     ui.heading(clip(track.hasTrack ? (track.headline || stationName) : stationName, 110)),
   ];
@@ -80,9 +85,10 @@ export function buildNowPlayingPanel(input) {
   if (track.hasTrack && track.sourceNote) headLines.push(ui.subtext(clip(track.sourceNote, 160)));
   if (!track.hasTrack) headLines.push(ui.subtext(t("Live-Radio-Stream läuft", "Live radio stream playing")));
   const image = track.artworkUrl || station.logoUrl || input.fallbackImageUrl || null;
+  const headText = headLines.filter(Boolean).join("\n");
   const head = image
-    ? ui.section({ content: headLines.join("\n"), thumbnailUrl: image })
-    : ui.text(headLines.join("\n"));
+    ? ui.section({ content: headText, thumbnailUrl: image })
+    : ui.text(headText);
 
   const details = [
     ui.statusLine([

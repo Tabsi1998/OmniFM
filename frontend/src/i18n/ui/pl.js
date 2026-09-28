@@ -219,6 +219,7 @@ export default {
   "If a stream fails hard, OmniFM can jump directly to another station instead of only reconnecting blindly.": "Gdy stream całkiem padnie, OmniFM może od razu przejść na inną stację zamiast tylko na ślepo łączyć się ponownie.",
   "If a stream fails hard, OmniFM switches to this station.": "Gdy stream całkiem padnie, OmniFM przełącza się na tę stację.",
   "If a stream fails hard, OmniFM tries this station first and keeps additional failover steps ready.": "Gdy stream całkiem padnie, OmniFM najpierw próbuje tej stacji i ma gotowe kolejne kroki zapasowe.",
+  "In a season the season’s emoji stands in front, unless you place {placeholder} yourself.": "W sezonie emoji sezonu stoi na początku, chyba że sam wstawisz {placeholder}.",
   "Interactive session with requests and voting note": "Interaktywna sesja z prośbami i zachętą do głosowania",
   "Invalid": "Nieprawidłowe",
   "Invite": "Zaproś",

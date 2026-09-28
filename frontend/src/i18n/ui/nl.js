@@ -219,6 +219,7 @@ export default {
   "If a stream fails hard, OmniFM can jump directly to another station instead of only reconnecting blindly.": "Als een stream helemaal uitvalt, kan OmniFM meteen naar een andere zender springen in plaats van blind opnieuw te verbinden.",
   "If a stream fails hard, OmniFM switches to this station.": "Als een stream helemaal uitvalt, schakelt OmniFM over naar deze zender.",
   "If a stream fails hard, OmniFM tries this station first and keeps additional failover steps ready.": "Als een stream helemaal uitvalt, probeert OmniFM eerst deze zender en houdt het extra reservestappen klaar.",
+  "In a season the season’s emoji stands in front, unless you place {placeholder} yourself.": "In het seizoen staat de seizoensemoji vooraan, tenzij je {placeholder} zelf plaatst.",
   "Interactive session with requests and voting note": "Interactieve sessie met verzoekjes en een oproep om te stemmen",
   "Invalid": "Ongeldig",
   "Invite": "Uitnodigen",

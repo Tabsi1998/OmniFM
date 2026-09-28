@@ -184,6 +184,16 @@ export function nextSeasonStart(moment = new Date(), timeZone = DEFAULT_SEASON_T
   return { season: next.season, ...dateOfDay(next.day) };
 }
 
+/** One emoji for a season and phase (voice channel status, dashboard preview); "" outside a season. */
+export function seasonEmoji(current) {
+  if (!current) return "";
+  if (current.season === "easter") return current.phase === "greeting" ? "🐣" : "🌷";
+  if (current.season === "advent") return "🕯️";
+  if (current.season === "christmas") return current.phase === "greeting" ? "🎄" : "❄️";
+  if (current.season === "newyear") return current.phase === "countdown" ? "🎆" : "🥂";
+  return "";
+}
+
 const allOn = (keys) => Object.fromEntries(keys.map((key) => [key, true]));
 
 /** A server's switches (dashboard): every season and part on unless switched off. */

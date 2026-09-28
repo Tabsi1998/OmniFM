@@ -13,6 +13,7 @@ import { buildVoiceChannelAccessMessage } from "../../lib/user-facing-setup.js";
 import { buildRuntimePresenceActivity } from "../runtime-presence.js";
 import { getRuntimeConnectedChannelId } from "../runtime-live-state.js";
 import { renderVoiceStatusTemplate, voiceStatusTemplateIsLive } from "../../lib/voice-status-template.js";
+import { globalSeason, seasonVoiceEmoji, serverSeason, withSeasonPresence } from "../season-look.js";
 import {
   VOICE_CHANNEL_STATUS_ENABLED,
   VOICE_CHANNEL_STATUS_TEMPLATE,
@@ -94,11 +95,12 @@ const voiceMethods = {
 
   // The status text (#277): the server's template from the dashboard, else
   // VOICE_CHANNEL_STATUS_TEMPLATE; see src/lib/voice-status-template.js.
-  renderVoiceStatusText(stationName, { guildId = null, template = null } = {}) {
+  renderVoiceStatusText(stationName, { guildId = null, template = null, season = "" } = {}) {
     const source = String(template || "").trim() || VOICE_CHANNEL_STATUS_TEMPLATE;
     const values = {
       station: clipText(String(stationName || "").trim(), 60) || "Radio",
       bot: clipText(String(this.config?.name || BRAND.name || "OmniFM"), 24),
+      season,
     };
     const state = guildId ? this.guildState?.get?.(guildId) : null;
     if (state) {
@@ -155,7 +157,12 @@ const voiceMethods = {
     if (!/^\d{17,22}$/.test(channelId)) return;
     const settings = stationName ? await this.loadGuildSettingsCached?.(guildId).catch(() => null) : null;
     const desired = stationName
-      ? this.renderVoiceStatusText(stationName, { guildId, template: settings?.voiceStatusTemplate })
+      ? this.renderVoiceStatusText(stationName, {
+        guildId,
+        template: settings?.voiceStatusTemplate,
+        // #426: the season's emoji, unless the server switched that part off.
+        season: seasonVoiceEmoji(serverSeason(guildId, settings)),
+      })
       : "";
     if (!this.shouldRefreshVoiceStatus(state, desired, channelId, { force })) return;
     const guild = this.client.guilds.cache.get(guildId) || null;
@@ -197,7 +204,8 @@ const voiceMethods = {
   },
 
   buildPresenceActivity() {
-    return buildRuntimePresenceActivity(this);
+    // #426: the season in front, the same on every server (only the owner's main switch).
+    return withSeasonPresence(buildRuntimePresenceActivity(this), globalSeason());
   },
 
   updatePresence() {

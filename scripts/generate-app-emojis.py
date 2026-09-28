@@ -226,6 +226,175 @@ def link():
     return finish(image)
 
 
+# ---- season emojis (#426): Advent, Christmas, New Year, Easter ----
+
+CANDLE_RED = (220, 38, 38, 255)
+CANDLE_SHADE = (185, 28, 28, 255)
+CANDLE_LIGHT = (252, 165, 165, 255)
+FLAME_OUTER = (255, 159, 28, 255)
+FLAME_INNER = (255, 224, 102, 255)
+WICK = (51, 41, 36, 255)
+ICE = (125, 211, 252, 255)
+ICE_LIGHT = (224, 242, 254, 255)
+GOLD = (251, 191, 36, 255)
+FIRE_RED = (255, 42, 95, 255)
+FIRE_CYAN = (0, 229, 255, 255)
+EGG_BASE = (253, 186, 116, 255)
+EGG_STRIPE = (236, 72, 153, 255)
+EGG_DOT = (56, 189, 248, 255)
+EGG_BAND = (134, 239, 172, 255)
+
+
+def candle_body(draw):
+    # A red candle with a light edge, a drop of wax and the wick.
+    draw.rounded_rectangle([p(42), p(58), p(86), p(122)], radius=p(8), fill=CANDLE_RED)
+    draw.rounded_rectangle([p(72), p(58), p(86), p(122)], radius=p(8), fill=CANDLE_SHADE)
+    draw.rounded_rectangle([p(48), p(64), p(55), p(112)], radius=p(4), fill=CANDLE_LIGHT)
+    draw.ellipse([p(58), p(56), p(70), p(70)], fill=CANDLE_RED)
+    draw.rounded_rectangle([p(62), p(44), p(66), p(60)], radius=p(2), fill=WICK)
+
+
+def flame(draw, height, sway, bright):
+    # A teardrop: round at the bottom, pointed at the top, leaning with the sway.
+    base_y = 56
+    tip_x = 64 + sway
+    tip_y = base_y - height
+    outer = [(p(64 + 10 * math.cos(a)), p(base_y - 8 + 10 * math.sin(a))) for a in [i * math.pi / 12 for i in range(0, 13)]]
+    outer = [(p(54), p(base_y - 8))] + outer[::-1] + [(p(74), p(base_y - 8)), (p(tip_x), p(tip_y))]
+    draw.polygon(outer, fill=FLAME_OUTER)
+    inner_h = height * 0.62
+    inner = [(p(64 + 6 * math.cos(a)), p(base_y - 7 + 6 * math.sin(a))) for a in [i * math.pi / 12 for i in range(0, 13)]]
+    inner = [(p(58), p(base_y - 7))] + inner[::-1] + [(p(70), p(base_y - 7)), (p(64 + sway * 0.6), p(base_y - 7 - inner_h))]
+    draw.polygon(inner, fill=FLAME_INNER)
+    core = (255, 255, 255, int(180 + 75 * bright))
+    draw.ellipse([p(61), p(base_y - 12), p(67), p(base_y - 4)], fill=core)
+
+
+def candle_frames(count=8):
+    frames = []
+    for index in range(count):
+        phase = 2 * math.pi * index / count
+        image, draw = canvas()
+        candle_body(draw)
+        flame(draw, height=30 + 5 * math.sin(phase) + 2 * math.sin(phase * 3), sway=3 * math.sin(phase * 2), bright=0.5 + 0.5 * math.sin(phase))
+        frames.append(finish(image))
+    return frames
+
+
+def candle_off():
+    image, draw = canvas()
+    candle_body(draw)
+    return finish(image)
+
+
+def snowflake_arm(draw, angle, length, width, color):
+    cx, cy = 64, 64
+    end = (cx + length * math.cos(angle), cy + length * math.sin(angle))
+    draw.line([(p(cx), p(cy)), (p(end[0]), p(end[1]))], fill=color, width=round(p(width)))
+    for along, branch in ((0.55, 14), (0.8, 10)):
+        bx = cx + length * along * math.cos(angle)
+        by = cy + length * along * math.sin(angle)
+        for side in (-1, 1):
+            branch_angle = angle + side * math.pi / 4
+            draw.line([(p(bx), p(by)), (p(bx + branch * math.cos(branch_angle)), p(by + branch * math.sin(branch_angle)))], fill=color, width=round(p(width)))
+    draw.ellipse([p(end[0] - width), p(end[1] - width), p(end[0] + width), p(end[1] + width)], fill=color)
+
+
+def snowflake_frames(count=12):
+    frames = []
+    for index in range(count):
+        rotation = (math.pi / 3) * index / count
+        twinkle = 0.5 + 0.5 * math.sin(2 * math.pi * index / count)
+        image, draw = canvas()
+        for arm in range(6):
+            snowflake_arm(draw, rotation + arm * math.pi / 3, 52, 6, ICE)
+        for arm in range(6):
+            snowflake_arm(draw, rotation + arm * math.pi / 3, 50, 2.4, ICE_LIGHT)
+        r = 9 + 2 * twinkle
+        draw.ellipse([p(64 - r), p(64 - r), p(64 + r), p(64 + r)], fill=WHITE)
+        frames.append(finish(image))
+    return frames
+
+
+def burst(draw, cx, cy, progress, color, rays=12, reach=34):
+    # Sparks fly out and fade; progress 0..1.
+    if progress <= 0 or progress >= 1:
+        return
+    alpha = int(255 * (1 - progress) ** 0.7)
+    spark = (color[0], color[1], color[2], alpha)
+    for ray in range(rays):
+        angle = 2 * math.pi * ray / rays
+        outer = reach * progress
+        inner = max(0.0, outer - 12)
+        draw.line([(p(cx + inner * math.cos(angle)), p(cy + inner * math.sin(angle))),
+                   (p(cx + outer * math.cos(angle)), p(cy + outer * math.sin(angle)))], fill=spark, width=round(p(5)))
+        dot = 3.5
+        draw.ellipse([p(cx + outer * math.cos(angle) - dot), p(cy + outer * math.sin(angle) - dot),
+                      p(cx + outer * math.cos(angle) + dot), p(cy + outer * math.sin(angle) + dot)], fill=spark)
+
+
+def fireworks_frames(count=12):
+    frames = []
+    bursts = [(64, 60, GOLD, 0.0), (36, 40, FIRE_RED, 0.33), (92, 42, FIRE_CYAN, 0.66)]
+    for index in range(count):
+        image, draw = canvas()
+        for cx, cy, color, offset in bursts:
+            progress = ((index / count) - offset) % 1.0
+            burst(draw, cx, cy, progress * 1.15, color, reach=30 if color != GOLD else 40)
+        frames.append(finish(image))
+    return frames
+
+
+def egg_image():
+    size = 96
+    egg = Image.new("RGBA", (p(size), p(size)), CLEAR)
+    draw = ImageDraw.Draw(egg)
+    # The egg: a bit narrower at the top.
+    draw.ellipse([p(18), p(6), p(78), p(92)], fill=EGG_BASE)
+    mask = Image.new("L", (p(size), p(size)), 0)
+    ImageDraw.Draw(mask).ellipse([p(18), p(6), p(78), p(92)], fill=255)
+    deco = Image.new("RGBA", (p(size), p(size)), CLEAR)
+    deco_draw = ImageDraw.Draw(deco)
+    deco_draw.rectangle([p(0), p(52), p(96), p(62)], fill=EGG_BAND)
+    zigzag = []
+    for step in range(0, 13):
+        x = step * 8
+        zigzag.append((p(x), p(36 if step % 2 == 0 else 28)))
+    deco_draw.line(zigzag, fill=EGG_STRIPE, width=round(p(5)), joint="curve")
+    for x, y in ((34, 74), (48, 78), (62, 74), (40, 18), (56, 18)):
+        deco_draw.ellipse([p(x - 3.5), p(y - 3.5), p(x + 3.5), p(y + 3.5)], fill=EGG_DOT)
+    egg.paste(deco, (0, 0), Image.composite(deco, Image.new("RGBA", deco.size, CLEAR), mask).getchannel("A"))
+    # A soft light on the left.
+    shine = Image.new("RGBA", (p(size), p(size)), CLEAR)
+    ImageDraw.Draw(shine).ellipse([p(28), p(18), p(40), p(40)], fill=(255, 255, 255, 110))
+    egg.alpha_composite(shine)
+    return egg
+
+
+def egg_frames(count=10):
+    frames = []
+    base = egg_image()
+    for index in range(count):
+        angle = 12 * math.sin(2 * math.pi * index / count)
+        image, _ = canvas()
+        rotated = base.rotate(angle, resample=Image.BICUBIC, center=(p(48), p(92)))
+        image.alpha_composite(rotated, (p(16), p(26)))
+        frames.append(finish(image))
+    return frames
+
+
+def harden(image):
+    """GIF knows only see-through or not: a soft edge either counts or goes."""
+    red, green, blue, alpha = image.split()
+    return Image.merge("RGBA", (red, green, blue, alpha.point(lambda value: 255 if value >= 110 else 0)))
+
+
+def harden(image):
+    """GIF knows only see-through or not: a soft edge either counts or goes."""
+    red, green, blue, alpha = image.split()
+    return Image.merge("RGBA", (red, green, blue, alpha.point(lambda value: 255 if value >= 110 else 0)))
+
+
 STATIC = {
     "play": play,
     "pause": pause,
@@ -246,6 +415,15 @@ STATIC = {
     "warning": warning,
     "error": error,
     "link": link,
+    "candle_off": candle_off,
+}
+
+# Animated, with their frame time in milliseconds (#426).
+ANIMATED = {
+    "candle": (candle_frames, 110),
+    "snowflake": (snowflake_frames, 120),
+    "fireworks": (fireworks_frames, 90),
+    "egg": (egg_frames, 90),
 }
 
 
@@ -263,6 +441,11 @@ def main():
     frames[0].save(OUT / "equalizer.gif", save_all=True, append_images=frames[1:], duration=110, loop=0,
                    disposal=2, transparency=0, optimize=False)
     entries.append({"name": "equalizer", "file": "equalizer.gif", "animated": True})
+    for name, (draw_frames, duration) in ANIMATED.items():
+        frames = [harden(frame) for frame in draw_frames()]
+        frames[0].save(OUT / f"{name}.gif", save_all=True, append_images=frames[1:], duration=duration, loop=0,
+                       disposal=2, transparency=0, optimize=False)
+        entries.append({"name": name, "file": f"{name}.gif", "animated": True})
     manifest = {"version": version, "prefix": "omnifm", "emojis": sorted(entries, key=lambda entry: entry["name"])}
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
     print(f"{len(entries)} emojis written to {OUT.relative_to(ROOT)} (version {version})")

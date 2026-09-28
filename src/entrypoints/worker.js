@@ -12,8 +12,11 @@ import {
 } from "./shared.js";
 import { startWorkerAutohealMonitor } from "./worker-autoheal.js";
 import { startRuntimeLogShipper } from "../services/runtime-health-reporter.js";
+import { startOwnerSettingsRefresh } from "../lib/owner-settings-cache.js";
 
 await initializeSharedServices({ requireMongo: true });
+// The owner's switches (seasonal decoration #426, prices) as the commander sees them.
+startOwnerSettingsRefresh();
 await initCustomStationsStore();
 // Buttons on a worker's now-playing message are delivered to the worker, so it
 // needs the /perm role rules as well (#232).

@@ -34,6 +34,8 @@ import { NP_PREFIX, getTierConfig } from "../runtime-shared.js";
 import { derivePlaybackPhase } from "../playback-phase.js";
 import { isComponentsV2Message } from "../../discord/ui/index.js";
 import { effectivePanelDesign, panelDesignSignature } from "../../lib/panel-design.js";
+import { seasonSignature, serverSeason } from "../season-look.js";
+import { sendNewYearGreeting } from "../season-greeting.js";
 import { nowPlayingStatsMethods } from "./stats-methods.js";
 import { nowPlayingEmbedMethods } from "./embed-methods.js";
 import { nowPlayingControlMethods } from "./control-methods.js";
@@ -366,6 +368,22 @@ const nowPlayingMethods = {
     return fallbackChannels[0] || null;
   },
 
+  /** #426: the server's season from its cached settings (like the panel look below). */
+  getGuildSeason(guildId) {
+    let settings;
+    try {
+      settings = this.getCachedGuildSettings?.(guildId) || null;
+    } catch {
+      settings = null;
+    }
+    return serverSeason(guildId, settings);
+  },
+
+  /** #426: at midnight once per server and year, into the panel's channel (season-greeting.js). */
+  sendNewYearGreeting(guildId, channel, season) {
+    return sendNewYearGreeting(this, { guildId, channel, season });
+  },
+
   /** The server's panel look from the dashboard (#281); the standard look without Premium. */
   getPanelDesign(guildId) {
     let stored;
@@ -540,7 +558,9 @@ const nowPlayingMethods = {
       await this.loadGuildSettingsCached?.(guildId).catch(() => null);
       const favoritesKey = (this.getVisibleFavoriteStations?.(guildId) || []).map((favorite) => favorite.key).join(",");
       const designKey = panelDesignSignature(this.getPanelDesign(guildId));
-      const signature = `${buildNowPlayingSignature(stationKey, nextMeta, state, channel.id)}|fav:${favoritesKey}|design:${designKey}`;
+      // #426: a new candle, midnight on New Year's Eve: the season redraws the panel too.
+      const season = this.getGuildSeason(guildId);
+      const signature = `${buildNowPlayingSignature(stationKey, nextMeta, state, channel.id)}|fav:${favoritesKey}|design:${designKey}|season:${seasonSignature(season)}`;
 
       if (!force && signature === state.nowPlayingSignature) {
         return;
@@ -568,6 +588,8 @@ const nowPlayingMethods = {
       const sent = await this.upsertNowPlayingMessage(guildId, state, payload, channel);
       if (sent) {
         state.nowPlayingSignature = signature;
+        // #426: at midnight, once per server and year, into the panel's channel only.
+        this.sendNewYearGreeting?.(guildId, channel, season).catch(() => null);
       }
     } catch (err) {
       this.logNowPlayingIssue(guildId, state, clipText(err?.message || String(err), 200));

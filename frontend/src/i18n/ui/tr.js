@@ -219,6 +219,7 @@ export default {
   "If a stream fails hard, OmniFM can jump directly to another station instead of only reconnecting blindly.": "Bir yayın tamamen çökerse OmniFM körü körüne yeniden bağlanmak yerine doğrudan başka bir istasyona geçebilir.",
   "If a stream fails hard, OmniFM switches to this station.": "Bir yayın tamamen çökerse OmniFM bu istasyona geçer.",
   "If a stream fails hard, OmniFM tries this station first and keeps additional failover steps ready.": "Bir yayın tamamen çökerse OmniFM önce bu istasyonu dener ve ek yedek adımlarını hazır tutar.",
+  "In a season the season’s emoji stands in front, unless you place {placeholder} yourself.": "Sezon sırasında sezon emojisi başta durur, {placeholder} değerini kendin yerleştirmediğin sürece.",
   "Interactive session with requests and voting note": "İstekler ve oylama notuyla etkileşimli oturum",
   "Invalid": "Geçersiz",
   "Invite": "Davet et",
