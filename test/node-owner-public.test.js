@@ -44,6 +44,30 @@ test("privacy and terms take the owner's company and integration settings", () =
   assert.deepEqual([terms.billing.premiumCheckoutEnabled, terms.billing.paymentProvider, terms.contact.governingLaw, terms.isConfigured], [false, "", "AT", true]);
 });
 
+test("the owner console wins over PRIVACY_* and TERMS_* in the environment; the environment fills gaps (#444)", () => {
+  const env = {
+    PRIVACY_HOSTING_LOCATION: "Österreuch |EU", PRIVACY_HOSTING_PROVIDER: "Old Host", PRIVACY_CONTACT_EMAIL: "old@radio.at",
+    PRIVACY_CONTROLLER_NAME: "Old Name", PRIVACY_DPO_NAME: "Old DPO",
+    TERMS_EFFECTIVE_DATE: "01.01.2020", TERMS_GOVERNING_LAW: "Recht von früher", TERMS_CONTACT_EMAIL: "old-terms@radio.at",
+  };
+  const owner = { company: {
+    providerName: "Radio GmbH", email: "hi@radio.at", hostingLocation: "Österreich | EU", hostingProvider: "Hetzner Online GmbH",
+    dpoName: "Data Person", effectiveDate: "01.03.2026", governingLaw: "Österreichisches Recht",
+  } };
+  const privacy = pub.privacyNotice(owner, env);
+  assert.deepEqual(privacy.hosting, { provider: "Hetzner Online GmbH", location: "Österreich | EU" });
+  assert.deepEqual([privacy.controller.name, privacy.contact.email, privacy.dpo.name], ["Radio GmbH", "hi@radio.at", "Data Person"]);
+  const terms = pub.termsNotice(owner, env);
+  assert.deepEqual([terms.contact.effectiveDate, terms.contact.governingLaw, terms.contact.email], ["01.03.2026", "Österreichisches Recht", "hi@radio.at"]);
+
+  // Nothing in the console: the environment still counts, before the console's defaults.
+  const fromEnv = pub.privacyNotice({}, env);
+  assert.deepEqual(fromEnv.hosting, { provider: "Old Host", location: "Österreuch |EU" });
+  assert.equal(fromEnv.contact.email, "old@radio.at");
+  assert.equal(pub.termsNotice({}, env).contact.governingLaw, "Recht von früher");
+  assert.equal(pub.termsNotice({}, {}).contact.governingLaw, "Österreichisches Recht", "the default without both");
+});
+
 test("prices follow the owner's plans; features only when the owner changed them", () => {
   const defaults = pub.premiumPricing(plansWith({}), { trialEnabled: true });
   assert.deepEqual(defaults.tiers.pro.features, []);

@@ -116,35 +116,48 @@ def build_public_legal_notice():
     }
 
 
+def _console_first():
+    """What the owner typed in the console first, then the environment (#444):
+    an old PRIVACY_* or TERMS_* line in .env must not hide a console value.
+    Reads the stored section, so the console's defaults do not win over .env."""
+    saved = core.load_owner_config_raw().get("company")
+    saved = saved if isinstance(saved, dict) else {}
+
+    def pick(field, env_key):
+        return str(saved.get(field) or "").strip() or (os.environ.get(env_key) or "").strip()
+
+    return pick
+
+
 def build_public_privacy_notice():
     legal_notice = core.build_public_legal_notice()
     legal = legal_notice.get("legal", {})
-    c = core.get_config_section("company")
+    pick = _console_first()
     has_smtp = bool(core.system_setting("smtp", "host", "SMTP_HOST"))
     bot_id_candidate = str(core.directory_setting("discordBotList", "botId", "DISCORDBOTLIST_BOT_ID") or os.environ.get("BOT_1_CLIENT_ID") or "").strip()
     has_discordbotlist = core.config_bool(core.directory_setting("discordBotList", "enabled", "DISCORDBOTLIST_ENABLED", False)) and bool(str(core.directory_setting("discordBotList", "token", "DISCORDBOTLIST_TOKEN") or "").strip()) and bool(re.match(r"^\d{17,22}$", bot_id_candidate))
     has_recognition = core.config_bool(core.system_setting("audioRecognition", "enabled", "NOW_PLAYING_RECOGNITION_ENABLED", False)) and bool(core.system_setting("audioRecognition", "apiKey", "ACOUSTID_API_KEY"))
 
     controller = {
-        "name": (os.environ.get("PRIVACY_CONTROLLER_NAME") or "").strip() or legal.get("providerName", ""),
-        "representative": (os.environ.get("PRIVACY_CONTROLLER_REPRESENTATIVE") or "").strip() or legal.get("representative", ""),
-        "streetAddress": (os.environ.get("PRIVACY_CONTROLLER_STREET_ADDRESS") or "").strip() or legal.get("streetAddress", ""),
-        "postalCode": (os.environ.get("PRIVACY_CONTROLLER_POSTAL_CODE") or "").strip() or legal.get("postalCode", ""),
-        "city": (os.environ.get("PRIVACY_CONTROLLER_CITY") or "").strip() or legal.get("city", ""),
-        "country": (os.environ.get("PRIVACY_CONTROLLER_COUNTRY") or "").strip() or legal.get("country", "") or "Österreich",
-        "website": (os.environ.get("PRIVACY_CONTROLLER_WEBSITE") or "").strip() or legal.get("website", ""),
+        "name": pick("providerName", "PRIVACY_CONTROLLER_NAME") or legal.get("providerName", ""),
+        "representative": pick("representative", "PRIVACY_CONTROLLER_REPRESENTATIVE") or legal.get("representative", ""),
+        "streetAddress": pick("streetAddress", "PRIVACY_CONTROLLER_STREET_ADDRESS") or legal.get("streetAddress", ""),
+        "postalCode": pick("postalCode", "PRIVACY_CONTROLLER_POSTAL_CODE") or legal.get("postalCode", ""),
+        "city": pick("city", "PRIVACY_CONTROLLER_CITY") or legal.get("city", ""),
+        "country": pick("country", "PRIVACY_CONTROLLER_COUNTRY") or legal.get("country", "") or "Österreich",
+        "website": pick("website", "PRIVACY_CONTROLLER_WEBSITE") or legal.get("website", ""),
     }
     contact = {
-        "email": (os.environ.get("PRIVACY_CONTACT_EMAIL") or "").strip() or legal.get("email", ""),
-        "phone": (os.environ.get("PRIVACY_CONTACT_PHONE") or "").strip() or legal.get("phone", ""),
+        "email": pick("email", "PRIVACY_CONTACT_EMAIL") or legal.get("email", ""),
+        "phone": pick("phone", "PRIVACY_CONTACT_PHONE") or legal.get("phone", ""),
     }
     dpo = {
-        "name": (os.environ.get("PRIVACY_DPO_NAME") or "").strip() or str(c.get("dpoName") or "").strip(),
-        "email": (os.environ.get("PRIVACY_DPO_EMAIL") or "").strip() or str(c.get("dpoEmail") or "").strip(),
+        "name": pick("dpoName", "PRIVACY_DPO_NAME"),
+        "email": pick("dpoEmail", "PRIVACY_DPO_EMAIL"),
     }
     hosting = {
-        "provider": (os.environ.get("PRIVACY_HOSTING_PROVIDER") or "").strip() or str(c.get("hostingProvider") or "").strip(),
-        "location": (os.environ.get("PRIVACY_HOSTING_LOCATION") or "").strip() or str(c.get("hostingLocation") or "").strip(),
+        "provider": pick("hostingProvider", "PRIVACY_HOSTING_PROVIDER"),
+        "location": pick("hostingLocation", "PRIVACY_HOSTING_LOCATION"),
     }
     authority = {
         "name": (os.environ.get("PRIVACY_AUTHORITY_NAME") or "").strip() or "Österreichische Datenschutzbehörde",
@@ -206,16 +219,18 @@ def build_public_terms_notice():
         "businessPurpose": legal.get("businessPurpose", ""),
         "website": legal.get("website", "") or public_url,
     }
+    pick = _console_first()
     contact = {
-        "email": (os.environ.get("TERMS_CONTACT_EMAIL") or "").strip()
+        "email": pick("email", "TERMS_CONTACT_EMAIL")
         or (os.environ.get("PRIVACY_CONTACT_EMAIL") or "").strip()
         or legal.get("email", "")
         or fallback_email,
-        "website": (os.environ.get("TERMS_SUPPORT_URL") or "").strip()
+        "website": pick("website", "TERMS_SUPPORT_URL")
         or legal.get("website", "")
         or public_url,
-        "effectiveDate": (os.environ.get("TERMS_EFFECTIVE_DATE") or "").strip() or str(c.get("effectiveDate") or "").strip(),
-        "governingLaw": (os.environ.get("TERMS_GOVERNING_LAW") or "").strip() or str(c.get("governingLaw") or "").strip(),
+        "effectiveDate": pick("effectiveDate", "TERMS_EFFECTIVE_DATE"),
+        # The console's default ("Österreichisches Recht") comes last.
+        "governingLaw": pick("governingLaw", "TERMS_GOVERNING_LAW") or str(c.get("governingLaw") or "").strip(),
     }
 
     missing_core_fields = []
