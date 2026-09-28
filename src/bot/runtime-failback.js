@@ -344,6 +344,13 @@ async function resolveReplacementStationForGuild(runtime, guildId, unavailableKe
     });
     for (const key of chain) candidates.push({ key, source: "failover-chain" });
   } catch {}
+  // #413: then the automatic fallbacks of the plan, before the catalogue default.
+  try {
+    const automatic = typeof runtime.getAutomaticFallbackKeys === "function"
+      ? await runtime.getAutomaticFallbackKeys(guildId, { key: unavailableKey, station: loadStations()?.stations?.[unavailableKey] || null })
+      : [];
+    for (const key of automatic || []) candidates.push({ key, source: "automatic" });
+  } catch {}
 
   let defaultKey;
   try {

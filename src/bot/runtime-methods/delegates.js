@@ -2,6 +2,7 @@
 // BotRuntime methods, split out of src/bot/runtime.js (#295); mixed into
 // BotRuntime.prototype there, so `this` is the runtime as before.
 import { recordRuntimeIncident } from "../../services/runtime-health-reporter.js";
+import { automaticFallbackKeysForGuild } from "../automatic-fallback.js";
 import {
   normalizeStationReference,
   resolveStationForGuild,
@@ -199,6 +200,11 @@ const runtimeDelegateMethods = {
 
   resolveStationForGuild(...args) {
     return resolveStationForGuild(this, ...args);
+  },
+
+  // #413: the fallback stations every plan gets when a stream fails.
+  getAutomaticFallbackKeys(guildId, resolvedStation) {
+    return automaticFallbackKeysForGuild(guildId, resolvedStation);
   },
 
   getResolvedCurrentStation(...args) {

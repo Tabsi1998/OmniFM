@@ -135,7 +135,7 @@ const CHAIN_STATIONS = {
   },
 };
 
-function createFailoverRuntime({ chain, failing, unavailable = [] }) {
+function createFailoverRuntime({ chain, failing, unavailable = [], automatic = null }) {
   const played = [];
   const alerts = [];
   const restarts = [];
@@ -162,6 +162,7 @@ function createFailoverRuntime({ chain, failing, unavailable = [] }) {
       state.currentStationName = CHAIN_STATIONS.stations[key].name;
     },
     loadGuildSettingsCached: async () => ({ failoverChain: chain }),
+    ...(automatic ? { getAutomaticFallbackKeys: async () => automatic } : {}),
     resolveStationForGuild: (guildId, key) => (unavailable.includes(key)
       ? { ok: false, message: "not in plan" }
       : { ok: true, key, station: CHAIN_STATIONS.stations[key], stations: CHAIN_STATIONS }),
@@ -220,6 +221,25 @@ test("an exhausted chain reports it and keeps retrying the preferred station", a
   assert.deepEqual(runtime.alerts, ["stream_failover_exhausted"]);
   assert.equal(runtime.restarts.length, 1);
   assert.equal(runtime.restarts[0].reason, "restart-error");
+});
+
+test("without a chain of its own, a server falls back to the automatic stations of its plan (#413)", async () => {
+  const runtime = createFailoverRuntime({ chain: [], failing: ["alpha"], automatic: ["gamma", "delta"] });
+  const state = unstableState();
+  await restartRuntimeCurrentStation(runtime, state, GUILD_ID);
+
+  assert.deepEqual(runtime.played, ["alpha", "gamma"]);
+  assert.equal(state.currentStationKey, "gamma");
+  assert.equal(state.desiredStationKey, "alpha", "the failback brings it back to its own station");
+  assert.equal(state.failoverActive, true);
+});
+
+test("the server's own chain is tried before the automatic stations", async () => {
+  const runtime = createFailoverRuntime({ chain: ["beta"], failing: ["alpha", "beta"], automatic: ["delta"] });
+  const state = unstableState();
+  await restartRuntimeCurrentStation(runtime, state, GUILD_ID);
+  assert.deepEqual(runtime.played, ["alpha", "beta", "delta"]);
+  assert.equal(state.currentStationKey, "delta");
 });
 
 function createRestoreRuntime(state) {

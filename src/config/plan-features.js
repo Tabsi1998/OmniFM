@@ -125,6 +125,12 @@ export const PLAN_FEATURES = Object.freeze([
     en: (plan) => `Back ${seconds(Math.max(1000, PLAN_LIMITS[plan].reconnectMs), "en")} s after a drop`,
   },
   {
+    // #413: every plan; the server's own chains stay Ultimate (failoverRules).
+    key: "fallback",
+    de: () => "Ersatzsender, wenn ein Stream ausfällt, und zurück, sobald er wieder läuft",
+    en: () => "A fallback station when a stream fails, and back once it plays again",
+  },
+  {
     key: "nowPlaying",
     de: () => "Now-Playing-Panel mit Knöpfen, auch mit /now",
     en: () => "Now-playing panel with buttons, also with /now",

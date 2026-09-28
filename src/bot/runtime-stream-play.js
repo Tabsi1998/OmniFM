@@ -248,10 +248,15 @@ async function restartRuntimeCurrentStationAttempt(runtime, state, guildId) {
       legacyFallbackStation = String(settings?.fallbackStation || "").trim().toLowerCase();
     } catch {}
 
+    // #413: after the server's own chain, every plan gets automatic fallbacks.
+    const automaticKeys = typeof runtime.getAutomaticFallbackKeys === "function"
+      ? await Promise.resolve(runtime.getAutomaticFallbackKeys(guildId, resolvedStation)).catch(() => [])
+      : [];
     const fallbackCandidates = buildFailoverCandidateChain({
       currentStationKey: resolvedStation.key,
       configuredChain: configuredFailoverChain,
       fallbackStation: legacyFallbackStation,
+      automaticKeys,
     });
     const failoverDecision = evaluateFailoverEligibility(state, {
       stationKey: resolvedStation.key,
