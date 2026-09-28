@@ -1,4 +1,5 @@
 import { getDb, isConnected } from "../../lib/db.js";
+import { clearGuildLanguage, getGuildLanguage, setGuildLanguage } from "../../guild-language-store.js";
 import { logError } from "../../lib/logging.js";
 import { loadDashboardGuildSettings } from "./dashboard-guild-settings.js";
 import { resolveUserFacingErrorMessage } from "../../lib/user-facing-errors.js";
@@ -23,6 +24,15 @@ export function buildDashboardFavoritesResponse(settings = {}, tier = "free") {
     limit: favoriteLimitForTier(tier),
     max: FAVORITES_MAX,
   };
+}
+
+const SERVER_LANGUAGES = Object.freeze(["auto", "de", "en"]);
+
+// The server's language (#413): set with /language before, now in the
+// dashboard too; "auto" follows each person's Discord language.
+export function buildDashboardLanguageResponse(guildId) {
+  const current = getGuildLanguage(guildId);
+  return { current: SERVER_LANGUAGES.includes(current) ? current : "auto", options: [...SERVER_LANGUAGES] };
 }
 
 // The voice channel status text (#277): the server's own template or the
@@ -82,8 +92,9 @@ export function createDashboardSettingsRouteHandler(deps) {
       sendLocalizedError(res, 403, language, "Kein Zugriff.", "No access.");
       return true;
     }
-    if (!serverHasCapability(guildInfo.id, "dashboard_access")) {
-      sendLocalizedError(res, 403, language, "Dashboard ist erst ab Pro verfuegbar.", "Dashboard is only available from Pro.");
+    // Every plan has the basics here (#413); each part checks its own plan below.
+    if (!serverHasCapability(guildInfo.id, "dashboard_basic")) {
+      sendLocalizedError(res, 403, language, "Kein Zugriff.", "No access.");
       return true;
     }
 
@@ -115,6 +126,7 @@ export function createDashboardSettingsRouteHandler(deps) {
         voiceGuard,
         voiceStatus: buildDashboardVoiceStatusResponse(settings),
         favorites: buildDashboardFavoritesResponse(settings, guildInfo.tier),
+        serverLanguage: buildDashboardLanguageResponse(guildInfo.id),
       });
       return true;
     }
@@ -241,6 +253,11 @@ export function createDashboardSettingsRouteHandler(deps) {
         }
 
         if (body?.voiceStatus && typeof body.voiceStatus === "object") {
+          // The channel status is part of shaping the server: Pro (#413).
+          if (!serverHasCapability(guildInfo.id, "dashboard_access")) {
+            sendLocalizedError(res, 403, language, "Den Sprachkanal-Status gestaltest du ab Pro.", "The voice channel status comes with Pro.");
+            return true;
+          }
           const validated = validateVoiceStatusTemplate(body.voiceStatus.template);
           if (!validated.ok) {
             const names = validated.unknown.map((name) => `{${name}}`).join(", ");
@@ -279,6 +296,15 @@ export function createDashboardSettingsRouteHandler(deps) {
           else unsets.push("favoriteStations");
         }
 
+        let nextServerLanguage = null;
+        if (body?.serverLanguage !== undefined) {
+          nextServerLanguage = String(body.serverLanguage || "").trim().toLowerCase();
+          if (!SERVER_LANGUAGES.includes(nextServerLanguage)) {
+            sendLocalizedError(res, 400, language, "Sprache muss auto, de oder en sein.", "Language must be auto, de or en.");
+            return true;
+          }
+        }
+
         if (!isConnected() || !getDb()) {
           sendLocalizedError(
             res,
@@ -289,6 +315,9 @@ export function createDashboardSettingsRouteHandler(deps) {
           );
           return true;
         }
+
+        if (nextServerLanguage === "auto") clearGuildLanguage(guildInfo.id);
+        else if (nextServerLanguage) setGuildLanguage(guildInfo.id, nextServerLanguage);
 
         const savedSettings = await getCurrentSettings();
         await getDb().collection("guild_settings").updateOne(
@@ -381,6 +410,7 @@ export function createDashboardSettingsRouteHandler(deps) {
               : { favoriteStations: updates.favoriteStations ?? savedSettings.favoriteStations },
             guildInfo.tier
           ),
+          serverLanguage: buildDashboardLanguageResponse(guildInfo.id),
         });
       } catch (err) {
         logError("[DashboardSettings] Save failed", err, {

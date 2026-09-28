@@ -2258,6 +2258,10 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
   assert.equal(statsResponse.payload.basic.health.liveStreams, 1);
   assert.equal(statsResponse.payload.basic.health.recoveringStreams, 1);
   assert.equal(statsResponse.payload.basic.health.streamErrors, 1);
+  // The overview's stream list and uptime: only FastAPI sent them before (#413).
+  assert.equal(statsResponse.payload.basic.activeStreamDetails.length, 1);
+  assert.equal(statsResponse.payload.basic.activeStreamDetails[0].stationKey, "rock");
+  assert.equal(typeof statsResponse.payload.basic.runtimeUptimeSec, "number");
   assert.equal(statsResponse.payload.basic.health.nextEventTitle, "Existing Show");
   assert.equal(statsResponse.payload.basic.health.alerts.length >= 1, true);
   assert.equal(statsResponse.payload.basic.health.incidents.length >= 1, true);

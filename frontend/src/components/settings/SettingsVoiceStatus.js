@@ -3,6 +3,7 @@
 import { Radio } from 'lucide-react';
 
 export default function SettingsVoiceStatus({
+  canManage = true,
   t,
   updateVoiceStatusTemplate,
   voiceStatus,
@@ -11,10 +12,11 @@ export default function SettingsVoiceStatus({
   voiceStatusTemplate,
 }) {
   return (
-    <div data-testid="settings-voice-status" style={{ background: '#0A0A0A', border: '1px solid #1A1A2E', padding: 16 }}>
+    <div data-testid="settings-voice-status" style={{ background: '#0A0A0A', border: '1px solid #1A1A2E', padding: 16, opacity: canManage ? 1 : 0.5 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
         <Radio size={18} color="#FF6B00" />
         <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20 }}>{t('Sprachkanal-Status', 'Voice channel status')}</h3>
+        {!canManage && <span style={{ fontSize: 11, color: '#00e5ff', border: '1px solid rgba(0,229,255,0.3)', padding: '2px 8px' }}>PRO</span>}
       </div>
       <p style={{ color: '#52525B', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
         {t(
@@ -25,6 +27,7 @@ export default function SettingsVoiceStatus({
       <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Vorlage', 'Template')}</label>
       <input
         data-testid="voice-status-template-input"
+        disabled={!canManage}
         value={voiceStatusTemplate}
         maxLength={voiceStatus.maxLength || 120}
         onChange={(e) => updateVoiceStatusTemplate(e.target.value)}
@@ -36,6 +39,7 @@ export default function SettingsVoiceStatus({
           <button
             key={name}
             type="button"
+            disabled={!canManage}
             onClick={() => updateVoiceStatusTemplate(`${voiceStatusTemplate}${voiceStatusTemplate && !voiceStatusTemplate.endsWith(' ') ? ' ' : ''}{${name}}`)}
             style={{ height: 28, padding: '0 10px', border: '1px solid rgba(255,107,0,0.3)', background: 'rgba(255,107,0,0.08)', color: '#FDBA74', cursor: 'pointer', fontSize: 12, fontFamily: 'monospace' }}
           >

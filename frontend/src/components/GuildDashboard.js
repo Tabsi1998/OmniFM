@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Radio, LayoutDashboard, ListMusic, ShieldCheck, BarChart3, CreditCard, LogOut,
   Plus, Trash2, Check, Crown, Zap, Music2, Users, Clock, Lock, Server,
@@ -17,6 +17,8 @@ import DashboardSettings from './DashboardSettings.js';
 import GuildLiveView from './GuildLiveView.js';
 import { normalizeDashboardCapabilityPayload } from '../lib/dashboardCapabilities.js';
 import { PLAN_LIMITS, PLAN_NAMES } from '../../../src/config/plan-features.js';
+import PlanLock from './PlanLock.js';
+import GuildStreamControls from './overview/GuildStreamControls.js';
 
 const NAV = [
   { id: 'overview', icon: LayoutDashboard },
@@ -258,16 +260,19 @@ export default function GuildDashboard() {
 
       const safe = (path) => apiRequest(path).catch(() => null);
       const base = `serverId=${encodeURIComponent(selectedGuildId)}`;
-      const [catalog, custom, rolesPayload, stats, detail, permsPayload, eventsPayload, channelsPayload] = await Promise.all([
+      // #413: what plays where, the stations, one event and the channels on every plan.
+      const [catalog, custom, rolesPayload, stats, detail, permsPayload, eventsPayload, channelsPayload, now] = await Promise.all([
         safe(`/api/dashboard/stations?${base}`),
-        safe(`/api/dashboard/custom-stations?${base}`),
-        safe(`/api/dashboard/roles?${base}`),
-        safe(`/api/dashboard/stats?${base}`),
+        tier === 'ultimate' ? safe(`/api/dashboard/custom-stations?${base}`) : null,
+        tier === 'free' ? null : safe(`/api/dashboard/roles?${base}`),
+        tier === 'free' ? null : safe(`/api/dashboard/stats?${base}`),
         tier === 'ultimate' ? safe(`/api/dashboard/stats/detail?${base}&days=30`) : null,
         tier === 'free' ? null : safe(`/api/dashboard/perms?${base}`),
-        tier === 'free' ? null : safe(`/api/dashboard/events?${base}`),
-        tier === 'free' ? null : safe(`/api/dashboard/channels?${base}`),
+        safe(`/api/dashboard/events?${base}`),
+        safe(`/api/dashboard/channels?${base}`),
+        safe(`/api/dashboard/playback/now?${base}`),
       ]);
+      const nowStreams = Array.isArray(now?.streams) ? now.streams : null;
       const stations = [...(catalog?.free || []), ...(catalog?.pro || [])];
       const basic = stats?.basic || {};
       const advanced = stats?.advanced || null;
@@ -289,11 +294,11 @@ export default function GuildDashboard() {
           textChannels: channelsPayload?.textChannels || [],
           trend: normalizeTrend(detail, advanced),
           top: normalizeTopStations(detail, advanced),
-          listeners: Number(basic.listenersNow || 0),
-          uptimeSec: Number(basic.runtimeUptimeSec || 0),
+          listeners: nowStreams ? nowStreams.reduce((sum, row) => sum + (Number(row.listeners) || 0), 0) : Number(basic.listenersNow || 0),
+          uptimeSec: Number(basic.runtimeUptimeSec || 0) || Math.max(0, ...(nowStreams || []).map((row) => Number(row.uptimeSec) || 0)),
           minutesMonth: Math.round(listeningMs / 60000),
-          activeStreams: Number(basic.activeStreams || 0),
-          liveStreams: Array.isArray(basic.activeStreamDetails) ? basic.activeStreamDetails : [],
+          activeStreams: nowStreams ? nowStreams.length : Number(basic.activeStreams || 0),
+          liveStreams: nowStreams || (Array.isArray(basic.activeStreamDetails) ? basic.activeStreamDetails : []),
           setupStatus: basic.setupStatus || null,
           license,
           loading: false,
@@ -309,12 +314,27 @@ export default function GuildDashboard() {
     if (session.authenticated && guildId) loadGuild(guildId);
   }, [guildId, loadGuild, session.authenticated]);
 
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+
   useEffect(() => {
     if (!session.authenticated || !guildId) return undefined;
     let stopped = false;
     const refreshLive = async () => {
       try {
-        const stats = await apiRequest(`/api/dashboard/stats?serverId=${encodeURIComponent(guildId)}`);
+        const free = (sessionRef.current.guilds.find((item) => item.id === guildId)?.tier || 'free') === 'free';
+        // #413: Free has no stats, only the list of what plays where.
+        const stats = free
+          ? { basic: await apiRequest(`/api/dashboard/playback/now?serverId=${encodeURIComponent(guildId)}`).then((now) => {
+            const streams = Array.isArray(now?.streams) ? now.streams : [];
+            return {
+              listenersNow: streams.reduce((sum, row) => sum + (Number(row.listeners) || 0), 0),
+              activeStreams: streams.length,
+              activeStreamDetails: streams,
+              runtimeUptimeSec: Math.max(0, ...streams.map((row) => Number(row.uptimeSec) || 0)),
+            };
+          }) }
+          : await apiRequest(`/api/dashboard/stats?serverId=${encodeURIComponent(guildId)}`);
         if (stopped) return;
         const basic = stats?.basic || {};
         setStore((current) => {
@@ -327,7 +347,7 @@ export default function GuildDashboard() {
               activeStreams: Number(basic.activeStreams || 0),
               liveStreams: Array.isArray(basic.activeStreamDetails) ? basic.activeStreamDetails : [],
               uptimeSec: Number(basic.runtimeUptimeSec || 0),
-              minutesMonth: Math.round(Number(basic.totalListeningMs ?? previous.minutesMonth * 60000) / 60000),
+              minutesMonth: basic.totalListeningMs === undefined ? previous.minutesMonth : Math.round(Number(basic.totalListeningMs) / 60000),
               setupStatus: basic.setupStatus || previous.setupStatus || null,
             },
           };
@@ -346,6 +366,11 @@ export default function GuildDashboard() {
   const gdata = store[guildId] || EMPTY_DATA;
   const tier = gdata.license?.tier || guild?.tier || 'free';
   const tm = TIER_META[tier] || TIER_META.free;
+  // The stations a bot can switch to: the plan's catalogue, on Ultimate also the server's own (#413).
+  const streamStationOptions = useMemo(() => [
+    ...(gdata.stations || []).map((station) => ({ key: station.key, name: station.name || station.key })),
+    ...(tier === 'ultimate' ? (gdata.custom || []).map((station) => ({ key: `custom:${station.key}`, name: station.name || station.key })) : []),
+  ], [gdata.stations, gdata.custom, tier]);
   const eventDependencies = useMemo(() => ({
     voiceChannels: gdata.voiceChannels,
     textChannels: gdata.textChannels,
@@ -515,13 +540,17 @@ export default function GuildDashboard() {
           <div className="oa-grid cols-4">
             <StatTile label={t('Aktive Hörer', 'Active listeners')} value={fmtInt(gdata.listeners)} icon={Users} accent="#ff6b00" foot={t('Echtzeit-Telemetrie', 'Real-time telemetry')} />
             <StatTile label="Uptime" value={gdata.uptimeSec > 0 ? fmtDuration(gdata.uptimeSec) : '—'} icon={Clock} accent="#10b981" foot={t('Bot-Prozess seit letztem Start', 'Bot process since last start')} />
-            <StatTile label={t('Gestreamt', 'Streamed')} value={fmtMinutes(gdata.minutesMonth)} icon={Music2} accent="#00e5ff" foot={t('erfasste Wiedergabezeit', 'recorded playback time')} />
+            <StatTile label={t('Gestreamt', 'Streamed')} value={tier === 'free' ? '—' : fmtMinutes(gdata.minutesMonth)} icon={Music2} accent="#00e5ff" foot={tier === 'free' ? t('Statistik gibt es ab Pro', 'Statistics come with Pro') : t('erfasste Wiedergabezeit', 'recorded playback time')} />
             <StatTile label={t('Aktive Streams', 'Active streams')} value={fmtInt(gdata.activeStreams)} icon={Server} accent="#5865f2" foot={`${tm.name} · ${tm.maxBots} ${t('Bots max.', 'bots max.')}`} />
           </div>
           <div className="oa-grid cols-3" style={{ marginTop: 18 }}>
+            {tier === 'free'
+              ? <div style={{ gridColumn: 'span 2' }}><PlanLock plan="pro" title={t('Hörer-Verlauf und Statistik', 'Listener trend and statistics')} t={t} locale={locale} testId="guild-trend-locked" /></div>
+              : <>
             <div className="oa-card oa-fade" style={{ gridColumn: 'span 2' }}><div className="oa-stat-label" style={{ marginBottom: 14 }}>{t('Hörer-Trend', 'Listener trend')}</div>
               {trendData.length ? <ResponsiveContainer width="100%" height={200}><AreaChart data={trendData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}><defs><linearGradient id="gdArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#ff6b00" stopOpacity={0.5} /><stop offset="100%" stopColor="#ff6b00" stopOpacity={0} /></linearGradient></defs><CartesianGrid strokeDasharray="3 3" stroke="#1b2133" vertical={false} /><XAxis dataKey="day" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} /><YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} /><Tooltip content={<ChartTip />} /><Area type="monotone" dataKey="listeners" name={t('Hörer', 'Listeners')} stroke="#ff6b00" strokeWidth={2.5} fill="url(#gdArea)" /></AreaChart></ResponsiveContainer> : <div className="oa-sub" style={{ padding: '64px 0', textAlign: 'center' }}>{t('Noch keine Messwerte vorhanden.', 'No measurements available yet.')}</div>}
             </div>
+              </>}
             <div className="oa-card oa-fade">
               <div className="oa-stat-label" style={{ marginBottom: 12 }}>{t('Aktive Streams', 'Active streams')} ({gdata.liveStreams.length})</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 250, overflowY: 'auto', paddingRight: 3 }}>
@@ -531,6 +560,7 @@ export default function GuildDashboard() {
                     <div style={{ width: 36, height: 36, borderRadius: 9, background: stream.recovering ? 'rgba(245,158,11,.15)' : 'linear-gradient(135deg,rgba(255,107,0,.22),rgba(255,42,95,.18))', display: 'grid', placeItems: 'center' }}><Radio size={17} color={stream.recovering ? '#fbbf24' : '#ff7a2f'} /></div>
                     <div style={{ minWidth: 0 }}><div style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stream.stationName}</div>{streamStateLine(stream, t) && <div title={streamStateLine(stream, t)} style={{ fontSize: 10.5, color: stream.parkedReason ? '#f87171' : '#fbbf24', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{streamStateLine(stream, t)}</div>}<div className="oa-mono" style={{ fontSize: 10.5, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stream.botName} · {stream.channelName}</div></div>
                     <div style={{ textAlign: 'right' }}><span className={`oa-pill ${streamBadge(stream, t).tone}`} style={{ padding: '2px 7px' }}>{streamBadge(stream, t).label}</span><div className="oa-mono" style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>{fmtInt(stream.listeners)} {t('Hörer', 'listeners')} · {fmtInt(stream.volume)}%</div></div>
+                    <GuildStreamControls stream={stream} stationOptions={streamStationOptions} apiRequest={apiRequest} guildId={guildId} t={t} onChanged={() => loadGuild(guildId)} />
                   </div>
                 ))}
               </div>
@@ -542,7 +572,7 @@ export default function GuildDashboard() {
           {guildCapabilities?.basicHealth && <GuildLiveView apiRequest={apiRequest} guildId={guildId} t={t} locale={locale} />}
         </>}
 
-        {section === 'events' && <>{tier === 'free' ? <div className="oa-card" style={{ display: 'flex', alignItems: 'center', gap: 14 }}><Lock size={22} /><div><b>{t('Automatische Radio-Events sind ab Pro verfügbar.', 'Scheduled radio events are available from Pro.')}</b></div><button className="oa-btn primary" style={{ marginLeft: 'auto' }} onClick={() => setSection('subscription')}>Upgrade</button></div> : <>
+        {section === 'events' && <>{tier === 'free' ? <div className="oa-sub" style={{ marginBottom: 12 }} data-testid="guild-events-free-note">{t(`Mit Free geht ${PLAN_LIMITS.free.events} geplantes Event, mit Pro beliebig viele.`, `Free comes with ${PLAN_LIMITS.free.events} scheduled event, Pro with as many as you like.`)}</div> : null}<>
           <DashboardEvents
             events={gdata.events}
             eventForm={eventForm}
@@ -560,23 +590,23 @@ export default function GuildDashboard() {
             setupStatus={gdata.setupStatus}
             prefetchedDependencies={eventDependencies}
           />
-        </>}</>}
+        </></>}
 
         {section === 'stations' && <>
           <div className="oa-section-title"><Radio size={15} /> {t('Verfügbare Sender', 'Available stations')} ({gdata.stations.length})</div>
           <div className="oa-grid cols-3" data-testid="guild-preset-stations">{gdata.stations.map((station) => <div key={station.key} className="oa-card hoverable"><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 38, height: 38, borderRadius: 10, background: '#1c2235', display: 'grid', placeItems: 'center' }}><Music2 size={17} color="#94a3b8" /></div><div><div style={{ fontWeight: 700 }}>{station.name}</div><div className="oa-mono" style={{ fontSize: 11, color: '#64748b' }}>{station.genre || 'Radio'}</div></div></div></div>)}</div>
           <div className="oa-section-title" style={{ marginTop: 28 }}><ListMusic size={15} /> {t('Eigene Sender', 'Custom stations')} ({gdata.custom.length}/{tm.customLimit || 0})</div>
-          {tier !== 'ultimate' ? <div className="oa-card" style={{ display: 'flex', alignItems: 'center', gap: 14 }} data-testid="guild-custom-locked"><Lock size={22} color="#94a3b8" /><div><div style={{ fontWeight: 700 }}>{t('Eigene Stream-URLs sind ein Ultimate-Feature', 'Custom stream URLs are an Ultimate feature')}</div><div style={{ color: '#94a3b8', fontSize: 13 }}>{t('Im offiziellen Senderkatalog stehen dir weiterhin alle Sender deines Plans zur Verfügung.', 'The official catalog remains available according to your plan.')}</div></div><button className="oa-btn primary" style={{ marginLeft: 'auto' }} onClick={() => setSection('subscription')}>Upgrade</button></div> : <>
+          {tier !== 'ultimate' ? <PlanLock plan="ultimate" title={t('Eigene Sender', 'Your own stations')} t={t} locale={locale} testId="guild-custom-locked" /> : <>
             <div className="oa-card" style={{ marginBottom: 16 }} data-testid="guild-custom-form"><div className="oa-grid cols-2" style={{ gap: 12 }}><div><label className="oa-stat-label">Name</label><input className="oa-input" style={{ marginTop: 6 }} value={newStation.name} onChange={(event) => setNewStation({ ...newStation, name: event.target.value })} /></div><div><label className="oa-stat-label">Stream-URL</label><input className="oa-input" style={{ marginTop: 6 }} value={newStation.url} placeholder="https://…/stream.mp3" onChange={(event) => setNewStation({ ...newStation, url: event.target.value })} /></div></div><button className="oa-btn primary" style={{ marginTop: 14 }} onClick={addCustom}><Plus size={16} /> {t('Hinzufügen', 'Add')}</button></div>
             <div className="oa-table-wrap"><table className="oa-table"><thead><tr><th>Name</th><th>Stream-URL</th><th /></tr></thead><tbody>{!gdata.custom.length && <tr><td colSpan={3} style={{ textAlign: 'center', color: '#64748b', padding: 22 }}>{t('Noch keine eigenen Sender', 'No custom stations yet')}</td></tr>}{gdata.custom.map((station) => <tr key={station.key}><td style={{ fontWeight: 600 }}>{station.name}</td><td className="oa-mono" style={{ fontSize: 12, color: '#94a3b8' }}>{station.url}</td><td style={{ textAlign: 'right' }}><button className="oa-btn ghost" style={{ color: '#ff8fab' }} onClick={() => removeCustom(station.key)}><Trash2 size={14} /></button></td></tr>)}</tbody></table></div>
           </>}
         </>}
 
-        {section === 'roles' && <>{tier === 'free' ? <div className="oa-card" style={{ display: 'flex', alignItems: 'center', gap: 14 }}><Lock size={22} /><div><b>{t('Rollenrechte sind ab Pro verfügbar.', 'Role permissions are available from Pro.')}</b></div><button className="oa-btn primary" style={{ marginLeft: 'auto' }} onClick={() => setSection('subscription')}>Upgrade</button></div> : <><div className="oa-section-title"><ShieldCheck size={15} /> {t('Command-Berechtigungen', 'Command permissions')}</div>{!gdata.roles.length ? <div className="oa-card"><AlertTriangle size={18} color="#ffb020" /> {t('Discord-Rollen sind noch nicht synchronisiert. Aktualisiere die Ansicht, sobald der Commander online ist.', 'Discord roles have not been synchronized yet. Refresh once the commander is online.')}</div> : <><div className="oa-table-wrap" data-testid="guild-perms-matrix"><table className="oa-table"><thead><tr><th>Command</th>{gdata.roles.map((role) => <th key={role.id} style={{ textAlign: 'center', color: role.color || '#cbd5e1' }}>{role.name}</th>)}</tr></thead><tbody>{COMMANDS.map((command) => <tr key={command.id}><td className="oa-mono" style={{ color: '#ffb27a' }}>{command.label}</td>{gdata.roles.map((role) => { const enabled = !!perms[`${command.id}:${role.id}`]; return <td key={role.id} style={{ textAlign: 'center' }}><button onClick={() => togglePerm(command.id, role.id)} style={{ width: 42, height: 24, borderRadius: 999, border: 'none', cursor: 'pointer', background: enabled ? 'linear-gradient(90deg,#ff6b00,#ff2a5f)' : '#2a3450', position: 'relative' }}><span style={{ position: 'absolute', top: 3, left: enabled ? 21 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff' }} /></button></td>; })}</tr>)}</tbody></table></div><button className="oa-btn primary" style={{ marginTop: 16 }} onClick={savePerms}><Check size={16} /> {t('Speichern', 'Save')}</button></>}</>}</>}
+        {section === 'roles' && <>{tier === 'free' ? <PlanLock plan="pro" title={t('Rollenrechte', 'Role permissions')} t={t} locale={locale} testId="guild-roles-locked" /> : <><div className="oa-section-title"><ShieldCheck size={15} /> {t('Command-Berechtigungen', 'Command permissions')}</div>{!gdata.roles.length ? <div className="oa-card"><AlertTriangle size={18} color="#ffb020" /> {t('Discord-Rollen sind noch nicht synchronisiert. Aktualisiere die Ansicht, sobald der Commander online ist.', 'Discord roles have not been synchronized yet. Refresh once the commander is online.')}</div> : <><div className="oa-table-wrap" data-testid="guild-perms-matrix"><table className="oa-table"><thead><tr><th>Command</th>{gdata.roles.map((role) => <th key={role.id} style={{ textAlign: 'center', color: role.color || '#cbd5e1' }}>{role.name}</th>)}</tr></thead><tbody>{COMMANDS.map((command) => <tr key={command.id}><td className="oa-mono" style={{ color: '#ffb27a' }}>{command.label}</td>{gdata.roles.map((role) => { const enabled = !!perms[`${command.id}:${role.id}`]; return <td key={role.id} style={{ textAlign: 'center' }}><button onClick={() => togglePerm(command.id, role.id)} style={{ width: 42, height: 24, borderRadius: 999, border: 'none', cursor: 'pointer', background: enabled ? 'linear-gradient(90deg,#ff6b00,#ff2a5f)' : '#2a3450', position: 'relative' }}><span style={{ position: 'absolute', top: 3, left: enabled ? 21 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff' }} /></button></td>; })}</tr>)}</tbody></table></div><button className="oa-btn primary" style={{ marginTop: 16 }} onClick={savePerms}><Check size={16} /> {t('Speichern', 'Save')}</button></>}</>}</>}
 
-        {section === 'stats' && <>{tier === 'free' ? <div className="oa-card"><Lock size={22} /> <b>{t('Statistiken sind ab Pro verfügbar.', 'Statistics are available from Pro.')}</b></div> : <><div className="oa-grid cols-3"><StatTile label={t('Ø Hörer', 'Avg. listeners')} value={fmtInt(Math.round(trendData.reduce((sum, row) => sum + row.listeners, 0) / Math.max(1, trendData.length)))} icon={Users} accent="#ff6b00" /><StatTile label={t('Peak Hörer', 'Peak listeners')} value={fmtInt(Math.max(0, ...trendData.map((row) => row.listeners)))} icon={BarChart3} accent="#00e5ff" /><StatTile label={t('Gestreamt', 'Streamed')} value={fmtMinutes(gdata.minutesMonth)} icon={Music2} accent="#10b981" /></div><div className="oa-card oa-fade" style={{ marginTop: 18 }}>{topData.length ? <ResponsiveContainer width="100%" height={260}><BarChart data={topData} layout="vertical" margin={{ right: 16, left: 20 }}><CartesianGrid strokeDasharray="3 3" stroke="#1b2133" horizontal={false} /><XAxis type="number" stroke="#64748b" fontSize={11} /><YAxis type="category" dataKey="name" stroke="#94a3b8" fontSize={12} width={140} /><Tooltip content={<ChartTip />} /><Bar dataKey="minutes" name={t('Minuten', 'Minutes')} radius={[0, 6, 6, 0]}>{topData.map((_, index) => <Cell key={index} fill={['#ff6b00', '#00e5ff', '#5865f2', '#10b981'][index % 4]} />)}</Bar></BarChart></ResponsiveContainer> : <div className="oa-sub" style={{ padding: 50, textAlign: 'center' }}>{t('Noch keine Wiedergabestatistik vorhanden.', 'No playback statistics available yet.')}</div>}</div></>}</>}
+        {section === 'stats' && <>{tier === 'free' ? <PlanLock plan="pro" title={t('Statistik', 'Statistics')} t={t} locale={locale} testId="guild-stats-locked" /> : <><div className="oa-grid cols-3"><StatTile label={t('Ø Hörer', 'Avg. listeners')} value={fmtInt(Math.round(trendData.reduce((sum, row) => sum + row.listeners, 0) / Math.max(1, trendData.length)))} icon={Users} accent="#ff6b00" /><StatTile label={t('Peak Hörer', 'Peak listeners')} value={fmtInt(Math.max(0, ...trendData.map((row) => row.listeners)))} icon={BarChart3} accent="#00e5ff" /><StatTile label={t('Gestreamt', 'Streamed')} value={fmtMinutes(gdata.minutesMonth)} icon={Music2} accent="#10b981" /></div><div className="oa-card oa-fade" style={{ marginTop: 18 }}>{topData.length ? <ResponsiveContainer width="100%" height={260}><BarChart data={topData} layout="vertical" margin={{ right: 16, left: 20 }}><CartesianGrid strokeDasharray="3 3" stroke="#1b2133" horizontal={false} /><XAxis type="number" stroke="#64748b" fontSize={11} /><YAxis type="category" dataKey="name" stroke="#94a3b8" fontSize={12} width={140} /><Tooltip content={<ChartTip />} /><Bar dataKey="minutes" name={t('Minuten', 'Minutes')} radius={[0, 6, 6, 0]}>{topData.map((_, index) => <Cell key={index} fill={['#ff6b00', '#00e5ff', '#5865f2', '#10b981'][index % 4]} />)}</Bar></BarChart></ResponsiveContainer> : <div className="oa-sub" style={{ padding: 50, textAlign: 'center' }}>{t('Noch keine Wiedergabestatistik vorhanden.', 'No playback statistics available yet.')}</div>}</div></>}</>}
 
-        {section === 'settings' && (guildCapabilities.dashboardAccess
+        {section === 'settings' && (guildCapabilities.dashboardBasic
           ? <DashboardSettings apiRequest={apiRequest} selectedGuildId={guild.id} t={t} capabilities={guildCapabilities} formatDate={formatDate} />
           : <div className="oa-card" style={{ display: 'flex', alignItems: 'center', gap: 14 }} data-testid="guild-settings-locked"><Lock size={22} /><div><b>{t('Einstellungen sind ab Pro verfügbar.', 'Settings are available from Pro.')}</b></div><button className="oa-btn primary" style={{ marginLeft: 'auto' }} onClick={() => setSection('subscription')}>Upgrade</button></div>)}
         {section === 'subscription' && <><div className="oa-card" style={{ marginBottom: 18 }} data-testid="guild-license-details"><div className="oa-section-title"><CreditCard size={15} /> {t('Aktive Lizenz', 'Active license')}</div><div className="oa-grid cols-3"><div><div className="oa-stat-label">Plan</div><div className="oa-stat-value" style={{ color: tm.color }}>{tm.name}</div></div><div><div className="oa-stat-label">Seats</div><div className="oa-stat-value">{gdata.license?.license ? `${gdata.license.license.seatsUsed}/${gdata.license.license.seats}` : '—'}</div></div><div><div className="oa-stat-label">{t('Läuft ab', 'Expires')}</div><div style={{ marginTop: 12, fontWeight: 700 }}>{gdata.license?.license?.expiresAt ? new Date(gdata.license.license.expiresAt).toLocaleDateString() : t('Keine aktive Kauf-Lizenz', 'No active paid license')}</div></div></div><div className="oa-mono" style={{ marginTop: 14, color: '#64748b', fontSize: 11 }}>Guild-ID {guild.id}{gdata.license?.license?.resolutionSource ? ` · Quelle: ${gdata.license.license.resolutionSource}` : ' · keine aktive Lizenzzuordnung gefunden'}</div></div><div className="oa-grid cols-3" data-testid="guild-subscription">{Object.entries(TIER_META).map(([key, meta]) => { const current = key === tier; return <div className="oa-card oa-fade" key={key} style={{ borderColor: current ? `${meta.color}66` : undefined, position: 'relative' }}>{current && <span className="oa-pill" style={{ position: 'absolute', top: 16, right: 16, color: meta.color }}>{t('Aktiv', 'Active')}</span>}<div style={{ width: 44, height: 44, borderRadius: 12, background: `${meta.color}1f`, color: meta.color, display: 'grid', placeItems: 'center', marginBottom: 14 }}><meta.icon size={22} /></div><div className="oa-display" style={{ fontSize: 22, fontWeight: 800 }}>{meta.name}</div><div style={{ margin: '12px 0 18px', color: '#cbd5e1', lineHeight: 1.8 }}><div><Check size={14} color={meta.color} /> {meta.maxBots} Bots</div><div><Check size={14} color={meta.color} /> {meta.bitrate} Audio</div><div><Check size={14} color={meta.color} /> {key === 'ultimate' ? t('Eigene Sender & Analytics', 'Custom stations & analytics') : key === 'pro' ? t('Dashboard & Rollenrechte', 'Dashboard & role permissions') : t('Basis-Radio', 'Basic radio')}</div></div>{current ? <button className="oa-btn ghost" style={{ width: '100%' }} disabled>{t('Aktueller Plan', 'Current plan')}</button> : <a className="oa-btn primary" style={{ width: '100%', textDecoration: 'none' }} href="/#pricing"><ChevronRight size={15} /> {key === 'free' ? 'Downgrade' : 'Upgrade'}</a>}</div>; })}</div></>}

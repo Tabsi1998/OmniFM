@@ -47,7 +47,7 @@ const messages = {
     highlights: [
       { key: 'speed', label: 'Start in under 1 minute' },
       { key: 'catalog', label: '120+ stations ready to play' },
-      { key: 'dashboard', label: 'Dashboard from Pro' },
+      { key: 'dashboard', label: 'Dashboard for all, everything from Pro' },
     ],
     proofRail: [
       {
@@ -119,7 +119,7 @@ const messages = {
       },
     },
     values: {
-      dashboard: 'Pro+',
+      dashboard: 'Free+',
       reliability: '24/7',
     },
     support: {
@@ -289,7 +289,7 @@ const messages = {
           desc: 'Status, weekly digest, and upgrade context show early where your setup is stable or needs more control.',
         },
       ],
-      note: 'Dashboard access starts with Pro and continues into Ultimate without a second workflow. Your existing bot setup stays intact.',
+      note: 'Every server has the dashboard: see what plays where, switch or stop the station, language and voice guard. Pro and Ultimate build on it, and your bot setup stays as it is.',
     },
     cards: {
       events: {
@@ -311,7 +311,7 @@ const messages = {
     },
     primaryCta: 'Open dashboard',
     secondaryCta: 'Compare plans',
-    ctaNote: 'Dashboard access starts with Pro. Upgrading adds control, not a second product path.',
+    ctaNote: 'Every server has the basics. Upgrading adds control, not a second product path.',
     tags: ['Discord SSO', 'Event scheduler', 'Role permissions', 'Health'],
     workflow: {
       eyebrow: 'Ops flow',
@@ -488,7 +488,7 @@ const messages = {
       {
         key: 'dashboard',
         question: 'Do I need the dashboard right away?',
-        answer: 'No. Free works without the dashboard, and one scheduled event already works with /event. From Pro you manage events, role permissions, the weekly recap and outage alerts in one place.',
+        answer: 'No, everything works in Discord too. With Free the dashboard shows what plays where, switches or stops the station, sets the language and plans one event. Pro adds the live view, statistics, unlimited events, role permissions and outage alerts.',
       },
       {
         key: 'pro',

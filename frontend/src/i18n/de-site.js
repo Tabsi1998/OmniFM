@@ -47,7 +47,7 @@ const messages = {
     highlights: [
       { key: 'speed', label: 'Start in unter 1 Minute' },
       { key: 'catalog', label: '120+ Stationen sofort spielbar' },
-      { key: 'dashboard', label: 'Dashboard ab Pro' },
+      { key: 'dashboard', label: 'Dashboard für alle, alles ab Pro' },
     ],
     proofRail: [
       {
@@ -119,7 +119,7 @@ const messages = {
       },
     },
     values: {
-      dashboard: 'Pro+',
+      dashboard: 'Free+',
       reliability: '24/7',
     },
     support: {
@@ -289,7 +289,7 @@ const messages = {
           desc: 'Status, Weekly Digest und Upgrade-Hinweise zeigen früh, wo dein Setup stabil ist oder mehr Kontrolle braucht.',
         },
       ],
-      note: 'Dashboard-Zugang startet mit Pro und geht in Ultimate ohne zweiten Workflow weiter. Dein bestehendes Bot-Setup bleibt dabei intakt.',
+      note: 'Das Dashboard hat jeder Server: sehen, was wo läuft, Sender wechseln oder stoppen, Sprache und Voice Guard. Pro und Ultimate bauen darauf auf, dein Bot-Setup bleibt dabei, wie es ist.',
     },
     cards: {
       events: {
@@ -311,7 +311,7 @@ const messages = {
     },
     primaryCta: 'Dashboard ansehen',
     secondaryCta: 'Pläne vergleichen',
-    ctaNote: 'Dashboard-Zugang startet mit Pro. Upgrade bedeutet mehr Kontrolle, nicht einen neuen Produktpfad.',
+    ctaNote: 'Die Grundfunktionen hat jeder Server. Upgrade bedeutet mehr Kontrolle, nicht einen neuen Produktpfad.',
     tags: ['Discord SSO', 'Event-Scheduler', 'Rollenrechte', 'Health'],
     workflow: {
       eyebrow: 'Ops-Flow',
@@ -488,7 +488,7 @@ const messages = {
       {
         key: 'dashboard',
         question: 'Brauche ich das Dashboard sofort?',
-        answer: 'Nein. Free funktioniert ohne Dashboard, auch ein geplantes Event geht schon mit /event. Ab Pro verwaltest du im Dashboard Events, Rollenrechte, Wochenrückblick und Ausfall-Meldungen an einer Stelle.',
+        answer: 'Nein, alles geht auch in Discord. Mit Free siehst du im Dashboard, was wo läuft, wechselst oder stoppst den Sender, stellst die Sprache ein und planst ein Event. Ab Pro kommen Live-Ansicht, Statistik, Events ohne Grenze, Rollenrechte und Ausfall-Meldungen dazu.',
       },
       {
         key: 'pro',

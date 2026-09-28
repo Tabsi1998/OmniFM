@@ -37,6 +37,7 @@ import SettingsVoiceStatus from './settings/SettingsVoiceStatus.js';
 import SettingsFavorites from './settings/SettingsFavorites.js';
 import SettingsExports from './settings/SettingsExports.js';
 import SettingsIncidentAlerts from './settings/SettingsIncidentAlerts.js';
+import SettingsLanguage from './settings/SettingsLanguage.js';
 import SettingsVoiceGuard from './settings/SettingsVoiceGuard.js';
 
 export default function DashboardSettings({
@@ -164,7 +165,9 @@ export default function DashboardSettings({
       if (capabilities.incidentAlerts === true && settings?.incidentAlerts) body.incidentAlerts = settings.incidentAlerts;
       if (capabilities.exportsWebhooks === true && settings?.exportsWebhook) body.exportsWebhook = settings.exportsWebhook;
       if (capabilities.voiceGuard === true && settings?.voiceGuard) body.voiceGuard = settings.voiceGuard;
-      if (settings?.voiceStatus) body.voiceStatus = { template: settings.voiceStatus.template || '' };
+      // The channel status is Pro (#413); Free saves language, voice guard and favourites.
+      if (capabilities.dashboardAccess === true && settings?.voiceStatus) body.voiceStatus = { template: settings.voiceStatus.template || '' };
+      if (settings?.serverLanguage?.current) body.serverLanguage = settings.serverLanguage.current;
       if (settings?.favorites) body.favorites = { stations: settings.favorites.stations || [] };
       const result = await apiRequest(`/api/dashboard/settings?serverId=${encodeURIComponent(selectedGuildId)}`, {
         method: 'PUT',
@@ -215,6 +218,11 @@ export default function DashboardSettings({
   // #413: outage alerts in Discord come with Pro, webhooks and exports with Ultimate.
   const canManageIncidentAlerts = capabilities.incidentAlerts === true;
   const canManageVoiceGuard = capabilities.voiceGuard === true;
+  const canManageVoiceStatus = capabilities.dashboardAccess === true;
+  const setServerLanguage = (value) => setSettings((current) => ({
+    ...(current || {}),
+    serverLanguage: { ...(current?.serverLanguage || {}), current: value },
+  }));
   const configuredFailoverChain = getConfiguredFailoverChain(settings);
   const digestSummary = buildWeeklyDigestSummary(settings, t, formatDate);
   const fallbackSummary = buildFallbackStationSummary(settings, t);
@@ -466,6 +474,10 @@ export default function DashboardSettings({
       {error && <div style={{ border: '1px solid rgba(252,165,165,0.25)', background: 'rgba(127,29,29,0.12)', padding: '10px 12px', color: '#FCA5A5', fontSize: 13 }}>{error}</div>}
       {message && <div style={{ border: '1px solid rgba(16,185,129,0.25)', background: 'rgba(6,95,70,0.12)', padding: '10px 12px', color: '#6EE7B7', fontSize: 13 }}>{message}</div>}
 
+      {settings?.serverLanguage && (
+    <SettingsLanguage serverLanguage={settings.serverLanguage} setServerLanguage={setServerLanguage} t={t} />
+      )}
+
     <SettingsWeeklyDigest
       canManageWeeklyDigest={canManageWeeklyDigest}
       digestHint={digestHint}
@@ -508,6 +520,7 @@ export default function DashboardSettings({
 
       {voiceStatus && (
     <SettingsVoiceStatus
+      canManage={canManageVoiceStatus}
       t={t}
       updateVoiceStatusTemplate={updateVoiceStatusTemplate}
       voiceStatus={voiceStatus}

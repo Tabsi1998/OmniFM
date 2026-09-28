@@ -90,13 +90,16 @@ test("the plan cards: Free lists everything, Pro and Ultimate only what they add
   assert.ok(free.lines.includes("20 Sender aus dem Katalog"));
   assert.ok(free.lines.includes("1 geplantes Radio-Event"));
   assert.ok(free.lines.includes("Now-Playing-Panel mit Knöpfen, auch mit /now"));
-  assert.ok(!free.lines.some((line) => /Dashboard|Rollenrechte|eigene Sender/i.test(line)));
+  assert.ok(!free.lines.some((line) => /Rollenrechte|eigene Sender|Live-Ansicht/i.test(line)));
+  // #413 part 3: the dashboard's basics are Free, the rest of it Pro.
+  assert.ok(free.lines.includes("Web-Dashboard: was läuft wo, Sender wechseln oder stoppen, Sprache"));
 
   const pro = planCardLines("pro", { language: "de", context });
   assert.equal(pro.intro, "Alles aus Free, dazu:");
   assert.ok(pro.lines.includes("Alle 120 Sender des Katalogs"));
   assert.ok(pro.lines.includes("Ausfall-Meldungen in einen Discord-Kanal"));
   assert.ok(pro.lines.includes("Geplante Radio-Events ohne Grenze"));
+  assert.ok(pro.lines.includes("Web-Dashboard mit Live-Ansicht, Statistik und allen Einstellungen"));
   assert.ok(!pro.lines.includes("Voice Guard: der Bot bleibt in seinem Kanal"), "what Free has already is not repeated");
 
   const ultimate = planCardLines("ultimate", { language: "en", context });
