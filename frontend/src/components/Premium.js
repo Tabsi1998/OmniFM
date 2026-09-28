@@ -4,7 +4,7 @@ import { useI18n } from '../i18n.js';
 import { buildApiUrl } from '../lib/api.js';
 import { resolvePrimaryInviteUrl } from '../lib/invite.js';
 import { CheckoutModal } from './PremiumCodeModal.js';
-import { planCardLines } from '../../../src/config/plan-features.js';
+import { planCardLinesIn } from '../../../src/config/plan-feature-texts.js';
 
 const PLAN_ORDER = ['free', 'pro', 'ultimate'];
 const PLAN_META = {
@@ -121,10 +121,9 @@ function Premium({ bots = [], planContext = {} }) {
   // #413: what each plan brings, from the bot's plan file; the owner's own
   // list from the owner console still wins.
   const fallbackPricing = useMemo(() => {
-    const language = locale === 'de' ? 'de' : 'en';
     const context = { freeStations, allStations };
     const tierOf = (plan) => {
-      const card = planCardLines(plan, { language, context });
+      const card = planCardLinesIn(plan, { language: locale, context });
       return { ...BASE_FALLBACK_PRICING.tiers[plan], features: card.lines, intro: card.intro || '' };
     };
     return { ...BASE_FALLBACK_PRICING, tiers: { free: tierOf('free'), pro: tierOf('pro'), ultimate: tierOf('ultimate') } };

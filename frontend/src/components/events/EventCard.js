@@ -25,8 +25,10 @@ import {
   getDiscordSyncState,
   resolveRepeatLabel,
 } from './eventsShared.js';
+import { useI18n } from '../../i18n.js';
 
 export function EventCard({ event, onToggle, onDelete, onEdit, t, formatDate, voiceChannels, textChannels, serverEmojis }) {
+  const { locale } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const isActive = event.enabled !== false;
   const isPast = event.startsAt && new Date(event.startsAt) < new Date();
@@ -42,9 +44,10 @@ export function EventCard({ event, onToggle, onDelete, onEdit, t, formatDate, vo
     detailsPrefix: t('OmniFM Auto-Event | Station', 'OmniFM auto event | Station'),
   });
 
-  const repeatLabel = event?.repeatLabelDe || event?.repeatLabelEn
+  // The server writes the label in German and English; other languages build it here.
+  const repeatLabel = (event?.repeatLabelDe || event?.repeatLabelEn) && (locale === 'de' || locale === 'en')
     ? t(event.repeatLabelDe || resolveRepeatLabel(event.repeat, t), event.repeatLabelEn || resolveRepeatLabel(event.repeat, t))
-    : getDashboardRepeatLabel(event.repeat, t('de', 'en'), {
+    : getDashboardRepeatLabel(event.repeat, locale, {
       startsAt: event.startsAtLocal || event.startsAt,
     });
 

@@ -274,10 +274,7 @@ export default function DashboardSettings({
       setDigestPreview(result?.preview || null);
       const channelLabel = result?.channelName ? `#${result.channelName}` : t('dem gewählten Channel', 'the selected channel');
       setMessage(
-        t(
-          `Test-Digest erfolgreich an ${channelLabel} gesendet.`,
-          `Test digest sent successfully to ${channelLabel}.`
-        )
+        t('Test-Digest erfolgreich an {channel} gesendet.', 'Test digest sent successfully to {channel}.', { channel: channelLabel })
       );
     } catch (err) {
       setError(err.message);
@@ -346,8 +343,9 @@ export default function DashboardSettings({
         : '';
       setMessage(
         t(
-          `Export erfolgreich heruntergeladen.${webhookSuffix}`,
-          `Export downloaded successfully.${webhookSuffix}`
+          'Export erfolgreich heruntergeladen.{suffix}',
+          'Export downloaded successfully.{suffix}',
+          { suffix: webhookSuffix }
         )
       );
     } catch (err) {
@@ -370,8 +368,9 @@ export default function DashboardSettings({
       });
       setMessage(
         t(
-          `Webhook-Test erfolgreich gesendet (Status ${result?.delivery?.status || 200}).`,
-          `Webhook test sent successfully (status ${result?.delivery?.status || 200}).`
+          'Webhook-Test erfolgreich gesendet (Status {status}).',
+          'Webhook test sent successfully (status {status}).',
+          { status: result?.delivery?.status || 200 }
         )
       );
     } catch (err) {

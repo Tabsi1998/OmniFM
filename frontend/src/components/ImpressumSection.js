@@ -7,6 +7,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useI18n } from '../i18n.js';
+import LegalLanguageNote from './LegalLanguageNote.js';
 
 function renderFieldValue(value, emptyLabel, kind = 'text') {
   const text = String(value || '').trim();
@@ -223,6 +224,7 @@ function ImpressumSection({ legal }) {
           >
             {copy.legal.subtitle}
           </p>
+          <LegalLanguageNote page="imprint" />
         </div>
 
         {missingCoreFields.length > 0 && (

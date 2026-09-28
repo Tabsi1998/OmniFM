@@ -3,9 +3,9 @@
 import { Languages } from 'lucide-react';
 
 const LABELS = {
-  auto: ['Automatisch (Discord-Sprache jeder Person)', 'Automatic (each person’s Discord language)'],
-  de: ['Deutsch', 'German'],
-  en: ['Englisch', 'English'],
+  auto: { de: 'Automatisch (Discord-Sprache jeder Person)', en: 'Automatic (each person’s Discord language)' },
+  de: { de: 'Deutsch', en: 'German' },
+  en: { de: 'Englisch', en: 'English' },
 };
 
 export default function SettingsLanguage({ serverLanguage, setServerLanguage, t }) {
@@ -30,7 +30,7 @@ export default function SettingsLanguage({ serverLanguage, setServerLanguage, t 
         style={{ width: '100%', height: 40 }}
       >
         {options.map((option) => (
-          <option key={option} value={option}>{t(...(LABELS[option] || [option, option]))}</option>
+          <option key={option} value={option}>{LABELS[option] ? t(LABELS[option].de, LABELS[option].en) : option}</option>
         ))}
       </select>
     </div>

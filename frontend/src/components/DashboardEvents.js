@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AlertTriangle, CalendarDays, Clock, Plus } from 'lucide-react';
 import RichMessageEditor from './RichMessageEditor.js';
+import { useI18n } from '../i18n.js';
 import {
   applyDashboardEventTemplate,
   applyDashboardSchedulePreset,
@@ -41,6 +42,7 @@ export default function DashboardEvents({
   inviteLinks = null,
   prefetchedDependencies = null,
 }) {
+  const { locale } = useI18n();
   const [showForm, setShowForm] = useState(false);
   const [voiceChannels, setVoiceChannels] = useState([]);
   const [textChannels, setTextChannels] = useState([]);
@@ -229,9 +231,9 @@ export default function DashboardEvents({
       value: option.value,
       label: option.value === 'none'
         ? t(option.de, option.en)
-        : getDashboardRepeatLabel(option.value, t('de', 'en'), { startsAt: eventForm.startsAt }),
+        : getDashboardRepeatLabel(option.value, locale, { startsAt: eventForm.startsAt }),
     })),
-    [eventForm.startsAt, t]
+    [eventForm.startsAt, locale, t]
   );
   const eventTemplatePresets = useMemo(() => buildDashboardEventTemplatePresets(t), [t]);
   const schedulePresets = useMemo(() => buildDashboardSchedulePresets(t), [t]);
@@ -569,7 +571,7 @@ export default function DashboardEvents({
                         </div>
                         <div style={{ color: '#71717A', fontSize: 12 }}>
                           {row.endsAtLocal
-                            ? t(`Endet ${row.endsAtLocal}`, `Ends ${row.endsAtLocal}`)
+                            ? t('Endet {time}', 'Ends {time}', { time: row.endsAtLocal })
                             : t('Ohne Endzeit', 'No end time')}
                         </div>
                       </div>

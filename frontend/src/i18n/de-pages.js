@@ -24,83 +24,21 @@ const messages = {
         },
       ],
     pricingFallback: 'Pricing-API nicht erreichbar, Fallback-Daten aktiv.',
-    proofTitle: 'Warum der Upgrade-Schritt sauber ist',
-    proofCards: {
-      trial: {
-        title: 'Risikoarm prüfen',
-        valueEnabled: ({ months }) => `${months} Monat${months === 1 ? '' : 'e'} Test`,
-        valueDisabled: 'Direkter Start',
-        desc: 'Teste Pro zuerst mit Dashboard, Events und Rollenrechten, bevor du den Plan für deinen Server fest übernimmst.',
-      },
-      seats: {
-        title: 'Mehrere Server unter Kontrolle',
-        value: ({ min, max }) => `${min}-${max} Server-Slots`,
-        desc: 'Seat-Bundles halten Upgrade und Lizenzierung für wachsende Communities sauber an einer Stelle.',
-      },
-      activation: {
-        title: 'Discord-first Aktivierung',
-        value: '/license activate',
-        desc: 'Dein Lizenz-Key kommt per E-Mail und wird direkt im Bot mit dem Server verknüpft.',
-      },
-      tiers: {
-        title: 'Klare Planlogik',
-        value: 'Free -> Pro -> Ultimate',
-        desc: 'Free bleibt der Einstieg, Pro ist das Management-Upgrade und Ultimate die Operator-Stufe.',
-      },
-    },
-    flowNote: 'Jeder Plan baut auf demselben Bot-Kern auf. Upgrades schalten Kontrolle, Zuverlässigkeit und Skalierung frei, ohne dein Setup neu aufzubauen.',
     planPopular: 'Beliebt',
-    planFitLabel: 'Ideal für',
-    planUpgradeLabel: 'Upgrade wenn',
-    planOutcomes: {
-      free: {
-        note: 'Der starke Einstieg für 24/7 Radio ohne Admin-Overhead.',
-        fit: 'Kleine Communities, Freundesgruppen und Server, die schnell live gehen wollen.',
-        upgrade: 'du Dashboard, Event-Scheduler oder rollenbasierte Steuerung brauchst.',
-      },
-      pro: {
-        note: 'Der eigentliche Verwaltungsplan für aktive Server.',
-        fit: 'Community-Admins, Event-Server und Teams mit klaren Rollen und wiederkehrenden Sessions.',
-        upgrade: 'du Custom Stations, tiefere Analytics oder stärkere Recovery-Funktionen benötigst.',
-      },
-      ultimate: {
-        note: 'Die Operator-Stufe für maximale Kontrolle und tieferen Betrieb.',
-        fit: 'Power-User, Multi-Server-Setups und größere Communities mit hohem Anspruch an Zuverlässigkeit.',
-        upgrade: 'du OmniFM als verwaltetes System mit maximaler Kontrolle statt nur als Radio-Bot nutzen willst.',
-      },
-    },
     perMonth: '/Monat',
     freeCta: 'Mit Free starten',
-    buy: ({ name }) => `${name} kaufen`,
     trialCta: ({ months }) => `${months} Monat${months === 1 ? '' : 'e'} kostenlos testen`,
-    trialActivated: 'Pro-Testmonat aktiviert.',
     emailLabel: 'E-Mail Adresse',
     emailHint: 'Dein Lizenz-Key und die Rechnung werden an diese Adresse gesendet.',
     emailPlaceholder: 'deine@email.de',
     couponLabel: 'Rabattcode (optional)',
     couponPlaceholder: 'z.B. PRO10',
-    referralLabel: 'Referral-Code (optional)',
-    referralPlaceholder: 'z.B. CREATOR10',
-    referralHint: 'Referral-Links können den Code automatisch vorbelegen.',
-    seatsLabel: 'Anzahl Server',
-    seatsSuffix: 'Server',
-    seatsMonthly: ({ amount }) => `${amount}/Monat`,
-    seatsHint: 'Lizenziere mehrere Server mit einem Abo. Höhere Bundles senken den Preis pro Server.',
-    durationLabel: 'Laufzeit wählen',
-    durationMonth: 'Monat',
-    durationMonths: 'Monate',
-    durationBonus: '+2 gratis',
-    bestValue: 'Beste Wahl',
-    summary: ({ durationLabel, seatsLabel }) => `${durationLabel}${seatsLabel ? ` · ${seatsLabel}` : ''}`,
     licenseHintLead: 'Nach dem Kauf erhältst du deinen',
     licenseHintKey: 'Lizenz-Key',
     licenseHintMiddle: 'per E-Mail. Nutze',
     licenseHintCommand: '/license activate',
     licenseHintTail: 'im Discord, um deinen Server zu verknüpfen.',
-    checkoutRedirect: 'Weiterleitung...',
-    payButton: ({ amount }) => `${amount} bezahlen`,
     cancel: 'Abbrechen',
-    checkoutTitle: ({ name }) => `OmniFM ${name}`,
     invalidEmail: 'Bitte eine gültige E-Mail-Adresse eingeben.',
     checkoutFailed: 'Checkout fehlgeschlagen. Bitte später erneut versuchen.',
     redeemTitle: ({ name }) => `OmniFM ${name}: Code einlösen`,
@@ -125,13 +63,10 @@ const messages = {
     statusResult: ({ tier, bitrate, days, expires }) => `Tier: ${tier} | Bitrate: ${bitrate} | Resttage: ${days} | Ablauf: ${expires}`,
     priceFrom: 'ab',
     freePrice: '0 EUR',
-    monthLabel: ({ count }) => count === 1 ? '1 Monat' : `${count} Monate`,
-    seatsLabelInline: ({ count }) => count === 1 ? '1 Server' : `${count} Server`,
   },
   footer: {
     stats: {
       servers: 'Server',
-      users: 'Nutzer',
       connections: 'Verbindungen',
       listeners: 'Zuhörer',
       bots: 'Bots',
@@ -139,29 +74,6 @@ const messages = {
     },
     liveNote: 'Die öffentlichen Netzwerkzahlen werden live aus dem Produkt geladen und regelmäßig aktualisiert.',
     operatedBy: ({ operator }) => `Betrieben von ${operator}.`,
-    proofTitle: 'Vertrauen am Ende der Seite',
-    proofCards: {
-      operations: {
-        title: 'Live-Netzwerk',
-        value: ({ readyBots, totalBots }) => `${readyBots}/${totalBots} Bots bereit`,
-        desc: 'Öffentliche Zahlen, aktive Stationen und ein laufendes Bot-Netzwerk zeigen echten Produktbetrieb statt nur Marketing.',
-      },
-      support: {
-        title: 'Direkter Support',
-        value: 'Discord Community',
-        desc: 'Fragen, Rollout-Hilfe und Troubleshooting bleiben direkt erreichbar.',
-      },
-      languages: {
-        title: 'Zweisprachig',
-        value: 'DE / EN',
-        desc: 'Website und Produktführung bleiben in Deutsch und Englisch verfügbar.',
-      },
-      legal: {
-        title: 'Rechtlich erreichbar',
-        value: 'Impressum + Datenschutz + Terms',
-        desc: 'Impressum, Datenschutzerklärung und Nutzungsbedingungen sind von jeder Seite aus direkt verlinkt.',
-      },
-    },
     links: {
       imprint: 'Impressum',
       privacy: 'Datenschutzerklärung',
@@ -255,7 +167,6 @@ const messages = {
     hours: ({ count }) => `${count} Std.`,
   },
   legal: {
-    pageTitle: 'OmniFM | Impressum',
     eyebrow: 'Impressum',
     title: 'Impressum & Offenlegung',
     subtitle: 'Pflichtangaben für den Webauftritt von OmniFM. Die Inhalte werden aus der Server-Konfiguration geladen und können direkt über das Setup-Menü gepflegt werden.',
@@ -300,7 +211,6 @@ const messages = {
     basis: 'Rechtsgrundlagen: § 5 ECG, § 14 UGB, § 63 GewO und § 25 MedienG.',
   },
   privacy: {
-    pageTitle: 'OmniFM | Datenschutzerklärung',
     eyebrow: 'Datenschutzerklärung',
     title: 'Datenschutzerklärung',
     subtitle: 'Diese Erklärung beschreibt, welche personenbezogenen Daten OmniFM im Webauftritt, im Discord-Bot-Betrieb und in Premium-, E-Mail- und Supportprozessen verarbeitet.',
@@ -391,7 +301,6 @@ const messages = {
     basis: 'Rechtsgrundlagen: Art. 13 DSGVO sowie Art. 15 bis 22 DSGVO. Zuständige österreichische Beschwerdestelle: Österreichische Datenschutzbehörde.',
   },
   terms: {
-    pageTitle: 'OmniFM | Nutzungsbedingungen',
     eyebrow: 'Nutzungsbedingungen',
     title: 'Nutzungsbedingungen',
     subtitle: 'Diese Bedingungen regeln die Nutzung der OmniFM-Webseite, des Discord-Bots, des Dashboards und optionaler Premium-Funktionen.',
@@ -470,6 +379,74 @@ const messages = {
     noteTitle: 'Wichtiger Hinweis',
     note: 'Diese Nutzungsbedingungen bilden die typische Produktstruktur von OmniFM nach aktuellem Code- und Konfigurationsstand ab. Je nach Geschäftsmodell, Rechtsform, Zahlungsablauf oder individueller Supportzusage kann eine zusätzliche rechtliche Prüfung sinnvoll sein.',
     basis: 'Hinweis: Diese Seite ergänzt Impressum und Datenschutzerklärung um den vertraglichen Nutzungsrahmen des Dienstes.',
+  },
+  // Search engines and link previews: title and description per page, the FAQ (lib/seo.js).
+  seo: {
+    pages: {
+      home: {
+        title: 'OmniFM | 24/7 Radio für Discord',
+        description: 'OmniFM bringt 24/7 Discord-Radio, Worker-Bots, Dashboard-Kontrolle und Premium-Audio auf deinen Server.',
+      },
+      dashboard: {
+        title: 'OmniFM Dashboard | Server verwalten',
+        description: 'Verwalte OmniFM-Server, Events, Rollenrechte, Statistiken und Premium-Funktionen im Dashboard.',
+      },
+      stations: {
+        title: 'OmniFM Stationen | Discord Radio Sender',
+        description: 'Entdecke die OmniFM Sender für Discord-Radio: freie Stationen, Pro-Katalog und Ultimate-Optionen für 24/7 Musik im Voice-Channel.',
+      },
+      premium: {
+        title: 'OmniFM Preise | Free, Pro und Ultimate',
+        description: 'Vergleiche OmniFM Free, Pro und Ultimate für Discord-Radio, Worker-Bots, Dashboard, Audioqualität, Reconnect und Custom Stations.',
+      },
+      faq: {
+        title: 'OmniFM FAQ | Discord Radio Bot Fragen',
+        description: 'Antworten zu OmniFM, Commander und Worker, Free/Pro/Ultimate, Dashboard, Stationen und 24/7 Discord-Radio.',
+      },
+      imprint: {
+        title: 'OmniFM | Impressum',
+        description: 'Pflichtangaben und Anbieterinformationen für den Webauftritt von OmniFM.',
+      },
+      privacy: {
+        title: 'OmniFM | Datenschutzerklärung',
+        description: 'Datenschutzhinweise für Webseite, Discord-Bot-Betrieb, Dashboard, Premium, E-Mail und Support.',
+      },
+      terms: {
+        title: 'OmniFM | Nutzungsbedingungen',
+        description: 'Nutzungsbedingungen für die OmniFM-Webseite, den Discord-Bot, das Dashboard und Premium-Funktionen.',
+      },
+      charts: {
+        title: 'OmniFM-Charts | Die meistgehörten Sender und Songs der Woche',
+        description: 'Die meistgehörten Radiosender und die meistgespielten Songs der letzten Woche auf allen Discord-Servern mit OmniFM, ohne Personen- und Serverbezug.',
+      },
+      status: {
+        title: 'OmniFM Status | Verfügbarkeit der Bots',
+        description: 'Läuft OmniFM? Jeder Bot mit Verfügbarkeit über 90 Tage, aktuelle Störungen und geplante Wartungen.',
+      },
+    },
+    faq: [
+      {
+        question: 'Was ist OmniFM?',
+        answer: 'OmniFM ist ein Discord Radio Bot für 24/7 Streams, Commander- und Worker-Bots, Dashboard-Kontrolle und Premium-Funktionen.',
+      },
+      {
+        question: 'Brauche ich für OmniFM einen Worker?',
+        answer: 'Ja. Der Commander nimmt Befehle an, während ein Worker den eigentlichen Stream im Voice-Channel ausführt.',
+      },
+      {
+        question: 'Was ist im Free-Plan enthalten?',
+        answer: 'Free startet mit dem Commander- und Worker-Ablauf, freien Stationen und den wichtigsten Befehlen. Pro und Ultimate erweitern Kontrolle, Stabilität und Audio-Optionen.',
+      },
+      {
+        question: 'Wer betreibt OmniFM?',
+        answer: 'OmniFM ist das Produkt. Betreiber und Anbieter ist IT-Tabelander.',
+      },
+    ],
+  },
+  // Above the legal pages in every language but German (LegalLanguageNote.js).
+  legalNote: {
+    text: 'Verbindlich ist die deutsche Fassung dieser Seite.',
+    link: 'Zur deutschen Fassung',
   },
 };
 

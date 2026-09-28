@@ -8,45 +8,37 @@ import {
 } from 'react';
 import { buildPageHref, resolvePageFromUrl } from './lib/pageRouting.js';
 import { applySeoMetadata } from './lib/seo.js';
-import deSite from './i18n/de-site.js';
-import dePages from './i18n/de-pages.js';
-import enSite from './i18n/en-site.js';
-import enPages from './i18n/en-pages.js';
+import {
+  LANGUAGE_CODES,
+  WEBSITE_LANGUAGES,
+  copyFor,
+  isLanguageLoaded,
+  loadLanguage,
+  normalizeLanguage,
+  translatorFor,
+  uiTableFor,
+} from './i18n/languages.js';
 
 const STORAGE_KEY = 'omnifm.web.locale';
 const DEFAULT_LOCALE = 'en';
-const SUPPORTED_LOCALES = ['de', 'en'];
+// Nine languages (#306): German and English in full, the others from
+// ./i18n/<code>-*.js and ./i18n/ui/<code>.js, English where one is missing.
+const SUPPORTED_LOCALES = LANGUAGE_CODES;
 
-const LOCALE_META = {
-  de: {
-    label: 'DE',
-    switchLabel: 'EN',
-    switchTitle: 'Switch to English',
-    intl: 'de-DE',
-  },
-  en: {
-    label: 'EN',
-    switchLabel: 'DE',
-    switchTitle: 'Auf Deutsch umschalten',
-    intl: 'en-US',
-  },
-};
+const LOCALE_META = Object.fromEntries(WEBSITE_LANGUAGES.map((language) => [language.code, {
+  label: language.code.toUpperCase(),
+  name: language.name,
+  intl: language.intl,
+}]));
 
-// Exported for the completeness test (#294): every text in German and English.
-// The website texts per language, from ./i18n/ (#296).
-export const LOCALE_MESSAGES = {
-  de: { ...deSite, ...dePages },
-  en: { ...enSite, ...enPages },
-};
+// The two languages written in full, for the completeness test (#294); the
+// others are checked against English (#306).
+export const LOCALE_MESSAGES = { de: copyFor('de'), en: copyFor('en') };
 
 const I18nContext = createContext(null);
 
 function normalizeLocale(rawLocale) {
-  const value = String(rawLocale || '').trim().toLowerCase();
-  if (!value) return DEFAULT_LOCALE;
-  if (value.startsWith('de')) return 'de';
-  if (value.startsWith('en')) return 'en';
-  return SUPPORTED_LOCALES.includes(value) ? value : DEFAULT_LOCALE;
+  return normalizeLanguage(rawLocale, DEFAULT_LOCALE);
 }
 
 function writeStoredLocale(locale) {
@@ -71,16 +63,37 @@ function syncLocaleToUrl(locale) {
 
 function resolveInitialLocale() {
   if (typeof window === 'undefined') return DEFAULT_LOCALE;
-  // Language follows the browser automatically — no manual switch.
+  // Language follows the browser automatically, no manual switch. A ?lang=
+  // in the link wins: the site writes it into its own links, and search
+  // engines find each language that way (#306).
+  try {
+    const requested = new URL(window.location.href).searchParams.get('lang');
+    if (requested && SUPPORTED_LOCALES.includes(normalizeLanguage(requested, ''))) return normalizeLanguage(requested);
+  } catch {
+    // no usable URL: the browser decides
+  }
   const nav = (window.navigator?.languages && window.navigator.languages[0])
     || window.navigator?.language
     || DEFAULT_LOCALE;
   return normalizeLocale(nav);
 }
 
+/**
+ * Loads the visitor's language before the first render (index.js), so a
+ * French page never flashes up in English first. Never fails: without the
+ * download the page shows English.
+ */
+export function preloadLanguage() {
+  if (typeof window === 'undefined') return Promise.resolve();
+  return loadLanguage(resolveInitialLocale()).catch(() => null);
+}
+
 export function I18nProvider({ children }) {
   const [locale, setLocaleState] = useState(resolveInitialLocale);
-  const copy = LOCALE_MESSAGES[locale] || LOCALE_MESSAGES[DEFAULT_LOCALE];
+  const ready = isLanguageLoaded(locale);
+  const [, setLoadedCount] = useState(0);
+  const copy = copyFor(locale);
+  const uiTable = uiTableFor(locale);
   const intlLocale = LOCALE_META[locale]?.intl || LOCALE_META[DEFAULT_LOCALE].intl;
 
   const setLocale = useCallback((nextLocale) => {
@@ -89,10 +102,6 @@ export function I18nProvider({ children }) {
     syncLocaleToUrl(normalized);
     setLocaleState(normalized);
   }, []);
-
-  const toggleLocale = useCallback(() => {
-    setLocale(locale === 'de' ? 'en' : 'de');
-  }, [locale, setLocale]);
 
   const formatNumber = useCallback((value) => {
     const amount = Number(value) || 0;
@@ -115,17 +124,31 @@ export function I18nProvider({ children }) {
     return new Intl.DateTimeFormat(intlLocale, options).format(date);
   }, [intlLocale]);
 
+  // A language that is not there yet comes now; until then the page is English.
+  useEffect(() => {
+    if (ready) return undefined;
+    let alive = true;
+    loadLanguage(locale)
+      .then(() => { if (alive) setLoadedCount((count) => count + 1); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [locale, ready]);
+
   useEffect(() => {
     if (typeof document === 'undefined') return;
     applySeoMetadata({ locale, url: window.location.href });
   }, [copy, locale]);
 
+  // The dashboard's t('Deutsch', 'English', params) in the current language.
+  const t = useMemo(() => translatorFor(locale, uiTable), [locale, uiTable]);
+
   const contextValue = useMemo(() => ({
     locale,
     localeMeta: LOCALE_META[locale] || LOCALE_META[DEFAULT_LOCALE],
+    languages: WEBSITE_LANGUAGES,
     copy,
+    t,
     setLocale,
-    toggleLocale,
     formatNumber,
     formatDecimal,
     formatDate,
@@ -136,7 +159,7 @@ export function I18nProvider({ children }) {
     formatNumber,
     locale,
     setLocale,
-    toggleLocale,
+    t,
   ]);
 
   return (

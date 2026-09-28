@@ -35,12 +35,13 @@ export default defineConfig({
     strictPort: true,
     fs: {
       // The voice status preview uses the bot's own renderer (#277) and the
-      // plans come from the bot's plan file (#413); only these files outside
-      // frontend/ are served.
+      // plans come from the bot's plan files (#413, #306); only these files
+      // outside frontend/ are served.
       allow: [
         searchForWorkspaceRoot(process.cwd()),
         fileURLToPath(new URL('../src/lib/voice-status-template.js', import.meta.url)),
         fileURLToPath(new URL('../src/config/plan-features.js', import.meta.url)),
+        fileURLToPath(new URL('../src/config/plan-feature-texts.js', import.meta.url)),
       ],
     },
   },

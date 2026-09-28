@@ -33,19 +33,19 @@ function Equalizer({ bars = 14, height = 44, colorful = true }) {
 }
 
 function NowPlayingConsole({ listeners, live }) {
-  const { formatNumber, locale } = useI18n();
+  const { formatNumber, t } = useI18n();
   const stations = useShowcaseStations(8);
   const [idx, setIdx] = useState(0);
   const [cover, setCover] = useState(null);
   useEffect(() => {
     if (stations.length < 2) return undefined;
-    const t = setInterval(() => setIdx((v) => (v + 1) % stations.length), 4200);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setIdx((v) => (v + 1) % stations.length), 4200);
+    return () => clearInterval(timer);
   }, [stations.length]);
   const track = stations.length
     ? stations[idx % stations.length]
     : { name: 'OmniFM Radio Network', tier: '', bitrate: 'Live' };
-  const streamLabel = locale === 'en' ? 'Live radio stream' : 'Live-Radio-Stream';
+  const streamLabel = t('Live-Radio-Stream', 'Live radio stream');
   useEffect(() => {
     let stop = false;
     setCover(null);
@@ -80,12 +80,12 @@ function NowPlayingConsole({ listeners, live }) {
           color: '#ffd9e2', fontFamily: "'JetBrains Mono', monospace",
         }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: live ? '#ff2a5f' : '#00e5ff', animation: 'onair-pulse 1.8s infinite' }} />
-          {live ? 'ON AIR' : (locale === 'en' ? 'PREVIEW' : 'VORSCHAU')}
+          {live ? 'ON AIR' : t('VORSCHAU', 'PREVIEW')}
         </span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#94a3b8', fontSize: 12.5, fontFamily: "'JetBrains Mono', monospace" }}>
           {Number(listeners) > 0
-            ? <><Users size={13} color="#ff6b00" /> {formatNumber(Number(listeners))} {locale === 'en' ? 'listening' : 'hören zu'}</>
-            : <><span style={{ width: 7, height: 7, borderRadius: '50%', background: live ? '#ff2a5f' : '#00e5ff' }} /> {live ? 'LIVE' : (locale === 'en' ? 'DEMO' : 'DEMO')}</>}
+            ? <><Users size={13} color="#ff6b00" /> {formatNumber(Number(listeners))} {t('hören zu', 'listening')}</>
+            : <><span style={{ width: 7, height: 7, borderRadius: '50%', background: live ? '#ff2a5f' : '#00e5ff' }} /> {live ? 'LIVE' : 'DEMO'}</>}
         </span>
       </div>
 
@@ -123,7 +123,7 @@ function NowPlayingConsole({ listeners, live }) {
           <div style={{ height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, #ff6b00, #00e5ff)', animation: 'np-progress 30s linear infinite' }} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, color: '#64748b', fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>
-          <span>{live ? 'LIVE STREAM' : (locale === 'en' ? 'STATION PREVIEW' : 'SENDER-VORSCHAU')}</span><span>24 / 7</span>
+          <span>{live ? 'LIVE STREAM' : t('SENDER-VORSCHAU', 'STATION PREVIEW')}</span><span>24 / 7</span>
         </div>
       </div>
 

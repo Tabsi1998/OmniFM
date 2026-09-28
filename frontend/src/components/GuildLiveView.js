@@ -41,7 +41,7 @@ function Timeline({ bot, windowStart, windowEnd, t, locale }) {
   return (
     <div
       role="img"
-      aria-label={t(`Verlauf von ${bot.botName} in den letzten 24 Stunden`, `${bot.botName} over the last 24 hours`)}
+      aria-label={t('Verlauf von {bot} in den letzten 24 Stunden', '{bot} over the last 24 hours', { bot: bot.botName })}
       data-testid={`live-timeline-${bot.botId}`}
       style={{ position: 'relative', height: 22, borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid #20283b', overflow: 'hidden' }}
     >
@@ -94,8 +94,8 @@ export default function GuildLiveView({ apiRequest, guildId, t, locale = 'de-DE'
     try {
       await apiRequest(`/api/dashboard/playback/${action}`, { method: 'POST', body: JSON.stringify({ serverId: guildId, botId: bot.botId }) });
       setNotice({ ok: true, text: action === 'restart'
-        ? t(`${bot.botName} startet den Sender neu.`, `${bot.botName} restarts the station.`)
-        : t(`${bot.botName} verbindet sich neu.`, `${bot.botName} reconnects.`) });
+        ? t('{bot} startet den Sender neu.', '{bot} restarts the station.', { bot: bot.botName })
+        : t('{bot} verbindet sich neu.', '{bot} reconnects.', { bot: bot.botName }) });
       setTimeout(load, 3000);
     } catch (err) {
       setNotice({ ok: false, text: err?.message || String(err) });
@@ -142,7 +142,7 @@ export default function GuildLiveView({ apiRequest, guildId, t, locale = 'de-DE'
               </div>
               {bot.events.length ? (
                 <details style={{ marginTop: 6 }}>
-                  <summary style={{ cursor: 'pointer', fontSize: 12, color: '#94a3b8' }}>{t(`Letzte Änderungen (${bot.events.length})`, `Last changes (${bot.events.length})`)}</summary>
+                  <summary style={{ cursor: 'pointer', fontSize: 12, color: '#94a3b8' }}>{t('Letzte Änderungen ({count})', 'Last changes ({count})', { count: bot.events.length })}</summary>
                   <ul style={{ listStyle: 'none', margin: '8px 0 0', padding: 0, display: 'grid', gap: 4, fontSize: 12 }}>
                     {bot.events.map((event) => (
                       <li key={`${event.at}-${event.phase}`} style={{ color: event.unexpected ? '#fbbf24' : '#cbd5e1' }}>

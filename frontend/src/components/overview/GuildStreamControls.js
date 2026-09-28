@@ -22,7 +22,7 @@ export default function GuildStreamControls({ stream, stationOptions = [], apiRe
         ok: true,
         text: action === 'stop'
           ? t('Gestoppt.', 'Stopped.')
-          : t(`Läuft jetzt: ${result?.stationName || stationKey}`, `Now playing: ${result?.stationName || stationKey}`),
+          : t('Läuft jetzt: {station}', 'Now playing: {station}', { station: result?.stationName || stationKey }),
       });
       setConfirmStop(false);
       onChanged?.();

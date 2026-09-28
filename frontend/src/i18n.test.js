@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { LOCALE_MESSAGES } from './i18n.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { I18nProvider, LOCALE_MESSAGES, useI18n } from './i18n.js';
 
 // Every text exists in German and English (#294): the same keys, the same
 // list lengths, and no empty string where the other language has text.
@@ -31,5 +32,37 @@ describe('translations', () => {
 
   it('has every text in both languages', () => {
     expect(differences(LOCALE_MESSAGES.de, LOCALE_MESSAGES.en)).toEqual([]);
+  });
+});
+
+// The other seven languages come as their own download (#306); the page shows
+// them once it is there. Their completeness: test/website-languages.test.js.
+function Probe() {
+  const { copy, t, locale } = useI18n();
+  return (
+    <div>
+      <span data-testid="locale">{locale}</span>
+      <span data-testid="cta">{copy.hero.ctaInvite}</span>
+      <span data-testid="stop">{t('Stoppen', 'Stop')}</span>
+    </div>
+  );
+}
+
+describe('a language of its own download', () => {
+  afterEach(cleanup);
+
+  it('follows the browser and shows the page in French once the file is there', async () => {
+    vi.spyOn(window.navigator, 'languages', 'get').mockReturnValue(['fr-FR', 'fr']);
+    render(<I18nProvider><Probe /></I18nProvider>);
+    expect(screen.getByTestId('locale').textContent).toBe('fr');
+    await screen.findByText('Inviter le commander');
+    expect(screen.getByTestId('stop').textContent).toBe('Arrêter');
+  });
+
+  it('shows English for a language the site does not speak', () => {
+    vi.spyOn(window.navigator, 'languages', 'get').mockReturnValue(['ja-JP']);
+    render(<I18nProvider><Probe /></I18nProvider>);
+    expect(screen.getByTestId('locale').textContent).toBe('en');
+    expect(screen.getByTestId('cta').textContent).toBe('Invite commander');
   });
 });

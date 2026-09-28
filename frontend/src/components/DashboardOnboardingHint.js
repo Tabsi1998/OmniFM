@@ -105,7 +105,7 @@ export default function DashboardOnboardingHint({
             <Copy size={14} />
             {copiedCommand === hint.command
               ? t('Befehl kopiert', 'Command copied')
-              : hint.commandLabel || t(`Befehl kopieren: ${hint.command}`, `Copy command: ${hint.command}`)}
+              : hint.commandLabel || t('Befehl kopieren: {command}', 'Copy command: {command}', { command: hint.command })}
           </button>
         ) : null}
 
