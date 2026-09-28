@@ -17,6 +17,7 @@ import { I18nProvider } from './i18n.js';
 import { PlayerProvider } from './lib/player.js';
 import { buildApiUrl } from './lib/api.js';
 import { getSectionAnchorForPage, resolvePageFromUrl } from './lib/pageRouting.js';
+import SeasonLayer from './components/season/SeasonLayer.js';
 
 // Loaded only on their own pages (#296): the start page carries neither the
 // dashboard nor the owner console, nor the charts both of them draw.
@@ -327,6 +328,7 @@ function AppContent() {
       <Premium bots={bots} planContext={{ freeStations: stats.freeStations, allStations: stats.stations }} />
       <CommunitySection />
       <FaqSection />
+      <SeasonLayer />
       <StatsFooter stats={stats} bots={bots} legal={legal} />
       <NowPlayingBar stats={stats} bots={bots} />
       <CookieConsent />

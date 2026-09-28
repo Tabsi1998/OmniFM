@@ -218,6 +218,23 @@ export function normalizeOwnerSeasons(raw) {
 }
 
 /**
+ * A look of the test mode (SEASON_PREVIEWS) as a season, whatever the date:
+ * for the owner's test servers and the website's ?season= (#427); null for
+ * an unknown look.
+ */
+export function seasonPreview(id, now = new Date(), timeZone = DEFAULT_SEASON_TIME_ZONE) {
+  const preview = SEASON_PREVIEWS.find((entry) => entry.id === id);
+  if (!preview) return null;
+  const local = localTime(now, timeZone);
+  return state(preview.season, preview.phase, {
+    candles: preview.candles,
+    // The look of the coming turn of the year; in January the one just passed.
+    year: preview.season === "newyear" && local.month !== 1 ? local.year + 1 : local.year,
+    countdown: preview.phase === "countdown" ? secondsToMidnight(local) : null,
+  });
+}
+
+/**
  * What a server shows now, or null: the calendar in the server's time zone,
  * unless the owner or the server switched that season off. The owner's test
  * mode forces its look on the servers it names, whatever the date and the
@@ -234,13 +251,7 @@ export function seasonForServer({ now = new Date(), guildId = "", timeZone = DEF
 
   let current;
   if (preview) {
-    const local = localTime(now, zone);
-    current = state(preview.season, preview.phase, {
-      candles: preview.candles,
-      // The look of the coming turn of the year; in January the one just passed.
-      year: preview.season === "newyear" && local.month !== 1 ? local.year + 1 : local.year,
-      countdown: preview.phase === "countdown" ? secondsToMidnight(local) : null,
-    });
+    current = seasonPreview(preview.id, now, zone);
   } else {
     current = seasonAt(now, zone);
     if (!current || !switches.enabled[current.season] || !settings.seasons[current.season]) return null;
