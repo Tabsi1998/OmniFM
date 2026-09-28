@@ -51,7 +51,7 @@ function answerFor(url) {
     return { notices: [{ id: 'a1b2c3d4e5f60718', kind: 'maintenance', title: 'Server-Update', message: '', impact: 'maintenance', startsAt: '2026-09-28T08:00:00.000Z', endsAt: '2026-09-28T09:00:00.000Z', resolvedAt: null }] };
   }
   if (route === '/api/owner/status') return { checks: [], checkedAt: null };
-  if (route === '/api/admin/config') return {};
+  if (route === '/api/admin/config') return { charts: { postEnabled: false, channelId: '', language: 'de' } };
   return {};
 }
 

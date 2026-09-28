@@ -28,6 +28,7 @@ const ImpressumSection = lazy(() => import('./components/ImpressumSection.js'));
 const PrivacySection = lazy(() => import('./components/PrivacySection.js'));
 const TermsSection = lazy(() => import('./components/TermsSection.js'));
 const StatusPage = lazy(() => import('./components/StatusPage.js'));
+const ChartsPage = lazy(() => import('./components/ChartsPage.js'));
 
 // What shows for the moment a page's code is on its way.
 function PageLoading() {
@@ -242,6 +243,20 @@ function AppContent() {
         <Navbar page={currentPage} />
         <Suspense fallback={<PageLoading />}>
           <StatusPage />
+        </Suspense>
+        <StatsFooter stats={stats} bots={bots} legal={legal} />
+        <CookieConsent />
+      </div>
+    );
+  }
+
+  if (currentPage === 'charts') {
+    return (
+      <div data-testid="app-root" style={{ position: 'relative', minHeight: '100vh' }}>
+        <div className="noise-overlay" />
+        <Navbar page={currentPage} />
+        <Suspense fallback={<PageLoading />}>
+          <ChartsPage />
         </Suspense>
         <StatsFooter stats={stats} bots={bots} legal={legal} />
         <CookieConsent />

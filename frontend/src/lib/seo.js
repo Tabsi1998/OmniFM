@@ -94,6 +94,17 @@ const PAGE_SEO = {
       description: 'Terms for the OmniFM website, Discord bot, dashboard, and optional Premium features.',
     },
   },
+  charts: {
+    type: 'website',
+    de: {
+      title: 'OmniFM-Charts | Die meistgespielten Songs der Woche',
+      description: 'Die meistgespielten Songs der letzten Woche auf allen Discord-Servern mit OmniFM, ohne Personen- und Serverbezug.',
+    },
+    en: {
+      title: 'OmniFM Charts | The most played songs of the week',
+      description: 'The most played songs of last week across every Discord server with OmniFM, without any person or server.',
+    },
+  },
   status: {
     type: 'website',
     de: {

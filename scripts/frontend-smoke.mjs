@@ -49,6 +49,7 @@ const PAGES = [
   { name: "Datenschutz", path: "/datenschutz", shows: '[data-testid="privacy-section"]' },
   { name: "Nutzungsbedingungen", path: "/nutzungsbedingungen", shows: '[data-testid="terms-section"]' },
   { name: "Status", path: "/status", shows: '[data-testid="status-content"][aria-busy="false"]', lean: true },
+  { name: "Charts", path: "/charts", shows: '[data-testid="charts-content"][aria-busy="false"]', lean: true },
   { name: "Dashboard (angemeldet)", path: "/dashboard", shows: '[data-testid="guild-nav-overview"]', mockDashboard: true },
   { name: "Owner-Konsole (Login)", path: "/admin", shows: '[data-testid="admin-token-input"]' },
 ];

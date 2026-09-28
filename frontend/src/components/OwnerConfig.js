@@ -87,6 +87,7 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
   const [discord, setDiscord] = useState(null);
   const [marketing, setMarketing] = useState(null);
   const [discordShop, setDiscordShop] = useState(null);
+  const [charts, setCharts] = useState(null);
   const [system, setSystem] = useState(null);
   const [access, setAccess] = useState(null);
   const [recoverySettings, setRecoverySettings] = useState([]);
@@ -102,14 +103,14 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
     setLoadError('');
     try {
       const d = await apiGet('/api/admin/config', token);
-      setCompany(d.company); setPlans(d.plans); setDiscord(d.discord); setMarketing(d.marketing); setDiscordShop(d.discordShop || { enabled: false, skus: { pro: '', ultimate: '' } }); setSystem(d.system); setAccess(d.access || { accounts: [], tokenEnabled: true }); setRecoverySettings(Array.isArray(d.recoverySettings) ? d.recoverySettings : []);
-      setLoaded({ company: JSON.stringify(d.company), plans: JSON.stringify(d.plans), discord: JSON.stringify(d.discord), marketing: JSON.stringify(d.marketing), discordShop: JSON.stringify(d.discordShop || { enabled: false, skus: { pro: '', ultimate: '' } }), system: JSON.stringify(d.system), access: JSON.stringify(d.access || { accounts: [], tokenEnabled: true }) });
+      setCompany(d.company); setPlans(d.plans); setDiscord(d.discord); setMarketing(d.marketing); setDiscordShop(d.discordShop || { enabled: false, skus: { pro: '', ultimate: '' } }); setCharts(d.charts || { postEnabled: false, channelId: '', language: 'de' }); setSystem(d.system); setAccess(d.access || { accounts: [], tokenEnabled: true }); setRecoverySettings(Array.isArray(d.recoverySettings) ? d.recoverySettings : []);
+      setLoaded({ company: JSON.stringify(d.company), plans: JSON.stringify(d.plans), discord: JSON.stringify(d.discord), marketing: JSON.stringify(d.marketing), discordShop: JSON.stringify(d.discordShop || { enabled: false, skus: { pro: '', ultimate: '' } }), charts: JSON.stringify(d.charts || { postEnabled: false, channelId: '', language: 'de' }), system: JSON.stringify(d.system), access: JSON.stringify(d.access || { accounts: [], tokenEnabled: true }) });
     } catch (error) { setLoadError(error?.message || 'Konfiguration konnte nicht geladen werden.'); }
   }, [apiGet, token]);
 
   useEffect(() => { load(); }, [load]);
 
-  const current = { company, plans, discord, marketing, system, access, discordShop };
+  const current = { company, plans, discord, marketing, system, access, discordShop, charts };
   const isDirty = (sec) => current[sec] != null && loaded[sec] !== undefined && JSON.stringify(current[sec]) !== loaded[sec];
   const anyDirty = Object.keys(current).some(isDirty);
   // Leaving the page with unsaved changes asks first.
@@ -580,6 +581,39 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
   }
 
   // ---------------- PREMIUM IN DISCORD (#320) ----------------
+  if (section === 'charts') {
+    if (!charts) return <div className="oa-sub">Lade Konfiguration…</div>;
+    const channelOk = /^\d{17,22}$/.test(String(charts.channelId || ''));
+    return (
+      <div className="oa-fade" data-testid="config-charts">
+        <div className="oa-card" style={{ marginBottom: 18 }}>
+          <div className="oa-section-title">OmniFM-Charts</div>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14, lineHeight: 1.6 }}>
+            Die meistgespielten Songs der letzten Woche über alle Server stehen auf <a href="/charts" target="_blank" rel="noopener noreferrer" style={{ color: '#00e5ff' }}>omnifm.xyz/charts</a>.
+            Ein Song kommt nur hinein, wenn er auf mindestens 3 Servern lief; so lässt sich kein einzelner Server erkennen.
+            Ist der Post an, schickt der Commander die Charts jeden Montag ab 10 Uhr in den Kanal unten: die Top 3 mit Cover, Platz 4 bis 10 als Liste.
+          </div>
+          <Toggle label="Charts jede Woche posten" checked={!!charts.postEnabled} onChange={(v) => setCharts((p) => ({ ...p, postEnabled: v && channelOk }))} testid="cfg-charts-enabled" />
+          {!channelOk && <div className="oa-sub" style={{ marginTop: 8 }}>Erst die Kanal-ID eintragen, dann lässt sich der Post einschalten.</div>}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0 18px', marginTop: 14 }}>
+            <Field label="Kanal-ID" value={charts.channelId || ''} onChange={(v) => setCharts((p) => ({ ...p, channelId: v.trim() }))} placeholder="123456789012345678" testid="cfg-charts-channel" />
+            <label style={{ display: 'block' }}>
+              <span className="oa-stat-label">Sprache des Posts</span>
+              <select className="oa-input" style={{ marginTop: 6 }} value={charts.language === 'en' ? 'en' : 'de'} onChange={(e) => setCharts((p) => ({ ...p, language: e.target.value }))} data-testid="cfg-charts-language">
+                <option value="de">Deutsch</option>
+                <option value="en">English</option>
+              </select>
+            </label>
+          </div>
+          <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.6, marginTop: 10 }}>
+            Die Kanal-ID findest du in Discord mit eingeschaltetem Entwicklermodus: Rechtsklick auf den Kanal → „Kanal-ID kopieren“. Der Commander muss auf dem Server sein und in den Kanal schreiben dürfen.
+          </div>
+        </div>
+        <SaveBar onSave={() => save('charts', charts)} saving={saving} msg={msg} testid="cfg-charts-save" dirty={isDirty('charts')} />
+      </div>
+    );
+  }
+
   if (section === 'discordShop') {
     if (!discordShop) return <div className="oa-sub">Lade Konfiguration…</div>;
     const skus = discordShop.skus || {};

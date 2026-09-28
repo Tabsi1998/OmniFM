@@ -11,6 +11,7 @@ import {
   publicStatsResponse,
 } from "../../lib/owner-public.js";
 import { statusResponse } from "../../services/status-page.js";
+import { weeklyChart } from "../../services/charts.js";
 
 /** The API contract the owner console and start.sh expect; FastAPI's BACKEND_CONTRACT_VERSION. */
 export const BACKEND_CONTRACT_VERSION = "owner-live-v5";
@@ -148,6 +149,16 @@ export function createPublicRoutesHandler(deps) {
         return true;
       }
       sendJson(res, 200, await cachedStatusResponse());
+      return true;
+    }
+
+    // The OmniFM charts (#300): the last week across all servers, cached 10 minutes.
+    if (requestUrl.pathname === "/api/charts") {
+      if (req.method !== "GET") {
+        methodNotAllowed(res, ["GET"]);
+        return true;
+      }
+      sendJson(res, 200, await weeklyChart(isConnected() ? getDb() : null));
       return true;
     }
 

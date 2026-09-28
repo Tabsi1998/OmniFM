@@ -22,6 +22,7 @@ import {
   startServerDataRetention,
 } from "../services/server-data-retention.js";
 import { startDiscordShopSync } from "../premium/discord-shop.js";
+import { startChartsPostService } from "../services/charts.js";
 import { isRuntimeVoiceConnected } from "./runtime-live-state.js";
 import { handleRuntimeAutocomplete, handleRuntimeInteraction } from "./runtime-interactions.js";
 import { shouldHandleRuntimeIdleEvent } from "./runtime-streams.js";
@@ -99,6 +100,8 @@ class BotRuntime {
         startServerDataRetention(this);
         // Premium bought in Discord becomes the server's license (#320).
         startDiscordShopSync(this);
+        // The weekly OmniFM charts go to the owner's channel (#300).
+        startChartsPostService(this);
         this.enforcePremiumGuildScope("startup").catch((err) => {
           log("ERROR", `[${this.config.name}] Premium-Guild-Scope Pruefung fehlgeschlagen: ${err?.message || err}`);
         });

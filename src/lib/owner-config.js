@@ -218,6 +218,8 @@ export function ownerConfigResponse(raw, env = process.env) {
     access: configSectionFrom(raw, "access"),
     // Premium sold in Discord (#320): the switch and a SKU per plan.
     discordShop: configSectionFrom(raw, "discordShop"),
+    // The weekly OmniFM charts post (#300): switch, channel, language.
+    charts: configSectionFrom(raw, "charts"),
     recoverySettings: RECOVERY_SETTINGS,
   };
 }

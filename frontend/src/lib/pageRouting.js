@@ -30,6 +30,7 @@ const PAGE_ALIASES = new Map([
   ["nutzungsbedingungen", "terms"],
   ["agb", "terms"],
   ["status", "status"],
+  ["charts", "charts"],
 ]);
 
 const PATH_ALIASES = new Map([
@@ -61,6 +62,7 @@ const PATH_ALIASES = new Map([
   ["/nutzungsbedingungen", "terms"],
   ["/agb", "terms"],
   ["/status", "status"],
+  ["/charts", "charts"],
 ]);
 
 export function normalizePageId(rawPage, fallback = "") {
@@ -104,6 +106,7 @@ export function getCanonicalPagePath(page, locale = "de") {
   if (normalizedPage === "privacy") return useGerman ? "/datenschutz" : "/privacy";
   if (normalizedPage === "terms") return useGerman ? "/nutzungsbedingungen" : "/terms";
   if (normalizedPage === "status") return "/status";
+  if (normalizedPage === "charts") return "/charts";
   return "/";
 }
 

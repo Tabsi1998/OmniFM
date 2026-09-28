@@ -199,5 +199,10 @@
       "pro": "",
       "ultimate": ""
     }
+  },
+  "charts": {
+    "postEnabled": false,
+    "channelId": "",
+    "language": "de"
   }
 }

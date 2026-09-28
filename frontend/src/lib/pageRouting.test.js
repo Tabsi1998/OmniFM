@@ -9,6 +9,7 @@ describe('page routing', () => {
     expect(resolvePageFromUrl('https://omnifm.xyz/?page=admin&lang=de')).toBe('admin');
     expect(resolvePageFromUrl('https://omnifm.xyz/owner')).toBe('admin');
     expect(resolvePageFromUrl('https://omnifm.xyz/status')).toBe('status');
+    expect(resolvePageFromUrl('https://omnifm.xyz/charts')).toBe('charts');
   });
 
   it('builds links with the language', () => {
