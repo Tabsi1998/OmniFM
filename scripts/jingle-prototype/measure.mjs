@@ -19,12 +19,33 @@ import path from "node:path";
 import { performance } from "node:perf_hooks";
 import { Readable } from "node:stream";
 import { setTimeout as delay } from "node:timers/promises";
+import { parseArgs } from "node:util";
 import { StreamType, createAudioResource } from "@discordjs/voice";
 import { JingleMixer, SAMPLE_RATE, toSamples } from "./jingle-mixer.mjs";
 
-const SECONDS = Number(process.env.JINGLE_SECONDS || 60);
-const JINGLE_EVERY_S = Number(process.env.JINGLE_EVERY_S || 15);
-const SWITCHES = Number(process.env.JINGLE_SWITCHES || 5);
+// --seconds per way, --every seconds between jingles, --switches against the
+// test radio, --stations real stream URLs separated by commas ("" skips them).
+const { values: options } = parseArgs({
+  options: {
+    seconds: { type: "string", default: "60" },
+    every: { type: "string", default: "15" },
+    switches: { type: "string", default: "5" },
+    stations: {
+      type: "string",
+      // Real stations from the catalog, from four different hosts.
+      default: [
+        "https://ice4.somafm.com/groovesalad-128-mp3",
+        "https://streams.ilovemusic.de/iloveradio1.mp3",
+        "http://streams.bigfm.de/bigfm-charts-128-mp3",
+        "https://stream.laut.fm/blues",
+      ].join(","),
+    },
+  },
+});
+const SECONDS = Number(options.seconds) || 60;
+const JINGLE_EVERY_S = Number(options.every) || 15;
+const SWITCHES = Number(options.switches) || 5;
+const REAL_STATIONS = String(options.stations).split(",").map((url) => url.trim()).filter(Boolean);
 const BITRATE_KBPS = 128;
 // Linux counts CPU time in clock ticks, 100 per second (getconf CLK_TCK).
 const CLOCK_TICKS = 100;
@@ -250,14 +271,6 @@ async function measureSwitches(url, times = SWITCHES) {
   }
   return results;
 }
-
-// Real stations from the catalog, from four different hosts; JINGLE_REAL_STATIONS="" skips them.
-const REAL_STATIONS = String(process.env.JINGLE_REAL_STATIONS ?? [
-  "https://ice4.somafm.com/groovesalad-128-mp3",
-  "https://streams.ilovemusic.de/iloveradio1.mp3",
-  "http://streams.bigfm.de/bigfm-charts-128-mp3",
-  "https://stream.laut.fm/blues",
-].join(",")).split(",").map((url) => url.trim()).filter(Boolean);
 
 const fmt = (value, digits = 0) => (Number.isFinite(value) ? value.toFixed(digits) : "–");
 
