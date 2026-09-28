@@ -6,6 +6,42 @@ folgt [SemVer](https://semver.org/lang/de/): Die erste Zahl steigt bei
 Funktionen, die dritte bei reinen Fehlerbehebungen. Wie ein Release entsteht,
 steht in `scripts/release.mjs`.
 
+## 3.15.0 – 2026-09-29
+
+Melden direkt aus Discord, zuerst privat beim Team, und die Ostereiersuche
+für das nächste Frühjahr.
+
+### Neu
+
+- **Probleme, Ideen und Feedback aus Discord:** `/problem`, `/idee` und
+  `/feedback`, „Problem melden“ im Panel und ein neuer Knopf „Melden“ im
+  Dashboard. Jede Meldung geht zuerst in einen privaten Team-Kanal im
+  OmniFM-Server, den @everyone nicht sieht. Öffentlich im Forum steht sie
+  nur, wenn die Person das angekreuzt hat und das Team auf „Im Forum
+  veröffentlichen“ klickt, und dann ohne Server und ohne Namen. Wer „Gib mir
+  Bescheid“ ankreuzt, bekommt eine Direktnachricht, wenn die Meldung
+  erledigt oder abgelehnt ist, auf Wunsch mit einer Antwort des Teams. Die
+  Forum-Beiträge tragen den Status als Tag. In der Owner-Konsole stehen die
+  Meldungen unter „Meldungen“, dort werden auch Team-Kanal und Foren
+  eingestellt; ohne Team-Kanal bleibt alles wie bisher. (#436, #437)
+- **Ostereiersuche:** Von Palmsonntag bis Ostermontag bringt etwa jeder
+  achte Song ein Ei ins Panel, selten ein goldenes, das 5 zählt. Wer zuerst
+  klickt, bekommt es, auch wenn viele gleichzeitig klicken. `/ostereier`
+  zeigt die Bestenliste des Servers, nur für den, der fragt. Die Server
+  schalten die Suche im Dashboard unter „Saison-Deko“ ab; die Owner-Konsole
+  zeigt je Server die drei mit den meisten Eiern. (#429)
+- **Datenschutz:** Die Datenschutzerklärung erklärt beides in allen neun
+  Sprachen. `/meine-daten` zeigt Meldungen und Eier und löscht sie mit
+  „Alles löschen“. Entschiedene Meldungen werden nach 180 Tagen gelöscht,
+  offene nach einem Jahr, die Eier 30 Tage nach Ostermontag. (#436, #437,
+  #429)
+
+### Behoben
+
+- **Sicherheitsupdate:** Die HTTP-Bibliothek von discord.js (undici) steht
+  auf 6.29.0. Die alte Version ließ sich mit einem kaputten
+  WebSocket-Paket zum Absturz bringen. (#459)
+
 ## 3.14.0 – 2026-09-29
 
 Zeigen statt erklären: die ersten Schritte als Live-Demos, eine Anleitung
