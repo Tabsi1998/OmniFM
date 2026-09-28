@@ -545,6 +545,15 @@ class RemoteWorkerHandle {
     return null;
   }
 
+  // The live view's buttons in the dashboard (#304).
+  async restartStationFromDashboard(guildId) {
+    return this.sendCommand("restartStation", { guildId }, { timeoutMs: 20_000 });
+  }
+
+  async reconnectVoiceFromDashboard(guildId) {
+    return this.sendCommand("reconnectVoice", { guildId }, { timeoutMs: 20_000 });
+  }
+
   async setSleepTimerInGuild(guildId, minutes) {
     return this.sendCommand("setSleepTimer", { guildId, minutes }, { timeoutMs: 15_000 });
   }

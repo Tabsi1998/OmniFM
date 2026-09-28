@@ -19,6 +19,7 @@
 
 import { log } from "../lib/logging.js";
 import { recordUnexpectedPlaybackTransition } from "../services/operator-alerts.js";
+import { recordPlaybackTimelineEntry } from "../playback-timeline-store.js";
 
 const PLAYBACK_PHASES = Object.freeze(["idle", "connecting", "starting", "playing", "paused", "recovering", "parked"]);
 
@@ -92,6 +93,10 @@ function notePlaybackPhase(state, reason = "", now = Date.now()) {
  */
 function recordPlaybackPhase(runtime, guildId, state, reason = "") {
   const transition = notePlaybackPhase(state, reason);
+  // The dashboard's live view keeps every change for a day (#304); never waited for.
+  if (transition) {
+    recordPlaybackTimelineEntry({ guildId, bot: { id: runtime?.config?.id, name: runtime?.config?.name }, transition, state }).catch(() => null);
+  }
   if (transition?.unexpected) {
     log(
       "WARN",
