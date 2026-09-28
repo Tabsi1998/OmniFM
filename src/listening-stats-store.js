@@ -424,8 +424,13 @@ export async function endListeningSession(guildId, { botId = "" } = {}) {
 
   // Save to MongoDB
   await mongoSafe(async (db) => {
-    // Store completed session (without raw samples for space)
-    await db.collection("listening_sessions").insertOne(completedSession);
+    // Store completed session (without raw samples for space). Start and end
+    // go in as dates: MongoDB's 180-day TTL on endedAt only acts on dates.
+    await db.collection("listening_sessions").insertOne({
+      ...completedSession,
+      startedAt: new Date(completedSession.startedAt),
+      endedAt: new Date(completedSession.endedAt),
+    });
 
     for (const day of dailyBreakdown) {
       const isStartDay = day.date === todayDateString(session.startedAt);
@@ -724,7 +729,7 @@ export function __resetListeningStatsStoreForTests({ deleteFiles = false } = {})
 }
 
 // Split into topic modules (#295); the public API stays here.
-export { migrateJsonToMongo } from "./listening-stats/migration.js";
+export { convertSessionDates, migrateJsonToMongo } from "./listening-stats/migration.js";
 export {
   getGlobalStats,
   getGuildConnectionHealth,
