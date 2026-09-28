@@ -5,7 +5,6 @@ const messages = {
     links: [
       { key: 'flow', label: 'Ablauf', href: '#features' },
       { key: 'why', label: 'Warum', href: '#why-omnifm' },
-      { key: 'dashboard', label: 'Dashboard', href: '#dashboard-showcase' },
       { key: 'stations', label: 'Stationen', page: 'stations' },
       { key: 'pricing', label: 'Preise', page: 'premium' },
       { key: 'faq', label: 'FAQ', page: 'faq' },
@@ -75,51 +74,29 @@ const messages = {
     subtitle: 'OmniFM ist am stärksten, wenn Musik, Stabilität und Server-Verwaltung zusammenkommen.',
     cards: {
       radio: {
+        label: 'Radio',
         title: 'Sofort startklar',
         desc: 'Commander einladen, Worker hinzufügen, /play ausführen und direkt Radio hören. Kein schweres Setup, bevor der erste Nutzen sichtbar wird.',
       },
       workers: {
+        label: 'Worker',
         title: 'Mehr als ein einzelner Bot',
         desc: 'Die Worker-Architektur verteilt Streams sauber und macht parallele Nutzung für größere Communities planbar.',
       },
       control: {
+        label: 'Steuerung',
         title: 'Steuerung für Admins',
         desc: 'Dashboard, Events, Rollenrechte und Statusansichten geben Pro-Servern echte Kontrolle statt nur mehr Sendern.',
       },
       growth: {
+        label: 'Wachstum',
         title: 'Wachstum ohne Bruch',
         desc: 'Free, Pro und Ultimate bauen logisch aufeinander auf und decken von Einstieg bis Operator-Setup denselben Produktkern ab.',
       },
     },
   },
-  dashboardShowcase: {
-    eyebrow: 'Dashboard und Betrieb',
-    title: 'Pro und Ultimate bringen echte Server-Steuerung',
-    subtitle: 'OmniFM ist nicht nur ein Bot zum Starten von Streams. Mit dem Dashboard wird daraus ein verwaltbares System für Events, Rechte, Health, Analytics und Automatisierung.',
-    cards: {
-      events: {
-        title: 'Event-Scheduler',
-        desc: 'Plane automatische Starts für wiederkehrende Sessions, Community-Abende oder feste Musik-Slots.',
-      },
-      permissions: {
-        title: 'Rollenrechte pro Command',
-        desc: 'Lege sauber fest, wer /event, /perm oder andere sensible Befehle auf deinem Server nutzen darf.',
-      },
-      health: {
-        title: 'Health und Analytics',
-        desc: 'Behalte Server-Status, Basis-Metriken und in Ultimate auch tiefere Analytics im Blick.',
-      },
-      automation: {
-        title: 'Custom Stations und Webhooks',
-        desc: 'Ultimate erweitert OmniFM für Power-User mit eigenen Stationen, Exporten und Automatisierungs-Hooks.',
-      },
-    },
-    primaryCta: 'Dashboard ansehen',
-    secondaryCta: 'Pläne vergleichen',
-    ctaNote: 'Die Grundfunktionen hat jeder Server. Upgrade bedeutet mehr Kontrolle, nicht einen neuen Produktpfad.',
-  },
   stations: {
-    eyebrow: 'Live Station Directory',
+    eyebrow: 'Live-Senderverzeichnis',
     title: 'OmniFM Stationen',
     summary: ({ count, free, pro, ultimate }) => `${count} Stationen (${free} Free, ${pro} Pro, ${ultimate} Ultimate). Klicke zum Vorhören oder nutze /play im Discord.`,
     nowPlaying: 'Vorschau läuft',
@@ -213,7 +190,7 @@ const messages = {
     titleLead: 'Läuft im ',
     titleAccent: 'Voice-Channel',
     titleTail: ', gesteuert per Slash-Command.',
-    body: 'Kein Browser-Player, kein Abspielen auf der Website. OmniFM streamt 24/7 direkt in deinen Discord-Voice-Channel – mit sauberen Now-Playing-Embeds, Buttons und Reconnect.',
+    body: 'Auf der Website hörst du nur rein – laufen tut OmniFM 24/7 direkt in deinem Discord-Sprachkanal, mit Now-Playing-Panel, Knöpfen und automatischem Wiederverbinden.',
     cmds: [
       ['/play synthwave', 'Startet den Stream im Voice-Channel'],
       ['/now', 'Zeigt Live-Titel, Cover & Hörer'],
@@ -227,7 +204,7 @@ const messages = {
   howTo: {
     eyebrow: 'How-To · in unter 60 Sekunden',
     title: 'So startest du OmniFM in Discord',
-    subtitle: 'Kein Browser-Player. Drei Schritte, dann läuft dein Radio 24/7 direkt im Voice-Channel.',
+    subtitle: 'Drei Schritte, dann läuft dein Radio 24/7 direkt im Sprachkanal.',
     steps: [
       { n: '01', cmd: 'App hinzufügen', title: 'Commander einladen', desc: 'Füge den OmniFM Commander zu deinem Server hinzu. Er nimmt alle Slash-Commands entgegen und verwaltet deine Worker.' },
       { n: '02', cmd: '/invite', title: 'Worker-Bot hinzufügen', desc: 'Lade mindestens einen Worker ein. Er übernimmt den eigentlichen Voice-Stream – mehr Worker = mehr parallele Channels.' },

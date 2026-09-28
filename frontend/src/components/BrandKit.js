@@ -67,7 +67,7 @@ export default function BrandKit({ embedded = false }) {
         <div className="oa-grid cols-3" data-testid="brand-catalog">
           {BRAND_ASSETS.map((a) => (
             <div className="oa-card hoverable" key={a.slug} data-testid={`brand-asset-${a.slug}`}>
-              <div style={{ height: 150, borderRadius: 12, background: bgFor(a.bg), display: 'grid', placeItems: 'center', overflow: 'hidden', marginBottom: 14, border: '1px solid #1b2133' }}>
+              <div style={{ height: 150, borderRadius: 12, background: bgFor(a.bg), display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: 14, border: '1px solid #1b2133' }}>
                 <img src={a.file} alt={t(a.label.de, a.label.en)} style={{ maxWidth: '82%', maxHeight: '82%', objectFit: 'contain' }} />
               </div>
               <div style={{ fontWeight: 700, fontSize: 15 }}>{t(a.label.de, a.label.en)}</div>

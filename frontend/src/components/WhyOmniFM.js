@@ -64,7 +64,7 @@ export default function WhyOmniFM() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                   <Icon size={18} color={card.color} />
                   <span style={{ fontSize: 10, color: card.color, textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 800 }}>
-                    {card.key}
+                    {item.label}
                   </span>
                 </div>
                 <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 700, marginBottom: 8 }}>

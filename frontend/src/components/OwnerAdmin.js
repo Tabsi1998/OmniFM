@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Radio,
   LayoutDashboard,
   KeyRound,
   ListMusic,
@@ -568,7 +567,7 @@ export default function OwnerAdmin() {
     <div className="oa-root" data-testid="owner-admin">
       <aside className="oa-sidebar">
         <div className="oa-brand">
-          <div className="oa-brand-logo"><Radio size={20} /></div>
+          <div className="oa-brand-logo"><img src="/brand/omnifm-mark.svg" alt="" width="28" height="28" /></div>
           <div>
             <div className="oa-display" style={{ fontSize: 18, fontWeight: 800 }}>OmniFM</div>
             <div className="oa-owner-badge">Owner Engine</div>
