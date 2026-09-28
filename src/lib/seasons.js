@@ -122,7 +122,12 @@ function secondsToMidnight(local) {
   return 86_400 - (local.hour * 3600 + local.minute * 60 + local.second);
 }
 
-function state(season, phase, { candles = 0, year, countdown = null } = {}) {
+/**
+ * @param {string} season
+ * @param {string} phase
+ * @param {{ candles?: number, year: number, countdown?: number | null }} details
+ */
+function state(season, phase, { candles = 0, year, countdown = null }) {
   return { season, phase, candles, year, secondsToMidnight: countdown };
 }
 
@@ -207,6 +212,7 @@ export function normalizeOwnerSeasons(raw) {
  * unless the owner or the server switched that season off. The owner's test
  * mode forces its look on the servers it names, whatever the date and the
  * season switches say; the parts still follow the server's switches.
+ * @param {{ now?: Date, guildId?: string, timeZone?: string, server?: any, owner?: any }} [options]
  */
 export function seasonForServer({ now = new Date(), guildId = "", timeZone = DEFAULT_SEASON_TIME_ZONE, server, owner } = {}) {
   const settings = normalizeSeasonSettings(server);
