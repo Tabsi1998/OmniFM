@@ -84,7 +84,10 @@ test("React SEO assets and base metadata are present", () => {
   assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/datenschutz<\/loc>/);
   assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/nutzungsbedingungen<\/loc>/);
   assert.equal(manifest.name, "OmniFM");
-  assert.equal(manifest.start_url, "/");
+  // The installed app opens the dashboard (#305); the id keeps an earlier install the same app.
+  assert.equal(manifest.start_url, "/dashboard");
+  assert.equal(manifest.id, "/");
+  assert.ok(manifest.icons.some((icon) => icon.purpose === "maskable" && icon.sizes === "512x512"), "a maskable icon for Android");
   assert.ok(manifest.icons.length > 0, "the manifest declares icons");
   for (const icon of manifest.icons) {
     // Width and height of a PNG sit in its IHDR chunk at bytes 16-23. The

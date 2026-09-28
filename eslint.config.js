@@ -57,6 +57,17 @@ export default [
     },
   },
   {
+    // The service worker (#305): a classic script in the worker's scope; the
+    // `module` check at its end only serves the tests.
+    files: ["frontend/public/sw.js"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "script",
+      globals: { ...globals.serviceworker, module: "readonly" },
+    },
+    rules: sharedRules,
+  },
+  {
     files: ["frontend/src/**/*.{js,jsx}"],
     languageOptions: {
       ecmaVersion: "latest",
