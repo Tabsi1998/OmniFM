@@ -99,6 +99,9 @@ describe('legal pages', () => {
     const toc = screen.getByTestId('legal-toc');
     expect(toc.querySelector('a[href="#privacy-transfers"]').textContent).toBe('Übermittlung in Länder außerhalb der EU');
     expect(document.getElementById('privacy-transfers').textContent).toContain('Data Privacy Framework');
+    // Art. 13 (1)(c) and (2)(e)/(f): consent as a legal basis, voluntary data, no automated decisions.
+    expect(document.getElementById('privacy-basis').textContent).toContain('Art. 6 Abs. 1 lit. a DSGVO');
+    expect(document.getElementById('privacy-voluntary').textContent).toContain('Art. 22 DSGVO');
     expect(text).toContain('Österreich | EU');
     expect(screen.getByTestId('legal-facts').textContent).not.toContain('Hosting-Anbieter');
     for (const phrase of OPERATOR_ONLY) expect(text).not.toContain(phrase);

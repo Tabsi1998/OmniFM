@@ -268,7 +268,9 @@ const messages = {
       retentionTitle: 'Saklama süresi',
       retentionBody: ({ logDays, songHistoryMaxPerGuild }) => `Döngüsel teknik kayıtlar genellikle en fazla ${logDays} gün saklanır. Şarkı geçmişi sunucu başına yapılandırılmış en fazla ${songHistoryMaxPerGuild} kayıtla saklanır. Lisans, ayar, istatistik ve etkinlik verileri silinene, değiştirilene veya yasal nedenlerle artık gerekmeyene kadar saklanır. OmniFM bir sunucudan kaldırılırsa sunucu sahibi tarihi içeren bir özel mesaj alır: 30 gün sonra o sunucunun ayarlarını, kendi istasyonlarını, etkinliklerini, istatistiklerini ve şarkı geçmişini sileriz. OmniFM bundan önce yeniden davet edilirse her şey kalır. Premium lisanslar saklanır.`,
       basisTitle: 'Hukuki dayanaklar',
-      basisBody: 'İşlemeye göre OmniFM başlıca GDPR Madde 6(1)(b) (sözleşme/hizmet), GDPR Madde 6(1)(c) (yasal yükümlülükler) ve GDPR Madde 6(1)(f) (güvenlik, hizmet istikrarı ve kötüye kullanımın önlenmesindeki meşru menfaatler) hükümlerine dayanır.',
+      basisBody: 'OmniFM verileri yalnızca yasanın bir gerekçe sunduğu durumlarda işler: kullandığın hizmet için gerekli olduğunda (GDPR Madde 6(1)(b)), bir yasa gerektirdiğinde, örneğin saklama yükümlülükleri (GDPR Madde 6(1)(c)), iznin olduğunda, örneğin Google Analytics için (GDPR Madde 6(1)(a) ve 2021 tarihli Avusturya Telekomünikasyon Kanunu § 165(3)) ya da OmniFM’in hizmeti güvenli, istikrarlı ve kötüye kullanımdan uzak tutmakta meşru bir menfaati olduğunda (GDPR Madde 6(1)(f)).',
+      voluntaryTitle: 'Gönüllü veriler ve otomatik karar yok',
+      voluntaryBody: 'Hiçbir yasa ya da sözleşme seni OmniFM’e veri vermeye zorlamaz. Ancak bazı veriler olmadan bazı şeyler çalışmaz: bot Discord’daki sunucu ve kanal kimliklerine, panel Discord ile girişine, lisans veya deneme ayı ise e-posta adresine ihtiyaç duyar. OmniFM, yalnızca otomatik işlemeye dayanan ve seni hukuken ya da benzer ölçüde önemli şekilde etkileyen kararlar almaz (GDPR Madde 22).',
       rightsTitle: 'Hakların',
       rightsBody: 'Yasal koşullar sağlandığında şu haklarını kullanabilirsin:',
       rightsItems: [

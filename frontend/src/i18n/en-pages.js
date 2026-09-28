@@ -267,7 +267,9 @@ const messages = {
       retentionTitle: 'Retention',
       retentionBody: ({ logDays, songHistoryMaxPerGuild }) => `Technical rotated logs are typically retained for up to ${logDays} days. Song history is retained per server up to the configured maximum of ${songHistoryMaxPerGuild} entries. License, settings, statistics, and event data remain stored until they are deleted, replaced, or no longer required for legal reasons. If OmniFM is removed from a server, the server owner gets a direct message with the date: 30 days later we delete that server's settings, own stations, events, statistics and song history. If OmniFM is invited again before then, everything stays. Premium licenses are kept.`,
       basisTitle: 'Legal bases',
-      basisBody: 'Depending on the processing activity, OmniFM primarily relies on Article 6(1)(b) GDPR (contract/service), Article 6(1)(c) GDPR (legal obligations), and Article 6(1)(f) GDPR (legitimate interests in security, service stability, and abuse prevention).',
+      basisBody: 'OmniFM only processes data when the law gives a reason: because it is needed for the service you use (Art. 6(1)(b) GDPR), because a law requires it, such as retention duties (Art. 6(1)(c) GDPR), because you consented, such as for Google Analytics (Art. 6(1)(a) GDPR and § 165(3) of the Austrian Telecommunications Act 2021), or because OmniFM has a legitimate interest in keeping the service secure, stable and free from abuse (Art. 6(1)(f) GDPR).',
+      voluntaryTitle: 'Voluntary data and no automated decisions',
+      voluntaryBody: 'No law and no contract obliges you to give OmniFM any data. Without certain data, some things do not work, though: the bot needs the server and channel IDs from Discord, the dashboard needs you to sign in with Discord, and a license or the trial month needs your email address. OmniFM makes no decisions that are taken by a computer alone and affect you legally or in a similarly significant way (Art. 22 GDPR).',
       rightsTitle: 'Your rights',
       rightsBody: 'You may exercise the following rights where the legal requirements are met:',
       rightsItems: [

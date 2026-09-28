@@ -92,7 +92,8 @@ function PrivacySection({ legal, privacy }) {
       songHistoryMaxPerGuild: retention.songHistoryMaxPerGuild || 100,
     })],
     ['basis', sections.basisTitle, sections.basisBody],
-    ['rights', sections.rightsTitle, sections.rightsBody, sections.rightsItems],
+    ['voluntary', sections.voluntaryTitle, sections.voluntaryBody],
+    ['rights',sections.rightsTitle, sections.rightsBody, sections.rightsItems],
     ['contact', sections.contactTitle, sections.contactBody({ authorityName: authority.name || text.defaultAuthorityName })],
     ['note', fields.customNote, privacy?.customNote || ''],
   ].map(([key, title, body, items]) => ({ id: `privacy-${key}`, title, body, items }));
