@@ -2,7 +2,8 @@
 // invitation to the first song, each step with its live demo (#431), then
 // the dashboard and what helps when something does not work. The bot links
 // here from its welcome message, /setup and /help; the start page's how-to,
-// the menu and the FAQ do too.
+// the menu and the FAQ do too. Its texts are one small file per language
+// (i18n/guide/), loaded with this page only.
 import { useEffect, useState } from 'react';
 import { ArrowRight, ChevronDown, ChevronUp, LifeBuoy, Sparkles } from 'lucide-react';
 import { useI18n } from '../i18n.js';
@@ -11,6 +12,18 @@ import { buildPageHref } from '../lib/pageRouting.js';
 import LiveDemo from './demo/LiveDemo.js';
 
 const DEMO_OF_STEP = { commander: 'commander', worker: 'worker', play: 'play', panel: 'panel' };
+const GUIDE_TEXTS = import.meta.glob('../i18n/guide/*.js');
+
+function useGuideTexts(locale) {
+  const [texts, setTexts] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    const load = GUIDE_TEXTS[`../i18n/guide/${locale}.js`] || GUIDE_TEXTS['../i18n/guide/en.js'];
+    load().then((module) => { if (alive) setTexts(module.default); });
+    return () => { alive = false; };
+  }, [locale]);
+  return texts;
+}
 
 const css = `
 .sg-step { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 40px; align-items: start; }
@@ -51,8 +64,13 @@ function HelpItem({ item, open, onToggle }) {
 }
 
 export default function StartGuide({ bots = [] }) {
-  const { copy, locale } = useI18n();
-  const s = copy.startGuide;
+  const { locale } = useI18n();
+  const texts = useGuideTexts(locale);
+  // Until the texts are there, room for the page, so the footer does not jump up.
+  return texts ? <Guide s={texts} bots={bots} locale={locale} /> : <div aria-busy="true" style={{ minHeight: '100vh' }} />;
+}
+
+function Guide({ s, bots, locale }) {
   const inviteUrl = resolvePrimaryInviteUrl(bots);
   const external = inviteUrl.startsWith('http');
   const [open, setOpen] = useState(s.help[0]?.key || '');

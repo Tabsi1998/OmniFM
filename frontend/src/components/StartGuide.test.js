@@ -33,13 +33,15 @@ afterEach(() => {
   window.history.replaceState(null, '', '/');
 });
 
-function guide() {
-  return render(<I18nProvider><StartGuide bots={BOTS} /></I18nProvider>);
+async function guide() {
+  const view = render(<I18nProvider><StartGuide bots={BOTS} /></I18nProvider>);
+  await screen.findByTestId('start-guide');
+  return view;
 }
 
 describe('the page "Erste Schritte"', () => {
-  it('walks from the invitation to the dashboard, each Discord step with its demo', () => {
-    guide();
+  it('walks from the invitation to the dashboard, each Discord step with its demo', async () => {
+    await guide();
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('OmniFM in fünf Minuten einrichten');
     const steps = ['commander', 'worker', 'play', 'panel', 'dashboard'];
     for (const step of steps) expect(screen.getByTestId(`start-step-${step}`)).toBeTruthy();
@@ -52,8 +54,8 @@ describe('the page "Erste Schritte"', () => {
     expect(screen.getByTestId('start-community').getAttribute('href')).toBe('https://discord.gg/UeRkfGS43R');
   });
 
-  it('answers the stumbling blocks one at a time, the first one open', () => {
-    guide();
+  it('answers the stumbling blocks one at a time, the first one open', async () => {
+    await guide();
     const join = screen.getByTestId('start-help-join');
     const silent = screen.getByTestId('start-help-silent');
     expect(join.textContent).toContain('„Verbinden“ und „Sprechen“');
@@ -64,25 +66,51 @@ describe('the page "Erste Schritte"', () => {
     expect(silent.querySelector('button').getAttribute('aria-expanded')).toBe('true');
   });
 
-  it('has a table of contents whose every entry lands on the page', () => {
-    const { container } = guide();
+  it('has a table of contents whose every entry lands on the page', async () => {
+    const { container } = await guide();
     const targets = [...container.querySelectorAll('nav a')].map((link) => link.getAttribute('href'));
     expect(targets).toEqual(['#commander', '#worker', '#play', '#panel', '#dashboard', '#help']);
     for (const target of targets) expect(container.querySelector(target)).not.toBeNull();
   });
 
-  it('scrolls to the help when the bot links to /start#help', () => {
+  it('scrolls to the help when the bot links to /start#help', async () => {
     const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView');
     window.history.replaceState(null, '', '/start?lang=de#help');
-    guide();
+    await guide();
     expect(scroll).toHaveBeenCalledTimes(1);
     expect(scroll.mock.instances[0].id).toBe('help');
   });
 });
 
+describe('the texts of the guide', () => {
+  const texts = import.meta.glob('../i18n/guide/*.js', { eager: true, import: 'default' });
+  const shape = (value) => (Array.isArray(value)
+    ? value.map((entry) => shape(entry))
+    : value && typeof value === 'object'
+      ? Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, key === 'id' || key === 'key' ? entry : shape(entry)]))
+      : typeof value);
+
+  it('exist in all nine languages with the same steps, tips and answers as English', () => {
+    const codes = Object.keys(texts).map((file) => file.match(/guide\/(\w+)\.js$/)[1]).sort();
+    expect(codes).toEqual(['de', 'en', 'es', 'fr', 'it', 'nl', 'pl', 'pt', 'tr']);
+    const english = shape(texts['../i18n/guide/en.js']);
+    for (const [file, guide] of Object.entries(texts)) {
+      expect(shape(guide), file).toEqual(english);
+      const strings = JSON.stringify(guide).match(/"(?:[^"\\]|\\.)*"/g);
+      expect(strings.every((entry) => entry.length > 2), file).toBe(true);
+    }
+  });
+
+  it('load in the language of the page', async () => {
+    vi.spyOn(window.navigator, 'languages', 'get').mockReturnValue(['fr-FR']);
+    render(<I18nProvider><StartGuide bots={BOTS} /></I18nProvider>);
+    expect((await screen.findByRole('heading', { level: 1 })).textContent).toBe('Installer OmniFM en cinq minutes');
+  });
+});
+
 describe('the ways to the guide', () => {
   it('the menu, the how-to and the FAQ link to /start', () => {
-    const { container } = render(
+    render(
       <I18nProvider>
         <Navbar page="home" />
         <HowToDiscord bots={BOTS} />
