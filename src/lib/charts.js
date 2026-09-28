@@ -78,7 +78,9 @@ function movementOf(before, rank) {
 
 function rankedStations(rows, catalog, { minServers, size }) {
   return rows
-    .filter((row) => catalog[row?.stationKey] && Number(row?.servers) >= minServers && Number(row?.listeningMs) >= HOUR_MS / 60)
+    // At least one listening hour: a station many servers run with nobody
+    // listening is no "most listened" station (it showed as "0 hours").
+    .filter((row) => catalog[row?.stationKey] && Number(row?.servers) >= minServers && Number(row?.listeningMs) >= HOUR_MS)
     .sort((a, b) => b.listeningMs - a.listeningMs || b.servers - a.servers || String(a.stationKey).localeCompare(String(b.stationKey)))
     .slice(0, size);
 }

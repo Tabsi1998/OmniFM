@@ -34,6 +34,8 @@ test("stations: only catalogue stations of enough servers, by listening time", (
     { stationKey: "einslive", listeningMs: 90 * HOUR, servers: CHART_MIN_SERVERS - 1 },
     { stationKey: "custom:myserver", listeningMs: 500 * HOUR, servers: 9 },
     { stationKey: "deepspace", listeningMs: 12.34 * HOUR, servers: CHART_MIN_SERVERS },
+    // Run on many servers, but hardly anyone listened: not a most listened station.
+    { stationKey: "einslive", listeningMs: 20 * 60_000, servers: 9 },
   ];
   const chart = rankStations(rows, [{ stationKey: "deepspace", listeningMs: 50 * HOUR, servers: 4 }], CATALOG);
   assert.deepEqual(chart.map((entry) => [entry.rank, entry.key, entry.hours, entry.movement]), [

@@ -419,7 +419,8 @@ async function inspectSeo(baseUrl) {
       path: "/manifest.json",
       assertions: [
         { label: "app name", regex: /"name"\s*:\s*"OmniFM"/i },
-        { label: "start url", regex: /"start_url"\s*:\s*"\/"/i },
+        // The installed app opens the dashboard (#305).
+        { label: "start url", regex: /"start_url"\s*:\s*"\/dashboard"/i },
       ],
     },
     {

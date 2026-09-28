@@ -188,7 +188,7 @@ const messages = {
     listen: ({ name }) => `Listen to ${name}`,
     pause: ({ name }) => `Pause ${name}`,
     logoAlt: ({ name }) => `Logo of ${name}`,
-    emptyStations: 'Last week no station ran on enough servers for the charts yet.',
+    emptyStations: 'Last week no station had enough listeners on enough servers for the charts yet.',
     week: ({ week, from, to }) => `Week ${week} · ${from} to ${to}`,
     plays: ({ count }) => `${count} plays`,
     servers: ({ count }) => `on ${count} servers`,

@@ -6,6 +6,68 @@ folgt [SemVer](https://semver.org/lang/de/): Die erste Zahl steigt bei
 Funktionen, die dritte bei reinen Fehlerbehebungen. Wie ein Release entsteht,
 steht in `scripts/release.mjs`.
 
+## 3.8.0 – 2026-09-28
+
+Neu: eine öffentliche Statusseite, die OmniFM-Charts und OmniFM als App.
+Dazu zwei Fehler behoben, die still Daten betrafen.
+
+### Neu
+
+- **Statusseite (omnifm.xyz/status):** zeigt, ob OmniFM selbst läuft: jeder
+  Bot mit seiner Verfügbarkeit über 90 Tage, aktuelle Störungen, geplante
+  Wartungen und die Vorfälle der letzten 14 Tage. Servernamen und Hörerzahlen
+  einzelner Server stehen dort nie. Gemessen wird jede Minute; ein Ausfall
+  unter 2 Minuten (ein Neustart) ist keine Störung. Störungen mit Erklärung und
+  geplante Wartungen trägst du in der Owner-Konsole unter „Bots & Discord ›
+  Statusseite“ ein. `/status` im Bot hat einen Knopf zur Statusseite. (#299,
+  #396)
+- **OmniFM-Charts (omnifm.xyz/charts):** oben die meistgehörten Sender der
+  letzten Woche (nach Hörstunden, also wie lange Menschen zugehört haben),
+  darunter die meistgespielten Songs, gezählt über alle Server. Hinein kommt
+  nur, was auf mindestens 3 Servern lief, bei den Sendern nur Sender aus dem
+  OmniFM-Katalog mit mindestens einer Hörstunde; so lässt sich kein einzelner
+  Server erkennen. Jeder Sender
+  lässt sich auf der Seite direkt anhören. Auf Wunsch postet der Commander die
+  Charts jeden Montag ab 10 Uhr in einen Kanal deiner Wahl: Owner-Konsole ›
+  „Bots & Discord › OmniFM-Charts“. (#300, #401)
+- **OmniFM als App:** auf dem Handy „Zum Startbildschirm hinzufügen“, am
+  Rechner das Installieren-Symbol in der Adressleiste. Die App öffnet direkt
+  das Dashboard. (#305, #406)
+
+### Behoben
+
+- **Sender-CLI (`npm run stations`):** Sie hat Änderungen nicht abgewartet (im
+  Assistenten schlug jede zweite Änderung fehl) und nie mit MongoDB
+  gesprochen: In Produktion landeten Änderungen in einer Datei, die weder der
+  Bot noch die Owner-Konsole liest, obwohl „hinzugefuegt“ dastand. Jetzt
+  speichert sie dort, wo Bot und Owner-Konsole lesen. (#298, #399)
+- **Hör-Sitzungen wurden nie gelöscht:** Die Löschung nach 180 Tagen griff
+  nicht, weil Start und Ende als Text gespeichert waren. Neue Sitzungen haben
+  jetzt Datumswerte, ältere werden beim Start einmal umgewandelt. Die Summen
+  der Statistik bleiben, sie liegen getrennt. (#407)
+
+### Intern
+
+- Frontend aufgeteilt: Die Startseite lädt nur, was sie zeigt; Dashboard,
+  Owner-Konsole und Diagramme kommen erst auf ihren Seiten. Keine Datei im
+  Frontend hat mehr als 800 Zeilen. (#296, #394, #395)
+- ESLint: kein Befund mehr im ganzen Projekt, und ein neuer lässt sich nicht
+  mehr in die Liste aufnehmen. (#297, #397, #400)
+- Typprüfung erweitert um die Discord-Oberfläche, Premium, die Stores und die
+  Sender-CLI. Dabei gefunden: Der Discord-Shop übergab einen Zeitpunkt, den die
+  Ablaufprüfung ignorierte; live ohne Wirkung, jetzt richtig. (#298, #398,
+  #399)
+- Dependabot schlägt keine Node-Typen für eine neuere Node-Version mehr vor;
+  der Bot läuft auf Node 22. (#403)
+
+### Nach dem Update
+
+- Beim ersten Start wandelt der Bot die alten Hör-Sitzungen um (Logzeile
+  „Listening-Sessions: … umgewandelt“). Danach löscht MongoDB Sitzungen, die
+  älter als 180 Tage sind.
+- Die Statusseite füllt ihre Balken ab dem Update-Tag; ältere Tage zeigen
+  „keine Messung“.
+
 ## 3.7.0 – 2026-09-27
 
 Auf der Website wird nichts mehr verkauft: Stripe ist raus, Premium kommt
