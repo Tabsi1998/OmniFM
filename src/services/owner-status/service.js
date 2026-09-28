@@ -23,6 +23,7 @@ import {
   checkBotLists,
   checkBots,
   checkDiscordLogin,
+  checkLegal,
   checkMongo,
   checkOperatorWebhook,
   checkRecognition,
@@ -97,6 +98,7 @@ export function createOwnerStatusService({
       ],
     }),
     stations: () => checkStations({ report: getStationHealthReport() }),
+    legal: (context) => checkLegal({ ownerConfig: context.ownerConfig, env }),
     version: () => checkVersion({ runningVersion, fetchImpl }),
   };
   const table = checks || defaultChecks;

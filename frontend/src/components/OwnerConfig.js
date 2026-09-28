@@ -4,6 +4,7 @@ import {
   Tag, Terminal, ShieldCheck, Info, Star, Heart, Mail, Music2, History, Fingerprint, Globe2, BellRing, Users, KeyRound,
 } from 'lucide-react';
 import { discordRedirectUriFor, secretInputValue } from '../lib/ownerConfigSecrets.js';
+import OwnerLegalChecklist from './owner/OwnerLegalChecklist.js';
 
 const labelStyle = {
   fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase',
@@ -136,6 +137,11 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
   };
 
   const setC = (k, v) => setCompany((p) => ({ ...p, [k]: v }));
+  // "Trifft nicht zu" of the legal checklist (#424), saved with the company data.
+  const setNotApplicable = (key, on) => setCompany((p) => {
+    const list = Array.isArray(p.legalNotApplicable) ? p.legalNotApplicable.filter((entry) => entry !== key) : [];
+    return { ...p, legalNotApplicable: on ? [...list, key] : list };
+  });
   const setPlan = (tier, k, v) => setPlans((p) => ({ ...p, [tier]: { ...p[tier], [k]: v } }));
 
   if (loadError) {
@@ -382,6 +388,14 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
     if (!company) return <div className="oa-sub">Lade Konfiguration…</div>;
     return (
       <div className="oa-fade" data-testid="config-company">
+        <OwnerLegalChecklist
+          apiGet={apiGet}
+          token={token}
+          version={loaded.company}
+          notApplicable={company.legalNotApplicable}
+          onNotApplicable={setNotApplicable}
+          dirty={isDirty('company')}
+        />
         <div className="oa-card" style={{ marginBottom: 18 }}>
           <div className="oa-section-title"><Building2 size={15} /> Unternehmensdaten (Österreich)</div>
           <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 16 }}>
@@ -405,13 +419,43 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
         </div>
 
         <div className="oa-card" style={{ marginBottom: 18 }}>
+          <div className="oa-section-title"><Tag size={15} /> Gewerbe &amp; Firmenbuch (nur wenn zutreffend)</div>
+          <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 16 }}>
+            Mit Gewerbeschein oder Firmenbucheintrag gehören diese Angaben ins Impressum. Leere Felder erscheinen auf der Website nicht.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 18px' }}>
+            <Field label="Gewerbebehörde" value={company.supervisoryAuthority} onChange={(v) => setC('supervisoryAuthority', v)} placeholder="z.B. Magistrat der Stadt Linz" testid="cfg-company-authority" />
+            <Field label="Kammer" value={company.chamber} onChange={(v) => setC('chamber', v)} placeholder="z.B. Wirtschaftskammer Oberösterreich" testid="cfg-company-chamber" />
+            <Field label="Berufsbezeichnung" value={company.profession} onChange={(v) => setC('profession', v)} placeholder="z.B. Dienstleistungen in der automatischen Datenverarbeitung, verliehen in Österreich" testid="cfg-company-profession" />
+            <Field label="Berufsrecht" value={company.professionRules} onChange={(v) => setC('professionRules', v)} placeholder="Gewerbeordnung, www.ris.bka.gv.at" testid="cfg-company-profession-rules" />
+            <Field label="Firmenbuchnummer" value={company.commercialRegisterNumber} onChange={(v) => setC('commercialRegisterNumber', v)} placeholder="z.B. FN 123456a" testid="cfg-company-register-number" />
+            <Field label="Firmenbuchgericht" value={company.commercialRegisterCourt} onChange={(v) => setC('commercialRegisterCourt', v)} placeholder="z.B. Landesgericht Linz" testid="cfg-company-register-court" />
+          </div>
+        </div>
+
+        <div className="oa-card" style={{ marginBottom: 18 }}>
+          <div className="oa-section-title"><Info size={15} /> Offenlegung (Mediengesetz)</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 18px' }}>
+            <Field label="Medieninhaber mit Wohnort bzw. Sitz" value={company.mediaOwner} onChange={(v) => setC('mediaOwner', v)} placeholder="z.B. Max Mustermann, Linz" testid="cfg-company-media-owner" />
+            <Field label="Redaktionell verantwortlich (optional)" value={company.editorialResponsible} onChange={(v) => setC('editorialResponsible', v)} testid="cfg-company-editorial" />
+            <Field label="Grundlegende Richtung (optional)" value={company.mediaLine} onChange={(v) => setC('mediaLine', v)} hint="Braucht eine kleine Website nicht; erscheint nur, wenn du etwas einträgst." testid="cfg-company-media-line" />
+          </div>
+        </div>
+
+        <div className="oa-card" style={{ marginBottom: 18 }}>
           <div className="oa-section-title"><ShieldCheck size={15} /> Datenschutz & Hosting</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 18px' }}>
             <Field label="Datenschutzkontakt / DSB (optional)" value={company.dpoName} onChange={(v) => setC('dpoName', v)} testid="cfg-company-dpo" />
             <Field label="Datenschutz-E-Mail (optional)" value={company.dpoEmail} onChange={(v) => setC('dpoEmail', v)} type="email" testid="cfg-company-dpo-email" />
             <Field label="Hosting-Anbieter" value={company.hostingProvider} onChange={(v) => setC('hostingProvider', v)} placeholder="z.B. Hetzner" testid="cfg-company-hosting" />
             <Field label="Hosting-Standort" value={company.hostingLocation} onChange={(v) => setC('hostingLocation', v)} placeholder="z.B. Deutschland / EU" testid="cfg-company-hosting-loc" />
-            <Field label="Terms gültig ab" value={company.effectiveDate} onChange={(v) => setC('effectiveDate', v)} placeholder="TT.MM.JJJJ" testid="cfg-company-effective" />
+          </div>
+        </div>
+
+        <div className="oa-card" style={{ marginBottom: 18 }}>
+          <div className="oa-section-title"><Info size={15} /> Nutzungsbedingungen</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 18px' }}>
+            <Field label="Nutzungsbedingungen gültig ab" value={company.effectiveDate} onChange={(v) => setC('effectiveDate', v)} placeholder="TT.MM.JJJJ" testid="cfg-company-effective" />
             <Field label="Anwendbares Recht" value={company.governingLaw} onChange={(v) => setC('governingLaw', v)} testid="cfg-company-law" />
           </div>
         </div>
