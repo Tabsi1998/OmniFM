@@ -27,6 +27,7 @@ function Movement({ entry, s }) {
     : entry.movement === 'up' ? `▲ ${steps}` : entry.movement === 'down' ? `▼ ${steps}` : '–';
   return (
     <span
+      className="charts-move"
       title={label}
       aria-label={label}
       data-movement={entry.movement}
@@ -51,7 +52,7 @@ function rowStyle(top) {
 function Rank({ rank }) {
   const top = rank <= 3;
   return (
-    <span style={{ width: 30, flexShrink: 0, textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", fontSize: top ? 24 : 18, fontWeight: 800, color: top ? '#00e5ff' : '#A1A1AA' }}>
+    <span className="charts-rank" style={{ width: 30, flexShrink: 0, textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", fontSize: top ? 24 : 18, fontWeight: 800, color: top ? '#00e5ff' : '#A1A1AA' }}>
       {rank}
     </span>
   );
@@ -59,10 +60,10 @@ function Rank({ rank }) {
 
 function Artwork({ src, alt, color, Icon }) {
   if (src) {
-    return <img src={src} alt={alt} width={52} height={52} loading="lazy" style={{ width: 52, height: 52, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />;
+    return <img className="charts-art" src={src} alt={alt} width={52} height={52} loading="lazy" style={{ width: 52, height: 52, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />;
   }
   return (
-    <span aria-hidden="true" style={{ width: 52, height: 52, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: color ? `${color}22` : 'rgba(255,255,255,0.05)', border: color ? `1px solid ${color}44` : 'none' }}>
+    <span className="charts-art" aria-hidden="true" style={{ width: 52, height: 52, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: color ? `${color}22` : 'rgba(255,255,255,0.05)', border: color ? `1px solid ${color}44` : 'none' }}>
       <Icon size={20} color={color || '#52525B'} />
     </span>
   );
@@ -72,12 +73,12 @@ function StationRow({ entry, s, formatNumber, player }) {
   const playing = Boolean(player.playing && player.current?.key === entry.key);
   const hours = formatNumber(entry.hours);
   return (
-    <li data-testid={`charts-station-${entry.rank}`} style={rowStyle(entry.rank <= 3)}>
+    <li className="charts-row" data-testid={`charts-station-${entry.rank}`} style={rowStyle(entry.rank <= 3)}>
       <Rank rank={entry.rank} />
       <Movement entry={entry} s={s} />
       <Artwork src={entry.logo} alt={s.logoAlt({ name: entry.name })} color={entry.color} Icon={Radio} />
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontWeight: 700, color: '#F4F4F5', overflowWrap: 'anywhere', lineHeight: 1.3 }}>{entry.name}</div>
+        <div style={{ fontWeight: 700, color: '#F4F4F5', overflowWrap: 'break-word', hyphens: 'auto', lineHeight: 1.3 }}>{entry.name}</div>
         {entry.genre ? <div style={{ color: '#D4D4D8', fontSize: 13 }}>{entry.genre}</div> : null}
         <div style={{ color: '#71717A', fontSize: 12, marginTop: 2 }}>
           {s.hours({ count: hours })} · {s.servers({ count: formatNumber(entry.servers) })}
@@ -105,14 +106,14 @@ function StationRow({ entry, s, formatNumber, player }) {
 function SongRow({ entry, s, formatNumber }) {
   const { artist, title } = splitTitle(entry.displayTitle);
   return (
-    <li data-testid={`charts-entry-${entry.rank}`} style={rowStyle(entry.rank <= 3)}>
+    <li className="charts-row" data-testid={`charts-entry-${entry.rank}`} style={rowStyle(entry.rank <= 3)}>
       <Rank rank={entry.rank} />
       <Movement entry={entry} s={s} />
       <Artwork src={entry.cover} alt={s.coverAlt({ title: entry.displayTitle })} Icon={Music} />
       <div style={{ minWidth: 0, flex: 1 }}>
         {/* Titles wrap on a phone instead of losing their end; the numbers keep their own line. */}
-        <div style={{ fontWeight: 700, color: '#F4F4F5', overflowWrap: 'anywhere', lineHeight: 1.3 }}>{title}</div>
-        {artist ? <div style={{ color: '#D4D4D8', fontSize: 13, overflowWrap: 'anywhere' }}>{artist}</div> : null}
+        <div style={{ fontWeight: 700, color: '#F4F4F5', overflowWrap: 'break-word', hyphens: 'auto', lineHeight: 1.3 }}>{title}</div>
+        {artist ? <div style={{ color: '#D4D4D8', fontSize: 13, overflowWrap: 'break-word' }}>{artist}</div> : null}
         <div style={{ color: '#71717A', fontSize: 12, marginTop: 2 }}>
           {s.plays({ count: formatNumber(entry.plays) })} · {s.servers({ count: formatNumber(entry.servers) })}
         </div>
@@ -152,6 +153,15 @@ export default function ChartsPage() {
 
   return (
     <section data-testid="charts-page" style={{ position: 'relative', padding: '110px 24px 40px' }}>
+      {/* On a phone the rows give the names more room. */}
+      <style>{`
+        @media (max-width: 640px) {
+          .charts-row { gap: 8px !important; padding: 10px !important; }
+          .charts-rank { width: 22px !important; font-size: 17px !important; }
+          .charts-move { min-width: 28px !important; }
+          .charts-art { width: 40px !important; height: 40px !important; }
+        }
+      `}</style>
       <div className="section-container" style={{ position: 'relative', zIndex: 2, maxWidth: 820 }}>
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#00e5ff', fontFamily: "'JetBrains Mono', monospace", marginBottom: 14 }}>
