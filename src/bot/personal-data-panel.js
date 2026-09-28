@@ -32,6 +32,7 @@ function rows({ t, counts }) {
     [t("📅 Events, die du angelegt hast", "📅 Events you created"), counts.eventsCreated, ""],
     [t("🛠 Deine Dashboard-Änderungen im Protokoll", "🛠 Your dashboard changes in the log"), counts.dashboardChanges, ""],
     counts.stationSuggestions ? [t("📻 Deine Sender-Vorschläge", "📻 Your station suggestions"), counts.stationSuggestions, ""] : null,
+    counts.reports ? [t("📣 Deine Meldungen (mit „Gib mir Bescheid“)", "📣 Your reports (with “Tell me when it is done”)"), counts.reports, ""] : null,
     counts.ownerConsoleLogins ? [t("🔐 Anmeldungen in der Owner-Konsole", "🔐 Owner console logins"), counts.ownerConsoleLogins, ""] : null,
   ].filter(Boolean);
 }

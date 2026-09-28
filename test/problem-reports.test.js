@@ -22,6 +22,8 @@ const service = await import("../src/services/problem-reports.js");
 const { buildCommandsJson } = await import("../src/commands.js");
 const { setOwnerSettingsForTests } = await import("../src/lib/owner-settings-cache.js");
 const { setLicenseProvider } = await import("../src/core/entitlements.js");
+const { createDashboardReportsRouteHandler } = await import("../src/api/routes/dashboard-reports.js");
+const { getRecentRuntimeIncidents, describeRuntimeIncident } = await import("../src/runtime-incidents-store.js");
 
 const GUILD = "123456789012345678";
 const USER = "323456789012345678";
@@ -468,3 +470,63 @@ test("the commander posts /problem at once; a worker's panel report waits for th
   assert.match(panelCard, /Kein Ton/);
   created.push(panelCard.match(/Meldung ([a-f0-9]{16})/)[1]);
 });
+
+// ---- the dashboard's "Melden" (#436) ----
+
+function dashboardRoute(userId) {
+  const answers = [];
+  const handle = createDashboardReportsRouteHandler({
+    getDashboardRequestTranslator: () => ({ language: "de" }),
+    getDashboardSession: () => ({ session: { user: { id: userId, username: "alex", globalName: "Alex" } } }),
+    getLocalizedJsonBodyError: () => "Ungültiger Body.",
+    methodNotAllowed: () => answers.push([405, null]),
+    resolveDashboardGuildForSession: (_session, id) => (id === GUILD ? { id: GUILD, name: "Lofi Lounge", tier: "pro" } : null),
+    sendJson: (_res, status, body) => answers.push([status, body]),
+    sendLocalizedError: (_res, status, _language, german) => answers.push([status, { error: german }]),
+  });
+  const send = (body, { runtimes = [], serverId = GUILD } = {}) => handle({
+    req: { method: "POST" },
+    res: {},
+    requestUrl: new URL(`https://omnifm.local/api/dashboard/reports?serverId=${serverId}`),
+    readJsonBody: async () => body,
+    runtimes,
+  });
+  return { answers, send };
+}
+
+test("dashboard: without a team channel nothing goes to Discord, the owner console keeps it, and the page is told", async () => {
+  setOwnerSettingsForTests({});
+  const route = dashboardRoute("111111111111111111");
+  assert.equal(await route.send({ kind: "feedback", text: "Tolles Radio, danke!", consent: { public: true } }), true);
+  assert.deepEqual(route.answers[0], [200, { ok: false, reason: "unavailable" }]);
+  const [incident] = await getRecentRuntimeIncidents(GUILD, 3);
+  assert.equal(incident.payload.kind, "feedback");
+  assert.equal(describeRuntimeIncident("listener_report", incident.payload, "Lofi Lounge"), "Lofi Lounge: Feedback von einem Hörer: Tolles Radio, danke!");
+  assert.equal(JSON.stringify(incident).includes("111111111111111111"), false, "nobody's ID in the incident");
+
+  // One report per person and five minutes; a text of a few words at least; only one's own servers.
+  await route.send({ kind: "idea", text: "Noch eine Idee" });
+  assert.deepEqual(route.answers[1], [200, { ok: false, reason: "cooldown" }]);
+  const other = dashboardRoute("222222222222222222");
+  await other.send({ kind: "problem", text: "ok" });
+  assert.deepEqual(other.answers[0], [400, { ok: false, reason: "text" }]);
+  await other.send({ kind: "problem", text: "Kein Ton" }, { serverId: "999999999999999999" });
+  assert.equal(other.answers[1][0], 403);
+});
+
+test("dashboard: with a team channel the commander in this process posts the report at once", { skip: !hasMongoConfig }, async () => {
+  const { connect } = await import("../src/lib/db.js");
+  await connect();
+  setOwnerSettingsForTests({ reports: { teamChannelId: TEAM } });
+  const team = textChannel(TEAM);
+  const route = dashboardRoute(`7${String(Date.now()).padStart(17, "0")}`);
+  await route.send({ kind: "problem", text: "Das Dashboard zeigt keine Hörer", consent: { notify: true } }, { runtimes: [{ role: "commander", client: discordClient({ [TEAM]: team }) }] });
+  assert.deepEqual(route.answers[0], [200, { ok: true, waiting: false }]);
+  const card = allText(team.sent[0]);
+  assert.match(card, /Problem aus dem Dashboard/);
+  assert.match(card, /Lofi Lounge/);
+  assert.match(card, /möchte Bescheid/);
+  created.push(card.match(/Meldung ([a-f0-9]{16})/)[1]);
+  setOwnerSettingsForTests({});
+});
+

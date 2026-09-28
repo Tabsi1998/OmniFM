@@ -24,6 +24,7 @@ import { deleteOwnerSessionsOfUser } from "./owner-access.js";
 import { forgetStationPollCreator, listStationPollsOfCreator } from "../station-polls-store.js";
 import { listScheduledEvents, patchScheduledEvent } from "../scheduled-events-store.js";
 import { forgetStationSuggestionSubmitter, listStationSuggestionsOfUser } from "../station-suggestions-store.js";
+import { forgetReporter, listReportsOfReporter } from "../problem-reports-store.js";
 
 export const ERASED_ACTOR = "dashboard:gelöscht";
 // Another process may hold the vote list or a login in its cache for a few seconds.
@@ -54,7 +55,7 @@ export async function collectPersonalData(userId, { now = new Date() } = {}) {
   const id = cleanUserId(userId);
   if (!id) return { ok: false, error: "invalid_user" };
   if (!personalDataAvailable()) return { ok: false, error: "db_unavailable" };
-  const [savedSongs, votes, logins, ownerLogins, polls, changes, suggestions] = await Promise.all([
+  const [savedSongs, votes, logins, ownerLogins, polls, changes, suggestions, reports] = await Promise.all([
     listSavedSongs(id),
     listVoteEventsOfUser(id),
     listDashboardSessionsOfUser(id),
@@ -62,6 +63,7 @@ export async function collectPersonalData(userId, { now = new Date() } = {}) {
     listStationPollsOfCreator(id),
     dashboardChangesOf(id),
     listStationSuggestionsOfUser(id),
+    listReportsOfReporter(id),
   ]);
   return {
     ok: true,
@@ -98,6 +100,14 @@ export async function collectPersonalData(userId, { now = new Date() } = {}) {
         status: suggestion.status,
         createdAt: suggestion.createdAt instanceof Date ? suggestion.createdAt.toISOString() : suggestion.createdAt,
       })),
+      // Reports (#436, #437): the Discord ID is kept only for the promised message.
+      reports: reports.map((report) => ({
+        kind: report.kind,
+        text: report.text,
+        status: report.status,
+        public: report.consent?.public === true,
+        createdAt: report.createdAt instanceof Date ? report.createdAt.toISOString() : report.createdAt,
+      })),
       notIncluded: [
         "Premium-Käufe und Rechnungen: Die müssen wir aus steuerlichen Gründen aufbewahren.",
         "Server-Einstellungen, eigene Sender und Events gehören dem Server, nicht einer Person.",
@@ -117,6 +127,7 @@ export function countPersonalData(data = {}) {
     eventsCreated: data.eventsCreated?.length || 0,
     dashboardChanges: data.dashboardChanges?.length || 0,
     stationSuggestions: data.stationSuggestions?.length || 0,
+    reports: data.reports?.length || 0,
   };
 }
 
@@ -139,6 +150,8 @@ async function eraseOnce(id) {
     dashboardChanges: audit.modifiedCount || 0,
     // The suggestions stay in the queue, without the person.
     stationSuggestions: await forgetStationSuggestionSubmitter(id),
+    // The reports stay with the team, without the person and without the message.
+    reports: await forgetReporter(id),
   };
 }
 

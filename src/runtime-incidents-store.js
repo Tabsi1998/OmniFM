@@ -175,6 +175,9 @@ function normalizeRuntimeIncident(rawIncident, guildId = "") {
       failoverDurationMs: normalizeCount(payloadInput.failoverDurationMs),
       // A listener's report (#273) carries the last playback phases.
       phaseHistory: normalizeCandidateList(payloadInput.phaseHistory, 5),
+      // A report Discord could not take (#436): its kind and why it stayed here.
+      kind: sanitizeText(payloadInput.kind, 20),
+      undelivered: sanitizeText(payloadInput.undelivered, 40),
     },
   };
 }

@@ -70,6 +70,14 @@ def build_router(core):
             return guard
         return {"suggestions": [], "pending": 0}
 
+    @router.get("/api/admin/reports")
+    async def admin_reports(request: Request):
+        """Reports from Discord (#436) live in the Node API only; this way back lists none."""
+        guard = core._admin_guard(request)
+        if guard is not None:
+            return guard
+        return {"reports": [], "open": 0}
+
     @router.post("/api/admin/station-suggestions/{suggestion_id}/{action}")
     async def admin_station_suggestion_decide(request: Request, suggestion_id: str, action: str):
         """Deciding a suggestion needs the Node API (#303)."""
