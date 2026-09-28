@@ -68,7 +68,10 @@ export default function DashboardSubscription({ apiRequest, selectedGuildId, t, 
   const lic = data?.license || null;
   const workspace = lic?.workspace || null;
   const workspaceLinkedServers = Array.isArray(workspace?.linkedServers) ? workspace.linkedServers : [];
-  const workspaceAvailableServers = Array.isArray(workspace?.availableServers) ? workspace.availableServers : [];
+  const workspaceAvailableServers = useMemo(
+    () => (Array.isArray(workspace?.availableServers) ? workspace.availableServers : []),
+    [workspace],
+  );
   const workspaceBlockedServers = Array.isArray(workspace?.blockedServers) ? workspace.blockedServers : [];
   const workspaceCanLink = Boolean(workspace?.canManage) && Number(lic?.seatsAvailable || 0) > 0;
   const effectiveTier = data?.effectiveTier || lic?.plan || data?.tier || 'free';
@@ -78,7 +81,10 @@ export default function DashboardSubscription({ apiRequest, selectedGuildId, t, 
   const canManagePaidPlan = lic && ['pro', 'ultimate'].includes(String(lic.plan || effectiveTier || '').toLowerCase());
   const canUpgradeToUltimate = String(lic?.plan || effectiveTier || '').toLowerCase() === 'pro';
   const plansHref = buildHomeHref(locale, '#premium');
-  const blockedFeatureKeys = data?.upgradeHints?.blockedFeatures || capabilityPayload?.upgradeHints?.blockedFeatures || [];
+  const blockedFeatureKeys = useMemo(
+    () => data?.upgradeHints?.blockedFeatures || capabilityPayload?.upgradeHints?.blockedFeatures || [],
+    [data, capabilityPayload],
+  );
   const blockedFeatureLabels = useMemo(
     () => getDashboardBlockedFeatureLabels(blockedFeatureKeys, t, 6),
     [blockedFeatureKeys, t]

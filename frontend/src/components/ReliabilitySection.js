@@ -1,4 +1,3 @@
-import React from 'react';
 import { Activity, RadioTower, ShieldCheck, Split } from 'lucide-react';
 import { useI18n } from '../i18n.js';
 

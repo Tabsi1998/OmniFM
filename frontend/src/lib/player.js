@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useRef, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useRef, useState, useCallback, useEffect } from 'react';
 
 const PlayerCtx = createContext(null);
 export const usePlayer = () => useContext(PlayerCtx) || {};

@@ -1,7 +1,7 @@
 // ESLint for the bot, the scripts, the tests and the React frontend (#209).
-// Findings that existed when the linter came in are debt in the "eslint" list
-// of scripts/ci-baseline.json; `npm run lint` (scripts/check-lint.mjs) fails
-// on every new one.
+// The debt list ("eslint" in scripts/ci-baseline.json) is empty since #297:
+// `npm run lint` (scripts/check-lint.mjs) fails on every finding. A place that
+// is right on purpose gets an eslint-disable comment with the reason.
 import js from "@eslint/js";
 import globals from "globals";
 import nodePlugin from "eslint-plugin-n";

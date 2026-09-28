@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, AreaChart, Area,
@@ -15,8 +14,6 @@ import {
 import { buildDashboardNextSetupAction } from '../lib/dashboardOnboarding.js';
 import DashboardOnboardingHint from './DashboardOnboardingHint.js';
 
-const DAYS_DE = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
-const DAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function formatRepeatModeLabel(repeat, t) {
   switch (String(repeat || '').trim().toLowerCase()) {
@@ -59,8 +56,6 @@ function Section({ title, testId, children }) {
 export default function DashboardStatsPanel({ stats, detailStats, inviteLinks = null, t, formatDate }) {
   const basic = stats?.basic || {};
   const detail = detailStats || {};
-  const isDE = t('de', 'en') === 'de';
-  const dayNames = isDE ? DAYS_DE : DAYS_EN;
 
   const ls = detail.listeningStats || {};
   const detailDays = Math.max(1, Number.parseInt(String(detail.days || detail.connectionWindowDays || 30), 10) || 30);
@@ -113,8 +108,6 @@ export default function DashboardStatsPanel({ stats, detailStats, inviteLinks = 
   const channelData = buildVoiceChannelUsageRows(ls.voiceChannels, ls.voiceChannelNames);
 
   // Hourly heatmap data
-  const hoursMap = ls.hours || {};
-  const dowMap = ls.daysOfWeek || {};
   const hasAnalyticsData = (
     stationTimeData.length > 0
     || commandData.length > 0

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Play, Pause, Users, Headphones, X } from 'lucide-react';
 import { resolvePrimaryInviteUrl } from '../lib/invite.js';
 import { useI18n } from '../i18n.js';
@@ -35,11 +35,12 @@ export default function NowPlayingBar({ stats = {}, bots = [] }) {
   const invite = resolvePrimaryInviteUrl(bots);
 
   // Rotiert nur die Vorschau, solange NICHTS läuft.
+  const playing = player.current;
   useEffect(() => {
-    if (player.current || showcase.length < 2) return undefined;
+    if (playing || showcase.length < 2) return undefined;
     const t = setInterval(() => setIdx((v) => (v + 1) % showcase.length), 4500);
     return () => clearInterval(t);
-  }, [player.current, showcase.length]);
+  }, [playing, showcase.length]);
 
   const station = player.current || (showcase.length ? showcase[idx % showcase.length] : { name: 'OmniFM Radio Network', bitrate: 'Live' });
   const isPlaying = !!player.playing;
@@ -48,15 +49,16 @@ export default function NowPlayingBar({ stats = {}, bots = [] }) {
   const streamLabel = locale === 'en' ? 'Live radio stream' : 'Live-Radio-Stream';
   const listeners = stats.listeners || 0;
 
+  const stationName = station?.name || '';
   useEffect(() => {
     let stop = false;
     setCover(null);
-    if (!station || !station.name) return undefined;
-    fetch(buildApiUrl(`/api/cover?term=${encodeURIComponent(station.name)}`))
+    if (!stationName) return undefined;
+    fetch(buildApiUrl(`/api/cover?term=${encodeURIComponent(stationName)}`))
       .then((r) => r.json()).then((d) => { if (!stop && d && d.ok && d.artwork) setCover(d.artwork); })
       .catch(() => {});
     return () => { stop = true; };
-  }, [station && station.name]);
+  }, [stationName]);
 
   if (closed) return null;
 

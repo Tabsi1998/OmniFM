@@ -359,7 +359,8 @@ export function renderDiscordMarkdown(text, options = {}) {
 
   const sanitizeLinkHref = (rawHref) => {
     const decoded = decodeBasicEntities(rawHref).trim();
-    if (!decoded || /[\u0000-\u001F\u007F\s]/.test(decoded)) return '';
+    // eslint-disable-next-line no-control-regex -- an address with control characters is refused
+  if (!decoded || /[\u0000-\u001F\u007F\s]/.test(decoded)) return '';
     try {
       const parsed = new URL(decoded);
       const protocol = String(parsed.protocol || '').toLowerCase();

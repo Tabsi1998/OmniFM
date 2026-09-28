@@ -40,7 +40,7 @@ function formatSummaryDate(value, formatDate, fallbackLabel, options) {
   });
 }
 
-function buildWeeklyDigestSummary(settings, t = (de, en) => de, formatDate = null) {
+function buildWeeklyDigestSummary(settings, t = (de, _en) => de, formatDate = null) {
   const weeklyDigest = settings?.weeklyDigest && typeof settings.weeklyDigest === "object"
     ? settings.weeklyDigest
     : { enabled: false, channelId: "", dayOfWeek: 1, hour: 9, language: "de" };
@@ -122,7 +122,7 @@ function getConfiguredFailoverChain(settings) {
   return normalizeFailoverChain(settings?.fallbackStation || "");
 }
 
-function buildFallbackStationSummary(settings, t = (de, en) => de) {
+function buildFallbackStationSummary(settings, t = (de, _en) => de) {
   const configuredChain = getConfiguredFailoverChain(settings);
   const selectedValue = configuredChain[0] || "";
   const failoverPreviewList = Array.isArray(settings?.failoverChainPreview)

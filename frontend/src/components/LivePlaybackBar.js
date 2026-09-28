@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const liveCss = `
 @keyframes lpb-live-shimmer { 0%{background-position:-200% 0;} 100%{background-position:200% 0;} }

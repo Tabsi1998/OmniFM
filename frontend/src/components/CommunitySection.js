@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ExternalLink, Star, Heart } from 'lucide-react';
 import { buildApiUrl } from '../lib/api.js';
 import { useI18n } from '../i18n.js';

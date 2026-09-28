@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Music, Pause, Play, Radio, Search, Volume2, VolumeX } from 'lucide-react';
 import { usePlayer } from '../lib/player.js';
 import { useI18n } from '../i18n.js';

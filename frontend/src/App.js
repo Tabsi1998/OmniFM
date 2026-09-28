@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState, useEffect, useCallback, useRef } from 'react';
+import { Suspense, lazy, useState, useEffect, useCallback, useRef } from 'react';
 import Hero from './components/Hero.js';
 import TrustBar from './components/TrustBar.js';
 import WhyOmniFM from './components/WhyOmniFM.js';
@@ -190,7 +190,7 @@ function AppContent() {
         activeController.abort();
       }
     };
-  }, [fetchData]);
+  }, [fetchData, currentPage]);
 
   if (currentPage === 'imprint') {
     return (

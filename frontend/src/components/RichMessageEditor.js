@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Bold, Italic, Underline, Strikethrough, Code, List, Link2, Eye, PenLine, Smile, X, Search } from 'lucide-react';
 import EMOJI_CATEGORIES from './emojiData.js';
 import { EVENT_PLACEHOLDERS, renderDiscordMarkdown, renderEventTemplate } from '../lib/dashboardEvents.js';
@@ -42,14 +42,10 @@ function EmojiPicker({ serverEmojis, loading, onSelectUnicode, onSelectCustom, o
 
   // Search across all categories
   const searchLower = search.toLowerCase();
+  // Unicode emojis cannot be searched by name, so the search covers the server's own.
   let filteredServer = serverEmojis;
-  let filteredCategories = EMOJI_CATEGORIES;
   if (search) {
     filteredServer = serverEmojis.filter(e => e.name.toLowerCase().includes(searchLower));
-    filteredCategories = EMOJI_CATEGORIES.map(c => ({
-      ...c,
-      emojis: c.emojis, // Unicode emojis can't be searched by name easily, so show all when in category view
-    }));
   }
 
   const isSearchMode = search.length > 0;

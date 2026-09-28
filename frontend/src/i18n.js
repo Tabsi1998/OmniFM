@@ -1,4 +1,4 @@
-import React, {
+import {
   createContext,
   useCallback,
   useContext,
@@ -49,14 +49,6 @@ function normalizeLocale(rawLocale) {
   return SUPPORTED_LOCALES.includes(value) ? value : DEFAULT_LOCALE;
 }
 
-function readStoredLocale() {
-  try {
-    return window.localStorage.getItem(STORAGE_KEY);
-  } catch {
-    return '';
-  }
-}
-
 function writeStoredLocale(locale) {
   try {
     window.localStorage.setItem(STORAGE_KEY, locale);
@@ -74,15 +66,6 @@ function syncLocaleToUrl(locale) {
     window.history.replaceState({}, '', `${nextHref}${url.hash}`);
   } catch {
     // ignore URL update failures
-  }
-}
-
-function readQueryLocale() {
-  try {
-    const url = new URL(window.location.href);
-    return url.searchParams.get('lang') || '';
-  } catch {
-    return '';
   }
 }
 

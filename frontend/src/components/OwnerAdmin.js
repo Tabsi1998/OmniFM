@@ -90,7 +90,6 @@ export default function OwnerAdmin() {
   const [stHealthSummary, setStHealthSummary] = useState(null);
   const [stHealthBusy, setStHealthBusy] = useState(false);
   const [stHealthProg, setStHealthProg] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [licQuery, setLicQuery] = useState('');
   const [licForm, setLicForm] = useState(null);
@@ -225,7 +224,6 @@ export default function OwnerAdmin() {
       if (ov.status === 'rejected' && ov.reason?.message === 'unauthorized') throw new Error('unauthorized');
     } finally {
       setRefreshing(false);
-      setLoading(false);
     }
   }, [apiGet]);
 
@@ -254,7 +252,6 @@ export default function OwnerAdmin() {
       }
       if (known?.authenticated && known.via === 'discord') {
         try {
-          setLoading(true);
           await loadAll('');
           if (!cancelled) { setSession(known); setAuthed(true); }
         } catch { /* the session ended in between */ }
@@ -263,7 +260,6 @@ export default function OwnerAdmin() {
       }
       if (!token) { if (!cancelled) setChecking(false); return; }
       try {
-        setLoading(true);
         await loadAll(token);
         if (!cancelled) { setSession({ via: 'token', role: 'owner', roleLabel: 'Owner', user: null }); setAuthed(true); }
       } catch {
@@ -273,6 +269,7 @@ export default function OwnerAdmin() {
       }
     })();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the saved sign-in is checked once, when the console opens
   }, []);
 
   // Failover history (#217): loaded when the monitoring tab opens and on demand.
@@ -499,7 +496,6 @@ export default function OwnerAdmin() {
       if (!res.ok) { setLoginErr('Ungültiger Owner-Token.'); setLoggingIn(false); return; }
       window.localStorage.setItem(TOKEN_KEY, tk);
       setToken(tk);
-      setLoading(true);
       await loadAll(tk);
       setSession({ via: 'token', role: 'owner', roleLabel: 'Owner', user: null });
       setAuthed(true);
