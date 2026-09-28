@@ -27,7 +27,7 @@ describe('service worker', () => {
 
   it('never touches the API, other methods, other sites or other files', () => {
     expect(route('/api/stats')).toBe('network');
-    expect(route('/api/status', { mode: 'navigate' })).toBe('network');
+    expect(route('/api/stations', { mode: 'navigate' })).toBe('network');
     expect(route('/assets/index-Ab12Cd.js', { method: 'POST' })).toBe('network');
     expect(route('https://ice.somafm.com/groovesalad-128-mp3')).toBe('network');
     expect(route('/brand/omnifm-icon-192.png')).toBe('network');
