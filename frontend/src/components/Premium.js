@@ -131,7 +131,7 @@ function Premium({ bots = [], planContext = {} }) {
   const [checkoutPlan, setCheckoutPlan] = useState(null);
   // Who each plan is for, on its card: the one plan explanation of the start page (#435).
   const planFit = (planId) => (copy.premium.positioning || []).find((item) => item.key === planId);
-  const freeInviteUrl = resolvePrimaryInviteUrl(bots);
+  const freeInviteUrl = resolvePrimaryInviteUrl(bots, locale);
   const freeInviteIsExternal = freeInviteUrl.startsWith('http');
 
   useEffect(() => {

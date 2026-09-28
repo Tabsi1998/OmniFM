@@ -165,7 +165,7 @@ export default function SettingsFailover({
             fontSize: 13,
           }}
         >
-          <option value="">{t('Station zur Kette hinzufuegen...', 'Add station to chain...')}</option>
+          <option value="">{t('Station zur Kette hinzufügen...', 'Add station to chain...')}</option>
           {availableFailoverStations.map((station) => <option key={station.value} value={station.value}>{station.label}</option>)}
         </select>
 
@@ -176,7 +176,7 @@ export default function SettingsFailover({
           onClick={addFailoverStation}
           style={{ height: 40, padding: '0 14px', border: '1px solid rgba(139,92,246,0.3)', background: 'rgba(91,33,182,0.18)', color: canManageFallbackStation && pendingFailoverStation ? '#DDD6FE' : '#3F3F46', cursor: canManageFallbackStation && pendingFailoverStation ? 'pointer' : 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600 }}
         >
-          <Plus size={14} /> {t('Hinzufuegen', 'Add')}
+          <Plus size={14} /> {t('Hinzufügen', 'Add')}
         </button>
       </div>
     </div>

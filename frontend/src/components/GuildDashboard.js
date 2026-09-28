@@ -11,6 +11,8 @@ import {
 } from 'recharts';
 import { buildApiUrl } from '../lib/api.js';
 import { dashboardApiRequest } from '../lib/dashboardApi.js';
+import { isDashboardDemo, isDashboardTour } from '../lib/dashboardDemoMode.js';
+import { buildPageHref } from '../lib/pageRouting.js';
 import { useI18n } from '../i18n.js';
 import DashboardEvents from './DashboardEvents.js';
 import DashboardSettings from './DashboardSettings.js';
@@ -101,6 +103,17 @@ function streamStateLine(stream, t) {
   return '';
 }
 
+// Where the server's license comes from, in words (the API names it by its technical source).
+function licenseSource(source, t) {
+  if (!source) return t('keine aktive Lizenzzuordnung gefunden', 'no active license assignment found');
+  const label = {
+    serverEntitlement: t('direkt für diesen Server', 'assigned to this server'),
+    linkedServerIds: t('über eine verknüpfte Lizenz', 'through a linked license'),
+    legacyServerKey: t('ältere Zuordnung', 'older assignment'),
+  }[source] || source;
+  return `${t('Quelle', 'Source')}: ${label}`;
+}
+
 function streamBadge(stream, t) {
   if (stream.parkedReason) return { label: t('PAUSIERT', 'PAUSED'), tone: 'red' };
   if (stream.serverMuted) return { label: t('STUMM', 'MUTED'), tone: 'amber' };
@@ -155,7 +168,29 @@ function eventFormFromRow(event) {
 }
 
 // Every change carries the dashboard's CSRF header; without it the API refuses it (#374).
-const apiRequest = (path, options = {}) => dashboardApiRequest(path, options);
+// In the preview (/dashboard?demo, #432) the answers come from example data in
+// the page instead, loaded only there; nothing goes to the server.
+let demoRequest = null;
+const apiRequest = (path, options = {}) => {
+  if (!isDashboardDemo()) return dashboardApiRequest(path, options);
+  if (!demoRequest) demoRequest = import('../lib/dashboardDemoApi.js').then((module) => module.createPageDemoApi());
+  return demoRequest.then((request) => request(path, options));
+};
+
+// Says that this is the preview, with the way to the real dashboard; in the start page's tour without buttons.
+function DemoBanner({ t, locale }) {
+  const tour = isDashboardTour();
+  return (
+    <div className="oa-card" data-testid="guild-demo-banner" style={{ marginBottom: 16, padding: tour ? '10px 14px' : undefined, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', borderColor: 'rgba(255,107,0,0.45)', background: 'linear-gradient(90deg, rgba(255,107,0,0.12), rgba(255,42,95,0.05))' }}>
+      <span className="oa-pill" style={{ color: '#ffb27a', border: '1px solid rgba(255,107,0,0.45)' }}>{t('Vorschau', 'Preview')}</span>
+      <div style={{ flex: '1 1 240px', minWidth: 0, color: '#cbd5e1', fontSize: 13.5, lineHeight: 1.5 }}>{t('Beispieldaten zum Anschauen: drei Server, einer pro Plan. Nichts hier wird gespeichert.', 'Example data to look around: three servers, one per plan. Nothing here is saved.')}</div>
+      {tour ? null : <>
+        <a href={buildApiUrl('/api/auth/discord/login?redirect=1&nextPage=dashboard')} className="oa-btn primary" style={{ background: 'linear-gradient(135deg,#5865f2,#4752c4)', color: '#fff', textDecoration: 'none' }} data-testid="guild-demo-login">{t('Mit Discord anmelden', 'Continue with Discord')}</a>
+        <a href={buildPageHref(locale, 'home')} className="oa-btn ghost" style={{ textDecoration: 'none' }} data-testid="guild-demo-website">{t('Zurück zur Website', 'Back to website')}</a>
+      </>}
+    </div>
+  );
+}
 
 function normalizeTrend(detail, advanced) {
   const rows = Array.isArray(detail?.dailyStats) && detail.dailyStats.length
@@ -491,7 +526,7 @@ export default function GuildDashboard() {
 
   if (loading) return (
     <div className="oa-root" style={{ display: 'grid', placeItems: 'center' }}>
-      <div style={{ textAlign: 'center', color: '#94a3b8' }}><span className="oa-eq"><span /><span /><span /><span /><span /></span><div className="oa-mono" style={{ marginTop: 14, fontSize: 12, letterSpacing: '0.14em' }}>DASHBOARD LÄDT…</div></div>
+      <div style={{ textAlign: 'center', color: '#94a3b8' }}><span className="oa-eq"><span /><span /><span /><span /><span /></span><div className="oa-mono" style={{ marginTop: 14, fontSize: 12, letterSpacing: '0.14em' }}>{t('DASHBOARD LÄDT…', 'DASHBOARD LOADING…')}</div></div>
     </div>
   );
 
@@ -515,6 +550,7 @@ export default function GuildDashboard() {
 
   const trendData = gdata.trend;
   const topData = gdata.top;
+  const demo = isDashboardDemo();
   return (
     <div className="oa-root" data-testid="guild-dashboard">
       <aside className="oa-sidebar">
@@ -526,16 +562,18 @@ export default function GuildDashboard() {
       </aside>
 
       <main className="oa-main">
+        {demo ? <DemoBanner t={t} locale={locale} /> : null}
         <div className="oa-topbar">
           <div><h1 className="oa-h1 oa-display" data-testid="guild-section-title">{navLabel(section)}</h1><div className="oa-sub">{guild.name}{Number(guild.memberCount || guild.members) > 0 ? ` · ${fmtInt(guild.memberCount || guild.members)} ${t('Mitglieder', 'members')}` : ''} · <span className="oa-mono">Guild-ID {guild.id}</span></div></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>
             <button className="oa-btn ghost" onClick={() => loadGuild(guildId)} disabled={gdata.loading} title={t('Aktualisieren', 'Refresh')}><RefreshCw size={15} /></button>
-            <SeasonBadge />
+            {/* The season's badge asks the server for the owner's switches; the preview asks nothing. */}
+            {demo ? null : <SeasonBadge />}
             <span className="oa-pill" style={{ background: `${tm.color}22`, color: tm.color, border: `1px solid ${tm.color}55` }} data-testid="guild-active-tier"><tm.icon size={13} /> {tm.name}</span>
             <select className="oa-input" style={{ height: 40, width: 'auto', maxWidth: 'min(360px, 100%)', minWidth: 0 }} value={guildId} onChange={(event) => setGuildId(event.target.value)} data-testid="guild-switcher">{session.guilds.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.id}</option>)}</select>
           </div>
         </div>
-        <div className="oa-mobile-nav">{NAV.map((item) => <button key={item.id} className={`oa-nav-btn ${section === item.id ? 'active' : ''}`} style={{ width: 'auto', whiteSpace: 'nowrap' }} onClick={() => setSection(item.id)}><item.icon size={16} /> {navLabel(item.id)}</button>)}</div>
+        <div className="oa-mobile-nav">{NAV.map((item) => <button key={item.id} className={`oa-nav-btn ${section === item.id ? 'active' : ''}`} style={{ width: 'auto', whiteSpace: 'nowrap' }} onClick={() => setSection(item.id)} data-testid={`guild-mobile-nav-${item.id}`}><item.icon size={16} /> {navLabel(item.id)}</button>)}</div>
         {msg && <div className={`oa-pill ${msg.ok ? 'green' : 'red'}`} style={{ marginBottom: 16 }} data-testid="guild-message">{msg.ok ? <Check size={13} /> : <AlertTriangle size={13} />} {msg.text}</div>}
 
         {section === 'overview' && <>
@@ -611,7 +649,7 @@ export default function GuildDashboard() {
         {section === 'settings' && (guildCapabilities.dashboardBasic
           ? <DashboardSettings apiRequest={apiRequest} selectedGuildId={guild.id} t={t} capabilities={guildCapabilities} formatDate={formatDate} />
           : <div className="oa-card" style={{ display: 'flex', alignItems: 'center', gap: 14 }} data-testid="guild-settings-locked"><Lock size={22} /><div><b>{t('Einstellungen sind ab Pro verfügbar.', 'Settings are available from Pro.')}</b></div><button className="oa-btn primary" style={{ marginLeft: 'auto' }} onClick={() => setSection('subscription')}>Upgrade</button></div>)}
-        {section === 'subscription' && <><div className="oa-card" style={{ marginBottom: 18 }} data-testid="guild-license-details"><div className="oa-section-title"><CreditCard size={15} /> {t('Aktive Lizenz', 'Active license')}</div><div className="oa-grid cols-3"><div><div className="oa-stat-label">Plan</div><div className="oa-stat-value" style={{ color: tm.color }}>{tm.name}</div></div><div><div className="oa-stat-label">Seats</div><div className="oa-stat-value">{gdata.license?.license ? `${gdata.license.license.seatsUsed}/${gdata.license.license.seats}` : '—'}</div></div><div><div className="oa-stat-label">{t('Läuft ab', 'Expires')}</div><div style={{ marginTop: 12, fontWeight: 700 }}>{gdata.license?.license?.expiresAt ? new Date(gdata.license.license.expiresAt).toLocaleDateString() : t('Keine aktive Kauf-Lizenz', 'No active paid license')}</div></div></div><div className="oa-mono" style={{ marginTop: 14, color: '#64748b', fontSize: 11 }}>Guild-ID {guild.id}{gdata.license?.license?.resolutionSource ? ` · Quelle: ${gdata.license.license.resolutionSource}` : ' · keine aktive Lizenzzuordnung gefunden'}</div></div><div className="oa-grid cols-3" data-testid="guild-subscription">{Object.entries(TIER_META).map(([key, meta]) => { const current = key === tier; return <div className="oa-card oa-fade" key={key} style={{ borderColor: current ? `${meta.color}66` : undefined, position: 'relative' }}>{current && <span className="oa-pill" style={{ position: 'absolute', top: 16, right: 16, color: meta.color }}>{t('Aktiv', 'Active')}</span>}<div style={{ width: 44, height: 44, borderRadius: 12, background: `${meta.color}1f`, color: meta.color, display: 'grid', placeItems: 'center', marginBottom: 14 }}><meta.icon size={22} /></div><div className="oa-display" style={{ fontSize: 22, fontWeight: 800 }}>{meta.name}</div><div style={{ margin: '12px 0 18px', color: '#cbd5e1', lineHeight: 1.8 }}><div><Check size={14} color={meta.color} /> {meta.maxBots} Bots</div><div><Check size={14} color={meta.color} /> {meta.bitrate} Audio</div><div><Check size={14} color={meta.color} /> {key === 'ultimate' ? t('Eigene Sender & Analytics', 'Custom stations & analytics') : key === 'pro' ? t('Dashboard & Rollenrechte', 'Dashboard & role permissions') : t('Basis-Radio', 'Basic radio')}</div></div>{current ? <button className="oa-btn ghost" style={{ width: '100%' }} disabled>{t('Aktueller Plan', 'Current plan')}</button> : <a className="oa-btn primary" style={{ width: '100%', textDecoration: 'none' }} href="/#pricing"><ChevronRight size={15} /> {key === 'free' ? 'Downgrade' : 'Upgrade'}</a>}</div>; })}</div></>}
+        {section === 'subscription' && <><div className="oa-card" style={{ marginBottom: 18 }} data-testid="guild-license-details"><div className="oa-section-title"><CreditCard size={15} /> {t('Aktive Lizenz', 'Active license')}</div><div className="oa-grid cols-3"><div><div className="oa-stat-label">Plan</div><div className="oa-stat-value" style={{ color: tm.color }}>{tm.name}</div></div><div><div className="oa-stat-label">Seats</div><div className="oa-stat-value">{gdata.license?.license ? `${gdata.license.license.seatsUsed}/${gdata.license.license.seats}` : '—'}</div></div><div><div className="oa-stat-label">{t('Läuft ab', 'Expires')}</div><div style={{ marginTop: 12, fontWeight: 700 }}>{gdata.license?.license?.expiresAt ? new Date(gdata.license.license.expiresAt).toLocaleDateString() : t('Keine aktive Kauf-Lizenz', 'No active paid license')}</div></div></div><div className="oa-mono" style={{ marginTop: 14, color: '#64748b', fontSize: 11 }} data-testid="guild-license-source">Guild-ID {guild.id} · {licenseSource(gdata.license?.license?.resolutionSource, t)}</div></div><div className="oa-grid cols-3" data-testid="guild-subscription">{Object.entries(TIER_META).map(([key, meta]) => { const current = key === tier; return <div className="oa-card oa-fade" key={key} style={{ borderColor: current ? `${meta.color}66` : undefined, position: 'relative' }}>{current && <span className="oa-pill" style={{ position: 'absolute', top: 16, right: 16, color: meta.color }}>{t('Aktiv', 'Active')}</span>}<div style={{ width: 44, height: 44, borderRadius: 12, background: `${meta.color}1f`, color: meta.color, display: 'grid', placeItems: 'center', marginBottom: 14 }}><meta.icon size={22} /></div><div className="oa-display" style={{ fontSize: 22, fontWeight: 800 }}>{meta.name}</div><div style={{ margin: '12px 0 18px', color: '#cbd5e1', lineHeight: 1.8 }}><div><Check size={14} color={meta.color} /> {meta.maxBots} Bots</div><div><Check size={14} color={meta.color} /> {meta.bitrate} Audio</div><div><Check size={14} color={meta.color} /> {key === 'ultimate' ? t('Eigene Sender & Analytics', 'Custom stations & analytics') : key === 'pro' ? t('Dashboard & Rollenrechte', 'Dashboard & role permissions') : t('Basis-Radio', 'Basic radio')}</div></div>{current ? <button className="oa-btn ghost" style={{ width: '100%' }} disabled>{t('Aktueller Plan', 'Current plan')}</button> : <a className="oa-btn primary" style={{ width: '100%', textDecoration: 'none' }} href="/#pricing"><ChevronRight size={15} /> {key === 'free' ? 'Downgrade' : 'Upgrade'}</a>}</div>; })}</div></>}
       </main>
     </div>
   );

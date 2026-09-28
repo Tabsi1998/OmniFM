@@ -2,6 +2,7 @@ import { Suspense, lazy, useState, useEffect, useCallback, useRef } from 'react'
 import Hero from './components/Hero.js';
 import TrustBar from './components/TrustBar.js';
 import WhyOmniFM from './components/WhyOmniFM.js';
+import DashboardPreview from './components/DashboardPreview.js';
 import StationBrowser from './components/StationBrowser.js';
 import Premium from './components/Premium.js';
 import SiteFooter from './components/SiteFooter.js';
@@ -31,7 +32,7 @@ const ChartsPage = lazy(() => import('./components/ChartsPage.js'));
 const StartGuide = lazy(() => import('./components/StartGuide.js'));
 // One live demo alone, for recording clips (#431): /?demo=play
 const DemoStage = lazy(() => import('./components/demo/DemoStage.js'));
-const DEMO_SCENES = ['commander', 'worker', 'play', 'panel'];
+const DEMO_SCENES = ['commander', 'worker', 'play', 'panel', 'dashboard'];
 
 // What shows for the moment a page's code is on its way.
 function PageLoading() {
@@ -363,6 +364,7 @@ function AppContent() {
         <HowToDiscord bots={bots} />
         <StationBrowser stations={stations} loading={loading} />
         <WhyOmniFM />
+        <DashboardPreview />
         <Premium bots={bots} planContext={{ freeStations: stats.freeStations, allStations: stats.stations }} />
         <CommunitySection />
         <FaqSection />

@@ -255,7 +255,7 @@ function Navbar({ page = 'home' }) {
       )}
 
       <style>{`
-        @media (max-width: 768px) {
+        @media (max-width: 1023px) {
           .nav-desktop { display: none !important; }
           .nav-mobile-btn { display: block !important; }
         }

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Records the website's live demos as video clips for Discord announcements
-// and social media (#431), one round of each scene at 1280 × 720:
+// and social media (#431), one round of each scene at 1280 × 720, and the
+// tour through the dashboard preview (#432):
 //
 //   node scripts/record-demo-clips.mjs [--site http://127.0.0.1:4173] [--lang de,en]
 //
@@ -16,7 +17,7 @@ import { chromium } from "playwright";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = path.join(ROOT, ".local-testing", "demo-clips");
-const SCENES = ["commander", "worker", "play", "panel"];
+const SCENES = ["commander", "worker", "play", "panel", "dashboard"];
 
 function option(name, fallback) {
   const index = process.argv.indexOf(`--${name}`);
@@ -36,9 +37,14 @@ async function record(browser, scene, language) {
     reducedMotion: "no-preference",
   });
   const page = await context.newPage();
+  const started = Date.now();
   await page.goto(`${site}/?demo=${scene}&lang=${language}`, { waitUntil: "networkidle" });
   const figure = page.getByTestId(`demo-${scene}`);
   await figure.waitFor();
+  // The tour starts once the dashboard in its frame is there.
+  if (scene === "dashboard") await page.waitForSelector('[data-testid="dashboard-tour"][data-ready="true"]', { timeout: 30_000 });
+  // The MP4 leaves out the moment the page takes to load.
+  const lead = ((Date.now() - started) / 1000).toFixed(2);
   const round = Number(await figure.getAttribute("data-round-ms")) || 10_000;
   // One whole round and a moment of the next start.
   await page.waitForTimeout(round + 600);
@@ -48,7 +54,7 @@ async function record(browser, scene, language) {
   fs.renameSync(await video.path(), webm);
   if (ffmpeg) {
     const mp4 = webm.replace(/\.webm$/, ".mp4");
-    spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-i", webm, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an", mp4], { stdio: "inherit" });
+    spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-i", webm, "-ss", lead, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an", mp4], { stdio: "inherit" });
   }
   console.log(`recorded ${path.relative(ROOT, webm)}${ffmpeg ? " (+ .mp4)" : ""}`);
 }

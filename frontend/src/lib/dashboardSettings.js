@@ -61,14 +61,14 @@ function buildWeeklyDigestSummary(settings, t = (de, _en) => de, formatDate = nu
     statusLabel = t("Channel fehlt", "Channel required");
     statusAccent = "#EF4444";
     description = t(
-      "Waehle einen Text-Channel, damit der Weekly Digest gesendet werden kann.",
+      "Wähle einen Text-Channel, damit der Weekly Digest gesendet werden kann.",
       "Select a text channel so the weekly digest can be sent."
     );
   } else if (enabled && hasChannel) {
     statusLabel = t("Geplant", "Scheduled");
     statusAccent = "#10B981";
     description = t(
-      "Der Weekly Digest wird automatisch im gewaehlten Channel gepostet.",
+      "Der Weekly Digest wird automatisch im gewählten Channel gepostet.",
       "The weekly digest will automatically post in the selected channel."
     );
   }
@@ -152,10 +152,10 @@ function buildFallbackStationSummary(settings, t = (de, _en) => de) {
 
   if (preview?.valid === false) {
     return {
-      statusLabel: t("Ungueltig", "Invalid"),
+      statusLabel: t("Ungültig", "Invalid"),
       statusAccent: "#EF4444",
       description: t(
-        "Die gespeicherte Fallback-Station ist aktuell nicht verfuegbar.",
+        "Die gespeicherte Fallback-Station ist aktuell nicht verfügbar.",
         "The saved fallback station is currently unavailable."
       ),
       stationLabel: preview.label || selectedValue,
@@ -176,11 +176,11 @@ function buildFallbackStationSummary(settings, t = (de, _en) => de) {
     statusAccent: "#8B5CF6",
     description: remainingStations > 0
       ? t(
-        "Wenn ein Stream hart fehlschlaegt, probiert OmniFM diese Station zuerst und hat weitere Failover-Schritte bereit.",
+        "Wenn ein Stream hart fehlschlägt, probiert OmniFM diese Station zuerst und hat weitere Failover-Schritte bereit.",
         "If a stream fails hard, OmniFM tries this station first and keeps additional failover steps ready."
       )
       : t(
-        "Wenn ein Stream hart fehlschlaegt, wechselt OmniFM auf diese Station.",
+        "Wenn ein Stream hart fehlschlägt, wechselt OmniFM auf diese Station.",
         "If a stream fails hard, OmniFM switches to this station."
       ),
     stationLabel: preview?.label || preview?.name || selectedValue,

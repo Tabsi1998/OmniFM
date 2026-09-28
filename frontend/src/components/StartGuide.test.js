@@ -3,10 +3,12 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { I18nProvider } from '../i18n.js';
 import { PlayerProvider } from '../lib/player.js';
 import CommunitySection from './CommunitySection.js';
+import DashboardPreview from './DashboardPreview.js';
 import FaqSection from './FaqSection.js';
 import Hero from './Hero.js';
 import HowToDiscord from './HowToDiscord.js';
 import Navbar from './Navbar.js';
+import NowPlayingBar from './NowPlayingBar.js';
 import Premium from './Premium.js';
 import StartGuide from './StartGuide.js';
 import StationBrowser from './StationBrowser.js';
@@ -131,6 +133,24 @@ describe('the ways to the guide', () => {
     expect(screen.getByTestId('nav-link-faq').getAttribute('aria-current')).toBeNull();
   });
 
+  it('without the bot list yet, every invite button leads to the guide\'s first step, not into nothing', () => {
+    const { container } = render(
+      <I18nProvider>
+        <PlayerProvider>
+          <Hero stats={{}} bots={[]} />
+          <HowToDiscord bots={[]} />
+          <Premium bots={[]} planContext={{}} />
+          <NowPlayingBar bots={[]} />
+        </PlayerProvider>
+      </I18nProvider>
+    );
+    expect(container.querySelector('a[href="#bots"]')).toBeNull();
+    const toGuide = [...container.querySelectorAll('a')].filter((link) => link.getAttribute('href') === '/start?lang=de#commander');
+    // The hero, the how-to, the Free plan card and the player bar.
+    expect(toGuide.length).toBe(4);
+    expect(toGuide.every((link) => link.getAttribute('target') === null)).toBe(true);
+  });
+
   it('no link on the start page jumps to a section that is not there ("Wie es funktioniert" went nowhere)', () => {
     const { container } = render(
       <I18nProvider>
@@ -140,6 +160,7 @@ describe('the ways to the guide', () => {
           <HowToDiscord bots={BOTS} />
           <StationBrowser stations={[]} loading={false} />
           <WhyOmniFM />
+          <DashboardPreview />
           <Premium bots={BOTS} planContext={{}} />
           <CommunitySection />
           <FaqSection />

@@ -5,6 +5,7 @@ const messages = {
     links: [
       { key: 'flow', label: 'Zo werkt het', href: '#how-to' },
       { key: 'why', label: 'Waarom OmniFM', href: '#why-omnifm' },
+      { key: 'demo', label: 'Demo', href: '#dashboard-demo' },
       { key: 'stations', label: 'Zenders', page: 'stations' },
       { key: 'pricing', label: 'Prijzen', page: 'premium' },
       { key: 'start', label: 'Handleiding', page: 'start' },
@@ -95,6 +96,26 @@ const messages = {
       free: 'Free',
       pro: 'Pro',
       ultimate: 'Ultimate',
+    },
+  },
+  // The start page's tour through the dashboard with example data (#432).
+  dashboardPreview: {
+    eyebrow: 'Dashboard',
+    title: 'Je radio in één oogopslag, ook buiten Discord',
+    subtitle: 'Het echte dashboard met voorbeeldgegevens: wat in welk kanaal speelt, events, statistieken en instellingen. Het label zegt in welk plan het zit.',
+    tryIt: 'Probeer het zelf',
+    tryNote: 'Zonder inloggen. Er wordt niets opgeslagen.',
+    frameTitle: 'Rondleiding door het dashboard met voorbeeldgegevens',
+    everyPlan: 'Elk plan',
+    fromPlan: ({ plan }) => `vanaf ${plan}`,
+    steps: {
+      overview: 'Wat waar speelt',
+      live: 'Liveweergave van de laatste 24 uur',
+      stations: 'Eigen zenders',
+      events: 'Geplande events',
+      stats: 'Statistieken',
+      roles: 'Rolrechten',
+      settings: 'Paneel en instellingen',
     },
   },
   faq: {

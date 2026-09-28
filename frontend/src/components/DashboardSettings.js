@@ -355,7 +355,7 @@ export default function DashboardSettings({
 
       const webhookSuffix = result?.webhookDelivery?.attempted
         ? (result.webhookDelivery.delivered
-          ? t(' Webhook wurde ebenfalls ausgeloest.', ' Webhook was triggered as well.')
+          ? t(' Webhook wurde ebenfalls ausgelöst.', ' Webhook was triggered as well.')
           : t(' Export gespeichert, aber Webhook fehlgeschlagen.', ' Export downloaded, but the webhook failed.'))
         : '';
       setMessage(

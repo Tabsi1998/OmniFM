@@ -119,6 +119,12 @@ export default function DashboardEvents({
     ...stations.ultimate.map((station) => ({ value: station.key, label: `${station.name} (Ultimate)` })),
   ]), [stations.custom, stations.free, stations.pro, stations.ultimate, t]);
 
+  // The stations' names, so an event says "LoFi Beats" and not "pro_urban_09".
+  const stationNames = useMemo(() => Object.fromEntries([
+    ...stations.custom.map((station) => [`custom:${station.key}`, station.name]),
+    ...[...stations.free, ...stations.pro, ...stations.ultimate].map((station) => [station.key, station.name]),
+  ]), [stations.custom, stations.free, stations.pro, stations.ultimate]);
+
   const selectedStationLabel = useMemo(() => {
     const directMatch = [...stations.custom, ...stations.free, ...stations.pro, ...stations.ultimate].find((station) => {
       if (`custom:${station.key}` === eventForm.stationKey) return true;
@@ -318,7 +324,7 @@ export default function DashboardEvents({
                     </div>
                     <div style={{ color: '#71717A', fontSize: 12, marginTop: 4 }}>
                       {t(
-                        'Fuellt Titel, Dauer, Discord-Nachricht und Beschreibung mit einer Vorlage.',
+                        'Füllt Titel, Dauer, Discord-Nachricht und Beschreibung mit einer Vorlage.',
                         'Fills title, duration, Discord message and description from a template.'
                       )}
                     </div>
@@ -663,6 +669,7 @@ export default function DashboardEvents({
             voiceChannels={voiceChannels}
             textChannels={textChannels}
             serverEmojis={serverEmojis}
+            stationNames={stationNames}
           />
         ))}
       </div>

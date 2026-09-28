@@ -28,7 +28,7 @@ function StepShell({ step, children }) {
 export default function HowToDiscord({ bots = [] }) {
   const { copy, locale } = useI18n();
   const s = copy.howTo;
-  const inviteUrl = resolvePrimaryInviteUrl(bots);
+  const inviteUrl = resolvePrimaryInviteUrl(bots, locale);
 
   return (
     <section id="how-to" data-testid="how-to-discord" style={{ padding: '90px 24px', position: 'relative' }}>

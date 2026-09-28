@@ -12,7 +12,7 @@ export function buildDashboardNextSetupAction({ setupStatus, inviteLinks, t }) {
 
   if (!setupStatus.commanderReady) {
     return {
-      eyebrow: t('Naechste Aktion', 'Next action'),
+      eyebrow: t('Nächste Aktion', 'Next action'),
       title: t('Commander zuerst verbinden', 'Connect the commander first'),
       body: t(
         'Ohne den Hauptbot kann OmniFM diesen Server noch nicht sauber steuern.',
@@ -26,8 +26,8 @@ export function buildDashboardNextSetupAction({ setupStatus, inviteLinks, t }) {
 
   if (!setupStatus.workerInvited) {
     return {
-      eyebrow: t('Naechste Aktion', 'Next action'),
-      title: t('Naechster Schritt: ersten Worker einladen', 'Next step: invite the first worker'),
+      eyebrow: t('Nächste Aktion', 'Next action'),
+      title: t('Nächster Schritt: ersten Worker einladen', 'Next step: invite the first worker'),
       body: t(
         'Sobald mindestens ein Worker auf dem Server ist, kann /play den eigentlichen Stream starten.',
         'As soon as at least one worker is on the server, /play can start the actual stream.'
@@ -40,8 +40,8 @@ export function buildDashboardNextSetupAction({ setupStatus, inviteLinks, t }) {
 
   if (!setupStatus.firstStreamLive) {
     return {
-      eyebrow: t('Naechste Aktion', 'Next action'),
-      title: t('Naechster Schritt: ersten Stream starten', 'Next step: start the first stream'),
+      eyebrow: t('Nächste Aktion', 'Next action'),
+      title: t('Nächster Schritt: ersten Stream starten', 'Next step: start the first stream'),
       body: t(
         'Die Bot-Architektur ist bereit. Starte jetzt in Discord den ersten Sender mit /play.',
         'The bot setup is ready. Start the first station in Discord with /play now.'
@@ -51,7 +51,7 @@ export function buildDashboardNextSetupAction({ setupStatus, inviteLinks, t }) {
   }
 
   return {
-    eyebrow: t('Naechste Aktion', 'Next action'),
+    eyebrow: t('Nächste Aktion', 'Next action'),
     title: t('Setup abgeschlossen', 'Setup completed'),
     body: t(
       'Dieser Server ist startklar. Danach lohnen sich je nach Bedarf Events, Rechte und weitere Worker.',
@@ -70,7 +70,7 @@ export function buildDashboardEventsHint({ setupStatus, inviteLinks, hasEvents, 
       eyebrow: t('Events vorbereiten', 'Prepare events'),
       title: t('Vor dem ersten Event zuerst einen Worker einladen', 'Invite a worker before the first event'),
       body: t(
-        'Geplante Events starten spaeter automatisch Radio. Dafuer muss mindestens ein Worker bereits auf diesem Server verfuegbar sein.',
+        'Geplante Events starten später automatisch Radio. Dafür muss mindestens ein Worker bereits auf diesem Server verfügbar sein.',
         'Scheduled events start radio automatically later on. For that, at least one worker already needs to be available on this server.'
       ),
       inviteLabel: t('Worker einladen', 'Invite worker'),
@@ -82,7 +82,7 @@ export function buildDashboardEventsHint({ setupStatus, inviteLinks, hasEvents, 
   if (Number(voiceChannelCount || 0) <= 0) {
     return {
       eyebrow: t('Events vorbereiten', 'Prepare events'),
-      title: t('Es fehlt noch ein Ziel-Channel fuer Events', 'A target channel for events is still missing'),
+      title: t('Es fehlt noch ein Ziel-Channel für Events', 'A target channel for events is still missing'),
       body: t(
         'Lege in Discord zuerst einen Voice- oder Stage-Channel an. Danach kann OmniFM das Event direkt dort starten.',
         'Create a voice or stage channel in Discord first. After that, OmniFM can start the event directly there.'
@@ -99,7 +99,7 @@ export function buildDashboardEventsHint({ setupStatus, inviteLinks, hasEvents, 
     eyebrow: t('Events vorbereiten', 'Prepare events'),
     title: t('Lege dein erstes automatisches Radio-Event an', 'Create your first automated radio event'),
     body: t(
-      'Waehle einen Sender, eine Startzeit und den Ziel-Channel. Die Presets unten helfen fuer schnelle Weekly- oder One-Time-Shows.',
+      'Wähle einen Sender, eine Startzeit und den Ziel-Channel. Die Presets unten helfen für schnelle Weekly- oder One-Time-Shows.',
       'Choose a station, a start time, and the target channel. The presets below help with quick weekly or one-time shows.'
     ),
     note: t(
@@ -116,9 +116,9 @@ export function buildDashboardCustomStationsHint({ setupStatus, inviteLinks, has
   if (!setupStatus?.workerInvited) {
     return {
       eyebrow: t('Custom-Streams vorbereiten', 'Prepare custom streams'),
-      title: t('Schliesse zuerst das Grundsetup ab', 'Finish the core setup first'),
+      title: t('Schließe zuerst das Grundsetup ab', 'Finish the core setup first'),
       body: t(
-        'Custom-Stationen lohnen sich am meisten, wenn der normale OmniFM-Flow bereits mit einem Worker laeuft.',
+        'Custom-Stationen lohnen sich am meisten, wenn der normale OmniFM-Flow bereits mit einem Worker läuft.',
         'Custom stations are most useful once the normal OmniFM flow already runs with a worker.'
       ),
       inviteLabel: t('Worker einladen', 'Invite worker'),
@@ -132,7 +132,7 @@ export function buildDashboardCustomStationsHint({ setupStatus, inviteLinks, has
       eyebrow: t('Custom-Streams vorbereiten', 'Prepare custom streams'),
       title: t('Teste zuerst einen normalen Live-Stream', 'Test a normal live stream first'),
       body: t(
-        'Wenn /play bereits sauber funktioniert, lassen sich eigene Stream-URLs spaeter leichter pruefen und einordnen.',
+        'Wenn /play bereits sauber funktioniert, lassen sich eigene Stream-URLs später leichter prüfen und einordnen.',
         'Once /play works cleanly, your own stream URLs become much easier to verify and organize.'
       ),
       command: '/play',
@@ -145,13 +145,13 @@ export function buildDashboardCustomStationsHint({ setupStatus, inviteLinks, has
 
   return {
     eyebrow: t('Custom-Streams vorbereiten', 'Prepare custom streams'),
-    title: t('Fuege deine erste eigene Stream-URL hinzu', 'Add your first own stream URL'),
+    title: t('Füge deine erste eigene Stream-URL hinzu', 'Add your first own stream URL'),
     body: t(
       'Lege einen stabilen Namen, eine HTTPS-URL und bei Bedarf Ordner oder Tags fest. So wird aus Ultimate ein echter Operator-Workspace.',
       'Add a stable name, an HTTPS URL, and optional folders or tags. That turns Ultimate into a real operator workspace.'
     ),
     note: t(
-      'Nutze Ordner fuer Quellen oder Formate und Tags fuer Themen wie news, club oder chill.',
+      'Nutze Ordner für Quellen oder Formate und Tags für Themen wie news, club oder chill.',
       'Use folders for sources or formats and tags for topics like news, club, or chill.'
     ),
   };
@@ -164,7 +164,7 @@ export function buildDashboardPermissionsHint({ setupStatus, availableRoleCount,
         eyebrow: t('Berechtigungen vorbereiten', 'Prepare permissions'),
         title: t('Verbinde zuerst den Commander mit diesem Server', 'Connect the commander to this server first'),
         body: t(
-          'Ohne den Hauptbot koennen Discord-Rollen hier noch nicht sauber geladen und zugeordnet werden.',
+          'Ohne den Hauptbot können Discord-Rollen hier noch nicht sauber geladen und zugeordnet werden.',
           'Without the main bot, Discord roles cannot be loaded and assigned cleanly here yet.'
         ),
         command: '/setup',
@@ -173,9 +173,9 @@ export function buildDashboardPermissionsHint({ setupStatus, availableRoleCount,
 
     return {
       eyebrow: t('Berechtigungen vorbereiten', 'Prepare permissions'),
-      title: t('Discord-Rollen sind gerade noch nicht verfuegbar', 'Discord roles are not available yet'),
+      title: t('Discord-Rollen sind gerade noch nicht verfügbar', 'Discord roles are not available yet'),
       body: t(
-        'OmniFM konnte fuer diesen Server noch keine Rollen laden. Pruefe kurz, ob der Bot verbunden ist und Discord die Rollenliste liefert.',
+        'OmniFM konnte für diesen Server noch keine Rollen laden. Prüfe kurz, ob der Bot verbunden ist und Discord die Rollenliste liefert.',
         'OmniFM could not load roles for this server yet. Check whether the bot is connected and Discord returns the role list.'
       ),
       command: '/setup',
@@ -189,13 +189,13 @@ export function buildDashboardPermissionsHint({ setupStatus, availableRoleCount,
   if (!hasRestrictedCommands) {
     return {
       eyebrow: t('Berechtigungen vorbereiten', 'Prepare permissions'),
-      title: t('Commands sind aktuell noch fuer alle offen', 'Commands are currently open to everyone'),
+      title: t('Commands sind aktuell noch für alle offen', 'Commands are currently open to everyone'),
       body: t(
-        'Ein sauberer Start ist meist: /play, /stop und /event nur fuer DJ- oder Admin-Rollen freigeben.',
+        'Ein sauberer Start ist meist: /play, /stop und /event nur für DJ- oder Admin-Rollen freigeben.',
         'A clean starting point is usually to allow /play, /stop, and /event only for DJ or admin roles.'
       ),
       note: t(
-        'OmniFM blockiert hier nichts automatisch. Du entscheidest pro Command, welche Rollen wirklich duerfen.',
+        'OmniFM blockiert hier nichts automatisch. Du entscheidest pro Command, welche Rollen wirklich dürfen.',
         'OmniFM does not block anything automatically here. You decide per command which roles are actually allowed.'
       ),
     };
@@ -212,9 +212,9 @@ export function buildDashboardWeeklyDigestHint({ setupStatus, weeklyDigest, text
   if (Number(textChannelCount || 0) <= 0) {
     return {
       eyebrow: t('Digest vorbereiten', 'Prepare digest'),
-      title: t('Es fehlt noch ein Text-Channel fuer den Digest', 'A text channel for the digest is still missing'),
+      title: t('Es fehlt noch ein Text-Channel für den Digest', 'A text channel for the digest is still missing'),
       body: t(
-        'Lege in Discord zuerst einen Text-Channel fuer Reports oder Bot-Updates an. Danach kann der Weekly Digest sauber geplant werden.',
+        'Lege in Discord zuerst einen Text-Channel für Reports oder Bot-Updates an. Danach kann der Weekly Digest sauber geplant werden.',
         'Create a text channel for reports or bot updates in Discord first. After that, the weekly digest can be scheduled cleanly.'
       ),
       command: '/setup',
@@ -226,7 +226,7 @@ export function buildDashboardWeeklyDigestHint({ setupStatus, weeklyDigest, text
       eyebrow: t('Digest vorbereiten', 'Prepare digest'),
       title: t('Sammle zuerst die ersten echten Laufdaten', 'Collect the first real runtime data first'),
       body: t(
-        'Der Weekly Digest wird deutlich wertvoller, sobald auf diesem Server bereits Sessions, Zuhoerer und Senderstarts vorhanden sind.',
+        'Der Weekly Digest wird deutlich wertvoller, sobald auf diesem Server bereits Sessions, Zuhörer und Senderstarts vorhanden sind.',
         'The weekly digest becomes much more valuable once this server already has sessions, listeners, and station starts.'
       ),
       command: '/play',
@@ -240,9 +240,9 @@ export function buildDashboardWeeklyDigestHint({ setupStatus, weeklyDigest, text
   if (digest.enabled !== true) {
     return {
       eyebrow: t('Digest vorbereiten', 'Prepare digest'),
-      title: t('Aktiviere den Weekly Digest fuer diesen Server', 'Enable the weekly digest for this server'),
+      title: t('Aktiviere den Weekly Digest für diesen Server', 'Enable the weekly digest for this server'),
       body: t(
-        'Waehle einen Channel, einen Wochentag und eine Sprache. So bekommt dein Team automatisch einen kompakten Wochenbericht.',
+        'Wähle einen Channel, einen Wochentag und eine Sprache. So bekommt dein Team automatisch einen kompakten Wochenbericht.',
         'Choose a channel, weekday, and language. That gives your team an automatic compact weekly report.'
       ),
     };
@@ -278,9 +278,9 @@ export function buildDashboardFailoverHint({ setupStatus, failoverChainLength, t
   if (!setupStatus?.firstStreamLive) {
     return {
       eyebrow: t('Failover vorbereiten', 'Prepare failover'),
-      title: t('Teste zuerst den regulaeren Stream', 'Test the regular stream first'),
+      title: t('Teste zuerst den regulären Stream', 'Test the regular stream first'),
       body: t(
-        'Sobald der erste Sender stabil laeuft, kannst du hier gezielt die erste Ausweichstation hinterlegen.',
+        'Sobald der erste Sender stabil läuft, kannst du hier gezielt die erste Ausweichstation hinterlegen.',
         'As soon as the first station runs reliably, you can define the first fallback station here.'
       ),
       command: '/play',
@@ -292,7 +292,7 @@ export function buildDashboardFailoverHint({ setupStatus, failoverChainLength, t
       eyebrow: t('Failover vorbereiten', 'Prepare failover'),
       title: t('Lege die erste Ausweichstation fest', 'Define the first fallback station'),
       body: t(
-        'Wenn ein Stream hart ausfaellt, kann OmniFM damit direkt auf eine andere Station springen statt nur stumpf neu zu verbinden.',
+        'Wenn ein Stream hart ausfällt, kann OmniFM damit direkt auf eine andere Station springen statt nur stumpf neu zu verbinden.',
         'If a stream fails hard, OmniFM can jump directly to another station instead of only reconnecting blindly.'
       ),
     };
@@ -323,7 +323,7 @@ export function buildDashboardExportsHint({ setupStatus, exportsWebhook, t }) {
       eyebrow: t('Webhooks vorbereiten', 'Prepare webhooks'),
       title: t('Hinterlege zuerst eine Webhook-URL', 'Add a webhook URL first'),
       body: t(
-        'Mit einer Ziel-URL kann OmniFM Exporte, Testnachrichten und spaeter auch Recovery- oder Failover-Alerts sauber an dein eigenes System uebergeben.',
+        'Mit einer Ziel-URL kann OmniFM Exporte, Testnachrichten und später auch Recovery- oder Failover-Alerts sauber an dein eigenes System übergeben.',
         'With a target URL, OmniFM can hand off exports, test messages, and later also recovery or failover alerts cleanly to your own system.'
       ),
     };
@@ -334,7 +334,7 @@ export function buildDashboardExportsHint({ setupStatus, exportsWebhook, t }) {
       eyebrow: t('Webhooks vorbereiten', 'Prepare webhooks'),
       title: t('Aktiviere den Webhook, sobald URL und Secret passen', 'Enable the webhook once URL and secret are ready'),
       body: t(
-        'Der Endpoint ist hinterlegt. Jetzt kannst du Events auswaehlen und den Webhook bewusst aktiv schalten.',
+        'Der Endpoint ist hinterlegt. Jetzt kannst du Events auswählen und den Webhook bewusst aktiv schalten.',
         'The endpoint is saved. Now you can choose events and deliberately enable the webhook.'
       ),
     };
@@ -343,9 +343,9 @@ export function buildDashboardExportsHint({ setupStatus, exportsWebhook, t }) {
   if (!Array.isArray(webhook.events) || webhook.events.length <= 0) {
     return {
       eyebrow: t('Webhooks vorbereiten', 'Prepare webhooks'),
-      title: t('Waehle mindestens ein Webhook-Event aus', 'Select at least one webhook event'),
+      title: t('Wähle mindestens ein Webhook-Event aus', 'Select at least one webhook event'),
       body: t(
-        'Ohne ausgewaehlte Events bleibt der Webhook aktiv, aber er wird nie etwas senden.',
+        'Ohne ausgewählte Events bleibt der Webhook aktiv, aber er wird nie etwas senden.',
         'Without selected events, the webhook stays enabled but it will never send anything.'
       ),
     };
