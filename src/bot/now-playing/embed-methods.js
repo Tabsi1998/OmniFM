@@ -222,6 +222,8 @@ const nowPlayingEmbedMethods = {
       design: this.getPanelDesign(guildId),
       // #426: the server's season from its cached settings and the owner's switches.
       season: this.getGuildSeason?.(guildId) ?? null,
+      // #428: from 1 to 24 December the door of the day.
+      adventDoor: this.getAdventDoor?.(guildId) ?? null,
       nowMs: Date.now(),
     });
   },

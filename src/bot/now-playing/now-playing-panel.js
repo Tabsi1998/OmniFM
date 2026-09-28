@@ -14,6 +14,7 @@ import { NP_PREFIX } from "../runtime-shared.js";
 import { normalizePanelDesign } from "../../lib/panel-design.js";
 import { FAVORITES_MAX } from "../../lib/favorite-stations.js";
 import { seasonPanelLook } from "../season-look.js";
+import { ADVENT_BUTTON_ID } from "../advent-calendar.js";
 
 function clip(value, max) {
   const textValue = String(value ?? "").trim();
@@ -63,6 +64,7 @@ function linkButton(url, label, emoji, appId) {
  * @param {object} [input.design] the server's panel look (#281), see panel-design.js
  * @param {object|null} [input.season] the server's season (#426), see season-look.js
  * @param {number} [input.nowMs] now, for the New Year countdown
+ * @param {number|null} [input.adventDoor] today's door of the Advent calendar (#428)
  */
 export function buildNowPlayingPanel(input) {
   const { t, applicationId: appId = null, station = {}, track = {}, playback = {}, notices = {} } = input;
@@ -157,6 +159,13 @@ export function buildNowPlayingPanel(input) {
         .setEmoji({ name: colorSquare(favorite.color) })
         .setDisabled(onAir);
     })));
+  }
+  // #428: the Advent calendar, one door a day from 1 to 24 December.
+  if (Number.isInteger(input.adventDoor) && input.adventDoor >= 1 && input.adventDoor <= 24) {
+    rows.push(new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(ADVENT_BUTTON_ID).setStyle(ButtonStyle.Success)
+        .setLabel(t(`Türchen ${input.adventDoor}`, `Door ${input.adventDoor}`)).setEmoji({ name: "🎁" }),
+    ));
   }
   if (failover.active && failover.desiredName) {
     rows.push(new ActionRowBuilder().addComponents(

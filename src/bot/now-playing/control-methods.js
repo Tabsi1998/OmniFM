@@ -3,8 +3,33 @@
 import { MessageFlags } from "discord.js";
 import { runRuntimeFailbackProbe, keepRuntimeFailoverStation } from "../runtime-streams.js";
 import { NP_PREFIX } from "../runtime-shared.js";
+import { ADVENT_LABELS } from "../../config/advent-doors.js";
+import { adventDoorFor, adventLanguage, adventStationTip, buildAdventDoor } from "../advent-calendar.js";
+import { buildStationCatalog } from "../runtime-panels.js";
+import { ownerSettings } from "../../lib/owner-settings-cache.js";
 
 const nowPlayingControlMethods = {
+  // #428: the door opens for everyone, the answer is private; "Play now" only with the /play right.
+  async handleAdventDoor(interaction) {
+    const guildId = interaction.guildId;
+    const settings = await this.loadGuildSettingsCached?.(guildId).catch(() => null);
+    const day = adventDoorFor({ guildId, settings: settings || {}, owner: ownerSettings()?.seasons });
+    const language = adventLanguage(interaction.locale);
+    if (!day) {
+      await interaction.reply({ content: (ADVENT_LABELS[language] || ADVENT_LABELS.en).closed, flags: MessageFlags.Ephemeral });
+      return true;
+    }
+    const { stationsData } = buildStationCatalog(guildId);
+    const permission = this.checkCommandRolePermission?.(interaction, "play");
+    await interaction.reply(buildAdventDoor({
+      day,
+      language,
+      tip: adventStationTip(stationsData?.stations || {}, day),
+      canPlay: !permission || permission.ok === true,
+    }));
+    return true;
+  },
+
   // Live-Steuerung direkt aus der Now-Playing-Nachricht (Buttons).
   async handleNowPlayingControl(interaction) {
     const { t } = this.createInteractionTranslator(interaction);
@@ -16,6 +41,8 @@ const nowPlayingControlMethods = {
     const action = String(interaction.customId || "").slice(NP_PREFIX.length);
     // "Share" (#282): the now-playing card, posted in the channel.
     if (action === "share") return this.handleShareCardControl(interaction);
+    // #428: today's door of the Advent calendar, only for whoever opens it.
+    if (action === "advent") return this.handleAdventDoor(interaction);
     // "Report a problem" (#273): the form, then the report for the owner.
     if (action === "report") return this.showProblemReportForm(interaction);
     if (action === "reportform" && interaction.isModalSubmit?.()) return this.handleProblemReportSubmit(interaction);

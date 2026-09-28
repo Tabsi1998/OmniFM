@@ -36,6 +36,8 @@ import { isComponentsV2Message } from "../../discord/ui/index.js";
 import { effectivePanelDesign, panelDesignSignature } from "../../lib/panel-design.js";
 import { seasonSignature, serverSeason } from "../season-look.js";
 import { sendNewYearGreeting } from "../season-greeting.js";
+import { adventDoorFor } from "../advent-calendar.js";
+import { ownerSettings } from "../../lib/owner-settings-cache.js";
 import { nowPlayingStatsMethods } from "./stats-methods.js";
 import { nowPlayingEmbedMethods } from "./embed-methods.js";
 import { nowPlayingControlMethods } from "./control-methods.js";
@@ -379,6 +381,17 @@ const nowPlayingMethods = {
     return serverSeason(guildId, settings);
   },
 
+  /** #428: today's Advent door for the panel's button, or null. */
+  getAdventDoor(guildId) {
+    let settings;
+    try {
+      settings = this.getCachedGuildSettings?.(guildId) || null;
+    } catch {
+      settings = null;
+    }
+    return adventDoorFor({ guildId, settings: settings || {}, owner: ownerSettings()?.seasons });
+  },
+
   /** #426: at midnight once per server and year, into the panel's channel (season-greeting.js). */
   sendNewYearGreeting(guildId, channel, season) {
     return sendNewYearGreeting(this, { guildId, channel, season });
@@ -560,7 +573,7 @@ const nowPlayingMethods = {
       const designKey = panelDesignSignature(this.getPanelDesign(guildId));
       // #426: a new candle, midnight on New Year's Eve: the season redraws the panel too.
       const season = this.getGuildSeason(guildId);
-      const signature = `${buildNowPlayingSignature(stationKey, nextMeta, state, channel.id)}|fav:${favoritesKey}|design:${designKey}|season:${seasonSignature(season)}`;
+      const signature = `${buildNowPlayingSignature(stationKey, nextMeta, state, channel.id)}|fav:${favoritesKey}|design:${designKey}|season:${seasonSignature(season)}|advent:${this.getAdventDoor(guildId) || ""}`;
 
       if (!force && signature === state.nowPlayingSignature) {
         return;
