@@ -36,6 +36,12 @@ const clip = (value, max) => String(value ?? "").trim().slice(0, max);
 /**
  * Stores one phase change of a bot on a server. `transition` is what
  * notePlaybackPhase returns; `state` gives the station at that moment.
+ * @param {{
+ *   guildId?: string,
+ *   bot?: { id?: string, name?: string },
+ *   transition?: { from?: string, to?: string, at?: number, reason?: string, unexpected?: boolean },
+ *   state?: Record<string, any>,
+ * }} [input]
  */
 export async function recordPlaybackTimelineEntry({ guildId, bot = {}, transition, state = {} } = {}) {
   const timeline = collection();
