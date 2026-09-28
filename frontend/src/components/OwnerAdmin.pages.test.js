@@ -46,6 +46,9 @@ function answerFor(url) {
   if (route === '/api/admin/failover-history') return { history: [], count: 0 };
   if (route === '/api/admin/audit') return { audit: [], entries: [] };
   if (route === '/api/admin/archive') return { archive: [], count: 0 };
+  if (route === '/api/admin/station-suggestions') {
+    return { suggestions: [{ id: 'a1b2c3d4e5f60718', name: 'Radio Paradise', url: 'https://stream.example.com/rp.mp3', genre: 'Eclectic', status: 'pending', createdAt: '2026-09-28T08:00:00.000Z', from: 'someone', health: { checks: 3, ok: 3, share: 100 }, lastCheck: { ok: true, bitrate: 128 } }], pending: 1 };
+  }
   if (route === '/api/admin/server-retention') return { retentionDays: 30, pending: [], count: 0 };
   if (route === '/api/admin/status-notices') {
     return { notices: [{ id: 'a1b2c3d4e5f60718', kind: 'maintenance', title: 'Server-Update', message: '', impact: 'maintenance', startsAt: '2026-09-28T08:00:00.000Z', endsAt: '2026-09-28T09:00:00.000Z', resolvedAt: null }] };

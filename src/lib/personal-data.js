@@ -23,6 +23,7 @@ import { deleteDashboardSessionsOfUser, listDashboardSessionsOfUser } from "../d
 import { deleteOwnerSessionsOfUser } from "./owner-access.js";
 import { forgetStationPollCreator, listStationPollsOfCreator } from "../station-polls-store.js";
 import { listScheduledEvents, patchScheduledEvent } from "../scheduled-events-store.js";
+import { forgetStationSuggestionSubmitter, listStationSuggestionsOfUser } from "../station-suggestions-store.js";
 
 export const ERASED_ACTOR = "dashboard:gelöscht";
 // Another process may hold the vote list or a login in its cache for a few seconds.
@@ -53,13 +54,14 @@ export async function collectPersonalData(userId, { now = new Date() } = {}) {
   const id = cleanUserId(userId);
   if (!id) return { ok: false, error: "invalid_user" };
   if (!personalDataAvailable()) return { ok: false, error: "db_unavailable" };
-  const [savedSongs, votes, logins, ownerLogins, polls, changes] = await Promise.all([
+  const [savedSongs, votes, logins, ownerLogins, polls, changes, suggestions] = await Promise.all([
     listSavedSongs(id),
     listVoteEventsOfUser(id),
     listDashboardSessionsOfUser(id),
     getDb().collection("owner_sessions").countDocuments({ discordId: id }),
     listStationPollsOfCreator(id),
     dashboardChangesOf(id),
+    listStationSuggestionsOfUser(id),
   ]);
   return {
     ok: true,
@@ -89,6 +91,13 @@ export async function collectPersonalData(userId, { now = new Date() } = {}) {
         runAt: event.runAtMs ? new Date(event.runAtMs).toISOString() : null,
       })),
       dashboardChanges: changes,
+      // Station suggestions (#303): the Discord ID is kept only to answer.
+      stationSuggestions: suggestions.map((suggestion) => ({
+        name: suggestion.name,
+        url: suggestion.url,
+        status: suggestion.status,
+        createdAt: suggestion.createdAt instanceof Date ? suggestion.createdAt.toISOString() : suggestion.createdAt,
+      })),
       notIncluded: [
         "Premium-Käufe und Rechnungen: Die müssen wir aus steuerlichen Gründen aufbewahren.",
         "Server-Einstellungen, eigene Sender und Events gehören dem Server, nicht einer Person.",
@@ -107,6 +116,7 @@ export function countPersonalData(data = {}) {
     pollsStarted: data.pollsStarted?.length || 0,
     eventsCreated: data.eventsCreated?.length || 0,
     dashboardChanges: data.dashboardChanges?.length || 0,
+    stationSuggestions: data.stationSuggestions?.length || 0,
   };
 }
 
@@ -127,6 +137,8 @@ async function eraseOnce(id) {
     pollsStarted: await forgetStationPollCreator(id),
     eventsCreated,
     dashboardChanges: audit.modifiedCount || 0,
+    // The suggestions stay in the queue, without the person.
+    stationSuggestions: await forgetStationSuggestionSubmitter(id),
   };
 }
 

@@ -19,6 +19,7 @@ import { handleEventCommand } from "../runtime-event-command.js";
 import {
   EVENT_FORM_ID,
   STATION_FORM_ID,
+  SUGGESTION_FORM_ID,
   buildProblemReportModal,
   buildStationFormModal,
   problemReasonLabel,
@@ -150,6 +151,7 @@ ${t("Das Logo ist gespeichert und erscheint im Now-Playing-Panel und im Dashboar
   async handleFormSubmit(interaction) {
     if (!interaction.isModalSubmit?.()) return false;
     if (interaction.customId === STATION_FORM_ID) return this.handleStationFormSubmit(interaction);
+    if (interaction.customId === SUGGESTION_FORM_ID) return this.handleSuggestionFormSubmit(interaction);
     if (interaction.customId === EVENT_FORM_ID) return this.handleEventFormSubmit(interaction);
     return false;
   },
