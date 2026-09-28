@@ -149,6 +149,15 @@ export async function getGuildDailyStats(guildId, days = 30) {
     .map((entry) => ({ ...entry })), activeSess, nowMs).slice(0, safeDays);
 }
 
+// Stored sessions carry dates (older ones text); callers get text as before.
+function withTextDates(session) {
+  const copy = { ...session };
+  for (const field of ["startedAt", "endedAt"]) {
+    if (copy[field] instanceof Date) copy[field] = copy[field].toISOString();
+  }
+  return copy;
+}
+
 /** Finished sessions that started since `sinceMs`, newest first (weekly digest, #278). */
 export async function getGuildSessionsSince(guildId, sinceMs, { limit = 5000 } = {}) {
   const gid = normalizeGuildId(guildId);
@@ -157,12 +166,14 @@ export async function getGuildSessionsSince(guildId, sinceMs, { limit = 5000 } =
   const max = Math.max(1, Math.min(20000, Number(limit) || 5000));
 
   const result = await mongoSafe(async (db) => {
-    return db.collection("listening_sessions")
-      .find({ guildId: gid, startedAt: { $gte: sinceIso } })
+    // A comparison only matches its own type: dates and not yet converted text.
+    const rows = await db.collection("listening_sessions")
+      .find({ guildId: gid, $or: [{ startedAt: { $gte: new Date(sinceIso) } }, { startedAt: { $gte: sinceIso } }] })
       .sort({ startedAt: -1 })
       .limit(max)
       .project({ _id: 0, stationKey: 1, stationName: 1, startedAt: 1, humanListeningMs: 1, peakListeners: 1 })
       .toArray();
+    return rows.map(withTextDates);
   });
   if (result) return result;
 
@@ -177,12 +188,13 @@ export async function getGuildSessionHistory(guildId, limit = 20) {
   if (!gid) return [];
 
   const result = await mongoSafe(async (db) => {
-    return db.collection("listening_sessions")
+    const rows = await db.collection("listening_sessions")
       .find({ guildId: gid })
       .sort({ startedAt: -1 })
       .limit(Math.min(limit, 100))
       .project({ _id: 0 })
       .toArray();
+    return rows.map(withTextDates);
   });
 
   if (result) {

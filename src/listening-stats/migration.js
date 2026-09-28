@@ -4,6 +4,22 @@ import { getDb } from "../lib/db.js";
 import { log } from "../lib/logging.js";
 import { ensureState, useMongo } from "../listening-stats-store.js";
 
+/**
+ * Listening sessions kept their start and end as text, so MongoDB's 180-day
+ * TTL on endedAt never removed one. Turns every such text into a date; a text
+ * that is no date stays as it was. Runs on every start and finds nothing once
+ * everything is converted.
+ */
+export async function convertSessionDates(db = getDb()) {
+  if (!db) return 0;
+  const asDate = (field) => ({ $convert: { input: `$${field}`, to: "date", onError: `$${field}`, onNull: `$${field}` } });
+  const result = await db.collection("listening_sessions").updateMany(
+    { $or: [{ startedAt: { $type: "string" } }, { endedAt: { $type: "string" } }] },
+    [{ $set: { startedAt: asDate("startedAt"), endedAt: asDate("endedAt") } }],
+  );
+  return Number(result?.modifiedCount || 0);
+}
+
 // ============================================================
 // Migration: Import JSON data to MongoDB on first connect
 // ============================================================
@@ -11,6 +27,12 @@ export async function migrateJsonToMongo() {
   if (!useMongo()) return { migrated: false, reason: "mongodb-not-connected" };
 
   const db = getDb();
+  try {
+    const converted = await convertSessionDates(db);
+    if (converted) log("INFO", `Listening-Sessions: ${converted} Zeitangaben in Datumswerte umgewandelt; die Löschung nach 180 Tagen greift jetzt.`);
+  } catch (err) {
+    log("WARN", `Listening-Sessions: Umwandlung der Zeitangaben fehlgeschlagen: ${err?.message || err}`);
+  }
   const existingCount = await db.collection("guild_stats").countDocuments();
   if (existingCount > 0) return { migrated: false, reason: "data-exists" };
 
