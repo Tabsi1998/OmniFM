@@ -29,3 +29,10 @@ shows English, and so does every text a language leaves out.
    `node scripts/extract-ui-strings.mjs` lists every dashboard text.
 
 The owner console stays German only and is not part of the languages.
+
+## The legal pages
+
+A change to the texts of the privacy policy or the terms (`privacy`, `terms`
+in `<code>-pages.js`) also moves `LEGAL_TEXTS_UPDATED` in
+`../components/LegalDocument.js`: that date is the "Stand" above both pages.
+German stays the binding version; the other languages translate it.

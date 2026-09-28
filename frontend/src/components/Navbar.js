@@ -8,7 +8,7 @@ const DISCORD_URL = 'https://discord.gg/UeRkfGS43R';
 function Navbar({ page = 'home' }) {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
-  const { copy, locale } = useI18n();
+  const { copy, locale, t } = useI18n();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -161,6 +161,8 @@ function Navbar({ page = 'home' }) {
 
       <button
         data-testid="nav-mobile-toggle"
+        aria-label={open ? t('Menü schließen', 'Close menu') : t('Menü öffnen', 'Open menu')}
+        aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
         style={{
           display: 'none',

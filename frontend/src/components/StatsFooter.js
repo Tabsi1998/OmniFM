@@ -49,7 +49,7 @@ function StatsFooter({ stats, legal }) {
               >
                 {formatNumber(item.value)}
               </div>
-              <div style={{ marginTop: 4, fontSize: 11, color: '#71717A', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+              <div style={{ marginTop: 4, fontSize: 11, color: '#8A8A93', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
                 {item.label}
               </div>
             </div>
@@ -70,38 +70,38 @@ function StatsFooter({ stats, legal }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
               <img src="/brand/omnifm-wordmark-dark.png" alt="OmniFM" style={{ height: 30, width: 'auto', display: 'block' }} data-testid="footer-logo" />
             </div>
-            <p style={{ margin: 0, color: '#71717A', fontSize: 13, lineHeight: 1.7, maxWidth: 560 }}>
+            <p style={{ margin: 0, color: '#8A8A93', fontSize: 13, lineHeight: 1.7, maxWidth: 560 }}>
               {copy.footer.liveNote}
             </p>
             {operatorName && (
-              <p data-testid="footer-operator" style={{ margin: '6px 0 0', color: '#52525B', fontSize: 12, lineHeight: 1.6 }}>
+              <p data-testid="footer-operator" style={{ margin: '6px 0 0', color: '#80808A', fontSize: 12, lineHeight: 1.6 }}>
                 {copy.footer.operatedBy({ operator: operatorName })}
               </p>
             )}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
-            <a href={buildPageHref(locale, 'imprint')} data-testid="footer-impressum" style={{ color: '#71717A', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            <a href={buildPageHref(locale, 'imprint')} data-testid="footer-impressum" style={{ color: '#8A8A93', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
               {copy.footer.links.imprint}
             </a>
-            <a href={buildPageHref(locale, 'privacy')} data-testid="footer-privacy" style={{ color: '#71717A', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            <a href={buildPageHref(locale, 'privacy')} data-testid="footer-privacy" style={{ color: '#8A8A93', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
               {copy.footer.links.privacy}
             </a>
-            <a href={buildPageHref(locale, 'terms')} data-testid="footer-terms" style={{ color: '#71717A', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            <a href={buildPageHref(locale, 'terms')} data-testid="footer-terms" style={{ color: '#8A8A93', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
               {copy.footer.links.terms}
             </a>
-            <a href={buildPageHref(locale, 'charts')} data-testid="footer-charts" style={{ color: '#71717A', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            <a href={buildPageHref(locale, 'charts')} data-testid="footer-charts" style={{ color: '#8A8A93', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
               {copy.footer.links.charts}
             </a>
-            <a href={buildPageHref(locale, 'status')} data-testid="footer-status" style={{ color: '#71717A', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            <a href={buildPageHref(locale, 'status')} data-testid="footer-status" style={{ color: '#8A8A93', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
               {copy.footer.links.status}
             </a>
-            <a href="https://discord.gg/UeRkfGS43R" target="_blank" rel="noopener noreferrer" data-testid="footer-discord" style={{ color: '#5865F2', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            <a href="https://discord.gg/UeRkfGS43R" target="_blank" rel="noopener noreferrer" data-testid="footer-discord" style={{ color: '#7983F5', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
               {copy.footer.discord}
             </a>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#52525B' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#80808A' }}>
             {copy.footer.builtWith} <Heart size={12} color="#ff2a5f" /> {copy.footer.forDiscord}
           </div>
         </div>
