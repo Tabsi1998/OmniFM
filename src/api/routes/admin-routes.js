@@ -78,6 +78,7 @@ import { createAdminLicenseRoutes } from "./admin-license-routes.js";
 import { createAdminStatusRoutes } from "./admin-status-routes.js";
 import { createAdminSuggestionRoutes } from "./admin-suggestion-routes.js";
 import { createAdminReportRoutes } from "./admin-report-routes.js";
+import { createAdminEggHuntRoutes } from "./admin-egg-hunt-routes.js";
 import { createAdminStationRoutes, loadCatalogFileStations } from "./admin-station-routes.js";
 
 export function readRequestBody(req, limitBytes = 4096) {
@@ -326,6 +327,8 @@ export function createAdminRoutesHandler(deps) {
   // The queue of station suggestions (#303).
   const handleSuggestionRoutes = createAdminSuggestionRoutes(routeDeps);
   const handleReportRoutes = createAdminReportRoutes(routeDeps);
+  // The Easter egg hunt's top three per server (#429).
+  const handleEggHuntRoutes = createAdminEggHuntRoutes(routeDeps);
 
   return async function handleAdminRoutes(context) {
     const { req, res, requestUrl } = context;
@@ -701,6 +704,7 @@ export function createAdminRoutesHandler(deps) {
     if (await handleStatusRoutes(context)) return true;
     if (await handleSuggestionRoutes(context)) return true;
     if (await handleReportRoutes(context)) return true;
+    if (await handleEggHuntRoutes(context)) return true;
     return handleStationRoutes(context);
   };
 }

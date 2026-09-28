@@ -78,6 +78,7 @@ test("after 'delete everything' the Discord ID is in no collection", { skip: !ha
   const { collectPersonalData, countPersonalData, erasePersonalData } = await import("../src/lib/personal-data.js");
   const { createStationSuggestion } = await import("../src/station-suggestions-store.js");
   const { createProblemReport } = await import("../src/problem-reports-store.js");
+  const { claimEgg } = await import("../src/easter-eggs-store.js");
   await Promise.all([
     initVoteEventsStore({ refreshMs: 60_000 }),
     initDiscordBotListStore({ refreshMs: 60_000 }),
@@ -118,6 +119,10 @@ test("after 'delete everything' the Discord ID is in no collection", { skip: !ha
   // A report with "tell me" keeps the ID for the promised message (#437).
   const reported = await createProblemReport({ kind: "idea", text: "Mehr Jazz bitte", consent: { notify: true }, reporter: { userId: person, name: "person" } });
   assert.ok(reported.report, JSON.stringify(reported));
+  // An Easter egg (#429): server, ID, count and year, gone with "delete everything".
+  const eggId = `egg-${Math.random().toString(36).slice(2)}`;
+  const found = await claimEgg({ eggId, guildId, guildName: "Mein Server", userId: person, year: 2027, song: "songkey" });
+  assert.equal(found.ok, true, JSON.stringify(found));
   assert.ok(await eventually(async () => (await listVoteEventsOfUser(person)).length === 1
     && Boolean(await db.collection("dashboard_auth_sessions").findOne({ "session.user.id": person }))
     && Boolean(await db.collection("scheduled_events").findOne({ createdByUserId: person }))), "seeded");
@@ -125,9 +130,13 @@ test("after 'delete everything' the Discord ID is in no collection", { skip: !ha
   const collected = await collectPersonalData(person);
   assert.equal(collected.ok, true);
   assert.deepEqual(countPersonalData(collected.data), {
-    savedSongs: 1, votes: 1, dashboardLogins: 1, ownerConsoleLogins: 1, pollsStarted: 1, eventsCreated: 1, dashboardChanges: 1, stationSuggestions: 1, reports: 1,
+    savedSongs: 1, votes: 1, dashboardLogins: 1, ownerConsoleLogins: 1, pollsStarted: 1, eventsCreated: 1, dashboardChanges: 1, stationSuggestions: 1, reports: 1, easterEggs: 1,
   });
   assert.equal(collected.data.reports[0].text, "Mehr Jazz bitte");
+  assert.deepEqual(
+    { ...collected.data.easterEggs[0], lastFoundAt: typeof collected.data.easterEggs[0].lastFoundAt },
+    { serverId: guildId, serverName: "Mein Server", year: 2027, eggs: 1, lastFoundAt: "string", lastSongKey: "songkey" },
+  );
   assert.equal(collected.data.dashboardLogins[0].servers[0].name, "Mein Server");
   assert.ok(!JSON.stringify(collected.data).includes(`token-${person}`), "no login token in the file");
 
@@ -163,6 +172,7 @@ test("after 'delete everything' the Discord ID is in no collection", { skip: !ha
   assert.equal(report?.reporter, undefined);
   assert.equal(report?.consent?.notify, false);
   await db.collection("problem_reports").deleteOne({ _id: reported.report._id });
+  await db.collection("easter_egg_claims").deleteOne({ _id: `${guildId}:${eggId}` });
 
   // A sync reading the old vote again leaves it out; a new vote counts.
   assert.equal(mergeVoteEvents([{ provider: "topgg", userId: person, username: "person", votedAt: hourAgo }]).added, 0);

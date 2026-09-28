@@ -6,6 +6,7 @@ import { NP_PREFIX } from "../runtime-shared.js";
 import { ADVENT_LABELS } from "../../config/advent-doors.js";
 import { adventDoorFor, adventLanguage, adventStationTip, buildAdventDoor } from "../advent-calendar.js";
 import { buildStationCatalog } from "../runtime-panels.js";
+import { EGG_ACTION_PREFIX } from "../easter-eggs.js";
 import { ownerSettings } from "../../lib/owner-settings-cache.js";
 
 const nowPlayingControlMethods = {
@@ -43,6 +44,8 @@ const nowPlayingControlMethods = {
     if (action === "share") return this.handleShareCardControl(interaction);
     // #428: today's door of the Advent calendar, only for whoever opens it.
     if (action === "advent") return this.handleAdventDoor(interaction);
+    // #429: an egg of the Easter egg hunt; whoever clicks first gets it.
+    if (action.startsWith(EGG_ACTION_PREFIX)) return this.handleEasterEggClick(interaction, action.slice(EGG_ACTION_PREFIX.length));
     // "Report a problem" (#273): the form, then the report for the owner.
     if (action === "report") return this.showProblemReportForm(interaction);
     if (action === "reportform" && interaction.isModalSubmit?.()) return this.handleProblemReportSubmit(interaction);

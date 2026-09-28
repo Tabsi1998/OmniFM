@@ -184,6 +184,8 @@ const PRE_PERMISSION_COMMANDS = {
   report: ({ runtime, interaction }) => runtime.openReportForm(interaction, "problem"),
   idea: ({ runtime, interaction }) => runtime.openReportForm(interaction, "idea"),
   feedback: ({ runtime, interaction }) => runtime.openReportForm(interaction, "feedback"),
+  // The Easter egg hunt's board (#429), only for whoever asks.
+  eggs: ({ runtime, interaction }) => runtime.handleEggHuntCommand(interaction),
   help: INFO_COMMANDS.help,
   setup: INFO_COMMANDS.setup,
   language: INFO_COMMANDS.language,

@@ -37,6 +37,7 @@ import { effectivePanelDesign, panelDesignSignature } from "../../lib/panel-desi
 import { seasonSignature, serverSeason } from "../season-look.js";
 import { sendNewYearGreeting } from "../season-greeting.js";
 import { adventDoorFor } from "../advent-calendar.js";
+import { eggSignature } from "../easter-eggs.js";
 import { ownerSettings } from "../../lib/owner-settings-cache.js";
 import { nowPlayingStatsMethods } from "./stats-methods.js";
 import { nowPlayingEmbedMethods } from "./embed-methods.js";
@@ -563,17 +564,24 @@ const nowPlayingMethods = {
       // #277: a template with {title}, {artist} or {listeners} follows the song.
       this.syncVoiceChannelStatus?.(guildId, state.currentStationName || station.name || stationKey).catch(() => null);
       // #278: every new song counts once for the weekly recap's top songs.
-      if (hasFreshTrack && displayTitle && !sameTrackAsPrevious) {
+      const newSong = Boolean(hasFreshTrack && displayTitle && !sameTrackAsPrevious);
+      if (newSong) {
         recordSongPlay(guildId, { artist, title, displayTitle }).catch(() => null);
       }
 
       // The favourites come from the settings; a changed list re-renders the panel (#276).
       await this.loadGuildSettingsCached?.(guildId).catch(() => null);
+      // #429: from Palm Sunday to Easter Monday about every eighth new song brings an egg.
+      if (newSong) {
+        this.rollEasterEgg?.(guildId, state, displayTitle);
+      } else if (state.easterEgg && (!nextMeta.displayTitle || !this.getEggHunt?.(guildId))) {
+        state.easterEgg = null;
+      }
       const favoritesKey = (this.getVisibleFavoriteStations?.(guildId) || []).map((favorite) => favorite.key).join(",");
       const designKey = panelDesignSignature(this.getPanelDesign(guildId));
       // #426: a new candle, midnight on New Year's Eve: the season redraws the panel too.
       const season = this.getGuildSeason(guildId);
-      const signature = `${buildNowPlayingSignature(stationKey, nextMeta, state, channel.id)}|fav:${favoritesKey}|design:${designKey}|season:${seasonSignature(season)}|advent:${this.getAdventDoor(guildId) || ""}`;
+      const signature = `${buildNowPlayingSignature(stationKey, nextMeta, state, channel.id)}|fav:${favoritesKey}|design:${designKey}|season:${seasonSignature(season)}|advent:${this.getAdventDoor(guildId) || ""}|egg:${eggSignature(state.easterEgg)}`;
 
       if (!force && signature === state.nowPlayingSignature) {
         return;

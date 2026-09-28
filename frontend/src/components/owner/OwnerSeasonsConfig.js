@@ -1,6 +1,7 @@
 import { Info, Star } from 'lucide-react';
 import { SEASONS, SEASON_PREVIEWS, normalizeOwnerSeasons } from '../../../../src/lib/seasons.js';
 import { Field, SaveBar, Toggle, labelStyle } from './configFields.js';
+import OwnerEggHunt from './OwnerEggHunt.js';
 
 // The seasonal decoration (#425): what the switches and the test looks are called.
 const SEASON_SWITCH_LABELS = {
@@ -25,8 +26,8 @@ const SEASON_PREVIEW_LABELS = {
   'newyear-greeting': 'Neujahr: „Frohes neues Jahr“',
 };
 
-/** Owner page "Saison-Deko" (#425): a main switch per season and the test mode. */
-export default function OwnerSeasonsConfig({ seasons, setSeasons, onSave, saving, msg, dirty }) {
+/** Owner page "Saison-Deko" (#425): a main switch per season, the test mode and the egg hunt's top three (#429). */
+export default function OwnerSeasonsConfig({ seasons, setSeasons, onSave, saving, msg, dirty, apiGet = null }) {
   if (!seasons) return <div className="oa-sub">Lade Konfiguration…</div>;
   const test = seasons.test || { preview: '', guildIds: [] };
   const setTest = (changes) => setSeasons((p) => ({ ...p, test: { ...(p.test || {}), ...changes } }));
@@ -52,6 +53,7 @@ export default function OwnerSeasonsConfig({ seasons, setSeasons, onSave, saving
         <div className="oa-section-title"><Info size={15} /> Testmodus: Saison erzwingen</div>
         <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 16 }}>
           Die genannten Server zeigen den gewählten Look sofort, egal welches Datum ist und was die Schalter sagen. So lässt sich alles vor dem Termin im eigenen Server prüfen. „Aus“ beendet den Test.
+          Mit einem Oster-Look läuft dort auch die Ostereiersuche, mit einem Ei etwa bei jedem zweiten Song; gefundene Eier zählen dort wie echte.
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 18px' }}>
           <div style={{ marginBottom: 14 }}>
@@ -79,6 +81,7 @@ export default function OwnerSeasonsConfig({ seasons, setSeasons, onSave, saving
         </div>
       </div>
       <SaveBar onSave={() => onSave(normalizeOwnerSeasons(seasons))} saving={saving} msg={msg} testid="cfg-seasons-save" dirty={dirty} />
+      {apiGet ? <OwnerEggHunt apiGet={apiGet} /> : null}
     </div>
   );
 }

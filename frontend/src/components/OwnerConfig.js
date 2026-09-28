@@ -403,7 +403,7 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
 
   // ---------------- SEASONAL DECORATION (#425) ----------------
   if (section === 'seasons') {
-    return <OwnerSeasonsConfig seasons={seasons} setSeasons={setSeasons} onSave={(value) => save('seasons', value)} saving={saving} msg={msg} dirty={isDirty('seasons')} />;
+    return <OwnerSeasonsConfig apiGet={apiGet} seasons={seasons} setSeasons={setSeasons} onSave={(value) => save('seasons', value)} saving={saving} msg={msg} dirty={isDirty('seasons')} />;
   }
 
   // Reports from Discord (#436, #437): the open ones and where they go.

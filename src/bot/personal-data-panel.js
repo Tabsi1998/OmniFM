@@ -33,6 +33,7 @@ function rows({ t, counts }) {
     [t("🛠 Deine Dashboard-Änderungen im Protokoll", "🛠 Your dashboard changes in the log"), counts.dashboardChanges, ""],
     counts.stationSuggestions ? [t("📻 Deine Sender-Vorschläge", "📻 Your station suggestions"), counts.stationSuggestions, ""] : null,
     counts.reports ? [t("📣 Deine Meldungen (mit „Gib mir Bescheid“)", "📣 Your reports (with “Tell me when it is done”)"), counts.reports, ""] : null,
+    counts.easterEggs ? [t("🥚 Ostereiersuche (je Server und Jahr)", "🥚 Easter egg hunt (per server and year)"), counts.easterEggs, ""] : null,
     counts.ownerConsoleLogins ? [t("🔐 Anmeldungen in der Owner-Konsole", "🔐 Owner console logins"), counts.ownerConsoleLogins, ""] : null,
   ].filter(Boolean);
 }

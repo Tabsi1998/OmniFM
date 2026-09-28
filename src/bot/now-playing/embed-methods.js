@@ -224,6 +224,8 @@ const nowPlayingEmbedMethods = {
       season: this.getGuildSeason?.(guildId) ?? null,
       // #428: from 1 to 24 December the door of the day.
       adventDoor: this.getAdventDoor?.(guildId) ?? null,
+      // #429: the song's egg, from Palm Sunday to Easter Monday.
+      easterEgg: this.guildState?.get?.(guildId)?.easterEgg ?? null,
       nowMs: Date.now(),
     });
   },

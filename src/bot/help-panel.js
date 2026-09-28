@@ -86,6 +86,7 @@ export function buildHelpPayload(input) {
         t("`/stations` öffnet den Sender-Browser mit Genres, Suche und Abspielen-Knopf.", "`/stations` opens the station browser with genres, search and a play button."),
         t("`/history` zeigt die letzten Songs, `/stats` die Hörstatistik deines Servers.", "`/history` shows the last songs, `/stats` your server's listening stats."),
         t("`/jahresrueckblick` zeigt euer Jahr: Stunden, Sender, Songs und Uhrzeiten.", "`/year-review` shows your year: hours, stations, songs and times."),
+        t("Von Palmsonntag bis Ostermontag verstecken sich Eier im Panel; `/ostereier` zeigt, wer die meisten gefunden hat.", "From Palm Sunday to Easter Monday eggs hide in the panel; `/eggs` shows who found the most."),
         t("Eigene Sender (Ultimate): `/addstation`, `/mystations`, `/removestation`.", "Your own stations (Ultimate): `/addstation`, `/mystations`, `/removestation`."),
         t("Ein Sender fehlt im Katalog? Schlag ihn mit `/sender-vorschlagen` vor; du bekommst per DM Bescheid.", "A station missing from the catalogue? Suggest it with `/suggest-station`; you hear back by DM."),
       ],
