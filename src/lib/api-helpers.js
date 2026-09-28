@@ -258,7 +258,7 @@ function sanitizeLicenseForApi(license, includeSensitive = false) {
     tier: license.plan || "free",
     plan: license.plan || "free",
     seats: normalizeSeats(license.seats || 1),
-    active: Boolean(license.active) && !Boolean(license.expired),
+    active: Boolean(license.active) && !license.expired,
     expired: Boolean(license.expired),
     expiresAt: license.expiresAt || null,
     remainingDays: Number.isFinite(license.remainingDays) ? license.remainingDays : null,

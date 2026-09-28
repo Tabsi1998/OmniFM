@@ -8,7 +8,7 @@ function buildSetupStatusSummary({
   invitedWorkerCount = 0,
   maxWorkerSlots = 0,
   voiceChannelCount = 0,
-  t = (de, en) => de,
+  t = (de, _en) => de,
 } = {}) {
   const invited = normalizeCount(invitedWorkerCount);
   const maxWorkers = Math.max(invited, normalizeCount(maxWorkerSlots));
@@ -71,7 +71,7 @@ function buildVoiceChannelAccessMessage({
   issue = "connect_missing",
   channelLabel = "",
   workerName = "",
-  t = (de, en) => de,
+  t = (de, _en) => de,
 } = {}) {
   const target = String(channelLabel || "").trim() || t("dem gewählten Channel", "the selected channel");
   const actor = String(workerName || "").trim();

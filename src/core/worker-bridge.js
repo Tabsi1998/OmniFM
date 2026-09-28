@@ -328,6 +328,7 @@ async function waitForWorkerCommandResult(commandId, options = {}) {
   const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
+    // eslint-disable-next-line no-await-in-loop -- polls the command until the worker answers
     const doc = await getWorkerCommand(normalizedCommandId);
     if (!doc) {
       throw new Error("Worker-Command wurde nicht gefunden.");
@@ -346,6 +347,7 @@ async function waitForWorkerCommandResult(commandId, options = {}) {
       throw new Error(String(doc.error || "Worker-Command abgebrochen."));
     }
     // Polling stays the fallback; the worker's ring ends the wait early.
+    // eslint-disable-next-line no-await-in-loop -- polls the command until the worker answers
     await waitForDoorbell(WORKER_COMMAND_DONE_TOPIC, {
       timeoutMs: Math.min(pollMs, Math.max(0, deadline - Date.now())),
       match: (detail) => detail?.commandId === normalizedCommandId,

@@ -1,3 +1,4 @@
+/* eslint-disable no-await-in-loop -- an interactive CLI asks one question after the other */
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import dotenv from "dotenv";
@@ -17,7 +18,6 @@ import {
 import { isConfigured as isEmailConfigured, sendMail } from "./email.js";
 import { loadBotConfigs, buildInviteUrl } from "./bot-config.js";
 import {
-  normalizeSeats as normalizeSeatsShared,
   getSeatPricePerMonthCents as getSeatPricePerMonthCentsShared,
   calculatePrice as calculatePriceShared,
   calculateUpgradePrice as calculateUpgradePriceShared,
@@ -37,10 +37,6 @@ if (String(process.env.MONGO_URL || "").trim()) {
   await connect();
   await initPremiumStore();
   await initCouponStore();
-}
-
-function normalizeSeats(rawSeats) {
-  return normalizeSeatsShared(rawSeats);
 }
 
 function getSeatPricePerMonthCents(tier, seats = 1) {
@@ -171,7 +167,6 @@ async function getInviteOverviewForTier(tier) {
     const botConfigs = loadBotConfigs(process.env);
     const resolved = [];
     for (const botConfig of botConfigs) {
-      // eslint-disable-next-line no-await-in-loop
       const runtimeClientId = await resolveRuntimeClientId(botConfig);
       resolved.push({ ...botConfig, clientId: runtimeClientId });
     }

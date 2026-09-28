@@ -192,7 +192,7 @@ function buildPurchaseEmail(data) {
     ? `${referralCodeText}${offerOwnerLabel ? ` (${offerOwnerLabel})` : ""}`
     : null;
 
-  let tierBenefits = "";
+  let tierBenefits;
   if (tier === "ultimate") {
     tierBenefits = isDe
       ? `

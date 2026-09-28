@@ -397,6 +397,7 @@ setInterval(async () => {
           const warningSubject = emailLanguage === "de"
             ? `Premium ${tierName} laeuft in ${Math.max(1, daysUntilExpiry)} ${Math.max(1, daysUntilExpiry) === 1 ? "Tag" : "Tagen"} ab!`
             : `Premium ${tierName} expires in ${Math.max(1, daysUntilExpiry)} day${Math.max(1, daysUntilExpiry) === 1 ? "" : "s"}!`;
+          // eslint-disable-next-line no-await-in-loop -- one mail after the other, gentle on the mail server
           const result = await sendMail(contactEmail, warningSubject, html);
           if (result?.success) {
             patchLicenseById(licenseId, { [warningFlagField]: license.expiresAt });
@@ -414,6 +415,7 @@ setInterval(async () => {
         const expiredSubject = emailLanguage === "de"
           ? `Premium ${tierName} abgelaufen`
           : `Premium ${tierName} expired`;
+        // eslint-disable-next-line no-await-in-loop -- one mail after the other, gentle on the mail server
         const result = await sendMail(contactEmail, expiredSubject, html);
         if (result?.success) {
           patchLicenseById(licenseId, { _expiredNotifiedForExpiryAt: license.expiresAt, _expiredNotified: true });

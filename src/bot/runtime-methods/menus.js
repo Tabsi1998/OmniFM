@@ -308,6 +308,7 @@ const menuMethods = {
       const inviteUrl = resolvedClientId && worker
         ? buildInviteUrl({ ...worker.config, clientId: resolvedClientId })
         : null;
+      // eslint-disable-next-line no-await-in-loop -- a handful of workers, checked one after the other
       const alreadyInvited = worker ? await this.isWorkerAlreadyInvited(guild, worker) : false;
 
       workers.push({

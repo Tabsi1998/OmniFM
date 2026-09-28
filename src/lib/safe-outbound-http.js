@@ -160,6 +160,7 @@ async function resolveHostnameForOutboundRequest(hostname, {
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
+      // eslint-disable-next-line no-await-in-loop -- DNS retries wait for each other
       const records = await activeResolver(hostname, { all: true, verbatim: true });
       const addresses = (Array.isArray(records) ? records : [])
         .map((entry) => {
@@ -174,6 +175,7 @@ async function resolveHostnameForOutboundRequest(hostname, {
     }
 
     if (attempt < attempts && isRetryableDnsLookupError(lastError)) {
+      // eslint-disable-next-line no-await-in-loop -- DNS retries wait for each other
       await waitForDnsRetry(retryDelayMs);
     } else {
       break;
@@ -379,9 +381,11 @@ async function safeFetch(rawUrl, {
   let requestHeaders = headers;
 
   for (let redirectCount = 0; ; redirectCount += 1) {
+    // eslint-disable-next-line no-await-in-loop -- each redirect hop depends on the one before
     const target = await resolveSafeOutboundTarget(currentUrl, policyOptions);
     let incoming;
     try {
+      // eslint-disable-next-line no-await-in-loop -- each redirect hop depends on the one before
       incoming = await requestImpl(target, {
         method: normalizedMethod,
         headers: requestHeaders,

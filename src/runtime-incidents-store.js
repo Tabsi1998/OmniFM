@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import { fileStoresAllowed } from "./lib/store-policy.js";
-import path from "node:path";
 import { getDb, isConnected } from "./lib/db.js";
 import { log } from "./lib/logging.js";
 import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";

@@ -81,7 +81,7 @@ export function createDashboardStatsRouteHandler(deps) {
         return true;
       }
 
-      let body = {};
+      let body;
       try {
         body = await readJsonBody();
       } catch (err) {
@@ -187,6 +187,7 @@ export function createDashboardStatsRouteHandler(deps) {
         const db = getDb();
         if (db) {
           for (const collectionName of ["daily_stats", "listening_sessions", "listener_snapshots"]) {
+            // eslint-disable-next-line no-await-in-loop -- three deletes, one after the other; each count goes into the answer
             const result = await db.collection(collectionName).deleteMany({ guildId });
             deletedCounts[collectionName] = result.deletedCount || 0;
           }

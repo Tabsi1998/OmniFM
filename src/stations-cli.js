@@ -1,3 +1,4 @@
+/* eslint-disable no-await-in-loop -- an interactive CLI asks one question after the other */
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import {

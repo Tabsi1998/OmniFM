@@ -352,6 +352,7 @@ async function restoreRuntimeState(runtime, stations) {
 
   for (const [guildId, data] of restorableEntries) {
     try {
+      // eslint-disable-next-line no-await-in-loop -- one server after the other, so a restart does not open every voice connection at once
       await restoreRuntimeGuildEntry(runtime, guildId, data, stations, { source: "restore" });
     } catch (err) {
       const state = runtime.guildState.get(guildId);

@@ -70,6 +70,7 @@ test("an end within five seconds counts as an error and backs off exponentially"
   const state = playingState();
   for (let i = 0; i < 3; i += 1) {
     state.lastStreamStartAt = Date.now() - 2_000;
+    // eslint-disable-next-line no-await-in-loop -- the stream ends happen in order
     await handleRuntimeStreamEnd(runtime, GUILD_ID, state, "idle");
   }
   assert.deepEqual(runtime.restarts.map((entry) => entry.delayMs), [1_000, 2_000, 4_000]);
@@ -82,6 +83,7 @@ test("repeated normal ends within the idle window get a growing penalty", async 
   const state = playingState();
   for (let i = 0; i < 3; i += 1) {
     state.lastStreamStartAt = Date.now() - 60_000;
+    // eslint-disable-next-line no-await-in-loop -- the stream ends happen in order
     await handleRuntimeStreamEnd(runtime, GUILD_ID, state, "idle");
   }
   const delays = runtime.restarts.map((entry) => entry.delayMs);

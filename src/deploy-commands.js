@@ -34,6 +34,7 @@ const commanderBot = Number.isFinite(configuredCommander) && configuredCommander
 for (const bot of bots) {
   try {
     const rest = new REST({ version: "10" }).setToken(bot.token);
+    // eslint-disable-next-line no-await-in-loop -- one bot after the other, as Discord's rate limit wants
     const me = await rest.get(Routes.user("@me"));
     const runtimeClientId = String(me?.id || bot.clientId || "").trim();
     if (!runtimeClientId) {
@@ -46,6 +47,7 @@ for (const bot of bots) {
 
     if (!isCommander) {
       if (cleanGlobalCommands) {
+        // eslint-disable-next-line no-await-in-loop -- one bot after the other, as Discord's rate limit wants
         await rest.put(Routes.applicationCommands(runtimeClientId), { body: [] });
         console.log(`Worker ${bot.name}: globale Slash-Commands entfernt.`);
       } else {
@@ -57,8 +59,10 @@ for (const bot of bots) {
 
     if (syncGlobalCommands) {
       console.log(`Registriere globale Slash-Commands fuer Commander ${bot.name} (${runtimeClientId})...`);
+      // eslint-disable-next-line no-await-in-loop -- one bot after the other, as Discord's rate limit wants
       await rest.put(Routes.applicationCommands(runtimeClientId), { body: commands });
     } else if (cleanGlobalCommands) {
+      // eslint-disable-next-line no-await-in-loop -- one bot after the other, as Discord's rate limit wants
       await rest.put(Routes.applicationCommands(runtimeClientId), { body: [] });
       console.log(`Commander ${bot.name}: globale Slash-Commands bereinigt (Modus ${commandRegistrationMode}).`);
     } else {

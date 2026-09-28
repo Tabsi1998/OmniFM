@@ -471,6 +471,7 @@ const permissionMethods = {
 
     await this.respondInteraction(interaction, { content: chunks[0], ephemeral });
     for (let i = 1; i < chunks.length; i++) {
+      // eslint-disable-next-line no-await-in-loop -- the parts of a long answer must arrive in order
       await interaction.followUp({ content: chunks[i], flags: ephemeral ? MessageFlags.Ephemeral : 0 });
     }
   },

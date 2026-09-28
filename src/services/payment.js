@@ -34,6 +34,7 @@ import { activateProTrial } from "./payment-trial.js";
 async function sendMailWithRetry({ to, subject, html, label, maxAttempts = 2 }) {
   let lastError = "";
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    // eslint-disable-next-line no-await-in-loop -- mail retries wait for each other
     const result = await sendMail(to, subject, html);
     if (result?.success) {
       log("INFO", `[Email] ${label} sent to ${to} (attempt ${attempt}/${maxAttempts})`);
@@ -43,6 +44,7 @@ async function sendMailWithRetry({ to, subject, html, label, maxAttempts = 2 }) 
     lastError = String(result?.error || "unknown email error");
     log("ERROR", `[Email] ${label} failed for ${to} (attempt ${attempt}/${maxAttempts}): ${lastError}`);
     if (attempt < maxAttempts) {
+      // eslint-disable-next-line no-await-in-loop -- mail retries wait for each other
       await waitMs(1000 * attempt);
     }
   }

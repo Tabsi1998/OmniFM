@@ -240,12 +240,14 @@ async function topGGRequest(method, path, {
 
   for (let attemptIndex = 0; attemptIndex <= retryOptions.maxRetries; attemptIndex += 1) {
     try {
+      // eslint-disable-next-line no-await-in-loop -- retries wait for each other
       const response = await fetch(endpoint, {
         method,
         headers,
         body: body !== undefined ? JSON.stringify(body) : undefined,
       });
 
+      // eslint-disable-next-line no-await-in-loop -- retries wait for each other
       const rawText = await response.text();
       let parsed = null;
       if (rawText.trim()) {
@@ -301,6 +303,7 @@ async function topGGRequest(method, path, {
         `(attempt ${nextAttempt}/${totalAttempts}, status=${normalizedError.status || "network"}).`
       );
       if (delayMs > 0) {
+        // eslint-disable-next-line no-await-in-loop -- retries wait for each other
         await waitMs(delayMs);
       }
     }
@@ -560,6 +563,7 @@ async function syncTopGGVotes(runtimes = []) {
   try {
     while (pages < maxPages) {
       const query = buildVotesQuery({ cursor, startDate });
+      // eslint-disable-next-line no-await-in-loop -- each page needs the cursor of the one before
       const response = await topGGRequest("GET", `/projects/@me/votes?${query}`, {
         token: config.token,
         apiVersion: "v1",
@@ -683,7 +687,7 @@ function handleTopGGWebhook(headers = {}, rawBody = "") {
     return { ok: false, status: 401, error: "Unauthorized." };
   }
 
-  let parsedBody = {};
+  let parsedBody;
   try {
     parsedBody = rawBody.trim() ? JSON.parse(rawBody) : {};
   } catch {

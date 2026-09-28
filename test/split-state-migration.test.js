@@ -5,9 +5,6 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const monolithStatePath = path.join(repoRoot, "bot-state.json");
-const monolithBackupPath = `${monolithStatePath}.bak`;
-
 
 function setEnv(overrides) {
   const previous = new Map();

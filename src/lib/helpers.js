@@ -1,7 +1,7 @@
 // ============================================================
 // OmniFM: General Utility/Helper Functions
 // ============================================================
-import { BRAND, PLANS } from "../config/plans.js";
+import { PLANS } from "../config/plans.js";
 import { sanitizeUrlForLog } from "./redact-sensitive.js";
 import { ownerPlanPriceCents } from "./owner-settings-cache.js";
 

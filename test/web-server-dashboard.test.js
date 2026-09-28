@@ -323,6 +323,7 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
   ];
   const snapshots = new Map();
   for (const filePath of trackedFiles) {
+    // eslint-disable-next-line no-await-in-loop -- one file after the other
     snapshots.set(filePath, await snapshotFile(filePath));
   }
 
@@ -562,6 +563,7 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
       await closeDb().catch(() => null);
     }
     for (const [filePath, snapshot] of snapshots.entries()) {
+      // eslint-disable-next-line no-await-in-loop -- one file after the other
       await restoreFile(filePath, snapshot);
     }
   });
@@ -2410,6 +2412,7 @@ test("dashboard stats keep recovering workers visible even without an active voi
   ];
   const snapshots = new Map();
   for (const filePath of trackedFiles) {
+    // eslint-disable-next-line no-await-in-loop -- one file after the other
     snapshots.set(filePath, await snapshotFile(filePath));
   }
 
@@ -2580,6 +2583,7 @@ test("dashboard stats keep recovering workers visible even without an active voi
     setLicenseProvider(() => null);
     restoreEnv();
     for (const [filePath, snapshot] of snapshots.entries()) {
+      // eslint-disable-next-line no-await-in-loop -- one file after the other
       await restoreFile(filePath, snapshot);
     }
   });

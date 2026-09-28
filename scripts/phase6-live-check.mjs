@@ -68,12 +68,6 @@ function logLine(level, message) {
   console.log(`[${level}] ${redactSensitiveText(message)}`);
 }
 
-function summarizeSync(entry) {
-  if (!entry) return "never";
-  const at = String(entry.at || "unknown");
-  return entry.ok === false ? `failed@${at}` : `ok@${at}`;
-}
-
 function clipLine(value, maxLength = 180) {
   const text = redactSensitiveText(value).replace(/\s+/g, " ").trim();
   if (text.length <= maxLength) return text;
@@ -188,6 +182,7 @@ async function inspectCoreRoutes(baseUrl) {
   ];
 
   for (const check of spaChecks) {
+    // eslint-disable-next-line no-await-in-loop -- one live check after the other, gentle on the site and in order in the report
     const response = await fetchText(baseUrl, check.path);
     const failures = [];
     if (!response.ok) {
@@ -246,6 +241,7 @@ async function inspectCoreRoutes(baseUrl) {
   ];
 
   for (const check of legalChecks) {
+    // eslint-disable-next-line no-await-in-loop -- one live check after the other, gentle on the site and in order in the report
     const response = await fetchJson(baseUrl, check.path);
     const jsonError = expectJsonObject(response, check.name);
     const missing = Array.isArray(response.body?.missingCoreFields) ? response.body.missingCoreFields : [];
@@ -265,6 +261,7 @@ async function inspectLegacyAssets(baseUrl) {
   let ok = true;
 
   for (const legacyPath of legacyPaths) {
+    // eslint-disable-next-line no-await-in-loop -- one live check after the other, gentle on the site and in order in the report
     const response = await fetchText(baseUrl, legacyPath);
     if (response.status === 200) {
       ok = false;
@@ -353,6 +350,7 @@ async function inspectSecurityHeaders(baseUrl) {
   let ok = true;
 
   for (const check of checks) {
+    // eslint-disable-next-line no-await-in-loop -- one live check after the other, gentle on the site and in order in the report
     const response = await fetchText(baseUrl, check.path);
     if (!response.ok) {
       ok = false;
@@ -444,6 +442,7 @@ async function inspectSeo(baseUrl) {
 
   let ok = true;
   for (const check of checks) {
+    // eslint-disable-next-line no-await-in-loop -- one live check after the other, gentle on the site and in order in the report
     const response = await fetchText(baseUrl, check.path);
     if (!response.ok) {
       ok = false;
@@ -466,70 +465,6 @@ async function inspectSeo(baseUrl) {
     logLine("OK", `seo ${check.name}: status=${response.status}, contentType=${response.contentType || "unknown"}`);
   }
   return { ok };
-}
-
-function evaluateProvider(name, payload, syncFields) {
-  const failures = [];
-  const warnings = [];
-  if (!payload?.configured) {
-    warnings.push("not configured");
-  }
-
-  const state = payload?.state || {};
-  for (const field of syncFields) {
-    const entry = state?.[field] || null;
-    if (!entry) {
-      if (payload?.configured) warnings.push(`${field}=never`);
-      continue;
-    }
-    if (entry.ok === false) {
-      failures.push(`${field}=${entry.error || "failed"}`);
-    }
-  }
-
-  const live = payload?.live;
-  if (live) {
-    if (live.ok === true) {
-      return { failures, warnings };
-    }
-    if (live.skipped) {
-      warnings.push(`live=${live.reason || "skipped"}`);
-    } else {
-      failures.push(`live=${live.error || live.reason || "failed"}`);
-    }
-  }
-
-  return { failures, warnings };
-}
-
-function printProviderSummary(name, payload, syncFields) {
-  const { failures, warnings } = evaluateProvider(name, payload, syncFields);
-  const live = payload?.live || null;
-  const state = payload?.state || {};
-  const syncSummary = syncFields
-    .map((field) => `${field}:${summarizeSync(state[field])}`)
-    .join(", ");
-  const liveSummary = live
-    ? live.ok
-      ? "ok"
-      : live.skipped
-        ? `skipped:${live.reason || "unknown"}`
-        : `failed:${live.error || live.reason || "unknown"}`
-    : "not-requested";
-  const header = `${name}: configured=${payload?.configured === true ? "yes" : "no"}, live=${liveSummary}, sync=[${syncSummary}]`;
-
-  if (failures.length > 0) {
-    logLine("FAIL", `${header}; ${failures.join("; ")}`);
-    return { ok: false, warnings };
-  }
-
-  if (warnings.length > 0) {
-    logLine("WARN", `${header}; ${warnings.join("; ")}`);
-    return { ok: true, warnings };
-  }
-
-  logLine("OK", header);
-  return { ok: true, warnings };
 }
 
 function inspectLogs(logDir) {
@@ -633,6 +568,7 @@ async function main() {
       ];
 
       for (const request of requests) {
+        // eslint-disable-next-line no-await-in-loop -- one live check after the other, gentle on the site and in order in the report
         const response = await fetchJson(baseUrl, request.path, adminToken);
         if (!response.ok) {
           hadFailure = true;

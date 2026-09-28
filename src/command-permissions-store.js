@@ -204,6 +204,7 @@ export async function initCommandPermissionsStore({ refreshMs = 2000 } = {}) {
   const entries = Object.entries(fileStore.guilds || {});
   let migratedCommands = 0;
   for (const [guildId, entry] of entries) {
+    // eslint-disable-next-line no-await-in-loop -- the one-time copy goes server by server
     const existing = await collection.findOne({ _guildId: guildId }, { projection: { _id: 0 } });
     const commands = normalizeCommandRules(existing?.commands);
     let guildChanged = !existing;
@@ -214,6 +215,7 @@ export async function initCommandPermissionsStore({ refreshMs = 2000 } = {}) {
       migratedCommands += 1;
     }
     if (guildChanged) {
+      // eslint-disable-next-line no-await-in-loop -- the one-time copy goes server by server
       await collection.replaceOne(
         { _guildId: guildId },
         { _guildId: guildId, guildId, commands, updatedAt: existing?.updatedAt || new Date().toISOString() },

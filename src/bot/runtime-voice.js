@@ -29,6 +29,7 @@ function clearRestoreBlockState(state) {
 async function waitForVoiceConnectToSettle(state, timeoutMs = 30_000) {
   const startedAt = Date.now();
   while (state?.voiceConnectInFlight && (Date.now() - startedAt) < timeoutMs) {
+    // eslint-disable-next-line no-await-in-loop -- waits in small steps until the connection is gone
     await waitMs(150);
   }
 }
