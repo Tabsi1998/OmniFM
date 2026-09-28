@@ -126,23 +126,33 @@ function directoryEnabled(raw, env, directory, envPrefix) {
     && Boolean(text(directorySetting(raw, directory, "token", `${envPrefix}_TOKEN`, "", env)));
 }
 
+/**
+ * What the owner typed in the console first, then the environment, then the
+ * default (#444): an old PRIVACY_* or TERMS_* line in .env must not hide a
+ * value the owner changed in the console.
+ */
+function consoleFirst(raw, env) {
+  const saved = raw?.company && typeof raw.company === "object" ? raw.company : {};
+  return (field, envKey) => text(saved[field]) || envValue(env, envKey);
+}
+
 /** GET /api/privacy (build_public_privacy_notice). */
 export function privacyNotice(raw, env = process.env) {
   const legal = legalNotice(raw, env).legal;
-  const company = configSectionFrom(raw, "company");
+  const pick = consoleFirst(raw, env);
   const botId = text(directorySetting(raw, "discordBotList", "botId", "DISCORDBOTLIST_BOT_ID", "", env) || env.BOT_1_CLIENT_ID);
   const controller = {
-    name: envValue(env, "PRIVACY_CONTROLLER_NAME") || legal.providerName,
-    representative: envValue(env, "PRIVACY_CONTROLLER_REPRESENTATIVE") || legal.representative,
-    streetAddress: envValue(env, "PRIVACY_CONTROLLER_STREET_ADDRESS") || legal.streetAddress,
-    postalCode: envValue(env, "PRIVACY_CONTROLLER_POSTAL_CODE") || legal.postalCode,
-    city: envValue(env, "PRIVACY_CONTROLLER_CITY") || legal.city,
-    country: envValue(env, "PRIVACY_CONTROLLER_COUNTRY") || legal.country || "Österreich",
-    website: envValue(env, "PRIVACY_CONTROLLER_WEBSITE") || legal.website,
+    name: pick("providerName", "PRIVACY_CONTROLLER_NAME") || legal.providerName,
+    representative: pick("representative", "PRIVACY_CONTROLLER_REPRESENTATIVE") || legal.representative,
+    streetAddress: pick("streetAddress", "PRIVACY_CONTROLLER_STREET_ADDRESS") || legal.streetAddress,
+    postalCode: pick("postalCode", "PRIVACY_CONTROLLER_POSTAL_CODE") || legal.postalCode,
+    city: pick("city", "PRIVACY_CONTROLLER_CITY") || legal.city,
+    country: pick("country", "PRIVACY_CONTROLLER_COUNTRY") || legal.country || "Österreich",
+    website: pick("website", "PRIVACY_CONTROLLER_WEBSITE") || legal.website,
   };
   const contact = {
-    email: envValue(env, "PRIVACY_CONTACT_EMAIL") || legal.email,
-    phone: envValue(env, "PRIVACY_CONTACT_PHONE") || legal.phone,
+    email: pick("email", "PRIVACY_CONTACT_EMAIL") || legal.email,
+    phone: pick("phone", "PRIVACY_CONTACT_PHONE") || legal.phone,
   };
   const authority = {
     name: envValue(env, "PRIVACY_AUTHORITY_NAME") || "Österreichische Datenschutzbehörde",
@@ -154,12 +164,12 @@ export function privacyNotice(raw, env = process.env) {
     productName: legal.productName,
     contact,
     dpo: {
-      name: envValue(env, "PRIVACY_DPO_NAME") || text(company.dpoName),
-      email: envValue(env, "PRIVACY_DPO_EMAIL") || text(company.dpoEmail),
+      name: pick("dpoName", "PRIVACY_DPO_NAME"),
+      email: pick("dpoEmail", "PRIVACY_DPO_EMAIL"),
     },
     hosting: {
-      provider: envValue(env, "PRIVACY_HOSTING_PROVIDER") || text(company.hostingProvider),
-      location: envValue(env, "PRIVACY_HOSTING_LOCATION") || text(company.hostingLocation),
+      provider: pick("hostingProvider", "PRIVACY_HOSTING_PROVIDER"),
+      location: pick("hostingLocation", "PRIVACY_HOSTING_LOCATION"),
     },
     authority,
     additionalRecipients: envValue(env, "PRIVACY_ADDITIONAL_RECIPIENTS"),
@@ -203,11 +213,13 @@ export function termsNotice(raw, env = process.env) {
     businessPurpose: legal.businessPurpose || "",
     website: legal.website || publicUrl,
   };
+  const pick = consoleFirst(raw, env);
   const contact = {
-    email: envValue(env, "TERMS_CONTACT_EMAIL") || envValue(env, "PRIVACY_CONTACT_EMAIL") || legal.email || fallbackEmail,
-    website: envValue(env, "TERMS_SUPPORT_URL") || legal.website || publicUrl,
-    effectiveDate: envValue(env, "TERMS_EFFECTIVE_DATE") || text(company.effectiveDate),
-    governingLaw: envValue(env, "TERMS_GOVERNING_LAW") || text(company.governingLaw),
+    email: pick("email", "TERMS_CONTACT_EMAIL") || envValue(env, "PRIVACY_CONTACT_EMAIL") || legal.email || fallbackEmail,
+    website: pick("website", "TERMS_SUPPORT_URL") || legal.website || publicUrl,
+    effectiveDate: pick("effectiveDate", "TERMS_EFFECTIVE_DATE"),
+    // The console's default ("Österreichisches Recht") comes last, so TERMS_GOVERNING_LAW still counts without an owner value.
+    governingLaw: pick("governingLaw", "TERMS_GOVERNING_LAW") || text(company.governingLaw),
   };
   const missingCoreFields = missingLegalFields({ terms: { operator, contact } }, ["terms"]);
   return {
