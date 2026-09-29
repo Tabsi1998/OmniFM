@@ -31,7 +31,7 @@ function phaseLabel(phase, paused, t, appId) {
   return `${ui.icon("equalizer", appId)} ${t("LIVE · Jetzt auf Sendung", "LIVE · On air now")}`;
 }
 
-function button(customId, { label, emoji, style = ButtonStyle.Secondary, appId }) {
+function button(customId, { label, emoji = "", style = ButtonStyle.Secondary, appId }) {
   const control = new ButtonBuilder().setCustomId(customId).setStyle(style);
   if (label) control.setLabel(clip(label, 80));
   const componentEmoji = emoji ? ui.componentEmoji(emoji, appId) : undefined;
@@ -52,12 +52,19 @@ function linkButton(url, label, emoji, appId) {
  * @param {string|null} input.applicationId  the sending bot: its app emojis
  * @param {string} input.workerName
  * @param {string} input.planTier  the server's plan: free, pro or ultimate
- * @param {object} input.station   { name, key, genre, tier, color, logoUrl }
- * @param {object} input.track     { hasTrack, headline, artist, album, artworkUrl, sourceNote, sourceLabel, metadataHint }
- * @param {object} input.playback  { phase, paused, listeners, bitrate, volume, channelId }
- * @param {object} [input.notices] { serverMuted, failover: { active, desiredName, currentName } }
+ * @param {{ name?: string | null, key?: string | null, genre?: string, tier?: string, color?: number | null, logoUrl?: string | null }} input.station
+ * @param {{
+ *   hasTrack?: boolean, headline?: string, artist?: string, album?: string, artworkUrl?: string | null,
+ *   sourceNote?: string | null, sourceLabel?: string | null, metadataHint?: string | null,
+ * }} input.track
+ * @param {{
+ *   phase?: string, paused?: boolean, listeners?: number, bitrate?: string | null, volume?: number,
+ *   channelId?: string | null, sleepUntilMs?: number,
+ * }} input.playback
+ * @param {{ serverMuted?: boolean, failover?: { active?: boolean, desiredName?: string, currentName?: string | null } | null }} [input.notices]
  * @param {string[]} [input.recent] display titles of the last songs, newest first
- * @param {object[]} [input.favorites] { key, name, color } of the server's favourites (#276)
+ * @param {{ key: string, name?: string, color?: string | null }[]} [input.favorites] the server's favourites (#276)
+ * @param {boolean} [input.shareEnabled] "Share" (#282); off for the commander
  * @param {string|null} [input.searchQuery]
  * @param {string|null} [input.musicBrainzUrl]
  * @param {string|null} [input.fallbackImageUrl] bot avatar when neither cover nor logo exists

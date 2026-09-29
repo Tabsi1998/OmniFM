@@ -78,7 +78,7 @@ export function createDashboardReportsRouteHandler(deps) {
     const created = settings.teamChannelId
       ? await createProblemReport(report, { now }).catch((err) => ({ error: String(err?.message || err) }))
       : { error: "unconfigured" };
-    if (!created.report) {
+    if (!("report" in created) || !created.report) {
       // Nothing to Discord; the owner console keeps it.
       await recordReportIncident(report, created.error);
       sendJson(res, 200, { ok: false, reason: "unavailable" });

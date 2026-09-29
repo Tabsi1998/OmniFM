@@ -29,6 +29,9 @@ import { handleRuntimeAutocomplete, handleRuntimeInteraction } from "./runtime-i
 import { shouldHandleRuntimeIdleEvent } from "./runtime-streams.js";
 import { restoreRuntimeState } from "./runtime-recovery.js";
 import { nowPlayingMethods } from "./now-playing/now-playing-methods.js";
+import { nowPlayingStatsMethods } from "./now-playing/stats-methods.js";
+import { nowPlayingEmbedMethods } from "./now-playing/embed-methods.js";
+import { nowPlayingControlMethods } from "./now-playing/control-methods.js";
 import { menuMethods } from "./runtime-methods/menus.js";
 import { permissionMethods } from "./runtime-methods/permissions.js";
 import { statusMethods } from "./runtime-methods/status.js";
@@ -56,8 +59,18 @@ import { easterEggMethods } from "./runtime-methods/easter-eggs.js";
 import { startStationSuggestionService } from "../services/station-suggestions.js";
 import { startProblemReportService } from "../services/problem-reports.js";
 
-class BotRuntime {
+// Method groups that live in their own modules (#210) are assigned to
+// BotRuntime.prototype at the end of this file. TypeScript sees them
+// through this base class, which is empty at runtime (#298).
+/**
+ * @typedef {typeof guildSettingsMethods & typeof commandSyncMethods & typeof runtimeDelegateMethods & typeof playbackControlMethods & typeof nowPlayingStatsMethods & typeof nowPlayingEmbedMethods & typeof nowPlayingControlMethods & typeof nowPlayingMethods & typeof menuMethods & typeof permissionMethods & typeof statusMethods & typeof voiceMethods & typeof onboardingMethods & typeof favoriteMethods & typeof formMethods & typeof shareMethods & typeof savedSongMethods & typeof personalDataMethods & typeof sleepMethods & typeof pollMethods & typeof botProfileMethods & typeof liveViewMethods & typeof yearReviewMethods & typeof suggestionMethods & typeof reportMethods & typeof easterEggMethods} RuntimeMixins
+ */
+/** @type {new () => RuntimeMixins} */
+const RuntimeMixinBase = /** @type {any} */ (class {});
+
+class BotRuntime extends RuntimeMixinBase {
   constructor(config, { role = "worker", workerManager = null } = {}) {
+    super();
     this.config = config;
     this.role = role; // "commander" or "worker"
     this.workerSlot = role === "worker" ? (Number(config?.index || 0) || null) : null;
@@ -572,6 +585,9 @@ Object.assign(
   commandSyncMethods,
   runtimeDelegateMethods,
   playbackControlMethods,
+  nowPlayingStatsMethods,
+  nowPlayingEmbedMethods,
+  nowPlayingControlMethods,
   nowPlayingMethods,
   menuMethods,
   permissionMethods,

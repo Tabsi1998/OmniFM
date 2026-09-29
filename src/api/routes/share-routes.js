@@ -54,6 +54,12 @@ export function buildSharePageHtml({ language = "de", title, description, imageU
 `;
 }
 
+/**
+ * @param {{
+ *   websiteUrl?: string, getInviteUrl?: (runtimes?: any[]) => string | null,
+ *   fetchImage?: typeof fetchCardImage,
+ * }} options
+ */
 export function createShareRoutesHandler({ websiteUrl, getInviteUrl = () => null, fetchImage = fetchCardImage }) {
   const base = String(websiteUrl || "https://omnifm.xyz").replace(/\/+$/, "");
 

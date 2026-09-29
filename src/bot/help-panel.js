@@ -35,11 +35,11 @@ function row(...components) {
  * @param {object} input
  * @param {(de: string, en: string) => string} input.t
  * @param {string} [input.section]
- * @param {object} input.plan   { name, bitrate, maxBots }
+ * @param {{ name?: string, bitrate?: string, maxBots?: number }} input.plan
  * @param {string} [input.guildName]
- * @param {object} input.urls   { dashboard, guide, website, support, premium }
+ * @param {{ dashboard?: string, guide?: string, website?: string, support?: string, premium?: string }} input.urls
  * @param {string|null} [input.applicationId]
- * @param {object} [input.planContext] { freeStations, allStations } of the catalogue (#413)
+ * @param {{ freeStations?: number, allStations?: number }} [input.planContext] of the catalogue (#413)
  */
 export function buildHelpPayload(input) {
   const { t, plan = {}, urls = {}, applicationId: appId = null, planContext = {} } = input;

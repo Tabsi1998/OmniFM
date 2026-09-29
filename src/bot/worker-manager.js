@@ -36,7 +36,8 @@ function getOwnedChannelId(state) {
 
 class WorkerManager {
   /**
-   * @param {BotRuntime[]} workers - Worker bot instances
+   * @param {Array<import("./runtime.js").BotRuntime | import("./remote-worker-handle.js").RemoteWorkerHandle>} workers
+   *   the workers in this process, or handles of workers in their own processes (split mode)
    */
   constructor(workers = [], options = {}) {
     this.workers = [...workers].sort((a, b) => Number(a?.config?.index || 0) - Number(b?.config?.index || 0));
@@ -195,7 +196,7 @@ class WorkerManager {
         );
 
         for (const worker of this.workers) {
-          if (typeof worker?.applyRemoteStatus !== "function") continue;
+          if (!worker || !("applyRemoteStatus" in worker) || typeof worker.applyRemoteStatus !== "function") continue;
           const workerId = String(worker?.config?.id || "").trim();
           worker.applyRemoteStatus(docMap.get(workerId) || null);
         }

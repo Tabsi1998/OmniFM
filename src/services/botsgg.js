@@ -102,6 +102,7 @@ function resolveBotsGGShardState(runtimes = []) {
   return { shardCount, shardId };
 }
 
+/** @param {string} method @param {string} path @param {{ token?: string, body?: any }} [options] */
 async function botsGGRequest(method, path, { token, body } = {}) {
   const endpoint = `${BOTSGG_API_BASE}${path}`;
   const headers = {

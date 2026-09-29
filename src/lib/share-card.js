@@ -199,7 +199,7 @@ function cached(key, build) {
 }
 
 /** The link preview of a station: logo, name, genre. */
-export function renderStationCard({ key, name, genre, color, logoUrl, footer, t = (...parts) => parts[0], fetchImage = fetchCardImage }) {
+export function renderStationCard({ key, name, genre, color, logoUrl, footer = "", t = (...parts) => parts[0], fetchImage = fetchCardImage }) {
   return cached(`station:${key}:${logoUrl || ""}:${t("de", "en")}`, async () => renderCard({
     color,
     image: await fetchImage(logoUrl),

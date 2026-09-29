@@ -87,7 +87,7 @@ async function sendWebhook(payload) {
 /**
  * Sendet eine deduplizierte Operator-Nachricht.
  * @param {string} dedupKey Eindeutiger Key für Deduplizierung
- * @param {object} embedData
+ * @param {{ color?: number, title?: string, description?: string, fields?: { name: string, value: string, inline?: boolean }[] }} embedData
  */
 async function notify(dedupKey, embedData) {
   if (!OPERATOR_WEBHOOK_ENABLED) return;

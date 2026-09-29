@@ -152,6 +152,19 @@ export function buildNoticeFixRow(fix, t, language) {
  * A notice in the design system (#264, #270): a container in the colour of
  * its tone, private. With `code` the text and the fix button come from the
  * notice catalog; `title`/`description` still work for one-off texts.
+ * @param {{
+ *   t?: (de: string, en: string) => string,
+ *   language?: string,
+ *   tone?: string,
+ *   title?: string,
+ *   description?: string,
+ *   code?: string | null,
+ *   params?: Record<string, any>,
+ *   fields?: { name?: string, value?: any, inline?: boolean }[],
+ *   quickActions?: any,
+ *   supportActions?: any,
+ *   extraComponents?: any[],
+ * }} [options]
  */
 export function buildNoticePayload({
   t,
@@ -169,7 +182,7 @@ export function buildNoticePayload({
   const entry = code ? NOTICE_CATALOG[code] : null;
   const kind = entry?.kind || TONE_KINDS[tone] || "info";
   const style = ui.NOTICE_KINDS[kind] || ui.NOTICE_KINDS.info;
-  const translate = typeof t === "function" ? t : (de) => de;
+  const translate = typeof t === "function" ? t : (de, _en) => de;
   const heading = entry ? `${ui.icon(style.icon)} ${translate(...entry.title)}` : String(title || "");
   const bodyText = entry ? translate(...entry.body(params)) : String(description || "");
 

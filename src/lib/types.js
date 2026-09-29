@@ -1,5 +1,5 @@
-// Shared JSDoc types (#211). `npm run typecheck` checks src/lib and src/core
-// against them (tsconfig.json); other modules reference them in JSDoc.
+// Shared JSDoc types (#211). `npm run typecheck` checks all of src/ with
+// them (tsconfig.json, #298); modules reference them in JSDoc.
 
 /**
  * An Error that carries the HTTP status an API route should answer with.

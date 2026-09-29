@@ -23,6 +23,7 @@ const CUSTOM_ID_MAX = 100;
 
 // The nine coloured squares Discord renders everywhere; the genre colour
 // picks the nearest one, so the list shows the colours of the catalog.
+/** @type {[string, number][]} */
 const COLOR_SQUARES = [
   ["🟥", 0xDD2E44], ["🟧", 0xF4900C], ["🟨", 0xFDCB58], ["🟩", 0x78B159], ["🟦", 0x55ACEE],
   ["🟪", 0xAA8ED6], ["🟫", 0xC1694F], ["⬛", 0x31373D], ["⬜", 0xE6E7E8],
@@ -48,6 +49,15 @@ export function colorSquare(hex) {
 
 /** The select value of the season rubric (#430), next to the genres. */
 export const SEASON_RUBRIC = "__season__";
+
+/**
+ * A station in the browser: an official one with its lock state, or one of
+ * the server's own.
+ * @typedef {{
+ *   key: string, name: string, genre: string, color?: string | null, tier?: string,
+ *   locked: boolean, source: string, seasonal?: boolean,
+ * }} BrowserEntry
+ */
 
 /**
  * Every official station with its lock state for the server's plan, plus the
@@ -106,8 +116,8 @@ export function parsePickTarget(sessionPart) {
  * @param {object} input
  * @param {(de: string, en: string) => string} input.t
  * @param {string} input.prefix      custom id prefix of the browser
- * @param {object} input.session     { id, data: { page, genre, query } }
- * @param {object[]} input.entries   buildBrowserEntries()
+ * @param {{ id: string, data?: { page?: number, genre?: string | null, query?: string } }} input.session
+ * @param {BrowserEntry[]} input.entries   buildBrowserEntries()
  * @param {string} input.planName
  * @param {string} input.premiumUrl
  * @param {string|null} [input.applicationId]
@@ -237,5 +247,5 @@ export function buildStationSearchModal({ t, prefix, sessionId, query = "" }) {
   return new ModalBuilder()
     .setCustomId(`${prefix}searchform:${sessionId}`)
     .setTitle(t("Sender suchen", "Search stations"))
-    .addComponents(new ActionRowBuilder().addComponents(input));
+    .addComponents(/** @type {ActionRowBuilder<TextInputBuilder>} */ (new ActionRowBuilder().addComponents(input)));
 }

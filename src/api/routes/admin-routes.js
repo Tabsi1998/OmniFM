@@ -114,7 +114,7 @@ export function readRequestBody(req, limitBytes = 4096) {
         // The route handler still returns the bounded-request error below.
       }
 
-      const error = new Error(message);
+      const error = /** @type {import("../../lib/types.js").HttpError} */ (new Error(message));
       error.statusCode = statusCode;
       reject(error);
     };

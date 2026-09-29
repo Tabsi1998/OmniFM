@@ -56,6 +56,12 @@ function getSplitRestartDelay(crashCount, { baseMs = 1_000, maxMs = 30_000 } = {
   return Math.min(Math.max(250, maxMs), Math.max(250, baseMs) * (2 ** Math.min(5, count - 1)));
 }
 
+/**
+ * @param {{
+ *   botIndexes?: number[], commanderIndex?: number, spawnImpl?: typeof spawn,
+ *   env?: NodeJS.ProcessEnv, cwd?: string, stableAfterMs?: number,
+ * }} [options]
+ */
 async function superviseSplitRuntime({
   botIndexes,
   commanderIndex = 1,
@@ -130,20 +136,20 @@ async function superviseSplitRuntime({
 
     const exits = [];
     for (const child of children.values()) {
-      exits.push(new Promise((resolve) => {
+      exits.push(/** @type {Promise<void>} */ (new Promise((resolve) => {
         if (child.exitCode !== null || child.signalCode) {
           resolve();
           return;
         }
         child.once("exit", resolve);
         try { child.kill("SIGTERM"); } catch { resolve(); }
-      }));
+      })));
     }
 
     let forceTimer;
     await Promise.race([
       Promise.allSettled(exits),
-      new Promise((resolve) => {
+      /** @type {Promise<void>} */ (new Promise((resolve) => {
         forceTimer = setTimeout(() => {
           for (const child of children.values()) {
             if (child.exitCode === null && !child.signalCode) {
@@ -152,7 +158,7 @@ async function superviseSplitRuntime({
           }
           resolve();
         }, 15_000);
-      }),
+      })),
     ]);
     if (forceTimer) clearTimeout(forceTimer);
     children.clear();

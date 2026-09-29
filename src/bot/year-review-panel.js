@@ -45,6 +45,7 @@ function numberFormat(language) {
   return new Intl.NumberFormat(language === "de" ? "de-DE" : "en-GB");
 }
 
+/** @param {"short" | "long"} [style] */
 function monthName(monthKey, language, style = "short") {
   const [year, month] = String(monthKey).split("-").map(Number);
   return new Intl.DateTimeFormat(language === "de" ? "de-DE" : "en-GB", { month: style, timeZone: "UTC" })
@@ -100,7 +101,7 @@ function navigation(page, t) {
  * @param {object} input
  * @param {(de: string, en: string) => string} input.t
  * @param {string} input.language
- * @param {object} input.review from yearReviewFor()
+ * @param {Partial<ReturnType<typeof import("../lib/year-review.js").buildYearReview>>} input.review from yearReviewFor()
  * @param {number} [input.page]
  * @param {boolean} [input.final] December or January: the whole year
  * @param {string} [input.guildName]

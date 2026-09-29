@@ -215,6 +215,11 @@ function resolveTopGGShardState(runtimes = []) {
   return { shardCount, shardId };
 }
 
+/**
+ * @param {string} method
+ * @param {string} path
+ * @param {{ token?: string, body?: any, apiVersion?: string, authMode?: string }} [options]
+ */
 async function topGGRequest(method, path, {
   token,
   body,

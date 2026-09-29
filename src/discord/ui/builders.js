@@ -150,7 +150,7 @@ export function list({ accent = UI_COLORS.brand, title, items = [], page = 0, pa
 }
 
 /** A yes/no question with two buttons. */
-export function confirm({ title, body = "", confirmId, cancelId, confirmLabel, cancelLabel, danger = false, t = (de, _en) => de }) {
+export function confirm({ title, body = "", confirmId, cancelId, confirmLabel = "", cancelLabel = "", danger = false, t = (de, _en) => de }) {
   return panel({
     accent: danger ? UI_COLORS.error : UI_COLORS.brand,
     title,

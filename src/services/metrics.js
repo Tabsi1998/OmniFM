@@ -48,6 +48,7 @@ function buildMetricsText(commanderRuntime, allRuntimes = []) {
   let totalReconnects = 0;
 
   for (const runtime of allRuntimes) {
+    /** @type {{ servers?: number, connections?: number, listeners?: number }} */
     const stats = runtime.collectStats?.() || {};
     const botName = String(runtime.config?.name || runtime.config?.id || "unknown");
     const botId = String(runtime.config?.id || "unknown");
@@ -137,7 +138,7 @@ function buildMetricsText(commanderRuntime, allRuntimes = []) {
 
 /**
  * Registriert den /metrics Endpunkt am Express-App-Objekt.
- * @param {import('express').Application} app
+ * @param {{ get: (path: string, handler: (req: any, res: any) => any) => any }} app an Express-like app
  * @param {import('../bot/runtime.js').BotRuntime} commanderRuntime
  * @param {import('../bot/runtime.js').BotRuntime[]} allRuntimes
  */

@@ -286,6 +286,10 @@ export function buildDashboardDiscordSyncPatch(event, { discordScheduledEventId 
   };
 }
 
+/**
+ * @param {any} body
+ * @param {{ guildId?: string, botId?: string, runtime?: any, existingEvent?: any, language?: string }} [options]
+ */
 export async function normalizeDashboardEventInput(body, {
   guildId,
   botId,

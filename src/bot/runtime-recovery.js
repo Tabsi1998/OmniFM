@@ -551,6 +551,14 @@ export async function fetchRestoreChannel(guild, channelId) {
   }
 }
 
+/**
+ * @param {any} runtime
+ * @param {string} guildId
+ * @param {any} state
+ * @param {string} code
+ * @param {any} detail
+ * @param {{ threshold?: number, recheckReason?: string, logMessage?: string }} [options]
+ */
 export function confirmTransientVoiceIssue(runtime, guildId, state, code, detail, {
   threshold,
   recheckReason,
