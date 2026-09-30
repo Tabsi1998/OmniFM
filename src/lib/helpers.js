@@ -242,6 +242,27 @@ function applyVolumeTransformerLevel(transformer, value) {
   return false;
 }
 
+// libopus' request number for the bitrate (OPUS_SET_BITRATE).
+const OPUS_SET_BITRATE = 4002;
+
+/**
+ * Sets the bitrate of the Opus encoder discord.js uses for a resource (#464).
+ * The bot sets the volume itself, so discord.js encodes the audio once more;
+ * its encoder starts at libopus' default of about 96 kbit/s whatever the
+ * plan, and prism-media's setBitrate() stops at 128k. Returns whether an
+ * encoder took it.
+ * @param {any} resource an AudioResource of @discordjs/voice
+ * @param {number} kbps
+ */
+function applyEncoderBitrate(resource, kbps) {
+  const encoder = resource?.encoder?.encoder;
+  const control = encoder?.applyEncoderCTL || encoder?.encoderCTL;
+  const bitsPerSecond = Math.round(Number(kbps) * 1000);
+  if (typeof control !== "function" || !(bitsPerSecond > 0)) return false;
+  control.call(encoder, OPUS_SET_BITRATE, Math.min(510_000, Math.max(6_000, bitsPerSecond)));
+  return true;
+}
+
 function splitTextForDiscord(content, maxLength = 1900) {
   const text = String(content ?? "");
   if (!text) return [""];
@@ -455,6 +476,7 @@ export {
   clipText,
   clampVolume,
   applyVolumeTransformerLevel,
+  applyEncoderBitrate,
   sanitizeUrlForLog,
   splitTextForDiscord,
   concatUint8Arrays,

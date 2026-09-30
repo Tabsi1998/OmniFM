@@ -393,7 +393,7 @@ const statusMethods = {
       tier: tierConfig.tier,
       bitrateOverride,
       transcodeEnabled,
-      transcodeMode: String(process.env.TRANSCODE_MODE || "opus").toLowerCase(),
+      transcodeMode: String(process.env.TRANSCODE_MODE || "pcm").toLowerCase(),
       requestedBitrateKbps: profile.requestedKbps,
       profile: profile.isUltra ? "ultra-stable" : "stable",
       queue: profile.threadQueueSize,
