@@ -117,7 +117,7 @@ function assertCommonSecurityHeaders(headers, { expectGoogleAssets = false } = {
   if (expectGoogleAssets) {
     assert.match(csp, /googletagmanager\.com/i);
     assert.match(csp, /google-analytics\.com/i);
-    assert.match(csp, /fonts\.googleapis\.com/i);
+    assert.doesNotMatch(csp, /fonts\.(googleapis|gstatic)\.com/i, "the fonts come from this site (#467)");
   }
 }
 

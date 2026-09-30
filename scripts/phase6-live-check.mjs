@@ -376,9 +376,6 @@ async function inspectSecurityHeaders(baseUrl) {
     if (check.path === "/" && !/googletagmanager\.com/i.test(csp)) {
       failures.push("content-security-policy missing googletagmanager.com");
     }
-    if (check.path === "/" && !/fonts\.googleapis\.com/i.test(csp)) {
-      failures.push("content-security-policy missing fonts.googleapis.com");
-    }
 
     if (failures.length > 0) {
       ok = false;
