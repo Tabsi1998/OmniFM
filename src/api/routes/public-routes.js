@@ -13,6 +13,7 @@ import {
 import { statusResponse } from "../../services/status-page.js";
 import { weeklyChart } from "../../services/charts.js";
 import { normalizeOwnerSeasons } from "../../lib/seasons.js";
+import { websiteChart, websiteCover, websiteMarketing } from "../../lib/public-images.js";
 import { ownerSettings } from "../../lib/owner-settings-cache.js";
 
 /** The API contract the owner console and start.sh expect; FastAPI's BACKEND_CONTRACT_VERSION. */
@@ -160,7 +161,8 @@ export function createPublicRoutesHandler(deps) {
         methodNotAllowed(res, ["GET"]);
         return true;
       }
-      sendJson(res, 200, await weeklyChart(isConnected() ? getDb() : null));
+      // Logos and covers from this site (#469); the Discord post keeps the originals.
+      sendJson(res, 200, websiteChart(await weeklyChart(isConnected() ? getDb() : null)));
       return true;
     }
 
@@ -241,7 +243,7 @@ export function createPublicRoutesHandler(deps) {
         methodNotAllowed(res, ["GET"]);
         return true;
       }
-      sendJson(res, 200, marketingResponse(await loadOwnerConfigRaw()));
+      sendJson(res, 200, websiteMarketing(marketingResponse(await loadOwnerConfigRaw())));
       return true;
     }
 
@@ -251,11 +253,11 @@ export function createPublicRoutesHandler(deps) {
         return true;
       }
       const params = requestUrl.searchParams;
-      sendJson(res, 200, await coverLookup({
+      sendJson(res, 200, websiteCover(await coverLookup({
         artist: params.get("artist") || "",
         title: params.get("title") || "",
         term: params.get("term") || "",
-      }));
+      })));
       return true;
     }
 

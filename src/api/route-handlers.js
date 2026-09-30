@@ -31,6 +31,7 @@ import { createPublicRoutesHandler } from "./routes/public-routes.js";
 import { runtimeApiReachable } from "./runtime-forward.js";
 import { createShareRoutesHandler } from "./routes/share-routes.js";
 import { createStationLogoRoutesHandler } from "./routes/station-logo-routes.js";
+import { createImageRoutesHandler } from "./routes/image-routes.js";
 import { createOwnerStatusRoutesHandler } from "./routes/owner-status-routes.js";
 import { getOwnerStatusService } from "../services/owner-status/service.js";
 import { WEBSITE_URL } from "../bot/runtime-links.js";
@@ -310,6 +311,9 @@ export const handleDashboardReportsRoute = createDashboardReportsRouteHandler({
 
 // Logos of the servers' own stations (#340).
 export const handleStationLogoRoutes = createStationLogoRoutesHandler();
+
+// Covers, station and partner logos for the website, from this site (#469).
+export const handleImageRoutes = createImageRoutesHandler();
 
 // The owner cockpit (#355).
 export const handleOwnerStatusRoutes = createOwnerStatusRoutesHandler({ getService: getOwnerStatusService });
