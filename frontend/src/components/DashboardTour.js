@@ -12,6 +12,8 @@ import { PLAN_CAPABILITIES, PLAN_NAMES } from '../../../src/config/plan-features
 import { enableDashboardDemo } from '../lib/dashboardDemoMode.js';
 
 const GuildDashboard = lazy(() => import('./GuildDashboard.js'));
+// How long the tour stays in view before the dashboard's code loads.
+const TOUR_DWELL_MS = 400;
 
 export const TOUR_STEPS = [
   { key: 'overview', area: 'overview', capability: 'dashboard_basic' },
@@ -98,13 +100,21 @@ export default function DashboardTour({ labels, stage = false }) {
       setVisible(true);
       return undefined;
     }
-    // Not sooner: jumping to the prices right below must not bring the dashboard along.
+    // Not sooner: jumping to the prices right below must not bring the
+    // dashboard along, and neither must a moment in view while the page still
+    // settles (#467: with its own fonts it starts earlier). It loads once it
+    // stays in view for a moment; scrolling past loads nothing.
+    let dwell = null;
     const viewing = new IntersectionObserver(([entry]) => {
       setVisible(entry.isIntersecting);
-      if (entry.isIntersecting) setNear(true);
+      clearTimeout(dwell);
+      if (entry.isIntersecting) dwell = setTimeout(() => setNear(true), TOUR_DWELL_MS);
     }, { threshold: 0.25 });
     viewing.observe(holder.current);
-    return () => viewing.disconnect();
+    return () => {
+      clearTimeout(dwell);
+      viewing.disconnect();
+    };
   }, [stage]);
 
   const size = tourScreen(width, { stage, phone });
