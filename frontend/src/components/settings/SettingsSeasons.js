@@ -69,7 +69,7 @@ export default function SettingsSeasons({ seasonDecor, timeZone, setSeasonDecor,
         <Sparkles size={18} color="#F472B6" />
         <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20 }}>{t('Saison-Deko', 'Seasonal decoration')}</h3>
       </div>
-      <p style={{ color: '#52525B', fontSize: 13, marginBottom: 12, lineHeight: 1.6 }}>
+      <p style={{ color: '#8e8e97', fontSize: 13, marginBottom: 12, lineHeight: 1.6 }}>
         {t(
           'Zu Ostern, Halloween, im Advent, zu Weihnachten und zu Silvester schmückt sich OmniFM von selbst, in jedem Plan. Schalte ab, was du nicht möchtest.',
           'At Easter, Halloween, in Advent, at Christmas and on New Year’s Eve OmniFM decorates itself, in every plan. Switch off what you do not want.'
@@ -84,7 +84,7 @@ export default function SettingsSeasons({ seasonDecor, timeZone, setSeasonDecor,
           })}
       </div>
 
-      <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A', marginBottom: 8 }}>{t('Saisons', 'Seasons')}</div>
+      <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#8e8e97', marginBottom: 8 }}>{t('Saisons', 'Seasons')}</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8, marginBottom: 14 }}>
         {SEASONS.map((key) => (
           <Switch
@@ -100,7 +100,7 @@ export default function SettingsSeasons({ seasonDecor, timeZone, setSeasonDecor,
         ))}
       </div>
 
-      <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A', marginBottom: 8 }}>{t('Teile', 'Parts')}</div>
+      <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#8e8e97', marginBottom: 8 }}>{t('Teile', 'Parts')}</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}>
         {SEASON_PARTS.map((key) => (
           <Switch

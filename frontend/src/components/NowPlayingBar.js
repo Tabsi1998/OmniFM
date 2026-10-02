@@ -131,7 +131,7 @@ export default function NowPlayingBar({ bots = [] }) {
             onClick={() => { setClosed(true); try { window.sessionStorage.setItem('omnifm_npbar_closed', '1'); } catch { /* noop */ } }}
             data-testid="now-playing-bar-close"
             aria-label="Leiste schließen"
-            style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 4, flexShrink: 0 }}
+            style={{ background: 'none', border: 'none', color: '#8190a8', cursor: 'pointer', padding: 4, flexShrink: 0 }}
           ><X size={18} /></button>
         </div>
       </div>

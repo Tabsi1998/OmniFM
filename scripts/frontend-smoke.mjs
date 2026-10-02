@@ -4,11 +4,15 @@
 // throws no JavaScript error. The site is scripts/local-site-proxy.mjs: pages
 // from `serve` with serve.json and /api from a real Node API, one address as in
 // production. Only the dashboard's Discord login is mocked; there every area
-// is opened.
+// is opened. Every page and every dashboard area passes axe without a serious
+// or critical finding (#488-#490): every control has a name, every text its
+// contrast.
 //
 //   node scripts/frontend-smoke.mjs <site-url>
 //
 // Exit 1 with one line per broken page.
+import fs from "node:fs";
+import { createRequire } from "node:module";
 import { chromium } from "playwright";
 import { PLAN_CAPABILITIES } from "../src/config/plan-features.js";
 
@@ -65,6 +69,29 @@ const LEAN_MARKERS = [
   ["guild-perms-matrix", "Server-Dashboard"],
   ["admin-token-input", "Owner-Konsole"],
 ];
+
+// The rules of WCAG 2.1 A and AA that axe tests by itself.
+const AXE_SOURCE = fs.readFileSync(createRequire(import.meta.url).resolve("axe-core/axe.min.js"), "utf8");
+const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21aa"];
+
+async function axeRun(tab) {
+  await tab.addScriptTag({ content: AXE_SOURCE });
+  return tab.evaluate(async (tags) => {
+    // In the page: globalThis is its window.
+    const result = await globalThis.axe.run(globalThis.document, { resultTypes: ["violations"], runOnly: { type: "tag", values: tags } });
+    return result.violations
+      .filter((violation) => violation.impact === "serious" || violation.impact === "critical")
+      .map((violation) => `${violation.id} ${violation.nodes.length}x, z. B. ${violation.nodes[0].target.join(" ")}`);
+  }, AXE_TAGS);
+}
+
+// A fade-in that still runs mixes its colours; what is still there a moment later counts.
+async function accessibilityFindings(tab) {
+  const first = await axeRun(tab);
+  if (!first.length) return first;
+  await tab.waitForTimeout(1500);
+  return axeRun(tab);
+}
 
 // Third-party resources (fonts, analytics) may fail offline; the page itself must not.
 const ignoredConsole = (text) => /Failed to load resource|net::ERR_|googletagmanager|google-analytics/i.test(text);
@@ -129,12 +156,16 @@ try {
           }
         }
       }
+      // eslint-disable-next-line no-await-in-loop
+      for (const line of await accessibilityFindings(tab)) errors.push(`Barrierefreiheit: ${line}`);
       if (page.mockDashboard) {
         for (const area of DASHBOARD_AREAS) {
           // eslint-disable-next-line no-await-in-loop -- one area after the other, like a person clicks
           await tab.click(`[data-testid="guild-nav-${area}"]`, { timeout: 10_000 });
           // eslint-disable-next-line no-await-in-loop
           await tab.waitForTimeout(300);
+          // eslint-disable-next-line no-await-in-loop
+          for (const line of await accessibilityFindings(tab)) errors.push(`Barrierefreiheit (${area}): ${line}`);
         }
       }
     } catch (error) {

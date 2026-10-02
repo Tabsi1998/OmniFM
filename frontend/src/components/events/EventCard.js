@@ -57,8 +57,8 @@ export function EventCard({ event, onToggle, onDelete, onEdit, t, formatDate, vo
       border: '1px solid', borderColor: isActive ? '#1A1A2E' : '#27272A',
       background: isActive ? '#0A0A0A' : '#080808', padding: '12px 14px', opacity: isActive ? 1 : 0.7,
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: '1 1 240px' }}>
           <CalendarDays size={16} color={isActive ? '#5865F2' : '#52525B'} style={{ flexShrink: 0 }} />
           <strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {event.title || t('Unbenanntes Event', 'Untitled event')}
@@ -70,22 +70,22 @@ export function EventCard({ event, onToggle, onDelete, onEdit, t, formatDate, vo
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-          <button data-testid={`event-expand-${event.id}`} onClick={() => setExpanded((current) => !current)} style={{ border: '1px solid #1A1A2E', background: 'transparent', color: '#A1A1AA', width: 30, height: 30, cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 'auto' }}>
+          <button data-testid={`event-expand-${event.id}`} onClick={() => setExpanded((current) => !current)} aria-expanded={expanded} aria-label={expanded ? t('Details ausblenden', 'Hide details') : t('Details zeigen', 'Show details')} style={{ border: '1px solid #1A1A2E', background: 'transparent', color: '#A1A1AA', width: 30, height: 30, cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
             {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
-          <button data-testid={`event-edit-${event.id}`} onClick={() => onEdit(event)} style={{
+          <button data-testid={`event-edit-${event.id}`} onClick={() => onEdit(event)} aria-label={t('Event bearbeiten', 'Edit event')} style={{
             border: '1px solid rgba(88,101,242,0.4)', background: 'rgba(88,101,242,0.1)', color: '#A5B4FC', width: 30, height: 30, cursor: 'pointer', display: 'grid', placeItems: 'center',
           }}>
             <PencilLine size={14} />
           </button>
-          <button data-testid={`event-toggle-${event.id}`} onClick={() => onToggle(event.id, !isActive)} style={{
+          <button data-testid={`event-toggle-${event.id}`} onClick={() => onToggle(event.id, !isActive)} aria-pressed={isActive} aria-label={t('Event aktiv', 'Event active')} style={{
             border: '1px solid', borderColor: isActive ? 'rgba(16,185,129,0.4)' : '#27272A',
-            background: isActive ? 'rgba(16,185,129,0.1)' : 'transparent', color: isActive ? '#10B981' : '#71717A', width: 30, height: 30, cursor: 'pointer', display: 'grid', placeItems: 'center',
+            background: isActive ? 'rgba(16,185,129,0.1)' : 'transparent', color: isActive ? '#10B981' : '#8e8e97', width: 30, height: 30, cursor: 'pointer', display: 'grid', placeItems: 'center',
           }}>
             {isActive ? <Power size={14} /> : <PowerOff size={14} />}
           </button>
-          <button data-testid={`event-delete-${event.id}`} onClick={() => onDelete(event.id)} style={{
+          <button data-testid={`event-delete-${event.id}`} onClick={() => onDelete(event.id)} aria-label={t('Event löschen', 'Delete event')} style={{
             border: '1px solid rgba(239,68,68,0.4)', background: 'rgba(239,68,68,0.08)', color: '#EF4444', width: 30, height: 30, cursor: 'pointer', display: 'grid', placeItems: 'center',
           }}>
             <Trash2 size={14} />
@@ -93,7 +93,7 @@ export function EventCard({ event, onToggle, onDelete, onEdit, t, formatDate, vo
         </div>
       </div>
 
-      <div style={{ marginTop: 8, display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 13, color: '#71717A' }}>
+      <div style={{ marginTop: 8, display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 13, color: '#8e8e97' }}>
         <span>{t('Station', 'Station')}: <span style={{ color: '#A1A1AA' }} data-testid={`event-station-${event.id}`}>{stationName || '-'}</span></span>
         <span><Hash size={11} style={{ verticalAlign: '-1px' }} /> <span style={{ color: '#A1A1AA' }}>{voiceName}</span></span>
         <span>
@@ -108,12 +108,12 @@ export function EventCard({ event, onToggle, onDelete, onEdit, t, formatDate, vo
       {expanded && (
         <div style={{ marginTop: 10, padding: '10px 0 0', borderTop: '1px solid #1A1A2E', fontSize: 13, display: 'grid', gap: 10 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}>
-            <div><span style={{ color: '#52525B' }}>{t('ID', 'ID')}:</span> <span style={{ fontFamily: "'JetBrains Mono', monospace", color: '#A1A1AA', fontSize: 11 }}>{event.id}</span></div>
-            <div><span style={{ color: '#52525B' }}>{t('Zeitzone', 'Time zone')}:</span> <span style={{ color: '#A1A1AA' }}>{event.timezone || '-'}</span></div>
-            {textName && <div><span style={{ color: '#52525B' }}>{t('Text-Channel', 'Text channel')}:</span> <span style={{ color: '#A1A1AA' }}>#{textName}</span></div>}
-            <div><span style={{ color: '#52525B' }}>{t('Discord-Sync', 'Discord sync')}:</span> <span style={{ color: syncState.color }}>{syncState.label}</span></div>
-            {event.discordScheduledEventId && <div><span style={{ color: '#52525B' }}>{t('Discord-Event-ID', 'Discord event ID')}:</span> <span style={{ color: '#A1A1AA', fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>{event.discordScheduledEventId}</span></div>}
-            {event.stageTopic && <div><span style={{ color: '#52525B' }}>{t('Stage-Thema', 'Stage topic')}:</span> <span style={{ color: '#A1A1AA' }}>{event.stageTopic}</span></div>}
+            <div><span style={{ color: '#8e8e97' }}>{t('ID', 'ID')}:</span> <span style={{ fontFamily: "'JetBrains Mono', monospace", color: '#A1A1AA', fontSize: 11 }}>{event.id}</span></div>
+            <div><span style={{ color: '#8e8e97' }}>{t('Zeitzone', 'Time zone')}:</span> <span style={{ color: '#A1A1AA' }}>{event.timezone || '-'}</span></div>
+            {textName && <div><span style={{ color: '#8e8e97' }}>{t('Text-Channel', 'Text channel')}:</span> <span style={{ color: '#A1A1AA' }}>#{textName}</span></div>}
+            <div><span style={{ color: '#8e8e97' }}>{t('Discord-Sync', 'Discord sync')}:</span> <span style={{ color: syncState.color }}>{syncState.label}</span></div>
+            {event.discordScheduledEventId && <div><span style={{ color: '#8e8e97' }}>{t('Discord-Event-ID', 'Discord event ID')}:</span> <span style={{ color: '#A1A1AA', fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>{event.discordScheduledEventId}</span></div>}
+            {event.stageTopic && <div><span style={{ color: '#8e8e97' }}>{t('Stage-Thema', 'Stage topic')}:</span> <span style={{ color: '#A1A1AA' }}>{event.stageTopic}</span></div>}
           </div>
 
           {event.discordSyncError && (
@@ -125,7 +125,7 @@ export function EventCard({ event, onToggle, onDelete, onEdit, t, formatDate, vo
 
           {event.announceMessage && (
             <div>
-              <span style={{ color: '#52525B' }}>{t('Nachrichten-Vorschau', 'Message preview')}:</span>
+              <span style={{ color: '#8e8e97' }}>{t('Nachrichten-Vorschau', 'Message preview')}:</span>
               <div style={{ marginTop: 4, background: '#050505', border: '1px solid #1A1A2E', padding: '10px 12px', color: '#D4D4D8' }}>
                 <div dangerouslySetInnerHTML={{ __html: renderDiscordMarkdown(announcementPreview, { serverEmojis }) }} />
               </div>
@@ -134,7 +134,7 @@ export function EventCard({ event, onToggle, onDelete, onEdit, t, formatDate, vo
 
           {event.description && (
             <div>
-              <span style={{ color: '#52525B' }}>{t('Discord-Event-Beschreibung', 'Discord event description')}:</span>
+              <span style={{ color: '#8e8e97' }}>{t('Discord-Event-Beschreibung', 'Discord event description')}:</span>
               <div style={{ marginTop: 4, background: '#050505', border: '1px solid #1A1A2E', padding: '10px 12px', color: '#A1A1AA' }}>
                 <div dangerouslySetInnerHTML={{ __html: renderDiscordMarkdown(descriptionPreview, { serverEmojis }) }} />
               </div>

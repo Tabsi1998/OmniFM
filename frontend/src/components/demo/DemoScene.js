@@ -67,7 +67,7 @@ function CommanderScene({ step, labels, height }) {
   const chosen = step >= 4;
   const card = { width: 'min(92%, 330px)', background: DISCORD.chat, borderRadius: 8, padding: 16, boxShadow: '0 16px 40px rgba(0,0,0,0.5)', color: DISCORD.text, fontSize: 13 };
   const button = (primary, marker, text, pressed) => (
-    <span data-demo-target={marker} style={{ padding: '7px 14px', borderRadius: 4, fontWeight: 600, fontSize: 12.5, background: primary ? DISCORD.blurple : 'transparent', color: primary ? '#fff' : DISCORD.text, opacity: primary && page === 1 && !chosen ? 0.5 : 1, transform: pressed ? 'scale(0.95)' : 'none', transition: 'transform 0.12s' }}>{text}</span>
+    <span data-demo-target={marker} aria-disabled={primary && page === 1 && !chosen ? 'true' : undefined} style={{ padding: '7px 14px', borderRadius: 4, fontWeight: 600, fontSize: 12.5, background: primary ? DISCORD.blurple : 'transparent', color: primary ? '#fff' : DISCORD.text, opacity: primary && page === 1 && !chosen ? 0.5 : 1, transform: pressed ? 'scale(0.95)' : 'none', transition: 'transform 0.12s' }}>{text}</span>
   );
   return (
     <div ref={ref} style={{ position: 'relative', height, borderRadius: 12, overflow: 'hidden', display: 'grid', placeItems: 'center', background: 'radial-gradient(circle at 50% 30%, #2B2D31, #111214)', border: '1px solid #1a1b1e', boxShadow: '0 24px 60px rgba(0,0,0,0.45)', fontFamily: "'gg sans', 'Noto Sans', Helvetica, Arial, sans-serif", textAlign: 'left' }}>

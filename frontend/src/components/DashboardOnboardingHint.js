@@ -155,7 +155,7 @@ export default function DashboardOnboardingHint({
       </div>
 
       {hint.note ? (
-        <div style={{ color: '#71717A', fontSize: 12 }}>
+        <div style={{ color: '#8e8e97', fontSize: 12 }}>
           {hint.note}
         </div>
       ) : null}

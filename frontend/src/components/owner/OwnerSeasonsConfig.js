@@ -63,7 +63,7 @@ export default function OwnerSeasonsConfig({ seasons, setSeasons, onSave, saving
               {SEASON_PREVIEWS.map((entry) => <option key={entry.id} value={entry.id}>{SEASON_PREVIEW_LABELS[entry.id] || entry.id}</option>)}
             </select>
             {test.preview ? (
-              <div style={{ fontSize: 11, color: '#64748b', marginTop: 5 }}>
+              <div style={{ fontSize: 11, color: '#8190a8', marginTop: 5 }}>
                 Auf der Website sieht den Look nur, wer diesen Link öffnet:{' '}
                 <a href={`/?season=${test.preview}`} target="_blank" rel="noopener noreferrer" data-testid="cfg-season-website" style={{ color: '#00e5ff' }}>{`/?season=${test.preview}`}</a>
               </div>

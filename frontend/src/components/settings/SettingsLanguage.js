@@ -25,7 +25,7 @@ export default function SettingsLanguage({ serverLanguage, setServerLanguage, t 
         <Languages size={18} color="#00E5FF" />
         <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20 }}>{t('Sprache des Bots', 'Bot language')}</h3>
       </div>
-      <p style={{ color: '#52525B', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
+      <p style={{ color: '#8e8e97', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
         {t(
           'In dieser Sprache antwortet OmniFM auf dem Server und schreibt seine Panels. Dasselbe wie /language in Discord.',
           'The language OmniFM answers in on the server and writes its panels in. The same as /language in Discord.'
@@ -34,6 +34,7 @@ export default function SettingsLanguage({ serverLanguage, setServerLanguage, t 
       <select
         className="oa-input"
         data-testid="settings-language-select"
+        aria-label={t('Sprache des Bots', 'Bot language')}
         value={serverLanguage?.current || 'auto'}
         onChange={(e) => setServerLanguage(e.target.value)}
         style={{ width: '100%', height: 40 }}

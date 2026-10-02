@@ -2,10 +2,10 @@
 // A colour never stands alone: every state has its icon and its word.
 
 export const COCKPIT_STATES = Object.freeze({
-  fail: { label: 'Fehler', icon: '✕', color: '#d03b3b', rank: 0 },
+  fail: { label: 'Fehler', icon: '✕', color: '#f87171', rank: 0 },
   warn: { label: 'Prüfen', icon: '!', color: '#fab219', rank: 1 },
-  off: { label: 'Nicht eingerichtet', icon: '○', color: '#64748b', rank: 2 },
-  pending: { label: 'Wird geprüft', icon: '…', color: '#475569', rank: 3 },
+  off: { label: 'Nicht eingerichtet', icon: '○', color: '#8190a8', rank: 2 },
+  pending: { label: 'Wird geprüft', icon: '…', color: '#8190a8', rank: 3 },
   ok: { label: 'OK', icon: '✓', color: '#0ca30c', rank: 4 },
 });
 

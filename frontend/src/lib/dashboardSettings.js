@@ -51,7 +51,7 @@ function buildWeeklyDigestSummary(settings, t = (de, _en) => de, formatDate = nu
   const hasChannel = Boolean(String(weeklyDigest.channelId || "").trim());
 
   let statusLabel = t("Deaktiviert", "Disabled");
-  let statusAccent = "#71717A";
+  let statusAccent = "#8e8e97";
   let description = t(
     "Der Weekly Digest ist aktuell ausgeschaltet.",
     "The weekly digest is currently turned off."
@@ -138,7 +138,7 @@ function buildFallbackStationSummary(settings, t = (de, _en) => de) {
   if (!selectedValue) {
     return {
       statusLabel: t("Nicht gesetzt", "Not configured"),
-      statusAccent: "#71717A",
+      statusAccent: "#8e8e97",
       description: t(
         "Ohne Fallback bleibt es bei der normalen Auto-Reconnect-Logik.",
         "Without a fallback the normal auto-reconnect logic stays in place."
@@ -173,7 +173,7 @@ function buildFallbackStationSummary(settings, t = (de, _en) => de) {
 
   return {
     statusLabel: t("Bereit", "Ready"),
-    statusAccent: "#8B5CF6",
+    statusAccent: "#A78BFA",
     description: remainingStations > 0
       ? t(
         "Wenn ein Stream hart fehlschlägt, probiert OmniFM diese Station zuerst und hat weitere Failover-Schritte bereit.",

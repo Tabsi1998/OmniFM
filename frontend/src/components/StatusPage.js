@@ -106,7 +106,7 @@ function NoticeCard({ tone, Icon, kind, title, message, meta, testId }) {
       <div style={{ minWidth: 0 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 6 }}>
           <Chip tone={tone}>{kind}</Chip>
-          <span style={{ color: '#71717A', fontSize: 13 }}>{meta}</span>
+          <span style={{ color: '#8e8e97', fontSize: 13 }}>{meta}</span>
         </div>
         <div style={{ fontWeight: 700, color: '#F4F4F5', fontSize: 16 }}>{title}</div>
         {message ? <p style={{ margin: '6px 0 0', color: '#A1A1AA', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{message}</p> : null}
@@ -167,7 +167,7 @@ function UptimeBars({ bot, s, fmt }) {
           );
         })}
       </div>
-      <div aria-live="polite" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 8, fontSize: 12, color: '#71717A', minHeight: 18 }}>
+      <div aria-live="polite" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 8, fontSize: 12, color: '#8e8e97', minHeight: 18 }}>
         {shown ? (
           <span data-testid={`status-day-${bot.key}`} style={{ color: '#D4D4D8' }}>
             {s.dayTooltip({
@@ -196,7 +196,7 @@ function BotRow({ bot, s, fmt }) {
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, minWidth: 0 }}>
           <span style={{ fontWeight: 700, color: '#F4F4F5' }}>{bot.name}</span>
-          <span style={{ color: '#71717A', fontSize: 12 }}>
+          <span style={{ color: '#8e8e97', fontSize: 12 }}>
             {s.roles[bot.role] || bot.role} · {tier.charAt(0).toUpperCase() + tier.slice(1)}
           </span>
         </div>
@@ -338,7 +338,7 @@ export default function StatusPage() {
                           <Chip tone={entry.type === 'maintenance' ? 'maintenance' : (entry.type === 'outage' || entry.impact === 'major' ? 'critical' : 'warning')}>{s.kinds[entry.type]}</Chip>
                           <span style={{ fontWeight: 700, color: '#F4F4F5' }}>{entry.type === 'outage' ? s.outageTitle({ bot: entry.bot }) : entry.title}</span>
                         </div>
-                        <span style={{ color: '#71717A', fontSize: 13 }}>
+                        <span style={{ color: '#8e8e97', fontSize: 13 }}>
                           {fmt.window(entry.startedAt, entry.endedAt)} · {s.duration({ text: fmt.span(entry.startedAt, entry.endedAt) })}
                         </span>
                         {entry.message ? <span style={{ color: '#A1A1AA', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{entry.message}</span> : null}
@@ -352,7 +352,7 @@ export default function StatusPage() {
             ) : null}
 
             {data ? (
-              <p style={{ margin: 0, color: '#71717A', fontSize: 12, lineHeight: 1.6 }}>
+              <p style={{ margin: 0, color: '#8e8e97', fontSize: 12, lineHeight: 1.6 }}>
                 {s.note} {data.generatedAt ? s.updated({ time: fmt.time(data.generatedAt) }) : null}
               </p>
             ) : null}

@@ -26,7 +26,7 @@ export default function SettingsWeeklyDigest({
         <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20 }}>{t('Wöchentlicher Stats-Digest', 'Weekly stats digest')}</h3>
         {!canManageWeeklyDigest && <span style={{ fontSize: 11, color: '#10B981', border: '1px solid rgba(16,185,129,0.3)', padding: '2px 8px' }}>PRO</span>}
       </div>
-      <p style={{ color: '#52525B', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
+      <p style={{ color: '#8e8e97', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
         {t(
           'Automatisch ein Embed mit der Wochen-Zusammenfassung in einen Text-Channel posten.',
           'Automatically post an embed with the weekly summary to a text channel.'
@@ -52,7 +52,7 @@ export default function SettingsWeeklyDigest({
         </div>
 
         <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#8e8e97' }}>
             {t('Nächster Lauf', 'Next run')}
           </div>
           <div data-testid="digest-next-run" style={{ marginTop: 6, fontSize: 16, fontWeight: 600, color: '#D4D4D8' }}>
@@ -61,13 +61,13 @@ export default function SettingsWeeklyDigest({
         </div>
 
         <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#8e8e97' }}>
             {t('Letzte Sendung', 'Last delivery')}
           </div>
           <div data-testid="digest-last-sent" style={{ marginTop: 6, fontSize: 16, fontWeight: 600, color: '#D4D4D8' }}>
             {digestSummary.lastSentLabel}
           </div>
-          <div style={{ marginTop: 6, fontSize: 12, color: '#71717A' }}>
+          <div style={{ marginTop: 6, fontSize: 12, color: '#8e8e97' }}>
             {t('Sprache', 'Language')}: {digestSummary.languageLabel}
           </div>
         </div>
@@ -86,9 +86,10 @@ export default function SettingsWeeklyDigest({
         </label>
 
         <div>
-          <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Channel', 'Channel')}</label>
+          <label style={{ display: 'block', fontSize: 11, color: '#8e8e97', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Channel', 'Channel')}</label>
           <select
             data-testid="digest-channel-select"
+            aria-label={t('Channel', 'Channel')}
             disabled={!canManageWeeklyDigest}
             value={wd.channelId}
             onChange={(e) => setSettings((current) => ({ ...(current || {}), weeklyDigest: { ...wd, channelId: e.target.value } }))}
@@ -100,9 +101,10 @@ export default function SettingsWeeklyDigest({
         </div>
 
         <div>
-          <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Wochentag', 'Day')}</label>
+          <label style={{ display: 'block', fontSize: 11, color: '#8e8e97', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Wochentag', 'Day')}</label>
           <select
             data-testid="digest-day-select"
+            aria-label={t('Wochentag', 'Day')}
             disabled={!canManageWeeklyDigest}
             value={wd.dayOfWeek}
             onChange={(e) => setSettings((current) => ({ ...(current || {}), weeklyDigest: { ...wd, dayOfWeek: Number(e.target.value) } }))}
@@ -113,9 +115,10 @@ export default function SettingsWeeklyDigest({
         </div>
 
         <div>
-          <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Uhrzeit', 'Hour')}</label>
+          <label style={{ display: 'block', fontSize: 11, color: '#8e8e97', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Uhrzeit', 'Hour')}</label>
           <select
             data-testid="digest-hour-select"
+            aria-label={t('Uhrzeit', 'Hour')}
             disabled={!canManageWeeklyDigest}
             value={wd.hour}
             onChange={(e) => setSettings((current) => ({ ...(current || {}), weeklyDigest: { ...wd, hour: Number(e.target.value) } }))}
@@ -126,9 +129,10 @@ export default function SettingsWeeklyDigest({
         </div>
 
         <div>
-          <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Sprache', 'Language')}</label>
+          <label style={{ display: 'block', fontSize: 11, color: '#8e8e97', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Sprache', 'Language')}</label>
           <select
             data-testid="digest-language-select"
+            aria-label={t('Sprache', 'Language')}
             disabled={!canManageWeeklyDigest}
             value={wd.language || 'de'}
             onChange={(e) => setSettings((current) => ({ ...(current || {}), weeklyDigest: { ...wd, language: e.target.value } }))}
@@ -139,9 +143,10 @@ export default function SettingsWeeklyDigest({
           </select>
         </div>
         <div>
-          <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Für wen', 'For whom')}</label>
+          <label style={{ display: 'block', fontSize: 11, color: '#8e8e97', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Für wen', 'For whom')}</label>
           <select
             data-testid="digest-audience-select"
+            aria-label={t('Für wen', 'For whom')}
             disabled={!canManageWeeklyDigest}
             value={wd.audience === 'public' ? 'public' : 'team'}
             onChange={(e) => setSettings((current) => ({ ...(current || {}), weeklyDigest: { ...wd, audience: e.target.value } }))}
@@ -195,14 +200,14 @@ export default function SettingsWeeklyDigest({
       <div data-testid="digest-preview-card" style={{ marginTop: 14, border: '1px solid #1A1A2E', background: '#050505', padding: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
+            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#8e8e97' }}>
               {t('Preview', 'Preview')}
             </div>
             <div style={{ marginTop: 6, fontSize: 18, fontWeight: 700, color: '#F4F4F5' }}>
               {digestPreview?.title || t('Noch keine Vorschau geladen', 'No preview loaded yet')}
             </div>
           </div>
-          <div style={{ fontSize: 12, color: '#71717A' }}>
+          <div style={{ fontSize: 12, color: '#8e8e97' }}>
             {t('Erstellt', 'Generated')}: {digestPreviewGeneratedLabel}
           </div>
         </div>
@@ -211,14 +216,14 @@ export default function SettingsWeeklyDigest({
           {digestPreview?.description || t('Nutze die Vorschau, um den Weekly Digest vor dem Versand zu prüfen.', 'Use the preview to inspect the weekly digest before sending it.')}
         </div>
 
-        <div style={{ marginTop: 12, fontSize: 12, color: '#71717A' }}>
+        <div style={{ marginTop: 12, fontSize: 12, color: '#8e8e97' }}>
           {t('Ziel-Channel', 'Target channel')}: {digestPreview?.channelName ? `#${digestPreview.channelName}` : t('Noch keiner ausgewählt', 'None selected yet')}
         </div>
 
         <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
           {(digestPreview?.fields || []).map((field) => (
             <div key={`${field.name}-${field.value}`} style={{ border: '1px solid #1A1A2E', background: '#09090B', padding: '12px 14px' }}>
-              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>{field.name}</div>
+              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#8e8e97' }}>{field.name}</div>
               <div style={{ marginTop: 6, fontSize: 14, color: '#F4F4F5', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{field.value}</div>
             </div>
           ))}

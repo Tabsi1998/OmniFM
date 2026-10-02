@@ -255,11 +255,11 @@ export default function DashboardEvents({
   );
 
   return (
-    <section data-testid="dashboard-events-panel" style={{ display: 'grid', gap: 14 }}>
+    <section data-testid="dashboard-events-panel" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14 }}>
       <div style={{ background: '#0A0A0A', border: '1px solid #1A1A2E', padding: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20 }}>
-            {t('Events', 'Events')} <span style={{ color: '#52525B', fontSize: 14 }}>({events.length})</span>
+            {t('Events', 'Events')} <span style={{ color: '#8e8e97', fontSize: 14 }}>({events.length})</span>
           </h3>
           <button data-testid="event-toggle-form-btn" onClick={() => {
             if (showForm && !isEditing) {
@@ -301,7 +301,7 @@ export default function DashboardEvents({
               <div style={{ color: '#A1A1AA', fontSize: 13 }}>
                 {isEditing ? t('Event bearbeiten', 'Edit event') : t('Neues Event anlegen', 'Create new event')}
               </div>
-              <div style={{ color: '#52525B', fontSize: 12 }}>
+              <div style={{ color: '#8e8e97', fontSize: 12 }}>
                 {t('Der Synchronisationsstatus zeigt, ob das Discord-Server-Event vom Commander bestätigt wurde.', 'The sync status shows whether the Discord server event was confirmed by the Commander.')}
               </div>
             </div>
@@ -322,7 +322,7 @@ export default function DashboardEvents({
                     <div style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>
                       {t('Event-Templates', 'Event templates')}
                     </div>
-                    <div style={{ color: '#71717A', fontSize: 12, marginTop: 4 }}>
+                    <div style={{ color: '#8e8e97', fontSize: 12, marginTop: 4 }}>
                       {t(
                         'Füllt Titel, Dauer, Discord-Nachricht und Beschreibung mit einer Vorlage.',
                         'Fills title, duration, Discord message and description from a template.'
@@ -369,7 +369,7 @@ export default function DashboardEvents({
                   <div style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>
                     {t('Termin-Presets', 'Schedule presets')}
                   </div>
-                  <div style={{ color: '#71717A', fontSize: 12, marginTop: 4 }}>
+                  <div style={{ color: '#8e8e97', fontSize: 12, marginTop: 4 }}>
                     {t(
                       'Setzt Startzeit und Wiederholung für häufige Event-Muster.',
                       'Sets start time and recurrence for common event patterns.'
@@ -414,7 +414,7 @@ export default function DashboardEvents({
                   <option value="">{t('Station wählen...', 'Select station...')}</option>
                   {stationOptions.map((option, index) => (
                     option.disabled
-                      ? <option key={`${option.label}-${index}`} disabled style={{ color: '#52525B' }}>{option.label}</option>
+                      ? <option key={`${option.label}-${index}`} disabled style={{ color: '#8e8e97' }}>{option.label}</option>
                       : <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>
@@ -519,7 +519,7 @@ export default function DashboardEvents({
                     <div style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>
                       {t('Zeitplan-Vorschau', 'Schedule preview')}
                     </div>
-                    <div style={{ color: '#71717A', fontSize: 12 }}>
+                    <div style={{ color: '#8e8e97', fontSize: 12 }}>
                       {previewData
                         ? previewRepeatLabel
                         : t(
@@ -569,13 +569,13 @@ export default function DashboardEvents({
                           gap: 4,
                         }}
                       >
-                        <div style={{ color: '#71717A', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                        <div style={{ color: '#8e8e97', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                           {index === 0 ? t('Nächster Start', 'Next start') : t('Weitere Ausführung', 'Upcoming run')}
                         </div>
                         <div style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>
                           {row.startsAtLocal || row.startsAt || '-'}
                         </div>
-                        <div style={{ color: '#71717A', fontSize: 12 }}>
+                        <div style={{ color: '#8e8e97', fontSize: 12 }}>
                           {row.endsAtLocal
                             ? t('Endet {time}', 'Ends {time}', { time: row.endsAtLocal })
                             : t('Ohne Endzeit', 'No end time')}
@@ -607,7 +607,7 @@ export default function DashboardEvents({
                         <div style={{ color: '#D4D4D8', fontSize: 13 }}>
                           {conflict.message}
                         </div>
-                        <div style={{ color: '#71717A', fontSize: 12 }}>
+                        <div style={{ color: '#8e8e97', fontSize: 12 }}>
                           {conflict.startsAtLocal || conflict.startsAt || '-'}
                           {conflict.endsAtLocal ? ` -> ${conflict.endsAtLocal}` : ` -> ${t('offen', 'open')}`}
                         </div>
@@ -649,12 +649,12 @@ export default function DashboardEvents({
         )}
       </div>
 
-      <div style={{ display: 'grid', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 8 }}>
         {events.length === 0 && (
           <div data-testid="events-empty" style={{ background: '#0A0A0A', border: '1px solid #1A1A2E', padding: '40px 20px', textAlign: 'center' }}>
             <CalendarDays size={32} color="#27272A" style={{ margin: '0 auto' }} />
-            <p style={{ color: '#52525B', marginTop: 10 }}>{t('Noch keine Events erstellt.', 'No events created yet.')}</p>
-            <p style={{ color: '#3F3F46', marginTop: 4, fontSize: 13 }}>{t('Lege oben dein erstes Radio-Event an.', 'Create your first radio event above.')}</p>
+            <p style={{ color: '#8e8e97', marginTop: 10 }}>{t('Noch keine Events erstellt.', 'No events created yet.')}</p>
+            <p style={{ color: '#8e8e97', marginTop: 4, fontSize: 13 }}>{t('Lege oben dein erstes Radio-Event an.', 'Create your first radio event above.')}</p>
           </div>
         )}
         {events.map((event) => (

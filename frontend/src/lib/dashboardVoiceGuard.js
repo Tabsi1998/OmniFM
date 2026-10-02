@@ -68,7 +68,7 @@ function buildDashboardVoiceGuardSummary(rawConfig, t = (de, _en) => de) {
 
   if (config.effectivePolicy === 'allow') {
     statusLabel = t('Freigegeben', 'Allowed');
-    statusAccent = '#71717A';
+    statusAccent = '#8e8e97';
     description = t(
       'Fremdverschiebungen werden akzeptiert. OmniFM bleibt im neuen Channel.',
       'Foreign moves are accepted. OmniFM stays in the new channel.'

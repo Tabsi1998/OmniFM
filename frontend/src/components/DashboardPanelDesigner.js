@@ -82,7 +82,7 @@ export default function DashboardPanelDesigner({ apiRequest, selectedGuildId, t 
         <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20 }}>{t('Panel-Design', 'Panel design')}</h3>
         {!canSave && <span style={{ fontSize: 11, color: '#8B5CF6', border: '1px solid rgba(139,92,246,0.3)', padding: '2px 8px' }}>PRO</span>}
       </div>
-      <p style={{ color: '#52525B', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
+      <p style={{ color: '#8e8e97', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
         {t(
           'So sieht das „Läuft gerade“-Panel auf deinem Server aus. Pause und Stop bleiben immer, ebenso die Knöpfe bei einem Ersatzsender. Rechts siehst du das echte Panel mit Beispieldaten.',
           'This is how the "now playing" panel looks on your server. Pause and Stop always stay, and so do the buttons of a backup station. On the right is the real panel with example data.'
@@ -90,7 +90,7 @@ export default function DashboardPanelDesigner({ apiRequest, selectedGuildId, t 
       </p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, alignItems: 'start' }}>
         <div style={{ display: 'grid', gap: 10 }}>
-          <div style={{ fontSize: 11, color: '#71717A', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Knöpfe', 'Buttons')}</div>
+          <div style={{ fontSize: 11, color: '#8e8e97', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Knöpfe', 'Buttons')}</div>
           {(data.buttons || []).map((entry) => (
             <label key={entry.key} style={labelStyle}>
               <input
@@ -102,7 +102,7 @@ export default function DashboardPanelDesigner({ apiRequest, selectedGuildId, t 
               {entry.label}
             </label>
           ))}
-          <div style={{ fontSize: 11, color: '#71717A', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 6 }}>{t('Anzeige', 'Display')}</div>
+          <div style={{ fontSize: 11, color: '#8e8e97', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 6 }}>{t('Anzeige', 'Display')}</div>
           <label style={labelStyle}>
             <input type="checkbox" data-testid="panel-show-recent" checked={design.showRecent} onChange={(event) => change({ ...design, showRecent: event.target.checked })} />
             {t('„Zuletzt“ – die letzten Titel', '"Earlier" – the last songs')}
@@ -129,7 +129,7 @@ export default function DashboardPanelDesigner({ apiRequest, selectedGuildId, t 
               data-testid="panel-design-save"
               disabled={!canSave || !dirty || busy}
               onClick={() => save()}
-              style={{ height: 36, padding: '0 14px', border: 'none', background: canSave && dirty ? '#10B981' : '#1A1A2E', color: canSave && dirty ? '#042f2e' : '#52525B', fontWeight: 700, cursor: canSave && dirty && !busy ? 'pointer' : 'not-allowed' }}
+              style={{ height: 36, padding: '0 14px', border: 'none', background: canSave && dirty ? '#10B981' : '#1A1A2E', color: canSave && dirty ? '#042f2e' : '#8e8e97', fontWeight: 700, cursor: canSave && dirty && !busy ? 'pointer' : 'not-allowed' }}
             >
               {busy ? t('Speichert...', 'Saving...') : t('Speichern', 'Save')}
             </button>

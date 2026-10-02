@@ -37,7 +37,7 @@ export default function OwnerOverview({ apiGet, mrr, ov, planData, revenueTrend,
       <div className="oa-grid cols-3" style={{ marginTop: 18 }}>
         <div className="oa-card oa-fade" style={{ gridColumn: 'span 2' }} data-testid="chart-revenue">
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-            <div><div className="oa-stat-label">MRR — aktueller Stand</div><div style={{ fontSize: 18, fontWeight: 700, marginTop: 4 }}>{fmtMoney(mrr)} <span style={{ fontSize: 12, color: '#64748b' }}>/ Monat · keine Historie</span></div></div>
+            <div><div className="oa-stat-label">MRR — aktueller Stand</div><div style={{ fontSize: 18, fontWeight: 700, marginTop: 4 }}>{fmtMoney(mrr)} <span style={{ fontSize: 12, color: '#8190a8' }}>/ Monat · keine Historie</span></div></div>
             <Equalizer />
           </div>
           <ResponsiveContainer width="100%" height={210}>
@@ -49,8 +49,8 @@ export default function OwnerOverview({ apiGet, mrr, ov, planData, revenueTrend,
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#1b2133" vertical={false} />
-              <XAxis dataKey="month" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} tick={false} />
-              <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
+              <XAxis dataKey="month" stroke="#8190a8" fontSize={11} tickLine={false} axisLine={false} tick={false} />
+              <YAxis stroke="#8190a8" fontSize={11} tickLine={false} axisLine={false} />
               <Tooltip content={<ChartTooltip />} />
               <Area type="monotone" dataKey="mrr" name="MRR" stroke="#ff6b00" strokeWidth={2.5} fill="url(#oaRev)" />
             </AreaChart>
@@ -67,7 +67,7 @@ export default function OwnerOverview({ apiGet, mrr, ov, planData, revenueTrend,
             </PieChart>
           </ResponsiveContainer>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 4 }}>
-            <span className="oa-mono" style={{ fontSize: 11, color: '#94a3b8' }}><span style={{ color: '#64748b' }}>●</span> Free {stations?.free ?? 0}</span>
+            <span className="oa-mono" style={{ fontSize: 11, color: '#94a3b8' }}><span style={{ color: '#8190a8' }}>●</span> Free {stations?.free ?? 0}</span>
             <span className="oa-mono" style={{ fontSize: 11, color: '#94a3b8' }}><span style={{ color: '#ff6b00' }}>●</span> Pro {stations?.pro ?? 0}</span>
           </div>
         </div>
@@ -80,15 +80,15 @@ export default function OwnerOverview({ apiGet, mrr, ov, planData, revenueTrend,
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={planData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1b2133" vertical={false} />
-                <XAxis dataKey="plan" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis allowDecimals={false} stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
+                <XAxis dataKey="plan" stroke="#8190a8" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis allowDecimals={false} stroke="#8190a8" fontSize={11} tickLine={false} axisLine={false} />
                 <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
                 <Bar dataKey="count" name="Lizenzen" radius={[6, 6, 0, 0]}>
                   {planData.map((e, i) => <Cell key={i} fill={e.fill} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
-          ) : <div style={{ color: '#64748b', fontSize: 13, padding: '30px 0', textAlign: 'center' }}>Keine aktiven Lizenzen</div>}
+          ) : <div style={{ color: '#8190a8', fontSize: 13, padding: '30px 0', textAlign: 'center' }}>Keine aktiven Lizenzen</div>}
         </div>
       </div>
     </>

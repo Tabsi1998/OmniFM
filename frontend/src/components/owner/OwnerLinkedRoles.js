@@ -60,7 +60,7 @@ export default function OwnerLinkedRoles({ apiGet, linkedRoles, setLinkedRoles, 
     <div className="oa-fade" data-testid="owner-linked-roles">
       <div className="oa-card" style={{ marginBottom: 18 }}>
         <div className="oa-section-title">Verknüpfte Rollen in Discord</div>
-        <div style={{ fontSize: 12, color: '#64748b', margin: '8px 0 10px', lineHeight: 1.6 }}>
+        <div style={{ fontSize: 12, color: '#8190a8', margin: '8px 0 10px', lineHeight: 1.6 }}>
           Server können Rollen an zwei OmniFM-Werte knüpfen: Hörstunden (nur gezählt, wenn die Person das in /meine-daten einschaltet) und „Premium-Kunde“ (besitzt einen Server mit Pro oder Ultimate). Die Person verbindet OmniFM einmal über Discord; danach gehen ihre Werte einmal am Tag neu an Discord.
         </div>
         {error ? <div className="oa-pill red" style={{ margin: '10px 0' }}>{error}</div> : null}
@@ -88,14 +88,14 @@ export default function OwnerLinkedRoles({ apiGet, linkedRoles, setLinkedRoles, 
 
       <div className="oa-card" style={{ marginBottom: 18 }} data-testid="config-linked-roles">
         <div className="oa-section-title">Premium-Rolle im Support-Server</div>
-        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14, lineHeight: 1.6 }}>
+        <div style={{ fontSize: 12, color: '#8190a8', marginBottom: 14, lineHeight: 1.6 }}>
           Wer einen Server mit Pro oder Ultimate besitzt, bekommt im Support-Server diese Rolle; wer keinen mehr hat, verliert sie. OmniFM nimmt die Rolle nur Leuten wieder weg, denen es sie selbst gegeben hat. Alle sechs Stunden.
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0 18px' }}>
           <Field label="Support-Server (ID)" value={supportGuildId} onChange={(value) => setLinkedRoles((current) => ({ ...current, supportGuildId: value.trim() }))} placeholder="123456789012345678" testid="cfg-linked-roles-guild" />
           <Field label="Premium-Rolle (ID)" value={premiumRoleId} onChange={(value) => setLinkedRoles((current) => ({ ...current, premiumRoleId: value.trim() }))} placeholder="123456789012345678" testid="cfg-linked-roles-role" />
         </div>
-        <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.6 }}>
+        <div style={{ fontSize: 12, color: '#8190a8', lineHeight: 1.6 }}>
           IDs findest du in Discord mit eingeschaltetem Entwicklermodus: Rechtsklick auf den Server bzw. die Rolle → „ID kopieren“. Der Commander braucht im Support-Server „Rollen verwalten“, und seine eigene Rolle muss über der Premium-Rolle stehen.
         </div>
         {idProblem ? <div className="oa-pill red" style={{ marginTop: 10 }}>Eine ID sieht nicht richtig aus (nur Ziffern, 17 bis 22 Stellen).</div> : null}

@@ -109,7 +109,7 @@ function buildPriceLabel(planId, tier, copy, formatDecimal) {
 }
 
 function Premium({ bots = [], planContext = {} }) {
-  const { copy, locale, formatDecimal } = useI18n();
+  const { copy, locale, formatDecimal, t } = useI18n();
   const { freeStations, allStations } = planContext;
 
   // #413: what each plan brings, from the bot's plan file; the owner's own
@@ -422,6 +422,7 @@ function Premium({ bots = [], planContext = {} }) {
           onClose={closeCheckout}
           copy={copy}
           locale={locale}
+          t={t}
         />
       )}
     </section>

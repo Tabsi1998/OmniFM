@@ -72,7 +72,7 @@ export default function BrandKit({ embedded = false }) {
               </div>
               <div style={{ fontWeight: 700, fontSize: 15 }}>{t(a.label.de, a.label.en)}</div>
               <div style={{ color: '#94a3b8', fontSize: 13, margin: '4px 0 6px', lineHeight: 1.45 }}>{t(a.desc.de, a.desc.en)}</div>
-              <div className="oa-mono" style={{ fontSize: 10.5, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>{t(a.use.de, a.use.en)}</div>
+              <div className="oa-mono" style={{ fontSize: 10.5, color: '#8190a8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>{t(a.use.de, a.use.en)}</div>
               <a className="oa-btn primary" style={{ width: '100%', height: 40, textDecoration: 'none' }} href={a.file} download data-testid={`brand-download-${a.slug}`}>
                 <Download size={15} /> Download
               </a>
@@ -113,7 +113,7 @@ export default function BrandKit({ embedded = false }) {
                   <div key={c.hex} data-testid={`brand-color-${c.hex.replace('#','')}`}>
                     <div style={{ height: 54, borderRadius: 10, background: c.hex, border: '1px solid rgba(255,255,255,0.08)' }} />
                     <div style={{ fontSize: 12.5, fontWeight: 600, marginTop: 7 }}>{c.name}</div>
-                    <div className="oa-mono" style={{ fontSize: 11, color: '#64748b' }}>{c.hex}</div>
+                    <div className="oa-mono" style={{ fontSize: 11, color: '#8190a8' }}>{c.hex}</div>
                   </div>
                 ))}
               </div>
@@ -125,7 +125,7 @@ export default function BrandKit({ embedded = false }) {
               {BRAND_FONTS.map((f) => (
                 <div key={f.name} className="oa-integration">
                   <span><span style={{ fontFamily: f.name === 'Syne' ? "'Syne'" : f.name === 'DM Sans' ? "'DM Sans'" : "'JetBrains Mono'", fontSize: 18, fontWeight: 700 }}>{f.name}</span>
-                    <span style={{ display: 'block', fontSize: 12, color: '#64748b' }}>{f.role}</span></span>
+                    <span style={{ display: 'block', fontSize: 12, color: '#8190a8' }}>{f.role}</span></span>
                   <span className="oa-pill slate">{f.weight}</span>
                 </div>
               ))}

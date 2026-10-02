@@ -3,7 +3,7 @@ import { Palette } from 'lucide-react';
 import { AVATAR_BOX, BANNER_BOX, prepareProfileImage } from '../lib/profileImage.js';
 
 const inputStyle = { width: '100%', padding: '8px 10px', border: '1px solid #1A1A2E', background: '#050505', color: '#fff', boxSizing: 'border-box', fontSize: 13 };
-const labelStyle = { display: 'block', fontSize: 11, color: '#71717A', margin: '10px 0 4px', textTransform: 'uppercase', letterSpacing: '0.08em' };
+const labelStyle = { display: 'block', fontSize: 11, color: '#8e8e97', margin: '10px 0 4px', textTransform: 'uppercase', letterSpacing: '0.08em' };
 
 function WorkerProfileCard({ worker, limits, t, onSave }) {
   const [avatar, setAvatar] = useState(null);
@@ -60,17 +60,18 @@ function WorkerProfileCard({ worker, limits, t, onSave }) {
         />
         <div>
           <div style={{ color: '#fff', fontWeight: 700 }}>{worker.name}</div>
-          <div style={{ color: '#71717A', fontSize: 12 }}>
+          <div style={{ color: '#8e8e97', fontSize: 12 }}>
             {hasCustom ? t('Eigenes Aussehen auf diesem Server', 'Own look on this server') : t('Standard-Aussehen', 'Default look')}
           </div>
         </div>
       </div>
       <label style={labelStyle}>{t('Avatar (PNG, JPG, GIF, WebP)', 'Avatar (PNG, JPG, GIF, WebP)')}</label>
-      <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" onChange={pick(setAvatar, AVATAR_BOX)} style={inputStyle} />
+      <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" aria-label={t('Avatar (PNG, JPG, GIF, WebP)', 'Avatar (PNG, JPG, GIF, WebP)')} onChange={pick(setAvatar, AVATAR_BOX)} style={inputStyle} />
       <label style={labelStyle}>{t('Banner', 'Banner')}</label>
-      <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" onChange={pick(setBanner, BANNER_BOX)} style={inputStyle} />
+      <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" aria-label={t('Banner', 'Banner')} onChange={pick(setBanner, BANNER_BOX)} style={inputStyle} />
       <label style={labelStyle}>{t('Bio', 'Bio')} ({bio.length}/{limits.bioLength || 190})</label>
       <textarea
+        aria-label={t('Bio', 'Bio')}
         value={bio}
         maxLength={limits.bioLength || 190}
         onChange={(event) => setBio(event.target.value)}
@@ -82,7 +83,7 @@ function WorkerProfileCard({ worker, limits, t, onSave }) {
           type="button"
           disabled={busy || !hasChanges}
           onClick={() => submit(changes)}
-          style={{ height: 36, padding: '0 14px', border: 'none', background: hasChanges ? '#10B981' : '#1A1A2E', color: hasChanges ? '#042f2e' : '#52525B', fontWeight: 700, cursor: hasChanges && !busy ? 'pointer' : 'not-allowed' }}
+          style={{ height: 36, padding: '0 14px', border: 'none', background: hasChanges ? '#10B981' : '#1A1A2E', color: hasChanges ? '#042f2e' : '#8e8e97', fontWeight: 700, cursor: hasChanges && !busy ? 'pointer' : 'not-allowed' }}
         >
           {busy ? t('Übernehme...', 'Applying...') : t('Übernehmen', 'Apply')}
         </button>
@@ -136,7 +137,7 @@ export default function DashboardBotProfile({ apiRequest, selectedGuildId, t }) 
         <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20 }}>{t('Bot-Aussehen', 'Bot look')}</h3>
         {!available && <span style={{ fontSize: 11, color: '#8B5CF6', border: '1px solid rgba(139,92,246,0.3)', padding: '2px 8px' }}>ULTIMATE</span>}
       </div>
-      <p style={{ color: '#52525B', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
+      <p style={{ color: '#8e8e97', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
         {t(
           'Jeder Worker kann auf deinem Server einen eigenen Avatar, ein Banner und eine Bio haben – zum Beispiel im Vereinslook. Das gilt nur hier, auf anderen Servern bleibt OmniFM, wie es ist. Discord erlaubt nur wenige Änderungen hintereinander.',
           'Every worker can have its own avatar, banner and bio on your server – in your club look, for example. It only applies here; on other servers OmniFM stays as it is. Discord allows only a few changes in a row.'

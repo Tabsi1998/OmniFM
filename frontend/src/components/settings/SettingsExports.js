@@ -29,7 +29,7 @@ export default function SettingsExports({
         <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20 }}>{t('Exporte & Webhooks', 'Exports & webhooks')}</h3>
         {!canManageExports && <span style={{ fontSize: 11, color: '#8B5CF6', border: '1px solid rgba(139,92,246,0.3)', padding: '2px 8px' }}>ULTIMATE</span>}
       </div>
-      <p style={{ color: '#52525B', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
+      <p style={{ color: '#8e8e97', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
         {t(
           'Ultimate-Server können Stats und Custom-Stationen als JSON exportieren und zusätzlich Stall-, Recovery- sowie Failover-Ereignisse per Webhook oder Discord-Channel an Automationen und Operatoren melden.',
           'Ultimate servers can export stats and custom stations as JSON and additionally send stall, recovery, and failover events to automations and operators via webhook or Discord channel.'
@@ -55,7 +55,7 @@ export default function SettingsExports({
         </div>
 
         <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#8e8e97' }}>
             {t('Webhook-Ziel', 'Webhook target')}
           </div>
           <div data-testid="exports-webhook-url-label" style={{ marginTop: 6, fontSize: 14, fontWeight: 600, color: '#D4D4D8', wordBreak: 'break-all' }}>
@@ -64,13 +64,13 @@ export default function SettingsExports({
         </div>
 
         <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#8e8e97' }}>
             {t('Auslöser', 'Triggers')}
           </div>
           <div data-testid="exports-webhook-events-count" style={{ marginTop: 6, fontSize: 16, fontWeight: 600, color: '#D4D4D8' }}>
             {exportsWebhook.events.length} / {DASHBOARD_EXPORT_WEBHOOK_EVENTS.length}
           </div>
-          <div style={{ marginTop: 6, fontSize: 12, color: '#71717A' }}>
+          <div style={{ marginTop: 6, fontSize: 12, color: '#8e8e97' }}>
             {exportsWebhook.secretConfigured ? t('Secret gesetzt', 'Secret configured') : t('Ohne Secret', 'No secret')}
           </div>
         </div>
@@ -89,7 +89,7 @@ export default function SettingsExports({
         </label>
 
         <div>
-          <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Webhook-URL', 'Webhook URL')}</label>
+          <label style={{ display: 'block', fontSize: 11, color: '#8e8e97', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Webhook-URL', 'Webhook URL')}</label>
           <input
             data-testid="exports-webhook-url-input"
             disabled={!canManageExports}
@@ -101,7 +101,7 @@ export default function SettingsExports({
         </div>
 
         <div>
-          <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Secret', 'Secret')}</label>
+          <label style={{ display: 'block', fontSize: 11, color: '#8e8e97', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Secret', 'Secret')}</label>
           <input
             data-testid="exports-webhook-secret-input"
             disabled={!canManageExports}
@@ -118,7 +118,7 @@ export default function SettingsExports({
               data-testid="exports-webhook-secret-clear"
               disabled={!canManageExports}
               onClick={() => updateExportsWebhook({ secret: '' })}
-              style={{ marginTop: 7, border: 0, padding: 0, background: 'transparent', color: canManageExports ? '#FCA5A5' : '#52525B', cursor: canManageExports ? 'pointer' : 'not-allowed', fontSize: 12 }}
+              style={{ marginTop: 7, border: 0, padding: 0, background: 'transparent', color: canManageExports ? '#FCA5A5' : '#8e8e97', cursor: canManageExports ? 'pointer' : 'not-allowed', fontSize: 12 }}
             >
               {t('Secret beim Speichern entfernen', 'Remove secret when saving')}
             </button>
@@ -128,7 +128,7 @@ export default function SettingsExports({
 
       <div data-testid="exports-webhook-event-list" style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
         {DASHBOARD_EXPORT_WEBHOOK_EVENTS.map((event) => (
-          <label key={event.key} style={{ display: 'flex', alignItems: 'center', gap: 10, color: canManageExports ? '#D4D4D8' : '#52525B', fontSize: 13 }}>
+          <label key={event.key} style={{ display: 'flex', alignItems: 'center', gap: 10, color: canManageExports ? '#D4D4D8' : '#8e8e97', fontSize: 13 }}>
             <input
               type="checkbox"
               disabled={!canManageExports}

@@ -57,10 +57,10 @@ function EmojiPicker({ serverEmojis, loading, onSelectUnicode, onSelectCustom, o
     }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', borderBottom: '1px solid #1A1A2E' }}>
-        <span style={{ fontSize: 12, color: '#71717A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        <span style={{ fontSize: 12, color: '#8e8e97', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           Emojis
         </span>
-        <button data-testid="emoji-picker-close" onClick={onClose} style={{ border: 'none', background: 'transparent', color: '#71717A', cursor: 'pointer', padding: 2 }}>
+        <button data-testid="emoji-picker-close" onClick={onClose} aria-label={t('Schließen', 'Close')} style={{ border: 'none', background: 'transparent', color: '#8e8e97', cursor: 'pointer', padding: 2 }}>
           <X size={14} />
         </button>
       </div>
@@ -71,11 +71,12 @@ function EmojiPicker({ serverEmojis, loading, onSelectUnicode, onSelectCustom, o
           <Search size={12} color="#52525B" />
           <input
             data-testid="emoji-search-input" value={search} onChange={(e) => setSearch(e.target.value)}
+            aria-label={t('Emoji suchen...', 'Search emoji...')}
             placeholder={t('Emoji suchen...', 'Search emoji...')}
             style={{ flex: 1, border: 'none', background: 'transparent', color: '#fff', fontSize: 12, outline: 'none' }}
           />
           {search && (
-            <button onClick={() => setSearch('')} style={{ border: 'none', background: 'transparent', color: '#52525B', cursor: 'pointer', padding: 0 }}>
+            <button onClick={() => setSearch('')} aria-label={t('Suche leeren', 'Clear search')} style={{ border: 'none', background: 'transparent', color: '#8e8e97', cursor: 'pointer', padding: 0 }}>
               <X size={12} />
             </button>
           )}
@@ -93,7 +94,7 @@ function EmojiPicker({ serverEmojis, loading, onSelectUnicode, onSelectCustom, o
               style={{
                 border: 'none', background: 'transparent', cursor: 'pointer',
                 padding: '6px 9px', fontSize: 11, whiteSpace: 'nowrap',
-                color: activeTab === tab.id ? '#5865F2' : '#52525B',
+                color: activeTab === tab.id ? '#5865F2' : '#8e8e97',
                 borderBottom: activeTab === tab.id ? '2px solid #5865F2' : '2px solid transparent',
                 fontWeight: activeTab === tab.id ? 600 : 400,
                 transition: 'all 0.12s',
@@ -107,14 +108,14 @@ function EmojiPicker({ serverEmojis, loading, onSelectUnicode, onSelectCustom, o
 
       {/* Emoji Grid */}
       <div style={{ flex: 1, overflowY: 'auto', padding: 8, minHeight: 180 }}>
-        {loading && <div style={{ color: '#52525B', fontSize: 12, textAlign: 'center', padding: 20 }}>{t('Lade...', 'Loading...')}</div>}
+        {loading && <div style={{ color: '#8e8e97', fontSize: 12, textAlign: 'center', padding: 20 }}>{t('Lade...', 'Loading...')}</div>}
 
         {/* Search mode: show server emojis + matching category name for context */}
         {isSearchMode && !loading && (
           <>
             {filteredServer.length > 0 && (
               <>
-                <div style={{ fontSize: 10, color: '#52525B', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '4px 2px 6px', fontWeight: 600 }}>
+                <div style={{ fontSize: 10, color: '#8e8e97', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '4px 2px 6px', fontWeight: 600 }}>
                   {t('Server-Emojis', 'Server emojis')}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(40px, 1fr))', gap: 6, marginBottom: 10 }}>
@@ -133,7 +134,7 @@ function EmojiPicker({ serverEmojis, loading, onSelectUnicode, onSelectCustom, o
               </>
             )}
             {filteredServer.length === 0 && serverEmojis.length === 0 && (
-              <div style={{ color: '#3F3F46', fontSize: 12, textAlign: 'center', padding: 12 }}>
+              <div style={{ color: '#8e8e97', fontSize: 12, textAlign: 'center', padding: 12 }}>
                 {t('Tipp: Wähle eine Kategorie oder tippe ein Emoji ein.', 'Tip: Select a category or type an emoji.')}
               </div>
             )}
@@ -144,7 +145,7 @@ function EmojiPicker({ serverEmojis, loading, onSelectUnicode, onSelectCustom, o
         {!isSearchMode && !loading && activeTab === 'server' && (
           <>
             {serverEmojis.length === 0 ? (
-              <div style={{ color: '#52525B', fontSize: 12, textAlign: 'center', padding: 20 }}>
+              <div style={{ color: '#8e8e97', fontSize: 12, textAlign: 'center', padding: 20 }}>
                 {t('Keine Server-Emojis vorhanden.', 'No server emojis available.')}
               </div>
             ) : (
@@ -323,7 +324,7 @@ export default function RichMessageEditor({
   return (
     <div data-testid={testId} ref={containerRef}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-        <label style={{ fontSize: 11, color: '#71717A', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        <label style={{ fontSize: 11, color: '#8e8e97', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           {resolvedLabel}
         </label>
         <div style={{ display: 'flex', gap: 4 }}>
@@ -406,7 +407,7 @@ export default function RichMessageEditor({
               <div style={{ whiteSpace: 'pre-wrap' }}>{resolvedPreviewText}</div>
             )
           ) : (
-            <span style={{ color: '#3F3F46' }}>{previewEmptyLabel}</span>
+            <span style={{ color: '#8e8e97' }}>{previewEmptyLabel}</span>
           )}
         </div>
       )}

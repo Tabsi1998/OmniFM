@@ -78,7 +78,7 @@ export default function OwnerReports({ apiGet, reports, setReports, onSave, savi
             <input type="checkbox" checked={showAll} onChange={(event) => setShowAll(event.target.checked)} data-testid="owner-reports-all" /> auch entschiedene zeigen
           </label>
         </div>
-        <div style={{ fontSize: 12, color: '#64748b', margin: '8px 0 4px', lineHeight: 1.6 }}>
+        <div style={{ fontSize: 12, color: '#8190a8', margin: '8px 0 4px', lineHeight: 1.6 }}>
           Probleme, Ideen und Feedback aus /problem, /idee, /feedback und dem Panel. Entschieden wird auf der Karte im Team-Kanal (Owner und Support); hier steht, wo jede Meldung steht.
         </div>
         {!SNOWFLAKE.test(teamChannelId) ? (
@@ -94,7 +94,7 @@ export default function OwnerReports({ apiGet, reports, setReports, onSave, savi
 
       <div className="oa-card" style={{ marginBottom: 18 }} data-testid="config-reports">
         <div className="oa-section-title">Wohin Meldungen gehen</div>
-        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14, lineHeight: 1.6 }}>
+        <div style={{ fontSize: 12, color: '#8190a8', marginBottom: 14, lineHeight: 1.6 }}>
           Jede Meldung geht zuerst in den privaten Team-Kanal. Öffentlich im Forum steht sie nur, wenn die Person zugestimmt hat und jemand im Team auf „Im Forum veröffentlichen“ klickt; dort stehen nur der Text, der Sender und der Plan.
           Der Team-Kanal muss ein Textkanal sein, den @everyone nicht sieht; sonst postet der Bot dort nichts.
         </div>
@@ -110,7 +110,7 @@ export default function OwnerReports({ apiGet, reports, setReports, onSave, savi
             <Field key={status} label={STATUS[status]} value={reports.tags?.[status] ?? DEFAULT_REPORT_TAGS[status]} onChange={(value) => setTag(status, value)} placeholder="kein Tag" testid={`cfg-reports-tag-${status}`} />
           ))}
         </div>
-        <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.6, marginTop: 6 }}>
+        <div style={{ fontSize: 12, color: '#8190a8', lineHeight: 1.6, marginTop: 6 }}>
           IDs findest du in Discord mit eingeschaltetem Entwicklermodus: Rechtsklick auf den Kanal → „Kanal-ID kopieren“. Der Commander braucht im Team-Kanal „Kanal ansehen“ und „Nachrichten senden“, in den Foren „Beiträge erstellen“ und „Threads verwalten“ (für die Tags).
           Die Tags legst du im Forum an (Forum bearbeiten → Tags); der Bot sucht sie hier nach dem Namen, Groß- und Kleinschreibung egal. Ein leeres Feld heißt: kein Tag.
         </div>

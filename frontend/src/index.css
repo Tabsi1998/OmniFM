@@ -88,7 +88,7 @@ a {
 }
 
 .station-search::placeholder {
-  color: #71717A;
+  color: #8e8e97;
 }
 
 .station-search:focus {
@@ -136,7 +136,7 @@ a {
   --oa-indigo: #5865f2;
   --oa-text: #f3f4f8;
   --oa-text-2: #94a3b8;
-  --oa-text-3: #64748b;
+  --oa-text-3: #8190a8;
   min-height: 100vh;
   background:
     radial-gradient(1200px 600px at 85% -10%, rgba(255,107,0,0.10), transparent 60%),

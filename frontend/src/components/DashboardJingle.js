@@ -7,7 +7,7 @@ import { buildApiUrl } from '../lib/api.js';
 // loudness and refuses anything over 10 seconds.
 const MAX_FILE_BYTES = 6 * 1024 * 1024;
 const ACCEPT = 'audio/*,.mp3,.wav,.ogg,.oga,.opus,.flac,.m4a,.webm';
-const labelStyle = { display: 'block', fontSize: 11, color: '#71717A', margin: '12px 0 4px', textTransform: 'uppercase', letterSpacing: '0.08em' };
+const labelStyle = { display: 'block', fontSize: 11, color: '#8e8e97', margin: '12px 0 4px', textTransform: 'uppercase', letterSpacing: '0.08em' };
 
 function buttonStyle(primary, enabled) {
   return {
@@ -15,7 +15,7 @@ function buttonStyle(primary, enabled) {
     padding: '0 14px',
     border: primary ? 'none' : '1px solid #1A1A2E',
     background: primary ? (enabled ? '#10B981' : '#1A1A2E') : 'transparent',
-    color: primary ? (enabled ? '#042f2e' : '#52525B') : '#A1A1AA',
+    color: primary ? (enabled ? '#042f2e' : '#8e8e97') : '#A1A1AA',
     fontWeight: primary ? 700 : 400,
     cursor: enabled ? 'pointer' : 'not-allowed',
   };
@@ -32,7 +32,7 @@ function readAsDataUrl(file) {
 
 function Switch({ checked, disabled, label, onChange, testId }) {
   return (
-    <label style={{ display: 'flex', alignItems: 'center', gap: 10, color: disabled ? '#52525B' : '#D4D4D8', fontSize: 13, marginTop: 8, cursor: disabled ? 'not-allowed' : 'pointer' }}>
+    <label style={{ display: 'flex', alignItems: 'center', gap: 10, color: disabled ? '#8e8e97' : '#D4D4D8', fontSize: 13, marginTop: 8, cursor: disabled ? 'not-allowed' : 'pointer' }}>
       <input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} data-testid={testId} />
       {label}
     </label>
@@ -111,13 +111,13 @@ export default function DashboardJingle({ apiRequest, selectedGuildId, t }) {
         <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20 }}>{t('Jingle', 'Jingle')}</h3>
         {!available && <span style={{ fontSize: 11, color: '#8B5CF6', border: '1px solid rgba(139,92,246,0.3)', padding: '2px 8px' }}>ULTIMATE</span>}
       </div>
-      <p style={{ color: '#52525B', fontSize: 13, marginBottom: 10, lineHeight: 1.6 }}>
+      <p style={{ color: '#8e8e97', fontSize: 13, marginBottom: 10, lineHeight: 1.6 }}>
         {t(
           'Ein kurzer Jingle über der Musik, wie im Radio: wenn jemand den Sender startet oder wechselt, und auf Wunsch zur vollen Stunde. Die Musik wird dabei leiser und kommt danach zurück. Höchstens 10 Sekunden; die Lautstärke gleichen wir an.',
           'A short jingle over the music, like on the radio: when someone starts or switches the station and, if you like, on the hour. The music goes down meanwhile and comes back after. 10 seconds at most; we even out the loudness.'
         )}
       </p>
-      <p style={{ color: '#71717A', fontSize: 12, marginBottom: 12, lineHeight: 1.6 }}>
+      <p style={{ color: '#8e8e97', fontSize: 12, marginBottom: 12, lineHeight: 1.6 }}>
         {t('Lade nur Jingles hoch, die du selbst gemacht hast oder für die du die Rechte hast.', 'Only upload jingles you made yourself or hold the rights to.')}
       </p>
       {!available && (
@@ -129,7 +129,7 @@ export default function DashboardJingle({ apiRequest, selectedGuildId, t }) {
       {jingle ? (
         <div data-testid="jingle-current" style={{ border: '1px solid #1A1A2E', background: '#050505', padding: 12 }}>
           <div style={{ color: '#fff', fontWeight: 700, overflowWrap: 'anywhere' }}>{jingle.name}</div>
-          <div style={{ color: '#71717A', fontSize: 12, marginTop: 2 }}>
+          <div style={{ color: '#8e8e97', fontSize: 12, marginTop: 2 }}>
             {t('{seconds} s, hochgeladen am {date}', '{seconds} s, uploaded on {date}', {
               seconds: (Number(jingle.durationMs || 0) / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 }),
               date: new Date(Number(jingle.updatedAt || 0)).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }),
@@ -168,6 +168,7 @@ export default function DashboardJingle({ apiRequest, selectedGuildId, t }) {
               onChange={(event) => setFile(event.target.files?.[0] || null)}
               style={{ flex: '1 1 220px', minWidth: 0, padding: '8px 10px', border: '1px solid #1A1A2E', background: '#050505', color: '#fff', fontSize: 13 }}
               data-testid="jingle-file"
+              aria-label={t('Datei (MP3, WAV, OGG, FLAC, M4A, WebM; bis 6 MB)', 'File (MP3, WAV, OGG, FLAC, M4A, WebM; up to 6 MB)')}
             />
             <button type="button" disabled={working || !file} onClick={upload} style={buttonStyle(true, !working && Boolean(file))} data-testid="jingle-upload">
               {busy === 'upload' ? t('Lade hoch...', 'Uploading...') : t('Hochladen', 'Upload')}

@@ -56,7 +56,7 @@ export default function OwnerStatusPosts({ apiGet, apiSend }) {
   return (
     <div className="oa-card" style={{ marginTop: 18 }} data-testid="status-posts">
       <div className="oa-section-title">Status-Posts in Discord</div>
-      <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14, lineHeight: 1.6 }}>
+      <div style={{ fontSize: 12, color: '#8190a8', marginBottom: 14, lineHeight: 1.6 }}>
         Jede Störung und Wartung von hier und jeder gemessene Ausfall eines Bots (ab 2 Minuten, wie auf der Statusseite) wird ein Beitrag im Kanal unten.
         Änderungen bearbeiten denselben Beitrag; ist es vorbei, steht das im Beitrag und eine kurze Antwort kommt darunter.
         Im Beitrag steht nur, was die Statusseite auch zeigt. In einem Ankündigungskanal veröffentlicht der Commander den Beitrag, damit ihn auch Server sehen, die dem Kanal folgen.
@@ -78,7 +78,7 @@ export default function OwnerStatusPosts({ apiGet, apiSend }) {
           </select>
         </label>
       </div>
-      <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.6, marginTop: 10 }}>
+      <div style={{ fontSize: 12, color: '#8190a8', lineHeight: 1.6, marginTop: 10 }}>
         Die Kanal-ID findest du in Discord mit eingeschaltetem Entwicklermodus: Rechtsklick auf den Kanal → „Kanal-ID kopieren“. Der Commander muss auf dem Server sein und in den Kanal schreiben dürfen.
         Titel und Text deiner Meldungen kommen so in den Beitrag, wie du sie schreibst; die Sprache gilt für den Rest (Art, Zeiten, Hinweise).
       </div>

@@ -53,7 +53,7 @@ function CheckTile({ check, busy, onCheck, onOpen }) {
             Einstellen
           </button>
         )}
-        <span style={{ marginLeft: 'auto', color: '#64748b', fontSize: 11 }}>
+        <span style={{ marginLeft: 'auto', color: '#8190a8', fontSize: 11 }}>
           {check.checkedAt ? new Date(check.checkedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : ''}
         </span>
       </div>
@@ -101,7 +101,7 @@ export default function OwnerCockpit({ apiGet, apiSend, onOpen }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
         <StateBadge state={headline.state} />
         <div style={{ color: '#f8fafc', fontSize: 16, fontWeight: 700 }} data-testid="cockpit-headline">{headline.text}</div>
-        <span style={{ color: '#64748b', fontSize: 12 }}>
+        <span style={{ color: '#8190a8', fontSize: 12 }}>
           {data?.checkedAt ? `Zuletzt geprüft ${new Date(data.checkedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} · automatisch alle 5 Minuten` : ''}
         </span>
         <button type="button" className="oa-btn ghost" disabled={busy} onClick={() => check()} data-testid="cockpit-check-all" style={{ marginLeft: 'auto' }}>

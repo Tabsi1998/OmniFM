@@ -16,6 +16,7 @@ export function CheckoutModal(props) {
     onClose,
     copy,
     locale,
+    t,
   } = props;
 
   const [email, setEmail] = useState('');
@@ -175,13 +176,14 @@ export function CheckoutModal(props) {
         <button
           data-testid="checkout-modal-close"
           onClick={onClose}
+          aria-label={t('Schließen', 'Close')}
           style={{
             position: 'absolute',
             top: 14,
             right: 14,
             background: 'none',
             border: 'none',
-            color: '#52525B',
+            color: '#8e8e97',
             cursor: 'pointer',
             padding: 4,
           }}
@@ -232,7 +234,7 @@ export function CheckoutModal(props) {
             onFocus={(event) => { event.target.style.borderColor = `${meta.color}60`; }}
             onBlur={(event) => { event.target.style.borderColor = 'rgba(255,255,255,0.12)'; }}
           />
-          <p style={{ margin: '4px 0 0', fontSize: 11, color: '#52525B' }}>
+          <p style={{ margin: '4px 0 0', fontSize: 11, color: '#8e8e97' }}>
             {copy.premium.emailHint}
           </p>
         </div>
@@ -344,14 +346,14 @@ export function CheckoutModal(props) {
             padding: '8px 0',
             background: 'none',
             border: 'none',
-            color: '#52525B',
+            color: '#8e8e97',
             fontSize: 13,
             cursor: 'pointer',
             fontFamily: "'DM Sans', sans-serif",
             transition: 'color 0.2s',
           }}
           onMouseEnter={(event) => { event.currentTarget.style.color = '#A1A1AA'; }}
-          onMouseLeave={(event) => { event.currentTarget.style.color = '#52525B'; }}
+          onMouseLeave={(event) => { event.currentTarget.style.color = '#8e8e97'; }}
         >
           {copy.premium.cancel}
         </button>
