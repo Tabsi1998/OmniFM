@@ -5,6 +5,8 @@ import { MessageFlags } from "discord.js";
 
 import { log } from "../../lib/logging.js";
 import { collectPersonalData, countPersonalData, erasePersonalData } from "../../lib/personal-data.js";
+import { setListeningConsent } from "../../listening-hours-store.js";
+import { clearLinkedRoleConnection, premiumCustomersOf, syncLinkedRoleUser } from "../../services/linked-roles.js";
 import {
   buildErasePersonalDataConfirm,
   buildPersonalDataErasedPayload,
@@ -27,7 +29,8 @@ const personalDataMethods = {
     const applicationId = interaction.applicationId || this.client?.application?.id || null;
     const collected = await collectPersonalData(interaction.user?.id);
     if (!collected.ok) return buildPersonalDataProblemPayload({ t, error: collected.error, applicationId });
-    return buildPersonalDataPayload({ t, counts: countPersonalData(collected.data), applicationId });
+    const listening = { counting: Boolean(collected.data.listeningHours), hours: collected.data.listeningHours?.hours || 0 };
+    return buildPersonalDataPayload({ t, counts: countPersonalData(collected.data), applicationId, listening });
   },
 
   /** /meine-daten: private, always allowed; it is the person's own data. */
@@ -43,6 +46,20 @@ const personalDataMethods = {
     const applicationId = interaction.applicationId || this.client?.application?.id || null;
     const userId = interaction.user?.id;
 
+    // Listening hours for the linked roles (#302): on, or off and deleted.
+    // A connected person's values go to Discord at once.
+    if (action === "hourson" || action === "hoursoff") {
+      const on = action === "hourson";
+      const result = await setListeningConsent(userId, on);
+      if (!result.ok) {
+        await interaction.update(asUpdate(buildPersonalDataProblemPayload({ t, error: result.error, applicationId })));
+        return true;
+      }
+      this.noteListeningConsent?.(userId, on);
+      syncLinkedRoleUser(userId, { premiumIds: premiumCustomersOf(this), force: true }).catch(() => null);
+      await interaction.update(asUpdate(await this.buildPersonalDataView(interaction)));
+      return true;
+    }
     if (action === "eraseno") {
       await interaction.update(asUpdate(await this.buildPersonalDataView(interaction)));
       return true;
@@ -55,6 +72,9 @@ const personalDataMethods = {
       return true;
     }
     if (action === "eraseyes") {
+      // Discord gets empty values and the keys are revoked before OmniFM forgets them (#302).
+      await clearLinkedRoleConnection(userId).catch(() => null);
+      this.noteListeningConsent?.(userId, false);
       const result = await erasePersonalData(userId);
       if (!result.ok) {
         await interaction.update(asUpdate(buildPersonalDataProblemPayload({ t, error: result.error, applicationId })));

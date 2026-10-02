@@ -8,6 +8,7 @@ import { discordRedirectUriFor, secretInputValue } from '../lib/ownerConfigSecre
 import OwnerLegalChecklist from './owner/OwnerLegalChecklist.js';
 import OwnerSeasonsConfig from './owner/OwnerSeasonsConfig.js';
 import OwnerReports from './owner/OwnerReports.js';
+import OwnerLinkedRoles from './owner/OwnerLinkedRoles.js';
 import { normalizeReportSettings } from '../../../src/lib/problem-reports.js';
 import { Field, SaveBar, Toggle, labelStyle } from './owner/configFields.js';
 
@@ -26,6 +27,7 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
   const [charts, setCharts] = useState(null);
   const [seasons, setSeasons] = useState(null);
   const [reports, setReports] = useState(null);
+  const [linkedRoles, setLinkedRoles] = useState(null);
   const [system, setSystem] = useState(null);
   const [access, setAccess] = useState(null);
   const [recoverySettings, setRecoverySettings] = useState([]);
@@ -41,14 +43,14 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
     setLoadError('');
     try {
       const d = await apiGet('/api/admin/config', token);
-      setCompany(d.company); setPlans(d.plans); setDiscord(d.discord); setMarketing(d.marketing); setDiscordShop(d.discordShop || { enabled: false, skus: { pro: '', ultimate: '' } }); setCharts(d.charts || { postEnabled: false, channelId: '', language: 'de' }); setSeasons(normalizeOwnerSeasons(d.seasons)); setReports(normalizeReportSettings(d.reports)); setSystem(d.system); setAccess(d.access || { accounts: [], tokenEnabled: true }); setRecoverySettings(Array.isArray(d.recoverySettings) ? d.recoverySettings : []);
-      setLoaded({ company: JSON.stringify(d.company), plans: JSON.stringify(d.plans), discord: JSON.stringify(d.discord), marketing: JSON.stringify(d.marketing), discordShop: JSON.stringify(d.discordShop || { enabled: false, skus: { pro: '', ultimate: '' } }), charts: JSON.stringify(d.charts || { postEnabled: false, channelId: '', language: 'de' }), seasons: JSON.stringify(normalizeOwnerSeasons(d.seasons)), reports: JSON.stringify(normalizeReportSettings(d.reports)), system: JSON.stringify(d.system), access: JSON.stringify(d.access || { accounts: [], tokenEnabled: true }) });
+      setCompany(d.company); setPlans(d.plans); setDiscord(d.discord); setMarketing(d.marketing); setDiscordShop(d.discordShop || { enabled: false, skus: { pro: '', ultimate: '' } }); setCharts(d.charts || { postEnabled: false, channelId: '', language: 'de' }); setSeasons(normalizeOwnerSeasons(d.seasons)); setReports(normalizeReportSettings(d.reports)); setLinkedRoles(d.linkedRoles || { supportGuildId: '', premiumRoleId: '' }); setSystem(d.system); setAccess(d.access || { accounts: [], tokenEnabled: true }); setRecoverySettings(Array.isArray(d.recoverySettings) ? d.recoverySettings : []);
+      setLoaded({ company: JSON.stringify(d.company), plans: JSON.stringify(d.plans), discord: JSON.stringify(d.discord), marketing: JSON.stringify(d.marketing), discordShop: JSON.stringify(d.discordShop || { enabled: false, skus: { pro: '', ultimate: '' } }), charts: JSON.stringify(d.charts || { postEnabled: false, channelId: '', language: 'de' }), seasons: JSON.stringify(normalizeOwnerSeasons(d.seasons)), reports: JSON.stringify(normalizeReportSettings(d.reports)), linkedRoles: JSON.stringify(d.linkedRoles || { supportGuildId: '', premiumRoleId: '' }), system: JSON.stringify(d.system), access: JSON.stringify(d.access || { accounts: [], tokenEnabled: true }) });
     } catch (error) { setLoadError(error?.message || 'Konfiguration konnte nicht geladen werden.'); }
   }, [apiGet, token]);
 
   useEffect(() => { load(); }, [load]);
 
-  const current = { company, plans, discord, marketing, system, access, discordShop, charts, seasons, reports };
+  const current = { company, plans, discord, marketing, system, access, discordShop, charts, seasons, reports, linkedRoles };
   const isDirty = (sec) => current[sec] != null && loaded[sec] !== undefined && JSON.stringify(current[sec]) !== loaded[sec];
   const anyDirty = Object.keys(current).some(isDirty);
   // Leaving the page with unsaved changes asks first.
@@ -406,6 +408,10 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
     return <OwnerSeasonsConfig apiGet={apiGet} seasons={seasons} setSeasons={setSeasons} onSave={(value) => save('seasons', value)} saving={saving} msg={msg} dirty={isDirty('seasons')} />;
   }
 
+  // Linked roles (#302): what is set up, the portal addresses, the support role.
+  if (section === 'linkedRoles') {
+    return <OwnerLinkedRoles apiGet={apiGet} linkedRoles={linkedRoles} setLinkedRoles={setLinkedRoles} onSave={(value) => save('linkedRoles', value)} saving={saving} msg={msg} dirty={isDirty('linkedRoles')} />;
+  }
   // Reports from Discord (#436, #437): the open ones and where they go.
   if (section === 'reports') {
     return <OwnerReports apiGet={apiGet} reports={reports} setReports={setReports} onSave={(value) => save('reports', value)} saving={saving} msg={msg} dirty={isDirty('reports')} />;

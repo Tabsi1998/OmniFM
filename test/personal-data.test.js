@@ -79,6 +79,8 @@ test("after 'delete everything' the Discord ID is in no collection", { skip: !ha
   const { createStationSuggestion } = await import("../src/station-suggestions-store.js");
   const { createProblemReport } = await import("../src/problem-reports-store.js");
   const { claimEgg } = await import("../src/easter-eggs-store.js");
+  const { setListeningConsent, addListeningTime } = await import("../src/listening-hours-store.js");
+  const { saveLinkedRoleTokens, recordSupportRole } = await import("../src/linked-roles-store.js");
   await Promise.all([
     initVoteEventsStore({ refreshMs: 60_000 }),
     initDiscordBotListStore({ refreshMs: 60_000 }),
@@ -123,6 +125,12 @@ test("after 'delete everything' the Discord ID is in no collection", { skip: !ha
   const eggId = `egg-${Math.random().toString(36).slice(2)}`;
   const found = await claimEgg({ eggId, guildId, guildName: "Mein Server", userId: person, year: 2027, song: "songkey" });
   assert.equal(found.ok, true, JSON.stringify(found));
+  // Listening hours, the linked roles' tokens and the support role (#302).
+  await setListeningConsent(person, true);
+  await addListeningTime(new Map([[person, 2 * 3_600_000]]));
+  const saved = await saveLinkedRoleTokens(person, { accessToken: "access", refreshToken: "refresh", expiresAt: new Date(Date.now() + 86_400_000) }, { key: Buffer.alloc(32, 7) });
+  assert.equal(saved.ok, true, JSON.stringify(saved));
+  await recordSupportRole(snowflake(), person, snowflake());
   assert.ok(await eventually(async () => (await listVoteEventsOfUser(person)).length === 1
     && Boolean(await db.collection("dashboard_auth_sessions").findOne({ "session.user.id": person }))
     && Boolean(await db.collection("scheduled_events").findOne({ createdByUserId: person }))), "seeded");
@@ -131,7 +139,10 @@ test("after 'delete everything' the Discord ID is in no collection", { skip: !ha
   assert.equal(collected.ok, true);
   assert.deepEqual(countPersonalData(collected.data), {
     savedSongs: 1, votes: 1, dashboardLogins: 1, ownerConsoleLogins: 1, pollsStarted: 1, eventsCreated: 1, dashboardChanges: 1, stationSuggestions: 1, reports: 1, easterEggs: 1,
+    listeningHours: 1, linkedRoles: 1, supportRoles: 1,
   });
+  assert.equal(collected.data.listeningHours.hours, 2);
+  assert.ok(!JSON.stringify(collected.data).includes("refresh"), "no Discord key in the file");
   assert.equal(collected.data.reports[0].text, "Mehr Jazz bitte");
   assert.deepEqual(
     { ...collected.data.easterEggs[0], lastFoundAt: typeof collected.data.easterEggs[0].lastFoundAt },

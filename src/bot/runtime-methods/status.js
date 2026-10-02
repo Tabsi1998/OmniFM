@@ -62,10 +62,12 @@ const statusMethods = {
   sampleListenerStatsForActiveGuilds() {
     const now = Date.now();
     const guildIds = this.collectGuildIdsForListenerStats();
+    const channelsByGuild = new Map();
 
     for (const guildId of guildIds) {
       const liveStreams = this.getLiveGuildPlaybackSnapshot(guildId);
       if (!liveStreams.length) continue;
+      channelsByGuild.set(guildId, liveStreams.map((stream) => stream.channelId).filter(Boolean));
 
       const totalListeners = liveStreams.reduce((sum, stream) => sum + (Number(stream.listenerCount) || 0), 0);
       recordGuildListenerSample(guildId, totalListeners, now);
@@ -77,6 +79,13 @@ const statusMethods = {
           timestampMs: now,
         });
       }
+    }
+
+    // Listening time per person, only with the switch in /mydata (#302).
+    if (typeof this.countListeningTime === "function") {
+      this.countListeningTime(channelsByGuild, { now }).catch((err) => {
+        log("WARN", `[${this.config.name}] Hörzeit nicht gezählt: ${err?.message || err}`);
+      });
     }
   },
 

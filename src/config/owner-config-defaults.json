@@ -233,5 +233,9 @@
       "rejected": "Abgelehnt",
       "duplicate": "Doppelt"
     }
+  },
+  "linkedRoles": {
+    "supportGuildId": "",
+    "premiumRoleId": ""
   }
 }

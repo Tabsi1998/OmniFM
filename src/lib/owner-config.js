@@ -224,6 +224,8 @@ export function ownerConfigResponse(raw, env = process.env) {
     seasons: configSectionFrom(raw, "seasons"),
     // Reports from Discord (#436): the private team channel and a forum per kind.
     reports: configSectionFrom(raw, "reports"),
+    // The linked roles (#302): the support server and its premium role.
+    linkedRoles: configSectionFrom(raw, "linkedRoles"),
     recoverySettings: RECOVERY_SETTINGS,
   };
 }
