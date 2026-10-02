@@ -17,7 +17,10 @@ function fakeApi(answers = {}) {
   return { calls, fetchJson };
 }
 
-const flush = async () => { for (let i = 0; i < 5; i += 1) await Promise.resolve(); };
+const flush = async () => {
+  // eslint-disable-next-line no-await-in-loop -- one microtask turn after the other, so chained answers settle
+  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+};
 
 describe('what a page loads', () => {
   it('the start page and its sections: the catalogue once, the live numbers again; a legal page only its text', () => {
