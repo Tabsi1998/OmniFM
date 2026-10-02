@@ -75,7 +75,8 @@ test("no new text built from ${…}: values go in as {placeholders}; the list on
 });
 
 test("every translator is botTranslator, so placeholders are always filled", () => {
-  const own = /\(\s*_?de\s*,\s*_?en\s*\)\s*=>/;
+  // (de, en) => …, (german, english) => … and (...parts) => parts[0] are translators of their own.
+  const own = /\(\s*_?(?:de|german)\s*,\s*_?(?:en|english)\s*\)\s*=>|\(\s*\.\.\.(\w+)\s*\)\s*=>\s*\1\[0\]/;
   const found = [];
   const walk = (directory) => {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {

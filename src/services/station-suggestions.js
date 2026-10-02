@@ -6,6 +6,7 @@
 // sent it about the owner's decision, once, by direct message. The owner
 // console only marks the decision: it runs without a Discord connection.
 
+import { botTranslator, normalizeBotLanguage } from "../lib/bot-i18n.js";
 import { log } from "../lib/logging.js";
 import { probeStationUrl } from "../lib/owner-stations.js";
 import {
@@ -44,8 +45,7 @@ export async function checkPendingSuggestions({ probe = probeStationUrl, now = D
 
 /** The message to the person who sent the suggestion, in their language. */
 export function buildSuggestionAnswer(suggestion) {
-  const en = suggestion?.submitter?.language === "en";
-  const t = (de, english) => (en ? english : de);
+  const t = botTranslator(normalizeBotLanguage(suggestion?.submitter?.language, "en"));
   const name = String(suggestion?.name || "");
   if (suggestion?.status === "accepted") {
     return ui.message(ui.notice("success", {
