@@ -371,12 +371,21 @@ export function cachedCover(input = {}) {
   return query ? coverCache.get(query.toLowerCase()) || null : null;
 }
 
-/** GET /api/cover: the first iTunes match for a song, cached like FastAPI (500 entries, then cleared). */
+/**
+ * GET /api/cover: the first iTunes match for a song. The last 500 searches
+ * are kept; a new one pushes out the longest unused, so a flood of new terms
+ * cannot empty the cache the charts' covers live on (#469).
+ */
 export async function coverLookup({ artist = "", title = "", term = "" } = {}, { fetchImpl = safeFetch } = {}) {
   const query = coverQuery({ artist, title, term });
   if (!query) return { ok: false, error: "Kein Suchbegriff." };
   const cacheKey = query.toLowerCase();
-  if (coverCache.has(cacheKey)) return coverCache.get(cacheKey);
+  if (coverCache.has(cacheKey)) {
+    const kept = coverCache.get(cacheKey);
+    coverCache.delete(cacheKey);
+    coverCache.set(cacheKey, kept);
+    return kept;
+  }
   let result = { ok: false, query };
   try {
     const url = `https://itunes.apple.com/search?${new URLSearchParams({ term: query, entity: "song", limit: "1" })}`;
@@ -402,8 +411,9 @@ export async function coverLookup({ artist = "", title = "", term = "" } = {}, {
   } catch {
     result = { ok: false, query };
   }
-  if (coverCache.size >= COVER_CACHE_MAX) coverCache.clear();
+  coverCache.delete(cacheKey);
   coverCache.set(cacheKey, result);
+  while (coverCache.size > COVER_CACHE_MAX) coverCache.delete(coverCache.keys().next().value);
   return result;
 }
 
