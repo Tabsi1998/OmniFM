@@ -6,6 +6,49 @@ folgt [SemVer](https://semver.org/lang/de/): Die erste Zahl steigt bei
 Funktionen, die dritte bei reinen Fehlerbehebungen. Wie ein Release entsteht,
 steht in `scripts/release.mjs`.
 
+## 3.18.0 – 2026-10-02
+
+Der Bot und die Kauf-E-Mails sprechen jetzt neun Sprachen, und Störungen,
+Wartungen und Ausfälle der Statusseite erscheinen als Beiträge in Discord.
+
+### Neu
+
+- **Der Bot spricht neun Sprachen:** Deutsch, Englisch, Französisch,
+  Spanisch, Italienisch, Polnisch, Türkisch, Portugiesisch und
+  Niederländisch, dieselben neun wie die Website. Das gilt für jede Antwort:
+  Befehle, das Panel mit seinen Knöpfen, Formulare, Events, den
+  Jahresrückblick, die Wochenübersicht, die Easter Eggs und die Hinweise bei
+  Problemen. Ohne eigene Einstellung richtet sich der Bot wie bisher nach der
+  Sprache von Discord; `/language set` und die Sprach-Karte im Dashboard
+  bieten alle neun an. Datum und Uhrzeit stehen im Format der Lesenden.
+  (#477)
+- **Status-Posts in Discord:** Störungen und Wartungen aus der
+  Owner-Konsole und die Ausfälle, die die Statusseite misst (ab 2 Minuten),
+  erscheinen als je ein Beitrag in einem Kanal des Support-Servers.
+  Änderungen bearbeiten denselben Beitrag, das Ende meldet eine kurze
+  Antwort darunter. In einem Ankündigungskanal veröffentlicht der Bot den
+  Beitrag, damit Server, die dem Kanal folgen, ihn auch bekommen. Niemand
+  wird angepingt. Einschalten in der Owner-Konsole unter Statusseite →
+  „Status-Posts in Discord“ (Kanal-ID und Sprache). (#478)
+
+### Verbessert
+
+- **Kauf-E-Mails in neun Sprachen:** Die Lizenz-Mail (Gratis-Code,
+  Probemonat, Verlängerung, Upgrade), die Erinnerung vor dem Ablauf und die
+  Ablauf-Mail kommen in der Sprache, in der jemand auf der Website eingelöst
+  hat, auch Monate später. Die Mails zeigen dieselben Plan-Vorteile wie
+  Website und Bot, Beträge und Daten im gewohnten Format (`8,97 €`). Der
+  Hinweis an den Betreiber bleibt in der Sprache der Installation. (#482)
+
+### Behoben
+
+- **Teilen-Karten:** Eine französische und eine englische Karte teilten sich
+  ein Bild im Zwischenspeicher; jetzt hat jede Sprache ihr eigenes. (#477)
+- **Meldungen mit `/report`:** Die Antwort kommt in der Sprache der
+  meldenden Person, nicht mehr nur auf Deutsch oder Englisch. (#477)
+- **Kauf-E-Mails:** „1 Tag“, „1 Monat“ und „1 Server“ stehen in der
+  Einzahl. (#482)
+
 ## 3.17.0 – 2026-10-02
 
 Eigene Jingles für Ultimate-Server, verknüpfte Rollen in Discord und ein
