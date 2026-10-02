@@ -22,9 +22,10 @@ export const CSP_DIRECTIVES = Object.freeze({
     "https://www.googletagmanager.com",
     "https://www.google-analytics.com",
   ],
-  "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-  "style-src-elem": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-  "font-src": ["'self'", "data:", "https://fonts.gstatic.com"],
+  // The fonts come from this site (#467), not from Google Fonts.
+  "style-src": ["'self'", "'unsafe-inline'"],
+  "style-src-elem": ["'self'", "'unsafe-inline'"],
+  "font-src": ["'self'", "data:"],
   "img-src": ["'self'", "data:", "blob:", "https:"],
   "media-src": ["'self'", "data:", "blob:", "https:"],
   "connect-src": [

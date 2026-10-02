@@ -57,8 +57,9 @@ test("security headers include CSP and Permissions-Policy without forcing HSTS o
     assert.match(csp, /frame-ancestors 'none'/);
     assert.match(csp, /https:\/\/www\.googletagmanager\.com/);
     assert.match(csp, /https:\/\/www\.google-analytics\.com/);
-    assert.match(csp, /https:\/\/fonts\.googleapis\.com/);
-    assert.match(csp, /https:\/\/fonts\.gstatic\.com/);
+    // The fonts come from this site (#467).
+    assert.doesNotMatch(csp, /fonts\.(googleapis|gstatic)\.com/);
+    assert.match(csp, /font-src 'self'/);
     assert.doesNotMatch(csp, /stripe/, "no payment pages since #321");
 
     assert.match(permissions, /camera=\(\)/);

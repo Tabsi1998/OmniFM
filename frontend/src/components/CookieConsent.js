@@ -68,24 +68,17 @@ function ToggleRow({ title, body, checked, disabled, onChange, testId }) {
 
 export default function CookieConsent() {
   const { copy, locale } = useI18n();
-  const [visible, setVisible] = useState(false);
+  // The stored choice is read in the first render (#467): the bar used to
+  // come one render later, and on phones it was the page's last big paint.
+  const [stored] = useState(readStoredConsent);
+  const [visible, setVisible] = useState(!stored);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [analytics, setAnalytics] = useState(false);
-  const [initialized, setInitialized] = useState(false);
+  const [analytics, setAnalytics] = useState(stored?.analytics === true);
   const consentCopy = copy.cookieConsent;
 
   useEffect(() => {
-    const stored = readStoredConsent();
-    if (stored) {
-      setAnalytics(stored.analytics);
-      applyConsent(stored);
-      setVisible(false);
-    } else {
-      applyConsent({ analytics: false });
-      setVisible(true);
-    }
-    setInitialized(true);
-  }, []);
+    applyConsent(stored || { analytics: false });
+  }, [stored]);
 
   const persist = (nextAnalytics) => {
     const stored = writeStoredConsent({ analytics: nextAnalytics });
@@ -94,8 +87,6 @@ export default function CookieConsent() {
     setVisible(false);
     setSettingsOpen(false);
   };
-
-  if (!initialized) return null;
 
   return (
     <>
