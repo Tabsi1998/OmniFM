@@ -93,6 +93,9 @@ SITE_PORT = 18053
 LIGHTHOUSE_GOAL = 90
 LIGHTHOUSE_TOLERANCE = 5
 API_TOKEN = "ci-owner-token"
+# The key the API under test seals the owner console's secrets with (#284);
+# a test value, nothing real is sealed with it.
+CONTRACT_TOKEN_KEY = "ab" * 32
 MASK = "•" * 8
 
 ENV_USE = re.compile(r"process\.env\.([A-Z][A-Z0-9_]*)|process\.env\[['\"]([A-Z][A-Z0-9_]*)['\"]\]")
@@ -1125,6 +1128,7 @@ def start_node_api(context: Context, name: str, port: int, env: dict, **settings
         "MONGO_URL": env["MONGO_URL"], "DB_NAME": env["DB_NAME"], "API_ADMIN_TOKEN": env["API_ADMIN_TOKEN"],
         "WEB_SERVER_ENABLED": "1", "WEB_BIND": "127.0.0.1", "WEB_INTERNAL_PORT": str(port),
         "PUBLIC_WEB_URL": base, "OMNIFM_RUNTIME_DATA_DIR": str(scratch), "LOGS_DIR": str(scratch / "logs"),
+        "OMNIFM_TOKEN_KEY": CONTRACT_TOKEN_KEY,
     }, **settings)
     prepared = context.run(node, "scripts/database.mjs", "prepare", env=node_env, check=False, timeout=300)
     context.log(f"{name}-prepare", prepared.stdout + prepared.stderr)
@@ -1211,11 +1215,18 @@ def check_owner_contract(in_mongo, run_mongo, *, base: str) -> None:
     expect(saved.get("ok") and oauth.get("clientSecretSet") is True and oauth.get("clientSecret") == MASK,
            f"the saved OAuth secret is not masked in the answer: {oauth}")
 
-    # Saving the form again sends the mask back. It must not become the secret.
+    # #284: sealed in MongoDB; a dump of the document shows no secret.
+    sealed = in_mongo("d.owner_config.find_one({'_id':'global'})['system']['discordOAuth']['clientSecret']")
+    expect(str(sealed).startswith("enc:v1:"), f"the client secret is not stored sealed: {str(sealed)[:10]!r}...")
+    expect("local-secret" not in json.dumps(in_mongo("d.owner_config.find_one({'_id':'global'})")),
+           "the client secret is stored in plain text")
+
+    # Saving the form again sends the mask back. It must not become the
+    # secret: the sealed value stays exactly as it was.
     request("PUT", "/api/admin/config", token=API_TOKEN, body={
         "section": "system", "data": {"discordOAuth": dict(secret, clientSecret=MASK, clientSecretSet=True)}})
     stored = in_mongo("d.owner_config.find_one({'_id':'global'})['system']['discordOAuth']")
-    expect(stored.get("clientSecret") == "local-secret", "writing the masked value back replaced the real client secret")
+    expect(stored.get("clientSecret") == sealed, "writing the masked value back replaced the real client secret")
     expect("clientSecretSet" not in stored, "clientSecretSet leaked into the stored document")
 
     _, _, integration = request("POST", "/api/admin/integrations/test", token=API_TOKEN,
@@ -1308,6 +1319,7 @@ def node_public_entry(context: Context) -> str:
     common = dict(node_path_env(context, node), **{
         "MONGO_URL": url, "DB_NAME": env["DB_NAME"], "API_ADMIN_TOKEN": API_TOKEN, "PUBLIC_WEB_URL": public_base,
         "OMNIFM_RUNTIME_DATA_DIR": str(scratch), "LOGS_DIR": str(scratch / "logs"),
+        "OMNIFM_TOKEN_KEY": CONTRACT_TOKEN_KEY,
     })
     runtime_env = dict(common, **{
         "WEB_SERVER_ENABLED": "1", "WEB_BIND": "127.0.0.1", "WEB_INTERNAL_PORT": str(NODE_RUNTIME_PORT),

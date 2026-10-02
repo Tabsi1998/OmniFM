@@ -326,6 +326,13 @@ log "Bereite die Datenbank vor (Senderkatalog, alte Demo-Daten)..."
 ( cd "$ROOT" && node scripts/database.mjs prepare ) \
   || die "Datenbank-Vorbereitung fehlgeschlagen; laufende Version bleibt aktiv."
 
+# #284: the owner console's secrets are sealed with OMNIFM_TOKEN_KEY. A key
+# that no longer opens them would start the bots without tokens, so the
+# deployment stops here, while the running version stays.
+log "Prüfe den Schlüssel der Geheimnisse (OMNIFM_TOKEN_KEY)..."
+( cd "$ROOT" && node scripts/database.mjs check-secrets ) \
+  || die "Die Geheimnisse in MongoDB passen nicht zum Schlüssel in backend/.env; laufende Version bleibt aktiv."
+
 log "Prüfe DB-gesteuerte Discord-Konfiguration vor dem Umschalten..."
 set +e
 ( cd "$ROOT" && DRY_RUN=1 node src/entrypoints/from-owner-config.mjs >"$LOG_DIR/bot-preflight.log" 2>&1 )
@@ -423,6 +430,15 @@ MIGRATION_OUTPUT="$(bash "$ROOT/scripts/migrate-runtime-data.sh" "$ROOT")" \
 if [ -n "$MIGRATION_OUTPUT" ]; then
   log "Laufzeitdateien ziehen nach runtime-data/ um:"
   printf '%s\n' "$MIGRATION_OUTPUT" | sed 's/^/  /'
+fi
+
+# #284: plain secrets of the owner console are sealed now, while no OmniFM
+# process reads them. A failure leaves them as they are: the new version
+# reads plain ones too, and the next start tries again.
+if SEAL_OUTPUT="$(cd "$ROOT" && node scripts/database.mjs encrypt-secrets 2>&1)"; then
+  [ -z "$SEAL_OUTPUT" ] || log "$SEAL_OUTPUT"
+else
+  warn "Geheimnisse bleiben vorerst unverschlüsselt: $SEAL_OUTPUT"
 fi
 
 port_is_open() {

@@ -45,10 +45,12 @@ import {
   OWNER_CONFIG_SECTIONS,
   configSectionFrom,
   loadOwnerConfigRaw,
+  loadOwnerConfigStored,
   mergedSectionForSave,
   ownerConfigResponse,
   sectionResponse,
 } from "../../lib/owner-config.js";
+import { SecretKeyError, sealOwnerSecrets } from "../../lib/stored-secrets.js";
 import { licenseRows, parseIntLike } from "../../lib/owner-licenses.js";
 import {
   FAILOVER_HISTORY_EVENTS,
@@ -692,8 +694,10 @@ export function createAdminRoutesHandler(deps) {
         return true;
       }
       try {
-        const raw = await loadOwnerConfigRaw();
-        const next = section === "access" ? saveData : mergedSectionForSave(raw, section, saveData);
+        // Merged with the stored, sealed values: a secret sent back masked
+        // keeps its sealed value; new ones are sealed before they are written (#284).
+        const raw = await loadOwnerConfigStored();
+        const next = sealOwnerSecrets(section === "access" ? saveData : mergedSectionForSave(raw, section, saveData));
         await getDb().collection("owner_config").updateOne({ _id: OWNER_CONFIG_ID }, { $set: { [section]: next } }, { upsert: true });
         // A new Discord login or plan price works at once, not only after the next sync.
         if (section === "system") await syncDiscordOauthFromOwnerConfig().catch(() => false);
@@ -702,7 +706,9 @@ export function createAdminRoutesHandler(deps) {
         sendJson(res, 200, { ok: true, section, data: sectionResponse({ ...raw, [section]: next }, section) });
       } catch (err) {
         auditOwnerAction(req, { action: "config.update", status: "failed", target: section, summary: err?.message || "Speichern fehlgeschlagen" });
-        sendJson(res, 500, { error: "Speichern fehlgeschlagen." });
+        // Without the key nothing secret is stored, not even in plain text.
+        if (err instanceof SecretKeyError) sendJson(res, 503, { error: err.message });
+        else sendJson(res, 500, { error: "Speichern fehlgeschlagen." });
       }
       return true;
     }

@@ -129,6 +129,7 @@ journalctl -u omnifm-bot -n 100 -f
 ./update.sh --status local-logs     # letzte Zeilen aus logs/
 ./update.sh --show-bots             # Commander/Worker aus dem Owner-Menü (ohne Tokens)
 ./update.sh --cleanup dry-run       # rotierte Logs älter als 14 Tage (run löscht sie)
+./update.sh --rotate-key            # neuer Schlüssel für die Geheimnisse (OmniFM stoppt kurz)
 ```
 
 Dateilogs liegen weiterhin unter `logs/` (`backend.log`, `frontend.log`, `bot.log`, `bot-console.log`).
@@ -147,6 +148,15 @@ Andere lokale Quellcodeänderungen bleiben unangetastet und stoppen das Update m
 Abhängigkeiten, Frontend-Build, MongoDB und die DB-gesteuerte Bot-Konfiguration werden vor
 dem Stoppen der laufenden Version geprüft. Frontend und Backend wechseln danach gemeinsam auf den
 neuen Git-Stand.
+
+**Geheimnisse verschlüsselt (#284):** Bot-Tokens, OAuth- und SMTP-Passwort, API-Schlüssel und
+Webhook-Adressen aus der Owner-Konsole liegen in MongoDB nur verschlüsselt (AES-256-GCM), ebenso die
+Discord-Zugänge der Linked Roles. Der Schlüssel ist `OMNIFM_TOKEN_KEY` in `backend/.env`; `start.sh`
+legt ihn an. Ein Datenbank-Dump oder ein Backup allein öffnet nichts. Umgekehrt gilt: Ohne diesen
+Schlüssel sind die Geheimnisse verloren und müssen in der Owner-Konsole neu eingetragen werden.
+`backend/.env` gehört deshalb zu jedem Backup (`update.sh` sichert es unter `.update-backups/`).
+Passt der Schlüssel nicht mehr zu den Daten, bricht `start.sh` vor dem Umschalten ab, und die
+laufende Version bleibt. Das Owner-Cockpit zeigt den Stand unter „Geheimnisse“.
 
 Mongo-Backups können unabhängig vom Update geprüft und – nur bei gestopptem OmniFM, mit ausdrücklichem
 `--force` und einem zusätzlichen Sicherheits-Snapshot des aktuellen Stands – wiederhergestellt werden:

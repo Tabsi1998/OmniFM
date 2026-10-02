@@ -10,6 +10,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { MongoClient } from "mongodb";
+import { SecretKeyError, openOwnerSecrets } from "../lib/stored-secrets.js";
+import { tokenKeysFrom } from "../lib/token-crypto.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const BACKEND_ENV_FILE = path.resolve(here, "..", "..", "backend", ".env");
@@ -24,6 +26,43 @@ export function readEnvFile(file) {
     }
   } catch { /* file may not exist */ }
   return out;
+}
+
+/**
+ * Sets single entries of an env file, or removes them with null; every other
+ * line stays as it is. Written to a temporary file next to it and renamed,
+ * so the file is never half written (the key change of #284 relies on it).
+ * @param {string} file
+ * @param {Record<string, string | null>} changes
+ */
+export function updateEnvFile(file, changes) {
+  let text = "";
+  try {
+    text = fs.readFileSync(file, "utf8");
+  } catch { /* a new file */ }
+  const newline = text.includes("\r\n") ? "\r\n" : "\n";
+  const lines = text ? text.split(/\r?\n/) : [];
+  if (lines.length && lines[lines.length - 1] === "") lines.pop();
+  const pending = new Map(Object.entries(changes));
+  const out = [];
+  for (const line of lines) {
+    const name = line.match(/^\s*([A-Za-z0-9_]+)\s*=/)?.[1];
+    if (name && Object.hasOwn(changes, name)) {
+      // The first line of a changed entry takes the new value; repeats of it go.
+      if (pending.has(name) && pending.get(name) !== null) out.push(`${name}=${pending.get(name)}`);
+      pending.delete(name);
+      continue;
+    }
+    out.push(line);
+  }
+  for (const [name, value] of pending) if (value !== null) out.push(`${name}=${value}`);
+  let mode = 0o600;
+  try {
+    mode = fs.statSync(file).mode & 0o777;
+  } catch { /* a new file stays private */ }
+  const temporary = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(temporary, out.join(newline) + newline, { mode });
+  fs.renameSync(temporary, file);
 }
 
 /**
@@ -46,16 +85,28 @@ export function mongoTarget(env = process.env, backendEnv = {}) {
   };
 }
 
-export async function loadOwnerConfig({ url, dbName }) {
+/**
+ * The owner console's settings with their secrets opened (#284). Throws a
+ * SecretKeyError when OMNIFM_TOKEN_KEY opens one of them not: a bot must
+ * not start with an empty token, as if none were set.
+ */
+export async function loadOwnerConfig({ url, dbName, keys = tokenKeysFrom() }) {
   const client = new MongoClient(url, { serverSelectionTimeoutMS: 8000 });
+  let stored;
   try {
     await client.connect();
     // The owner document has the string id "global", not an ObjectId.
     const ownerConfig = /** @type {import("mongodb").Collection<any>} */ (client.db(dbName).collection("owner_config"));
-    return (await ownerConfig.findOne({ _id: "global" })) || {};
+    stored = (await ownerConfig.findOne({ _id: "global" })) || {};
   } finally {
     await client.close().catch(() => {});
   }
+  const { doc, failed } = openOwnerSecrets(stored, keys);
+  if (failed.length) {
+    throw new SecretKeyError(`OMNIFM_TOKEN_KEY in backend/.env öffnet diese Geheimnisse in MongoDB nicht: ${failed.join(", ")}. `
+      + "Wurde der Schlüssel geändert? Den bisherigen Wert wieder eintragen.");
+  }
+  return doc;
 }
 
 /**

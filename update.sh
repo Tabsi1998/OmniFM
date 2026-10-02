@@ -204,11 +204,42 @@ rollback_update() {
     case "$answer" in j|J|ja|Ja|y|Y) ;; *) die "Abgebrochen, nichts veraendert." ;; esac
   fi
 
+  # #284: a version from before the encryption reads the owner console's
+  # secrets in plain text; this version, which sealed them, opens them.
+  if grep -q 'encrypt-secrets' "$ROOT/scripts/database.mjs" 2>/dev/null \
+    && ! git -C "$ROOT" show "$from:scripts/database.mjs" 2>/dev/null | grep -q 'encrypt-secrets'; then
+    log "Die Zielversion kennt keine verschluesselten Geheimnisse; speichere sie wieder im Klartext..."
+    ( cd "$ROOT" && node scripts/database.mjs decrypt-secrets ) \
+      || die "Geheimnisse konnten nicht entschluesselt werden; nichts zurueckgesetzt."
+  fi
+
   git -C "$ROOT" reset --hard "$from" >/dev/null
   printf '%s %s %s rollback\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$to" "$from" >> "$UPDATE_HISTORY"
   log "Code zurueckgesetzt auf $(git -C "$ROOT" log -1 --format='%h %s' | head -c 100). Starte neu..."
   ./start.sh
   log "Rollback abgeschlossen. Das naechste ./update.sh holt wieder den neuesten Stand - erst updaten, wenn der Fehler behoben ist."
+}
+
+# A new OMNIFM_TOKEN_KEY for the secrets in MongoDB (#284). OmniFM stops,
+# everything is sealed again with the new key, OmniFM starts. Until the end
+# the old key stays as OMNIFM_TOKEN_KEY_PREVIOUS, so an interrupted change
+# loses nothing and the next --rotate-key finishes it.
+rotate_key() {
+  local confirm="${1:-}" answer
+  echo "== Neuer Schluessel fuer die Geheimnisse (OMNIFM_TOKEN_KEY) =="
+  echo "OmniFM wird dafuer kurz gestoppt. Bot-Tokens, Passwoerter und die Discord-Zugaenge der Linked Roles werden mit dem neuen Schluessel neu verschluesselt."
+  if [ "$confirm" != "--yes" ]; then
+    read -r -p "Jetzt wechseln? [j/N] " answer || answer=""
+    case "$answer" in j|J|ja|Ja|y|Y) ;; *) die "Abgebrochen, nichts veraendert." ;; esac
+  fi
+  "$ROOT/stop.sh" || true
+  if ! ( cd "$ROOT" && node scripts/database.mjs rotate-key ); then
+    log "Schluesselwechsel nicht fertig. OmniFM startet trotzdem wieder (beide Schluessel oeffnen alles); ./update.sh --rotate-key setzt den Wechsel fort."
+    ./start.sh
+    exit 1
+  fi
+  ./start.sh
+  log "Schluesselwechsel abgeschlossen."
 }
 
 cleanup_logs() {
@@ -228,7 +259,7 @@ cleanup_logs() {
   du -sh "$ROOT/.update-backups" 2>/dev/null || echo "  (keine Backups vorhanden)"
 }
 
-USAGE="Nutzung: ./update.sh | --doctor | --status [quick|health|local-logs|mongo|storage|backup] | --show-bots | --cleanup [dry-run|run] | --rollback [--yes]"
+USAGE="Nutzung: ./update.sh | --doctor | --status [quick|health|local-logs|mongo|storage|backup] | --show-bots | --cleanup [dry-run|run] | --rollback [--yes] | --rotate-key [--yes]"
 case "${1:-}" in
   --doctor)
     [ "$#" -eq 1 ] || die "--doctor akzeptiert keine weiteren Argumente."
@@ -249,6 +280,10 @@ case "${1:-}" in
     ;;
   --rollback)
     rollback_update "${2:-}"
+    exit 0
+    ;;
+  --rotate-key)
+    rotate_key "${2:-}"
     exit 0
     ;;
   "")

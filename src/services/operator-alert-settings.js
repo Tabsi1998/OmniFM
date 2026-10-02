@@ -7,6 +7,7 @@
 // the webhook module reads, so a URL entered in the console reaches every
 // alert, not only those of the bot.
 import { MongoClient } from "mongodb";
+import { openOwnerSecrets } from "../lib/stored-secrets.js";
 
 export const OPERATOR_ALERT_SWITCHES = Object.freeze([
   ["workerOffline", "WORKER_OFFLINE"],
@@ -54,7 +55,8 @@ export async function loadOwnerOperatorAlerts({ mongoUrl, dbName, timeoutMs = 50
       { _id: "global" },
       { projection: { "system.operatorAlerts": 1 } },
     );
-    return doc?.system?.operatorAlerts || null;
+    // The webhook address is sealed in MongoDB (#284).
+    return openOwnerSecrets(doc || {}).doc?.system?.operatorAlerts || null;
   } catch {
     return null;
   } finally {

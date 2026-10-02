@@ -243,6 +243,8 @@ jobs:
       MONGO_URL: mongodb://127.0.0.1:27017
       DB_NAME: omnifm_ci_contract
       API_ADMIN_TOKEN: ci-owner-token
+      # The key the API seals the owner console's secrets with (#284); a test value.
+      OMNIFM_TOKEN_KEY: abababababababababababababababababababababababababababababababab
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -290,10 +292,11 @@ jobs:
           curl -fsS -X PUT -H 'X-Admin-Token: ci-owner-token' -H 'Content-Type: application/json' \
             --data '{"section":"system","data":{"discordOAuth":{"clientId":"123456789012345678","clientSecret":"ci-secret","redirectUri":"https://example.test/api/auth/discord/callback","scopes":"identify guilds"},"smtp":{"enabled":false},"audioRecognition":{"enabled":false},"songHistory":{"enabled":true,"maxPerGuild":100}}}' \
             http://127.0.0.1:8001/api/admin/config | python -c 'import json,sys; d=json.load(sys.stdin); assert d["ok"] and d["data"]["discordOAuth"]["clientSecretSet"] is True and d["data"]["discordOAuth"]["clientSecret"] == "••••••••"'
+          sealed="$(python -c 'import json; from pymongo import MongoClient; d=MongoClient("mongodb://127.0.0.1:27017").omnifm_ci_contract.owner_config.find_one({"_id":"global"}); s=d["system"]["discordOAuth"]["clientSecret"]; assert s.startswith("enc:v1:") and "ci-secret" not in json.dumps(d, default=str); print(s)')"
           curl -fsS -X PUT -H 'X-Admin-Token: ci-owner-token' -H 'Content-Type: application/json' \
             --data '{"section":"system","data":{"discordOAuth":{"clientId":"123456789012345678","clientSecret":"••••••••","clientSecretSet":true,"redirectUri":"https://example.test/api/auth/discord/callback","scopes":"identify guilds"}}}' \
             http://127.0.0.1:8001/api/admin/config >/dev/null
-          python -c 'from pymongo import MongoClient; d=MongoClient("mongodb://127.0.0.1:27017").omnifm_ci_contract.owner_config.find_one({"_id":"global"}); o=d["system"]["discordOAuth"]; assert o["clientSecret"] == "ci-secret" and "clientSecretSet" not in o'
+          python -c 'from pymongo import MongoClient; import sys; d=MongoClient("mongodb://127.0.0.1:27017").omnifm_ci_contract.owner_config.find_one({"_id":"global"}); o=d["system"]["discordOAuth"]; assert o["clientSecret"] == sys.argv[1] and "clientSecretSet" not in o' "$sealed"
           curl -fsS -X POST -H 'X-Admin-Token: ci-owner-token' -H 'Content-Type: application/json' \
             --data '{"integration":"songhistory"}' \
             http://127.0.0.1:8001/api/admin/integrations/test | python -c 'import json,sys; d=json.load(sys.stdin); assert d["ok"] and d["results"]["songHistory"]["ok"]'

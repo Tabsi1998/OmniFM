@@ -115,6 +115,16 @@ test("start.sh renders every template through the render script, stop.sh stops t
   assert.doesNotMatch(startSh, /\.venv\/bin|pip install|py_compile|uvicorn|omnifm-backend-fastapi/);
   assert.match(startSh, /node scripts\/database\.mjs wait "\$MONGO_WAIT_SECONDS"/);
   assert.match(startSh, /node scripts\/database\.mjs prepare/);
+  // #284: the key is checked while the running version stays; the secrets
+  // are sealed once nothing reads them; a rollback opens them first.
+  const checkAt = startSh.indexOf("node scripts/database.mjs check-secrets");
+  const stopAt = startSh.indexOf('"$ROOT/stop.sh" || true');
+  const sealAt = startSh.indexOf("node scripts/database.mjs encrypt-secrets");
+  assert.ok(checkAt > 0 && checkAt < stopAt && stopAt < sealAt, "check before the stop, sealing after it");
+  const updateSh = fs.readFileSync(path.join(repoRoot, "update.sh"), "utf8");
+  const openAt = updateSh.indexOf("node scripts/database.mjs decrypt-secrets");
+  assert.ok(openAt > 0 && openAt < updateSh.indexOf('git -C "$ROOT" reset --hard "$from"'),
+    "a rollback to a version before #284 gets the secrets in plain text first");
   assert.match(stopSh, /for unit in "\$UNIT_PREFIX-bot" "\$UNIT_PREFIX-frontend" "\$UNIT_PREFIX-backend"/);
   assert.ok(startSh.includes("MONGO_WAIT_SECONDS"), "start.sh waits for MongoDB before the preflight");
   assert.doesNotMatch(startSh, /Type=oneshot/, "the oneshot stack unit is gone");

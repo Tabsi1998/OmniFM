@@ -6,7 +6,7 @@
 // /mydata shows that a connection exists and deletes it; Discord forgets
 // the values when the person removes the connection there.
 import { getDb, isConnected } from "./lib/db.js";
-import { decryptToken, encryptToken, tokenKeyFrom } from "./lib/token-crypto.js";
+import { decryptToken, encryptToken, tokenKeyFrom, tokenKeysFrom } from "./lib/token-crypto.js";
 
 export const LINKED_ROLES_COLLECTION = "linked_roles";
 
@@ -49,8 +49,8 @@ export async function saveLinkedRoleTokens(userId, { accessToken, refreshToken, 
   return { ok: true };
 }
 
-/** The decrypted tokens, or null without a connection or when the key does not open them. */
-export async function getLinkedRoleTokens(userId, { key = tokenKeyFrom() } = {}) {
+/** The decrypted tokens, or null without a connection or when no key opens them (the previous one too, #284). */
+export async function getLinkedRoleTokens(userId, { key = tokenKeysFrom() } = {}) {
   const id = cleanUserId(userId);
   const linked = linkedCollection();
   if (!id || !linked) return null;

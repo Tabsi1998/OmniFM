@@ -12,6 +12,8 @@ import { resolveDiscordRedirectUri, publicWebsiteOrigin } from "../../lib/discor
 import { isPublicOrigin, originOf } from "../../lib/public-origin.js";
 import { legalNotice, privacyNotice, termsNotice } from "../../lib/owner-public.js";
 import { LEGAL_PAGES, legalChecklist } from "../../config/legal-requirements.js";
+import { checkStoredSecrets } from "../../lib/stored-secrets.js";
+import { tokenKeyFrom, tokenKeysFrom } from "../../lib/token-crypto.js";
 
 const REQUEST_TIMEOUT_MS = 10_000;
 
@@ -53,6 +55,38 @@ export async function checkMongo({ db }) {
   } catch (err) {
     return result("mongo", "fail", "MongoDB antwortet nicht.", String(err?.message || err));
   }
+}
+
+/**
+ * The owner console's secrets in MongoDB (#284): sealed with OMNIFM_TOKEN_KEY,
+ * still plain, or sealed with a key that is not in backend/.env any more.
+ */
+export async function checkSecrets({ db, env = process.env }) {
+  if (!db) return result("secrets", "warn", "Ohne MongoDB lässt sich das nicht prüfen.");
+  let report;
+  try {
+    report = await checkStoredSecrets(db, tokenKeysFrom(env));
+  } catch (err) {
+    return result("secrets", "warn", "Die Einstellungen ließen sich nicht lesen.", String(err?.message || err));
+  }
+  const count = (list) => `${list.length} ${list.length === 1 ? "Geheimnis" : "Geheimnisse"}`;
+  if (report.unopenable.length) {
+    return result("secrets", "fail", `${count(report.unopenable)} öffnet der Schlüssel in backend/.env nicht (OMNIFM_TOKEN_KEY). Den bisherigen Schlüssel wieder eintragen.`,
+      report.unopenable.join("\n"));
+  }
+  if (report.plain.length && !tokenKeyFrom(env)) {
+    return result("secrets", "warn", `OMNIFM_TOKEN_KEY fehlt in backend/.env: ${count(report.plain)} bleiben unverschlüsselt. ./update.sh legt den Schlüssel an.`,
+      report.plain.join("\n"));
+  }
+  if (report.plain.length) {
+    return result("secrets", "warn", `${count(report.plain)} noch unverschlüsselt in MongoDB; ./update.sh verschlüsselt sie.`, report.plain.join("\n"));
+  }
+  if (report.previousKey.length) {
+    return result("secrets", "warn", "Ein Schlüsselwechsel ist nicht fertig; ./update.sh --rotate-key setzt ihn fort.", report.previousKey.join("\n"));
+  }
+  return result("secrets", "ok", report.sealed
+    ? `Alle ${report.sealed} Geheimnisse (Bot-Tokens, Passwörter, Schlüssel) liegen verschlüsselt in MongoDB.`
+    : "Noch keine Geheimnisse gespeichert; neue werden verschlüsselt.");
 }
 
 /** Commander and workers: logged in or not, servers, streams. */
@@ -305,6 +339,7 @@ export const OWNER_STATUS_CHECKS = Object.freeze([
   { key: "discordLogin", label: "Discord-Login", area: "cfg-login" },
   { key: "website", label: "Website", area: "cfg-login" },
   { key: "mongo", label: "Datenbank", area: null },
+  { key: "secrets", label: "Geheimnisse", area: null },
   { key: "smtp", label: "E-Mail (SMTP)", area: "cfg-email" },
   { key: "recognition", label: "Song-Erkennung", area: "cfg-recognition" },
   { key: "operatorWebhook", label: "Alarm-Kanal", area: "cfg-alerts" },

@@ -11,11 +11,14 @@
 import fs from "node:fs";
 
 import { getDb, isConnected } from "./db.js";
+import { log } from "./logging.js";
+import { SECRET_CONFIG_FIELDS, openOwnerSecrets } from "./stored-secrets.js";
+import { tokenKeysFrom } from "./token-crypto.js";
 import { RECOVERY_SETTINGS } from "../config/recovery-settings.js";
 
+export { SECRET_CONFIG_FIELDS };
 export const OWNER_CONFIG_ID = "global";
 export const SECRET_MASK = "•".repeat(8);
-export const SECRET_CONFIG_FIELDS = new Set(["token", "secretKey", "webhookSecret", "secret", "clientSecret", "password", "apiKey", "webhookUrl"]);
 
 const DEFAULTS = JSON.parse(fs.readFileSync(new URL("../config/owner-config-defaults.json", import.meta.url), "utf8"));
 DEFAULTS.system.streamRecovery = Object.fromEntries(RECOVERY_SETTINGS.map((entry) => [entry.key, entry.default]));
@@ -35,7 +38,11 @@ export function deepMerge(base, override) {
   return base;
 }
 
-export async function loadOwnerConfigRaw({ db = isConnected() ? getDb() : null } = {}) {
+/**
+ * owner_config as stored, its secrets sealed (#284). Only the save route
+ * uses it: a secret the owner did not change keeps its sealed value.
+ */
+export async function loadOwnerConfigStored({ db = isConnected() ? getDb() : null } = {}) {
   if (!db) return {};
   try {
     const found = (await db.collection("owner_config").findOne({ _id: OWNER_CONFIG_ID })) || {};
@@ -44,6 +51,22 @@ export async function loadOwnerConfigRaw({ db = isConnected() ? getDb() : null }
   } catch {
     return {};
   }
+}
+
+let reportedUnopenable = "";
+
+/**
+ * owner_config with its secrets opened, for everything that uses them. A
+ * secret no key opens comes back empty and is logged once.
+ */
+export async function loadOwnerConfigRaw({ db = isConnected() ? getDb() : null, keys = tokenKeysFrom() } = {}) {
+  const { doc, failed } = openOwnerSecrets(await loadOwnerConfigStored({ db }), keys);
+  const failedList = failed.join(", ");
+  if (failedList && failedList !== reportedUnopenable) {
+    log("ERROR", `Owner-Config: OMNIFM_TOKEN_KEY öffnet diese Geheimnisse nicht, sie gelten als leer: ${failedList}`);
+  }
+  reportedUnopenable = failedList;
+  return doc;
 }
 
 /** The section with its defaults filled in, from the raw document. */

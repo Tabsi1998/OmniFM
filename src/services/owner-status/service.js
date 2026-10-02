@@ -10,6 +10,7 @@ import nodemailer from "nodemailer";
 
 import { log, rootDir } from "../../lib/logging.js";
 import { getDb, isConnected } from "../../lib/db.js";
+import { openOwnerSecrets } from "../../lib/stored-secrets.js";
 import { notifyOperator, OPERATOR_COLORS } from "../operator-webhook.js";
 import { getStationHealthReport } from "../station-health.js";
 import { getTopGGState } from "../../topgg-store.js";
@@ -25,6 +26,7 @@ import {
   checkDiscordLogin,
   checkLegal,
   checkMongo,
+  checkSecrets,
   checkOperatorWebhook,
   checkRecognition,
   checkSmtp,
@@ -47,7 +49,9 @@ function readRunningVersion() {
 
 async function loadOwnerConfig() {
   if (!isConnected() || !getDb()) return {};
-  return (await getDb().collection("owner_config").findOne({ _id: "global" }).catch(() => null)) || {};
+  const stored = (await getDb().collection("owner_config").findOne({ _id: "global" }).catch(() => null)) || {};
+  // The checks use the secrets themselves, sealed in MongoDB (#284).
+  return openOwnerSecrets(stored).doc;
 }
 
 function withTimeout(promise, key) {
@@ -91,6 +95,7 @@ export function createOwnerStatusService({
     discordLogin: (context) => checkDiscordLogin({ env, fetchImpl, storedRedirectUri: context.storedRedirectUri }),
     website: (context) => checkWebsite({ env, fetchImpl, storedRedirectUri: context.storedRedirectUri }),
     mongo: () => checkMongo({ db: isConnected() ? getDb() : null }),
+    secrets: () => checkSecrets({ db: isConnected() ? getDb() : null, env }),
     smtp: (context) => checkSmtp({ ownerConfig: context.ownerConfig, env, createTransport: nodemailer.createTransport.bind(nodemailer) }),
     recognition: (context) => checkRecognition({ ownerConfig: context.ownerConfig, env, fetchImpl }),
     operatorWebhook: () => checkOperatorWebhook({ env, fetchImpl }),

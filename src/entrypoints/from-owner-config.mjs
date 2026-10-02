@@ -32,7 +32,8 @@ async function main() {
     ownerConfig = await loadOwnerConfig({ url: MONGO_URL, dbName: DB_NAME });
   } catch (err) {
     console.error(`[OmniFM] Konnte Owner-Config nicht laden (${MONGO_URL} / ${DB_NAME}): ${err.message}`);
-    process.exit(1);
+    // A key that does not fit is a setting to fix, not a reason to restart (#284).
+    process.exit(err?.name === "SecretKeyError" ? 78 : 1);
   }
 
   const discord = ownerConfig.discord || {};

@@ -33,7 +33,7 @@ async function git(cwd, ...args) {
 
 // A server checkout of a tiny repository with the real update.sh; backups and
 // start.sh are stand-ins. A second clone plays the developer who pushes v2.
-async function setup(t) {
+async function setup(t, { v2Seals = false } = {}) {
   const base = await fs.mkdtemp(path.join(os.tmpdir(), "omnifm-rollback-"));
   t.after(() => fs.rm(base, { recursive: true, force: true }));
   const remote = path.join(base, "remote.git");
@@ -47,7 +47,7 @@ async function setup(t) {
   await fs.writeFile(path.join(server, "scripts", "backup-mongodb.sh"), "exit 0\n");
   await fs.writeFile(path.join(server, "start.sh"), "#!/usr/bin/env bash\necho started >> start.log\n", { mode: 0o755 });
   await fs.writeFile(path.join(server, "version.txt"), "v1\n");
-  await fs.writeFile(path.join(server, ".gitignore"), "backend/\n.update-backups/\nstart.log\nrun/\n");
+  await fs.writeFile(path.join(server, ".gitignore"), "backend/\n.update-backups/\nstart.log\nrun/\ndatabase.log\n");
   await git(server, "add", "-A");
   await git(server, "commit", "-q", "-m", "v1");
   await git(server, "push", "-q", "origin", "HEAD:main");
@@ -57,7 +57,14 @@ async function setup(t) {
 
   await git(base, "clone", "-q", remote, developer);
   await fs.writeFile(path.join(developer, "version.txt"), "v2\n");
-  await git(developer, "commit", "-q", "-am", "v2");
+  if (v2Seals) {
+    // v2 seals the secrets (#284); its scripts/database.mjs only notes what it is asked.
+    await fs.writeFile(path.join(developer, "scripts", "database.mjs"),
+      "// encrypt-secrets and decrypt-secrets stand in here\nimport fs from \"node:fs\";\n"
+      + "fs.appendFileSync(\"database.log\", `${process.argv.slice(2).join(\" \")}\\n`);\n");
+  }
+  await git(developer, "add", "-A");
+  await git(developer, "commit", "-q", "-m", "v2");
   await git(developer, "push", "-q", "origin", "HEAD:main");
   return { server };
 }
@@ -96,6 +103,16 @@ test("an update is recorded and --rollback returns to the code before it", async
   // The next update brings v2 back: a rollback lasts until the fix arrives.
   assert.equal((await run(server)).code, 0);
   assert.equal(await git(server, "rev-parse", "HEAD"), v2);
+});
+
+test("a rollback from a version that seals the secrets to one before it opens them first (#284)", async (t) => {
+  const { server } = await setup(t, { v2Seals: true });
+  const v1 = await git(server, "rev-parse", "HEAD");
+  assert.equal((await run(server)).code, 0);
+  const rollback = await run(server, "--rollback", "--yes");
+  assert.equal(rollback.code, 0, rollback.stderr);
+  assert.equal(await git(server, "rev-parse", "HEAD"), v1);
+  assert.equal(await fs.readFile(path.join(server, "database.log"), "utf8"), "decrypt-secrets\n", "opened before the code went back");
 });
 
 test("without a recorded update --rollback refuses and changes nothing", async (t) => {

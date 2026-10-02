@@ -14,6 +14,7 @@
 // (which answers the login since #195) reads them from there every 30
 // seconds, so a new secret works without a restart.
 import { getDb, isConnected } from "./db.js";
+import { openOwnerSecrets } from "./stored-secrets.js";
 import { isPublicOrigin, originOf, pickPublicOrigin, webDomainOrigin } from "./public-origin.js";
 
 export const DISCORD_OAUTH_CALLBACK_PATH = "/api/auth/discord/callback";
@@ -52,8 +53,9 @@ export function resolveDiscordRedirectUri(env = process.env, { stored = storedRe
 export async function syncDiscordOauthFromOwnerConfig(env = process.env, { db = null } = {}) {
   const database = db || (isConnected() ? getDb() : null);
   if (!database) return false;
-  const doc = await database.collection("owner_config").findOne({ _id: "global" }, { projection: { "system.discordOAuth": 1 } });
-  const oauth = doc?.system?.discordOAuth || {};
+  const stored = await database.collection("owner_config").findOne({ _id: "global" }, { projection: { "system.discordOAuth": 1 } });
+  // The client secret is sealed in MongoDB (#284); one no key opens counts as unset.
+  const oauth = openOwnerSecrets(stored || {}).doc?.system?.discordOAuth || {};
   for (const [field, envKey] of OWNER_FIELDS) {
     const value = typeof oauth[field] === "string" ? oauth[field].trim() : "";
     if (value) env[envKey] = value;
