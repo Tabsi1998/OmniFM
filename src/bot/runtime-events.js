@@ -46,6 +46,7 @@ import {
   withLanguageParam,
 } from "./runtime-links.js";
 import { buildOmniEmbed } from "./discord-ui.js";
+import { botTranslator } from "../lib/bot-i18n.js";
 
 // Moved to runtime-event-command.js (#210); re-exported for existing importers.
 export {
@@ -58,7 +59,7 @@ export function buildEventActionRows(language = "de", {
   includePremium = false,
   includeSupport = false,
 } = {}) {
-  const t = (de, en) => languagePick(language, de, en);
+  const t = botTranslator(language);
   const rows = [];
   if (includePlayback) {
     rows.push(
@@ -159,7 +160,7 @@ export function normalizeStationReference(runtime, rawStationKey) {
 }
 
 export function resolveStationForGuild(runtime, guildId, rawStationKey, language = "de", { random = Math.random } = {}) {
-  const t = (de, en) => languagePick(language, de, en);
+  const t = botTranslator(language);
   // #430: "/play weihnachten" picks one of the plan's Christmas stations.
   const seasonWord = stationSeasonFromWord(rawStationKey);
   if (seasonWord) {

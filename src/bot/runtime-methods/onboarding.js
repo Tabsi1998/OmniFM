@@ -39,6 +39,7 @@ import {
 import {
   ONBOARDING_MESSAGE_ENABLED,
 } from "../runtime-shared.js";
+import { botTranslator } from "../../lib/bot-i18n.js";
 
 const SETUP_SESSION_TTL_MS = 30 * 60_000;
 
@@ -112,7 +113,7 @@ const onboardingMethods = {
 
   buildOnboardingMessagePayload(guild) {
     const language = this.resolveGuildLanguage(guild?.id);
-    const t = (de, en) => (language === "de" ? de : en);
+    const t = botTranslator(language);
     return buildWelcomePayload({
       t,
       guildName: clipText(guild?.name || "", 80),

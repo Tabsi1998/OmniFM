@@ -28,6 +28,7 @@ import * as ui from "../discord/ui/index.js";
 import { normalizeFavoriteStations } from "../lib/favorite-stations.js";
 import { buildBrowserEntries, buildStationBrowserPayload } from "./station-browser.js";
 import { stationSeasonFor } from "../lib/seasons.js";
+import { botText } from "../lib/bot-i18n.js";
 
 const PANEL_TTL_MS = 15 * 60_000;
 const PLAY_STATION_OPTION_LIMIT = 25;
@@ -61,10 +62,10 @@ function sortStations(entries = []) {
 
 function formatStationTierBadge(entry, language) {
   const tier = String(entry?.tier || "free").trim().toLowerCase();
-  if (entry?.source === "custom") return language === "de" ? "Eigene Station" : "Custom";
+  if (entry?.source === "custom") return botText(language, "Eigene Station", "Custom");
   if (tier === "pro") return "PRO";
   if (tier === "ultimate") return "ULT";
-  return language === "de" ? "Free" : "Free";
+  return "Free";
 }
 
 export function buildStationCatalog(guildId) {
@@ -153,9 +154,9 @@ function buildWorkerOptions(runtime, guildId, language, selectedWorkerIndex = nu
   const guildTier = getTier(guildId);
   const maxIndex = runtime.workerManager.getMaxWorkerIndex(guildTier);
   const options = [{
-    label: language === "de" ? "Automatisch wählen" : "Choose automatically",
+    label: botText(language, "Automatisch wählen", "Choose automatically"),
     value: "auto",
-    description: language === "de" ? "Freien oder bereits verbundenen Worker nutzen" : "Use a free or already connected worker",
+    description: botText(language, "Freien oder bereits verbundenen Worker nutzen", "Use a free or already connected worker"),
     default: !Number.isInteger(selectedWorkerIndex),
   }];
 
@@ -164,7 +165,7 @@ function buildWorkerOptions(runtime, guildId, language, selectedWorkerIndex = nu
     options.push({
       label: clipText(worker?.config?.name || `Worker ${index}`, 90),
       value: String(index),
-      description: language === "de" ? `Worker-Slot ${index}` : `Worker slot ${index}`,
+      description: botText(language, "Worker-Slot {slot}", "Worker slot {slot}", { slot: index }),
       default: Number(selectedWorkerIndex) === index,
     });
   }
@@ -180,16 +181,14 @@ function getSelectedChannelLabel(interaction, channelId, t) {
 
 function getSelectedWorkerLabel(runtime, workerIndex, language) {
   if (!Number.isInteger(workerIndex)) {
-    return language === "de" ? "Automatisch" : "Automatic";
+    return botText(language, "Automatisch", "Automatic");
   }
   const worker = runtime.workerManager?.getWorkerByIndex?.(workerIndex, { prefer: "slot" });
   return worker?.config?.name || `Worker ${workerIndex}`;
 }
 
 function buildPlayFooter(language) {
-  return language === "de"
-    ? "Tipp: Ohne Auswahl versucht OmniFM deinen aktuellen Sprachkanal zu übernehmen."
-    : "Tip: Without an explicit selection, OmniFM tries to use your current voice channel.";
+  return botText(language, "Tipp: Ohne Auswahl versucht OmniFM deinen aktuellen Sprachkanal zu übernehmen.", "Tip: Without an explicit selection, OmniFM tries to use your current voice channel.");
 }
 
 export async function resolveExplicitVoiceChannel(interaction, explicitChannel, explicitChannelId) {

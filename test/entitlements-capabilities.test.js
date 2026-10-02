@@ -16,6 +16,7 @@ import {
   getDashboardCapabilityRequiredTier,
   normalizeDashboardCapabilityPayload,
 } from "../frontend/src/lib/dashboardCapabilities.js";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 test("legacy tier-only licenses retain their paid plan", (t) => {
   setLicenseProvider(() => ({ active: true, tier: "ultimate", seats: 1 }));
@@ -89,7 +90,7 @@ test("dashboard capability payload normalization fills defaults", () => {
 });
 
 test("dashboard blocked feature labels stay user-facing and deduplicated", () => {
-  const t = (_de, en) => en;
+  const t = botTranslator("en");
   const labels = getDashboardBlockedFeatureLabels(
     ["advancedAnalytics", "customStationUrls", "advancedAnalytics"],
     t,

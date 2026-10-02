@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { buildUserFacingRuntimeStatus } from "../src/lib/user-facing-status.js";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 test("user-facing runtime status prefers friendly reconnect wording", () => {
   const status = buildUserFacingRuntimeStatus({
@@ -12,7 +13,7 @@ test("user-facing runtime status prefers friendly reconnect wording", () => {
     stationName: "Nightwave FM",
     channelLabel: "#radio-live",
   }, {
-    t: (_de, en) => en,
+    t: botTranslator("en"),
   });
 
   assert.equal(status.label, "Connecting");
@@ -31,7 +32,7 @@ test("user-facing runtime status hides technical recovery counters during live p
     channelLabel: "#radio-live",
     listeners: 6,
   }, {
-    t: (_de, en) => en,
+    t: botTranslator("en"),
   });
 
   assert.equal(status.label, "Stabilizing");
@@ -41,7 +42,7 @@ test("user-facing runtime status hides technical recovery counters during live p
 });
 
 test("user-facing runtime status explains a parked target in plain words", () => {
-  const t = (de) => de;
+  const t = botTranslator("de");
   const permissions = buildUserFacingRuntimeStatus({
     ready: true,
     connected: false,

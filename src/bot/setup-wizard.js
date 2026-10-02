@@ -19,6 +19,7 @@ import {
 import { clipText } from "../lib/helpers.js";
 import * as ui from "../discord/ui/index.js";
 import { NOTICE_CATALOG } from "../discord/ui/notice-catalog.js";
+import { botTranslator } from "../lib/bot-i18n.js";
 
 export const SETUP_COMPONENT_PREFIX = "omnifm:setup:";
 export const SETUP_COMPONENT_ID_OPEN = `${SETUP_COMPONENT_PREFIX}open`;
@@ -29,13 +30,17 @@ const SETUP_ACTIONS = new Set(["voice", "station", "panel", "start", "refresh"])
 const TEXT_CHANNEL_OPTION_LIMIT = 24;
 
 // Names as the Discord client shows them in the permission settings.
-const PERMISSION_LABELS = Object.freeze({
-  ViewChannel: ["Kanal ansehen", "View Channel"],
-  Connect: ["Verbinden", "Connect"],
-  Speak: ["Sprechen", "Speak"],
-  SendMessages: ["Nachrichten senden", "Send Messages"],
-  EmbedLinks: ["Links einbetten", "Embed Links"],
-});
+/** A permission's name in the reader's language, as Discord names it. */
+function permissionLabel(name, t) {
+  switch (name) {
+    case "ViewChannel": return t("Kanal ansehen", "View Channel");
+    case "Connect": return t("Verbinden", "Connect");
+    case "Speak": return t("Sprechen", "Speak");
+    case "SendMessages": return t("Nachrichten senden", "Send Messages");
+    case "EmbedLinks": return t("Links einbetten", "Embed Links");
+    default: return name;
+  }
+}
 
 export const PANEL_CHANNEL_PERMISSIONS = Object.freeze(["ViewChannel", "SendMessages", "EmbedLinks"]);
 
@@ -47,10 +52,10 @@ export function voiceChannelPermissions(channelType) {
 }
 
 /** The permissions from `needed` that `perms` lacks, as labels in the user's language. */
-export function missingPermissionLabels(perms, needed, t = (de, _en) => de) {
+export function missingPermissionLabels(perms, needed, t = botTranslator("de")) {
   return needed
     .filter((name) => !perms?.has?.(PermissionFlagsBits[name]))
-    .map((name) => t(...(PERMISSION_LABELS[name] || [name, name])));
+    .map((name) => permissionLabel(name, t));
 }
 
 export function setupCustomId(action, sessionId) {
@@ -67,7 +72,7 @@ export function parseSetupCustomId(customId) {
 }
 
 /** Text and announcement channels in server order, for step ③. */
-export function buildPanelChannelOptions(guild, selectedId = null, { t = (de, _en) => de, canUse = null } = {}) {
+export function buildPanelChannelOptions(guild, selectedId = null, { t = botTranslator("de"), canUse = null } = {}) {
   const channels = Array.from(guild?.channels?.cache?.values?.() || [])
     .filter((channel) => channel && (channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement))
     .sort((left, right) => (Number(left?.rawPosition) || 0) - (Number(right?.rawPosition) || 0));
@@ -114,7 +119,9 @@ function selectRow(customId, placeholder, options, t) {
 
 function missingText(t, missing, channelMention) {
   const entry = NOTICE_CATALOG["missing-permissions"];
-  return `${ui.icon("error")} ${t(...entry.body({ missing, channel: channelMention }))}`;
+  const params = { missing, channel: channelMention };
+  const [de, en, values] = entry.body(params);
+  return `${ui.icon("error")} ${t(de, en, { ...params, ...(values || {}) })}`;
 }
 
 function helpButton(t, applicationId) {
@@ -132,7 +139,7 @@ function linkButton(label, url) {
 /**
  * The public welcome after the invite: what OmniFM is, the three steps, and
  * the button that opens the private setup.
- * @param {{ t: (de: string, en: string) => string, guildName?: string, urls?: { dashboard?: string, guide?: string, support?: string, permissionsHelp?: string }, applicationId?: string | null }} input
+ * @param {{ t: (de: string, en: string, params?: Record<string, unknown>) => string, guildName?: string, urls?: { dashboard?: string, guide?: string, support?: string, permissionsHelp?: string }, applicationId?: string | null }} input
  */
 export function buildWelcomePayload({ t, guildName = "", urls = {}, applicationId = null }) {
   const steps = [
@@ -156,7 +163,7 @@ export function buildWelcomePayload({ t, guildName = "", urls = {}, applicationI
   return ui.message(ui.panel({
     title: `${ui.icon("radio", applicationId)} ${t("Danke für die Einladung!", "Thanks for the invite!")}`,
     subtitle: guildName
-      ? t(`OmniFM ist jetzt auf **${guildName}**.`, `OmniFM is now on **${guildName}**.`)
+      ? t("OmniFM ist jetzt auf **{server}**.", "OmniFM is now on **{server}**.", { server: guildName })
       : "",
     body: [
       ui.text(`${t("In drei Schritten läuft euer Radio – ganz ohne Befehle:", "Three steps and your radio runs, no commands needed:")}\n${steps}`),
@@ -175,7 +182,7 @@ export function buildWelcomePayload({ t, guildName = "", urls = {}, applicationI
  * missing }, station { options, selectedKey, selectedName }, panel
  * { options, selectedId, missing }, optional hint { kind, title, body }.
  * @param {{
- *   t: (de: string, en: string) => string, sessionId: string, guildName?: string, view: any,
+ *   t: (de: string, en: string, params?: Record<string, unknown>) => string, sessionId: string, guildName?: string, view: any,
  *   urls?: { dashboard?: string, guide?: string, support?: string, permissionsHelp?: string }, applicationId?: string | null,
  * }} input
  */
@@ -213,9 +220,11 @@ export function buildSetupWizardPayload({ t, sessionId, guildName = "", view, ur
     const mention = `<#${voice.selectedId}>`;
     if (voiceState === "problem") voiceLine = missingText(t, voice.missing, mention);
     else if (Array.isArray(voice.missing)) {
-      voiceLine = t(`🔊 ${mention} · Die Rechte für ${worker.name || "den Worker"} passen.`, `🔊 ${mention} · ${worker.name || "The worker"} has the permissions it needs.`);
+      voiceLine = (worker.name
+      ? t("🔊 {channel} · Die Rechte für {worker} passen.", "🔊 {channel} · {worker} has the permissions it needs.", { channel: mention, worker: worker.name })
+      : t("🔊 {channel} · Die Rechte für den Worker passen.", "🔊 {channel} · The worker has the permissions it needs.", { channel: mention }));
     } else {
-      voiceLine = t(`🔊 ${mention} · Die Rechte prüfe ich beim Start.`, `🔊 ${mention} · I check the permissions when starting.`);
+      voiceLine = t("🔊 {channel} · Die Rechte prüfe ich beim Start.", "🔊 {channel} · I check the permissions when starting.", { channel: mention });
     }
   }
   body.push(ui.text(`${ui.heading(`① ${t("Sprachkanal", "Voice channel")}`, 3)}\n${voiceLine}`));
@@ -236,7 +245,7 @@ export function buildSetupWizardPayload({ t, sessionId, guildName = "", view, ur
     const mention = `<#${panel.selectedId}>`;
     panelLine = panelState === "problem"
       ? missingText(t, panel.missing, mention)
-      : t(`📌 Das Panel erscheint in ${mention}.`, `📌 The panel appears in ${mention}.`);
+      : t("📌 Das Panel erscheint in {channel}.", "📌 The panel appears in {channel}.", { channel: mention });
   }
   body.push(ui.text(`${ui.heading(`③ ${t("Panel-Kanal", "Panel channel")}`, 3)}\n${panelLine}`));
   body.push(selectRow(setupCustomId("panel", sessionId), t("📌 Panel-Kanal wählen", "📌 Choose the panel channel"), panel.options || [], t));
@@ -270,7 +279,7 @@ export function buildSetupWizardPayload({ t, sessionId, guildName = "", view, ur
 /**
  * The last view: the radio runs.
  * @param {{
- *   t: (de: string, en: string) => string, workerName?: string, stationName?: string, voiceChannelId?: string,
+ *   t: (de: string, en: string, params?: Record<string, unknown>) => string, workerName?: string, stationName?: string, voiceChannelId?: string,
  *   panelChannelId?: string | null, recovering?: boolean, urls?: { dashboard?: string, guide?: string, support?: string, permissionsHelp?: string }, quickstartId?: string | null,
  *   applicationId?: string | null,
  * }} input
@@ -289,10 +298,10 @@ export function buildSetupDonePayload({
   const who = workerName || "OmniFM";
   const lines = [
     recovering
-      ? t(`${who} ist in <#${voiceChannelId}> und holt **${stationName}** gerade noch einmal – das dauert einen Moment.`, `${who} is in <#${voiceChannelId}> and is fetching **${stationName}** once more; this takes a moment.`)
-      : t(`${who} spielt jetzt **${stationName}** in <#${voiceChannelId}>.`, `${who} now plays **${stationName}** in <#${voiceChannelId}>.`),
+      ? t("{worker} ist in <#{channel}> und holt **{station}** gerade noch einmal – das dauert einen Moment.", "{worker} is in <#{channel}> and is fetching **{station}** once more; this takes a moment.", { worker: who, channel: voiceChannelId, station: stationName })
+      : t("{worker} spielt jetzt **{station}** in <#{channel}>.", "{worker} now plays **{station}** in <#{channel}>.", { worker: who, channel: voiceChannelId, station: stationName }),
     panelChannelId && panelChannelId !== SETUP_PANEL_AUTO
-      ? t(`Das Now-Playing-Panel erscheint in <#${panelChannelId}>.`, `The now-playing panel appears in <#${panelChannelId}>.`)
+      ? t("Das Now-Playing-Panel erscheint in <#{channel}>.", "The now-playing panel appears in <#{channel}>.", { channel: panelChannelId })
       : t("Das Now-Playing-Panel erscheint im Chat des Sprachkanals.", "The now-playing panel appears in the voice channel's chat."),
   ];
   const buttons = [

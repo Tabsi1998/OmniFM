@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { MessageFlags, PermissionFlagsBits } from "discord.js";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 // #301 part 2: the year review as cards in Discord. Every plan pages
 // through them; the picture and the channel post come with Pro, the post
@@ -22,7 +23,7 @@ const ui = await import("../src/discord/ui/index.js");
 
 const GUILD = "123456789012345678";
 const HOUR = 3_600_000;
-const de = (german) => german;
+const de = botTranslator("de");
 const at = (iso) => Date.parse(iso);
 
 function sampleReview() {

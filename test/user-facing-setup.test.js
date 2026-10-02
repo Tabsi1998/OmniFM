@@ -5,6 +5,7 @@ import {
   buildSetupStatusSummary,
   buildVoiceChannelAccessMessage,
 } from "../src/lib/user-facing-setup.js";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 test("setup status summary points to inviting the first worker", () => {
   const summary = buildSetupStatusSummary({
@@ -12,7 +13,7 @@ test("setup status summary points to inviting the first worker", () => {
     invitedWorkerCount: 0,
     maxWorkerSlots: 8,
     voiceChannelCount: 2,
-    t: (_de, en) => en,
+    t: botTranslator("en"),
   });
 
   assert.equal(summary.command, "/invite");
@@ -26,7 +27,7 @@ test("setup status summary points to /play once workers and channels exist", () 
     invitedWorkerCount: 1,
     maxWorkerSlots: 8,
     voiceChannelCount: 3,
-    t: (_de, en) => en,
+    t: botTranslator("en"),
   });
 
   assert.equal(summary.command, "/play");
@@ -38,7 +39,7 @@ test("voice channel access message stays actionable for missing speak permission
     issue: "speak_missing",
     channelLabel: "#radio-live",
     workerName: "Worker 2",
-    t: (_de, en) => en,
+    t: botTranslator("en"),
   });
 
   assert.match(message, /Worker 2/i);

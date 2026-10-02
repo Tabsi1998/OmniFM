@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { MessageFlags } from "discord.js";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 const scratchDir = fs.mkdtempSync(path.join(os.tmpdir(), "omnifm-sleep-"));
 process.env.OMNIFM_RUNTIME_DATA_DIR = scratchDir;
@@ -134,7 +135,7 @@ test("'+30 min' during the fade brings the volume back and moves the end", async
   assert.deepEqual(volumes, [72, 64, 56]);
 
   const click = buttonClick("sleepextend");
-  runtime.createInteractionTranslator = () => ({ t: (de) => de, language: "de" });
+  runtime.createInteractionTranslator = () => ({ t: botTranslator("de"), language: "de" });
   await runtime.handleNowPlayingControl(click);
   assert.equal(click.calls[0][0], "update");
   assert.match(allText(click.calls[0][1]), /Verlängert/);
@@ -151,7 +152,7 @@ test("'+30 min' during the fade brings the volume back and moves the end", async
 test("'timer off' keeps the radio playing; without the /perm right nothing changes", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 0 });
   const { runtime, state, stops } = buildWorker();
-  runtime.createInteractionTranslator = () => ({ t: (de) => de, language: "de" });
+  runtime.createInteractionTranslator = () => ({ t: botTranslator("de"), language: "de" });
   await runtime.setSleepTimerInGuild(GUILD, 15);
 
   runtime.checkCommandRolePermission = () => ({ ok: false, message: "Nur DJs." });
@@ -214,11 +215,11 @@ test("/sleep asks the streaming workers and says when it ends", async () => {
   commander.workerManager = { getStreamingWorkers: () => [worker], getWorkerByIndex: () => null };
   commander.respondInteraction = async (_interaction, payload) => { replies.push(payload); };
   const interaction = { guildId: GUILD, options: { getString: () => "30", getInteger: () => null } };
-  await PLAYBACK_COMMANDS.sleep({ runtime: commander, interaction, t: (de) => de, language: "de", state: {} });
+  await PLAYBACK_COMMANDS.sleep({ runtime: commander, interaction, t: botTranslator("de"), language: "de", state: {} });
   assert.match(allText(replies[0]), /Sleep-Timer an[\s\S]*OmniFM 1[\s\S]*<t:1800000000:R>[\s\S]*<t:1800000000:t>/);
 
   commander.workerManager.getStreamingWorkers = () => [];
-  await PLAYBACK_COMMANDS.sleep({ runtime: commander, interaction, t: (de) => de, language: "de", state: {} });
+  await PLAYBACK_COMMANDS.sleep({ runtime: commander, interaction, t: botTranslator("de"), language: "de", state: {} });
   assert.match(allText(replies[1]), /Gerade läuft nichts/);
 
   const command = buildCommandsJson().find((entry) => entry.name === "sleep");
@@ -228,7 +229,7 @@ test("/sleep asks the streaming workers and says when it ends", async () => {
 
 test("the panel shows when the radio falls asleep", () => {
   const payload = buildNowPlayingPanel({
-    t: (de) => de,
+    t: botTranslator("de"),
     station: { name: "Groove Salad" },
     track: { hasTrack: false },
     playback: { phase: "playing", sleepUntilMs: 1_800_000_000_000 },

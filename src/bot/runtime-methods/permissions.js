@@ -24,12 +24,14 @@ import { normalizePermissionCommandName, isPermissionManagedCommand } from "../.
 import { getGuildLanguage, setGuildLanguage, resetGuildLanguage } from "../../guild-language-store.js";
 import { BRAND } from "../../config/plans.js";
 import { buildNoticePayload } from "../commands/command-helpers.js";
-import { normalizeLanguage, getDefaultLanguage } from "../../i18n.js";
+import { getDefaultLanguage } from "../../i18n.js";
 import { botLimitEmbed } from "../../ui/upgradeEmbeds.js";
 import {
   getTierConfig,
   PREMIUM_GUILD_ACCESS_MODE,
 } from "../runtime-shared.js";
+import { botTranslator } from "../../lib/bot-i18n.js";
+import { normalizeBotLanguage } from "../../lib/bot-i18n.js";
 
 const permissionMethods = {
   hasGuildManagePermissions(interaction) {
@@ -304,7 +306,7 @@ const permissionMethods = {
     }
 
     if (sub === "set") {
-      const value = normalizeLanguage(interaction.options.getString("value", true), getDefaultLanguage());
+      const value = normalizeBotLanguage(interaction.options.getString("value", true), getDefaultLanguage());
       setGuildLanguage(guildId, value);
       await interaction.reply({
         content: t(
@@ -366,7 +368,7 @@ const permissionMethods = {
     return {
       language,
       isDe,
-      t: (de, en) => (isDe ? de : en),
+      t: botTranslator(language),
     };
   },
 

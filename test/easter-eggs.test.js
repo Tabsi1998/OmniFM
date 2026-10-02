@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 // The Easter egg hunt (#429): from Palm Sunday to Easter Monday about every
 // eighth song brings an egg into the panel; whoever clicks first gets it, a
@@ -25,8 +26,8 @@ const { createAdminEggHuntRoutes } = await import("../src/api/routes/admin-egg-h
 
 const GUILD = "123456789012345678";
 const OTHER_GUILD = "223456789012345678";
-const de = (german) => german;
-const en = (_german, english) => english;
+const de = botTranslator("de");
+const en = botTranslator("en");
 
 // Fresh servers for the stored eggs, so runs never meet.
 const run = String(Date.now()).slice(-9);

@@ -113,7 +113,7 @@ const formMethods = {
    * @param {string} guildId
    * @param {string} key
    * @param {{ url?: string }} logo
-   * @param {{ t?: (de: string, en: string) => string, fetchLogo?: (url: string) => Promise<Buffer | null> }} [options]
+   * @param {{ t?: (de: string, en: string, params?: Record<string, unknown>) => string, fetchLogo?: (url: string) => Promise<Buffer | null> }} [options]
    */
   async storeStationFormLogo(guildId, key, logo, { t, fetchLogo = fetchUploadedLogo } = {}) {
     const buffer = await fetchLogo(logo.url).catch(() => null);

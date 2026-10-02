@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { ButtonStyle, MessageFlags } from "discord.js";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 const scratchDir = fs.mkdtempSync(path.join(os.tmpdir(), "omnifm-np-panel-"));
 process.env.OMNIFM_RUNTIME_DATA_DIR = scratchDir;
@@ -13,7 +14,7 @@ const { BotRuntime } = await import("../src/bot/runtime.js");
 const { buildNowPlayingPanel } = await import("../src/bot/now-playing/now-playing-panel.js");
 const ui = await import("../src/discord/ui/index.js");
 
-const t = (de) => de;
+const t = botTranslator("de");
 
 function input(overrides = {}) {
   return {

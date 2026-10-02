@@ -9,6 +9,7 @@
 import { randomBytes } from "node:crypto";
 import { getDb, isConnected } from "./lib/db.js";
 import { MAX_PENDING_PER_PERSON, readSuggestionInput, streamUrlKey } from "./lib/station-suggestions.js";
+import { normalizeBotLanguage } from "./lib/bot-i18n.js";
 
 export const STATION_SUGGESTIONS_COLLECTION = "station_suggestions";
 const KEEP_DECIDED_MS = 180 * 86_400_000;
@@ -72,7 +73,7 @@ export async function createStationSuggestion(input, submitter = {}, { now = Dat
         userId,
         userName: String(submitter.userName || "").slice(0, 80),
         guildId: cleanId(submitter.guildId) || null,
-        language: submitter.language === "en" ? "en" : "de",
+        language: normalizeBotLanguage(submitter.language, "en"),
       },
     } : {}),
   };

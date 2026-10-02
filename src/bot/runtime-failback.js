@@ -10,13 +10,13 @@ import { isRuntimeVoiceConnected } from "./runtime-live-state.js";
 import { AudioPlayerStatus } from "@discordjs/voice";
 import { safeFetch } from "../lib/safe-outbound-http.js";
 import { loadStations } from "../stations-store.js";
-import { languagePick } from "../lib/language.js";
 import {
   toPositiveInt,
   getTierConfig,
   emitRuntimeReliabilityAlert,
   getStreamRestartErrorMessage,
 } from "./runtime-streams.js";
+import { botTranslator } from "../lib/bot-i18n.js";
 
 // Failback: while a failover is active the preferred station is probed and
 // restored automatically once it delivers audio again (#187).
@@ -381,7 +381,7 @@ async function resolveReplacementStationForGuild(runtime, guildId, unavailableKe
  */
 async function notifyRuntimeStationUnavailable(runtime, guildId, state, payload = {}) {
   const language = typeof runtime.resolveGuildLanguage === "function" ? runtime.resolveGuildLanguage(guildId) : "de";
-  const t = (de, en) => languagePick(language, de, en);
+  const t = botTranslator(language);
   const previous = clipText(payload.previousStationName || payload.previousStationKey || "-", 80);
   const replacement = clipText(payload.replacementStationName || payload.replacementStationKey || "", 80);
   const reason = payload.reason ? ` (${clipText(payload.reason, 140)})` : "";

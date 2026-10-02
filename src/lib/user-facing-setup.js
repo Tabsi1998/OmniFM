@@ -1,3 +1,5 @@
+import { botTranslator } from "./bot-i18n.js";
+
 function normalizeCount(value) {
   const parsed = Number.parseInt(String(value || 0), 10);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
@@ -8,7 +10,7 @@ function buildSetupStatusSummary({
   invitedWorkerCount = 0,
   maxWorkerSlots = 0,
   voiceChannelCount = 0,
-  t = (de, _en) => de,
+  t = botTranslator("de"),
 } = {}) {
   const invited = normalizeCount(invitedWorkerCount);
   const maxWorkers = Math.max(invited, normalizeCount(maxWorkerSlots));
@@ -16,8 +18,8 @@ function buildSetupStatusSummary({
 
   const checklist = [
     `${commanderReady ? "OK" : "OFF"} ${t("Commander verbunden", "Commander connected")}`,
-    `${invited > 0 ? "OK" : "OFF"} ${t(`Worker eingeladen: ${invited}/${maxWorkers || 0}`, `Workers invited: ${invited}/${maxWorkers || 0}`)}`,
-    `${voiceChannels > 0 ? "OK" : "OFF"} ${t(`${voiceChannels} Voice-/Stage-Channels gefunden`, `${voiceChannels} voice/stage channels found`)}`,
+    `${invited > 0 ? "OK" : "OFF"} ${t("Worker eingeladen: {invited}/{max}", "Workers invited: {invited}/{max}", { invited, max: maxWorkers || 0 })}`,
+    `${voiceChannels > 0 ? "OK" : "OFF"} ${t("{count} Voice-/Stage-Channels gefunden", "{count} voice/stage channels found", { count: voiceChannels })}`,
   ];
 
   if (!commanderReady) {
@@ -71,7 +73,7 @@ function buildVoiceChannelAccessMessage({
   issue = "connect_missing",
   channelLabel = "",
   workerName = "",
-  t = (de, _en) => de,
+  t = botTranslator("de"),
 } = {}) {
   const target = String(channelLabel || "").trim() || t("dem gewählten Channel", "the selected channel");
   const actor = String(workerName || "").trim();
@@ -86,26 +88,30 @@ function buildVoiceChannelAccessMessage({
   if (issue === "connect_missing") {
     if (actor) {
       return t(
-        `${actor} kann ${target} nicht beitreten. Gib diesem Bot dort die Berechtigung \`Connect\` oder nutze einen anderen Channel/Worker.`,
-        `${actor} cannot join ${target}. Grant that bot \`Connect\` there or use a different channel/worker.`
+        "{bot} kann {channel} nicht beitreten. Gib diesem Bot dort die Berechtigung `Connect` oder nutze einen anderen Channel/Worker.",
+        "{bot} cannot join {channel}. Grant that bot `Connect` there or use a different channel/worker.",
+        { bot: actor, channel: target }
       );
     }
     return t(
-      `OmniFM kann ${target} nicht beitreten. Gib dem Bot dort die Berechtigung \`Connect\` oder wähle einen anderen Channel.`,
-      `OmniFM cannot join ${target}. Grant the bot \`Connect\` there or choose a different channel.`
+      "OmniFM kann {channel} nicht beitreten. Gib dem Bot dort die Berechtigung `Connect` oder wähle einen anderen Channel.",
+      "OmniFM cannot join {channel}. Grant the bot `Connect` there or choose a different channel.",
+      { channel: target }
     );
   }
 
   if (issue === "speak_missing") {
     if (actor) {
       return t(
-        `${actor} kann ${target} sehen, dort aber nicht sprechen. Gib diesem Bot \`Speak\` oder nutze einen anderen Channel.`,
-        `${actor} can see ${target}, but cannot speak there. Grant that bot \`Speak\` or use a different channel.`
+        "{bot} kann {channel} sehen, dort aber nicht sprechen. Gib diesem Bot `Speak` oder nutze einen anderen Channel.",
+        "{bot} can see {channel}, but cannot speak there. Grant that bot `Speak` or use a different channel.",
+        { bot: actor, channel: target }
       );
     }
     return t(
-      `OmniFM kann ${target} betreten, dort aber nicht sprechen. Gib dem Bot \`Speak\` oder wähle einen anderen Channel.`,
-      `OmniFM can join ${target}, but cannot speak there. Grant the bot \`Speak\` or choose a different channel.`
+      "OmniFM kann {channel} betreten, dort aber nicht sprechen. Gib dem Bot `Speak` oder wähle einen anderen Channel.",
+      "OmniFM can join {channel}, but cannot speak there. Grant the bot `Speak` or choose a different channel.",
+      { channel: target }
     );
   }
 

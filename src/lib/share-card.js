@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 
 import { createCanvas, GlobalFonts, loadImage } from "@napi-rs/canvas";
 
+import { botTranslator } from "./bot-i18n.js";
 import { safeFetch } from "./safe-outbound-http.js";
 
 export const CARD_WIDTH = 1200;
@@ -199,7 +200,7 @@ function cached(key, build) {
 }
 
 /** The link preview of a station: logo, name, genre. */
-export function renderStationCard({ key, name, genre, color, logoUrl, footer = "", t = (...parts) => parts[0], fetchImage = fetchCardImage }) {
+export function renderStationCard({ key, name, genre, color, logoUrl, footer = "", t = botTranslator("de"), fetchImage = fetchCardImage }) {
   return cached(`station:${key}:${logoUrl || ""}:${t("de", "en")}`, async () => renderCard({
     color,
     image: await fetchImage(logoUrl),
@@ -212,7 +213,7 @@ export function renderStationCard({ key, name, genre, color, logoUrl, footer = "
 }
 
 /** The card the panel posts: cover, title, artist, station, server. */
-export function renderNowPlayingCard({ title, artist, stationName, guildName, color, coverUrl, t = (...parts) => parts[0], fetchImage = fetchCardImage }) {
+export function renderNowPlayingCard({ title, artist, stationName, guildName, color, coverUrl, t = botTranslator("de"), fetchImage = fetchCardImage }) {
   return cached(`np:${stationName}:${artist}:${title}:${guildName}:${coverUrl || ""}:${t("de", "en")}`, async () => renderCard({
     color,
     image: await fetchImage(coverUrl),
@@ -225,7 +226,7 @@ export function renderNowPlayingCard({ title, artist, stationName, guildName, co
 }
 
 /** A page of the website (premium, invite, stations): title and subtitle. */
-export function renderPageCard({ page, title, subtitle, color = BRAND_ORANGE, t = (...parts) => parts[0] }) {
+export function renderPageCard({ page, title, subtitle, color = BRAND_ORANGE, t = botTranslator("de") }) {
   return cached(`page:${page}:${t("de", "en")}`, async () => renderCard({
     color,
     image: null,
@@ -241,7 +242,7 @@ export function renderPageCard({ page, title, subtitle, color = BRAND_ORANGE, t 
  * The year review of a server as a picture to share (#301): the hours in
  * big, top station, top song and the favourite hour.
  */
-export function renderYearReviewCard({ guildName, year, hours, topStation, topSong, busiestHour, color = BRAND_ORANGE, t = (...parts) => parts[0] }) {
+export function renderYearReviewCard({ guildName, year, hours, topStation, topSong, busiestHour, color = BRAND_ORANGE, t = botTranslator("de") }) {
   const numberFormat = new Intl.NumberFormat(t("de-DE", "en-GB"));
   const lines = [
     topStation ? t(`Top-Sender: ${topStation}`, `Top station: ${topStation}`) : null,

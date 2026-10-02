@@ -19,6 +19,7 @@ import { SONG_PLAYS_COLLECTION } from "../song-plays-store.js";
 import { loadStations } from "../stations-store.js";
 import { WEBSITE_URL, withLanguageParam } from "../bot/runtime-links.js";
 import * as ui from "../discord/ui/index.js";
+import { botTranslator, normalizeBotLanguage, botLocale } from "../lib/bot-i18n.js";
 
 const CACHE_MS = 10 * 60_000;
 const POST_CHECK_MS = 15 * 60_000;
@@ -159,8 +160,8 @@ function movementLabel(entry, t) {
  * then the top 3 songs, a button to the full charts on the website.
  */
 export function buildChartsMessage(chart, { language = "de" } = {}) {
-  const t = (de, en) => (language === "en" ? en : de);
-  const locale = language === "en" ? "en-US" : "de-DE";
+  const t = botTranslator(normalizeBotLanguage(language, "de"));
+  const locale = botLocale(normalizeBotLanguage(language, "de"));
   const numbers = new Intl.NumberFormat(locale);
   const hours = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 });
   const [firstDay, lastDay] = [new Date(chart.week.start), new Date(Date.parse(chart.week.end) - 86_400_000)];

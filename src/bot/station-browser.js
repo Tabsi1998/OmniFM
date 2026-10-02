@@ -114,7 +114,7 @@ export function parsePickTarget(sessionPart) {
 
 /**
  * @param {object} input
- * @param {(de: string, en: string) => string} input.t
+ * @param {(de: string, en: string, params?: Record<string, unknown>) => string} input.t
  * @param {string} input.prefix      custom id prefix of the browser
  * @param {{ id: string, data?: { page?: number, genre?: string | null, query?: string } }} input.session
  * @param {BrowserEntry[]} input.entries   buildBrowserEntries()
@@ -153,7 +153,7 @@ export function buildStationBrowserPayload(input) {
 
   const subtitle = ui.statusLine([
     `${t("Plan", "Plan")}: **${input.planName}**`,
-    t(`${shown.length} Sender`, `${shown.length} stations`),
+    t("{count} Sender", "{count} stations", { count: shown.length }),
     genre === SEASON_RUBRIC ? input.seasonLabel : (genre ? `${colorSquare(genreColors.get(genre))} ${genre}` : null),
     query ? `${t("Suche", "Search")}: „${query.slice(0, 40)}“` : null,
   ]);
@@ -201,7 +201,7 @@ export function buildStationBrowserPayload(input) {
     actions.push(new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId(`${prefix}fav:${session.id}`)
-        .setPlaceholder(t(`⭐ Favoriten auf dieser Seite (höchstens ${input.favoriteLimit || 3})`, `⭐ Favourites on this page (at most ${input.favoriteLimit || 3})`))
+        .setPlaceholder(t("⭐ Favoriten auf dieser Seite (höchstens {limit})", "⭐ Favourites on this page (at most {limit})", { limit: input.favoriteLimit || 3 }))
         .setMinValues(0)
         .setMaxValues(favoriteCandidates.length)
         .addOptions(favoriteCandidates.map((entry) => ({

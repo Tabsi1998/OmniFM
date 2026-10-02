@@ -5,6 +5,7 @@
 // the design being edited, sent as Discord's JSON. The dashboard only draws
 // that JSON, so preview and panel can never drift apart.
 import { buildNowPlayingPanel } from "./now-playing-panel.js";
+import { botTranslator } from "../../lib/bot-i18n.js";
 
 const SAMPLE_FAVORITES = [
   { key: "lounge", name: "Lounge", color: "#8B5CF6" },
@@ -22,7 +23,7 @@ const SAMPLE_FAVORITES = [
  * }} [options]
  */
 export function buildPanelPreviewInput({ design, language = "de", applicationId = null, planTier = "pro", favorites = null, workerName = "OmniFM", sample = {} } = {}) {
-  const t = (de, en) => (language === "de" ? de : en);
+  const t = botTranslator(language);
   const input = {
     t,
     applicationId,

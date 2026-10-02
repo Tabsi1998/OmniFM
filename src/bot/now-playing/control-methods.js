@@ -104,13 +104,14 @@ const nowPlayingControlMethods = {
         const probe = await runRuntimeFailbackProbe(this, guildId, state, { requiredConfirmations: 1 });
         if (probe?.switched) {
           result = { ok: true };
-          msg = t(`\u21a9 Zurück auf ${desiredName}.`, `\u21a9 Back on ${desiredName}.`);
+          msg = t("\u21a9 Zurück auf {station}.", "\u21a9 Back on {station}.", { station: desiredName });
         } else if (probe?.abandoned) {
           result = {
             ok: false,
             error: t(
-              `${desiredName} ist auf diesem Server nicht mehr verfügbar. OmniFM bleibt beim aktuellen Sender.`,
-              `${desiredName} is no longer available on this server. OmniFM stays on the current station.`
+              "{station} ist auf diesem Server nicht mehr verfügbar. OmniFM bleibt beim aktuellen Sender.",
+              "{station} is no longer available on this server. OmniFM stays on the current station.",
+              { station: desiredName }
             ),
           };
         } else if (probe?.skipped === "paused") {
@@ -130,8 +131,9 @@ const nowPlayingControlMethods = {
           result = {
             ok: false,
             error: t(
-              `${desiredName} ist noch nicht erreichbar. OmniFM prüft automatisch weiter und wechselt zurück, sobald der Sender wieder läuft.`,
-              `${desiredName} is not reachable yet. OmniFM keeps checking and switches back once the station plays again.`
+              "{station} ist noch nicht erreichbar. OmniFM prüft automatisch weiter und wechselt zurück, sobald der Sender wieder läuft.",
+              "{station} is not reachable yet. OmniFM keeps checking and switches back once the station plays again.",
+              { station: desiredName }
             ),
           };
         }
@@ -142,8 +144,9 @@ const nowPlayingControlMethods = {
         ? { ok: true }
         : { ok: false, error: t("Es ist gerade kein Ersatzsender aktiv.", "No backup station is active right now.") };
       msg = t(
-        `\u2714 ${state?.currentStationName || state?.currentStationKey || "-"} bleibt der Sender für diesen Server.`,
-        `\u2714 ${state?.currentStationName || state?.currentStationKey || "-"} stays the station for this server.`
+        "\u2714 {station} bleibt der Sender für diesen Server.",
+        "\u2714 {station} stays the station for this server.",
+        { station: state?.currentStationName || state?.currentStationKey || "-" }
       );
     } else {
       await interaction.editReply({ content: t("Unbekannte Aktion.", "Unknown action.") });

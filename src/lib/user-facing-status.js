@@ -1,3 +1,5 @@
+import { botTranslator } from "./bot-i18n.js";
+
 function clampNumber(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -29,13 +31,13 @@ function normalizeRuntimeStatusInput(source = {}) {
   };
 }
 
-function buildUserFacingRuntimeStatus(source = {}, { t = (de, _en) => de } = {}) {
+function buildUserFacingRuntimeStatus(source = {}, { t = botTranslator("de") } = {}) {
   const status = normalizeRuntimeStatusInput(source);
   const playbackBits = [];
   if (status.stationName) playbackBits.push(status.stationName);
   if (status.channelLabel) playbackBits.push(status.channelLabel);
   if (status.listeners > 0) {
-    playbackBits.push(t(`${status.listeners} Zuhörer`, `${status.listeners} listeners`));
+    playbackBits.push(t("{count} Zuhörer", "{count} listeners", { count: status.listeners }));
   }
 
   if (!status.ready) {
@@ -110,19 +112,23 @@ function buildUserFacingRuntimeStatus(source = {}, { t = (de, _en) => de } = {})
 
   if (status.failoverActive && status.connected && status.desiredStationName) {
     const nextCheck = status.failbackNextProbeAt > 0
-      ? t(
-        ` Nächste Prüfung <t:${Math.floor(status.failbackNextProbeAt / 1000)}:R>.`,
-        ` Next check <t:${Math.floor(status.failbackNextProbeAt / 1000)}:R>.`
-      )
+      ? t(" Nächste Prüfung <t:{unix}:R>.", " Next check <t:{unix}:R>.", { unix: Math.floor(status.failbackNextProbeAt / 1000) })
       : "";
     return {
       code: "failover",
       label: t("Ersatzsender aktiv", "Backup station active"),
       accent: 0xF59E0B,
-      summary: t(
-        `${status.desiredStationName} ist gerade nicht erreichbar. OmniFM spielt ${status.stationName || "einen Ersatzsender"} und wechselt automatisch zurück, sobald ${status.desiredStationName} wieder läuft.${nextCheck}`,
-        `${status.desiredStationName} is unreachable right now. OmniFM plays ${status.stationName || "a backup station"} and switches back automatically once ${status.desiredStationName} plays again.${nextCheck}`
-      ),
+      summary: (status.stationName
+        ? t(
+          "{station} ist gerade nicht erreichbar. OmniFM spielt {backup} und wechselt automatisch zurück, sobald {station} wieder läuft.{next}",
+          "{station} is unreachable right now. OmniFM plays {backup} and switches back automatically once {station} plays again.{next}",
+          { station: status.desiredStationName, backup: status.stationName, next: nextCheck }
+        )
+        : t(
+          "{station} ist gerade nicht erreichbar. OmniFM spielt einen Ersatzsender und wechselt automatisch zurück, sobald {station} wieder läuft.{next}",
+          "{station} is unreachable right now. OmniFM plays a backup station and switches back automatically once {station} plays again.{next}",
+          { station: status.desiredStationName, next: nextCheck }
+        )),
       playback: playbackBits.join(" | ") || t("Ersatzsender läuft", "Backup station playing"),
       nextStep: t(
         "Kein Eingreifen nötig. Die Buttons unter der Now-Playing-Nachricht wechseln sofort zurück oder behalten den Ersatzsender.",

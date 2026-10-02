@@ -77,10 +77,7 @@ async function resolvePlayableStation(runtime, interaction, requested) {
       const translated = translateCustomStationErrorMessage(validation.error, language);
       return {
         errorPayload: {
-          content: t(
-            `Custom-Station kann nicht genutzt werden: ${translated}`,
-            `Custom station cannot be used: ${translated}`
-          ),
+          content: t("Custom-Station kann nicht genutzt werden: {reason}", "Custom station cannot be used: {reason}", { reason: translated }),
           flags: MessageFlags.Ephemeral,
         },
       };
@@ -126,10 +123,10 @@ export async function delegatePlayToWorker(runtime, {
     });
     if (!check.ok) {
       const reasons = {
-        tier: t(`Worker ${requestedBotIndex} erfordert ein höheres Abo (max: ${check.maxIndex}).`, `Worker ${requestedBotIndex} requires a higher plan (max: ${check.maxIndex}).`),
-        not_configured: t(`Worker ${requestedBotIndex} ist nicht konfiguriert.`, `Worker ${requestedBotIndex} is not configured.`),
-        offline: t(`Worker ${requestedBotIndex} ist offline.`, `Worker ${requestedBotIndex} is offline.`),
-        not_invited: t(`Worker ${requestedBotIndex} ist nicht auf diesem Server. Nutze \`/invite worker:${requestedBotIndex}\` zum Einladen.`, `Worker ${requestedBotIndex} is not on this server. Use \`/invite worker:${requestedBotIndex}\` to invite.`),
+        tier: t("Worker {worker} erfordert ein höheres Abo (max: {max}).", "Worker {worker} requires a higher plan (max: {max}).", { worker: requestedBotIndex, max: check.maxIndex }),
+        not_configured: t("Worker {worker} ist nicht konfiguriert.", "Worker {worker} is not configured.", { worker: requestedBotIndex }),
+        offline: t("Worker {worker} ist offline.", "Worker {worker} is offline.", { worker: requestedBotIndex }),
+        not_invited: t("Worker {worker} ist nicht auf diesem Server. Nutze `/invite worker:{worker}` zum Einladen.", "Worker {worker} is not on this server. Use `/invite worker:{worker}` to invite.", { worker: requestedBotIndex }),
       };
       return { ok: false, message: reasons[check.reason] || t("Worker nicht verfügbar.", "Worker not available.") };
     }
@@ -195,7 +192,7 @@ export async function delegatePlayToWorker(runtime, {
   worker.clearScheduledEventPlaybackInGuild(guildId);
   const result = await worker.playInGuild(guildId, channelId, playable.key, playable.playStations, undefined);
   if (!result.ok) {
-    return { ok: false, message: t(`Fehler: ${result.error}`, `Error: ${result.error}`) };
+    return { ok: false, message: t("Fehler: {error}", "Error: {error}", { error: result.error }) };
   }
   if (typeof runtime.workerManager.refreshRemoteStates === "function") {
     await runtime.workerManager.refreshRemoteStates({ force: true }).catch(() => null);
@@ -317,17 +314,20 @@ export async function executeRuntimePlay(runtime, interaction, {
         : t("✅ Stream gestartet", "✅ Stream started"),
       description: result.recovering
         ? t(
-          `${result.workerName} bleibt verbunden und versucht die Quelle erneut: **${selectedStation?.name || playable.key}**${tierLabel}`,
-          `${result.workerName} stays connected and retries the source: **${selectedStation?.name || playable.key}**${tierLabel}`
+          "{worker} bleibt verbunden und versucht die Quelle erneut: **{station}**{plan}",
+          "{worker} stays connected and retries the source: **{station}**{plan}",
+          { worker: result.workerName, station: selectedStation?.name || playable.key, plan: tierLabel }
         )
         : reusingExistingWorker
           ? t(
-            `${result.workerName} wechselt jetzt auf **${selectedStation?.name || playable.key}**${tierLabel}.`,
-            `${result.workerName} is now switching to **${selectedStation?.name || playable.key}**${tierLabel}.`
+            "{worker} wechselt jetzt auf **{station}**{plan}.",
+            "{worker} is now switching to **{station}**{plan}.",
+            { worker: result.workerName, station: selectedStation?.name || playable.key, plan: tierLabel }
           )
           : t(
-            `${result.workerName} startet jetzt **${selectedStation?.name || playable.key}**${tierLabel}.`,
-            `${result.workerName} is now starting **${selectedStation?.name || playable.key}**${tierLabel}.`
+            "{worker} startet jetzt **{station}**{plan}.",
+            "{worker} is now starting **{station}**{plan}.",
+            { worker: result.workerName, station: selectedStation?.name || playable.key, plan: tierLabel }
           ),
       fields: [
         {
@@ -395,8 +395,9 @@ export async function executeRuntimePlay(runtime, interaction, {
             tone: "success",
             title: t("✅ Stream gestartet", "✅ Stream started"),
             description: t(
-              `Jetzt live: **${playable.playStations.stations[playable.key]?.name || playable.key}**${tierLabel}`,
-              `Now live: **${playable.playStations.stations[playable.key]?.name || playable.key}**${tierLabel}`
+              "Jetzt live: **{station}**{plan}",
+              "Now live: **{station}**{plan}",
+              { station: playable.playStations.stations[playable.key]?.name || playable.key, plan: tierLabel }
             ),
           }),
         ],
@@ -431,8 +432,9 @@ export async function executeRuntimePlay(runtime, interaction, {
               tone: "warning",
               title: t("⚠ Stream stabilisiert sich", "⚠ Stream is stabilizing"),
               description: t(
-                `Verbunden. Die Quelle ist aktuell instabil, OmniFM versucht **${playable.playStations.stations[playable.key]?.name || playable.key}** erneut.`,
-                `Connected. The source is unstable right now, OmniFM is retrying **${playable.playStations.stations[playable.key]?.name || playable.key}**.`
+                "Verbunden. Die Quelle ist aktuell instabil, OmniFM versucht **{station}** erneut.",
+                "Connected. The source is unstable right now, OmniFM is retrying **{station}**.",
+                { station: playable.playStations.stations[playable.key]?.name || playable.key }
               ),
             }),
           ],
@@ -471,7 +473,7 @@ export async function executeRuntimePlay(runtime, interaction, {
           buildOmniEmbed({
             tone: "danger",
             title: t("✖ Start fehlgeschlagen", "✖ Start failed"),
-            description: t(`Fehler beim Starten: ${err.message}`, `Error while starting: ${err.message}`),
+            description: t("Fehler beim Starten: {error}", "Error while starting: {error}", { error: err.message }),
           }),
         ],
         components: [

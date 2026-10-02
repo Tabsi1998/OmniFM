@@ -8,6 +8,7 @@ import {
   getDashboardExportWebhookEventLabel,
   buildDashboardExportDownloadName,
 } from "../frontend/src/lib/dashboardExports.js";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 test("dashboard exports helpers normalize config and labels", () => {
   const config = normalizeDashboardExportsWebhookConfig({
@@ -25,7 +26,7 @@ test("dashboard exports helpers normalize config and labels", () => {
     events: ["stats_exported", "custom_stations_exported"],
   });
   assert.equal(
-    getDashboardExportWebhookEventLabel(DASHBOARD_EXPORT_WEBHOOK_EVENTS[0].key, (_de, en) => en),
+    getDashboardExportWebhookEventLabel(DASHBOARD_EXPORT_WEBHOOK_EVENTS[0].key, botTranslator("en")),
     "Stats exports"
   );
 });
@@ -43,14 +44,14 @@ test("dashboard exports config keeps a stored-secret indicator without rehydrati
 });
 
 test("dashboard exports helpers expose useful summary states and filenames", () => {
-  const inactiveSummary = buildDashboardExportsWebhookSummary({}, (_de, en) => en);
+  const inactiveSummary = buildDashboardExportsWebhookSummary({}, botTranslator("en"));
   assert.equal(inactiveSummary.statusLabel, "Not configured");
 
   const activeSummary = buildDashboardExportsWebhookSummary({
     enabled: true,
     url: "https://example.com/webhook",
     events: ["stats_exported"],
-  }, (_de, en) => en);
+  }, botTranslator("en"));
   assert.equal(activeSummary.statusLabel, "Active");
 
   const fileName = buildDashboardExportDownloadName("custom-stations", "1234567890", "2026-03-09T08:00:00.000Z");

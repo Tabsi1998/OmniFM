@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { MessageFlags } from "discord.js";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 const scratchDir = fs.mkdtempSync(path.join(os.tmpdir(), "omnifm-weekly-recap-"));
 process.env.OMNIFM_RUNTIME_DATA_DIR = scratchDir;
@@ -16,7 +17,7 @@ const { sendWeeklyDigest } = await import("../src/services/weekly-digest-service
 const songPlays = await import("../src/song-plays-store.js");
 const ui = await import("../src/discord/ui/index.js");
 
-const de = (german) => german;
+const de = botTranslator("de");
 const HOUR = 3_600_000;
 // Sent on Monday 29 Sep 2026, 09:00 local time: the week is Mon 22 – Sun 28.
 const NOW = new Date(2026, 8, 29, 9, 0, 0);

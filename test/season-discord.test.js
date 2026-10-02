@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 // The seasonal decoration in Discord (#426), each season with a made-up date:
 // the panel's line and colour, the voice channel status, the bot's status
@@ -19,8 +20,8 @@ const { renderVoiceStatusTemplate, VOICE_STATUS_PLACEHOLDERS } = await import(".
 const { setOwnerSettingsForTests } = await import("../src/lib/owner-settings-cache.js");
 
 const GUILD = "123456789012345678";
-const de = (german) => german;
-const en = (_german, english) => english;
+const de = botTranslator("de");
+const en = botTranslator("en");
 const at = (iso, options = {}) => seasonForServer({ now: new Date(iso), guildId: GUILD, ...options });
 
 function panelInput(overrides = {}) {

@@ -346,7 +346,7 @@ export function demoSettingsAnswer(guildId, { language = 'en', now = Date.now() 
     },
     voiceStatus: { template: '', defaultTemplate: '🔊 | 24/7 {station}', placeholders: ['station', 'title', 'artist', 'listeners', 'emoji', 'bot', 'season'], maxLength: 120 },
     favorites: { stations: [...stored.favoriteStations], limit: PLAN_LIMITS[guild.plan].favorites, max: FAVORITES_MAX },
-    serverLanguage: { current: 'auto', options: ['auto', 'de', 'en'] },
+    serverLanguage: { current: 'auto', options: ['auto', 'de', 'en', 'fr', 'es', 'it', 'pl', 'tr', 'pt', 'nl'] },
     serverTimeZone: { current: stored.timeZone || DEMO_TIME_ZONE, default: DEMO_TIME_ZONE },
     seasonDecor: { seasons: ALL_ON(SEASONS), parts: ALL_ON(SEASON_PARTS), ownerEnabled: ALL_ON(SEASONS), current: null },
   };

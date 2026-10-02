@@ -1,5 +1,6 @@
-import { normalizeLanguage, getDefaultLanguage } from "../i18n.js";
+import { getDefaultLanguage } from "../i18n.js";
 import { isPublicOrigin, originOf, webDomainOrigin } from "../lib/public-origin.js";
+import { normalizeBotLanguage } from "../lib/bot-i18n.js";
 
 export function resolveWebsiteUrl() {
   const explicit = String(process.env.PUBLIC_WEB_URL || "").trim();
@@ -28,7 +29,7 @@ export const GUIDE_URL = `${String(WEBSITE_URL || "").replace(/\/+$/, "")}/start
 export function withLanguageParam(url, language) {
   const safeUrl = String(url || "").trim();
   if (!safeUrl) return safeUrl;
-  const lang = normalizeLanguage(language, getDefaultLanguage());
+  const lang = normalizeBotLanguage(language, getDefaultLanguage());
   try {
     const parsed = new URL(safeUrl);
     parsed.searchParams.set("lang", lang);

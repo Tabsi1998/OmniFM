@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { MessageFlags } from "discord.js";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 const scratchDir = fs.mkdtempSync(path.join(os.tmpdir(), "omnifm-saved-songs-"));
 process.env.OMNIFM_RUNTIME_DATA_DIR = scratchDir;
@@ -16,7 +17,7 @@ const ui = await import("../src/discord/ui/index.js");
 const { BotRuntime } = await import("../src/bot/runtime.js");
 const { buildCommandsJson } = await import("../src/commands.js");
 
-const de = (german) => german;
+const de = botTranslator("de");
 const USER = "123456789012345678";
 const OTHER = "223456789012345678";
 const GUILD = "323456789012345678";

@@ -19,6 +19,7 @@ import * as ui from "../discord/ui/index.js";
 import { PLAN_NAMES } from "../config/plan-features.js";
 import { cleanReportText, publicReportView, reportThreadName } from "../lib/problem-reports.js";
 import { problemReasonLabel } from "./forms.js";
+import { botTranslator } from "../lib/bot-i18n.js";
 
 // The team's buttons, and the answer form "done" and "rejected" open when the reporter wants to hear back.
 export const REPORT_PREFIX = "omnifm:report:";
@@ -139,8 +140,7 @@ export function buildReportAnswerModal(decision, id) {
 
 /** The direct message for somebody who asked to hear back, in their language: done or rejected, and the team's answer. */
 export function buildReporterNotice(report) {
-  const english = report.language !== "de";
-  const t = (de, en) => (english ? en : de);
+  const t = botTranslator(report.language || "en");
   const look = KIND_LOOK[report.kind] || KIND_LOOK.problem;
   const done = report.status === "done";
   const title = done

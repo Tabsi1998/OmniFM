@@ -21,6 +21,7 @@ import {
 } from "./runtime-links.js";
 import { brandAuthor, brandFooter } from "./brand-embed.js";
 import { buildHelpPayload } from "./help-panel.js";
+import { botTranslator } from "../lib/bot-i18n.js";
 
 function getTierConfig(guildId) {
   const config = getServerPlanConfig(guildId);
@@ -30,11 +31,12 @@ function getTierConfig(guildId) {
 // /help (#269): one panel with a topic menu; see help-panel.js.
 export function buildRuntimeHelpMessage(runtime, interaction, section = "overview") {
   const language = runtime.resolveInteractionLanguage(interaction);
-  const t = (de, en) => (language === "de" ? de : en);
+  const t = botTranslator(language);
   const guildId = interaction?.guildId;
   const tierConfig = guildId ? getTierConfig(guildId) : PLANS.free;
   return buildHelpPayload({
     t,
+    language,
     section,
     plan: { name: tierConfig.name, bitrate: tierConfig.bitrate, maxBots: tierConfig.maxBots },
     guildName: clipText(interaction?.guild?.name || "", 60),
@@ -140,8 +142,9 @@ export async function buildRuntimeWorkersStatusPayload(runtime, interaction, { h
     .setTitle(t("🤖 Worker-Status", "🤖 Worker status"))
     .setDescription(
       t(
-        `Plan: **${runtime.formatTierLabel(guildTier, language)}** | Freigeschaltet: **1-${maxIndex}**\nOnline: **${onlineCount}/${statuses.length}** | Aktiv: **${activeTotal}**`,
-        `Plan: **${runtime.formatTierLabel(guildTier, language)}** | Unlocked: **1-${maxIndex}**\nOnline: **${onlineCount}/${statuses.length}** | Active: **${activeTotal}**`
+        "Plan: **{plan}** | Freigeschaltet: **1-{max}**\nOnline: **{online}/{total}** | Aktiv: **{active}**",
+        "Plan: **{plan}** | Unlocked: **1-{max}**\nOnline: **{online}/{total}** | Active: **{active}**",
+        { plan: runtime.formatTierLabel(guildTier, language), max: maxIndex, online: onlineCount, total: statuses.length, active: activeTotal }
       )
     )
     .addFields({
@@ -158,8 +161,9 @@ export async function buildRuntimeWorkersStatusPayload(runtime, interaction, { h
     });
   }
   summaryEmbed.setFooter(brandFooter(t(
-    `Seite ${resolvedPage + 1}/${totalPages} · 🟢 Spielt · 🟡 Bereit · 🔴 Offline · 📨 Nicht eingeladen · 🔒 Upgrade`,
-    `Page ${resolvedPage + 1}/${totalPages} · 🟢 Playing · 🟡 Ready · 🔴 Offline · 📨 Not invited · 🔒 Upgrade`
+    "Seite {page}/{pages} · 🟢 Spielt · 🟡 Bereit · 🔴 Offline · 📨 Nicht eingeladen · 🔒 Upgrade",
+    "Page {page}/{pages} · 🟢 Playing · 🟡 Ready · 🔴 Offline · 📨 Not invited · 🔒 Upgrade",
+    { page: resolvedPage + 1, pages: totalPages }
   )));
 
   const row = new ActionRowBuilder().addComponents(

@@ -28,6 +28,7 @@ import {
   isReportKind,
   readConsents,
 } from "../lib/problem-reports.js";
+import { botTranslator } from "../lib/bot-i18n.js";
 
 export const FORM_PREFIX = "omnifm:form:";
 export const STATION_FORM_ID = `${FORM_PREFIX}station`;
@@ -260,7 +261,7 @@ export function readProblemReport(fields) {
   };
 }
 
-export function problemReasonLabel(reason, t = (de, _en) => de) {
+export function problemReasonLabel(reason, t = botTranslator("de")) {
   const entry = PROBLEM_REASONS.find((item) => item.value === reason);
   return entry ? t(entry.de, entry.en) : reason;
 }

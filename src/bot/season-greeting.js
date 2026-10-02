@@ -10,6 +10,7 @@ import { localTime } from "../lib/seasons.js";
 import { getDb, isConnected } from "../lib/db.js";
 import { isRuntimePlaybackActive } from "./runtime-live-state.js";
 import { SEASON_COLORS } from "./season-look.js";
+import { botTranslator } from "../lib/bot-i18n.js";
 
 /** The greeting goes out in the first minutes after midnight; a bot that starts later stays quiet. */
 export const GREETING_WINDOW_MINUTES = 15;
@@ -77,7 +78,7 @@ export async function sendNewYearGreeting(runtime, {
   if (String(state.nowPlayingChannelId || "") !== String(channel.id)) return false;
   if (!(await claimGreeting(db, { guildId, year: season.year, preview: season.preview === true }))) return false;
   const language = runtime.resolveGuildLanguage?.(guildId) || "en";
-  const t = (de, en) => (language === "de" ? de : en);
+  const t = botTranslator(language);
   const appId = runtime.getApplicationId?.() || runtime.client?.application?.id || null;
   await channel.send({ ...buildNewYearGreeting({ year: season.year, t, appId }), allowedMentions: { parse: [] } });
   return true;

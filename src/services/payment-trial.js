@@ -23,10 +23,11 @@ import {
 } from "../premium-store.js";
 import { buildInviteOverviewForTier, resolvePublicWebsiteUrl } from "../lib/api-helpers.js";
 import { sendMailWithRetry } from "./payment.js";
+import { botTranslator } from "../lib/bot-i18n.js";
 
 export async function activateProTrial({ email, language, runtimes, source = "trial" }) {
   const customerLanguage = normalizeLanguage(language, getDefaultLanguage());
-  const t = (de, en) => (customerLanguage === "de" ? de : en);
+  const t = botTranslator(customerLanguage);
   const customerEmail = String(email || "").trim().toLowerCase();
 
   if (!isProTrialEnabled()) {

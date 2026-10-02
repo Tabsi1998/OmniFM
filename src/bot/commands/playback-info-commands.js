@@ -228,8 +228,9 @@ export async function handleSleepCommand({ runtime, interaction, t, language, st
     title: minutes ? t("Sleep-Timer an", "Sleep timer on") : t("Sleep-Timer aus", "Sleep timer off"),
     body: minutes
       ? t(
-        `😴 ${formatWorkerList(done.map(({ worker }) => worker))} schaltet <t:${unix}:R> leise aus (um <t:${unix}:t>). Eine Minute vorher kommt ein Hinweis mit „+30 min“.`,
-        `😴 ${formatWorkerList(done.map(({ worker }) => worker))} turns off softly <t:${unix}:R> (at <t:${unix}:t>). A minute before, a note with “+30 min” comes.`
+        "😴 {workers} schaltet <t:{unix}:R> leise aus (um <t:{unix}:t>). Eine Minute vorher kommt ein Hinweis mit „+30 min“.",
+        "😴 {workers} turns off softly <t:{unix}:R> (at <t:{unix}:t>). A minute before, a note with “+30 min” comes.",
+        { workers: formatWorkerList(done.map(({ worker }) => worker)), unix }
       )
       : t("OmniFM spielt weiter, bis ihr stoppt.", "OmniFM keeps playing until you stop it."),
   })));

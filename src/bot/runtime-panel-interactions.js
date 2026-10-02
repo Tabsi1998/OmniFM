@@ -232,11 +232,12 @@ export async function handleRuntimePanelInteraction(runtime, interaction) {
         hint = t("Die Favoriten konnte ich gerade nicht speichern. Versuch es gleich noch einmal.", "I could not save the favourites right now. Please try again in a moment.");
       } else if (change.refused.length) {
         hint = t(
-          `Mehr als ${limit} Favoriten gehen mit deinem Plan nicht. Nimm erst einen anderen heraus.`,
-          `Your plan allows ${limit} favourites. Remove another one first.`
+          "Mehr als {limit} Favoriten gehen mit deinem Plan nicht. Nimm erst einen anderen heraus.",
+          "Your plan allows {limit} favourites. Remove another one first.",
+          { limit }
         );
       } else {
-        hint = t(`⭐ Gespeichert: ${change.list.length} Favoriten. Sie erscheinen im Now-Playing-Panel.`, `⭐ Saved: ${change.list.length} favourites. They show up in the now-playing panel.`);
+        hint = t("⭐ Gespeichert: {count} Favoriten. Sie erscheinen im Now-Playing-Panel.", "⭐ Saved: {count} favourites. They show up in the now-playing panel.", { count: change.list.length });
       }
       runtime.updateInteractiveUiSession(session.id, { data: { favorites: saved?.ok ? saved.list : session.data?.favorites || [] } });
       await interaction.update(buildRuntimeStationsBrowserPayload(runtime, interaction, runtime.getInteractiveUiSession(session.id), { hint }));

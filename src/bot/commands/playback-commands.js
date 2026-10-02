@@ -87,10 +87,7 @@ async function handleWorkersCommand({ runtime, interaction, t, language }) {
         language,
         tone: "success",
         title: t("📋 Worker-Panel gepostet", "📋 Worker panel posted"),
-        description: t(
-          `Worker-Panel gepostet: ${panelMessage?.url || createdLabel}`,
-          `Worker panel posted: ${panelMessage?.url || createdLabel}`
-        ),
+        description: t("Worker-Panel gepostet: {link}", "Worker panel posted: {link}", { link: panelMessage?.url || createdLabel }),
       }));
     } catch (err) {
       await interaction.reply(buildNoticePayload({
@@ -157,10 +154,7 @@ async function handlePauseCommand({ runtime, interaction, t, language, state }) 
       language,
       tone: failures.length > 0 ? "warning" : "success",
       title: t("⏸ Wiedergabe pausiert", "⏸ Playback paused"),
-      description: t(
-        `Pausiert: ${formatWorkerList(pausedWorkers) || t("Worker", "worker")}`,
-        `Paused: ${formatWorkerList(pausedWorkers) || t("worker", "worker")}`
-      ),
+      description: t("Pausiert: {workers}", "Paused: {workers}", { workers: formatWorkerList(pausedWorkers) || t("Worker", "worker") }),
       fields: failures.length > 0 ? [{ name: t("Fehler", "Errors"), value: clipText(failures.join("\n"), 1024), inline: false }] : [],
       quickActions: { includePlay: true, includeStations: true },
     }));
@@ -233,10 +227,7 @@ async function handleResumeCommand({ runtime, interaction, t, language, state })
       language,
       tone: failures.length > 0 ? "warning" : "success",
       title: t("▶ Wiedergabe fortgesetzt", "▶ Playback resumed"),
-      description: t(
-        `Fortgesetzt: ${formatWorkerList(resumedWorkers) || t("Worker", "worker")}`,
-        `Resumed: ${formatWorkerList(resumedWorkers) || t("worker", "worker")}`
-      ),
+      description: t("Fortgesetzt: {workers}", "Resumed: {workers}", { workers: formatWorkerList(resumedWorkers) || t("Worker", "worker") }),
       fields: failures.length > 0 ? [{ name: t("Fehler", "Errors"), value: clipText(failures.join("\n"), 1024), inline: false }] : [],
     }));
     return;
@@ -282,10 +273,7 @@ async function handleStopCommand({ runtime, interaction, t, language }) {
           language,
           tone: "warning",
           title: t("🤖 Worker nicht gefunden", "🤖 Worker not found"),
-          description: t(
-            `Worker **${requestedBot}** ist nicht konfiguriert oder nicht verfügbar.`,
-            `Worker **${requestedBot}** is not configured or not available.`
-          ),
+          description: t("Worker **{worker}** ist nicht konfiguriert oder nicht verfügbar.", "Worker **{worker}** is not configured or not available.", { worker: requestedBot }),
           extraComponents: [
             new ActionRowBuilder().addComponents(
               new ButtonBuilder()
@@ -304,10 +292,7 @@ async function handleStopCommand({ runtime, interaction, t, language }) {
           language,
           tone: "info",
           title: t("🛑 Dieser Bot streamt nicht", "🛑 This bot is not streaming"),
-          description: t(
-            `**${worker.config?.name || `Bot ${requestedBot}`}** streamt aktuell nicht auf diesem Server.`,
-            `**${worker.config?.name || `Bot ${requestedBot}`}** is not currently streaming on this server.`
-          ),
+          description: t("**{worker}** streamt aktuell nicht auf diesem Server.", "**{worker}** is not currently streaming on this server.", { worker: worker.config?.name || `Bot ${requestedBot}` }),
           fields: streamingWorkers.length > 0
             ? [{
               name: t("Aktive Worker", "Active workers"),
@@ -422,10 +407,7 @@ async function handleStopCommand({ runtime, interaction, t, language }) {
       language,
       tone: failures.length > 0 ? "warning" : "success",
       title: t("🛑 Wiedergabe gestoppt", "🛑 Playback stopped"),
-      description: t(
-        `Gestoppt: ${formatWorkerList(stoppedWorkers) || t("Worker", "worker")}`,
-        `Stopped: ${formatWorkerList(stoppedWorkers) || t("worker", "worker")}`
-      ),
+      description: t("Gestoppt: {workers}", "Stopped: {workers}", { workers: formatWorkerList(stoppedWorkers) || t("Worker", "worker") }),
       fields: failures.length > 0 ? [{ name: t("Fehler", "Errors"), value: clipText(failures.join("\n"), 1024), inline: false }] : [],
       quickActions: { includePlay: true, includeStations: true },
     }));

@@ -7,6 +7,7 @@ import {
 } from "./dashboard-incident-alerts.js";
 import { log } from "./logging.js";
 import { serverHasCapability } from "../core/entitlements.js";
+import { botTranslator, normalizeBotLanguage } from "./bot-i18n.js";
 
 const CUSTOMER_VISIBLE_RUNTIME_INCIDENT_EVENT_KEYS = new Set([
   "stream_healthcheck_stalled",
@@ -161,8 +162,8 @@ function buildRuntimeIncidentAlertCopy(eventKey, payload, t) {
 }
 
 export function buildRuntimeIncidentAlertMessage(input) {
-  const language = String(input?.language || "de").trim().toLowerCase() === "en" ? "en" : "de";
-  const t = (de, en) => (language === "en" ? en : de);
+  const language = normalizeBotLanguage(input?.language, "de");
+  const t = botTranslator(language);
   const payload = input?.payload && typeof input.payload === "object" ? input.payload : {};
   const copy = buildRuntimeIncidentAlertCopy(input?.eventKey, payload, t);
   const runtimeMeta = payload?.runtime && typeof payload.runtime === "object" ? payload.runtime : {};

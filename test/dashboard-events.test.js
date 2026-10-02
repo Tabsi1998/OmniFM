@@ -9,6 +9,7 @@ import {
   getDashboardRepeatLabel,
   renderDiscordMarkdown,
 } from "../frontend/src/lib/dashboardEvents.js";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 test("renderDiscordMarkdown keeps HTML escaped but renders Discord custom emojis", () => {
   const html = renderDiscordMarkdown(
@@ -57,7 +58,7 @@ test("getDashboardRepeatLabel mirrors Discord-style recurrence labels", () => {
 });
 
 test("dashboard event templates provide reusable pro event defaults", () => {
-  const t = (_de, en) => en;
+  const t = botTranslator("en");
   const templates = buildDashboardEventTemplatePresets(t);
   const primeTime = templates.find((entry) => entry.id === "prime_time");
 
@@ -69,7 +70,7 @@ test("dashboard event templates provide reusable pro event defaults", () => {
 });
 
 test("dashboard schedule presets compute deterministic quick picks", () => {
-  const t = (_de, en) => en;
+  const t = botTranslator("en");
   const presets = buildDashboardSchedulePresets(t, new Date(2026, 2, 5, 19, 30, 0, 0));
   const friday = presets.find((entry) => entry.id === "friday_20");
   const workdays = presets.find((entry) => entry.id === "workdays_08");
@@ -82,7 +83,7 @@ test("dashboard schedule presets compute deterministic quick picks", () => {
 });
 
 test("applying event templates and schedule presets only updates the intended form fields", () => {
-  const t = (_de, en) => en;
+  const t = botTranslator("en");
   const primeTime = buildDashboardEventTemplatePresets(t).find((entry) => entry.id === "prime_time");
   const friday = buildDashboardSchedulePresets(t, new Date(2026, 2, 5, 19, 30, 0, 0))
     .find((entry) => entry.id === "friday_20");

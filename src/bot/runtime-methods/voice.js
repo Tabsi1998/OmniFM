@@ -8,7 +8,7 @@ import { log } from "../../lib/logging.js";
 import { clipText } from "../../lib/helpers.js";
 import { recordConnectionEvent } from "../../listening-stats-store.js";
 import { BRAND } from "../../config/plans.js";
-import { normalizeLanguage, getDefaultLanguage } from "../../i18n.js";
+import { getDefaultLanguage } from "../../i18n.js";
 import { buildVoiceChannelAccessMessage } from "../../lib/user-facing-setup.js";
 import { buildRuntimePresenceActivity } from "../runtime-presence.js";
 import { getRuntimeConnectedChannelId } from "../runtime-live-state.js";
@@ -20,12 +20,12 @@ import {
   VOICE_CHANNEL_STATUS_MAX_LENGTH,
   VOICE_CHANNEL_STATUS_REFRESH_MS,
 } from "../runtime-shared.js";
+import { botTranslator, normalizeBotLanguage } from "../../lib/bot-i18n.js";
 
 const voiceMethods = {
   async validateVoiceChannelAccess(guild, channel, { language = null, workerName = "" } = {}) {
-    const resolvedLanguage = normalizeLanguage(language || this.resolveGuildLanguage(guild?.id), getDefaultLanguage());
-    const isDe = resolvedLanguage === "de";
-    const t = (de, en) => (isDe ? de : en);
+    const resolvedLanguage = normalizeBotLanguage(language || this.resolveGuildLanguage(guild?.id), getDefaultLanguage());
+    const t = botTranslator(resolvedLanguage);
 
     if (!guild || !channel) {
       return {

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 const scratchDir = fs.mkdtempSync(path.join(os.tmpdir(), "omnifm-np-failover-ui-"));
 process.env.OMNIFM_RUNTIME_DATA_DIR = scratchDir;
@@ -129,7 +130,7 @@ test("a server mute is detected, recorded once and re-renders the embed", async 
 });
 
 test("/status explains a mute and a backup station in plain words", () => {
-  const t = (de) => de;
+  const t = botTranslator("de");
   const muted = buildUserFacingRuntimeStatus({ ready: true, connected: true, serverMuted: true, stationName: "Alpha FM" }, { t });
   assert.equal(muted.code, "muted");
   assert.match(muted.nextStep, /Server-Stummschaltung aufheben/);
@@ -167,7 +168,7 @@ test("the failback button switches back after a single successful probe", async 
   const replies = [];
   let playedKey = null;
   const runtime = createRuntime(new Map([["guild-1", state]]));
-  runtime.createInteractionTranslator = () => ({ t: (de) => de });
+  runtime.createInteractionTranslator = () => ({ t: botTranslator("de") });
   runtime.resolveStationForGuild = (guildId, key) => ({
     ok: true,
     key,
@@ -200,7 +201,7 @@ test("now-playing buttons follow the /perm rule of their slash command", async (
   const calls = [];
   const replies = [];
   const runtime = createRuntime(new Map([["guild-1", { player: { state: { status: "playing" } }, volume: 50 }]]));
-  runtime.createInteractionTranslator = () => ({ t: (de) => de });
+  runtime.createInteractionTranslator = () => ({ t: botTranslator("de") });
   runtime.checkCommandRolePermission = (interaction, command) => {
     calls.push(command);
     return command === "stop"

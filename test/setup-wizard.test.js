@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { ChannelType, MessageFlags, PermissionFlagsBits } from "discord.js";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 const scratchDir = fs.mkdtempSync(path.join(os.tmpdir(), "omnifm-setup-"));
 process.env.OMNIFM_RUNTIME_DATA_DIR = scratchDir;
@@ -17,8 +18,8 @@ const { getNowPlayingCandidateIds } = await import("../src/lib/now-playing-targe
 const { normalizeGuildSettings } = await import("../src/lib/guild-settings.js");
 const { scoreOnboardingChannel } = await import("../src/bot/runtime-methods/onboarding.js");
 
-const de = (german) => german;
-const en = (_german, english) => english;
+const de = botTranslator("de");
+const en = botTranslator("en");
 const GUILD_ID = "123456789012345678";
 const VOICE_ID = "223456789012345678";
 const STAGE_ID = "323456789012345678";

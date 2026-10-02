@@ -69,7 +69,7 @@ export function planLimits(plan) {
 export function capabilityLabel(capabilityKey, language = "de") {
   const entry = PLAN_CAPABILITIES[capabilityKey];
   if (!entry) return String(capabilityKey || "");
-  return language === "en" ? entry.en : entry.de;
+  return language === "de" ? entry.de : entry.en;
 }
 
 /** "**Rollenrechte** gibt es ab OmniFM **Pro**." */
@@ -85,7 +85,7 @@ export function planRequirementText(capabilityKey, language = "de") {
 const seconds = (ms, language) => {
   const value = ms / 1000;
   const text = Number.isInteger(value) ? String(value) : value.toFixed(1);
-  return language === "en" ? text : text.replace(".", ",");
+  return language === "de" ? text.replace(".", ",") : text;
 };
 
 /**
@@ -254,7 +254,7 @@ export const PLAN_FEATURES = Object.freeze([
  * @param {PlanTexts | null} [texts]
  */
 function lineOf(feature, plan, language, context, texts = null) {
-  const write = texts?.[feature.key] || (language === "en" ? feature.en : feature.de);
+  const write = texts?.[feature.key] || (language === "de" ? feature.de : feature.en);
   const text = write(plan, context);
   return text ? String(text) : null;
 }
@@ -282,6 +282,6 @@ export function planCardLines(plan, { language = "de", context = {}, highlightsO
   }
   let intro = null;
   if (below && texts?.intro) intro = texts.intro(PLAN_NAMES[below]);
-  else if (below) intro = language === "en" ? `Everything in ${PLAN_NAMES[below]}, plus:` : `Alles aus ${PLAN_NAMES[below]}, dazu:`;
+  else if (below) intro = language === "de" ? `Alles aus ${PLAN_NAMES[below]}, dazu:` : `Everything in ${PLAN_NAMES[below]}, plus:`;
   return { basedOn: below, intro, lines };
 }

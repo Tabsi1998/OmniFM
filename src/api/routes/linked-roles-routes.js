@@ -24,6 +24,7 @@ import {
   premiumCustomersOf,
   syncLinkedRoleUser,
 } from "../../services/linked-roles.js";
+import { botTranslator } from "../../lib/bot-i18n.js";
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 const STATE_LIMIT = 500;
@@ -101,7 +102,7 @@ export function createLinkedRolesRoutes({
       return true;
     }
     const language = /^de\b/i.test(String(req.headers["accept-language"] || "").trim()) ? "de" : "en";
-    const t = (de, en) => (language === "de" ? de : en);
+    const t = botTranslator(language);
     if (!ready()) {
       sendPage(res, 503, language, {
         ok: false,

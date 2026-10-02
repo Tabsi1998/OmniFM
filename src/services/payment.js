@@ -30,6 +30,7 @@ import {
 import { markOfferRedemption, previewCheckoutOffer } from "../coupon-store.js";
 import { buildInviteOverviewForTier, resolvePublicWebsiteUrl } from "../lib/api-helpers.js";
 import { activateProTrial } from "./payment-trial.js";
+import { botTranslator } from "../lib/bot-i18n.js";
 
 async function sendMailWithRetry({ to, subject, html, label, maxAttempts = 2 }) {
   let lastError = "";
@@ -135,7 +136,7 @@ async function activateOfferGrant({
   source = "offer-grant",
 }) {
   const customerLanguage = normalizeLanguage(language, getDefaultLanguage());
-  const t = (de, en) => (customerLanguage === "de" ? de : en);
+  const t = botTranslator(customerLanguage);
   const customerEmail = String(email || "").trim().toLowerCase();
   const appliedOfferCode = sanitizeOfferCode(preview?.applied?.code);
   const referralCode = sanitizeOfferCode(preview?.attributionReferralCode || "");

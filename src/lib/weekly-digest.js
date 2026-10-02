@@ -1,3 +1,5 @@
+import { botTranslator } from "./bot-i18n.js";
+
 function clampInt(value, min, max, fallback) {
   const parsed = Number.parseInt(String(value ?? ""), 10);
   if (!Number.isFinite(parsed)) return fallback;
@@ -96,7 +98,7 @@ function buildWeeklyDigestPreview({
   now = new Date(),
 } = {}) {
   const normalizedLanguage = normalizeWeeklyDigestLanguage(language, "de");
-  const t = (de, en) => (normalizedLanguage === "de" ? de : en);
+  const t = botTranslator(normalizedLanguage);
   const generatedAt = toValidDate(now, new Date()) || new Date();
   const safeGuildName = String(guildName || "").trim() || "OmniFM";
   const safeChannelId = String(channelId || "").trim();

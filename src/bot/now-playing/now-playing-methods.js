@@ -39,6 +39,7 @@ import { sendNewYearGreeting } from "../season-greeting.js";
 import { adventDoorFor } from "../advent-calendar.js";
 import { eggSignature } from "../easter-eggs.js";
 import { ownerSettings } from "../../lib/owner-settings-cache.js";
+import { botTranslator } from "../../lib/bot-i18n.js";
 
 // #266: the panel is a Components V2 container. NOW_PLAYING_LAYOUT=classic
 // keeps the old embed for one release as a way back.
@@ -179,7 +180,7 @@ const nowPlayingMethods = {
 
   buildTrackLinkComponents(guildId, station, meta) {
     const language = this.resolveGuildLanguage(guildId);
-    const isDe = language === "de";
+    const t = botTranslator(language);
     const rows = [];
 
     // Steuerungs-Row (immer sichtbar): Pause/Weiter · Stop · Lautstärke -/+ · Sender wechseln.
@@ -191,7 +192,7 @@ const nowPlayingMethods = {
         .setCustomId(`${NP_PREFIX}toggle`)
         .setStyle(paused ? ButtonStyle.Success : ButtonStyle.Secondary)
         .setEmoji(paused ? "\u25b6" : "\u23f8")
-        .setLabel(paused ? (isDe ? "Weiter" : "Resume") : "Pause"),
+        .setLabel(paused ? (t("Weiter", "Resume")) : "Pause"),
       new ButtonBuilder()
         .setCustomId(`${NP_PREFIX}stop`)
         .setStyle(ButtonStyle.Danger)
@@ -209,7 +210,7 @@ const nowPlayingMethods = {
         .setCustomId(STATIONS_COMPONENT_ID_OPEN)
         .setStyle(ButtonStyle.Primary)
         .setEmoji("\u{1f4fb}")
-        .setLabel(isDe ? "Sender" : "Stations"),
+        .setLabel(t("Sender", "Stations")),
     );
     rows.push(controlRow);
 
@@ -227,12 +228,12 @@ const nowPlayingMethods = {
           .setCustomId(`${NP_PREFIX}failback`)
           .setStyle(ButtonStyle.Primary)
           .setEmoji("\u21a9")
-          .setLabel(clipText(isDe ? `Zurück zu ${desiredName}` : `Back to ${desiredName}`, 80)),
+          .setLabel(clipText(t("Zurück zu {station}", "Back to {station}", { station: desiredName }), 80)),
         new ButtonBuilder()
           .setCustomId(`${NP_PREFIX}keepstation`)
           .setStyle(ButtonStyle.Secondary)
           .setEmoji("\u2714")
-          .setLabel(clipText(isDe ? `${currentName} behalten` : `Keep ${currentName}`, 80)),
+          .setLabel(clipText(t("{station} behalten", "Keep {station}", { station: currentName }), 80)),
       ));
     }
 
@@ -244,15 +245,15 @@ const nowPlayingMethods = {
           .setCustomId(`${NP_PREFIX}save`)
           .setStyle(ButtonStyle.Secondary)
           .setEmoji("\u{1f4be}")
-          .setLabel(isDe ? "Merken" : "Save"),
+          .setLabel(t("Merken", "Save")),
         new ButtonBuilder()
           .setStyle(ButtonStyle.Link)
-          .setLabel(isDe ? "YouTube-Suche" : "YouTube search")
+          .setLabel(t("YouTube-Suche", "YouTube search"))
           .setURL(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`)
           .setEmoji("\u{1f4fa}"),
         new ButtonBuilder()
           .setStyle(ButtonStyle.Link)
-          .setLabel(isDe ? "Spotify-Suche" : "Spotify search")
+          .setLabel(t("Spotify-Suche", "Spotify search"))
           .setURL(`https://open.spotify.com/search/${encodeURIComponent(query)}`)
           .setEmoji("\u{1f3b5}"),
       ];
@@ -280,51 +281,43 @@ const nowPlayingMethods = {
   },
 
   buildNowPlayingSourceSummary(language, meta, hasTrack) {
-    const isDe = language === "de";
+    const t = botTranslator(language);
     const metadataSource = String(meta?.metadataSource || "").trim().toLowerCase();
     const metadataStatus = String(meta?.metadataStatus || (hasTrack ? "ok" : "empty")).trim().toLowerCase();
     const recognitionConfidence = Number.parseFloat(String(meta?.recognitionConfidence ?? ""));
 
-    let sourceLabel = isDe ? "Unbekannt" : "Unknown";
+    let sourceLabel = t("Unbekannt", "Unknown");
     let sourceDetail = sourceLabel;
     let sourceNote = null;
 
     if (metadataSource === "icy") {
-      sourceLabel = isDe ? "Sender-Metadaten" : "Station metadata";
+      sourceLabel = t("Sender-Metadaten", "Station metadata");
       sourceDetail = sourceLabel;
     } else if (metadataSource === "recognition") {
-      sourceLabel = isDe ? "Audio-Fingerprint" : "Audio fingerprint";
+      sourceLabel = t("Audio-Fingerprint", "Audio fingerprint");
       sourceDetail = [
         meta?.recognitionProvider || "AcoustID",
         Number.isFinite(recognitionConfidence) ? `${Math.round(recognitionConfidence * 100)}%` : "",
       ].filter(Boolean).join(" | ") || sourceLabel;
-      sourceNote = isDe
-        ? "Per Audio-Fingerprint erkannt."
-        : "Matched via audio fingerprint.";
+      sourceNote = t("Per Audio-Fingerprint erkannt.", "Matched via audio fingerprint.");
     } else if (metadataSource === "icy+recognition") {
-      sourceLabel = isDe ? "Metadaten + Fingerprint" : "Metadata + fingerprint";
+      sourceLabel = t("Metadaten + Fingerprint", "Metadata + fingerprint");
       sourceDetail = [
-        isDe ? "Sender-Metadaten ergänzt" : "Station metadata enriched",
+        t("Sender-Metadaten ergänzt", "Station metadata enriched"),
         meta?.recognitionProvider || "AcoustID",
         Number.isFinite(recognitionConfidence) ? `${Math.round(recognitionConfidence * 100)}%` : "",
       ].filter(Boolean).join(" | ");
-      sourceNote = isDe
-        ? "Senderdaten wurden per Audio-Fingerprint ergänzt."
-        : "Station data was enriched via audio fingerprint.";
+      sourceNote = t("Senderdaten wurden per Audio-Fingerprint ergänzt.", "Station data was enriched via audio fingerprint.");
     } else if (metadataSource === "stream") {
-      sourceLabel = isDe ? "Stream-Info" : "Stream info";
+      sourceLabel = t("Stream-Info", "Stream info");
       sourceDetail = sourceLabel;
     }
 
     let metadataHint = null;
     if (!hasTrack) {
       metadataHint = metadataStatus === "unsupported"
-        ? (isDe
-          ? "Dieser Stream sendet aktuell keine lesbaren Songdaten."
-          : "This stream is not sending readable track data right now.")
-        : (isDe
-          ? "Dieser Sender liefert aktuell keine verwertbaren Songdaten."
-          : "This station is not providing usable track data right now.");
+        ? t("Dieser Stream sendet aktuell keine lesbaren Songdaten.", "This stream is not sending readable track data right now.")
+        : t("Dieser Sender liefert aktuell keine verwertbaren Songdaten.", "This station is not providing usable track data right now.");
     }
 
     return { metadataSource, sourceLabel, sourceDetail, sourceNote, metadataHint };

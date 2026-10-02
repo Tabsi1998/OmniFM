@@ -1,6 +1,7 @@
 // Server dashboard: POST /api/dashboard/license/checkout.
 // Split out of dashboard-license.js (#293).
 import { logError } from "../../lib/logging.js";
+import { botTranslator } from "../../lib/bot-i18n.js";
 
 export function createDashboardLicenseCheckoutRoute(deps) {
   const {
@@ -49,8 +50,7 @@ export function createDashboardLicenseCheckoutRoute(deps) {
           body?.language,
           normalizeLanguage(license?.preferredLanguage, requestLanguage)
         );
-        const isDe = checkoutLanguage === "de";
-        const t = (de, en) => (isDe ? de : en);
+        const t = botTranslator(checkoutLanguage);
 
         if (!license) {
           sendJson(res, 404, {

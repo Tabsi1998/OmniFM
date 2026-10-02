@@ -8,7 +8,8 @@
 /**
  * A catalogued notice: its kind, the title and the body in German and
  * English, and the button that fixes it.
- * @typedef {{ kind: string, title: [string, string], body: (params?: any) => [string, string], fix: string | null }} CatalogNotice
+ * The body may bring the values of its {placeholders} as a third element (#477).
+ * @typedef {{ kind: string, title: [string, string], body: (params?: any) => ([string, string] | [string, string, Record<string, unknown>]), fix: string | null }} CatalogNotice
  */
 
 /**
@@ -49,17 +50,24 @@ const CATALOG = {
     title: ["Mir fehlen Rechte", "I am missing permissions"],
     body: ({ missing = [], channel = "" } = {}) => {
       const list = missing.length ? missing.join(", ") : "-";
-      return [
-        `In ${channel || "diesem Kanal"} fehlt mir: **${list}**. Gib OmniFM diese Rechte in den Kanal- oder Rolleneinstellungen.`,
-        `In ${channel || "this channel"} I am missing: **${list}**. Give OmniFM these permissions in the channel or role settings.`,
-      ];
+      return channel
+        ? [
+          "In {channel} fehlt mir: **{list}**. Gib OmniFM diese Rechte in den Kanal- oder Rolleneinstellungen.",
+          "In {channel} I am missing: **{list}**. Give OmniFM these permissions in the channel or role settings.",
+          { channel, list },
+        ]
+        : [
+          "In diesem Kanal fehlt mir: **{list}**. Gib OmniFM diese Rechte in den Kanal- oder Rolleneinstellungen.",
+          "In this channel I am missing: **{list}**. Give OmniFM these permissions in the channel or role settings.",
+          { list },
+        ];
     },
     fix: "permissions",
   },
   "premium-required": {
     kind: "premium",
     title: ["Premium nötig", "Premium needed"],
-    body: ({ tier = "Pro" } = {}) => [`Das gibt es ab **${tier}**.`, `This comes with **${tier}**.`],
+    body: ({ tier = "Pro" } = {}) => ["Das gibt es ab **{tier}**.", "This comes with **{tier}**.", { tier }],
     fix: "premium",
   },
   "station-unknown": {
@@ -71,10 +79,9 @@ const CATALOG = {
   "station-offline": {
     kind: "warning",
     title: ["Sender gerade nicht erreichbar", "Station unreachable right now"],
-    body: ({ station = "" } = {}) => [
-      `${station || "Der Sender"} antwortet gerade nicht. Versuch es später oder nimm einen anderen.`,
-      `${station || "The station"} is not answering right now. Try later or pick another one.`,
-    ],
+    body: ({ station = "" } = {}) => (station
+      ? ["{station} antwortet gerade nicht. Versuch es später oder nimm einen anderen.", "{station} is not answering right now. Try later or pick another one.", { station }]
+      : ["Der Sender antwortet gerade nicht. Versuch es später oder nimm einen anderen.", "The station is not answering right now. Try later or pick another one."]),
     fix: "stations",
   },
   "nothing-playing": {
@@ -92,16 +99,17 @@ const CATALOG = {
   "unknown-action": {
     kind: "warning",
     title: ["Unbekannte Aktion", "Unknown action"],
-    body: ({ command = "" } = {}) => [`Diese Aktion kennt ${command || "der Befehl"} nicht.`, `${command || "The command"} does not know this action.`],
+    body: ({ command = "" } = {}) => (command
+      ? ["Diese Aktion kennt {command} nicht.", "{command} does not know this action.", { command }]
+      : ["Diese Aktion kennt der Befehl nicht.", "The command does not know this action."]),
     fix: null,
   },
   "failed": {
     kind: "error",
     title: ["Hat nicht geklappt", "That did not work"],
-    body: ({ detail = "" } = {}) => [
-      detail ? `Fehler: ${detail}` : "Etwas ist schiefgegangen. Versuch es gleich noch einmal.",
-      detail ? `Error: ${detail}` : "Something went wrong. Please try again in a moment.",
-    ],
+    body: ({ detail = "" } = {}) => (detail
+      ? ["Fehler: {detail}", "Error: {detail}", { detail }]
+      : ["Etwas ist schiefgegangen. Versuch es gleich noch einmal.", "Something went wrong. Please try again in a moment."]),
     fix: null,
   },
 };

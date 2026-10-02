@@ -11,6 +11,7 @@ import { log } from "../../lib/logging.js";
 import { applyVolumeTransformerLevel } from "../../lib/helpers.js";
 import * as ui from "../../discord/ui/index.js";
 import { NP_PREFIX } from "../runtime-shared.js";
+import { botTranslator } from "../../lib/bot-i18n.js";
 
 export const SLEEP_CHOICES_MINUTES = Object.freeze([15, 30, 45, 60, 90, 120]);
 export const SLEEP_WARNING_MS = 60_000;
@@ -75,7 +76,7 @@ export function buildSleepStatePayload({ t, kind, sleepUntilMs = 0 }) {
 
 function translatorFor(runtime, guildId) {
   const language = runtime.resolveGuildLanguage?.(guildId) || "de";
-  return (de, en) => (language === "de" ? de : en);
+  return botTranslator(language);
 }
 
 const sleepMethods = {

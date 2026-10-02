@@ -25,13 +25,14 @@ import {
   resolvePollStations,
 } from "../station-poll.js";
 import { loadStations } from "../../stations-store.js";
+import { botTranslator } from "../../lib/bot-i18n.js";
 
 // Discord needs a moment after the end until the vote counts are final.
 const POLL_RESULT_SETTLE_MS = 2000;
 
 function translatorFor(runtime, guildId) {
   const language = runtime.resolveGuildLanguage?.(guildId) || "de";
-  return (de, en) => (language === "de" ? de : en);
+  return botTranslator(language);
 }
 
 /** The catalog of the server's plan with genre and colour, for picking stations. */

@@ -4,7 +4,8 @@
 // /help, /premium and the upgrade hints say what a plan brings with the
 // lines of src/config/plan-features.js, with the numbers of the catalogue.
 import { loadStations } from "../stations-store.js";
-import { PLAN_NAMES, planCardLines } from "../config/plan-features.js";
+import { PLAN_NAMES } from "../config/plan-features.js";
+import { planCardLinesIn } from "../config/plan-feature-texts.js";
 
 /**
  * How many stations the plan lines name: the Free ones and all of them.
@@ -24,7 +25,7 @@ export function catalogPlanContext(stations = loadStations()?.stations || {}) {
  * @param {{ freeStations?: number, allStations?: number }} [context]
  */
 export function planSummaryLine(plan, language, context = {}) {
-  const { lines } = planCardLines(plan, { language, context, highlightsOnly: true });
+  const { lines } = planCardLinesIn(plan, { language, context, highlightsOnly: true });
   return `**${PLAN_NAMES[plan] || plan}:** ${lines.join(" · ")}`;
 }
 
@@ -35,5 +36,5 @@ export function planSummaryLine(plan, language, context = {}) {
  * @param {{ freeStations?: number, allStations?: number }} [context]
  */
 export function planBulletLines(plan, language, context = {}) {
-  return planCardLines(plan, { language, context, highlightsOnly: true }).lines.map((line) => `> ${line}`).join("\n");
+  return planCardLinesIn(plan, { language, context, highlightsOnly: true }).lines.map((line) => `> ${line}`).join("\n");
 }

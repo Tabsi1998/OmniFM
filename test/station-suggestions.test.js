@@ -110,6 +110,9 @@ test("a probe as the queue keeps it; the answer to the person in their language"
   assert.match(rejected, /does not go into the catalogue/);
   assert.match(rejected, /Reason: Der Stream bricht oft ab\./);
   assert.doesNotMatch(allText(buildSuggestionAnswer({ name: "Groove FM", status: "rejected", submitter: { language: "en" } })), /Reason/);
+  // #477: someone who writes French gets no German answer.
+  const french = allText(buildSuggestionAnswer({ name: "Groove FM", status: "rejected", submitter: { language: "fr" } }));
+  assert.doesNotMatch(french, /Katalog|Danke/);
 });
 
 // ---- /suggest-station in Discord ----

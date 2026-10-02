@@ -11,7 +11,6 @@ import { ButtonBuilder, ButtonStyle, ActionRowBuilder } from "discord.js";
 
 import { getDb, isConnected } from "../lib/db.js";
 import { log } from "../lib/logging.js";
-import { languagePick } from "../lib/language.js";
 import { buildInviteUrlForRuntime } from "../lib/api-helpers.js";
 import { deleteGuildSettings } from "../lib/guild-settings.js";
 import { recordOwnerAudit } from "../lib/owner-audit-store.js";
@@ -33,6 +32,7 @@ import { resetGuildStats } from "../listening-stats-store.js";
 import { deleteDashboardTelemetry } from "../dashboard-store.js";
 import { clearRuntimeIncidentsForGuild } from "../runtime-incidents-store.js";
 import { forgetGuildInBotStates } from "../bot-state.js";
+import { botTranslator } from "../lib/bot-i18n.js";
 
 const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
 const FIRST_CHECK_MS = 10 * 60 * 1000;
@@ -92,7 +92,7 @@ export async function purgeServerData(guildId) {
 }
 
 function dmPayload({ language, guildName, deleteAfter, inviteUrl }) {
-  const t = (de, en) => languagePick(language, de, en);
+  const t = botTranslator(language);
   const when = `<t:${Math.floor(new Date(deleteAfter).getTime() / 1000)}:D>`;
   const name = guildName ? `„${guildName}“` : t("deinem Server", "your server");
   const actions = inviteUrl

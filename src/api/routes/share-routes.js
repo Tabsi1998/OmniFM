@@ -13,6 +13,7 @@ import { getCommonSecurityHeaders, methodNotAllowed } from "../../lib/api-helper
 import { resolveRequestLanguage } from "../../lib/request-language.js";
 import { fetchCardImage, renderPageCard, renderStationCard } from "../../lib/share-card.js";
 import { loadStations } from "../../stations-store.js";
+import { botTranslator } from "../../lib/bot-i18n.js";
 
 const STATION_PATH = /^\/api\/share\/station\/([a-z0-9][a-z0-9_-]{0,79})(\.png)?$/i;
 const PAGE_PATH = /^\/api\/share\/page\/(premium|stations|invite)(\.png)?$/;
@@ -81,7 +82,7 @@ export function createShareRoutesHandler({ websiteUrl, getInviteUrl = () => null
     }
     const headOnly = req.method === "HEAD";
     const language = resolveRequestLanguage(req.headers, requestUrl.searchParams.get("lang") || "", "de");
-    const t = (de, en) => (language === "de" ? de : en);
+    const t = botTranslator(language);
     const langQuery = `?lang=${language}`;
 
     const stationMatch = STATION_PATH.exec(path);

@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { ButtonStyle, MessageFlags, PermissionFlagsBits } from "discord.js";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 const scratchDir = fs.mkdtempSync(path.join(os.tmpdir(), "omnifm-favorites-"));
 process.env.OMNIFM_RUNTIME_DATA_DIR = scratchDir;
@@ -19,7 +20,7 @@ const { normalizeGuildSettings } = await import("../src/lib/guild-settings.js");
 const { setLicenseProvider } = await import("../src/core/entitlements.js");
 const ui = await import("../src/discord/ui/index.js");
 
-const de = (german) => german;
+const de = botTranslator("de");
 const catalog = JSON.parse(fs.readFileSync(new URL("../stations.json", import.meta.url), "utf8")).stations;
 const FREE_KEYS = Object.entries(catalog).filter(([, station]) => (station.tier || "free") === "free").map(([key]) => key);
 

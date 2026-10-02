@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { PermissionFlagsBits } from "discord.js";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 const scratchDir = fs.mkdtempSync(path.join(os.tmpdir(), "omnifm-poll-"));
 process.env.OMNIFM_RUNTIME_DATA_DIR = scratchDir;
@@ -15,7 +16,7 @@ const { BotRuntime } = await import("../src/bot/runtime.js");
 const { buildCommandsJson } = await import("../src/commands.js");
 const { setLicenseProvider } = await import("../src/core/entitlements.js");
 
-const de = (german) => german;
+const de = botTranslator("de");
 const GUILD = "123456789012345678";
 const VOICE = "223456789012345678";
 const TEXT = "323456789012345678";
