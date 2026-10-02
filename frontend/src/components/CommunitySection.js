@@ -6,6 +6,8 @@ import { useI18n } from '../i18n.js';
 export default function CommunitySection() {
   const { t } = useI18n();
   const [data, setData] = useState({ sponsors: [], botListings: [] });
+  // Logos that did not load show the partner's name instead (#486).
+  const [brokenLogos, setBrokenLogos] = useState(() => new Set());
 
   useEffect(() => {
     let alive = true;
@@ -54,8 +56,8 @@ export default function CommunitySection() {
             <h2 style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 'clamp(24px,3.5vw,36px)', marginBottom: 28 }}>{t('Unterstützt von', 'Supported by')}</h2>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: 24 }}>
               {sponsors.map((s, i) => {
-                const inner = s.logoUrl
-                  ? <img src={s.logoUrl} alt={s.name} style={{ maxHeight: 44, maxWidth: 160, objectFit: 'contain', opacity: 0.85 }} />
+                const inner = s.logoUrl && !brokenLogos.has(i)
+                  ? <img src={s.logoUrl} alt={s.name} onError={() => setBrokenLogos((previous) => new Set(previous).add(i))} style={{ maxHeight: 44, maxWidth: 160, objectFit: 'contain', opacity: 0.85 }} />
                   : <span style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 20, color: '#cbd5e1' }}>{s.name}</span>;
                 return s.url ? (
                   <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" data-testid={`sponsor-${i}`} style={{ display: 'inline-flex', alignItems: 'center', padding: '14px 22px', borderRadius: 12, background: 'rgba(20,22,30,0.6)', border: '1px solid #1b2133' }}>{inner}</a>

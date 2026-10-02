@@ -75,7 +75,10 @@ test("the website's answers name pictures by what they show; nothing points else
   assert.deepEqual(chart.songs.map((entry) => entry.cover), ["/api/image/cover?term=Artist+Song&size=600", null]);
 
   const marketing = images.websiteMarketing({ sponsors: [{ name: "A", logoUrl: "https://a.example/logo.png", url: "https://a.example" }, { name: "B", logoUrl: "", url: "" }], botListings: [] });
-  assert.deepEqual(marketing.sponsors.map((sponsor) => sponsor.logoUrl), ["/api/image/sponsor/0", ""]);
+  assert.match(marketing.sponsors[0].logoUrl, /^\/api\/image\/sponsor\/0\?v=[0-9a-f]{10}$/, "the number, and a version that changes with the logo (#486)");
+  assert.equal(marketing.sponsors[1].logoUrl, "");
+  const changed = images.websiteMarketing({ sponsors: [{ name: "A", logoUrl: "https://a.example/new.png", url: "" }] });
+  assert.notEqual(changed.sponsors[0].logoUrl, marketing.sponsors[0].logoUrl, "a new logo, a new address: no browser keeps the old one");
   assert.equal(marketing.sponsors[0].url, "https://a.example", "the link to the partner stays");
   assert.doesNotMatch(JSON.stringify([cover, chart, marketing]).replace(/"url":"[^"]*"/g, ""), /https?:\/\/(?!omnifm)/, "no picture from elsewhere");
 });

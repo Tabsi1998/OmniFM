@@ -52,6 +52,8 @@ const PAGES = [
   { name: "Charts", path: "/charts", shows: '[data-testid="charts-content"][aria-busy="false"]', lean: true },
   { name: "Dashboard (angemeldet)", path: "/dashboard", shows: '[data-testid="guild-nav-overview"]', mockDashboard: true },
   { name: "Owner-Konsole (Login)", path: "/admin", shows: '[data-testid="admin-token-input"]' },
+  // #487: an address the site does not have: HTTP 404, the not-found page, noindex.
+  { name: "Unbekannte Adresse", path: "/gibt-es-nicht", shows: '[data-testid="not-found-page"]', status: 404 },
   // #308: the Activity outside Discord shows where it runs; Discord alone may frame it.
   { name: "Discord-Activity", path: "/activity/", shows: '[data-testid="activity-outside"]', lean: true, activity: true },
 ];
@@ -96,7 +98,10 @@ try {
     try {
       // eslint-disable-next-line no-await-in-loop
       const response = await tab.goto(`${base}${page.path}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-      if (!response || response.status() >= 400) errors.push(`HTTP ${response ? response.status() : "keine Antwort"}`);
+      const expected = page.status || 200;
+      if (!response || (expected === 200 ? response.status() >= 400 : response.status() !== expected)) {
+        errors.push(`HTTP ${response ? response.status() : "keine Antwort"} statt ${expected}`);
+      }
       // Only the Activity may be framed, and only by Discord (#308); every other page never.
       const headers = response?.headers() || {};
       const ancestors = /frame-ancestors ([^;]*)/.exec(headers["content-security-policy"] || "")?.[1] || "";

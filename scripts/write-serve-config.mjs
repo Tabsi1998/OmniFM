@@ -8,6 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ACTIVITY_FRAME_ANCESTORS, buildContentSecurityPolicy, buildWebsiteSecurityHeaders } from "../src/config/security-headers.js";
+import { WEBSITE_PAGE_PATHS } from "../frontend/src/lib/pageRouting.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const SERVE_CONFIG_PATH = path.join(ROOT, "frontend", "serve.json");
@@ -28,10 +29,13 @@ export function buildServeConfig() {
       // serve picks header rules by the file it sends, so only a file of its own
       // can have its own frame rules.
       { source: "/activity", destination: "/activity/index.html" },
-      // Page paths of the single-page app never contain a dot, files always do.
-      // Only page paths get index.html; a missing file stays a 404 instead of
-      // being answered with the start page.
-      { source: "/:path([^.]+)", destination: "/index.html" },
+      // Only the addresses the website has get index.html, from the app's own
+      // list (#487). Any other answers 404 with build/404.html, which shows the
+      // not-found page and keeps search engines off, instead of a copy of the
+      // start page under every address.
+      ...WEBSITE_PAGE_PATHS.filter((page) => page !== "/")
+        .flatMap((page) => [page, `${page}/`])
+        .map((source) => ({ source, destination: "/index.html" })),
     ],
     headers: [
       {

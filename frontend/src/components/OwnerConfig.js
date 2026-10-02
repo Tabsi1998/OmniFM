@@ -9,6 +9,7 @@ import OwnerLegalChecklist from './owner/OwnerLegalChecklist.js';
 import OwnerSeasonsConfig from './owner/OwnerSeasonsConfig.js';
 import OwnerReports from './owner/OwnerReports.js';
 import OwnerLinkedRoles from './owner/OwnerLinkedRoles.js';
+import SponsorLogoUpload from './owner/SponsorLogoUpload.js';
 import { normalizeReportSettings } from '../../../src/lib/problem-reports.js';
 import { Field, SaveBar, Toggle, labelStyle } from './owner/configFields.js';
 
@@ -562,13 +563,16 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
             <div className="oa-section-title" style={{ margin: 0 }}><Heart size={15} /> Sponsoren / Partner ({sponsors.length})</div>
             <button className="oa-btn ghost" onClick={addSponsor} data-testid="cfg-sponsor-add"><Plus size={15} /> Sponsor</button>
           </div>
-          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14 }}>Erscheinen als Logo-Wand auf der Startseite („Unterstützt von“). Ohne Logo-URL wird der Name als Text angezeigt.</div>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14 }}>Erscheinen als Logo-Wand auf der Startseite („Unterstützt von“). Ohne Logo wird der Name als Text angezeigt. Ein hochgeladenes Logo kommt von diesem Server; eine Logo-URL holt der Server beim Partner ab.</div>
           {sponsors.map((s, i) => (
             <div key={i} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr)) 44px', gap: '0 14px', alignItems: 'end', marginBottom: 6 }} data-testid={`cfg-sponsor-${i}`}>
               <Field label="Name" value={s.name} onChange={(v) => setSponsor(i, 'name', v)} testid={`cfg-sponsor-${i}-name`} />
               <Field label="Logo-URL" value={s.logoUrl} onChange={(v) => setSponsor(i, 'logoUrl', v)} placeholder="https://…/logo.png" testid={`cfg-sponsor-${i}-logo`} />
               <Field label="Link" value={s.url} onChange={(v) => setSponsor(i, 'url', v)} placeholder="https://…" testid={`cfg-sponsor-${i}-url`} />
               <button className="oa-btn ghost" style={{ color: '#ff8fab', marginBottom: 14 }} onClick={() => removeSponsor(i)} data-testid={`cfg-sponsor-${i}-remove`}><Trash2 size={14} /></button>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <SponsorLogoUpload index={i} value={s.logoUrl} apiSend={apiSend} onUploaded={(ref) => setSponsor(i, 'logoUrl', ref)} />
+              </div>
             </div>
           ))}
         </div>

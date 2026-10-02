@@ -14,10 +14,10 @@
 |---|---|---|
 | **Landing** | Marketing-Seite mit Live „Now Playing", Discord-Embed-Showcase, Sticky-Player | `/` |
 | **Server-Dashboard** | Für Server-Admins (Discord OAuth): My Stations, Rollen & Rechte, Statistiken, Abo | `/dashboard` |
-| **Owner-Konsole** | Passwortgeschützt (nur Betreiber) — **die komplette Konfigurationszentrale**: Unternehmen & Recht, Pläne & Preise, Discord & Bots, Zahlungen, Stationen, Monitoring, Lizenzen, Audit, Brand | `/admin` |
+| **Owner-Konsole** | Passwortgeschützt (nur Betreiber) — **die komplette Konfigurationszentrale**: Unternehmen & Recht, Pläne & Preise, Discord & Bots, Stationen, Monitoring, Lizenzen, Audit, Brand | `/admin` |
 | **Brand-Kit** | Öffentliche Logo-/Presse-Seite mit Downloads & Sponsor-Badge-Einbettcode | `/brand` |
 
-> **Sprache:** Die Website erkennt die Sprache automatisch am Browser (Deutsch/Englisch). Kein manueller Umschalter.
+> **Sprache:** Website, Dashboard und Bot sprechen neun Sprachen: Deutsch, Englisch, Französisch, Spanisch, Italienisch, Polnisch, Türkisch, Portugiesisch und Niederländisch. Die Website nimmt die Sprache des Browsers; `?lang=fr` im Link legt sie fest.
 
 ## 🧱 Architektur (dieser Stack)
 
@@ -105,6 +105,16 @@ installieren; Ziel-IP des OmniFM-Servers dort eintragen). Danach `nginx -t && sy
 
 **2. Frontend bauen** – einfach `./start.sh` bzw. `./update.sh` (nutzt automatisch die
 relative Same-Origin-API). Fertig.
+
+**3. Dem Proxy vertrauen** (#484): Hinter dem Proxy kommt jede Anfrage von dessen Adresse.
+Ohne die zwei Zeilen unten sieht die API nur den Proxy, und **alle Besucher teilen sich ein
+Limit von 60 Anfragen pro Minute**: Bei etwas Andrang bleiben Senderliste und Preise leer.
+In `backend/.env` eintragen, dann `./update.sh`:
+```bash
+TRUST_PROXY_HEADERS=1
+TRUSTED_PROXY_IPS=192.168.2.100   # die Adresse des Proxys; nginx auf demselben Rechner: 127.0.0.1,::1
+```
+Fehlt das, zeigt das Owner-Cockpit unter „Besucher-Adressen“ eine gelbe Ampel mit genau diesen Zeilen.
 
 > Sonderfälle:
 > - `PUBLIC_URL=https://omnifm.xyz ./start.sh` – erzwingt die absolute Domain (auch Same-Origin).

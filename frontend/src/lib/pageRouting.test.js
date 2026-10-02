@@ -10,6 +10,10 @@ describe('page routing', () => {
     expect(resolvePageFromUrl('https://omnifm.xyz/owner')).toBe('admin');
     expect(resolvePageFromUrl('https://omnifm.xyz/status')).toBe('status');
     expect(resolvePageFromUrl('https://omnifm.xyz/charts')).toBe('charts');
+    // #487: an address the site does not have is no copy of the start page.
+    expect(resolvePageFromUrl('https://omnifm.xyz/gibt-es-nicht')).toBe('not-found');
+    expect(resolvePageFromUrl('https://omnifm.xyz/Sender/')).toBe('stations');
+    expect(resolvePageFromUrl('https://omnifm.xyz/')).toBe('home');
   });
 
   it('builds links with the language', () => {

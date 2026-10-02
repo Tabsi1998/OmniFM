@@ -34,12 +34,17 @@ test("the website and the Node API share one content security policy", () => {
   assert.equal(getCommonSecurityHeaders()["Content-Security-Policy"], buildContentSecurityPolicy());
 });
 
-test("only page paths fall back to index.html, hashed assets are cached for good", () => {
+test("only the site's pages get index.html; any other address stays a 404 (#487); assets cached for good", async () => {
   const config = buildServeConfig();
-  assert.deepEqual(config.rewrites, [
-    { source: "/activity", destination: "/activity/index.html" },
-    { source: "/:path([^.]+)", destination: "/index.html" },
-  ]);
+  const { WEBSITE_PAGE_PATHS } = await import("../frontend/src/lib/pageRouting.js");
+  assert.deepEqual(config.rewrites[0], { source: "/activity", destination: "/activity/index.html" });
+  const pages = config.rewrites.slice(1);
+  assert.ok(pages.every((rule) => rule.destination === "/index.html" && !rule.source.includes(":")), "named pages only, no pattern");
+  for (const page of ["/sender", "/preise", "/impressum", "/dashboard", "/admin", "/status", "/charts", "/start"]) {
+    assert.ok(pages.some((rule) => rule.source === page) && pages.some((rule) => rule.source === `${page}/`), page);
+  }
+  assert.equal(pages.length, (WEBSITE_PAGE_PATHS.length - 1) * 2, "every page of the app, with and without a slash");
+  assert.equal(pages.some((rule) => rule.source === "/gibt-es-nicht"), false);
   assert.match(headersFor(config, "assets/**")["Cache-Control"], /immutable/);
   assert.equal(headersFor(config, "favicon.ico")["Content-Type"], "image/x-icon");
 });

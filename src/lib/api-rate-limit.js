@@ -8,6 +8,7 @@ import {
   shouldTrustProxyHeaders,
 } from "./api-cors.js";
 import { sendJson } from "./api-helpers.js";
+import { noteUntrustedProxy } from "./proxy-notice.js";
 
 // ---- Rate limiting ----
 const apiRateLimitState = new Map();
@@ -119,6 +120,9 @@ function cleanupRateLimitState(now = Date.now()) {
 export function enforceApiRateLimit(req, res, pathname) {
   const spec = getApiRateLimitSpec(pathname);
   const ip = getClientIp(req);
+  // A proxy in front that backend/.env does not name: every visitor would
+  // count as the proxy (#484).
+  if (req?.headers?.["x-forwarded-for"] && !shouldTrustProxyHeaders(req)) noteUntrustedProxy(ip);
   const key = `${spec.scope}:${ip}`;
   const now = Date.now();
 

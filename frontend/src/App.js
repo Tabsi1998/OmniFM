@@ -6,6 +6,7 @@ import DashboardPreview from './components/DashboardPreview.js';
 import StationBrowser from './components/StationBrowser.js';
 import Premium from './components/Premium.js';
 import SiteFooter from './components/SiteFooter.js';
+import NotFoundPage from './components/NotFoundPage.js';
 import Navbar from './components/Navbar.js';
 import DiscordShowcase from './components/DiscordShowcase.js';
 import HowToDiscord from './components/HowToDiscord.js';
@@ -204,6 +205,20 @@ function AppContent() {
       <Suspense fallback={<PageLoading />}>
         <DemoStage scene={demoScene} />
       </Suspense>
+    );
+  }
+
+  if (currentPage === 'not-found') {
+    return (
+      <div data-testid="app-root" style={{ position: 'relative', minHeight: '100vh' }}>
+        <div className="noise-overlay" />
+        <Navbar page={currentPage} />
+        <main>
+          <NotFoundPage />
+        </main>
+        <SiteFooter legal={legal} />
+        <CookieConsent />
+      </div>
     );
   }
 

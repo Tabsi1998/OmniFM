@@ -6,7 +6,7 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { buildPageHref, resolvePageFromUrl } from './lib/pageRouting.js';
+import { NOT_FOUND_PAGE, buildPageHref, resolvePageFromUrl } from './lib/pageRouting.js';
 import { applySeoMetadata } from './lib/seo.js';
 import {
   LANGUAGE_CODES,
@@ -53,6 +53,12 @@ function syncLocaleToUrl(locale) {
   try {
     const url = new URL(window.location.href);
     const page = resolvePageFromUrl(url);
+    // An unknown address stays as it is (#487); only the language changes.
+    if (page === NOT_FOUND_PAGE) {
+      url.searchParams.set('lang', locale);
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+      return;
+    }
     const params = new URLSearchParams(url.search);
     const nextHref = buildPageHref(locale, page, params);
     window.history.replaceState({}, '', `${nextHref}${url.hash}`);
