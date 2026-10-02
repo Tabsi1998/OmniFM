@@ -55,6 +55,25 @@ test("the rate limiter notes a forwarded request it does not trust", () => {
   assert.equal(notice.noteUntrustedProxy("192.168.2.100"), true, "the address is known after the forwarded request");
 });
 
+test("the dashboard has its own budget, larger than the website's 60 a minute (#485)", async () => {
+  const { getApiRateLimitSpec } = await import("../src/lib/api-rate-limit.js");
+  assert.deepEqual([getApiRateLimitSpec("/api/dashboard/stats").scope, getApiRateLimitSpec("/api/dashboard/stats").max], ["dashboard", 300]);
+  assert.equal(getApiRateLimitSpec("/api/auth/session").scope, "general", "the login stays with the website's budget");
+  assert.equal(getApiRateLimitSpec("/api/stats").max, 60);
+});
+
+test("a refused request says when to ask again (#485)", () => {
+  const headers = {};
+  const res = { statusCode: 0, setHeader(name, value) { headers[name] = value; }, writeHead(status) { this.statusCode = status; }, end() {} };
+  const visitor = { socket: { remoteAddress: "198.51.100.7" }, headers: {} };
+  let allowed = 0;
+  for (let index = 0; index < 61; index += 1) if (enforceApiRateLimit(visitor, res, "/api/stats")) allowed += 1;
+  assert.equal(allowed, 60);
+  assert.equal(res.statusCode, 429);
+  const seconds = Number(headers["Retry-After"]);
+  assert.ok(seconds >= 1 && seconds <= 60, `Retry-After ${headers["Retry-After"]}`);
+});
+
 test("the owner cockpit: yellow with the two lines while a proxy is untrusted, green otherwise", async () => {
   const now = Date.parse("2026-10-02T16:00:00Z");
   const fresh = await checkProxy({ db: fakeDb({ address: "192.168.2.100", lastSeenAt: new Date(now - 5 * 60_000) }), now });

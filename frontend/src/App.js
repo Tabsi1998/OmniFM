@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState, useEffect, useCallback, useRef } from 'react';
+import { Suspense, lazy, useState, useEffect } from 'react';
 import Hero from './components/Hero.js';
 import TrustBar from './components/TrustBar.js';
 import WhyOmniFM from './components/WhyOmniFM.js';
@@ -18,6 +18,7 @@ import { I18nProvider } from './i18n.js';
 import { PlayerProvider } from './lib/player.js';
 import { buildApiUrl } from './lib/api.js';
 import { getSectionAnchorForPage, resolvePageFromUrl } from './lib/pageRouting.js';
+import { startSiteData } from './lib/siteData.js';
 import SeasonLayer from './components/season/SeasonLayer.js';
 
 // Loaded only on their own pages (#296): the start page carries neither the
@@ -57,7 +58,11 @@ async function fetchJson(path, signal) {
     const errorText = data && typeof data.error === 'string'
       ? data.error
       : `HTTP ${res.status}`;
-    throw new Error(`${path}: ${errorText}`);
+    const error = new Error(`${path}: ${errorText}`);
+    // When the server says when to ask again (429), the page waits that long.
+    const retryAfter = Number.parseInt(String(res.headers?.get?.('retry-after') || ''), 10);
+    if (Number.isFinite(retryAfter) && retryAfter > 0) error.retryAfterMs = retryAfter * 1000;
+    throw error;
   }
 
   return data || {};
@@ -71,8 +76,6 @@ function AppContent() {
   const [privacy, setPrivacy] = useState(null);
   const [terms, setTerms] = useState(null);
   const [loading, setLoading] = useState(true);
-  const mountedRef = useRef(true);
-  const inFlightRef = useRef(false);
   const currentPage = typeof window === 'undefined'
     ? 'home'
     : resolvePageFromUrl(window.location.href);
@@ -87,117 +90,23 @@ function AppContent() {
     return () => window.cancelAnimationFrame(frame);
   }, [currentPage]);
 
-  const fetchData = useCallback(async (signal) => {
-    const endpoints = [
-      '/api/bots',
-      '/api/stations',
-      '/api/stats',
-      '/api/legal',
-      '/api/privacy',
-      '/api/terms',
-    ];
-
-    const results = await Promise.allSettled(endpoints.map((path) => fetchJson(path, signal)));
-    if (!mountedRef.current) return;
-
-    let anyUpdate = false;
-
-    if (results[0].status === 'fulfilled') {
-      setBots(results[0].value?.bots || []);
-      anyUpdate = true;
-    } else if (results[0].reason?.name !== 'AbortError') {
-      console.error('Bots API error:', results[0].reason);
-    }
-
-    if (results[1].status === 'fulfilled') {
-      setStations(results[1].value?.stations || []);
-      anyUpdate = true;
-    } else if (results[1].reason?.name !== 'AbortError') {
-      console.error('Stations API error:', results[1].reason);
-    }
-
-    if (results[2].status === 'fulfilled') {
-      setStats(results[2].value || {});
-      anyUpdate = true;
-    } else if (results[2].reason?.name !== 'AbortError') {
-      console.error('Stats API error:', results[2].reason);
-    }
-
-    if (results[3].status === 'fulfilled') {
-      setLegal(results[3].value || null);
-      anyUpdate = true;
-    } else if (results[3].reason?.name !== 'AbortError') {
-      console.error('Legal API error:', results[3].reason);
-    }
-
-    if (results[4].status === 'fulfilled') {
-      setPrivacy(results[4].value || null);
-      anyUpdate = true;
-    } else if (results[4].reason?.name !== 'AbortError') {
-      console.error('Privacy API error:', results[4].reason);
-    }
-
-    if (results[5].status === 'fulfilled') {
-      setTerms(results[5].value || null);
-      anyUpdate = true;
-    } else if (results[5].reason?.name !== 'AbortError') {
-      console.error('Terms API error:', results[5].reason);
-    }
-
-    const nonAbortFailures = results.filter(
-      (result) => result.status === 'rejected' && result.reason?.name !== 'AbortError',
-    ).length;
-
-    if (!anyUpdate && nonAbortFailures > 0) {
-      console.error('API error: all endpoint requests failed.');
-    }
-
-    if (mountedRef.current) {
-      setLoading(false);
-    }
-  }, []);
-
+  // What the page shows, and nothing else (#485): src/lib/siteData.js.
   useEffect(() => {
-    if (currentPage === 'dashboard' || currentPage === 'dashboard-classic' || currentPage === 'dashboard-studio' || currentPage === 'admin' || currentPage === 'brand') {
-      setLoading(false);
-      return () => {};
-    }
-
-    mountedRef.current = true;
-    let activeController = null;
-
-    const runFetch = async () => {
-      if (inFlightRef.current) return;
-      inFlightRef.current = true;
-
-      const controller = new AbortController();
-      activeController = controller;
-      try {
-        await fetchData(controller.signal);
-      } catch (err) {
-        if (err?.name !== 'AbortError') {
-          console.error('Unhandled fetch loop error:', err);
-        }
-      } finally {
-        inFlightRef.current = false;
-        if (activeController === controller) {
-          activeController = null;
-        }
-      }
+    const show = {
+      bots: (data) => setBots(data?.bots || []),
+      stations: (data) => setStations(data?.stations || []),
+      stats: (data) => setStats(data || {}),
+      legal: (data) => setLegal(data || null),
+      privacy: (data) => setPrivacy(data || null),
+      terms: (data) => setTerms(data || null),
     };
-
-    runFetch();
-    const interval = setInterval(runFetch, 15000);
-
-    return () => {
-      mountedRef.current = false;
-      inFlightRef.current = false;
-      clearInterval(interval);
-      if (activeController) {
-        activeController.abort();
-      }
-    };
-  }, [fetchData, currentPage]);
+    return startSiteData(currentPage, {
+      fetchJson,
+      apply: (name, data) => show[name](data),
+      done: () => setLoading(false),
+      isVisible: () => typeof document === 'undefined' || document.visibilityState !== 'hidden',
+    });
+  }, [currentPage]);
 
   const demoScene = typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('demo');
   if (DEMO_SCENES.includes(demoScene)) {

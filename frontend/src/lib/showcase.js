@@ -6,12 +6,28 @@ const TIER_BITRATE = { free: '64 kbps', pro: '128 kbps', ultimate: '320 kbps' };
 
 // Liefert ECHTE Sender aus dem Katalog (/api/stations) für Marketing-Showcases.
 // Keine erfundenen Sender/Hörer/Server mehr.
+// Player and bar ask for the catalogue once together, not each (#485); a
+// failed answer lets the next showcase ask again.
+let catalogueRequest = null;
+function loadCatalogueOnce() {
+  catalogueRequest ||= fetch(buildApiUrl('/api/stations'))
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+    .catch((error) => {
+      catalogueRequest = null;
+      throw error;
+    });
+  return catalogueRequest;
+}
+
+/** For the tests: ask again. */
+export function forgetShowcaseCatalogue() {
+  catalogueRequest = null;
+}
 export function useShowcaseStations(limit = 8) {
   const [items, setItems] = useState([]);
   useEffect(() => {
     let stop = false;
-    fetch(buildApiUrl('/api/stations'))
-      .then((r) => r.json())
+    loadCatalogueOnce()
       .then((d) => {
         if (stop) return;
         const list = Array.isArray(d) ? d : (d && d.stations) || [];

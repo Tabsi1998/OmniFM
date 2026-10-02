@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { Headphones, Radio, Volume2, Play, SkipForward } from 'lucide-react';
 import { useI18n } from '../i18n.js';
 import { resolvePrimaryInviteUrl } from '../lib/invite.js';
-import { buildApiUrl } from '../lib/api.js';
 import { useShowcaseStations } from '../lib/showcase.js';
+import { coverFor } from '../lib/coverCache.js';
 
 const heroCss = `
 @keyframes eq-bounce { 0%,100% { transform: scaleY(0.28);} 50% { transform: scaleY(1);} }
@@ -49,9 +49,8 @@ function NowPlayingConsole({ live }) {
   useEffect(() => {
     let stop = false;
     setCover(null);
-    fetch(buildApiUrl(`/api/cover?term=${encodeURIComponent(track.name)}`))
-      .then((r) => r.json()).then((d) => { if (!stop && d && d.ok && d.artwork) setCover(d.artwork); })
-      .catch(() => {});
+    // Each name once per visit, shared with the bar below (#485).
+    coverFor(track.name).then((artwork) => { if (!stop && artwork) setCover(artwork); });
     return () => { stop = true; };
   }, [track.name]);
 
