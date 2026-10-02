@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import { getDb, isConnected } from "./lib/db.js";
 import { fileStoresAllowed } from "./lib/store-policy.js";
-import { getDefaultLanguage, normalizeLanguage } from "./i18n.js";
+import { getDefaultLanguage } from "./i18n.js";
+import { normalizeBotLanguage } from "./lib/bot-i18n.js";
 import { log, logStoreLoadError } from "./lib/logging.js";
 import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 
@@ -28,7 +29,7 @@ function normalizeState(input) {
   for (const [rawGuildId, rawLanguage] of Object.entries(guilds)) {
     const guildId = sanitizeGuildId(rawGuildId);
     if (!guildId) continue;
-    out[guildId] = normalizeLanguage(rawLanguage, getDefaultLanguage());
+    out[guildId] = normalizeBotLanguage(rawLanguage, getDefaultLanguage());
   }
 
   return {
@@ -198,7 +199,7 @@ export function setGuildLanguage(guildId, language) {
   const id = sanitizeGuildId(guildId);
   if (!id) return null;
   const state = ensureState();
-  const nextLanguage = normalizeLanguage(language, getDefaultLanguage());
+  const nextLanguage = normalizeBotLanguage(language, getDefaultLanguage());
   state.guilds[id] = nextLanguage;
   saveState(state);
   return nextLanguage;

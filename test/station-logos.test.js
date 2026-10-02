@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 const scratchDir = fs.mkdtempSync(path.join(os.tmpdir(), "omnifm-logos-"));
 process.env.OMNIFM_RUNTIME_DATA_DIR = scratchDir;
@@ -17,7 +18,7 @@ const { BotRuntime } = await import("../src/bot/runtime.js");
 const customStations = await import("../src/custom-stations.js");
 
 const GUILD = "123456789012345678";
-const de = (german) => german;
+const de = botTranslator("de");
 
 async function pictureOf(width, height, format = "png") {
   const canvas = createCanvas(width, height);

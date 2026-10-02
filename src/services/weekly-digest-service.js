@@ -25,6 +25,7 @@ import {
   normalizeWeeklyDigestConfig,
   shouldSendWeeklyDigest,
 } from "../lib/weekly-digest.js";
+import { botTranslator } from "../lib/bot-i18n.js";
 
 /** How often the digest check runs (hourly). */
 const DIGEST_CHECK_INTERVAL_MS = 60 * 60 * 1000;
@@ -69,7 +70,7 @@ async function loadWeeklyDigestReport(guildId, { now = new Date() } = {}) {
 /** The message for a server; also what the dashboard's "send test digest" posts. */
 async function buildWeeklyDigestMessage(guildId, { guildName = "", config = {}, now = new Date() } = {}) {
   const digest = normalizeWeeklyDigestConfig(config);
-  const t = (de, en) => (digest.language === "de" ? de : en);
+  const t = botTranslator(digest.language);
   const report = await loadWeeklyDigestReport(guildId, { now });
   const payload = buildWeeklyDigestPayload({
     t,

@@ -2,6 +2,7 @@
 // the bot start (from-owner-config.mjs), FastAPI (validation and the form)
 // and /diag: recovery-settings.json next to this file.
 import fs from "node:fs";
+import { botTranslator } from "../lib/bot-i18n.js";
 
 const RECOVERY_SETTINGS = Object.freeze(
   JSON.parse(fs.readFileSync(new URL("./recovery-settings.json", import.meta.url), "utf8"))
@@ -52,9 +53,9 @@ function formatDuration(ms, t) {
 /**
  * Short lines for /diag, so support can read the effective values.
  * @param {Record<string, string | undefined>} [env]
- * @param {(de: string, en: string) => string} [t]
+ * @param {(de: string, en: string, params?: Record<string, unknown>) => string} [t]
  */
-function describeRecoverySettings(env = process.env, t = (de, _en) => de) {
+function describeRecoverySettings(env = process.env, t = botTranslator("de")) {
   const values = Object.fromEntries(getEffectiveRecoverySettings(env).map((item) => [item.key, item.value]));
   return [
     t(

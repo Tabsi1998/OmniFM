@@ -1,5 +1,6 @@
 import { getDb, isConnected } from "../../lib/db.js";
 import { clearGuildLanguage, getGuildLanguage, setGuildLanguage } from "../../guild-language-store.js";
+import { BOT_LANGUAGES } from "../../lib/bot-i18n.js";
 import { logError } from "../../lib/logging.js";
 import { loadDashboardGuildSettings } from "./dashboard-guild-settings.js";
 import { resolveUserFacingErrorMessage } from "../../lib/user-facing-errors.js";
@@ -34,7 +35,8 @@ export function buildDashboardFavoritesResponse(settings = {}, tier = "free") {
   };
 }
 
-const SERVER_LANGUAGES = Object.freeze(["auto", "de", "en"]);
+// "auto" follows the server's language in Discord; or one of the bot's nine (#477).
+const SERVER_LANGUAGES = Object.freeze(["auto", ...BOT_LANGUAGES]);
 
 // The server's language (#413): set with /language before, now in the
 // dashboard too; "auto" follows each person's Discord language.
@@ -347,7 +349,7 @@ export function createDashboardSettingsRouteHandler(deps) {
         if (body?.serverLanguage !== undefined) {
           nextServerLanguage = String(body.serverLanguage || "").trim().toLowerCase();
           if (!SERVER_LANGUAGES.includes(nextServerLanguage)) {
-            sendLocalizedError(res, 400, language, "Sprache muss auto, de oder en sein.", "Language must be auto, de or en.");
+            sendLocalizedError(res, 400, language, "Unbekannte Sprache.", "Unknown language.");
             return true;
           }
         }

@@ -36,6 +36,12 @@ export function resolveLanguageFromAcceptLanguage(headerValue, fallback = DEFAUL
   return tokens.length ? "en" : normalizeLanguage("", fallback);
 }
 
+// The bot's nine languages (#477) format dates and numbers their own way.
+const LOCALES = Object.freeze({
+  de: "de-DE", en: "en-US", fr: "fr-FR", es: "es-ES", it: "it-IT", pl: "pl-PL", tr: "tr-TR", pt: "pt-BR", nl: "nl-NL",
+});
+
 export function getLocaleForLanguage(language) {
-  return normalizeLanguage(language) === "de" ? "de-DE" : "en-US";
+  const code = String(language || "").trim().toLowerCase().split(/[-_]/)[0];
+  return LOCALES[code] || (normalizeLanguage(language) === "de" ? "de-DE" : "en-US");
 }

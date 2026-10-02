@@ -33,7 +33,8 @@ function row(...components) {
 
 /**
  * @param {object} input
- * @param {(de: string, en: string) => string} input.t
+ * @param {(de: string, en: string, params?: Record<string, unknown>) => string} input.t
+ * @param {string} [input.language] the reader's language, for the plan lines
  * @param {string} [input.section]
  * @param {{ name?: string, bitrate?: string, maxBots?: number }} input.plan
  * @param {string} [input.guildName]
@@ -42,8 +43,7 @@ function row(...components) {
  * @param {{ freeStations?: number, allStations?: number }} [input.planContext] of the catalogue (#413)
  */
 export function buildHelpPayload(input) {
-  const { t, plan = {}, urls = {}, applicationId: appId = null, planContext = {} } = input;
-  const language = t("de", "en");
+  const { t, language = "en", plan = {}, urls = {}, applicationId: appId = null, planContext = {} } = input;
   const section = HELP_SECTIONS.includes(input.section) ? input.section : "overview";
   const labels = {
     overview: [t("Überblick", "Overview"), "info"],
@@ -58,7 +58,7 @@ export function buildHelpPayload(input) {
   const pages = {
     overview: {
       body: [
-        ui.statusLine([`${t("Plan", "Plan")}: **${plan.name || "Free"}**`, plan.bitrate ? `${plan.bitrate} Audio` : null, plan.maxBots ? t(`${plan.maxBots} Worker`, `${plan.maxBots} workers`) : null]),
+        ui.statusLine([`${t("Plan", "Plan")}: **${plan.name || "Free"}**`, plan.bitrate ? `${plan.bitrate} Audio` : null, plan.maxBots ? t("{count} Worker", "{count} workers", { count: plan.maxBots }) : null]),
         "",
         t("**So geht's los:**", "**Getting started:**"),
         t("1. Geh in einen Sprachkanal.", "1. Join a voice channel."),
@@ -104,7 +104,7 @@ export function buildHelpPayload(input) {
       body: [
         t("`/setup` führt Schritt für Schritt durch die Einrichtung.", "`/setup` walks you through the setup."),
         t("`/invite` holt weitere Worker auf den Server, `/workers` zeigt, welcher gerade spielt.", "`/invite` brings more workers to the server, `/workers` shows which one plays."),
-        t("`/perm` legt fest, welche Rollen welche Befehle dürfen; `/language` stellt Deutsch oder Englisch ein.", "`/perm` sets which roles may use which commands; `/language` switches between German and English."),
+        t("`/perm` legt fest, welche Rollen welche Befehle dürfen; `/language` stellt die Sprache des Bots ein.", "`/perm` sets which roles may use which commands; `/language` sets the bot's language."),
         t("`/meine-daten` zeigt, was OmniFM über dich speichert; dort holst du es als Datei oder löschst alles.", "`/mydata` shows what OmniFM keeps about you; there you get it as a file or delete everything."),
       ],
       actions: [row(button(INVITE_COMPONENT_ID_OPEN, t("Worker einladen", "Invite workers"), ButtonStyle.Primary), button(WORKERS_COMPONENT_ID_OPEN, t("Worker ansehen", "See workers")))],

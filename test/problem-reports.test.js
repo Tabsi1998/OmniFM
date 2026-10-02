@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { ChannelType, PermissionFlagsBits } from "discord.js";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 // Problems, ideas and feedback from Discord (#436): a report goes to a
 // private team channel first. Public it becomes only after a team member's
@@ -369,7 +370,7 @@ test("the forum post carries the tag of the status, found by its name (#437)", a
 });
 
 test("/problem, /idee and /feedback: the form, and the commands in German with their descriptions", () => {
-  const t = (de) => de;
+  const t = botTranslator("de");
   const modal = buildReportModal({ t, kind: "idea" }).toJSON();
   assert.equal(modal.custom_id, reportFormId("idea"));
   assert.equal(modal.title, "Idee vorschlagen");

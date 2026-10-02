@@ -8,11 +8,12 @@ import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "disc
 import { BRAND } from "../config/plans.js";
 import { PLAN_LIMITS, PLAN_NAMES } from "../config/plan-features.js";
 import { catalogPlanContext, planBulletLines } from "../bot/plan-texts.js";
-import { getDefaultLanguage, normalizeLanguage } from "../i18n.js";
+import { getDefaultLanguage } from "../i18n.js";
 import { brandFooter, brandAuthor } from "../bot/brand-embed.js";
+import { normalizeBotLanguage } from "../lib/bot-i18n.js";
 
 function languageOf(language) {
-  return normalizeLanguage(language, getDefaultLanguage()) === "de" ? "de" : "en";
+  return normalizeBotLanguage(language, getDefaultLanguage()) === "de" ? "de" : "en";
 }
 
 function pick(language, de, en) {

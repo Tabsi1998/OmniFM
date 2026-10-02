@@ -83,6 +83,7 @@ import {
   openRuntimeStationsBrowser,
 } from "../src/bot/runtime-panels.js";
 import { handleRuntimeInteraction } from "../src/bot/runtime-interactions.js";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 test("worker runtimes handle component interactions created by their own Discord application", async (t) => {
   const runtime = new BotRuntime({
@@ -111,7 +112,7 @@ test("now-playing controls acknowledge Discord before running voice operations",
   const calls = [];
   const runtime = {
     guildState: new Map([["guild-1", { player: { state: { status: "playing" } }, volume: 100 }]]),
-    createInteractionTranslator: () => ({ t: (de) => de }),
+    createInteractionTranslator: () => ({ t: botTranslator("de") }),
     pauseInGuild: async () => { calls.push("pause"); return { ok: true }; },
     resumeInGuild: async () => ({ ok: true }),
     stopInGuild: async () => ({ ok: true }),
@@ -137,7 +138,7 @@ test("remote slash controls acknowledge Discord before refreshing worker state",
   const runtime = {
     config: { name: "Commander" },
     role: "commander",
-    createInteractionTranslator: () => ({ language: "de", t: (de) => de }),
+    createInteractionTranslator: () => ({ language: "de", t: botTranslator("de") }),
     getGuildAccess: () => ({ allowed: true }),
     getState: () => ({}),
     checkCommandRolePermission: () => ({ ok: true }),
@@ -684,7 +685,7 @@ test("invite and workers components ack before rebuilding slow payloads", async 
     createInteractionTranslator() {
       return {
         language: "en",
-        t: (de, en) => en,
+        t: botTranslator("en"),
       };
     },
     buildInviteMenuPayload: async (_interaction, options = {}) => {
@@ -1101,7 +1102,7 @@ test("connectToVoice forwards the interaction language to voice access validatio
     createInteractionTranslator() {
       return {
         language: "en",
-        t: (de, en) => en || de,
+        t: botTranslator("en"),
       };
     },
     async validateVoiceChannelAccess(_guild, _channel, { language }) {
@@ -5332,7 +5333,7 @@ test("play wizard payload exposes modern quick-start controls", async () => {
   };
   fakeRuntime.createInteractionTranslator = () => ({
     language: "en",
-    t: (_de, en) => en,
+    t: botTranslator("en"),
   });
   fakeRuntime.resolveInteractionLanguage = () => "en";
 
@@ -5381,7 +5382,7 @@ test("stations browser payload exposes genres, paging, search and play buttons",
   };
   fakeRuntime.createInteractionTranslator = () => ({
     language: "en",
-    t: (_de, en) => en,
+    t: botTranslator("en"),
   });
   fakeRuntime.resolveInteractionLanguage = () => "en";
 
@@ -5462,7 +5463,7 @@ test("executeRuntimePlay does not block explicit remote workers on a synthetic c
   };
   fakeRuntime.createInteractionTranslator = () => ({
     language: "en",
-    t: (_de, en) => en,
+    t: botTranslator("en"),
   });
   fakeRuntime.resolveInteractionLanguage = () => "en";
 
@@ -5557,7 +5558,7 @@ test("executeRuntimePlay refreshes remote worker states before and after command
   };
   fakeRuntime.createInteractionTranslator = () => ({
     language: "en",
-    t: (_de, en) => en,
+    t: botTranslator("en"),
   });
   fakeRuntime.resolveInteractionLanguage = () => "en";
 
@@ -5639,7 +5640,7 @@ test("workers status payload paginates and exposes page controls", async () => {
     createInteractionTranslator() {
       return {
         language: "en",
-        t: (de, en) => en,
+        t: botTranslator("en"),
       };
     },
     formatTierLabel() {

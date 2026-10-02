@@ -12,6 +12,7 @@ import { buildCommandsJson } from "../commands.js";
 import { versionTag } from "./brand-embed.js";
 import { buildPanelPreview } from "./now-playing/panel-preview.js";
 import { menuMethods } from "./runtime-methods/menus.js";
+import { botTranslator } from "../lib/bot-i18n.js";
 
 /** The bot answers in German or English; German visitors see German, everybody else English. */
 export const DEMO_BOT_LANGUAGES = ["de", "en"];
@@ -59,7 +60,7 @@ export function buildDemoPanel(language, design = undefined) {
 
 /** The answer to /invite on a new Free server with two workers, built by the bot's own menu code. */
 async function inviteAnswer(language) {
-  const t = (de, en) => (language === "de" ? de : en);
+  const t = botTranslator(language);
   const workers = [1, 2].map((slot) => ({
     slot, botIndex: null, name: `OmniFM ${slot}`, requiredTier: "free", tierLocked: false, online: true,
     inviteUrl: `https://discord.com/oauth2/authorize?client_id=10000000000000000${slot}`, alreadyInvited: false, selectable: true,

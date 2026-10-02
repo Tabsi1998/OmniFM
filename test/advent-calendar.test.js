@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 // The Advent calendar (#428): a door a day from 1 to 24 December, private,
 // in the opener's language, with a station tip the plan plays.
@@ -96,7 +97,7 @@ test("the door: surprise, answer as a spoiler, the tip with 'Play now' only for 
 
 test("the panel gets the door button only while a door is open", () => {
   const base = {
-    t: (de) => de, applicationId: null, workerName: "OmniFM 1", planTier: "free",
+    t: botTranslator("de"), applicationId: null, workerName: "OmniFM 1", planTier: "free",
     station: { name: "Groove Salad", key: "groove", genre: "Ambient", tier: "free" },
     track: { hasTrack: true, headline: "Song", artist: "Artist" },
     playback: { phase: "playing", paused: false, listeners: 3 },

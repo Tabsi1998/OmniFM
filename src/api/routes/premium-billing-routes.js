@@ -1,3 +1,5 @@
+import { botTranslator } from "../../lib/bot-i18n.js";
+
 export function createPremiumBillingRoutesHandler(deps) {
   const {
     SEAT_OPTIONS,
@@ -30,7 +32,7 @@ export function createPremiumBillingRoutesHandler(deps) {
   }
 
   function getTranslator(language) {
-    return (de, en) => (language === "de" ? de : en);
+    return botTranslator(language);
   }
 
   return async function handlePremiumBillingRoutes(context) {

@@ -65,7 +65,7 @@ function discordDate({ year, month, day }) {
 /**
  * /ostereier: the server's board, only for whoever asks.
  * @param {{
- *   t: (de: string, en: string) => string,
+ *   t: (de: string, en: string, params?: Record<string, unknown>) => string,
  *   board: { year: number, top: { userId: string, count: number, rank: number }[], own: { count: number, rank: number } | null, finders: number } | null,
  *   running?: boolean, off?: boolean, next?: { year: number, month: number, day: number } | null,
  *   appId?: string | null,

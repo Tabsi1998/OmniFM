@@ -13,15 +13,16 @@ import {
   musicBrainzUrlFor,
   recentSongTitles,
 } from "./now-playing-methods.js";
+import { botTranslator } from "../../lib/bot-i18n.js";
 
 const nowPlayingEmbedMethods = {
   buildNowPlayingEmbed(guildId, station, meta, context = {}) {
     const language = this.resolveGuildLanguage(guildId);
-    const isDe = language === "de";
+    const t = botTranslator(language);
     const tierConfig = getTierConfig(guildId);
     const stationName = clipText(station?.name || meta?.name || "-", 120) || "-";
     const stationKey = clipText(String(context?.stationKey || station?.key || "").trim(), 80);
-    const stationGenre = clipText(String(station?.genre || station?.category || (isDe ? "Radio" : "Radio")).trim(), 80) || "Radio";
+    const stationGenre = clipText(String(station?.genre || station?.category || (t("Radio", "Radio"))).trim(), 80) || "Radio";
     const stationTier = String(station?.tier || "free").trim().toUpperCase();
     const artist = clipText(this.normalizeNowPlayingValue(meta?.artist, station, meta, 120), 120);
     const title = clipText(this.normalizeNowPlayingValue(meta?.title, station, meta, 140), 140);
@@ -58,31 +59,34 @@ const nowPlayingEmbedMethods = {
       if (sourceSummary.sourceNote) descriptionLines.push(`-# ${sourceSummary.sourceNote}`);
     } else {
       descriptionLines.push(`## ${stationName}`);
-      descriptionLines.push(`-# ${isDe ? "Live-Radio-Stream läuft" : "Live radio stream playing"}`);
+      descriptionLines.push(`-# ${t("Live-Radio-Stream läuft", "Live radio stream playing")}`);
       descriptionLines.push(`> ⚠️ ${sourceSummary.metadataHint}`);
     }
 
     if (context?.serverMuted === true) {
-      descriptionLines.push(isDe
-        ? "> \u{1f507} OmniFM ist auf diesem Server stummgeschaltet, niemand hört den Stream. Rechtsklick auf OmniFM im Sprachkanal → Server-Stummschaltung aufheben."
-        : "> \u{1f507} OmniFM is server-muted here, nobody hears the stream. Right-click OmniFM in the voice channel → remove the server mute.");
+      descriptionLines.push(t(
+        "> \u{1f507} OmniFM ist auf diesem Server stummgeschaltet, niemand hört den Stream. Rechtsklick auf OmniFM im Sprachkanal → Server-Stummschaltung aufheben.",
+        "> \u{1f507} OmniFM is server-muted here, nobody hears the stream. Right-click OmniFM in the voice channel → remove the server mute.",
+      ));
     }
     const failoverDesiredName = clipText(String(context?.failover?.desiredName || "").trim(), 80);
     if (context?.failover?.active === true && failoverDesiredName) {
-      descriptionLines.push(isDe
-        ? `> \u21aa Ersatzsender aktiv: **${failoverDesiredName}** ist gerade nicht erreichbar. OmniFM prüft ihn automatisch und wechselt zurück, sobald er wieder läuft.`
-        : `> \u21aa Backup station active: **${failoverDesiredName}** is unreachable right now. OmniFM keeps checking and switches back once it plays again.`);
+      descriptionLines.push(t(
+        "> \u21aa Ersatzsender aktiv: **{station}** ist gerade nicht erreichbar. OmniFM prüft ihn automatisch und wechselt zurück, sobald er wieder läuft.",
+        "> \u21aa Backup station active: **{station}** is unreachable right now. OmniFM keeps checking and switches back once it plays again.",
+        { station: failoverDesiredName },
+      ));
     }
 
     const stationDetails = [stationGenre, stationTier !== "FREE" ? stationTier : null].filter(Boolean).join(" · ");
     const stableFields = [
       {
-        name: isDe ? "📻 Sender" : "📻 Station",
+        name: t("📻 Sender", "📻 Station"),
         value: `**${stationName}**\n${stationDetails}${stationKey ? `\n-# ID: \`${stationKey}\`` : ""}`,
         inline: false,
       },
       {
-        name: isDe ? "\u{1f3a7} Qualit\u00e4t" : "\u{1f3a7} Quality",
+        name: t("\u{1f3a7} Qualit\u00e4t", "\u{1f3a7} Quality"),
         value: tierConfig.bitrate || "\u2014",
         inline: true,
       },
@@ -90,21 +94,21 @@ const nowPlayingEmbedMethods = {
 
     if (voiceChannelId) {
       stableFields.push({
-        name: isDe ? "\u{1f39b} L\u00e4uft in" : "\u{1f39b} Running in",
+        name: t("\u{1f39b} L\u00e4uft in", "\u{1f39b} Running in"),
         value: `<#${voiceChannelId}>`,
         inline: true,
       });
     }
     if (visibleListenerCount) {
       stableFields.push({
-        name: isDe ? "\u{1f465} H\u00f6ren gerade" : "\u{1f465} Listening now",
+        name: t("\u{1f465} H\u00f6ren gerade", "\u{1f465} Listening now"),
         value: visibleListenerCount,
         inline: true,
       });
     }
     if (visibleVolume) {
       stableFields.push({
-        name: isDe ? "\u{1f50a} Lautst\u00e4rke" : "\u{1f50a} Volume",
+        name: t("\u{1f50a} Lautst\u00e4rke", "\u{1f50a} Volume"),
         value: visibleVolume,
         inline: true,
       });
@@ -118,7 +122,7 @@ const nowPlayingEmbedMethods = {
     }
     if (streamInfo) {
       stableFields.push({
-        name: isDe ? "\u2139\ufe0f Stream-Info" : "\u2139\ufe0f Stream info",
+        name: t("\u2139\ufe0f Stream-Info", "\u2139\ufe0f Stream info"),
         value: streamInfo,
         inline: false,
       });
@@ -127,13 +131,13 @@ const nowPlayingEmbedMethods = {
     const stableFooterParts = [
       `${workerName} \u00b7 ${BRAND.name}`,
       sourceSummary.sourceLabel,
-      isDe ? `\u21bb Auto-Update ${Math.round(NOW_PLAYING_POLL_MS / 1000)}s` : `\u21bb Auto update ${Math.round(NOW_PLAYING_POLL_MS / 1000)}s`,
+      t("\u21bb Auto-Update {seconds}s", "\u21bb Auto update {seconds}s", { seconds: Math.round(NOW_PLAYING_POLL_MS / 1000) }),
       versionTag(),
     ].filter(Boolean);
 
     embed
       .setColor(hasTrack ? tierColor(tierConfig.tier) : OMNI_COLORS.warning)
-      .setTitle(isDe ? "\u{1f534} LIVE \u00b7 Jetzt auf Sendung" : "\u{1f534} LIVE \u00b7 On air now")
+      .setTitle(t("\u{1f534} LIVE \u00b7 Jetzt auf Sendung", "\u{1f534} LIVE \u00b7 On air now"))
       .setDescription(descriptionLines.join("\n"))
       .setAuthor(brandAuthor(`${workerName} \u00b7 ${BRAND.name}`, this.client.user?.displayAvatarURL?.({ extension: "png", size: 128 })))
       .setFooter(brandFooter(stableFooterParts.join("  \u00b7  ")));
@@ -162,7 +166,7 @@ const nowPlayingEmbedMethods = {
   // The data of the panel (#266); the layout lives in now-playing-panel.js.
   buildNowPlayingPanelPayload(guildId, station, meta, context = {}) {
     const language = this.resolveGuildLanguage(guildId);
-    const t = (de, en) => (language === "de" ? de : en);
+    const t = botTranslator(language);
     const tierConfig = getTierConfig(guildId);
     const artist = clipText(this.normalizeNowPlayingValue(meta?.artist, station, meta, 120), 120);
     const title = clipText(this.normalizeNowPlayingValue(meta?.title, station, meta, 140), 140);

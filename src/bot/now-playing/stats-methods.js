@@ -2,10 +2,10 @@
 // BotRuntime methods, split out of src/bot/now-playing/now-playing-methods.js (#295) and mixed in with it.
 import { EmbedBuilder } from "discord.js";
 import { clipText } from "../../lib/helpers.js";
-import { languagePick } from "../../lib/language.js";
 import { getGuildListeningStats, getTopGuildsByActivity } from "../../listening-stats-store.js";
 import { BRAND } from "../../config/plans.js";
 import { OMNI_COLORS, brandFooter, brandAuthor } from "../brand-embed.js";
+import { botTranslator } from "../../lib/bot-i18n.js";
 
 const nowPlayingStatsMethods = {
   formatStatsHourBucket(hour, language = "de") {
@@ -18,18 +18,17 @@ const nowPlayingStatsMethods = {
     return `${String(safeHour).padStart(2, "0")}:00-${String(nextHour).padStart(2, "0")}:00`;
   },
 
-  formatDurationMs(ms, language = "de") {
+  formatDurationMs(ms, _language = "de") {
     const totalMinutes = Math.floor(ms / 60_000);
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
-    if (hours > 0) {
-      return language === "de" ? `${hours}h ${minutes}m` : `${hours}h ${minutes}m`;
-    }
-    return language === "de" ? `${minutes}m` : `${minutes}m`;
+    // The same in every language.
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
   },
 
   buildListeningStatsEmbed(guildId, language = "de") {
-    const t = (de, en) => languagePick(language, de, en);
+    const t = botTranslator(language);
     const guild = this.client.guilds.cache.get(guildId) || null;
     const stats = getGuildListeningStats(guildId);
     const liveStreams = this.getLiveGuildPlaybackSnapshot(guildId);
@@ -92,8 +91,9 @@ const nowPlayingStatsMethods = {
       .setTitle(t("📊 Listening-Stats", "📊 Listening stats"))
       .setDescription(
         t(
-          `Server: **${guild?.name || guildId}**\nLive-Zuhörer jetzt: **${totalLiveListeners}**`,
-          `Server: **${guild?.name || guildId}**\nLive listeners now: **${totalLiveListeners}**`
+          "Server: **{server}**\nLive-Zuhörer jetzt: **{listeners}**",
+          "Server: **{server}**\nLive listeners now: **{listeners}**",
+          { server: guild?.name || guildId, listeners: totalLiveListeners }
         )
       )
       .addFields(
@@ -145,25 +145,24 @@ const nowPlayingStatsMethods = {
         },
         {
           name: t("Session-Daten", "Session data"),
-          value: t(
-            `Durchschnitt: **${avgSessionText}** | Längste: **${longestSessionText}**`,
-            `Average: **${avgSessionText}** | Longest: **${longestSessionText}**`
-          ),
+          value: t("Durchschnitt: **{average}** | Längste: **{longest}**", "Average: **{average}** | Longest: **{longest}**", { average: avgSessionText, longest: longestSessionText }),
           inline: false,
         },
         {
           name: t("Verbindung", "Connection"),
           value: t(
-            `Verbindungen: **${totalConnections}** | Reconnects: **${totalReconnects}** | Zuverlässigkeit: **${reliability}%**`,
-            `Connections: **${totalConnections}** | Reconnects: **${totalReconnects}** | Reliability: **${reliability}%**`
+            "Verbindungen: **{connections}** | Reconnects: **{reconnects}** | Zuverlässigkeit: **{reliability}%**",
+            "Connections: **{connections}** | Reconnects: **{reconnects}** | Reliability: **{reliability}%**",
+            { connections: totalConnections, reconnects: totalReconnects, reliability }
           ),
           inline: false,
         },
         {
           name: t("Server gesamt", "Server totals"),
           value: t(
-            `Starts ohne Recovery: **${Number(stats?.totalStarts || 0)}**\nLetzter Start: ${stats?.lastStartedAt ? this.formatDiscordTimestamp(stats.lastStartedAt, "R") : "-"}`,
-            `Starts without recovery: **${Number(stats?.totalStarts || 0)}**\nLast start: ${stats?.lastStartedAt ? this.formatDiscordTimestamp(stats.lastStartedAt, "R") : "-"}`
+            "Starts ohne Recovery: **{starts}**\nLetzter Start: {last}",
+            "Starts without recovery: **{starts}**\nLast start: {last}",
+            { starts: Number(stats?.totalStarts || 0), last: stats?.lastStartedAt ? this.formatDiscordTimestamp(stats.lastStartedAt, "R") : "-" }
           ),
           inline: true,
         },
@@ -182,7 +181,7 @@ const nowPlayingStatsMethods = {
   },
 
   buildSongHistoryEmbed(history, guildId, playbackRuntime, language = "de") {
-    const t = (de, en) => languagePick(language, de, en);
+    const t = botTranslator(language);
     const lines = history.map((entry, index) => {
       const unix = Number.isFinite(entry.timestampMs) ? Math.floor(entry.timestampMs / 1000) : null;
       const when = unix ? `<t:${unix}:R>` : "-";

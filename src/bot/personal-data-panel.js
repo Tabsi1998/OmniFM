@@ -117,8 +117,9 @@ export function buildErasePersonalDataConfirm({ t, counts }) {
   return ui.reply(ui.confirm({
     title: t("Alles löschen?", "Delete everything?"),
     body: t(
-      `OmniFM löscht deine Merkliste, deine Votes, deine Anmeldungen (du wirst im Dashboard abgemeldet), deine Hörstunden und die verknüpften Rollen. Bei Umfragen, Events und Dashboard-Änderungen bleibt der Eintrag für den Server, dein Name wird entfernt. Insgesamt ${totalCount(counts)} Einträge. Das lässt sich nicht rückgängig machen.`,
-      `OmniFM deletes your saved songs, your votes, your logins (you are signed out of the dashboard), your listening hours and the linked roles. Polls, events and dashboard changes stay with the server, your name is removed. ${totalCount(counts)} entries in all. This cannot be undone.`
+      "OmniFM löscht deine Merkliste, deine Votes, deine Anmeldungen (du wirst im Dashboard abgemeldet), deine Hörstunden und die verknüpften Rollen. Bei Umfragen, Events und Dashboard-Änderungen bleibt der Eintrag für den Server, dein Name wird entfernt. Insgesamt {count} Einträge. Das lässt sich nicht rückgängig machen.",
+      "OmniFM deletes your saved songs, your votes, your logins (you are signed out of the dashboard), your listening hours and the linked roles. Polls, events and dashboard changes stay with the server, your name is removed. {count} entries in all. This cannot be undone.",
+      { count: totalCount(counts) }
     ),
     confirmId: personalDataCustomId("eraseyes"),
     cancelId: personalDataCustomId("eraseno"),
@@ -132,8 +133,9 @@ export function buildPersonalDataErasedPayload({ t, counts, applicationId = null
   return ui.reply(ui.notice("success", {
     title: t("Deine Daten sind gelöscht", "Your data is deleted"),
     body: t(
-      `${totalCount(counts)} Einträge gelöscht oder von dir gelöst. Stimmst du später wieder ab oder merkst dir einen Song, entsteht das neu.`,
-      `${totalCount(counts)} entries deleted or detached from you. If you vote again or save a song later, that is stored anew.`
+      "{count} Einträge gelöscht oder von dir gelöst. Stimmst du später wieder ab oder merkst dir einen Song, entsteht das neu.",
+      "{count} entries deleted or detached from you. If you vote again or save a song later, that is stored anew.",
+      { count: totalCount(counts) }
     ),
     applicationId,
   }));

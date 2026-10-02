@@ -150,7 +150,7 @@ test("a Free server's dashboard: what plays where, switch, stop, and the rest by
   assert.equal(settings.status, 200, JSON.stringify(settings.payload));
   assert.equal(settings.payload.capabilities.dashboardBasic, true);
   assert.equal(settings.payload.capabilities.dashboardAccess, false);
-  assert.deepEqual(settings.payload.serverLanguage, { current: "auto", options: ["auto", "de", "en"] });
+  assert.deepEqual(settings.payload.serverLanguage, { current: "auto", options: ["auto", "de", "en", "fr", "es", "it", "pl", "tr", "pt", "nl"] }, "the bot's nine languages (#477)");
   // #425: the time zone and the seasonal decoration, every plan, everything on at first.
   assert.deepEqual(settings.payload.serverTimeZone, { current: "Europe/Vienna", default: "Europe/Vienna" });
   assert.ok(Object.values(settings.payload.seasonDecor.seasons).every(Boolean));

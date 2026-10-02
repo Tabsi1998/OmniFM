@@ -1,6 +1,7 @@
 import { ChannelType, SlashCommandBuilder } from "discord.js";
 import { getPermissionCommandChoices } from "./config/command-permissions.js";
 import { commandLocalizations } from "./config/command-translations.js";
+import { BOT_LANGUAGES, BOT_LANGUAGE_NAMES } from "./lib/bot-i18n.js";
 
 const DE = "de";
 
@@ -324,10 +325,8 @@ export function buildCommandBuilders() {
         .setDescription("Language")
         .setDescriptionLocalizations(localized("Language", "Sprache"))
         .setRequired(true)
-        .addChoices(
-          choice("German", "de", "Deutsch"),
-          choice("English", "en", "Englisch")
-        )))
+        // Each language by its own name (#477), readable in every language.
+        .addChoices(...BOT_LANGUAGES.map((code) => choice(BOT_LANGUAGE_NAMES[code], code)))))
     .addSubcommand((sub) => describe(sub.setName("reset"), "Return to automatic language selection", "Automatische Sprachwahl wieder aktivieren"));
 
   const addstation = describe(

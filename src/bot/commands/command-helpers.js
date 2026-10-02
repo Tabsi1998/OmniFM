@@ -23,6 +23,7 @@ import {
 import { buildOmniEmbed } from "../discord-ui.js";
 import * as ui from "../../discord/ui/index.js";
 import { NOTICE_CATALOG } from "../../discord/ui/notice-catalog.js";
+import { botTranslator } from "../../lib/bot-i18n.js";
 
 export async function deferRuntimeReply(interaction) {
   if (interaction?.deferred || interaction?.replied || typeof interaction?.deferReply !== "function") return;
@@ -153,7 +154,7 @@ export function buildNoticeFixRow(fix, t, language) {
  * its tone, private. With `code` the text and the fix button come from the
  * notice catalog; `title`/`description` still work for one-off texts.
  * @param {{
- *   t?: (de: string, en: string) => string,
+ *   t?: (de: string, en: string, params?: Record<string, unknown>) => string,
  *   language?: string,
  *   tone?: string,
  *   title?: string,
@@ -182,9 +183,10 @@ export function buildNoticePayload({
   const entry = code ? NOTICE_CATALOG[code] : null;
   const kind = entry?.kind || TONE_KINDS[tone] || "info";
   const style = ui.NOTICE_KINDS[kind] || ui.NOTICE_KINDS.info;
-  const translate = typeof t === "function" ? t : (de, _en) => de;
-  const heading = entry ? `${ui.icon(style.icon)} ${translate(...entry.title)}` : String(title || "");
-  const bodyText = entry ? translate(...entry.body(params)) : String(description || "");
+  const translate = typeof t === "function" ? t : botTranslator("de");
+  const heading = entry ? `${ui.icon(style.icon)} ${translate(entry.title[0], entry.title[1])}` : String(title || "");
+  const [bodyDe, bodyEn, values] = entry ? entry.body(params) : [];
+  const bodyText = entry ? translate(bodyDe, bodyEn, { ...(params || {}), ...(values || {}) }) : String(description || "");
 
   const rows = [];
   if (entry?.fix) {
@@ -258,8 +260,9 @@ export function buildStreamingRuntimeSelectionPayload(runtime, interaction, play
     title = t("🔎 Gewählter Worker nicht aktiv", "🔎 Selected worker is not active");
     description = requestedWorkerIndex
       ? t(
-        `Für \`bot:${requestedWorkerIndex}\` läuft aktuell kein Stream auf diesem Server.`,
-        `There is currently no active stream on this server for \`bot:${requestedWorkerIndex}\`.`
+        "Für `bot:{worker}` läuft aktuell kein Stream auf diesem Server.",
+        "There is currently no active stream on this server for `bot:{worker}`.",
+        { worker: requestedWorkerIndex }
       )
       : runtime.getStreamingRuntimeSelectionMessage(reason, language);
     tone = "warning";

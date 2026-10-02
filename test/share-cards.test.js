@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 const scratchDir = fs.mkdtempSync(path.join(os.tmpdir(), "omnifm-share-"));
 process.env.OMNIFM_RUNTIME_DATA_DIR = scratchDir;
@@ -14,7 +15,7 @@ const { createShareRoutesHandler, buildSharePageHtml } = await import("../src/ap
 const { buildNowPlayingPanel } = await import("../src/bot/now-playing/now-playing-panel.js");
 const { BotRuntime } = await import("../src/bot/runtime.js");
 
-const de = (german) => german;
+const de = botTranslator("de");
 const noImage = async () => null;
 const catalog = JSON.parse(fs.readFileSync(new URL("../stations.json", import.meta.url), "utf8")).stations;
 

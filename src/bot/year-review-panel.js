@@ -99,7 +99,7 @@ function navigation(page, t) {
 /**
  * One page of the review.
  * @param {object} input
- * @param {(de: string, en: string) => string} input.t
+ * @param {(de: string, en: string, params?: Record<string, unknown>) => string} input.t
  * @param {string} input.language
  * @param {Partial<ReturnType<typeof import("../lib/year-review.js").buildYearReview>>} input.review from yearReviewFor()
  * @param {number} [input.page]

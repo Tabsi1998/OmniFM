@@ -40,7 +40,7 @@ function tile(value, label, change = "") {
 
 /**
  * @param {object} input
- * @param {(de: string, en: string) => string} input.t
+ * @param {(de: string, en: string, params?: Record<string, unknown>) => string} input.t
  * @param {string} input.guildName
  * @param {ReturnType<typeof import("../lib/weekly-digest-report.js").buildWeeklyDigestReport>} input.report
  * @param {"team"|"public"} [input.audience]

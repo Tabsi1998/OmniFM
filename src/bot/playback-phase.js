@@ -20,6 +20,7 @@
 import { log } from "../lib/logging.js";
 import { recordUnexpectedPlaybackTransition } from "../services/operator-alerts.js";
 import { recordPlaybackTimelineEntry } from "../playback-timeline-store.js";
+import { botTranslator } from "../lib/bot-i18n.js";
 
 const PLAYBACK_PHASES = Object.freeze(["idle", "connecting", "starting", "playing", "paused", "recovering", "parked"]);
 
@@ -110,7 +111,7 @@ function recordPlaybackPhase(runtime, guildId, state, reason = "") {
 }
 
 /** One line per recent transition, newest last, for /diag. */
-function describePlaybackPhaseHistory(state, { limit = 5, t = (de, _en) => de } = {}) {
+function describePlaybackPhaseHistory(state, { limit = 5, t = botTranslator("de") } = {}) {
   const history = Array.isArray(state?.playbackPhaseHistory) ? state.playbackPhaseHistory.slice(-limit) : [];
   return history.map((entry) => {
     const when = `<t:${Math.floor(Number(entry.at || 0) / 1000)}:R>`;

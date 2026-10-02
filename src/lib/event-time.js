@@ -8,6 +8,7 @@ import {
 } from "discord.js";
 import { normalizeLanguage, getDefaultLanguage } from "../i18n.js";
 import { languagePick } from "./language.js";
+import { botLocale, normalizeBotLanguage } from "./bot-i18n.js";
 
 const REPEAT_MODES = new Set([
   "none",
@@ -166,7 +167,7 @@ function getWeekdayIndexInTimeZone(utcMs, timeZone) {
 }
 
 function getWeekdayName(utcMs, language = "de", timeZone = EVENT_FALLBACK_TIME_ZONE) {
-  const locale = normalizeLanguage(language, getDefaultLanguage()) === "de" ? "de-DE" : "en-US";
+  const locale = botLocale(normalizeBotLanguage(language, getDefaultLanguage()));
   const tz = normalizeEventTimeZone(timeZone, EVENT_FALLBACK_TIME_ZONE) || EVENT_FALLBACK_TIME_ZONE;
   return new Intl.DateTimeFormat(locale, { timeZone: tz, weekday: "long" }).format(new Date(utcMs));
 }
@@ -464,7 +465,7 @@ function parseEventStartDateTime(rawInput, language = "de", preferredTimeZone = 
 function formatDateTime(ms, language = "de", timeZone = null) {
   const value = Number.parseInt(String(ms || ""), 10);
   if (!Number.isFinite(value) || value <= 0) return "-";
-  const locale = normalizeLanguage(language, getDefaultLanguage()) === "de" ? "de-DE" : "en-US";
+  const locale = botLocale(normalizeBotLanguage(language, getDefaultLanguage()));
   const tz = normalizeEventTimeZone(timeZone, EVENT_FALLBACK_TIME_ZONE) || EVENT_FALLBACK_TIME_ZONE;
   return new Date(value).toLocaleString(locale, {
     timeZone: tz,
@@ -496,7 +497,7 @@ function formatOrdinal(value, language = "de") {
 
 function formatMonthDay(utcMs, language = "de", timeZone = EVENT_FALLBACK_TIME_ZONE) {
   if (!Number.isFinite(Number(utcMs)) || Number(utcMs) <= 0) return null;
-  const locale = normalizeLanguage(language, getDefaultLanguage()) === "de" ? "de-DE" : "en-US";
+  const locale = botLocale(normalizeBotLanguage(language, getDefaultLanguage()));
   return new Intl.DateTimeFormat(locale, {
     timeZone: normalizeEventTimeZone(timeZone, EVENT_FALLBACK_TIME_ZONE) || EVENT_FALLBACK_TIME_ZONE,
     day: "numeric",

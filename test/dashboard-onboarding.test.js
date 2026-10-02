@@ -11,8 +11,9 @@ import {
   buildDashboardWeeklyDigestHint,
   resolveDashboardInviteUrls,
 } from "../frontend/src/lib/dashboardOnboarding.js";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
-const t = (_de, en) => en;
+const t = botTranslator("en");
 
 test("resolveDashboardInviteUrls separates commander and worker links", () => {
   const urls = resolveDashboardInviteUrls({

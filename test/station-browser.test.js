@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { ButtonStyle, MessageFlags } from "discord.js";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 const scratchDir = fs.mkdtempSync(path.join(os.tmpdir(), "omnifm-station-browser-"));
 process.env.OMNIFM_RUNTIME_DATA_DIR = scratchDir;
@@ -22,7 +23,7 @@ const { BotRuntime } = await import("../src/bot/runtime.js");
 const { handleRuntimePanelInteraction } = await import("../src/bot/runtime-panels.js");
 const { STATIONS_COMPONENT_PREFIX } = await import("../src/bot/runtime-links.js");
 
-const t = (de) => de;
+const t = botTranslator("de");
 const catalog = JSON.parse(fs.readFileSync(new URL("../stations.json", import.meta.url), "utf8")).stations;
 
 function tree(payload) {
@@ -116,7 +117,7 @@ function createRuntime() {
   runtime.interactiveUiSessions = new Map();
   runtime.resolveGuildLanguage = () => "de";
   runtime.resolveInteractionLanguage = () => "de";
-  runtime.createInteractionTranslator = () => ({ t: (de) => de, language: "de" });
+  runtime.createInteractionTranslator = () => ({ t: botTranslator("de"), language: "de" });
   runtime.getApplicationId = () => "app-commander";
   return runtime;
 }

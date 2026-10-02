@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { MessageFlags } from "discord.js";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 const scratchDir = fs.mkdtempSync(path.join(os.tmpdir(), "omnifm-help-"));
 process.env.OMNIFM_RUNTIME_DATA_DIR = scratchDir;
@@ -15,8 +16,8 @@ const { BotRuntime } = await import("../src/bot/runtime.js");
 const { INFO_COMMANDS } = await import("../src/bot/commands/info-commands.js");
 const { INVITE_COMPONENT_ID_OPEN } = await import("../src/bot/runtime-links.js");
 
-const de = (german) => german;
-const en = (_german, english) => english;
+const de = botTranslator("de");
+const en = botTranslator("en");
 const urls = { dashboard: "https://omnifm.xyz/dashboard", guide: "https://omnifm.xyz/start", website: "https://omnifm.xyz", support: "https://discord.gg/x", premium: "https://omnifm.xyz/premium" };
 
 function tree(payload) {
@@ -29,7 +30,7 @@ function rowComponents(box) {
 
 test("every help topic is a private panel with a topic menu and a button that does something", () => {
   for (const section of HELP_SECTIONS) {
-    const payload = buildHelpPayload({ t: de, section, plan: { name: "Pro", bitrate: "128k", maxBots: 8 }, urls });
+    const payload = buildHelpPayload({ t: de, language: "de", section, plan: { name: "Pro", bitrate: "128k", maxBots: 8 }, urls });
     assert.equal(payload.flags, MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral, section);
     assert.deepEqual(ui.checkDiscordLimits(payload).problems, [], section);
     const components = rowComponents(tree(payload));
@@ -44,7 +45,7 @@ test("every help topic is a private panel with a topic menu and a button that do
 });
 
 test("the overview shows the plan and the three steps, in English too", () => {
-  const german = tree(buildHelpPayload({ t: de, plan: { name: "Pro", bitrate: "128k", maxBots: 8 }, urls, guildName: "Testserver" }));
+  const german = tree(buildHelpPayload({ t: de, language: "de", plan: { name: "Pro", bitrate: "128k", maxBots: 8 }, urls, guildName: "Testserver" }));
   const text = JSON.stringify(german);
   assert.match(text, /OmniFM-Hilfe/);
   assert.match(text, /Plan: \*\*Pro\*\* · 128k Audio · 8 Worker/);

@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 // Linked roles (#302): Discord knows two values per connected person, the
 // listening hours (counted only with the switch in /mydata) and whether the
@@ -337,7 +338,7 @@ test("the support server: premium customers get the role, former ones lose it, o
 // ---- /mydata and the owner console ----
 
 test("/mydata: the switch for the hours, and what the hours show", () => {
-  const t = (de) => de;
+  const t = botTranslator("de");
   const counts = { savedSongs: 0, votes: 0, dashboardLogins: 0, ownerConsoleLogins: 0, pollsStarted: 0, eventsCreated: 0, dashboardChanges: 0, linkedRoles: 1 };
   const buttonsOf = (payload) => payload.components.flatMap((component) => component.toJSON().components)
     .filter((block) => block.type === 1)

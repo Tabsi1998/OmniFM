@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 // Season stations (#430, #443): the catalogue field, the rubric in the
 // Discord browser and on the website, and /play weihnachten.
@@ -28,7 +29,7 @@ const { buildPublicStationCatalog } = await import("../src/lib/public-stations.j
 const { setLicenseProvider } = await import("../src/core/entitlements.js");
 
 const GUILD = "123456789012345678";
-const de = (german) => german;
+const de = botTranslator("de");
 
 test("the catalogue field: Christmas, Easter or Halloween, each once; anything else goes", () => {
   assert.deepEqual(normalizeStationSeasons(["christmas", "Easter", "summer", "christmas"]), ["christmas", "easter"]);

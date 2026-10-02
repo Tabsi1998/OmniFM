@@ -4,6 +4,7 @@ import { ButtonStyle, MessageFlags } from "discord.js";
 
 import * as ui from "../src/discord/ui/index.js";
 import { PLAYBACK_COMMANDS } from "../src/bot/commands/playback-commands.js";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 function json(payload) {
   return payload.components.map((component) => component.toJSON());
@@ -127,7 +128,7 @@ test("/status answers with the design system: private, within Discord's limits, 
     guild: { name: "Testserver" },
     async reply(payload) { replies.push(payload); },
   };
-  await PLAYBACK_COMMANDS.status({ runtime, interaction, t: (de) => de, language: "de" });
+  await PLAYBACK_COMMANDS.status({ runtime, interaction, t: botTranslator("de"), language: "de" });
 
   assert.equal(replies.length, 1);
   const [payload] = replies;

@@ -19,6 +19,7 @@ import {
 import { INFO_COMMANDS } from "./commands/info-commands.js";
 import { PLAYBACK_COMMANDS } from "./commands/playback-commands.js";
 import { SERVER_COMMANDS } from "./commands/server-commands.js";
+import { botTranslator } from "../lib/bot-i18n.js";
 
 export async function handleRuntimeAutocomplete(runtime, interaction) {
   try {
@@ -241,13 +242,14 @@ export async function handleRuntimeInteraction(runtime, interaction) {
   if (!interaction.isChatInputCommand()) return;
 
   if (!interaction.guildId) {
-    const isDe = resolveLanguageFromDiscordLocale(interaction?.locale, getDefaultLanguage()) === "de";
+    const language = resolveLanguageFromDiscordLocale(interaction?.locale, getDefaultLanguage());
+    const t = botTranslator(language);
     await interaction.reply(buildNoticePayload({
-      t: (de, en) => (isDe ? de : en),
-      language: isDe ? "de" : "en",
+      t,
+      language,
       tone: "warning",
-      title: isDe ? "🏠 Nur auf Servern verfügbar" : "🏠 Available in servers only",
-      description: isDe ? "Dieser Bot funktioniert nur auf Servern." : "This bot only works in servers.",
+      title: t("🏠 Nur auf Servern verfügbar", "🏠 Available in servers only"),
+      description: t("Dieser Bot funktioniert nur auf Servern.", "This bot only works in servers."),
       supportActions: { includeDashboard: false, includePremium: false, includeSupport: true },
     }));
     return;

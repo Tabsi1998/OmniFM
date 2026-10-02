@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 // #285: /mydata shows, sends and deletes what OmniFM keeps about one person.
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "omnifm-personal-data-"));
@@ -52,7 +53,7 @@ test("mydata buttons: own prefix, known actions only", () => {
 });
 
 test("mydata panel: private, and nothing to delete means no delete button", () => {
-  const t = (de) => de;
+  const t = botTranslator("de");
   const empty = { savedSongs: 0, votes: 0, dashboardLogins: 0, ownerConsoleLogins: 0, pollsStarted: 0, eventsCreated: 0, dashboardChanges: 0 };
   const payload = buildPersonalDataPayload({ t, counts: empty });
   const buttons = payload.components.flatMap((component) => component.toJSON().components)

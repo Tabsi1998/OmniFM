@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { ChannelType, ComponentType, MessageFlags, PermissionFlagsBits } from "discord.js";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 const scratchDir = fs.mkdtempSync(path.join(os.tmpdir(), "omnifm-forms-"));
 process.env.OMNIFM_RUNTIME_DATA_DIR = scratchDir;
@@ -17,7 +18,7 @@ const { listScheduledEvents } = await import("../src/scheduled-events-store.js")
 const { getRecentRuntimeIncidents, describeRuntimeIncident } = await import("../src/runtime-incidents-store.js");
 const { buildRepeatChoices } = await import("../src/commands.js");
 
-const de = (german) => german;
+const de = botTranslator("de");
 const GUILD = "123456789012345678";
 const VOICE = "223456789012345678";
 const USER = "323456789012345678";

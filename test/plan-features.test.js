@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { botTranslator } from "../src/lib/bot-i18n.js";
 
 // #413: one file says what Free, Pro and Ultimate can do; the bot, the API
 // and the website read it, and every plan check names something it knows.
@@ -22,7 +23,7 @@ const { buildNowPlayingPanel } = await import("../src/bot/now-playing/now-playin
 const ui = await import("../src/discord/ui/index.js");
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const de = (german) => german;
+const de = botTranslator("de");
 const context = { freeStations: 20, allStations: 120 };
 
 function sourceFiles(dir) {

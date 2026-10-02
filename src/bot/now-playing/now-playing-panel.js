@@ -48,7 +48,7 @@ function linkButton(url, label, emoji, appId) {
 
 /**
  * @param {object} input
- * @param {(de: string, en: string) => string} input.t
+ * @param {(de: string, en: string, params?: Record<string, unknown>) => string} input.t
  * @param {string|null} input.applicationId  the sending bot: its app emojis
  * @param {string} input.workerName
  * @param {string} input.planTier  the server's plan: free, pro or ultimate
@@ -130,8 +130,9 @@ export function buildNowPlayingPanel(input) {
   const failover = notices.failover || {};
   if (failover.active && failover.desiredName) {
     warnings.push(`> ↪ ${t(
-      `Ersatzsender aktiv: **${clip(failover.desiredName, 80)}** ist gerade nicht erreichbar. OmniFM prüft ihn automatisch und wechselt zurück, sobald er wieder läuft.`,
-      `Backup station active: **${clip(failover.desiredName, 80)}** is unreachable right now. OmniFM keeps checking and switches back once it plays again.`,
+      "Ersatzsender aktiv: **{station}** ist gerade nicht erreichbar. OmniFM prüft ihn automatisch und wechselt zurück, sobald er wieder läuft.",
+      "Backup station active: **{station}** is unreachable right now. OmniFM keeps checking and switches back once it plays again.",
+      { station: clip(failover.desiredName, 80) },
     )}`);
   }
 
@@ -173,7 +174,7 @@ export function buildNowPlayingPanel(input) {
   if (Number.isInteger(input.adventDoor) && input.adventDoor >= 1 && input.adventDoor <= 24) {
     rows.push(new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(ADVENT_BUTTON_ID).setStyle(ButtonStyle.Success)
-        .setLabel(t(`Türchen ${input.adventDoor}`, `Door ${input.adventDoor}`)).setEmoji({ name: "🎁" }),
+        .setLabel(t("Türchen {door}", "Door {door}", { door: input.adventDoor })).setEmoji({ name: "🎁" }),
     ));
   }
   // #429: an egg for whoever clicks first, then "Found".
@@ -182,12 +183,12 @@ export function buildNowPlayingPanel(input) {
   if (failover.active && failover.desiredName) {
     rows.push(new ActionRowBuilder().addComponents(
       button(`${NP_PREFIX}failback`, {
-        label: t(`Zurück zu ${clip(failover.desiredName, 50)}`, `Back to ${clip(failover.desiredName, 50)}`),
+        label: t("Zurück zu {station}", "Back to {station}", { station: clip(failover.desiredName, 50) }),
         style: ButtonStyle.Primary,
         appId,
       }),
       button(`${NP_PREFIX}keepstation`, {
-        label: t(`${clip(failover.currentName || stationName, 50)} behalten`, `Keep ${clip(failover.currentName || stationName, 50)}`),
+        label: t("{station} behalten", "Keep {station}", { station: clip(failover.currentName || stationName, 50) }),
         appId,
       }),
     ));

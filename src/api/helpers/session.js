@@ -13,6 +13,7 @@ import {
 } from "../../lib/api-helpers.js";
 import { getDashboardAuthSession, cleanupDashboardAuthState } from "../../dashboard-store.js";
 import { buildServerCapabilityPayload } from "./license.js";
+import { botTranslator } from "../../lib/bot-i18n.js";
 
 function parseEnvInt(value, fallback, minimum = 1) {
   const parsed = Number.parseInt(String(value || ""), 10);
@@ -280,7 +281,7 @@ export function getDashboardRequestTranslator(req, requestUrl, fallback = getDef
   const language = resolveDashboardRequestLanguage(req, requestUrl, fallback);
   return {
     language,
-    t: (de, en) => languagePick(language, de, en),
+    t: botTranslator(language),
   };
 }
 

@@ -1,6 +1,7 @@
 import { logError } from "../../lib/logging.js";
 import { resolveUserFacingErrorMessage } from "../../lib/user-facing-errors.js";
 import { createDashboardLicenseCheckoutRoute } from "./dashboard-license-checkout.js";
+import { botTranslator } from "../../lib/bot-i18n.js";
 
 export function createDashboardLicenseRouteHandler(deps) {
   const {
@@ -142,8 +143,7 @@ export function createDashboardLicenseRouteHandler(deps) {
           body?.language,
           normalizeLanguage(license?.preferredLanguage, requestLanguage)
         );
-        const isDe = previewLanguage === "de";
-        const t = (de, en) => (isDe ? de : en);
+        const t = botTranslator(previewLanguage);
 
         if (!license) {
           sendJson(res, 404, {

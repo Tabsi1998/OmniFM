@@ -26,7 +26,7 @@ test("on a server the server's language decides, not the person's", () => {
   const french = { guildId: "900000000000000003", guildLocale: "fr", locale: "de" };
   assert.equal(runtime.resolveInteractionLanguage(english), "en");
   assert.equal(runtime.resolveInteractionLanguage(german), "de");
-  assert.equal(runtime.resolveInteractionLanguage(french), "en");
+  assert.equal(runtime.resolveInteractionLanguage(french), "fr", "French is one of the bot's languages (#477)");
 });
 
 test("without a known server language OmniFM speaks English", () => {
@@ -42,7 +42,8 @@ test("without a known server language OmniFM speaks English", () => {
 test("direct messages follow the person's own Discord language", () => {
   const runtime = fakeRuntime();
   assert.equal(runtime.resolveInteractionLanguage({ locale: "de" }), "de");
-  assert.equal(runtime.resolveInteractionLanguage({ locale: "es-ES" }), "en");
+  assert.equal(runtime.resolveInteractionLanguage({ locale: "es-ES" }), "es");
+  assert.equal(runtime.resolveInteractionLanguage({ locale: "ja" }), "en", "a language the bot does not speak: English");
 });
 
 test("pages rendered by the server: German browser German, any other browser English", () => {
