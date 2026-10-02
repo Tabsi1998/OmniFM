@@ -66,3 +66,34 @@ describe('a language of its own download', () => {
     expect(screen.getByTestId('cta').textContent).toBe('Invite commander');
   });
 });
+
+// The language picked in the menu (#497) counts on the next visit before the
+// browser's; a ?lang= in the link still wins, so a shared link opens in its language.
+describe('the picked language', () => {
+  afterEach(() => {
+    cleanup();
+    window.localStorage.clear();
+    window.history.replaceState({}, '', '/');
+  });
+
+  it('comes before the browser', () => {
+    window.localStorage.setItem('omnifm.web.locale', 'de');
+    vi.spyOn(window.navigator, 'languages', 'get').mockReturnValue(['en-US', 'en']);
+    render(<I18nProvider><Probe /></I18nProvider>);
+    expect(screen.getByTestId('locale').textContent).toBe('de');
+  });
+
+  it('gives way to a ?lang= in the link', () => {
+    window.localStorage.setItem('omnifm.web.locale', 'de');
+    window.history.replaceState({}, '', '/?lang=en');
+    render(<I18nProvider><Probe /></I18nProvider>);
+    expect(screen.getByTestId('locale').textContent).toBe('en');
+  });
+
+  it('counts only when the site speaks it', () => {
+    window.localStorage.setItem('omnifm.web.locale', 'ja');
+    vi.spyOn(window.navigator, 'languages', 'get').mockReturnValue(['de-DE']);
+    render(<I18nProvider><Probe /></I18nProvider>);
+    expect(screen.getByTestId('locale').textContent).toBe('de');
+  });
+});

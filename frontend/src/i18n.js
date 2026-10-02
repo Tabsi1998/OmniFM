@@ -19,6 +19,8 @@ import {
   uiTableFor,
 } from './i18n/languages.js';
 
+// The language picked in the menu (#497). The privacy policy names this key
+// (localeStorageKey in src/lib/owner-public.js).
 const STORAGE_KEY = 'omnifm.web.locale';
 const DEFAULT_LOCALE = 'en';
 // Nine languages (#306): German and English in full, the others from
@@ -41,6 +43,15 @@ function normalizeLocale(rawLocale) {
   return normalizeLanguage(rawLocale, DEFAULT_LOCALE);
 }
 
+function readStoredLocale() {
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    return SUPPORTED_LOCALES.includes(stored) ? stored : '';
+  } catch {
+    return '';
+  }
+}
+
 function writeStoredLocale(locale) {
   try {
     window.localStorage.setItem(STORAGE_KEY, locale);
@@ -49,19 +60,24 @@ function writeStoredLocale(locale) {
   }
 }
 
+/**
+ * The address of the page you are on in another language (#497): the same
+ * page under its path for that language, ?lang= set, the rest kept.
+ */
+export function hrefForLocale(locale) {
+  const url = new URL(window.location.href);
+  const page = resolvePageFromUrl(url);
+  // An unknown address stays as it is (#487); only the language changes.
+  if (page === NOT_FOUND_PAGE) {
+    url.searchParams.set('lang', locale);
+    return `${url.pathname}${url.search}${url.hash}`;
+  }
+  return `${buildPageHref(locale, page, new URLSearchParams(url.search))}${url.hash}`;
+}
+
 function syncLocaleToUrl(locale) {
   try {
-    const url = new URL(window.location.href);
-    const page = resolvePageFromUrl(url);
-    // An unknown address stays as it is (#487); only the language changes.
-    if (page === NOT_FOUND_PAGE) {
-      url.searchParams.set('lang', locale);
-      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
-      return;
-    }
-    const params = new URLSearchParams(url.search);
-    const nextHref = buildPageHref(locale, page, params);
-    window.history.replaceState({}, '', `${nextHref}${url.hash}`);
+    window.history.replaceState({}, '', hrefForLocale(locale));
   } catch {
     // ignore URL update failures
   }
@@ -69,15 +85,17 @@ function syncLocaleToUrl(locale) {
 
 function resolveInitialLocale() {
   if (typeof window === 'undefined') return DEFAULT_LOCALE;
-  // Language follows the browser automatically, no manual switch. A ?lang=
-  // in the link wins: the site writes it into its own links, and search
-  // engines find each language that way (#306).
+  // A ?lang= in the link wins: the site writes it into its own links, a shared
+  // link opens in its language, and search engines find each language that
+  // way (#306). Then the language picked in the menu (#497), then the browser's.
   try {
     const requested = new URL(window.location.href).searchParams.get('lang');
     if (requested && SUPPORTED_LOCALES.includes(normalizeLanguage(requested, ''))) return normalizeLanguage(requested);
   } catch {
-    // no usable URL: the browser decides
+    // no usable URL: the choice or the browser decides
   }
+  const picked = readStoredLocale();
+  if (picked) return picked;
   const nav = (window.navigator?.languages && window.navigator.languages[0])
     || window.navigator?.language
     || DEFAULT_LOCALE;

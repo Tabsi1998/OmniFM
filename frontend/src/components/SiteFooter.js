@@ -1,6 +1,7 @@
 import { Heart } from 'lucide-react';
 import { useI18n } from '../i18n.js';
 import { buildPageHref } from '../lib/pageRouting.js';
+import { LanguageLinks } from './LanguageMenu.js';
 
 // The footer of every public page. The network's numbers are not here: they
 // stand once, in the bar under the hero (#435).
@@ -64,6 +65,9 @@ function SiteFooter({ legal }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#80808A' }}>
             {copy.footer.builtWith} <Heart size={12} color="#ff2a5f" /> {copy.footer.forDiscord}
           </div>
+        </div>
+        <div style={{ marginTop: 22, paddingTop: 18, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <LanguageLinks testid="footer-languages" size={12} />
         </div>
       </div>
     </footer>
