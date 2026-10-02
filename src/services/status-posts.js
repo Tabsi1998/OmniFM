@@ -17,7 +17,7 @@ import { ChannelType, EmbedBuilder } from "discord.js";
 import { getDb, isConnected } from "../lib/db.js";
 import { log } from "../lib/logging.js";
 import { configSectionFrom, loadOwnerConfigRaw } from "../lib/owner-config.js";
-import { OUTAGE_GRACE_MS } from "../lib/status-page.js";
+import { OUTAGE_GRACE_MS, STATUS_KEEP_MS } from "../lib/status-page.js";
 import { botTranslator, normalizeBotLanguage } from "../lib/bot-i18n.js";
 import { WEBSITE_URL, withLanguageParam } from "../bot/runtime-links.js";
 
@@ -28,6 +28,8 @@ const RECENT_OUTAGES_MS = 14 * 86_400_000;
 const COLORS = Object.freeze({ major: 0xed4245, minor: 0xfaa61a, maintenance: 0x5865f2, over: 0x57f287 });
 const NO_PINGS = Object.freeze({ parse: [] });
 const CHANNEL_ID = /^\d{17,22}$/;
+// A post's entry goes when the status page forgets the item; one that never ended after 200 days.
+const CLAIM_KEEP_MS = 200 * 86_400_000;
 
 /** The owner's settings for the posts: on only with a real channel ID. */
 export function normalizeStatusPostSettings(data) {
@@ -187,7 +189,7 @@ export async function syncStatusPosts(runtime, { db = isConnected() ? getDb() : 
       if (!channel) continue;
       try {
         // eslint-disable-next-line no-await-in-loop
-        await posts.insertOne({ _id: item.key, channelId: settings.channelId, claimedAt: new Date(now) });
+        await posts.insertOne({ _id: item.key, channelId: settings.channelId, claimedAt: new Date(now), expiresAt: new Date(now + CLAIM_KEEP_MS) });
       } catch (err) {
         if (err?.code === 11000) continue;
         throw err;
@@ -228,7 +230,7 @@ export async function syncStatusPosts(runtime, { db = isConnected() ? getDb() : 
     if (item.over && !stored.repliedAt) {
       // Claim the reply first: one reply, even with two commanders.
       // eslint-disable-next-line no-await-in-loop
-      const claim = await posts.updateOne({ _id: item.key, repliedAt: null }, { $set: { repliedAt: new Date(now), over: true } });
+      const claim = await posts.updateOne({ _id: item.key, repliedAt: null }, { $set: { repliedAt: new Date(now), over: true, expiresAt: new Date(now + STATUS_KEEP_MS) } });
       if (Number(claim?.modifiedCount || 0) !== 1) continue;
       // eslint-disable-next-line no-await-in-loop
       const replied = await replyToPost(runtime, stored, post.reply);

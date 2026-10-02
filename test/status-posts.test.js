@@ -135,6 +135,8 @@ test("a new incident is one post in the owner's channel; a change edits it; reso
   assert.deepEqual(reply.allowedMentions, { parse: [] });
 
   assert.deepEqual(await syncStatusPosts(runtime, { db, now: NOW + 4 * MINUTE, raw: ON }), { posted: 0, edited: 0, replied: 0 }, "one reply only");
+  const entry = db.data.get("status_posts")[0];
+  assert.equal(entry.expiresAt.getTime(), NOW + 3 * MINUTE + 96 * 86_400_000, "the entry goes when the status page forgets the incident");
 });
 
 test("after a restart nothing is sent twice, not even a post whose sending was cut off", async () => {

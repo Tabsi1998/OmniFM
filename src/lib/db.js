@@ -125,6 +125,8 @@ async function initCollections(database) {
       { key: { expiresAt: 1 }, name: "ttl", expireAfterSeconds: 0 },
     ]).catch(() => null);
     await database.collection("status_notices").createIndex({ expiresAt: 1 }, { name: "ttl", expireAfterSeconds: 0 }).catch(() => null);
+    // Its posts in Discord (#478): one entry per post, gone with the item.
+    await database.collection("status_posts").createIndex({ expiresAt: 1 }, { name: "ttl", expireAfterSeconds: 0 }).catch(() => null);
 
     initialized = true;
     log("INFO", "MongoDB Kollektionen und Indizes initialisiert.");
