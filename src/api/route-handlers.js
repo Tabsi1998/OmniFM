@@ -3,6 +3,7 @@
 import { createDashboardChannelsRouteHandler } from "./routes/dashboard-channels.js";
 import { createDashboardPlaybackRouteHandler } from "./routes/dashboard-playback.js";
 import { createAuthRoutesHandler } from "./routes/auth-routes.js";
+import { createLinkedRolesRoutes } from "./routes/linked-roles-routes.js";
 import { createDashboardCustomStationsRouteHandler } from "./routes/dashboard-custom-stations.js";
 import { createDashboardAccessRouteHandler } from "./routes/dashboard-access.js";
 import { createDashboardEmojisRouteHandler } from "./routes/dashboard-emojis.js";
@@ -328,6 +329,8 @@ export const handleStationLogoRoutes = createStationLogoRoutesHandler();
 
 // Covers, station and partner logos for the website, from this site (#469).
 export const handleImageRoutes = createImageRoutesHandler();
+// The sign-in for the linked roles (#302).
+export const handleLinkedRolesRoutes = createLinkedRolesRoutes();
 
 // The owner cockpit (#355).
 export const handleOwnerStatusRoutes = createOwnerStatusRoutesHandler({ getService: getOwnerStatusService });

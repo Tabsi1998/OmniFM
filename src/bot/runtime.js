@@ -57,14 +57,16 @@ import { suggestionMethods } from "./runtime-methods/suggestions.js";
 import { reportMethods } from "./runtime-methods/reports.js";
 import { easterEggMethods } from "./runtime-methods/easter-eggs.js";
 import { jingleMethods } from "./runtime-methods/jingles.js";
+import { listeningHourMethods } from "./runtime-methods/listening-hours.js";
 import { startStationSuggestionService } from "../services/station-suggestions.js";
 import { startProblemReportService } from "../services/problem-reports.js";
+import { startLinkedRolesService } from "../services/linked-roles.js";
 
 // Method groups that live in their own modules (#210) are assigned to
 // BotRuntime.prototype at the end of this file. TypeScript sees them
 // through this base class, which is empty at runtime (#298).
 /**
- * @typedef {typeof guildSettingsMethods & typeof commandSyncMethods & typeof runtimeDelegateMethods & typeof playbackControlMethods & typeof nowPlayingStatsMethods & typeof nowPlayingEmbedMethods & typeof nowPlayingControlMethods & typeof nowPlayingMethods & typeof menuMethods & typeof permissionMethods & typeof statusMethods & typeof voiceMethods & typeof onboardingMethods & typeof favoriteMethods & typeof formMethods & typeof shareMethods & typeof savedSongMethods & typeof personalDataMethods & typeof sleepMethods & typeof pollMethods & typeof botProfileMethods & typeof liveViewMethods & typeof yearReviewMethods & typeof suggestionMethods & typeof reportMethods & typeof easterEggMethods & typeof jingleMethods} RuntimeMixins
+ * @typedef {typeof guildSettingsMethods & typeof commandSyncMethods & typeof runtimeDelegateMethods & typeof playbackControlMethods & typeof nowPlayingStatsMethods & typeof nowPlayingEmbedMethods & typeof nowPlayingControlMethods & typeof nowPlayingMethods & typeof menuMethods & typeof permissionMethods & typeof statusMethods & typeof voiceMethods & typeof onboardingMethods & typeof favoriteMethods & typeof formMethods & typeof shareMethods & typeof savedSongMethods & typeof personalDataMethods & typeof sleepMethods & typeof pollMethods & typeof botProfileMethods & typeof liveViewMethods & typeof yearReviewMethods & typeof suggestionMethods & typeof reportMethods & typeof easterEggMethods & typeof jingleMethods & typeof listeningHourMethods} RuntimeMixins
  */
 /** @type {new () => RuntimeMixins} */
 const RuntimeMixinBase = /** @type {any} */ (class {});
@@ -97,6 +99,11 @@ class BotRuntime extends RuntimeMixinBase {
     // The servers' jingles in memory and the full-hour clock (#309).
     this.jingleCache = new Map();
     this.jingleClockTimer = null;
+    // Listening time per person, only with consent (#302).
+    /** @type {Set<string> | null} */
+    this.listeningConsents = null;
+    this.listeningConsentsAt = 0;
+    this.listeningCountedAt = 0;
     this.scheduledEventInFlight = new Set();
     this.lastPersistLoggedActiveCount = null;
     this.shuttingDown = false;
@@ -133,6 +140,8 @@ class BotRuntime extends RuntimeMixinBase {
         startStationSuggestionService(this);
         // Problems, ideas and feedback go to the private team channel (#436).
         startProblemReportService(this);
+        // Linked roles: values to Discord, the premium role in the support server (#302).
+        startLinkedRolesService(this);
         this.enforcePremiumGuildScope("startup").catch((err) => {
           log("ERROR", `[${this.config.name}] Premium-Guild-Scope Prüfung fehlgeschlagen: ${err?.message || err}`);
         });
@@ -614,6 +623,7 @@ Object.assign(
   reportMethods,
   easterEggMethods,
   jingleMethods,
+  listeningHourMethods,
 );
 
 export { BotRuntime };

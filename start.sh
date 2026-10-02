@@ -63,6 +63,18 @@ gen_token() {
   fi
 }
 
+# 32 random bytes as hex: OMNIFM_TOKEN_KEY encrypts the Discord access keys
+# of the linked roles (#302).
+gen_key32() {
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex 32
+  elif command -v python3 >/dev/null 2>&1; then
+    python3 -c "import secrets;print(secrets.token_hex(32))"
+  else
+    head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'
+  fi
+}
+
 # =============================================================================
 # 1) OWNER-PASSWORT (Admin-Token) — WIRD ZUERST ERZEUGT
 # =============================================================================
@@ -245,6 +257,7 @@ DEFAULT_LANGUAGE=en
 SEED_DEMO_DATA=0
 OMNIFM_DASHBOARD_BACKEND=node
 OMNIFM_PUBLIC_BACKEND=node
+OMNIFM_TOKEN_KEY=$(gen_key32)
 EOF
 else
   # Fehlenden/Platzhalter-Token nachtragen, damit Owner-Login funktioniert
@@ -264,6 +277,9 @@ else
   # #290: the public entry on the backend port is Node. Only added when
   # missing; OMNIFM_PUBLIC_BACKEND=fastapi in backend/.env is the way back.
   grep -qE '^OMNIFM_PUBLIC_BACKEND=' "$BACKEND_ENV" || set_kv "$BACKEND_ENV" OMNIFM_PUBLIC_BACKEND node
+  # #302: the key for the linked roles' Discord access keys, made once. A new
+  # key would mean everyone connects again, so an existing one stays.
+  grep -qE '^OMNIFM_TOKEN_KEY=..+' "$BACKEND_ENV" || set_kv "$BACKEND_ENV" OMNIFM_TOKEN_KEY "$(gen_key32)"
 fi
 
 # Which process answers the backend port: node (src/entrypoints/api.js) or fastapi (Uvicorn).

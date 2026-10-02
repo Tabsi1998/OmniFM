@@ -11,6 +11,9 @@
 //   events the person created             -> the event stays with the server, the person is forgotten
 //   dashboard changes in the audit log    -> the entry stays, the person is replaced by "gelöscht"
 //   Easter eggs found (#429)              -> deleted
+//   listening hours, if switched on (#302)  -> deleted, counting off
+//   the linked roles connection (#302)    -> deleted; Discord gets empty values first
+//   the premium role in the support server -> forgotten (given again while premium)
 // Not part of it: premium purchases and invoices (kept by law for tax), the
 // server settings (they belong to the server) and what the owner team did
 // in the owner console (their audit trail).
@@ -27,6 +30,8 @@ import { listScheduledEvents, patchScheduledEvent } from "../scheduled-events-st
 import { forgetStationSuggestionSubmitter, listStationSuggestionsOfUser } from "../station-suggestions-store.js";
 import { forgetReporter, listReportsOfReporter } from "../problem-reports-store.js";
 import { forgetEggFinder, listEggsOfFinder } from "../easter-eggs-store.js";
+import { forgetListeningHours, getListeningHours } from "../listening-hours-store.js";
+import { countSupportRolesOf, forgetLinkedRoles, forgetSupportRolesOf, getLinkedRoleInfo } from "../linked-roles-store.js";
 
 export const ERASED_ACTOR = "dashboard:gelöscht";
 // Another process may hold the vote list or a login in its cache for a few seconds.
@@ -57,7 +62,7 @@ export async function collectPersonalData(userId, { now = new Date() } = {}) {
   const id = cleanUserId(userId);
   if (!id) return { ok: false, error: "invalid_user" };
   if (!personalDataAvailable()) return { ok: false, error: "db_unavailable" };
-  const [savedSongs, votes, logins, ownerLogins, polls, changes, suggestions, reports, easterEggs] = await Promise.all([
+  const [savedSongs, votes, logins, ownerLogins, polls, changes, suggestions, reports, easterEggs, hours, linked, supportRoles] = await Promise.all([
     listSavedSongs(id),
     listVoteEventsOfUser(id),
     listDashboardSessionsOfUser(id),
@@ -67,6 +72,9 @@ export async function collectPersonalData(userId, { now = new Date() } = {}) {
     listStationSuggestionsOfUser(id),
     listReportsOfReporter(id),
     listEggsOfFinder(id),
+    getListeningHours(id),
+    getLinkedRoleInfo(id),
+    countSupportRolesOf(id),
   ]);
   return {
     ok: true,
@@ -120,6 +128,19 @@ export async function collectPersonalData(userId, { now = new Date() } = {}) {
         lastFoundAt: entry.lastFoundAt instanceof Date ? entry.lastFoundAt.toISOString() : entry.lastFoundAt || null,
         lastSongKey: entry.lastSong || null,
       })),
+      // Listening hours (#302): only while counting is switched on in /mydata.
+      listeningHours: hours.counting
+        ? { counting: true, hours: Math.floor(hours.listenedMs / 3_600_000), since: hours.consentAt ? hours.consentAt.toISOString() : null }
+        : null,
+      // The linked roles (#302): that the connection exists and what Discord got last; the keys stay out.
+      linkedRoles: linked
+        ? {
+          connectedAt: linked.linkedAt instanceof Date ? linked.linkedAt.toISOString() : linked.linkedAt,
+          lastSentAt: linked.pushedAt instanceof Date ? linked.pushedAt.toISOString() : linked.pushedAt,
+          lastSent: linked.metadata,
+        }
+        : null,
+      supportServerPremiumRole: supportRoles > 0,
       notIncluded: [
         "Premium-Käufe und Rechnungen: Die müssen wir aus steuerlichen Gründen aufbewahren.",
         "Server-Einstellungen, eigene Sender und Events gehören dem Server, nicht einer Person.",
@@ -141,6 +162,9 @@ export function countPersonalData(data = {}) {
     stationSuggestions: data.stationSuggestions?.length || 0,
     reports: data.reports?.length || 0,
     easterEggs: data.easterEggs?.length || 0,
+    listeningHours: data.listeningHours ? 1 : 0,
+    linkedRoles: data.linkedRoles ? 1 : 0,
+    supportRoles: data.supportServerPremiumRole ? 1 : 0,
   };
 }
 
@@ -166,6 +190,9 @@ async function eraseOnce(id) {
     // The reports stay with the team, without the person and without the message.
     reports: await forgetReporter(id),
     easterEggs: await forgetEggFinder(id),
+    listeningHours: await forgetListeningHours(id),
+    linkedRoles: await forgetLinkedRoles(id),
+    supportRoles: await forgetSupportRolesOf(id),
   };
 }
 

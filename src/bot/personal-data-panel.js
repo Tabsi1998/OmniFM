@@ -9,7 +9,7 @@ import { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, Messag
 import * as ui from "../discord/ui/index.js";
 
 export const PERSONAL_DATA_PREFIX = "omnifm:mydata:";
-const ACTIONS = new Set(["export", "erase", "eraseyes", "eraseno"]);
+const ACTIONS = new Set(["export", "erase", "eraseyes", "eraseno", "hourson", "hoursoff"]);
 
 export function personalDataCustomId(action) {
   return `${PERSONAL_DATA_PREFIX}${action}`;
@@ -34,6 +34,8 @@ function rows({ t, counts }) {
     counts.stationSuggestions ? [t("📻 Deine Sender-Vorschläge", "📻 Your station suggestions"), counts.stationSuggestions, ""] : null,
     counts.reports ? [t("📣 Deine Meldungen (mit „Gib mir Bescheid“)", "📣 Your reports (with “Tell me when it is done”)"), counts.reports, ""] : null,
     counts.easterEggs ? [t("🥚 Ostereiersuche (je Server und Jahr)", "🥚 Easter egg hunt (per server and year)"), counts.easterEggs, ""] : null,
+    counts.linkedRoles ? [t("🔗 Verknüpfte Rollen in Discord", "🔗 Linked roles in Discord"), t("verbunden", "connected"), ""] : null,
+    counts.supportRoles ? [t("⭐ Premium-Rolle im OmniFM-Support-Server", "⭐ Premium role in the OmniFM support server"), t("ja", "yes"), ""] : null,
     counts.ownerConsoleLogins ? [t("🔐 Anmeldungen in der Owner-Konsole", "🔐 Owner console logins"), counts.ownerConsoleLogins, ""] : null,
   ].filter(Boolean);
 }
@@ -42,12 +44,23 @@ export function totalCount(counts = {}) {
   return Object.values(counts).reduce((sum, value) => sum + (Number(value) || 0), 0);
 }
 
-/** The overview: what is stored, and the two buttons. */
-export function buildPersonalDataPayload({ t, counts, applicationId = null }) {
+/**
+ * The overview: what is stored, the listening hours switch (#302) and the
+ * two buttons. listening: { counting, hours } of the person.
+ */
+export function buildPersonalDataPayload({ t, counts, applicationId = null, listening = { counting: false, hours: 0 } }) {
   const lines = rows({ t, counts }).map(([label, count, unit]) => `${label}: **${count}**${unit ? ` ${unit}` : ""}`);
+  lines.push(listening?.counting
+    ? `${t("⏱ Hörstunden", "⏱ Listening hours")}: **${Number(listening.hours) || 0}** ${t("Std. (Zählen ist an)", "h (counting is on)")}`
+    : `${t("⏱ Hörstunden", "⏱ Listening hours")}: **${t("aus", "off")}**`);
   const total = totalCount(counts);
   const body = [
     ui.text(lines.join("\n")),
+    ui.separator(),
+    ui.text(ui.subtext(t(
+      "Hörstunden: Für verknüpfte Rollen (etwa „50 Stunden gehört“) zählt OmniFM die Zeit, in der du in einem Sprachkanal mit OmniFM bist. Nur, wenn du das hier einschaltest; Ausschalten löscht die Stunden.",
+      "Listening hours: for linked roles (such as “listened 50 hours”) OmniFM counts the time you spend in a voice channel with OmniFM. Only if you switch it on here; switching it off deletes the hours."
+    ))),
     ui.separator(),
     ui.text(ui.subtext(t(
       "Nicht dabei: Premium-Käufe und Rechnungen (die müssen wir aus steuerlichen Gründen aufbewahren) und die Einstellungen deiner Server (die gehören dem Server). Mehr dazu in der Datenschutzerklärung auf omnifm.xyz.",
@@ -59,6 +72,11 @@ export function buildPersonalDataPayload({ t, counts, applicationId = null }) {
       .setLabel(t("📄 Als Datei schicken", "📄 Send as a file")),
     new ButtonBuilder().setCustomId(personalDataCustomId("erase")).setStyle(ButtonStyle.Danger)
       .setLabel(t("🗑 Alles löschen", "🗑 Delete everything")).setDisabled(total === 0),
+    listening?.counting
+      ? new ButtonBuilder().setCustomId(personalDataCustomId("hoursoff")).setStyle(ButtonStyle.Secondary)
+        .setLabel(t("⏱ Hörstunden aus und löschen", "⏱ Hours off and deleted"))
+      : new ButtonBuilder().setCustomId(personalDataCustomId("hourson")).setStyle(ButtonStyle.Success)
+        .setLabel(t("⏱ Hörstunden zählen", "⏱ Count listening hours")),
   )];
   return ui.reply(ui.panel({
     title: `${ui.icon("info", applicationId)} ${t("Deine Daten bei OmniFM", "Your data at OmniFM")}`,
@@ -99,8 +117,8 @@ export function buildErasePersonalDataConfirm({ t, counts }) {
   return ui.reply(ui.confirm({
     title: t("Alles löschen?", "Delete everything?"),
     body: t(
-      `OmniFM löscht deine Merkliste, deine Votes und deine Anmeldungen (du wirst im Dashboard abgemeldet). Bei Umfragen, Events und Dashboard-Änderungen bleibt der Eintrag für den Server, dein Name wird entfernt. Insgesamt ${totalCount(counts)} Einträge. Das lässt sich nicht rückgängig machen.`,
-      `OmniFM deletes your saved songs, your votes and your logins (you are signed out of the dashboard). Polls, events and dashboard changes stay with the server, your name is removed. ${totalCount(counts)} entries in all. This cannot be undone.`
+      `OmniFM löscht deine Merkliste, deine Votes, deine Anmeldungen (du wirst im Dashboard abgemeldet), deine Hörstunden und die verknüpften Rollen. Bei Umfragen, Events und Dashboard-Änderungen bleibt der Eintrag für den Server, dein Name wird entfernt. Insgesamt ${totalCount(counts)} Einträge. Das lässt sich nicht rückgängig machen.`,
+      `OmniFM deletes your saved songs, your votes, your logins (you are signed out of the dashboard), your listening hours and the linked roles. Polls, events and dashboard changes stay with the server, your name is removed. ${totalCount(counts)} entries in all. This cannot be undone.`
     ),
     confirmId: personalDataCustomId("eraseyes"),
     cancelId: personalDataCustomId("eraseno"),

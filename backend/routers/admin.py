@@ -78,6 +78,14 @@ def build_router(core):
             return guard
         return {"reports": [], "open": 0}
 
+    @router.get("/api/admin/linked-roles")
+    async def admin_linked_roles(request: Request):
+        """The linked roles (#302) live in the Node API only; this way back shows them as not set up."""
+        guard = core._admin_guard(request)
+        if guard is not None:
+            return guard
+        return {"ready": False, "checks": {}, "linked": 0, "counting": 0, "supportRole": {"configured": False}}
+
     @router.get("/api/admin/egg-hunt")
     async def admin_egg_hunt(request: Request):
         """The Easter egg hunt (#429) lives in the Node API only; this way back lists none."""

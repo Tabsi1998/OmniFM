@@ -78,6 +78,8 @@ import { createAdminLicenseRoutes } from "./admin-license-routes.js";
 import { createAdminStatusRoutes } from "./admin-status-routes.js";
 import { createAdminSuggestionRoutes } from "./admin-suggestion-routes.js";
 import { createAdminReportRoutes } from "./admin-report-routes.js";
+import { createAdminLinkedRolesRoutes } from "./admin-linked-roles-routes.js";
+import { normalizeLinkedRolesSettings } from "../../lib/linked-roles.js";
 import { createAdminEggHuntRoutes } from "./admin-egg-hunt-routes.js";
 import { createAdminStationRoutes, loadCatalogFileStations } from "./admin-station-routes.js";
 
@@ -327,6 +329,8 @@ export function createAdminRoutesHandler(deps) {
   // The queue of station suggestions (#303).
   const handleSuggestionRoutes = createAdminSuggestionRoutes(routeDeps);
   const handleReportRoutes = createAdminReportRoutes(routeDeps);
+  // Where the linked roles stand (#302).
+  const handleLinkedRolesRoutes = createAdminLinkedRolesRoutes(routeDeps);
   // The Easter egg hunt's top three per server (#429).
   const handleEggHuntRoutes = createAdminEggHuntRoutes(routeDeps);
 
@@ -679,6 +683,8 @@ export function createAdminRoutesHandler(deps) {
       if (section === "seasons") saveData = normalizeOwnerSeasons(data);
       // Channel IDs only (#436).
       if (section === "reports") saveData = normalizeReportSettings(data);
+      // Server and role IDs only (#302).
+      if (section === "linkedRoles") saveData = normalizeLinkedRolesSettings(data);
       if (!isConnected() || !getDb()) {
         sendJson(res, 503, { error: "Keine Datenbank verbunden \u2013 Speichern nicht m\u00f6glich." });
         return true;
@@ -704,6 +710,7 @@ export function createAdminRoutesHandler(deps) {
     if (await handleStatusRoutes(context)) return true;
     if (await handleSuggestionRoutes(context)) return true;
     if (await handleReportRoutes(context)) return true;
+    if (await handleLinkedRolesRoutes(context)) return true;
     if (await handleEggHuntRoutes(context)) return true;
     return handleStationRoutes(context);
   };
