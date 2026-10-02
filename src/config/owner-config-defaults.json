@@ -237,5 +237,10 @@
   "linkedRoles": {
     "supportGuildId": "",
     "premiumRoleId": ""
+  },
+  "statusPosts": {
+    "postEnabled": false,
+    "channelId": "",
+    "language": "de"
   }
 }

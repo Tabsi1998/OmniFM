@@ -207,6 +207,8 @@ verlieren bei einem Update keine Secrets.
 - **Premium** — Lizenzen und Gratis-Codes aus der Konsole, dazu der Testmonat. Auf der Website
   wird nichts mehr verkauft; Premium kommt direkt in Discord (#320).
 - **Global Overview** (Lizenzen, MRR/ARR, Server, Stationen), **Live-Monitoring** (Worker-Health, Incidents, Logs).
+- **Statusseite** — Störungen und Wartungen für omnifm.xyz/status; auf Wunsch kommen sie und gemessene
+  Ausfälle als je ein Beitrag in einen Discord-Kanal, Änderungen bearbeiten denselben Beitrag (#478).
 - **Radio-Katalog** verwalten inkl. **Stream-Test**, **Lizenz-Manager**, **Audit-Log**, **Brand-Kit**.
 
 ## 📡 Wichtige API-Endpunkte

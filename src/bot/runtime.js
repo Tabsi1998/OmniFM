@@ -24,6 +24,7 @@ import {
 import { startYearReviewService } from "../services/year-review.js";
 import { startDiscordShopSync } from "../premium/discord-shop.js";
 import { startChartsPostService } from "../services/charts.js";
+import { startStatusPostService } from "../services/status-posts.js";
 import { isRuntimeVoiceConnected } from "./runtime-live-state.js";
 import { handleRuntimeAutocomplete, handleRuntimeInteraction } from "./runtime-interactions.js";
 import { shouldHandleRuntimeIdleEvent } from "./runtime-streams.js";
@@ -136,6 +137,8 @@ class BotRuntime extends RuntimeMixinBase {
         startDiscordShopSync(this);
         // The weekly OmniFM charts go to the owner's channel (#300).
         startChartsPostService(this);
+        // Incidents, maintenance and outages of the status page go to the owner's channel (#478).
+        startStatusPostService(this);
         // Station suggestions: hourly stream checks, answers to the senders (#303).
         startStationSuggestionService(this);
         // Problems, ideas and feedback go to the private team channel (#436).
