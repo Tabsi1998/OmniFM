@@ -68,7 +68,7 @@ describe('the Activity', () => {
           guildName: 'Lofi Lounge',
           channelName: 'Radio',
           refreshMs: 60_000,
-          streams: [{ botName: 'OmniFM 1', stationKey: 'groovesalad', stationName: 'Groove Salad', song: 'Air - La Femme d’Argent', logoUrl: '/api/image/station/groovesalad', recovering: false }],
+          streams: [{ botName: 'OmniFM 1', stationKey: 'groovesalad', stationName: 'Groove Salad', song: 'Air - La Femme d’Argent', logoUrl: '/station-logo.png', recovering: false }],
           listeners: [{ id: '1', name: 'Ada', avatarUrl: null }, { id: '2', name: 'Lin', avatarUrl: 'https://cdn.discordapp.com/a.png' }],
         });
       }
@@ -88,6 +88,23 @@ describe('the Activity', () => {
     expect(screen.getByText('Groove Salad')).toBeTruthy();
     expect(screen.getAllByTestId('activity-listener')).toHaveLength(2);
     expect(screen.getByTestId('activity-page').textContent).toContain('Radio');
+  });
+
+  it('keeps asking every few seconds, and signs in again when the session ran out', async () => {
+    window.history.replaceState({}, '', '/activity/?frame_id=f&instance_id=i');
+    const calls = [];
+    let asked = 0;
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      if (url === '/api/activity/config') return answer(200, { clientId: '100000000000000001' });
+      if (url === '/api/activity/token') return answer(200, { access_token: 'a', session: 's' });
+      asked += 1;
+      if (asked === 3) return answer(401, { error: 'no_session' });
+      return answer(200, { channelName: 'Radio', refreshMs: 20, streams: [], listeners: [] });
+    }));
+    await act(async () => { render(<ActivityApp loadSdk={fakeSdk(calls)} />); });
+    await waitFor(() => expect(asked).toBeGreaterThanOrEqual(5), { timeout: 3000 });
+    expect(calls.filter((call) => call[0] === 'authorize')).toHaveLength(2);
+    expect(screen.getByTestId('activity-silent')).toBeTruthy();
   });
 
   it('says plainly when the person is not in the channel', async () => {

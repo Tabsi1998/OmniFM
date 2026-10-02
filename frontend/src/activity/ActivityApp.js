@@ -79,12 +79,15 @@ const loadDiscordSdk = () => import('@discord/embedded-app-sdk');
  * @param {{ loadSdk?: () => Promise<any> }} props
  */
 export default function ActivityApp({ loadSdk = loadDiscordSdk }) {
-  const [phase, setPhase] = useState(() => (insideDiscord() ? 'connecting' : 'outside'));
+  const [inDiscord] = useState(() => insideDiscord());
+  const [phase, setPhase] = useState(() => (inDiscord ? 'connecting' : 'outside'));
   const [problem, setProblem] = useState('');
   const [now, setNow] = useState(null);
+  // A new sign-in when the session ran out; the phase alone must not restart it.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (phase !== 'connecting') return undefined;
+    if (!inDiscord) return undefined;
     let stopped = false;
     let timer = null;
     (async () => {
@@ -119,8 +122,8 @@ export default function ActivityApp({ loadSdk = loadDiscordSdk }) {
         } catch (err) {
           if (stopped) return;
           setProblem(messageFor(err));
-          // The session lasts an hour; after that the Activity starts over.
-          if (err.status === 401) setPhase('connecting');
+          // The session lasts an hour; after that the Activity signs in again.
+          if (err.status === 401) setAttempt((value) => value + 1);
           else timer = setTimeout(load, 15_000);
         }
       };
@@ -134,7 +137,7 @@ export default function ActivityApp({ loadSdk = loadDiscordSdk }) {
       stopped = true;
       clearTimeout(timer);
     };
-  }, [phase, loadSdk]);
+  }, [attempt, inDiscord, loadSdk]);
 
   if (phase === 'outside') {
     return (
