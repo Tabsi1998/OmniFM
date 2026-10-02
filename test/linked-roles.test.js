@@ -78,6 +78,8 @@ test("the tokens: encrypted with the key from the environment, opened only with 
   const [version, iv, tag, data] = sealed.split(":");
   const flipped = `${data.slice(0, -2)}${data.endsWith("A") ? "B" : "A"}${data.slice(-1)}`;
   assert.equal(crypto.decryptToken([version, iv, tag, flipped].join(":"), key), null, "a changed token is refused");
+  const shortTag = Buffer.from(tag, "base64url").subarray(0, 4).toString("base64url");
+  assert.equal(crypto.decryptToken([version, iv, shortTag, data].join(":"), key), null, "a shortened tag is refused");
   assert.equal(crypto.decryptToken("plain-text", key), null);
   assert.throws(() => crypto.encryptToken("x", null), /OMNIFM_TOKEN_KEY/);
 });
