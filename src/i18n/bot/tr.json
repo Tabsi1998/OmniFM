@@ -975,6 +975,7 @@
   "⚠️ Station **{previous}** is no longer available on this server{reason}. OmniFM stopped playback. Use /play to start another station.": "⚠️ **{previous}** istasyonu artık bu sunucuda kullanılamıyor{reason}. OmniFM çalmayı durdurdu. Başka bir istasyon başlatmak için /play kullan.",
   "✅ Custom station saved": "✅ Özel istasyon kaydedildi",
   "✅ License activated": "✅ Lisans etkinleştirildi",
+  "✅ Maintenance cancelled: {title}": "✅ Bakım iptal edildi: {title}",
   "✅ Maintenance completed: {title}": "✅ Bakım tamamlandı: {title}",
   "✅ Resolved: {title}": "✅ Çözüldü: {title}",
   "✅ Stream started": "✅ Yayın başladı",

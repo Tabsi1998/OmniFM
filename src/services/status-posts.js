@@ -84,6 +84,8 @@ export async function statusPostItems(db, { now = Date.now() } = {}) {
       endsAt,
       resolvedAt,
       running: kind === "maintenance" && startsAt !== null && startsAt <= now,
+      // "Absagen" in the owner console: resolved before the window began.
+      cancelled: kind === "maintenance" && resolvedAt !== null && startsAt !== null && resolvedAt < startsAt,
       over: overAt !== null && overAt <= now,
     });
   }
@@ -114,6 +116,7 @@ function headline(item, t) {
       : t("🔴 {bot} ist nicht erreichbar", "🔴 {bot} is unreachable", { bot: item.bot });
   }
   if (item.kind === "maintenance") {
+    if (item.over && item.cancelled) return t("✅ Wartung abgesagt: {title}", "✅ Maintenance cancelled: {title}", { title: item.title });
     if (item.over) return t("✅ Wartung beendet: {title}", "✅ Maintenance completed: {title}", { title: item.title });
     return item.running
       ? t("🛠️ Wartung läuft: {title}", "🛠️ Maintenance in progress: {title}", { title: item.title })
@@ -226,6 +229,11 @@ export async function syncStatusPosts(runtime, { db = isConnected() ? getDb() : 
         await posts.updateOne({ _id: item.key }, { $set: { hash: post.hash, editedAt: new Date(now) } });
         done.edited += 1;
       }
+    }
+    // Reopened after its reply: the next end gets a reply again.
+    if (!item.over && stored.repliedAt) {
+      // eslint-disable-next-line no-await-in-loop
+      await posts.updateOne({ _id: item.key }, { $set: { repliedAt: null, over: false, expiresAt: new Date(now + CLAIM_KEEP_MS) } });
     }
     if (item.over && !stored.repliedAt) {
       // Claim the reply first: one reply, even with two commanders.

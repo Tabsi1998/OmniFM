@@ -975,6 +975,7 @@
   "⚠️ Station **{previous}** is no longer available on this server{reason}. OmniFM stopped playback. Use /play to start another station.": "⚠️ Stacja **{previous}** nie jest już dostępna na tym serwerze{reason}. OmniFM zatrzymał odtwarzanie. Użyj /play, żeby włączyć inną stację.",
   "✅ Custom station saved": "✅ Własna stacja zapisana",
   "✅ License activated": "✅ Licencja aktywowana",
+  "✅ Maintenance cancelled: {title}": "✅ Konserwacja odwołana: {title}",
   "✅ Maintenance completed: {title}": "✅ Konserwacja zakończona: {title}",
   "✅ Resolved: {title}": "✅ Rozwiązane: {title}",
   "✅ Stream started": "✅ Stream uruchomiony",

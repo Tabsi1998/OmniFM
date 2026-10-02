@@ -202,6 +202,25 @@ test("maintenance: planned, in progress, completed in the same post", async () =
   assert.equal(runtime.messages.get("m1").edits[1].embeds[0].title, "✅ Wartung beendet: Server-Update");
 });
 
+test("a maintenance called off before it began says so; a reopened incident gets a reply again", async () => {
+  const db = fakeDb({ status_notices: [
+    { _id: "w2", kind: "maintenance", title: "Umzug", message: "", impact: "maintenance", startsAt: new Date(NOW + 60 * MINUTE), endsAt: new Date(NOW + 90 * MINUTE), resolvedAt: null },
+    incident(),
+  ] });
+  const runtime = fakeRuntime();
+  await syncStatusPosts(runtime, { db, now: NOW, raw: ON });
+  const [maintenance, notice] = db.data.get("status_notices");
+  maintenance.resolvedAt = new Date(NOW + MINUTE);
+  notice.resolvedAt = new Date(NOW + MINUTE);
+  await syncStatusPosts(runtime, { db, now: NOW + MINUTE, raw: ON });
+  assert.ok(runtime.channel.sent.some((payload) => payload.content === "✅ Wartung abgesagt: Umzug"));
+  notice.resolvedAt = null;
+  await syncStatusPosts(runtime, { db, now: NOW + 2 * MINUTE, raw: ON });
+  notice.resolvedAt = new Date(NOW + 3 * MINUTE);
+  await syncStatusPosts(runtime, { db, now: NOW + 3 * MINUTE, raw: ON });
+  assert.equal(runtime.channel.sent.filter((payload) => payload.content === "✅ Behoben: Sender starten verzögert").length, 2, "resolved twice, two replies");
+});
+
 test("an announcement channel publishes the post for the servers that follow it", async () => {
   const db = fakeDb({ status_notices: [incident()] });
   const runtime = fakeRuntime({ type: ChannelType.GuildAnnouncement });
