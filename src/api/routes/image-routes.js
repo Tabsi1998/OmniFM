@@ -7,11 +7,14 @@
 // The server fetches the picture and keeps it for a day, so a visitor's
 // browser never talks to Apple, a station or a partner. Only what these
 // three name is fetched, never an address from the request: no open proxy.
+// A cover is one the website's own search found before (/api/cover, the
+// charts): a request for a picture never makes the server search iTunes.
+// The kept pictures stay under 32 MB together.
 // Pictures only, at most 2 MB; an SVG comes with a sandbox, so it cannot run
 // scripts under this site's name.
 import { getCommonSecurityHeaders, methodNotAllowed } from "../../lib/api-helpers.js";
 import { loadOwnerConfigRaw } from "../../lib/owner-config.js";
-import { coverLookup, marketingResponse } from "../../lib/owner-public.js";
+import { cachedCover, marketingResponse } from "../../lib/owner-public.js";
 import { getPublicStationEntries } from "../../lib/public-stations.js";
 import { safeFetch } from "../../lib/safe-outbound-http.js";
 import { loadStations } from "../../stations-store.js";
@@ -20,6 +23,7 @@ export const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 const KEEP_MS = 24 * 60 * 60 * 1000;
 const MISS_MS = 5 * 60 * 1000;
 const CACHE_MAX = 300;
+const CACHE_BYTES = 32 * 1024 * 1024;
 export const IMAGE_TYPES = Object.freeze(["image/png", "image/jpeg", "image/webp", "image/gif", "image/avif", "image/svg+xml"]);
 
 const STATION_PATH = /^\/api\/image\/station\/([a-z0-9_-]{1,80})$/i;
@@ -82,13 +86,23 @@ export async function fetchPicture(url, fetchImpl = safeFetch) {
 
 export function createImageRoutesHandler({
   stations = loadStations,
-  lookupCover = coverLookup,
+  lookupCover = async (input) => cachedCover(input),
   marketing = async () => marketingResponse(await loadOwnerConfigRaw()),
   fetchImpl = safeFetch,
   now = Date.now,
+  cacheBytes = CACHE_BYTES,
 } = {}) {
-  // Source address -> { at, picture }: a day for a picture, five minutes for a miss.
+  // Source address -> { at, picture }: a day for a picture, five minutes for a
+  // miss; the longest unused goes first once there are too many or too much.
   const cache = new Map();
+  let keptBytes = 0;
+
+  function forget(url) {
+    const old = cache.get(url);
+    if (!old) return;
+    keptBytes -= old.picture?.body.length || 0;
+    cache.delete(url);
+  }
 
   async function pictureFor(url) {
     const hit = cache.get(url);
@@ -98,9 +112,10 @@ export function createImageRoutesHandler({
       return hit.picture;
     }
     const picture = await fetchPicture(url, fetchImpl).catch(() => null);
-    cache.delete(url);
+    forget(url);
     cache.set(url, { at: now(), picture });
-    while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
+    keptBytes += picture?.body.length || 0;
+    while (cache.size > CACHE_MAX || keptBytes > cacheBytes) forget(cache.keys().next().value);
     return picture;
   }
 

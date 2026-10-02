@@ -134,6 +134,23 @@ test("the cover lookup asks iTunes once per song and keeps the answer", async ()
   assert.deepEqual(await pub.coverLookup({}, { fetchImpl }), { ok: false, error: "Kein Suchbegriff." });
 });
 
+test("the cover search keeps its last 500 terms and pushes out the longest unused, never all of them (#469)", async () => {
+  const fetchImpl = async (url) => ({
+    status: 200,
+    json: async () => ({ results: [{ artworkUrl100: `https://img/${encodeURIComponent(new URL(url).searchParams.get("term"))}/100x100bb.jpg` }] }),
+  });
+  for (let index = 0; index < 500; index += 1) {
+    // eslint-disable-next-line no-await-in-loop -- one search after the other, in this order
+    await pub.coverLookup({ term: `keep term ${index}` }, { fetchImpl });
+  }
+  await pub.coverLookup({ term: "keep term 0" }, { fetchImpl });
+  await pub.coverLookup({ term: "one more term" }, { fetchImpl });
+  assert.ok(pub.cachedCover({ term: "keep term 0" }), "a term used again stays");
+  assert.equal(pub.cachedCover({ term: "keep term 1" }), null, "the longest unused goes");
+  assert.ok(pub.cachedCover({ term: "keep term 499" }));
+  assert.ok(pub.cachedCover({ term: "one   more term" }), "found with one space between the words");
+});
+
 test("Node announces the same API contract as FastAPI", async () => {
   const fs = await import("node:fs");
   const { BACKEND_CONTRACT_VERSION } = await import("../src/api/routes/public-routes.js");
