@@ -19,7 +19,7 @@ const READS = Object.freeze({
 });
 
 /** The bots that play on the server now: through the commander's workers, or a single bot itself. */
-async function playingBots(runtimes, guildId) {
+export async function playingBots(runtimes, guildId) {
   const commander = runtimes.find((runtime) => runtime?.role === "commander" && runtime.workerManager) || null;
   if (commander) {
     await commander.workerManager.refreshRemoteStates?.().catch(() => null);

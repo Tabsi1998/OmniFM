@@ -665,3 +665,34 @@ test("failover waits while the station still delivered audio recently and switch
   assert.equal(state.failoverFromStationKey, "alpha");
   cleanup(state);
 });
+
+test("someone starting a station brings the server's jingle; a restart stays quiet (#309)", async () => {
+  const jingles = [];
+  const mixer = { busy: false };
+  const runtime = createFakeRuntime({
+    async createStreamResource(url, volume, preset, botName, bitrate, scope, options = {}) {
+      return { resource: { url, metadata: options?.metadata || null }, process: createFakeProcess("pj"), mixer };
+    },
+    async playGuildJingle(guildId, options) {
+      jingles.push([guildId, options.reason]);
+      return { ok: true };
+    },
+  });
+  const state = createState();
+  const guildId = "123456789012345678";
+
+  await playRuntimeStation(runtime, state, STATIONS, "alpha", guildId, { countAsStart: true, jingle: true });
+  assert.equal(state.jingleMixer, mixer, "the stream's mixer is kept for later jingles");
+  assert.deepEqual(jingles, [[guildId, "switch"]]);
+
+  await playRuntimeStation(runtime, state, STATIONS, "beta", guildId, { countAsStart: false, resumeSession: true });
+  assert.equal(jingles.length, 1, "a restart, fallback or restore passes no jingle");
+
+  runtime.createStreamResource = async (url, volume, preset, botName, bitrate, scope, options = {}) => (
+    { resource: { url, metadata: options?.metadata || null }, process: createFakeProcess("opus") }
+  );
+  await playRuntimeStation(runtime, state, STATIONS, "alpha", guildId, { countAsStart: true, jingle: true });
+  assert.equal(state.jingleMixer, null, "Ogg Opus from ffmpeg has no mixer");
+  assert.equal(jingles.length, 1, "and so no jingle");
+  cleanup(state);
+});

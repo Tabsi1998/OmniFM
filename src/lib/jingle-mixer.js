@@ -1,21 +1,24 @@
 // ============================================================
-// OmniFM: the jingle prototype (#309), the mixer
+// OmniFM: the jingle mixer (#309)
 // ============================================================
 // Mixes a short jingle into the PCM of a running stream: the music ducks
 // while the jingle plays and comes back with a short fade, so the stream
 // neither stops nor reconnects. PCM is what ffmpeg hands discord.js:
-// 48 kHz, stereo, signed 16 bit, little endian. Not part of the bot yet;
-// measure.mjs shows what it costs.
+// 48 kHz, stereo, signed 16 bit, little endian (src/services/stream.js).
+// scripts/jingle-prototype/measure.mjs shows what it costs.
 import { Transform } from "node:stream";
 
 export const SAMPLE_RATE = 48_000;
 export const CHANNELS = 2;
 // One stereo frame: two channels of 16 bit.
-const FRAME_BYTES = 4;
+export const FRAME_BYTES = 4;
 
 const clamp = (value) => (value > 32767 ? 32767 : (value < -32768 ? -32768 : value));
 
-/** A PCM buffer as 16-bit samples, whole stereo frames only. */
+/**
+ * A PCM buffer as 16-bit samples, whole stereo frames only.
+ * @param {Buffer} pcm
+ */
 export function toSamples(pcm) {
   const usable = pcm.length - (pcm.length % FRAME_BYTES);
   const samples = new Int16Array(usable / 2);
@@ -37,18 +40,37 @@ export class JingleMixer extends Transform {
     /** @type {Int16Array | null} */
     this.jingle = null;
     this.position = 0;
+    this.down = 1;
     this.pending = Buffer.alloc(0);
+    this.flowed = false;
   }
 
-  /** Starts a jingle (16-bit samples or a PCM buffer) from its beginning, over whatever plays. */
-  play(jingle) {
-    this.jingle = Buffer.isBuffer(jingle) ? toSamples(jingle) : jingle;
+  /**
+   * Starts a jingle (16-bit samples or a PCM buffer) from its beginning, over
+   * whatever plays. fadeIn false: the music is down from the first sample,
+   * for a jingle at the start of a stream.
+   * @param {Int16Array | Buffer} jingle
+   * @param {{ fadeIn?: boolean }} [options]
+   * @returns {boolean} whether there was anything to play
+   */
+  play(jingle, { fadeIn = true } = {}) {
+    const samples = Buffer.isBuffer(jingle) ? toSamples(jingle) : jingle;
+    if (!samples?.length) return false;
+    this.jingle = samples;
     this.position = 0;
+    // A jingle shorter than the fade: the music goes down only while it plays.
+    this.down = fadeIn ? Math.max(1, Math.min(this.fadeSamples, samples.length)) : 0;
+    return true;
   }
 
   /** Whether a jingle or its fade back is still running. */
   get busy() {
     return this.jingle !== null;
+  }
+
+  /** Whether music has come through yet; before that a jingle needs no fade down. */
+  get flowing() {
+    return this.flowed;
   }
 
   _transform(chunk, _encoding, callback) {
@@ -60,6 +82,7 @@ export class JingleMixer extends Transform {
       callback();
       return;
     }
+    this.flowed = true;
     if (!this.jingle) {
       callback(null, data.subarray(0, usable));
       return;
@@ -69,13 +92,15 @@ export class JingleMixer extends Transform {
     callback(null, out);
   }
 
-  /** Ducks the music and adds the jingle, sample by sample, in place. */
+  /**
+   * Ducks the music and adds the jingle, sample by sample, in place.
+   * @param {Buffer} out
+   */
   mix(out) {
     const jingle = this.jingle;
     const total = jingle.length;
     const fade = this.fadeSamples;
-    // A jingle shorter than the fade: the music goes down only while it plays.
-    const down = Math.max(1, Math.min(fade, total));
+    const down = this.down;
     const samples = out.length / 2;
     for (let index = 0; index < samples; index += 1) {
       const position = this.position + index;

@@ -491,6 +491,14 @@ export function createDemoApi({ panels = {}, now = () => Date.now(), language = 
           limits: { avatarBytes: 2 * 1024 * 1024, bannerBytes: 4 * 1024 * 1024, bioLength: 190 },
           workers: server.streams.map((row) => ({ slot: row.bot, name: `OmniFM ${row.bot}`, avatarUrl: null, custom: { avatar: false, banner: false, bio: '' }, updatedAt: null })),
         };
+      case '/api/dashboard/jingle':
+        return {
+          serverId: guild.id,
+          available: guild.plan === 'ultimate',
+          limits: { maxMs: 10_000, fileBytes: 6 * 1024 * 1024 },
+          jingle: null,
+          settings: { onSwitch: true, onHour: false },
+        };
       default:
         throw refuse(t, method);
     }

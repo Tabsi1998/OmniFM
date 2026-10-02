@@ -554,6 +554,10 @@ class RemoteWorkerHandle {
     return this.sendCommand("reconnectVoice", { guildId }, { timeoutMs: 20_000 });
   }
 
+  async playJingleFromDashboard(guildId) {
+    return this.sendCommand("playJingle", { guildId }, { timeoutMs: 15_000 });
+  }
+
   async setSleepTimerInGuild(guildId, minutes) {
     return this.sendCommand("setSleepTimer", { guildId, minutes }, { timeoutMs: 15_000 });
   }

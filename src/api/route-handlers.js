@@ -12,6 +12,7 @@ import { createDashboardLicenseRouteHandler } from "./routes/dashboard-license.j
 import { createDashboardPermsRouteHandler } from "./routes/dashboard-perms.js";
 import { createDashboardReportsRouteHandler } from "./routes/dashboard-reports.js";
 import { createDashboardBotProfileRouteHandler } from "./routes/dashboard-bot-profile.js";
+import { createDashboardJingleRouteHandler } from "./routes/dashboard-jingle.js";
 import { createDashboardPanelDesignRouteHandler } from "./routes/dashboard-panel-design.js";
 import { createDashboardRolesRouteHandler } from "./routes/dashboard-roles.js";
 import { createDashboardSettingsDigestRouteHandler } from "./routes/dashboard-settings-digest.js";
@@ -266,6 +267,19 @@ export const handleDashboardBotProfileRoute = createDashboardBotProfileRouteHand
   resolveDashboardGuildForSession,
   sendJson,
   sendLocalizedError,
+});
+
+// The server's jingle (#309).
+export const handleDashboardJingleRoute = createDashboardJingleRouteHandler({
+  getDashboardRequestTranslator,
+  getDashboardSession,
+  getLocalizedJsonBodyError,
+  languagePick,
+  methodNotAllowed,
+  resolveDashboardGuildForSession,
+  sendJson,
+  sendLocalizedError,
+  serverHasCapability,
 });
 
 // The look of the now-playing panel per server (#281).

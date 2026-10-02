@@ -8,9 +8,10 @@ set -euo pipefail
 
 apt-get update -qq >/dev/null
 apt-get install -y -qq --no-install-recommends ffmpeg >/dev/null
-mkdir -p /app/scripts
+mkdir -p /app/scripts /app/src/lib
 cp /src/package.json /src/package-lock.json /app/
 cp -r /src/scripts/jingle-prototype /app/scripts/
+cp /src/src/lib/jingle-mixer.js /app/src/lib/
 cd /app
 npm ci --omit=dev --no-audit --no-fund --loglevel=error
 ffmpeg -hide_banner -version | sed -n 1p

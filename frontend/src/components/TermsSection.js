@@ -40,6 +40,7 @@ function TermsSection({ terms }) {
     ['discord', sections.discordTitle, sections.discordBody],
     ['preview', sections.previewTitle, sections.previewBody],
     ['custom-stations', sections.customStationsTitle, sections.customStationsBody],
+    ['jingles', sections.jinglesTitle, sections.jinglesBody],
     ['acceptable-use', sections.acceptableUseTitle, sections.acceptableUseBody, sections.acceptableUseItems],
     ['premium', sections.premiumTitle, sections.premiumBody()],
     ['stream-rights', sections.streamRightsTitle, sections.streamRightsBody],
