@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, searchForWorkspaceRoot, transformWithOxc } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -23,6 +25,26 @@ function pagesReaching(id, getModuleInfo, path = new Set()) {
   return pages;
 }
 
+// #487: an address the site does not have gets build/404.html, which `serve`
+// answers with status 404. The app shows its not-found page there; the
+// robots tag keeps search engines from keeping the address.
+let buildOutDir = '';
+const notFoundPage = {
+  name: 'omnifm:not-found-page',
+  apply: 'build',
+  configResolved(config) {
+    buildOutDir = path.resolve(config.root, config.build.outDir);
+  },
+  closeBundle() {
+    const index = path.join(buildOutDir, 'index.html');
+    if (!fs.existsSync(index)) return;
+    const html = fs.readFileSync(index, 'utf8');
+    const robots = /<meta name="robots" content="[^"]*" \/>/;
+    const noindex = '<meta name="robots" content="noindex,follow" />';
+    fs.writeFileSync(path.join(buildOutDir, '404.html'), robots.test(html) ? html.replace(robots, noindex) : html.replace('<head>', `<head>\n    ${noindex}`));
+  },
+};
+
 const jsxInJs = {
   name: 'omnifm:jsx-in-js',
   enforce: 'pre',
@@ -39,7 +61,7 @@ const jsxInJs = {
 export default defineConfig({
   // OmniFM historically uses JSX in .js files. Parse those source files as
   // JSX before Vite's regular import analysis while retaining their paths.
-  plugins: [jsxInJs, react()],
+  plugins: [jsxInJs, react(), notFoundPage],
   // Existing installations already use REACT_APP_* in frontend/.env. Keep
   // that contract while also accepting Vite's native VITE_* prefix.
   envPrefix: ['VITE_', 'REACT_APP_'],

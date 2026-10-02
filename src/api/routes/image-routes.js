@@ -3,7 +3,8 @@
 // ============================================================
 //   /api/image/station/<key>         a catalogue station's logo
 //   /api/image/cover?term=…&size=…   the cover the song search finds
-//   /api/image/sponsor/<n>           a partner's logo from the owner console
+//   /api/image/sponsor/<n>           a partner's logo from the owner console,
+//                                    fetched or uploaded there (#486)
 // The server fetches the picture and keeps it for a day, so a visitor's
 // browser never talks to Apple, a station or a partner. Only what these
 // three name is fetched, never an address from the request: no open proxy.
@@ -13,6 +14,8 @@
 // Pictures only, at most 2 MB; an SVG comes with a sandbox, so it cannot run
 // scripts under this site's name.
 import { getCommonSecurityHeaders, methodNotAllowed } from "../../lib/api-helpers.js";
+import { getDb, isConnected } from "../../lib/db.js";
+import { loadUploadedPicture, uploadIdOf } from "../../lib/uploaded-pictures.js";
 import { loadOwnerConfigRaw } from "../../lib/owner-config.js";
 import { cachedCover, marketingResponse } from "../../lib/owner-public.js";
 import { getPublicStationEntries } from "../../lib/public-stations.js";
@@ -48,7 +51,7 @@ async function sourceFor(requestUrl, { stations, lookupCover, marketing }) {
   const sponsor = SPONSOR_PATH.exec(path);
   if (sponsor) {
     const logo = String((await marketing())?.sponsors?.[Number(sponsor[1])]?.logoUrl || "");
-    return /^https:\/\//i.test(logo) ? logo : "";
+    return /^https:\/\//i.test(logo) || uploadIdOf(logo) ? logo : "";
   }
   return "";
 }
@@ -89,6 +92,7 @@ export function createImageRoutesHandler({
   lookupCover = async (input) => cachedCover(input),
   marketing = async () => marketingResponse(await loadOwnerConfigRaw()),
   fetchImpl = safeFetch,
+  loadUpload = async (ref) => loadUploadedPicture(isConnected() ? getDb() : null, ref),
   now = Date.now,
   cacheBytes = CACHE_BYTES,
 } = {}) {
@@ -126,7 +130,8 @@ export function createImageRoutesHandler({
       return true;
     }
     const source = await sourceFor(requestUrl, { stations, lookupCover, marketing }).catch(() => "");
-    const picture = source ? await pictureFor(source) : null;
+    // An uploaded picture is in MongoDB already: nothing to fetch, nothing to keep.
+    const picture = !source ? null : uploadIdOf(source) ? await loadUpload(source).catch(() => null) : await pictureFor(source);
     if (!picture) {
       res.writeHead(404, { ...getCommonSecurityHeaders(), "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=300" });
       res.end(req.method === "HEAD" ? undefined : "Not found");

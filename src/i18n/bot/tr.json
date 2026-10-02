@@ -572,7 +572,7 @@
   "Something is missing": "Bir şey eksik",
   "Something went wrong. Please try again in a moment.": "Bir şeyler ters gitti. Lütfen birazdan yeniden dene.",
   "Something wrong? **Report a problem** in the panel sends it straight to the OmniFM team.": "Bir sorun mu var? Paneldeki **Sorun bildir** bunu doğrudan OmniFM ekibine gönderir.",
-  "Song history is currently disabled (`SONG_HISTORY_ENABLED=0`).": "Şarkı geçmişi şu anda kapalı (`SONG_HISTORY_ENABLED=0`).",
+  "Song history is switched off on this OmniFM. Only its operator can switch it on.": "Şarkı geçmişi bu OmniFM'de kapalı. Yalnızca işletmecisi açabilir.",
   "Songs count since {date}.": "Şarkılar {date} tarihinden beri sayılıyor.",
   "Source": "Kaynak",
   "Speak": "Konuş",

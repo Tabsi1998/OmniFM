@@ -20,6 +20,7 @@ import { parseIntLike } from "./owner-licenses.js";
 import { roundHalfEven } from "./helpers.js";
 import { isPublicOrigin, pickPublicOrigin, webDomainOrigin } from "./public-origin.js";
 import { safeFetch } from "./safe-outbound-http.js";
+import { uploadIdOf } from "./uploaded-pictures.js";
 import { discordShopSettings, discordStoreUrl } from "./discord-shop-settings.js";
 import { missingLegalFields } from "../config/legal-requirements.js";
 
@@ -343,9 +344,11 @@ export function marketingResponse(raw) {
     const url = text(value);
     return /^https?:\/\//i.test(url) ? url : "";
   };
+  // A logo is a web address or a picture uploaded in the console (#486).
+  const logoOf = (value) => (uploadIdOf(value) ? text(value) : safeUrl(value));
   const sponsors = (Array.isArray(marketing.sponsors) ? marketing.sponsors : [])
     .filter((sponsor) => sponsor && typeof sponsor === "object" && text(sponsor.name))
-    .map((sponsor) => ({ name: text(sponsor.name), logoUrl: safeUrl(sponsor.logoUrl), url: safeUrl(sponsor.url) }));
+    .map((sponsor) => ({ name: text(sponsor.name), logoUrl: logoOf(sponsor.logoUrl), url: safeUrl(sponsor.url) }));
   const botListings = (Array.isArray(marketing.botListings) ? marketing.botListings : [])
     .filter((listing) => listing && typeof listing === "object" && listing.enabled && safeUrl(listing.url))
     .map((listing) => ({ name: text(listing.name), url: safeUrl(listing.url) }));

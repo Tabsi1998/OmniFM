@@ -5,7 +5,259 @@
       "destination": "/activity/index.html"
     },
     {
-      "source": "/:path([^.]+)",
+      "source": "/home",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/home/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/dashboard",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/dashboard/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/dashboard/classic",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/dashboard/classic/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/dashboard/studio",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/dashboard/studio/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/admin",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/admin/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/owner",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/owner/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/brand",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/brand/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/press",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/press/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/stations",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/stations/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/sender",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/sender/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/premium",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/premium/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/pricing",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/pricing/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/preise",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/preise/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/faq",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/faq/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/fragen",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/fragen/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/imprint",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/imprint/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/impressum",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/impressum/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/privacy/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/datenschutz",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/datenschutz/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/privacy-policy",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/privacy-policy/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/terms",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/terms/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/tos",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/tos/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/terms-of-service",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/terms-of-service/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/nutzungsbedingungen",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/nutzungsbedingungen/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/agb",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/agb/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/status",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/status/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/charts",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/charts/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/start",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/start/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/guide",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/guide/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/anleitung",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/anleitung/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/erste-schritte",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/erste-schritte/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/getting-started",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/getting-started/",
       "destination": "/index.html"
     }
   ],

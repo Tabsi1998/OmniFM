@@ -82,6 +82,7 @@ import { createAdminLinkedRolesRoutes } from "./admin-linked-roles-routes.js";
 import { normalizeLinkedRolesSettings } from "../../lib/linked-roles.js";
 import { normalizeStatusPostSettings } from "../../services/status-posts.js";
 import { createAdminEggHuntRoutes } from "./admin-egg-hunt-routes.js";
+import { createAdminPictureRoutes } from "./admin-picture-routes.js";
 import { createAdminStationRoutes, loadCatalogFileStations } from "./admin-station-routes.js";
 
 export function readRequestBody(req, limitBytes = 4096) {
@@ -334,6 +335,8 @@ export function createAdminRoutesHandler(deps) {
   const handleLinkedRolesRoutes = createAdminLinkedRolesRoutes(routeDeps);
   // The Easter egg hunt's top three per server (#429).
   const handleEggHuntRoutes = createAdminEggHuntRoutes(routeDeps);
+  // A partner's logo uploaded in the console (#486).
+  const handlePictureRoutes = createAdminPictureRoutes(routeDeps);
 
   return async function handleAdminRoutes(context) {
     const { req, res, requestUrl } = context;
@@ -715,6 +718,7 @@ export function createAdminRoutesHandler(deps) {
     if (await handleReportRoutes(context)) return true;
     if (await handleLinkedRolesRoutes(context)) return true;
     if (await handleEggHuntRoutes(context)) return true;
+    if (await handlePictureRoutes(context)) return true;
     return handleStationRoutes(context);
   };
 }

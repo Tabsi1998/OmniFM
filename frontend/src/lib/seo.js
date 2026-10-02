@@ -1,4 +1,4 @@
-import { getCanonicalPagePath, normalizePageId, resolvePageFromUrl } from './pageRouting.js';
+import { NOT_FOUND_PAGE, getCanonicalPagePath, normalizePageId, resolvePageFromUrl } from './pageRouting.js';
 import { LANGUAGE_CODES, WEBSITE_LANGUAGES, copyFor, normalizeLanguage } from '../i18n/languages.js';
 
 const SITE_ORIGIN = 'https://omnifm.xyz';
@@ -186,7 +186,8 @@ export function buildStructuredData(seo) {
 export function applySeoMetadata({ locale = 'en', url = null } = {}) {
   if (typeof document === 'undefined') return null;
   const page = resolvePageFromUrl(url || window.location.href);
-  const seo = getPageSeo(page, locale);
+  // An address the site does not have: no search engine shall keep it (#487).
+  const seo = page === NOT_FOUND_PAGE ? { ...getPageSeo('home', locale), robots: 'noindex,follow' } : getPageSeo(page, locale);
   document.documentElement.lang = seo.language;
   document.title = seo.title;
 

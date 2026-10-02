@@ -572,7 +572,7 @@
   "Something is missing": "Falta algo",
   "Something went wrong. Please try again in a moment.": "Algo salió mal. Vuelve a intentarlo en un momento.",
   "Something wrong? **Report a problem** in the panel sends it straight to the OmniFM team.": "¿Algo va mal? **Informar de un problema** en el panel lo envía directamente al equipo de OmniFM.",
-  "Song history is currently disabled (`SONG_HISTORY_ENABLED=0`).": "El historial de canciones está desactivado (`SONG_HISTORY_ENABLED=0`).",
+  "Song history is switched off on this OmniFM. Only its operator can switch it on.": "El historial de canciones está desactivado en este OmniFM. Solo su operador puede activarlo.",
   "Songs count since {date}.": "Las canciones cuentan desde el {date}.",
   "Source": "Origen",
   "Speak": "Hablar",

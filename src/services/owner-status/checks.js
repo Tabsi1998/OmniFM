@@ -12,6 +12,7 @@ import { resolveDiscordRedirectUri, publicWebsiteOrigin } from "../../lib/discor
 import { isPublicOrigin, originOf } from "../../lib/public-origin.js";
 import { legalNotice, privacyNotice, termsNotice } from "../../lib/owner-public.js";
 import { LEGAL_PAGES, legalChecklist } from "../../config/legal-requirements.js";
+import { PROXY_NOTICE_COLLECTION, PROXY_NOTICE_FRESH_MS, PROXY_NOTICE_ID, trustLinesFor } from "../../lib/proxy-notice.js";
 
 const REQUEST_TIMEOUT_MS = 10_000;
 
@@ -53,6 +54,23 @@ export async function checkMongo({ db }) {
   } catch (err) {
     return result("mongo", "fail", "MongoDB antwortet nicht.", String(err?.message || err));
   }
+}
+
+/**
+ * Whether the API sees every visitor (#484): a proxy in front that
+ * backend/.env does not name makes all visitors one, with one request budget.
+ */
+export async function checkProxy({ db, now = Date.now() }) {
+  if (!db) return result("proxy", "warn", "Ohne MongoDB lässt sich das nicht prüfen.");
+  const notice = await db.collection(PROXY_NOTICE_COLLECTION).findOne({ _id: PROXY_NOTICE_ID }).catch(() => null);
+  const seenAt = notice?.lastSeenAt ? new Date(notice.lastSeenAt).getTime() : 0;
+  if (!seenAt || now - seenAt > PROXY_NOTICE_FRESH_MS) {
+    return result("proxy", "ok", "Die API sieht jeden Besucher einzeln; kein Proxy, dem sie nicht vertraut.");
+  }
+  const address = text(notice.address);
+  return result("proxy", "warn",
+    `Anfragen kommen über einen Proxy (${address}), dem die API nicht vertraut: alle Besucher teilen sich ein Limit von 60 Anfragen pro Minute. `
+    + "Diese zwei Zeilen in backend/.env eintragen, dann ./update.sh.", trustLinesFor(address));
 }
 
 /** Commander and workers: logged in or not, servers, streams. */
@@ -304,6 +322,7 @@ export const OWNER_STATUS_CHECKS = Object.freeze([
   { key: "bots", label: "Bots", area: "monitoring" },
   { key: "discordLogin", label: "Discord-Login", area: "cfg-login" },
   { key: "website", label: "Website", area: "cfg-login" },
+  { key: "proxy", label: "Besucher-Adressen", area: null },
   { key: "mongo", label: "Datenbank", area: null },
   { key: "smtp", label: "E-Mail (SMTP)", area: "cfg-email" },
   { key: "recognition", label: "Song-Erkennung", area: "cfg-recognition" },

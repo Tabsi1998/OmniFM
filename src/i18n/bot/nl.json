@@ -572,7 +572,7 @@
   "Something is missing": "Er ontbreekt iets",
   "Something went wrong. Please try again in a moment.": "Er ging iets mis. Probeer het zo opnieuw.",
   "Something wrong? **Report a problem** in the panel sends it straight to the OmniFM team.": "Klopt er iets niet? **Probleem melden** in het paneel stuurt het direct naar het OmniFM-team.",
-  "Song history is currently disabled (`SONG_HISTORY_ENABLED=0`).": "De nummergeschiedenis staat nu uit (`SONG_HISTORY_ENABLED=0`).",
+  "Song history is switched off on this OmniFM. Only its operator can switch it on.": "De nummergeschiedenis staat uit op deze OmniFM. Alleen de beheerder kan hem aanzetten.",
   "Songs count since {date}.": "Nummers tellen sinds {date}.",
   "Source": "Bron",
   "Speak": "Spreken",

@@ -280,8 +280,8 @@ async function handleHistoryCommand({ runtime, interaction, t, language }) {
       tone: "warning",
       title: t("🕘 Song-History deaktiviert", "🕘 Song history disabled"),
       description: t(
-        "Song-History ist aktuell deaktiviert (`SONG_HISTORY_ENABLED=0`).",
-        "Song history is currently disabled (`SONG_HISTORY_ENABLED=0`)."
+        "Der Song-Verlauf ist bei diesem OmniFM ausgeschaltet. Einschalten kann ihn nur der Betreiber.",
+        "Song history is switched off on this OmniFM. Only its operator can switch it on."
       ),
     }));
     return;

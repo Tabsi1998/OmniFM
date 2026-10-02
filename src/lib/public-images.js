@@ -6,6 +6,7 @@
 // now name a picture by what it shows; /api/image fetches it on the server
 // (api/routes/image-routes.js). The charts post in Discord keeps the
 // original links: there Discord fetches the pictures, not a visitor.
+import { createHash } from "node:crypto";
 import { splitDisplayTitle } from "./charts.js";
 
 export const IMAGE_PATH = "/api/image";
@@ -22,9 +23,14 @@ export function coverImagePath(term, size = 600) {
   return `${IMAGE_PATH}/cover?${params}`;
 }
 
-/** The logo of the owner console's partner number `index` (from 0). */
-export function sponsorImagePath(index) {
-  return `${IMAGE_PATH}/sponsor/${Number(index)}`;
+/**
+ * The logo of the owner console's partner number `index` (from 0). With the
+ * logo's source the address changes when the logo does, so no browser keeps
+ * showing the old one for the day it may cache it.
+ */
+export function sponsorImagePath(index, source = "") {
+  const version = source ? `?v=${createHash("sha256").update(String(source)).digest("hex").slice(0, 10)}` : "";
+  return `${IMAGE_PATH}/sponsor/${Number(index)}${version}`;
 }
 
 /** The search term the charts use for a song's cover ("Artist Title", or the title alone). */
@@ -65,6 +71,6 @@ export function websiteChart(chart) {
 export function websiteMarketing(marketing) {
   return {
     ...marketing,
-    sponsors: (marketing?.sponsors || []).map((sponsor, index) => ({ ...sponsor, logoUrl: sponsor.logoUrl ? sponsorImagePath(index) : "" })),
+    sponsors: (marketing?.sponsors || []).map((sponsor, index) => ({ ...sponsor, logoUrl: sponsor.logoUrl ? sponsorImagePath(index, sponsor.logoUrl) : "" })),
   };
 }

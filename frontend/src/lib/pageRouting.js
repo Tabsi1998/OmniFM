@@ -1,4 +1,6 @@
 const DEFAULT_PAGE = "home";
+// An address the site does not have (#487): a page of its own, answered 404.
+export const NOT_FOUND_PAGE = "not-found";
 
 const PAGE_ALIASES = new Map([
   ["home", "home"],
@@ -75,6 +77,9 @@ const PATH_ALIASES = new Map([
   ["/getting-started", "start"],
 ]);
 
+/** Every address the website answers with a page; build/serve.json lets only these through (#487). */
+export const WEBSITE_PAGE_PATHS = Object.freeze([...PATH_ALIASES.keys()].filter((path) => path !== "/index.html"));
+
 export function normalizePageId(rawPage, fallback = "") {
   const normalized = String(rawPage || "").trim().toLowerCase();
   if (!normalized) return fallback;
@@ -93,9 +98,9 @@ export function resolvePageFromUrl(urlLike) {
     const url = urlLike instanceof URL ? urlLike : new URL(String(urlLike || "/"), "https://omnifm.local");
     const pageFromQuery = normalizePageId(url.searchParams.get("page"), "");
     if (pageFromQuery) return pageFromQuery;
-    const pageFromPath = PATH_ALIASES.get(normalizePathname(url.pathname));
+    const pageFromPath = PATH_ALIASES.get(normalizePathname(url.pathname).toLowerCase());
     if (pageFromPath) return pageFromPath;
-    return DEFAULT_PAGE;
+    return NOT_FOUND_PAGE;
   } catch {
     return DEFAULT_PAGE;
   }
