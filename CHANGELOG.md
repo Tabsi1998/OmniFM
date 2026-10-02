@@ -6,6 +6,50 @@ folgt [SemVer](https://semver.org/lang/de/): Die erste Zahl steigt bei
 Funktionen, die dritte bei reinen Fehlerbehebungen. Wie ein Release entsteht,
 steht in `scripts/release.mjs`.
 
+## 3.17.0 – 2026-10-02
+
+Eigene Jingles für Ultimate-Server, verknüpfte Rollen in Discord und ein
+erster Blick auf die OmniFM-Activity im Sprachkanal.
+
+### Neu
+
+- **Eigener Jingle (Ultimate):** Im Dashboard unter Einstellungen → Jingle
+  lädt ein Ultimate-Server eine kurze Senderkennung hoch (MP3, WAV,
+  OGG/Opus, FLAC, M4A oder WebM, höchstens 10 Sekunden). OmniFM bringt sie
+  auf eine einheitliche Lautstärke und spielt sie über der leiser gedrehten
+  Musik, wenn jemand den Sender startet oder wechselt, und auf Wunsch zur
+  vollen Stunde in der Zeitzone des Servers. Der Stream läuft dabei ohne
+  Unterbrechung weiter. „Im Sprachkanal abspielen“ spielt ihn sofort zum
+  Ausprobieren. Dafür muss ffmpeg PCM liefern (`TRANSCODE_MODE=pcm`, der
+  Standard seit 3.16.0). (#309)
+- **Verknüpfte Rollen in Discord:** Server können Rollen an zwei Werte von
+  OmniFM knüpfen: Hörstunden und „Premium-Kunde“ (wer einen Server mit Pro
+  oder Ultimate besitzt). Hörstunden zählt OmniFM nur, wenn die Person das
+  in `/meine-daten` einschaltet; Ausschalten löscht sie. Im Support-Server
+  bekommen Premium-Kunden automatisch ihre Rolle, sobald Server und Rolle in
+  der Owner-Konsole eingetragen sind. Zum Einschalten braucht es zwei
+  Adressen im Discord Developer Portal, die Anleitung steht in #302. (#302)
+- **OmniFM-Activity, ein erster Prototyp:** Im Sprachkanal zeigt eine
+  Activity, was dort läuft (Senderlogo, Sender, Song) und wer zuhört. Bis
+  Discord sie freigibt, kann nur das OmniFM-Team sie starten; die
+  Einrichtung steht in #308. (#308)
+
+### Verbessert
+
+- **Schnellerer erster Seitenaufbau:** Der Browser-Tab bekommt ein kleines
+  Favicon statt des großen App-Symbols, und das Logo im Seitenfuß lädt erst,
+  wenn es gebraucht wird. Lighthouse misst auf der Startseite 86 bis 88
+  statt 75. (#472)
+- **Rechtstexte:** Datenschutzerklärung und Nutzungsbedingungen beschreiben
+  die Jingles und die verknüpften Rollen (Stand 2. Oktober 2026).
+
+### Behoben
+
+- **Bilder der Website:** Ein Bild-Abruf startet nie mehr selbst eine Suche
+  bei iTunes, der Bild-Speicher bleibt unter 32 MB, und die Cover-Suche
+  vergisst bei sehr vielen Begriffen nur die am längsten unbenutzten statt
+  alle auf einmal. (#469)
+
 ## 3.16.0 – 2026-10-02
 
 Die Bitrate des Plans kommt jetzt wirklich bei Discord an, und die Website
