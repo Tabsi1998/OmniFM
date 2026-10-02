@@ -244,13 +244,13 @@ for (const runtime of startedRuntimes) {
   }
 }
 
-// ---- Optional Node web server ----
-// Production uses FastAPI :8001; keep this available only for explicit legacy
-// or test entrypoints that opt in.
+// ---- Node web server ----
+// The commander's API behind the public entry (src/lib/commander-api.js);
+// off only where WEB_SERVER_ENABLED=0.
 const webServerEnabled = String(process.env.WEB_SERVER_ENABLED ?? "1").trim() !== "0";
 const webServer = webServerEnabled ? startWebServer(runtimes) : null;
 if (!webServerEnabled) {
-  log("INFO", "Node-Webserver deaktiviert; FastAPI ist das produktive HTTP-Backend.");
+  log("INFO", "Node-Webserver deaktiviert (WEB_SERVER_ENABLED=0): Dashboard und Login antworten nicht.");
 }
 
 // ---- Runtime Health Reporter (echte Metriken -> MongoDB für Owner-Dashboard) ----

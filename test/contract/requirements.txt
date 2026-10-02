@@ -1,0 +1,6 @@
+# The contract tests only (test/contract): HTTP against a running Node API,
+# and MongoDB for the data their fixtures write. Not needed on a server.
+pymongo==4.18.2
+python-dotenv==1.2.3
+requests==2.34.2
+pytest==9.1.1

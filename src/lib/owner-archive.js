@@ -1,9 +1,8 @@
 // ============================================================
 // OmniFM: the owner console's data archive on the Node API (#288)
 // ============================================================
-// The Node twin of archive_mongo_records() / restore_archived_operation() in
-// backend/services/owner_audit.py: before the owner deletes something, its
-// documents are copied into data_archive, and one click puts them back -
+// Before the owner deletes something, its documents are copied into
+// data_archive, and one click puts them back -
 // unless newer data would be overwritten.
 import { randomBytes } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";

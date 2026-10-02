@@ -63,7 +63,7 @@ describe('owner console: seasonal decoration', () => {
     render(<OwnerConfig section="seasons" apiGet={apiGet} apiSend={apiSend} token="t" />);
     await screen.findByTestId('config-seasons');
 
-    // FastAPI sends no seasons section yet: everything on, no test.
+    // A server that sends no seasons section yet: everything on, no test.
     expect(screen.getByTestId('cfg-season-preview').value).toBe('');
     fireEvent.click(screen.getByTestId('cfg-season-advent'));
     fireEvent.change(screen.getByTestId('cfg-season-preview'), { target: { value: 'advent-2' } });

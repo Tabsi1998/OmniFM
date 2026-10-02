@@ -59,16 +59,16 @@ updates:
       - dependencies
       - frontend
 
-  # Production FastAPI backend dependencies.
+  # The contract tests' Python dependencies (test/contract), not on any server.
   - package-ecosystem: pip
-    directory: /backend
+    directory: /test/contract
     schedule:
       interval: weekly
       day: monday
       time: "05:45"
     open-pull-requests-limit: 3
     groups:
-      pip-backend:
+      pip-contract:
         patterns:
           - "*"
     labels:

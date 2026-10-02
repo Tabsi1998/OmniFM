@@ -92,7 +92,7 @@ if (!started) {
 const webServerEnabled = String(process.env.WEB_SERVER_ENABLED ?? "0").trim() !== "0";
 const webServer = webServerEnabled ? startWebServer(runtimes) : null;
 if (!webServerEnabled) {
-  log("INFO", "Node-Webserver deaktiviert; FastAPI :8001 bleibt das produktive Backend.");
+  log("INFO", "Node-Webserver deaktiviert (WEB_SERVER_ENABLED=0): Dashboard und Login antworten nicht.");
 }
 const stopRuntimeHealthReporter = startRuntimeHealthReporter(runtimes, {
   intervalMs: Number.parseInt(String(process.env.RUNTIME_HEALTH_INTERVAL_MS || "5000"), 10),

@@ -66,10 +66,10 @@ async function main() {
   process.env.COMMANDER_BOT_INDEX = "1";
   process.env.MONGO_URL = MONGO_URL;
   process.env.DB_NAME = DB_NAME;
-  // The public entry on :8001 (Node since #290, FastAPI as the way back)
-  // forwards /api/auth, /api/dashboard and the other paths that need the bots
-  // to the Node API of the commander on 127.0.0.1 (#195); configured below,
-  // once the OAuth settings are known.
+  // The public entry on :8001 (src/entrypoints/api.js, #290) forwards
+  // /api/auth, /api/dashboard and the other paths that need the bots to the
+  // Node API of the commander on 127.0.0.1 (#195); configured below, once
+  // the OAuth settings are known.
   process.env.WEB_SERVER_ENABLED = "0";
 
   // Apply the Owner Console system settings to the Discord runtime. Mongo
@@ -77,11 +77,9 @@ async function main() {
   // before the Owner document can be read.
   await applyOwnerSystemEnv(system, process.env);
   await preferPublicAddress(system, process.env);
-  const { configureDashboardBackend } = await import("../lib/dashboard-backend.js");
-  const dashboardBackend = configureDashboardBackend(process.env, { redirectUri: system.discordOAuth?.redirectUri });
-  console.log(dashboardBackend.enabled
-    ? `[OmniFM] Dashboard-API: Node im Commander auf 127.0.0.1:${dashboardBackend.port}; der öffentliche Eingang (${dashboardBackend.publicBackend === "node" ? "Node" : "FastAPI"}) leitet weiter.`
-    : "[OmniFM] Dashboard-API: FastAPI (OMNIFM_DASHBOARD_BACKEND ist nicht \"node\").");
+  const { configureCommanderApi } = await import("../lib/commander-api.js");
+  const commanderApi = configureCommanderApi(process.env, { redirectUri: system.discordOAuth?.redirectUri });
+  console.log(`[OmniFM] Dashboard-API: Node im Commander auf 127.0.0.1:${commanderApi.port}; der öffentliche Eingang leitet weiter.`);
 
   console.log(`[OmniFM] Bot-Config aus Owner-Menü: Commander="${entries[0].name || "OmniFM Commander"}", Worker=${entries.length - 1}`);
 

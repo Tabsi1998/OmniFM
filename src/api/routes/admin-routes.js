@@ -1,9 +1,8 @@
 // ============================================================
-// OmniFM: the owner console's API on Node (#288), FastAPI's contract
+// OmniFM: the owner console's API on Node (#288)
 // ============================================================
 // The owner console is the React app (frontend, /admin). These routes answer
-// it exactly like FastAPI's backend/routers/admin*.py, on the same MongoDB
-// collections. Access like FastAPI's _admin_guard(): the owner token
+// it from the MongoDB collections the bots share. Access: the owner token
 // (API_ADMIN_TOKEN) in X-Admin-Token or "Authorization: Bearer"; no cookie,
 // no ?token= in the address. 503 without a configured token, else 401.
 //
@@ -177,7 +176,7 @@ export function createAdminRoutesHandler(deps) {
     return String(resolveAdminToken?.() || ADMIN_TOKEN || "").trim();
   }
 
-  /** The owner token from X-Admin-Token or "Authorization: Bearer", like FastAPI's is_admin_request(). */
+  /** The owner token from X-Admin-Token or "Authorization: Bearer". */
   function getAdminTokenFromRequest(req) {
     const headerToken = String(req.headers?.["x-admin-token"] || "").trim();
     if (headerToken) return headerToken;
@@ -208,7 +207,7 @@ export function createAdminRoutesHandler(deps) {
     };
   }
 
-  /** The checks of POST /api/admin/integrations/test, like FastAPI's check_all(). */
+  /** The checks of POST /api/admin/integrations/test. */
   async function runIntegrationTests(names, sendTestAlert) {
     const raw = await loadOwnerConfigRaw();
     const db = isConnected() ? getDb() : null;
@@ -306,7 +305,7 @@ export function createAdminRoutesHandler(deps) {
 
   function auditOwnerAction(req, event) {
     try {
-      // The person behind the request (#283): the Discord account, or "owner" for the script token like FastAPI.
+      // The person behind the request (#283): the Discord account, or "owner" for the script token.
       return recordOwnerAudit({
         actor: req.ownerIdentity?.actor || "owner",
         ...event,
@@ -339,7 +338,7 @@ export function createAdminRoutesHandler(deps) {
     const { req, res, requestUrl } = context;
     const pathname = requestUrl?.pathname || "";
 
-    // POST /api/admin/login: the owner console checks its token (#288, like FastAPI).
+    // POST /api/admin/login: the owner console checks its token (#288).
     if (pathname === "/api/admin/login") {
       if (req.method !== "POST") { methodNotAllowed(res, ["POST"]); return true; }
       if (!resolveConfiguredAdminToken()) {
@@ -428,7 +427,7 @@ export function createAdminRoutesHandler(deps) {
       return true;
     }
 
-    // ---- Monitoring, overview and logs with FastAPI's contract (#288) ----
+    // ---- Monitoring, overview and logs (#288) ----
     const monitoringDb = () => (isConnected() ? getDb() : null);
 
     // GET /api/admin/overview
@@ -640,7 +639,7 @@ export function createAdminRoutesHandler(deps) {
       return true;
     }
 
-    // GET/PUT /api/admin/config: the owner console's settings (#288, same contract as FastAPI)
+    // GET/PUT /api/admin/config: the owner console's settings (#288)
     if (pathname === "/api/admin/config") {
       if (req.method === "GET") {
         sendJson(res, 200, ownerConfigResponse(await loadOwnerConfigRaw()));

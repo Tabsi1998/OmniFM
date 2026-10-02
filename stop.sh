@@ -59,6 +59,7 @@ kill_orphaned_omnifm_processes() {
         *src/entrypoints/api.js*) service="Node-API" ;;
       esac
     elif [ "$cwd" = "$backend_real" ]; then
+      # The FastAPI backend a version before #291 started without systemd.
       case "$command" in
         *uvicorn*server:app*) service="FastAPI-Backend" ;;
       esac

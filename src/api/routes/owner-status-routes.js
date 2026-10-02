@@ -1,4 +1,4 @@
-// The owner cockpit (#355), on the Node API; FastAPI forwards /api/owner.
+// The owner cockpit (#355), on the commander's Node API; the public entry forwards /api/owner.
 //   GET  /api/owner/status          the latest result of every check, 24 h history
 //   POST /api/owner/status/check    { key? } check now (one or all)
 // Access like the rest of the owner console (#283): the script token or a

@@ -1,25 +1,16 @@
 #!/usr/bin/env node
 // Route contract (#195): every /api path the frontend calls must exist in the
-// backend that answers it in production. /api/auth and /api/dashboard go to
-// the Node API (src/api), FastAPI forwards them there; every other path is a
-// FastAPI route in backend/server.py or backend/routers/.
+// Node API (src/api), the only backend since FastAPI is gone (#291). The
+// public entry answers part of it itself and passes the rest to the commander;
+// both run the same route modules.
 //
 //   node scripts/check-api-routes.mjs          check, exit 1 on a missing route
-//   node scripts/check-api-routes.mjs --list   also print where each path lives
+//   node scripts/check-api-routes.mjs --list   also print every path
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
-// The prefixes FastAPI forwards to the Node API, read from backend/server.py
-// so this check and the proxy can never disagree.
-function nodePrefixes() {
-  const source = fs.readFileSync(path.join(root, "backend", "server.py"), "utf8");
-  const tuple = /NODE_PROXY_PREFIXES\s*=\s*\(([^)]*)\)/.exec(source)?.[1] || "";
-  const prefixes = [...tuple.matchAll(/"([^"]+)"/g)].map((match) => `${match[1].replace(/\/+$/, "")}/`);
-  return prefixes.length ? prefixes : ["/api/auth/", "/api/dashboard/"];
-}
-const NODE_PREFIXES = nodePrefixes();
 
 function walk(directory, extensions, found = []) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -53,21 +44,6 @@ function nodeRouteSource() {
     .join("\n");
 }
 
-/** FastAPI route patterns as regular expressions. */
-function fastapiRoutes() {
-  // server.py and the route modules it includes (backend/routers/, #200).
-  const routerDir = path.join(root, "backend", "routers");
-  const files = [path.join(root, "backend", "server.py")]
-    .concat(fs.existsSync(routerDir) ? walk(routerDir, new Set([".py"])) : []);
-  const text = files.map((file) => fs.readFileSync(file, "utf8")).join("\n");
-  const routes = [];
-  for (const match of text.matchAll(/@(?:app|router)\.(?:get|post|put|patch|delete|api_route)\("([^"]+)"/g)) {
-    const pattern = `^${match[1].replace(/[.]/g, "\\.").replace(/\{[^}]+\}/g, "[^/]+")}$`;
-    routes.push({ route: match[1], regex: new RegExp(pattern) });
-  }
-  return routes;
-}
-
 function existsInNode(apiPath, source) {
   // Literal paths appear as strings; a parameter segment is matched by the
   // literal prefix before it (the Node routes split the rest themselves).
@@ -76,36 +52,17 @@ function existsInNode(apiPath, source) {
     || source.includes(`"${literal}/"`) || source.includes(`\`${literal}/`);
 }
 
-function existsInFastapi(apiPath, routes) {
-  const concrete = apiPath.replace(/:param/g, "x");
-  return routes.some((entry) => entry.regex.test(concrete));
-}
-
-// #287: every FastAPI route the Node API does not have yet, the gap list of M10.
-if (process.argv.includes("--node-gaps")) {
-  const source = nodeRouteSource();
-  const gaps = [...new Set(fastapiRoutes().map((entry) => entry.route))]
-    .filter((route) => route.startsWith("/api/"))
-    .filter((route) => !existsInNode(route.replace(/\{[^}]+\}.*$/, "").replace(/\/+$/, ""), source))
-    .sort();
-  console.log(`${gaps.length} FastAPI routes the Node API does not have yet:`);
-  for (const route of gaps) console.log(`  ${route}`);
-  process.exit(0);
-}
-
 const list = process.argv.includes("--list");
-const nodeSource = nodeRouteSource();
-const routes = fastapiRoutes();
+const source = nodeRouteSource();
 const missing = [];
 for (const [apiPath, file] of [...frontendPaths()].sort(([a], [b]) => a.localeCompare(b))) {
-  const viaNode = NODE_PREFIXES.some((prefix) => `${apiPath}/`.startsWith(prefix));
-  const ok = viaNode ? existsInNode(apiPath, nodeSource) : existsInFastapi(apiPath, routes);
-  if (list) console.log(`${ok ? "ok     " : "MISSING"} ${viaNode ? "node   " : "fastapi"} ${apiPath}`);
-  if (!ok) missing.push(`${apiPath} (${viaNode ? "Node API" : "FastAPI"}, called in ${file})`);
+  const ok = existsInNode(apiPath, source);
+  if (list) console.log(`${ok ? "ok     " : "MISSING"} ${apiPath}`);
+  if (!ok) missing.push(`${apiPath} (called in ${file})`);
 }
 
 if (missing.length) {
-  console.error(`${missing.length} frontend API paths have no backend route:\n  ${missing.join("\n  ")}`);
+  console.error(`${missing.length} frontend API paths have no route in the Node API:\n  ${missing.join("\n  ")}`);
   process.exit(1);
 }
-console.log("every frontend API path has a backend route");
+console.log("every frontend API path has a route in the Node API");

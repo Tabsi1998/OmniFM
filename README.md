@@ -36,8 +36,8 @@
 ```
 
 - **Frontend:** React + Vite, Design-System „Broadcast Studio" (Obsidian + Signal-Orange + Cyber-Cyan), `recharts`, `lucide-react`.
-- **Backend:** Die Node-API (`src/entrypoints/api.js`, Dienst `omnifm-backend`) ist der öffentliche Eingang für `/api` (Port 8001), MongoDB über `MONGO_URL`. Owner-Konsole (`/api/admin/*`), Website-Daten, Premium und Webhooks beantwortet sie selbst; Dashboard, Discord-Login, Share-Karten und Cockpit gibt sie an die Node-API im Commander (127.0.0.1:8002) weiter. Rückweg auf den bisherigen FastAPI-Dienst: `OMNIFM_PUBLIC_BACKEND=fastapi` in `backend/.env`, dann `./update.sh`.
-- **Dashboard-API (Entscheidung #195, 2026-09-24):** `/api/auth/*` und `/api/dashboard/*` beantwortet die Node-API im Commander-Prozess (nur `127.0.0.1:8002`); der öffentliche Eingang leitet sie weiter. So gelten für Failover-Kette, Voice Guard, Alerts, Exporte und Digest dieselben Module wie im Bot. `scripts/check-api-routes.mjs` prüft, dass jede `/api`-Route des Frontends im zuständigen Backend existiert.
+- **Backend:** Die Node-API (`src/entrypoints/api.js`, Dienst `omnifm-backend`) ist der öffentliche Eingang für `/api` (Port 8001), MongoDB über `MONGO_URL`. Owner-Konsole (`/api/admin/*`), Website-Daten, Premium und Webhooks beantwortet sie selbst; Dashboard, Discord-Login, Share-Karten und Cockpit gibt sie an die Node-API im Commander (127.0.0.1:8002) weiter. Ein Python-Backend gibt es seit #291 nicht mehr; der Server braucht für OmniFM kein Python.
+- **Dashboard-API (Entscheidung #195, 2026-09-24):** `/api/auth/*` und `/api/dashboard/*` beantwortet die Node-API im Commander-Prozess (nur `127.0.0.1:8002`); der öffentliche Eingang leitet sie weiter. So gelten für Failover-Kette, Voice Guard, Alerts, Exporte und Digest dieselben Module wie im Bot. `scripts/check-api-routes.mjs` prüft, dass jede `/api`-Route des Frontends in der Node-API existiert.
 - **Discord-Voice-Bot:** Node.js / `discord.js` (Commander/Worker-Split) – der eigentliche Streaming-Runtime unter `src/`. **Wird von `start.sh` mitgestartet und liest Commander + Worker vollständig aus dem Owner-Menü (MongoDB `owner_config.discord`) – keine Token-Env-Variablen nötig.** Teilt sich dieselbe MongoDB wie das Backend.
 
 ## 🎨 Marke
@@ -65,7 +65,7 @@ MongoDB muss erreichbar sein (siehe `.env`).
 ## 🖥️ Deployment auf Ubuntu 24.04 (kompletter Stack inkl. Discord-Bot)
 
 **Keine manuellen Voraussetzungen mehr.** `start.sh` installiert beim ersten Lauf automatisch
-alles Nötige: **Node.js 22 LTS (mindestens 22.12), MongoDB 8.0 Community (lokal), FFmpeg, Python-venv und
+alles Nötige: **Node.js 22 LTS (mindestens 22.12), MongoDB 8.0 Community (lokal), FFmpeg und
 Build-Tools**. Außerdem erzeugt es beim ersten Lauf automatisch `backend/.env` + `frontend/.env`.
 
 Klonen → einmalig `./start.sh` → ab dann Updates per `./update.sh`:
@@ -113,8 +113,8 @@ relative Same-Origin-API). Fertig.
 Owner-Login danach: Domain → `/admin` → Owner-Token (aus `backend/.env`, wird beim ersten
 `start.sh` erzeugt und angezeigt).
 
-`start.sh` ist idempotent: es installiert Systempakete nur, wenn sie fehlen, erstellt bei Bedarf
-ein Python-venv, installiert Backend-, Frontend- und Bot-Abhängigkeiten, baut das Frontend,
+`start.sh` ist idempotent: es installiert Systempakete nur, wenn sie fehlen, installiert Frontend-
+und Bot-Abhängigkeiten, bereitet die Datenbank vor (Senderkatalog), baut das Frontend,
 serviert es und startet den Discord-Bot **aus der Owner-Config**. Ist noch kein Commander-Token
 im Owner-Menü hinterlegt, wird der Bot sauber übersprungen (der Rest läuft trotzdem).
 
@@ -144,7 +144,7 @@ Version bleibt unangetastet. Backups werden nie automatisch gelöscht.
 Von älteren Deployments automatisch veränderte `package-lock.json`-Dateien werden dort als Patch
 gesichert und auf den letzten Git-Stand zurückgeführt, damit sie den Fast-Forward-Pull nicht blockieren.
 Andere lokale Quellcodeänderungen bleiben unangetastet und stoppen das Update mit einer klaren Meldung.
-Abhängigkeiten, Frontend-Build, FastAPI/MongoDB und die DB-gesteuerte Bot-Konfiguration werden vor
+Abhängigkeiten, Frontend-Build, MongoDB und die DB-gesteuerte Bot-Konfiguration werden vor
 dem Stoppen der laufenden Version geprüft. Frontend und Backend wechseln danach gemeinsam auf den
 neuen Git-Stand.
 

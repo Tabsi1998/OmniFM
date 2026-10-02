@@ -2,8 +2,8 @@
 // OmniFM: the owner console's settings for code that has to answer at once
 // ============================================================
 // Prices are read synchronously (price helpers, code redemption).
-// FastAPI reads MongoDB on every request; Node keeps the last read
-// owner_config here, refreshed once a minute and right after the console
+// Instead of reading MongoDB on every request, the last read
+// owner_config stays here, refreshed once a minute and right after the console
 // saves (#289). Before the first read everything falls back to the built-in
 // prices and the environment, exactly as without an owner console.
 import { loadOwnerConfigRaw } from "./owner-config.js";

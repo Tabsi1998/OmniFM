@@ -1,4 +1,4 @@
-// Owner API: the station catalogue (FastAPI contract, backend/routers/admin_stations.py).
+// Owner API: the station catalogue.
 // Split out of admin-routes.js (#293); runs after its sign-in and role checks.
 import fs from "node:fs";
 import { getClientIp } from "../../lib/api-helpers.js";
@@ -33,7 +33,7 @@ export function createAdminStationRoutes({ sendJson, methodNotAllowed, auditOwne
       try { return getClientIp(req) || "-"; } catch { return "-"; }
     };
 
-    // Station catalogue (FastAPI contract, backend/routers/admin_stations.py)
+    // Station catalogue
     const stationDb = () => (isConnected() ? getDb() : null);
     const readStationBody = async () => {
       try { return JSON.parse(await readRequestBody(req, 64 * 1024) || "{}") || {}; } catch { return {}; }

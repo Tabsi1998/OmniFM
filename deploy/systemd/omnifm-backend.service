@@ -1,8 +1,7 @@
 # OmniFM API (Node, #290): the public entry on the backend port. It answers the
 # website, the owner console, premium and the webhooks, and passes dashboard,
 # Discord login, share cards and cockpit to the commander's Node API on
-# 127.0.0.1 (omnifm-bot). OMNIFM_PUBLIC_BACKEND=fastapi in backend/.env renders
-# omnifm-backend-fastapi.service here instead (the way back).
+# 127.0.0.1 (omnifm-bot).
 # Rendered by start.sh: the double-underscore markers (ROOT, USER, ports, node
 # path) are replaced with the values of this installation before the unit is
 # written to /etc/systemd/system. Do not edit the rendered copy, edit this template.

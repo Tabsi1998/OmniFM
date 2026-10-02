@@ -1,13 +1,11 @@
 // ============================================================
 // OmniFM: the owner console's monitoring on the Node API (#288)
 // ============================================================
-// The Node twin of backend/services/monitoring.py and the monitoring routes
-// of backend/routers/admin.py. The source is the same as FastAPI's: the
-// health document the bots write into MongoDB (runtime_health "latest"),
+// The source is what the bots write into MongoDB: the health document
+// (runtime_health "latest"),
 // the per-server directory (runtime_guild_directory), incidents and logs.
-// So every process of a split setup is seen, not only this one. The
-// simulated demo telemetry of SEED_DEMO_DATA is left out: without live data
-// the answer is the honest "waiting" state.
+// So every process of a split setup is seen, not only this one. Without
+// live data the answer is the honest "waiting" state, never simulated numbers.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 

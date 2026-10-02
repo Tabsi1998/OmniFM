@@ -1,11 +1,10 @@
 // ============================================================
 // OmniFM: the public website data from the owner console (#288)
 // ============================================================
-// The Node twin of FastAPI's public answers that depend on the owner
-// console: imprint, privacy and terms (company section), prices and tiers
-// (plans), sponsors and bot listings (marketing), the live numbers from the
-// bots' health document, and the cover lookup. Same fields and fallbacks as
-// backend/services/legal.py, backend/routers/premium.py and public.py.
+// The website's answers that depend on the owner console: imprint, privacy
+// and terms (company section), prices and tiers (plans), sponsors and bot
+// listings (marketing), the live numbers from the bots' health document, and
+// the cover lookup.
 import {
   DEFAULT_OWNER_CONFIG,
   configSectionFrom,
@@ -23,7 +22,7 @@ import { safeFetch } from "./safe-outbound-http.js";
 import { discordShopSettings, discordStoreUrl } from "./discord-shop-settings.js";
 import { missingLegalFields } from "../config/legal-requirements.js";
 
-/** FastAPI's TIERS: the base the owner's plans are laid over. */
+/** The tiers the owner's plans are laid over. */
 export const BASE_TIERS = Object.freeze({
   free: { name: "Free", bitrate: "64k", reconnectMs: 5000, maxBots: 2, pricePerMonth: 0 },
   pro: { name: "Pro", bitrate: "128k", reconnectMs: 1500, maxBots: 8, pricePerMonth: 299 },

@@ -129,7 +129,7 @@ function getSeatPricePerMonthCents(tier, seats = 1) {
 }
 
 /**
- * FastAPI's calculate_price(): the monthly total for the seats with the
+ * The monthly total for the seats with the
  * discount of the chosen duration, rounded per month, times the months.
  */
 function calculatePrice(tier, months, seats = 1) {

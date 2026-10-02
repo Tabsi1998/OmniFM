@@ -26,7 +26,6 @@ doctor() {
   log "Prüfe Deployment-Konfiguration (ohne Änderungen)..."
   [ -f "$ROOT/backend/.env" ] || { log "FEHLT: backend/.env"; failed=1; }
   [ -f "$ROOT/frontend/.env" ] || { log "FEHLT: frontend/.env"; failed=1; }
-  command -v python3 >/dev/null 2>&1 || { log "FEHLT: python3"; failed=1; }
   command -v node >/dev/null 2>&1 || { log "FEHLT: node"; failed=1; }
   command -v npm >/dev/null 2>&1 || { log "FEHLT: npm"; failed=1; }
   command -v curl >/dev/null 2>&1 || { log "FEHLT: curl"; failed=1; }
@@ -49,36 +48,14 @@ doctor() {
 }
 
 BACKEND_PORT_VALUE="${BACKEND_PORT:-8001}"
-VENV_PY="$ROOT/.venv/bin/python"
 
 has_systemd() {
   command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]
 }
 
-mongo_url_from_env() {
-  grep -E '^MONGO_URL=' "$ROOT/backend/.env" 2>/dev/null | head -n1 | cut -d '=' -f2- | sed -e 's/^"//' -e 's/"$//'
-}
-
+# MONGO_URL from backend/.env: the answer and the collections per database.
 mongo_ping() {
-  local url
-  url="$(mongo_url_from_env)"
-  url="${url:-mongodb://127.0.0.1:27017}"
-  if [ ! -x "$VENV_PY" ]; then
-    printf 'MongoDB-Ping nicht moeglich: Python-venv fehlt (./start.sh ausfuehren).\n'
-    return 1
-  fi
-  MONGO_URL="$url" "$VENV_PY" -c 'import os
-from pymongo import MongoClient
-url = os.environ["MONGO_URL"]
-client = MongoClient(url, serverSelectionTimeoutMS=1500)
-client.admin.command("ping")
-host = url.split("@")[-1]
-print(f"MongoDB antwortet ({host})")
-for name in sorted(client.list_database_names()):
-    if name in ("admin", "config", "local"):
-        continue
-    db = client[name]
-    print(f"  {name}: {len(db.list_collection_names())} Collections")'
+  ( cd "$ROOT" && node scripts/database.mjs status )
 }
 
 service_lines() {

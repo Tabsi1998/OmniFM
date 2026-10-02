@@ -1,5 +1,5 @@
 // The recovery settings the owner console can change (#217). One list for
-// the bot start (from-owner-config.mjs), FastAPI (validation and the form)
+// the bot start (from-owner-config.mjs), the owner console (validation and the form)
 // and /diag: recovery-settings.json next to this file.
 import fs from "node:fs";
 import { botTranslator } from "../lib/bot-i18n.js";

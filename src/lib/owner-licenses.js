@@ -1,9 +1,8 @@
 // ============================================================
 // OmniFM: the owner console's license manager on the Node API (#288)
 // ============================================================
-// The Node twin of backend/routers/admin_licenses.py and the helpers in
-// backend/services/licenses.py, with the same rules, so the console behaves
-// the same whichever backend answers. Works on the premium store's data
+// Issuing, changing and listing licences for the owner console. Works on
+// the premium store's data
 // ({ licenses, serverEntitlements }); the caller loads and saves it.
 import { randomInt } from "node:crypto";
 
@@ -50,7 +49,7 @@ export function maskEmail(email) {
   return `${local.slice(0, 2)}***@${domain}`;
 }
 
-/** OMNI-XXXX-XXXX-XXXX, like the keys FastAPI hands out. */
+/** OMNI-XXXX-XXXX-XXXX. */
 export function generateOwnerLicenseKey() {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   const part = () => Array.from({ length: 4 }, () => chars[randomInt(chars.length)]).join("");

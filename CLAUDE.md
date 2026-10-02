@@ -15,7 +15,7 @@ check; nothing runs on push, pull request or schedule. Before every push:
 ```bash
 python scripts/local_check.py                 # everything but extra
 python scripts/local_check.py --all           # plus the gates GitHub does not run
-python scripts/local_check.py --only node,backend
+python scripts/local_check.py --only node,contract
 python scripts/local_check.py --list          # the steps, without running them
 ```
 
@@ -27,7 +27,7 @@ ignored by Git.
 | --- | --- | --- |
 | repository | ci.yml `syntax` | `test:repo-hygiene`, every `*.sh` parses, no CRLF in the index, Gitleaks over the history and over uncommitted files |
 | node | ci.yml `syntax`, `unit`, `voice-codec`, `mongo-smoke`; nightly | Node 22 as package.json pins it, `npm ci`, the syntax gates (`scripts/check-syntax.mjs` parses every module under `src/` and `scripts/`), the ESLint ratchet (`npm run lint`), the type check (`npm run typecheck`: tsc over `src/lib` and `src/core`, shared JSDoc types in `src/lib/types.js`), the Opus codec, the Mongo smoke, `test:unit` against a MongoDB 7.0.39 container |
-| backend | ci.yml `fastapi-smoke` | Python 3.12 venv, compileall, `backend/unit_tests`, the owner contract against a live uvicorn - the ci.yml assertions plus: admin routes refuse requests without the token; then the `backend/tests` contract suite against the same server (every failing test fails); then a second FastAPI with `OMNIFM_DASHBOARD_BACKEND=node` in front of the Node API started alone (`scripts/serve-node-api.mjs`, #195) |
+| contract | ci.yml `contract` | Python 3.12 venv with `test/contract/requirements.txt`; the Node API alone (`scripts/serve-node-api.mjs`) on a database prepared like start.sh prepares a server (`scripts/database.mjs prepare`); the owner contract against it - the ci.yml assertions plus: admin routes refuse requests without the token; the `test/contract` suite (pytest over HTTP, every failing test fails); the public entry `src/entrypoints/api.js` in front of a commander stand-in (#290). Pulls in the node install when the node group is not selected |
 | frontend | ci.yml `frontend-build` | `npm ci`, the Vite build, and proof it produced `build/index.html` and bundles |
 | extra | codeql.yml, live-smoke.yml, ci.yml `voice-codec` on Ubuntu | npm audit (high and critical), settings read by the code vs `.env.example`, dependency licences, OSV over the lockfiles, ShellCheck, the Opus codec on Linux in a `node:22-bookworm` container (a copy of the lockfile, the Windows `node_modules` stay untouched), Semgrep in place of CodeQL, the live smoke against omnifm.xyz |
 
@@ -90,8 +90,6 @@ MongoDB 27019 (container `omnifm-local-check-mongo`).
 - The venv lives in `~/.local-ci/OmniFM/`, never inside the repository.
 - Environment variables that look like credentials are withheld from every
   step; only their names are printed.
-- `tzdata` goes into the venv: Windows has no zoneinfo database, and tests that
-  build Europe/Vienna would fail only here.
 
 ## Machine-local helpers (not in Git)
 

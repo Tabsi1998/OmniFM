@@ -44,8 +44,8 @@ export function getHealthBinaryProbe() {
   return binaryHealthCache;
 }
 
-// The legal texts read the company section of the owner console (#288),
-// like FastAPI; LEGAL_* and PRIVACY_* stay as fallbacks.
+// The legal texts read the company section of the owner console (#288);
+// LEGAL_* and PRIVACY_* stay as fallbacks.
 export async function buildPublicLegalNotice() {
   return legalNotice(await loadOwnerConfigRaw());
 }

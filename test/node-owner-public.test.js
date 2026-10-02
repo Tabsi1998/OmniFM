@@ -151,9 +151,9 @@ test("the cover search keeps its last 500 terms and pushes out the longest unuse
   assert.ok(pub.cachedCover({ term: "one   more term" }), "found with one space between the words");
 });
 
-test("Node announces the same API contract as FastAPI", async () => {
+test("the API announces the contract start.sh waits for", async () => {
   const fs = await import("node:fs");
   const { BACKEND_CONTRACT_VERSION } = await import("../src/api/routes/public-routes.js");
-  const fastapi = fs.readFileSync(new URL("../backend/server.py", import.meta.url), "utf8");
-  assert.equal(fastapi.match(/^BACKEND_CONTRACT_VERSION = "([^"]+)"/m)?.[1], BACKEND_CONTRACT_VERSION);
+  const startSh = fs.readFileSync(new URL("../start.sh", import.meta.url), "utf8");
+  assert.equal(startSh.match(/contractVersion==="([^"]+)"/)?.[1], BACKEND_CONTRACT_VERSION);
 });

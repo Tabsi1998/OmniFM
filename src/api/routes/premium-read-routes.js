@@ -101,7 +101,7 @@ export function createPremiumReadRoutesHandler(deps) {
       return true;
     }
 
-    // Prices and features from the owner's plans (#288, FastAPI contract).
+    // Prices and features from the owner's plans (#288).
     const serverId = String(requestUrl.searchParams.get("serverId") || "").trim();
     let license = null;
     let upgrade = null;

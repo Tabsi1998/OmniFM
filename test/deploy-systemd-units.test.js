@@ -63,12 +63,7 @@ test("backend and bot wait for MongoDB, the bot never restart-loops on a missing
   assert.equal(directive(backend, "ExecStart"), "__NODE__ src/entrypoints/api.js --port __BACKEND_PORT__ --host 0.0.0.0");
   assert.equal(directive(backend, "EnvironmentFile"), "-__ROOT__/backend/.env");
   assert.equal(directive(backend, "KillSignal"), "SIGTERM");
-
-  // The way back: the same unit name with Uvicorn inside.
-  const fastapi = fs.readFileSync(path.join(unitDir, "omnifm-backend-fastapi.service"), "utf8");
-  assert.match(directive(fastapi, "ExecStart") || "", /uvicorn server:app .*--port __BACKEND_PORT__/);
-  assert.equal(directive(fastapi, "WorkingDirectory"), "__ROOT__/backend");
-  assert.doesNotMatch(withoutComments(render(fastapi)), /__[A-Z_]+__/);
+  assert.equal(fs.existsSync(path.join(unitDir, "omnifm-backend-fastapi.service")), false, "#291: no way back to FastAPI");
 
   const bot = readUnit("omnifm-bot");
   assert.match(bot, /^After=.*mongod\.service.*omnifm-backend\.service/m);
@@ -116,8 +111,10 @@ test("start.sh renders every template through the render script, stop.sh stops t
   const stopSh = fs.readFileSync(path.join(repoRoot, "stop.sh"), "utf8");
   assert.match(startSh, /for part in backend frontend bot; do\s+render_unit_file "omnifm-\$part\.service"/);
   assert.match(startSh, /scripts\/render-systemd-unit\.sh/);
-  assert.match(startSh, /"\$PUBLIC_BACKEND" = "fastapi" \]; then\s+template="\$UNIT_TEMPLATE_DIR\/omnifm-backend-fastapi\.service"/,
-    "OMNIFM_PUBLIC_BACKEND=fastapi renders the Uvicorn unit under the same name");
+  // #291: no Python environment, MongoDB waited for and prepared by Node.
+  assert.doesNotMatch(startSh, /\.venv\/bin|pip install|py_compile|uvicorn|omnifm-backend-fastapi/);
+  assert.match(startSh, /node scripts\/database\.mjs wait "\$MONGO_WAIT_SECONDS"/);
+  assert.match(startSh, /node scripts\/database\.mjs prepare/);
   assert.match(stopSh, /for unit in "\$UNIT_PREFIX-bot" "\$UNIT_PREFIX-frontend" "\$UNIT_PREFIX-backend"/);
   assert.ok(startSh.includes("MONGO_WAIT_SECONDS"), "start.sh waits for MongoDB before the preflight");
   assert.doesNotMatch(startSh, /Type=oneshot/, "the oneshot stack unit is gone");

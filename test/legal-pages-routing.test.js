@@ -264,7 +264,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
 
     // The owner console is the React app; the old HTML admin page, its cookie
     // login and the ?token= address are gone (#288). /api/admin/* takes the
-    // owner token in a header only, like FastAPI.
+    // owner token in a header only.
     const oldAdminPageResponse = await fetch(`http://127.0.0.1:${port}/admin?token=admin-route-token`, { redirect: "manual" });
     assert.equal(oldAdminPageResponse.headers.get("set-cookie"), null);
     assert.doesNotMatch(await oldAdminPageResponse.text(), /OMNIFM OWNER LOGIN|OMNIFM ADMIN/);
@@ -296,7 +296,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     const adminOverviewResponse = await fetch(`http://127.0.0.1:${port}/api/admin/overview`, { headers: ownerHeaders });
     assert.equal(adminOverviewResponse.status, 200);
     const adminOverview = await adminOverviewResponse.json();
-    // The owner console's overview with FastAPI's contract (#288).
+    // The owner console's overview (#288).
     assert.equal(adminOverview.brand, "OmniFM");
     assert.ok(adminOverview.stations.total > 0);
     assert.equal(adminOverview.release?.version, PACKAGE_VERSION);
@@ -306,7 +306,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     const adminStationsResponse = await fetch(`http://127.0.0.1:${port}/api/admin/stations`, { headers: ownerHeaders });
     assert.equal(adminStationsResponse.status, 200);
     const adminStations = await adminStationsResponse.json();
-    // FastAPI's summary (#288): counts by tier and a sample, from stations.json without MongoDB.
+    // The summary (#288): counts by tier and a sample, from stations.json without MongoDB.
     assert.ok(adminStations.total > 0);
     assert.equal(adminStations.total, adminStations.free + adminStations.pro);
     assert.ok(Array.isArray(adminStations.sample) && adminStations.sample.length > 0);

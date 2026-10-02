@@ -1,4 +1,4 @@
-// Owner API: licenses, activity and the archive (FastAPI contract).
+// Owner API: licenses, activity and the archive.
 // Split out of admin-routes.js (#293); runs after its sign-in and role checks.
 import fs from "node:fs";
 import { getClientIp } from "../../lib/api-helpers.js";
@@ -33,7 +33,7 @@ export function createAdminLicenseRoutes({ sendJson, methodNotAllowed, auditOwne
     const { req, res, requestUrl } = context;
     const pathname = requestUrl?.pathname || "";
 
-    // The servers the running bots are in (_runtime_guild_directory), from MongoDB like FastAPI.
+    // The servers the running bots are in (_runtime_guild_directory), from MongoDB.
     const guildDirectory = async () => {
       const db = isConnected() ? getDb() : null;
       return runtimeGuildDirectory(db, await readRuntimeHealthFresh(db));
@@ -46,7 +46,7 @@ export function createAdminLicenseRoutes({ sendJson, methodNotAllowed, auditOwne
       try { return getClientIp(req) || "-"; } catch { return "-"; }
     };
 
-    // GET/POST /api/admin/licenses: the license manager (#288, FastAPI contract)
+    // GET/POST /api/admin/licenses: the license manager (#288)
     if (pathname === "/api/admin/licenses") {
       if (req.method === "GET") {
         const data = await reloadPremiumStore();
@@ -126,7 +126,7 @@ export function createAdminLicenseRoutes({ sendJson, methodNotAllowed, auditOwne
       return true;
     }
 
-    // GET /api/admin/activity: redemptions, else issued licenses (FastAPI contract)
+    // GET /api/admin/activity: redemptions, else issued licenses
     if (pathname === "/api/admin/activity") {
       if (req.method !== "GET") { methodNotAllowed(res, ["GET"]); return true; }
       const data = await reloadPremiumStore();

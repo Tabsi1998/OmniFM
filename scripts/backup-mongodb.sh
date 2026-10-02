@@ -38,11 +38,11 @@ read_env_value() {
 
 load_config() {
   [[ -f "$ENV_FILE" ]] || fatal "Backend configuration is missing: $ENV_FILE"
-  command -v python3 >/dev/null 2>&1 || fatal "python3 is required to create a private MongoDB tools config."
 
   MONGO_URL="$(read_env_value MONGO_URL)"
   DB_NAME="$(read_env_value DB_NAME)"
   [[ -n "$MONGO_URL" ]] || fatal "MONGO_URL is missing in $ENV_FILE"
+  [[ "$MONGO_URL" != *[[:cntrl:]]* ]] || fatal "MONGO_URL contains control characters."
   [[ -n "$DB_NAME" ]] || fatal "DB_NAME is missing in $ENV_FILE"
   [[ "$DB_NAME" =~ ^[A-Za-z0-9._-]+$ ]] || fatal "DB_NAME contains unsupported characters."
 
@@ -52,9 +52,10 @@ load_config() {
     rm -f -- "$TOOLS_CONFIG"
   fi
   TOOLS_CONFIG="$(mktemp "$BACKUP_DIR/.mongo-tools.XXXXXX.yml")"
-  printf '%s' "$MONGO_URL" \
-    | python3 -c 'import json,sys; print("uri: " + json.dumps(sys.stdin.read()))' \
-    > "$TOOLS_CONFIG"
+  # A YAML string in double quotes, backslash and quote escaped; control
+  # characters, the only other thing YAML would need escaped, are refused above.
+  # Builtins and stdin only, so the password never shows in a process list.
+  printf 'uri: "%s"\n' "$(printf '%s' "$MONGO_URL" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')" > "$TOOLS_CONFIG"
   chmod 600 "$TOOLS_CONFIG"
 }
 

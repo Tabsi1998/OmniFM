@@ -5,7 +5,7 @@ import fs from "node:fs";
 const config = await import("../src/lib/owner-config.js");
 const { MASK } = { MASK: config.SECRET_MASK };
 
-test("the defaults are the same file FastAPI reads", () => {
+test("the defaults come from the shared defaults file", () => {
   const shared = JSON.parse(fs.readFileSync(new URL("../src/config/owner-config-defaults.json", import.meta.url), "utf8"));
   assert.deepEqual(Object.keys(config.DEFAULT_OWNER_CONFIG), Object.keys(shared));
   assert.deepEqual(config.DEFAULT_OWNER_CONFIG.company, shared.company);
@@ -29,7 +29,7 @@ test("secrets leave masked, and a mask sent back never replaces the stored secre
   assert.deepEqual(saved.workers.map((worker) => worker.token), ["tb", "ta", ""], "matched by clientId, never by position");
 });
 
-test("settings from the environment show until the owner saves them, like FastAPI", () => {
+test("settings from the environment show until the owner saves them", () => {
   const env = { SMTP_HOST: "mail.example", SMTP_PORT: "2525", TOPGG_TOKEN: "tg", STATION_HEALTH_BATCH_SIZE: "5.5" };
   const system = config.effectiveSystemConfig({}, env);
   assert.equal(system.smtp.host, "mail.example");
@@ -56,4 +56,27 @@ test("stream recovery values are clamped to the bounds the bot uses", () => {
   assert.ok(saved.streamRecovery.stableResetMs > 1, "clamped up to the minimum");
   assert.equal("failoverMinFailures" in saved.streamRecovery, false);
   assert.equal("unknown" in saved.streamRecovery, false);
+});
+
+// From FastAPI's unit tests (#291).
+test("stream recovery: the shared list, and owner values clamped and cleaned", async () => {
+  const { RECOVERY_SETTINGS } = await import("../src/config/recovery-settings.js");
+  const keys = RECOVERY_SETTINGS.map((entry) => entry.key);
+  assert.ok(keys.includes("failoverMinFailures") && keys.includes("voiceParkedRetryMs") && keys.length >= 13);
+  assert.equal(config.DEFAULT_OWNER_CONFIG.system.streamRecovery.failbackCheckMs, 120000);
+  assert.deepEqual(config.normalizeStreamRecovery({
+    failoverMinFailures: "1", failbackCheckMs: 999999999, failbackConfirmations: 3, healthcheckStallMs: "abc", voiceParkedRetryMs: true, unknownKey: 5,
+  }), { failoverMinFailures: 2, failbackCheckMs: 3600000, failbackConfirmations: 3 });
+});
+
+test("operator alerts: the webhook is masked like a password, every alert on by default", () => {
+  const alerts = config.maskConfigSecrets({ operatorAlerts: { webhookUrl: "https://discord.com/api/webhooks/1/secret", mention: "<@1>" } }).operatorAlerts;
+  assert.doesNotMatch(alerts.webhookUrl, /secret/);
+  assert.equal(alerts.webhookUrlSet, true);
+  assert.equal(alerts.mention, "<@1>");
+  const defaults = config.DEFAULT_OWNER_CONFIG.system.operatorAlerts;
+  assert.equal(defaults.webhookUrl, "");
+  for (const key of ["workerOffline", "failoverExhausted", "playbackLoops", "workerAutoheal", "diskSpace", "backupFailed", "updates"]) {
+    assert.equal(defaults[key], true, key);
+  }
 });

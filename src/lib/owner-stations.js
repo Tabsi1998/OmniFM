@@ -1,10 +1,9 @@
 // ============================================================
 // OmniFM: the owner console's station catalogue on the Node API (#288)
 // ============================================================
-// The Node twin of backend/routers/admin_stations.py: list with health,
-// stream test, create/update, delete (archived first) and the health check
-// on demand. Same rules and answers as FastAPI; outbound requests go through
-// safeFetch, which also refuses redirects into the local network.
+// List with health, stream test, create/update, delete (archived first) and
+// the health check on demand. Outbound requests go through safeFetch, which
+// also refuses redirects into the local network.
 import { safeFetch, validateOutboundUrlWithDns } from "./safe-outbound-http.js";
 import { parseIntLike } from "./owner-licenses.js";
 import { normalizeStationSeasons } from "./station-fields.js";
@@ -128,7 +127,7 @@ export async function buildStationDocument(body = {}) {
   if (!check.ok) throw new OwnerStationError(400, check.error || "Stream-URL ungültig.");
   const extra = stationCatalogFields({ ...body, genre });
   const doc = { key, name, url, tier, genre };
-  // An emptied field is stored empty, like FastAPI.
+  // An emptied field is stored empty.
   for (const field of ["country", "language", "color", "logo", "homepage"]) doc[field] = extra[field] || "";
   // #430: Christmas or Easter; an emptied list is stored empty too.
   doc.seasons = normalizeStationSeasons(body.seasons);
@@ -197,11 +196,11 @@ export async function runStationHealth(db, keys, { probe = probeStationUrl, now 
   const query = requested.length ? { key: { $in: requested.slice(0, 25) } } : { key: { $not: /^custom:/ } };
   const stations = (await db.collection("stations").find(query, { projection: { _id: 0, key: 1, url: 1 } }).limit(25).toArray()).filter((row) => row.url);
   const results = {};
-  // Only what FastAPI's _probe_station_url stores, so both write the same health documents.
+  // Only these fields, the shape every health document in MongoDB has.
   const healthFields = ({ ok, reachable, discordOk, status, latencyMs, message }) => ({
     ok, reachable, discordOk, status, latencyMs, ...(message === undefined ? {} : { message }),
   });
-  // At most 10 at a time, like FastAPI's thread pool.
+  // At most 10 at a time.
   for (let index = 0; index < stations.length; index += 10) {
     const batch = stations.slice(index, index + 10);
     // eslint-disable-next-line no-await-in-loop -- batches of 10 on purpose

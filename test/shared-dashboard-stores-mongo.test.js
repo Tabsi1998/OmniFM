@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-test("FastAPI Mongo writes are consumed by the Discord runtime stores", async (t) => {
+test("MongoDB writes of the API reach the Discord runtime stores", async (t) => {
   if (!String(process.env.MONGO_URL || "").trim()) {
     t.skip("MongoDB is not configured for this test run");
     return;

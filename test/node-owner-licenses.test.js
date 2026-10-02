@@ -67,5 +67,5 @@ test("the lists: masked for the short one, full with how each server resolves", 
     ["Verein", true, true, "pro", "serverEntitlement"],
     [G3, false, true, "pro", "serverEntitlement"],
   ]);
-  assert.equal(licenses.remainingLicenseDays(data.licenses[key], NOW.getTime()), 31, "30 days left count as 31, like FastAPI");
+  assert.equal(licenses.remainingLicenseDays(data.licenses[key], NOW.getTime()), 31, "30 days left count as 31");
 });

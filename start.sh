@@ -3,12 +3,12 @@
 # OmniFM — vollautomatisches Start-/Setup-Script (Ubuntu 24.04 / Debian)
 #
 # Installiert BEIM ERSTEN LAUF alles Nötige und startet dann den kompletten
-# Stack (MongoDB, FastAPI-Backend, React-Frontend, Discord-Bot).
+# Stack (MongoDB, Node-API, React-Frontend, Discord-Bot).
 #
 # Es installiert automatisch (falls nicht vorhanden):
 #   - Node.js 22 LTS  (NodeSource)
 #   - MongoDB 8.0 Community  (lokal, systemd)
-#   - FFmpeg, Python-venv, Build-Tools
+#   - FFmpeg, Build-Tools
 #
 # Als ERSTES wird ein Owner-Passwort (Admin-Token) erzeugt und angezeigt.
 #
@@ -21,7 +21,6 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUN_DIR="$ROOT/run"
 LOG_DIR="$ROOT/logs"
-VENV="$ROOT/.venv"
 BACKEND_ENV="$ROOT/backend/.env"
 FRONTEND_ENV="$ROOT/frontend/.env"
 # A second installation such as staging brings its instance.env (#262).
@@ -56,10 +55,8 @@ fi
 gen_token() {
   if command -v openssl >/dev/null 2>&1; then
     openssl rand -hex 24
-  elif command -v python3 >/dev/null 2>&1; then
-    python3 -c "import secrets;print(secrets.token_urlsafe(32))"
   else
-    date +%s%N | sha256sum | head -c 48
+    head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n'
   fi
 }
 
@@ -68,8 +65,6 @@ gen_token() {
 gen_key32() {
   if command -v openssl >/dev/null 2>&1; then
     openssl rand -hex 32
-  elif command -v python3 >/dev/null 2>&1; then
-    python3 -c "import secrets;print(secrets.token_hex(32))"
   else
     head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'
   fi
@@ -127,17 +122,18 @@ if ! command -v curl >/dev/null 2>&1 || ! command -v gpg >/dev/null 2>&1; then
   $SUDO apt-get install -y ca-certificates curl gnupg >>"$LOG_DIR/setup.log" 2>&1
 fi
 
-# --- Python + Build-Tools + FFmpeg ------------------------------------------
+# --- FFmpeg + Build-Tools ---------------------------------------------------
+# The build tools (and python3 for node-gyp) only serve npm when a native
+# module (Opus, Sodium, Canvas) has no prebuilt binary for this server.
+# OmniFM itself runs on Node alone (#291).
 NEED_PKGS=()
-command -v python3 >/dev/null 2>&1 || NEED_PKGS+=(python3)
-python3 -c "import venv" >/dev/null 2>&1 || NEED_PKGS+=(python3-venv)
-command -v pip3 >/dev/null 2>&1 || NEED_PKGS+=(python3-pip)
 command -v ffmpeg >/dev/null 2>&1 || NEED_PKGS+=(ffmpeg)
 command -v cc >/dev/null 2>&1 || NEED_PKGS+=(build-essential)
+command -v python3 >/dev/null 2>&1 || NEED_PKGS+=(python3)
 if [ "${#NEED_PKGS[@]}" -gt 0 ]; then
   log "Installiere Systempakete: ${NEED_PKGS[*]}"
   apt_update_once
-  $SUDO apt-get install -y python3-dev "${NEED_PKGS[@]}" >>"$LOG_DIR/setup.log" 2>&1 \
+  $SUDO apt-get install -y "${NEED_PKGS[@]}" >>"$LOG_DIR/setup.log" 2>&1 \
     || die "Installation der Systempakete fehlgeschlagen (siehe logs/setup.log)."
 fi
 
@@ -190,7 +186,7 @@ fi
 
 # --- MongoDB starten ---------------------------------------------------------
 # systemd only when it runs: in a container or WSL systemctl exists without it,
-# and MongoDB would then never start (found by scripts/rehearse-public-switch.sh).
+# and MongoDB would then never start (found rehearsing the switch to Node, #290).
 if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ] \
   && systemctl list-unit-files 2>/dev/null | grep -q '^mongod\.service'; then
   log "Starte MongoDB (systemd)..."
@@ -246,17 +242,14 @@ set_kv() { # file key value
 
 if [ ! -f "$BACKEND_ENV" ]; then
   log "Erzeuge backend/.env ..."
+  mkdir -p "$(dirname "$BACKEND_ENV")"
   cat > "$BACKEND_ENV" <<EOF
 MONGO_URL=mongodb://127.0.0.1:27017
 DB_NAME=radio_bot
 API_ADMIN_TOKEN=${OWNER_TOKEN}
 PUBLIC_WEB_URL=${BACKEND_PUBLIC}
 CORS_ALLOWED_ORIGINS=${CORS_ORIGINS}
-CHECKOUT_RETURN_ORIGINS=${CORS_ORIGINS}
 DEFAULT_LANGUAGE=en
-SEED_DEMO_DATA=0
-OMNIFM_DASHBOARD_BACKEND=node
-OMNIFM_PUBLIC_BACKEND=node
 OMNIFM_TOKEN_KEY=$(gen_key32)
 EOF
 else
@@ -269,23 +262,25 @@ else
   # Only add keys that did not exist in older installations.
   grep -qE '^PUBLIC_WEB_URL=' "$BACKEND_ENV" || set_kv "$BACKEND_ENV" PUBLIC_WEB_URL "$BACKEND_PUBLIC"
   grep -qE '^CORS_ALLOWED_ORIGINS=' "$BACKEND_ENV" || set_kv "$BACKEND_ENV" CORS_ALLOWED_ORIGINS "$CORS_ORIGINS"
-  grep -qE '^CHECKOUT_RETURN_ORIGINS=' "$BACKEND_ENV" || set_kv "$BACKEND_ENV" CHECKOUT_RETURN_ORIGINS "$CORS_ORIGINS"
-  grep -qE '^SEED_DEMO_DATA=' "$BACKEND_ENV" || set_kv "$BACKEND_ENV" SEED_DEMO_DATA 0
-  # #195: the dashboard is answered by the Node API behind FastAPI. Only added
-  # when missing; OMNIFM_DASHBOARD_BACKEND=fastapi in backend/.env switches back.
-  grep -qE '^OMNIFM_DASHBOARD_BACKEND=' "$BACKEND_ENV" || set_kv "$BACKEND_ENV" OMNIFM_DASHBOARD_BACKEND node
-  # #290: the public entry on the backend port is Node. Only added when
-  # missing; OMNIFM_PUBLIC_BACKEND=fastapi in backend/.env is the way back.
-  grep -qE '^OMNIFM_PUBLIC_BACKEND=' "$BACKEND_ENV" || set_kv "$BACKEND_ENV" OMNIFM_PUBLIC_BACKEND node
+  # #291: FastAPI is gone, and with it the switches between it and Node, its
+  # demo data and the checkout return addresses only it read. start.sh added
+  # them, so start.sh takes them out again; a way back still switched on is
+  # named.
+  if grep -qiE '^OMNIFM_(PUBLIC|DASHBOARD)_BACKEND=["'"'"']?fastapi' "$BACKEND_ENV"; then
+    warn "backend/.env stellte auf FastAPI zurück (OMNIFM_PUBLIC_BACKEND/OMNIFM_DASHBOARD_BACKEND=fastapi). FastAPI gibt es nicht mehr; die Node-API startet."
+  fi
+  OBSOLETE_KEYS='OMNIFM_PUBLIC_BACKEND|OMNIFM_DASHBOARD_BACKEND|SEED_DEMO_DATA|CHECKOUT_RETURN_ORIGINS'
+  if grep -qE "^($OBSOLETE_KEYS)=" "$BACKEND_ENV"; then
+    log "Entferne veraltete Einträge aus backend/.env: $(grep -oE "^($OBSOLETE_KEYS)=" "$BACKEND_ENV" | tr -d '=' | paste -sd ' ')."
+    sed -i -E "/^($OBSOLETE_KEYS)=/d" "$BACKEND_ENV"
+  fi
   # #302: the key for the linked roles' Discord access keys, made once. A new
   # key would mean everyone connects again, so an existing one stays.
   grep -qE '^OMNIFM_TOKEN_KEY=..+' "$BACKEND_ENV" || set_kv "$BACKEND_ENV" OMNIFM_TOKEN_KEY "$(gen_key32)"
 fi
 
-# Which process answers the backend port: node (src/entrypoints/api.js) or fastapi (Uvicorn).
-PUBLIC_BACKEND="$(grep -E '^OMNIFM_PUBLIC_BACKEND=' "$BACKEND_ENV" 2>/dev/null | tail -n1 | cut -d '=' -f2- | tr -d '"'"'"' ' | tr '[:upper:]' '[:lower:]')"
-[ "$PUBLIC_BACKEND" = "fastapi" ] || PUBLIC_BACKEND="node"
-if [ "$PUBLIC_BACKEND" = "node" ]; then BACKEND_NAME="Node-API"; else BACKEND_NAME="FastAPI-Backend (Rückweg)"; fi
+# The backend port is answered by the public Node entry, src/entrypoints/api.js.
+BACKEND_NAME="Node-API"
 
 # The frontend's API target is also configuration. Preserve it unless a
 # caller explicitly requested a different public URL for this deployment.
@@ -298,15 +293,8 @@ fi
 
 
 # =============================================================================
-# 4) BACKEND (FastAPI)
+# 4) ABHÄNGIGKEITEN, BUILD UND PRÜFUNGEN
 # =============================================================================
-log "Richte Python-Umgebung ein..."
-[ -d "$VENV" ] || python3 -m venv "$VENV"
-# shellcheck disable=SC1091
-source "$VENV/bin/activate"
-pip install --quiet --upgrade pip
-pip install --quiet -r "$ROOT/backend/requirements.txt"
-
 # Install and build before stopping the currently running version. A failed
 # dependency install or frontend compilation therefore causes no outage.
 log "Installiere Frontend-Abhängigkeiten reproduzierbar..."
@@ -319,33 +307,24 @@ log "Installiere Bot-Abhängigkeiten reproduzierbar..."
 # --omit=dev: the bot runs without ESLint and the other development tools.
 ( cd "$ROOT" && npm ci --omit=dev --no-audit --no-fund --engine-strict=true --loglevel=error )
 
-log "Prüfe Backend- und Runtime-Syntax vor dem Umschalten..."
-"$VENV/bin/python" -m py_compile "$ROOT/backend/server.py" "$ROOT"/backend/routers/*.py "$ROOT"/backend/services/*.py
+log "Prüfe Runtime-Syntax vor dem Umschalten..."
 ( cd "$ROOT" && npm run test:syntax )
 ( cd "$ROOT" && npm run test:split-syntax )
 
 # MongoDB is often still starting after a reboot. Wait for it instead of
 # failing the whole deployment on the first ping (#199).
 MONGO_WAIT_SECONDS="${MONGO_WAIT_SECONDS:-60}"
-BACKEND_MONGO_URL="$(grep -E '^MONGO_URL=' "$BACKEND_ENV" 2>/dev/null | head -n1 | cut -d '=' -f2- | sed -e 's/^"//' -e 's/"$//' || true)"
-BACKEND_MONGO_URL="${BACKEND_MONGO_URL:-mongodb://127.0.0.1:27017}"
 log "Warte auf MongoDB (max ${MONGO_WAIT_SECONDS}s)..."
-MONGO_READY=0
-for _ in $(seq 1 "$MONGO_WAIT_SECONDS"); do
-  if MONGO_URL="$BACKEND_MONGO_URL" "$VENV/bin/python" -c 'import os; from pymongo import MongoClient; MongoClient(os.environ["MONGO_URL"], serverSelectionTimeoutMS=1500).admin.command("ping")' >/dev/null 2>&1; then
-    MONGO_READY=1
-    break
-  fi
-  sleep 1
-done
-[ "$MONGO_READY" -eq 1 ] || die "MongoDB ist nach ${MONGO_WAIT_SECONDS}s nicht erreichbar (MONGO_URL aus backend/.env); laufende Version bleibt aktiv."
+( cd "$ROOT" && node scripts/database.mjs wait "$MONGO_WAIT_SECONDS" ) \
+  || die "MongoDB ist nach ${MONGO_WAIT_SECONDS}s nicht erreichbar (MONGO_URL aus backend/.env); laufende Version bleibt aktiv."
 log "MongoDB antwortet."
 
-log "Prüfe FastAPI-Import vor dem Umschalten..."
-# From backend/, like Uvicorn: FastAPI reads the .env of its working directory,
-# and on a new server backend/.env is the only one.
-( cd "$ROOT/backend" && "$VENV/bin/python" -c "import server as app; assert app.mongo_is_reachable(), 'MongoDB nicht erreichbar'" ) \
-  || die "FastAPI-Preflight fehlgeschlagen; laufende Version bleibt aktiv."
+# What importing FastAPI did until #291: an empty station catalogue gets
+# stations.json, stored stations their missing catalogue fields and fixes,
+# demo licences of old test setups go (src/lib/station-catalog-sync.js).
+log "Bereite die Datenbank vor (Senderkatalog, alte Demo-Daten)..."
+( cd "$ROOT" && node scripts/database.mjs prepare ) \
+  || die "Datenbank-Vorbereitung fehlgeschlagen; laufende Version bleibt aktiv."
 
 log "Prüfe DB-gesteuerte Discord-Konfiguration vor dem Umschalten..."
 set +e
@@ -383,10 +362,6 @@ render_unit_file() { # template in deploy/systemd, e.g. omnifm-backup.timer
   target="$UNIT_PREFIX-${1#omnifm-}"
   render="$ROOT/scripts/render-systemd-unit.sh"
   template="$UNIT_TEMPLATE_DIR/$1"
-  # The way back of #290: the same unit name, Uvicorn inside.
-  if [ "$1" = "omnifm-backend.service" ] && [ "$PUBLIC_BACKEND" = "fastapi" ]; then
-    template="$UNIT_TEMPLATE_DIR/omnifm-backend-fastapi.service"
-  fi
   env UNIT_PREFIX="$UNIT_PREFIX" ROOT="$ROOT" RUN_USER="$RUN_USER" \
     BACKEND_PORT="$BACKEND_PORT" FRONTEND_PORT="$FRONTEND_PORT" \
     NODE_BIN="$NODE_BIN" NODE_DIR="$NODE_DIR" \
@@ -451,7 +426,8 @@ if [ -n "$MIGRATION_OUTPUT" ]; then
 fi
 
 port_is_open() {
-  "$VENV/bin/python" -c 'import socket,sys; s=socket.socket(); s.settimeout(.4); rc=s.connect_ex(("127.0.0.1", int(sys.argv[1]))); s.close(); raise SystemExit(0 if rc == 0 else 1)' "$1"
+  node -e 'const s = require("node:net").connect(Number(process.argv[1]), "127.0.0.1"); s.setTimeout(400);
+s.on("connect", () => process.exit(0)).on("timeout", () => process.exit(1)).on("error", () => process.exit(1));' "$1"
 }
 
 for port in "$BACKEND_PORT" "$FRONTEND_PORT"; do
@@ -539,14 +515,9 @@ else
   warn "Kein systemd verfügbar (oder OMNIFM_SKIP_SYSTEMD=1): Prozesse laufen ohne Neustart-Überwachung."
 
   log "Starte $BACKEND_NAME auf Port $BACKEND_PORT..."
-  if [ "$PUBLIC_BACKEND" = "node" ]; then
-    # Production like the systemd units: MongoDB only, no store files (#292).
-    ( cd "$ROOT" && NODE_ENV=production nohup node src/entrypoints/api.js --port "$BACKEND_PORT" --host 0.0.0.0 \
-      >"$LOG_DIR/backend.log" 2>&1 & echo $! > "$RUN_DIR/backend.pid" )
-  else
-    ( cd "$ROOT/backend" && nohup "$VENV/bin/uvicorn" server:app --host 0.0.0.0 --port "$BACKEND_PORT" --workers 1 \
-      >"$LOG_DIR/backend.log" 2>&1 & echo $! > "$RUN_DIR/backend.pid" )
-  fi
+  # Production like the systemd units: MongoDB only, no store files (#292).
+  ( cd "$ROOT" && NODE_ENV=production nohup node src/entrypoints/api.js --port "$BACKEND_PORT" --host 0.0.0.0 \
+    >"$LOG_DIR/backend.log" 2>&1 & echo $! > "$RUN_DIR/backend.pid" )
   wait_for_backend_contract
 
   log "Serviere Frontend auf Port $FRONTEND_PORT..."
@@ -576,6 +547,12 @@ fi
 # =============================================================================
 # FERTIG
 # =============================================================================
+# The Python environment of the FastAPI backend (#291). Only now, so a start
+# that failed above leaves the previous state as it was.
+if [ -d "$ROOT/.venv" ] && [ ! -f "$ROOT/backend/server.py" ]; then
+  log "Entferne die alte Python-Umgebung (.venv); OmniFM braucht sie nicht mehr."
+  rm -rf "$ROOT/.venv"
+fi
 WEB_INFO="${PUBLIC_URL:-http://${SERVER_IP}:${FRONTEND_PORT}}"
 log "Fertig. Web: ${WEB_INFO}  |  Backend intern: http://127.0.0.1:${BACKEND_PORT}  |  API: ${FRONTEND_API:-/api (relativ)}"
 if [ "$USE_SYSTEMD" -eq 1 ]; then

@@ -258,8 +258,7 @@ export async function buildDashboardStatsForGuild(serverId, tier, runtimes) {
     eventsConfigured: events.length,
     eventsActive: events.filter((item) => item?.enabled !== false).length,
     permRules: Object.keys(permissionRules || {}).length,
-    // The overview's stream list and uptime tile; only FastAPI sent them, so
-    // both stayed empty since the Node API serves the dashboard (#413).
+    // The overview's stream list and uptime tile (#413).
     activeStreamDetails: liveRows,
     runtimeUptimeSec: liveRows.reduce((most, row) => Math.max(most, Number(row.uptimeSec || 0) || 0), 0),
     totalStarts: Number(listeningStats.totalStarts || 0),

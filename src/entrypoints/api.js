@@ -1,7 +1,7 @@
 // ============================================================
 // OmniFM: the public API on :8001 (#290)
 // ============================================================
-// The only public HTTP entry once FastAPI is gone (M10). It answers the owner
+// The only public HTTP entry (M10, #291). It answers the owner
 // console, the website (stations, prices, legal texts, stats), premium
 // codes and the trial, and the bot list webhooks itself, from MongoDB. What
 // needs the running bots (dashboard, Discord login, share cards, station
@@ -45,7 +45,7 @@ process.env.WEB_SERVER_ENABLED = "1";
 process.env.WEB_INTERNAL_PORT = String(argument("port", "8001"));
 process.env.WEB_BIND = String(argument("host", "0.0.0.0"));
 
-const { resolveNodeApiPort } = await import("../lib/dashboard-backend.js");
+const { resolveNodeApiPort } = await import("../lib/commander-api.js");
 const runtimeApi = String(process.env.OMNIFM_NODE_API_URL || "").trim().replace(/\/+$/, "")
   || `http://127.0.0.1:${resolveNodeApiPort(process.env)}`;
 

@@ -121,9 +121,9 @@ function writeAuditState(filePath, state) {
 const MONGO_STATUS = { success: "ok", failed: "error", denied: "denied", info: "ok", warn: "warn" };
 
 /**
- * The owner console reads its audit tab from MongoDB (owner_audit, written by
- * FastAPI). Node's entries go there too, in the same shape, so changes made
- * through the Node API (bot look, panel design, owner settings) show up.
+ * The owner console reads its audit tab from MongoDB (owner_audit). Every
+ * entry goes there too, so changes made through the Node API (bot look,
+ * panel design, owner settings) show up.
  */
 function mirrorOwnerAuditToMongo(normalized) {
   if (!isConnected() || !getDb()) return;

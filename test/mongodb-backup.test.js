@@ -31,6 +31,9 @@ test("MongoDB backup keeps credentials private and restore creates a safety snap
   const scriptPath = path.join(scriptsDir, "backup-mongodb.sh");
   const tracePath = path.join(sandbox, "tool-trace.log");
   const secret = "never-print-this-password";
+  // A backslash and a quote, which the YAML of the tools config has to escape.
+  const user = 'ow\\"ner';
+  const expectedConfig = path.join(sandbox, "expected-tools-config.yml");
 
   await fs.mkdir(scriptsDir, { recursive: true });
   await fs.mkdir(backendDir, { recursive: true });
@@ -38,14 +41,11 @@ test("MongoDB backup keeps credentials private and restore creates a safety snap
   await fs.copyFile(path.join(repoRoot, "scripts", "backup-mongodb.sh"), scriptPath);
   await fs.writeFile(
     path.join(backendDir, ".env"),
-    `MONGO_URL=mongodb://owner:${secret}@127.0.0.1:27017/?authSource=admin\nDB_NAME=omnifm_test\n`,
+    `MONGO_URL=mongodb://${user}:${secret}@127.0.0.1:27017/?authSource=admin\nDB_NAME=omnifm_test\n`,
     "utf8",
   );
-  await writeExecutable(path.join(binDir, "python3"), `#!/usr/bin/env bash
-set -euo pipefail
-uri="$(cat)"
-printf 'uri: "%s"\\n' "$uri"
-`);
+  const yamlUser = user.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  await fs.writeFile(expectedConfig, `uri: "mongodb://${yamlUser}:${secret}@127.0.0.1:27017/?authSource=admin"\n`, "utf8");
   await writeExecutable(path.join(binDir, "mongodump"), `#!/usr/bin/env bash
 set -euo pipefail
 archive=""
@@ -56,7 +56,7 @@ for arg in "$@"; do
     --config=*) config="\${arg#--config=}" ;;
   esac
 done
-grep -q '${secret}' "$config"
+cmp -s "$config" "$OMNIFM_EXPECTED_CONFIG" || { echo "the tools config is not the expected YAML" >&2; exit 3; }
 printf 'fake omnifm bson archive' | gzip -c > "$archive"
 printf '2026-09-24T04:15:01.200+0000\\tdone dumping omnifm_test.licenses (3 documents)\\n' >&2
 printf 'mongodump %s\\n' "$*" >> "$OMNIFM_FAKE_TRACE"
@@ -74,6 +74,7 @@ printf 'mongorestore %s\\n' "$*" >> "$OMNIFM_FAKE_TRACE"
     ...process.env,
     PATH: `${binDir}${path.delimiter}${process.env.PATH || ""}`,
     OMNIFM_FAKE_TRACE: tracePath,
+    OMNIFM_EXPECTED_CONFIG: expectedConfig,
   };
   const bash = resolveBash();
   const created = await execFile(bash, [scriptPath, "create"], { cwd: sandbox, env });

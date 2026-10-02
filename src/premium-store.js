@@ -318,7 +318,7 @@ export async function initPremiumStore() {
 
 // --- For the owner routes on the Node API (#288) ---
 
-/** The store fresh from MongoDB (FastAPI's checkout writes there too), after this process's own writes. */
+/** The store fresh from MongoDB (the other processes write there too), after this process's own writes. */
 export async function reloadPremiumStore() {
   await mongoWriteQueue.catch(() => null);
   if (getDb()) await refreshMongoSnapshot().catch(() => false);

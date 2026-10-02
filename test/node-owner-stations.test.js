@@ -55,7 +55,7 @@ const fakeResponse = (status, headers = {}) => ({
   body: { cancel: async () => {} },
 });
 
-test("station documents follow FastAPI's rules and keep the catalogue fields", async () => {
+test("station documents keep their rules and the catalogue fields", async () => {
   const doc = await stations.buildStationDocument({
     key: "Lounge.FM", name: "  Lounge FM ", url: PUBLIC_URL, tier: "PRO",
     color: "a1b2c3", logo: "https://cdn.example/logo.png", homepage: "http://insecure.example", country: "AT",
@@ -140,7 +140,7 @@ test("the health run stores the result and raises an incident on the second fail
   assert.deepEqual([a.status, a.consecutiveFailures, a.error], ["down", 2, "timeout"]);
   assert.equal(Object.hasOwn(a, "timedOut"), false);
   assert.deepEqual([b.status, b.consecutiveFailures, b.consecutiveSuccesses, b.responseTimeMs], ["up", 0, 1, 40]);
-  assert.equal(Object.hasOwn(b, "contentType"), false, "only FastAPI's probe fields reach the health document");
+  assert.equal(Object.hasOwn(b, "contentType"), false, "only the probe fields reach the health document");
   assert.deepEqual(db.data.runtime_incidents.map((row) => [row.severity, row.message, row.resolved]), [
     ["warning", "Sender a ist offline: timeout", false],
     ["info", "Sender b ist wieder erreichbar", true],

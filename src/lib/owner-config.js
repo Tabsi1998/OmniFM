@@ -1,8 +1,7 @@
 // ============================================================
 // OmniFM: the owner console's settings in MongoDB (#288)
 // ============================================================
-// The Node twin of backend/services/config.py, so the Node API can answer
-// the owner console with the same data and the same rules:
+// What the owner console reads and writes, with these rules:
 // - sections company, plans, discord, marketing, system, access, discordShop in
 //   owner_config {_id: "global"}, defaults from src/config/owner-config-defaults.json;
 // - secrets leave the API masked ("••••••••" plus "<key>Set": true) and a
@@ -158,7 +157,7 @@ function fillFromEnv(target, storedGroup, fields, env) {
     try {
       target[key] = convert(envValue);
     } catch {
-      // A value the environment cannot express is left out, like FastAPI does.
+      // A value the environment cannot express is left out.
     }
   }
 }

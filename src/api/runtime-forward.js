@@ -4,7 +4,7 @@
 // The dashboard, the Discord login, share cards, station logos and the owner
 // cockpit read the bots' Discord caches, so the Node API of the commander
 // answers them (127.0.0.1:8002). The public entry on :8001 passes those
-// requests on unchanged, like FastAPI's proxy_to_node_api() did (#195): the
+// requests on unchanged (#195): the
 // caller's address is appended to X-Forwarded-For so the commander limits the
 // browser and not this process, a same-origin Origin is dropped (the
 // commander's CSRF header still guards every change), a foreign one is passed
@@ -67,7 +67,7 @@ function answerUnavailable(res, securityHeaders) {
 
 /**
  * Passes one request to the commander's Node API and its answer back. A
- * commander that is restarting gives 503 with Retry-After, like FastAPI.
+ * commander that is restarting gives 503 with Retry-After.
  */
 export function forwardToRuntime(req, res, target, { securityHeaders = {}, readTimeoutMs = 60_000, connectTimeoutMs = 3_000 } = {}) {
   const base = new URL(target);
@@ -111,7 +111,7 @@ export function forwardToRuntime(req, res, target, { securityHeaders = {}, readT
 
 const reachability = { at: 0, target: "", value: false };
 
-/** Whether the commander's Node API answers, cached for ten seconds (health only, like FastAPI). */
+/** Whether the commander's Node API answers, cached for ten seconds (health only). */
 export async function runtimeApiReachable(target, { now = Date.now() } = {}) {
   if (reachability.target === target && now - reachability.at < 10_000) return reachability.value;
   const base = new URL(target);

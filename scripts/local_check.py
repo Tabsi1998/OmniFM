@@ -12,9 +12,10 @@ Groups:
     node        Node 22 as package.json pins it, a locked install, the syntax
                 gates, the ESLint ratchet, the native Opus codec, the Mongo
                 connection smoke and the unit suite against a MongoDB of its own
-    backend     the CI's Python 3.12 in an environment of its own, every module
-                compiles, the FastAPI unit tests, and the owner contract driven
-                end to end through a live server
+    contract    the API's contract tests from the CI's Python 3.12 in an
+                environment of its own, against the Node API: the owner
+                contract end to end, the test/contract suite, and the public
+                Node entry in front of the commander
     frontend    a locked install and the production build, checked for content
     extra       what GitHub does not run: npm audit, the settings contract,
                 dependency licences, OSV over the lockfiles and ShellCheck
@@ -58,29 +59,26 @@ LOGS = STATE / "logs"
 BASELINE = ROOT / "scripts" / "ci-baseline.json"
 WINDOWS = platform.system() == "Windows"
 
-GROUPS = ("repository", "node", "backend", "frontend", "extra")
-DEFAULT_GROUPS = ("repository", "node", "backend", "frontend")
+GROUPS = ("repository", "node", "contract", "frontend", "extra")
+DEFAULT_GROUPS = ("repository", "node", "contract", "frontend")
 
 FRONTEND = ROOT / "frontend"
-BACKEND = ROOT / "backend"
+CONTRACT = ROOT / "test" / "contract"
 # Virtual environments live outside the repository. A repository script that
 # walks the whole tree - a documentation link check, for one - would otherwise
 # read thousands of third-party files as if they were the project's own.
 CACHE = Path.home() / ".local-ci" / ROOT.name
 VENV = CACHE / "venv"
 
-# The versions the CI uses. package.json pins Node ">=22 <23"; the FastAPI job
+# The versions the CI uses. package.json pins Node ">=22 <23"; the contract job
 # sets up Python 3.12.
 NODE_MAJOR = 22
-BACKEND_PYTHON = "3.12"
+CONTRACT_PYTHON = "3.12"
 
 # Ports of their own: a developer's own MongoDB on 27017, or another
 # repository's stack on 8001, must neither be used nor disturbed.
 MONGO_PORT = 27019
 MONGO_CONTAINER = "omnifm-local-check-mongo"
-API_PORT = 18001
-NODE_API_PORT = 18002
-PROXY_API_PORT = 18003
 NODE_CONTRACT_PORT = 18004
 NODE_OWNER_CONTRACT_PORT = 18005
 # #290: the commander's Node API and the public Node entry in front of it.
@@ -105,7 +103,7 @@ ENV_PROVIDED = {
     "NODE_ENV", "CI", "PATH", "HOME", "PWD", "TZ", "PORT", "HOSTNAME", "LANG",
     # Set by OmniFM itself or its test harness, never by an operator:
     # the split supervisor (process index and role), start.sh (DRY_RUN
-    # preflight), node --test, and the backend contract test runner.
+    # preflight), node --test, and the contract test runner.
     "BOT_PROCESS_INDEX", "BOT_PROCESS_ROLE", "DRY_RUN", "NODE_TEST_CONTEXT",
     "OMNIFM_RUN_BACKEND_CONTRACT_TESTS", "OMNIFM_TEST_BASE_URL", "REACT_APP_BACKEND_URL",
     "OMNIFM_TEST_ADMIN_TOKEN",
@@ -1040,42 +1038,19 @@ def node_steps() -> list:
     ]
 
 
-# ------------------------------------------------------------------- backend
+# ------------------------------------------------------------------ contract
 
 def venv_python() -> str:
     exe = venv_executable(VENV)
     if not exe.is_file():
-        raise StepSkipped("the backend environment is not built yet")
+        raise StepSkipped("the contract test environment is not built yet")
     return str(exe)
 
 
-def backend_environment(context: Context) -> str:
-    # tzdata: Windows has no zoneinfo database, so a test that builds
-    # Europe/Vienna fails here and passes on the Linux runner. It is a data
-    # package for the local run and changes nothing in production.
-    extra = ["tzdata"] if WINDOWS else []
-    exe = make_venv(context, VENV, python_for(context, BACKEND_PYTHON),
-                    "--requirement", BACKEND / "requirements.txt", *extra)
-    return context.run(exe, "--version", timeout=60).stdout.strip() + " with backend/requirements.txt"
-
-
-def backend_compile(context: Context) -> str:
-    """Every backend module compiles, not only server.py, which is all the CI compiles."""
-    completed = context.run(venv_python(), "-m", "compileall", "-q", "-x", r"[\\/](\.?venv|node_modules)[\\/]",
-                            BACKEND, check=False, timeout=600)
-    if completed.returncode != 0:
-        raise StepFailed(tail(completed))
-    return "every backend module compiles"
-
-
-def backend_unit(context: Context) -> str:
-    completed = context.run(venv_python(), "-m", "pytest", BACKEND / "unit_tests", "-q", "-p", "no:cacheprovider",
-                            check=False, timeout=2400)
-    text = completed.stdout + completed.stderr
-    path = context.log("backend-unit", text)
-    if completed.returncode != 0:
-        raise StepFailed(f"the FastAPI unit tests failed. Full output: {path}\n" + tail(completed))
-    return describe_counts(pytest_counts(text))
+def contract_environment(context: Context) -> str:
+    exe = make_venv(context, VENV, python_for(context, CONTRACT_PYTHON),
+                    "--requirement", CONTRACT / "requirements.txt")
+    return context.run(exe, "--version", timeout=60).stdout.strip() + " with test/contract/requirements.txt"
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -1093,11 +1068,11 @@ def parse_json(raw: str) -> dict:
     return loaded if isinstance(loaded, dict) else {"_": loaded}
 
 
-def request(method: str, path: str, *, token: str = "", body: dict | None = None,
-            follow: bool = True, base: str = "") -> tuple:
-    """One call against the local server (FastAPI unless base says otherwise): status, headers and JSON."""
+def request(method: str, path: str, *, base: str, token: str = "", body: dict | None = None,
+            follow: bool = True) -> tuple:
+    """One call against the API under test: status, headers and JSON."""
     data = json.dumps(body).encode() if body is not None else None
-    call = urllib.request.Request(f"{base or f'http://127.0.0.1:{API_PORT}'}{path}", data=data, method=method)
+    call = urllib.request.Request(f"{base}{path}", data=data, method=method)
     if token:
         call.add_header("X-Admin-Token", token)
     if data is not None:
@@ -1118,7 +1093,7 @@ def expect(condition: object, message: str) -> None:
 def contract_database(context: Context, url: str, database: str) -> tuple:
     """An empty contract database and two helpers that read and write it with pymongo."""
     exe = venv_python()
-    env = {"MONGO_URL": url, "DB_NAME": database, "API_ADMIN_TOKEN": API_TOKEN, "SEED_DEMO_DATA": "0"}
+    env = {"MONGO_URL": url, "DB_NAME": database, "API_ADMIN_TOKEN": API_TOKEN}
     prelude = f"import json;from pymongo import MongoClient;d=MongoClient({url!r})[{database!r}];"
 
     def in_mongo(expression: str) -> object:
@@ -1133,101 +1108,87 @@ def contract_database(context: Context, url: str, database: str) -> tuple:
     return env, in_mongo, run_mongo
 
 
-def fastapi_contract(context: Context) -> str:
-    """Drive a live FastAPI through the owner contract the dashboard relies on.
+def start_node_api(context: Context, name: str, port: int, env: dict, **settings: str) -> tuple:
+    """The Node API alone (scripts/serve-node-api.mjs) on a contract database.
 
-    The CI's longest gate, and the one that catches the breakages that matter:
-    a masked secret that overwrites the real one, a licence that leaves an
-    entitlement behind when it is deleted, an archive that cannot be restored,
-    a monitoring answer with per-process figures for a shared process. Every
-    step asserts both the answer and what reached the database.
+    The database is prepared first the way start.sh prepares a server's
+    (scripts/database.mjs prepare), so the API sees the station catalogue a
+    real installation has. Returns the address and the scratch folder of the
+    runtime files, which the caller removes.
     """
-    exe = venv_python()
-    url = start_mongo(context, MONGO_CONTAINER, MONGO_PORT)
-    env, in_mongo, run_mongo = contract_database(context, url, "omnifm_local_contract")
-    if port_open(API_PORT):
-        raise StepSkipped(f"port {API_PORT} is taken; stop what uses it and run again")
-    start_process(context, "fastapi", [exe, "-m", "uvicorn", "backend.server:app", "--host", "127.0.0.1",
-                                       "--port", str(API_PORT)],
-                  cwd=ROOT, env=env, url=f"http://127.0.0.1:{API_PORT}/api/health", seconds=90)
-    context.cache["fastapi:env"] = env
-    check_owner_contract(in_mongo, run_mongo)
-    return "the owner contract holds end to end"
-
-
-def fastapi_contract_suite(context: Context) -> str:
-    """backend/tests: the Owner Console contract tests, against the live server.
-
-    They need a running FastAPI, and the contract step above already has one.
-    Their fixtures (backend/tests/conftest.py) write the data each test needs
-    into the same database, so the suite does not depend on demo seeds or on
-    what the owner contract left behind (#229). The baseline is empty: any
-    failing test fails the step.
-    """
-    env = context.cache.get("fastapi:env")
-    if not env or not port_open(API_PORT):
-        raise StepSkipped("the live FastAPI of backend/contract is not running")
-    base = f"http://127.0.0.1:{API_PORT}"
-    completed = context.run(
-        venv_python(), "-m", "pytest", BACKEND / "tests", "-q", "-p", "no:cacheprovider", "-rfE",
-        env={**env, "OMNIFM_RUN_BACKEND_CONTRACT_TESTS": "1", "OMNIFM_TEST_BASE_URL": base,
-             "REACT_APP_BACKEND_URL": base, "OMNIFM_TEST_ADMIN_TOKEN": API_TOKEN},
-        check=False, timeout=1800)
-    text = completed.stdout + completed.stderr
-    path = context.log("backend-contract-suite", text)
-    counts = pytest_counts(text)
-    if completed.returncode not in (0, 1) or not counts.get("passed"):
-        raise StepFailed(f"pytest did not run the contract suite. Full output: {path}\n" + tail(completed))
-    failing = set(re.findall(r"^(?:FAILED|ERROR) (\S+)", text, re.M))
-    verdict = ratchet(context, "backend-contract-suite", failing, "failing backend contract tests")
-    return f"{describe_counts(counts)}; {verdict}"
-
-
-def node_contract_suite(context: Context) -> str:
-    """#287: the same contract suite against the Node API, which will be the only server.
-
-    Starts the Node API alone on the contract database and runs backend/tests
-    against it. What fails is the gap list of M10: a route Node does not have
-    yet, another status, other fields. A ratchet keeps it honest: the number
-    may only go down, each PR of M10 records the smaller baseline.
-    """
-    env = context.cache.get("fastapi:env")
-    if not env:
-        raise StepSkipped("the FastAPI environment of backend/contract is missing")
-    if port_open(NODE_CONTRACT_PORT):
-        raise StepSkipped(f"port {NODE_CONTRACT_PORT} is taken; stop what uses it and run again")
+    if port_open(port):
+        raise StepSkipped(f"port {port} is taken; stop what uses it and run again")
     node = node_of(context, NODE_MAJOR)
-    scratch = Path(tempfile.mkdtemp(prefix="omnifm-node-contract-"))
-    base = f"http://127.0.0.1:{NODE_CONTRACT_PORT}"
+    scratch = Path(tempfile.mkdtemp(prefix=f"omnifm-{name}-"))
+    base = f"http://127.0.0.1:{port}"
     node_env = dict(node_path_env(context, node), **{
         "MONGO_URL": env["MONGO_URL"], "DB_NAME": env["DB_NAME"], "API_ADMIN_TOKEN": env["API_ADMIN_TOKEN"],
-        "WEB_SERVER_ENABLED": "1", "WEB_BIND": "127.0.0.1", "WEB_INTERNAL_PORT": str(NODE_CONTRACT_PORT),
+        "WEB_SERVER_ENABLED": "1", "WEB_BIND": "127.0.0.1", "WEB_INTERNAL_PORT": str(port),
         "PUBLIC_WEB_URL": base, "OMNIFM_RUNTIME_DATA_DIR": str(scratch), "LOGS_DIR": str(scratch / "logs"),
-        # The suite fires hundreds of requests from one address; the limiter
-        # would turn real gaps into 429 noise.
-        "API_RATE_LIMIT_MAX": "10000", "API_RATE_LIMIT_PREMIUM_MAX": "1000", "API_RATE_LIMIT_OWNER_MAX": "10000",
-    })
-    start_process(context, "node-contract-api", [node, "scripts/serve-node-api.mjs"], cwd=ROOT, env=node_env,
-                  url=f"{base}/api/auth/session", seconds=90)
-    completed = context.run(
-        venv_python(), "-m", "pytest", BACKEND / "tests", "-q", "-p", "no:cacheprovider", "-rfE",
-        env={**env, "OMNIFM_RUN_BACKEND_CONTRACT_TESTS": "1", "OMNIFM_TEST_BASE_URL": base,
-             "REACT_APP_BACKEND_URL": base, "OMNIFM_TEST_ADMIN_TOKEN": API_TOKEN},
-        check=False, timeout=1800)
+    }, **settings)
+    prepared = context.run(node, "scripts/database.mjs", "prepare", env=node_env, check=False, timeout=300)
+    context.log(f"{name}-prepare", prepared.stdout + prepared.stderr)
+    if prepared.returncode != 0:
+        raise StepFailed("scripts/database.mjs prepare failed:\n" + tail(prepared))
+    start_process(context, name, [node, "scripts/serve-node-api.mjs"], cwd=ROOT, env=node_env,
+                  url=f"{base}/api/health", seconds=90)
+    return base, scratch
+
+
+def owner_contract(context: Context) -> str:
+    """Drive the Node API through the owner contract the owner console relies on.
+
+    The longest gate, and the one that catches the breakages that matter: a
+    masked secret that overwrites the real one, a licence that leaves an
+    entitlement behind when it is deleted, an archive that cannot be restored,
+    a monitoring answer with per-process figures for a shared process. Every
+    step asserts both the answer and what reached the database, which is its
+    own and empty, so nothing another step left behind changes the counts.
+    """
+    url = start_mongo(context, MONGO_CONTAINER, MONGO_PORT)
+    env, in_mongo, run_mongo = contract_database(context, url, "omnifm_local_contract_owner")
+    base, scratch = start_node_api(context, "node-owner-api", NODE_OWNER_CONTRACT_PORT, env)
+    try:
+        check_owner_contract(in_mongo, run_mongo, base=base)
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+    return "the owner contract holds end to end against the Node API"
+
+
+def contract_suite(context: Context) -> str:
+    """test/contract: the API contract tests, against the Node API.
+
+    Their fixtures (test/contract/conftest.py) write the data each test needs
+    into the database, so the suite depends neither on demo seeds nor on what
+    another step left behind (#229). The baseline is empty: any failing test
+    fails the step.
+    """
+    url = start_mongo(context, MONGO_CONTAINER, MONGO_PORT)
+    env, _, _ = contract_database(context, url, "omnifm_local_contract")
+    # The suite fires hundreds of requests from one address; the limiter
+    # would turn real failures into 429 noise.
+    base, scratch = start_node_api(context, "node-contract-api", NODE_CONTRACT_PORT, env,
+                                   API_RATE_LIMIT_MAX="10000", API_RATE_LIMIT_PREMIUM_MAX="1000",
+                                   API_RATE_LIMIT_OWNER_MAX="10000")
+    try:
+        completed = context.run(
+            venv_python(), "-m", "pytest", CONTRACT, "-q", "-p", "no:cacheprovider", "-rfE",
+            env={**env, "OMNIFM_RUN_BACKEND_CONTRACT_TESTS": "1", "OMNIFM_TEST_BASE_URL": base,
+                 "REACT_APP_BACKEND_URL": base, "OMNIFM_TEST_ADMIN_TOKEN": API_TOKEN},
+            check=False, timeout=1800)
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
     text = completed.stdout + completed.stderr
-    gaps = context.run(node, "scripts/check-api-routes.mjs", "--node-gaps", env=node_path_env(context, node),
-                       check=False, timeout=120)
-    path = context.log("node-contract-suite", text + "\n\n" + gaps.stdout)
-    shutil.rmtree(scratch, ignore_errors=True)
+    path = context.log("contract-suite", text)
     counts = pytest_counts(text)
     if completed.returncode not in (0, 1) or not (counts.get("passed") or counts.get("failed")):
-        raise StepFailed(f"pytest did not run the contract suite against Node. Full output: {path}\n" + tail(completed))
+        raise StepFailed(f"pytest did not run the contract suite. Full output: {path}\n" + tail(completed))
     failing = set(re.findall(r"^(?:FAILED|ERROR) (\S+)", text, re.M))
-    verdict = ratchet(context, "node-contract-suite", failing, "contract tests the Node API still fails")
-    return f"{describe_counts(counts)} against Node; {verdict}. Gap list: {path}"
+    verdict = ratchet(context, "contract-suite", failing, "failing contract tests")
+    return f"{describe_counts(counts)}; {verdict}. Full output: {path}"
 
 
-def check_owner_contract(in_mongo, run_mongo, base: str = "") -> None:
+def check_owner_contract(in_mongo, run_mongo, *, base: str) -> None:
     request = functools.partial(globals()["request"], base=base)
     _, _, health = request("GET", "/api/health")
     expect(health.get("ok") is True, f"/api/health is not ok: {health}")
@@ -1326,109 +1287,6 @@ def check_owner_contract(in_mongo, run_mongo, base: str = "") -> None:
            f"the OAuth login does not redirect to Discord: {location!r}")
 
 
-def node_owner_contract(context: Context) -> str:
-    """#288: the owner contract of backend/contract, driven against the Node API.
-
-    Node answers the owner console once #290 switches over, so the same walk
-    (masked secrets, licence, archive and restore, runtime health, OAuth
-    redirect) has to hold there too. Its own empty database, so nothing the
-    FastAPI steps left behind changes the counts.
-    """
-    if port_open(NODE_OWNER_CONTRACT_PORT):
-        raise StepSkipped(f"port {NODE_OWNER_CONTRACT_PORT} is taken; stop what uses it and run again")
-    url = start_mongo(context, MONGO_CONTAINER, MONGO_PORT)
-    env, in_mongo, run_mongo = contract_database(context, url, "omnifm_local_contract_node")
-    node = node_of(context, NODE_MAJOR)
-    scratch = Path(tempfile.mkdtemp(prefix="omnifm-node-owner-"))
-    base = f"http://127.0.0.1:{NODE_OWNER_CONTRACT_PORT}"
-    node_env = dict(node_path_env(context, node), **{
-        "MONGO_URL": url, "DB_NAME": env["DB_NAME"], "API_ADMIN_TOKEN": API_TOKEN,
-        "WEB_SERVER_ENABLED": "1", "WEB_BIND": "127.0.0.1", "WEB_INTERNAL_PORT": str(NODE_OWNER_CONTRACT_PORT),
-        "PUBLIC_WEB_URL": base, "OMNIFM_RUNTIME_DATA_DIR": str(scratch), "LOGS_DIR": str(scratch / "logs"),
-    })
-    start_process(context, "node-owner-api", [node, "scripts/serve-node-api.mjs"], cwd=ROOT, env=node_env,
-                  url=f"{base}/api/health", seconds=90)
-    try:
-        check_owner_contract(in_mongo, run_mongo, base=base)
-    finally:
-        shutil.rmtree(scratch, ignore_errors=True)
-    return "the owner contract holds end to end against Node"
-
-
-def node_dashboard_proxy(context: Context) -> str:
-    """#195: FastAPI forwards /api/auth and /api/dashboard to the Node API.
-
-    Production runs it that way (OMNIFM_DASHBOARD_BACKEND=node). This starts the
-    Node API alone (scripts/serve-node-api.mjs) and a second FastAPI in that
-    mode, then checks what the dashboard relies on: routes FastAPI never had
-    answer, the Node API's CSRF guard and origin check still hold, the owner
-    console stays in FastAPI, and a stopped Node API gives a clear 503.
-    """
-    env = context.cache.get("fastapi:env")
-    if not env:
-        raise StepSkipped("the FastAPI environment of backend/contract is missing")
-    for port in (NODE_API_PORT, PROXY_API_PORT):
-        if port_open(port):
-            raise StepSkipped(f"port {port} is taken; stop what uses it and run again")
-    node = node_of(context, NODE_MAJOR)
-    scratch = Path(tempfile.mkdtemp(prefix="omnifm-node-api-"))
-    proxy_base = f"http://127.0.0.1:{PROXY_API_PORT}"
-    node_env = dict(node_path_env(context, node), **{
-        "MONGO_URL": env["MONGO_URL"], "DB_NAME": env["DB_NAME"],
-        "WEB_SERVER_ENABLED": "1", "WEB_BIND": "127.0.0.1", "WEB_INTERNAL_PORT": str(NODE_API_PORT),
-        "TRUST_PROXY_HEADERS": "1", "TRUSTED_PROXY_IPS": "127.0.0.1,::1", "PUBLIC_WEB_URL": proxy_base,
-        "OMNIFM_RUNTIME_DATA_DIR": str(scratch), "LOGS_DIR": str(scratch / "logs"),
-    })
-    start_process(context, "node-api", [node, "scripts/serve-node-api.mjs"], cwd=ROOT, env=node_env,
-                  url=f"http://127.0.0.1:{NODE_API_PORT}/api/auth/session", seconds=90)
-    node_process = context.processes[-1][0]
-    proxy_env = dict(env, OMNIFM_DASHBOARD_BACKEND="node", OMNIFM_NODE_API_URL=f"http://127.0.0.1:{NODE_API_PORT}")
-    start_process(context, "fastapi-node-proxy", [venv_python(), "-m", "uvicorn", "backend.server:app", "--host",
-                                                  "127.0.0.1", "--port", str(PROXY_API_PORT)],
-                  cwd=ROOT, env=proxy_env, url=f"{proxy_base}/api/health", seconds=90)
-
-    def call(method: str, path: str, headers: dict | None = None, body: dict | None = None) -> tuple:
-        data = json.dumps(body).encode() if body is not None else None
-        prepared = urllib.request.Request(f"{proxy_base}{path}", data=data, method=method)
-        for key, value in (headers or {}).items():
-            prepared.add_header(key, value)
-        if data is not None:
-            prepared.add_header("Content-Type", "application/json")
-        try:
-            with urllib.request.build_opener(NoRedirect).open(prepared, timeout=30) as answer:
-                return answer.status, dict(answer.headers), parse_json(answer.read().decode("utf-8", "replace"))
-        except urllib.error.HTTPError as error:
-            return error.code, dict(error.headers), parse_json(error.read().decode("utf-8", "replace"))
-
-    server = "123456789012345678"
-    _, _, health = call("GET", "/api/health")
-    services = health.get("services", {})
-    expect(services.get("dashboardBackend") == "node" and services.get("dashboardApi") is True,
-           f"the proxy FastAPI does not report the Node API: {services}")
-    status, _, session = call("GET", "/api/auth/session")
-    expect(status == 200 and session.get("authenticated") is False,
-           f"/api/auth/session did not come from the Node API: {status} {session}")
-    status, _, answer = call("GET", f"/api/dashboard/capabilities?serverId={server}")
-    expect(status == 401, f"/api/dashboard/capabilities, which FastAPI never had, answered {status} {answer}")
-    status, _, answer = call("PUT", f"/api/dashboard/settings?serverId={server}",
-                             headers={"Origin": proxy_base}, body={"failoverChain": ["alpha"]})
-    expect(status == 403 and "CSRF" in str(answer.get("error", "")),
-           f"a dashboard change without the CSRF header was not refused by the Node API: {status} {answer}")
-    status, _, answer = call("GET", f"/api/dashboard/stats?serverId={server}", headers={"Origin": "https://evil.example"})
-    expect(status == 403, f"a foreign origin reached the dashboard: {status} {answer}")
-    status, _, _ = call("GET", "/api/admin/config", headers={"X-Admin-Token": API_TOKEN})
-    expect(status == 200, f"the owner console no longer answers from FastAPI: {status}")
-
-    node_process.terminate()
-    node_process.wait(timeout=20)
-    status, headers, answer = call("GET", "/api/auth/session")
-    retry_after = {key.lower(): value for key, value in headers.items()}.get("retry-after")
-    expect(status == 503 and answer.get("retryable") is True and retry_after == "5",
-           f"a stopped Node API did not give a clear 503: {status} {answer}")
-    shutil.rmtree(scratch, ignore_errors=True)
-    return "FastAPI forwards the dashboard to the Node API end to end"
-
-
 def node_public_entry(context: Context) -> str:
     """#290: the public Node entry (src/entrypoints/api.js) in front of the commander's Node API.
 
@@ -1508,25 +1366,18 @@ def node_public_entry(context: Context) -> str:
             expect(status == 200, f"{path} stopped with the commander ({status}); it belongs to the public entry")
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
-    return "the public Node entry answers and forwards like FastAPI, and outlives a commander restart"
+    return "the public Node entry answers and forwards, and outlives a commander restart"
 
 
-def backend_steps() -> list:
+def contract_steps() -> list:
     return [
-        Step("backend", "venv", f"Python {BACKEND_PYTHON} with backend/requirements.txt", backend_environment),
-        Step("backend", "compile", "Every backend module compiles", backend_compile, ("venv",)),
-        Step("backend", "unit", "The FastAPI unit tests", backend_unit, ("venv",)),
-        Step("backend", "contract", "The owner contract against a live server", fastapi_contract, ("venv",)),
-        Step("backend", "contract-suite", "The backend/tests contract suite against the same server",
-             fastapi_contract_suite, ("contract",)),
-        Step("backend", "node-dashboard", "FastAPI forwards the dashboard to the Node API",
-             node_dashboard_proxy, ("contract", "node/npm-ci")),
-        Step("backend", "node-public-entry", "The public Node entry in front of the commander (#290)",
+        Step("contract", "venv", f"Python {CONTRACT_PYTHON} with test/contract/requirements.txt", contract_environment),
+        Step("contract", "owner-contract", "The owner contract against the Node API",
+             owner_contract, ("venv", "node/npm-ci")),
+        Step("contract", "contract-suite", "The test/contract suite against the Node API",
+             contract_suite, ("venv", "node/npm-ci")),
+        Step("contract", "public-entry", "The public Node entry in front of the commander (#290)",
              node_public_entry, ("venv", "node/npm-ci")),
-        Step("backend", "node-owner-contract", "The owner contract against the Node API",
-             node_owner_contract, ("venv",)),
-        Step("backend", "node-contract", "The contract suite against the Node API (M10 gap list)",
-             node_contract_suite, ("contract", "node/npm-ci")),
     ]
 
 
@@ -1748,13 +1599,10 @@ def env_contract(context: Context) -> str:
         if commented:
             documented.add(commented.group(1))
     used: set = set()
-    for name in tracked(context, "src/*.js", "src/*.mjs", "scripts/*.mjs", "backend/*.py"):
+    for name in tracked(context, "src/*.js", "src/*.mjs", "scripts/*.mjs"):
         text = (ROOT / name).read_text(encoding="utf-8", errors="replace")
         for match in ENV_USE.finditer(text):
             used.add(match.group(1) or match.group(2))
-        if name.endswith(".py"):
-            used.update(re.findall(r"os\.environ(?:\.get)?[\(\[]\s*['\"]([A-Z][A-Z0-9_]*)['\"]", text))
-            used.update(re.findall(r"os\.getenv\(\s*['\"]([A-Z][A-Z0-9_]*)['\"]", text))
     return ratchet(context, "env-contract", used - documented - ENV_PROVIDED,
                    "settings read by the code but absent from .env.example")
 
@@ -1841,7 +1689,7 @@ def licence_inventory(context: Context) -> str:
 # they read. The registry needs no account; its rules can gain new checks over
 # time, which then show up as new findings like any other.
 SEMGREP_RULESETS = ("p/javascript", "p/nodejs", "p/python", "p/react", "p/secrets")
-SEMGREP_TARGETS = ("src", "backend", "scripts", "frontend/src")
+SEMGREP_TARGETS = ("src", "scripts", "frontend/src")
 LIVE_URL = "https://omnifm.xyz"
 
 
@@ -1957,19 +1805,22 @@ def extra_steps() -> list:
 # -------------------------------------------------------------------- wiring
 
 def plan(groups: set) -> list:
-    builders = {"repository": repository_steps, "node": node_steps, "backend": backend_steps,
+    builders = {"repository": repository_steps, "node": node_steps, "contract": contract_steps,
                 "frontend": frontend_steps, "extra": extra_steps}
     steps: list = []
     for group in GROUPS:
         if group in groups:
             steps += builders[group]()
+    wanted: set = set()
     if "extra" in groups:
         # The licence inventory reads node_modules, which the installs provide.
-        present = {step.key for step in steps}
-        needed = [step for step in node_steps() + frontend_steps()
-                  if step.key in ("node/node-version", "node/npm-ci", "frontend/npm-ci") and step.key not in present]
-        steps = needed + steps
-    return steps
+        wanted |= {"node/node-version", "node/npm-ci", "frontend/npm-ci"}
+    if "contract" in groups:
+        # The contract steps run the Node API from node_modules.
+        wanted |= {"node/node-version", "node/npm-ci"}
+    present = {step.key for step in steps}
+    needed = [step for step in node_steps() + frontend_steps() if step.key in wanted and step.key not in present]
+    return needed + steps
 
 
 def build_context(record: bool = False) -> Context:

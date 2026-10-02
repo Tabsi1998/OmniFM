@@ -13,8 +13,8 @@ concurrency:
 permissions:
   contents: read
 
-# Production architecture: React :3000, FastAPI :8001, MongoDB, and the
-# separate Node.js Discord runtime. CI gates every production component.
+# Production architecture: React :3000, the Node API :8001, MongoDB, and the
+# Node.js Discord runtime. CI gates every production component.
 jobs:
   syntax:
     name: syntax (node ${{ matrix.node-version }})
@@ -225,8 +225,8 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  fastapi-smoke:
-    name: FastAPI production smoke
+  contract:
+    name: API contract (Node)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -241,25 +241,43 @@ jobs:
           --health-retries 5
     env:
       MONGO_URL: mongodb://127.0.0.1:27017
-      DB_NAME: omnifm_ci_fastapi
+      DB_NAME: omnifm_ci_contract
       API_ADMIN_TOKEN: ci-owner-token
-      SEED_DEMO_DATA: 0
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: backend/requirements.txt
-      - name: Install backend dependencies
-        run: python -m pip install -r backend/requirements.txt
-      - name: Validate and smoke FastAPI
+          cache-dependency-path: test/contract/requirements.txt
+      - name: Install dependencies
+        run: |
+          npm ci
+          python -m pip install -r test/contract/requirements.txt
+      - name: Owner contract and contract suite against the Node API
         shell: bash
+        env:
+          WEB_SERVER_ENABLED: "1"
+          WEB_BIND: 127.0.0.1
+          WEB_INTERNAL_PORT: "8001"
+          PUBLIC_WEB_URL: http://127.0.0.1:8001
+          OMNIFM_RUNTIME_DATA_DIR: ${{ runner.temp }}/omnifm-runtime
+          LOGS_DIR: ${{ runner.temp }}/omnifm-runtime/logs
+          # The suite fires hundreds of requests from one address.
+          API_RATE_LIMIT_MAX: "10000"
+          API_RATE_LIMIT_PREMIUM_MAX: "1000"
+          API_RATE_LIMIT_OWNER_MAX: "10000"
         run: |
           set -euo pipefail
-          python -m py_compile backend/server.py backend/routers/*.py backend/services/*.py
-          python -m pytest backend/unit_tests -q
-          python -m uvicorn backend.server:app --host 127.0.0.1 --port 8001 >fastapi.log 2>&1 &
+          # Like start.sh: wait for MongoDB, prepare the database, then start.
+          node scripts/database.mjs wait 30
+          node scripts/database.mjs prepare
+          node scripts/serve-node-api.mjs >node-api.log 2>&1 &
           api_pid=$!
           trap 'kill "$api_pid" 2>/dev/null || true' EXIT
           for attempt in {1..30}; do
@@ -275,27 +293,32 @@ jobs:
           curl -fsS -X PUT -H 'X-Admin-Token: ci-owner-token' -H 'Content-Type: application/json' \
             --data '{"section":"system","data":{"discordOAuth":{"clientId":"123456789012345678","clientSecret":"••••••••","clientSecretSet":true,"redirectUri":"https://example.test/api/auth/discord/callback","scopes":"identify guilds"}}}' \
             http://127.0.0.1:8001/api/admin/config >/dev/null
-          python -c 'from pymongo import MongoClient; d=MongoClient("mongodb://127.0.0.1:27017").omnifm_ci_fastapi.owner_config.find_one({"_id":"global"}); o=d["system"]["discordOAuth"]; assert o["clientSecret"] == "ci-secret" and "clientSecretSet" not in o'
+          python -c 'from pymongo import MongoClient; d=MongoClient("mongodb://127.0.0.1:27017").omnifm_ci_contract.owner_config.find_one({"_id":"global"}); o=d["system"]["discordOAuth"]; assert o["clientSecret"] == "ci-secret" and "clientSecretSet" not in o'
           curl -fsS -X POST -H 'X-Admin-Token: ci-owner-token' -H 'Content-Type: application/json' \
             --data '{"integration":"songhistory"}' \
             http://127.0.0.1:8001/api/admin/integrations/test | python -c 'import json,sys; d=json.load(sys.stdin); assert d["ok"] and d["results"]["songHistory"]["ok"]'
           curl -fsS -X POST -H 'X-Admin-Token: ci-owner-token' -H 'Content-Type: application/json' \
             --data '{"email":"owner-contract@example.test","tier":"pro","months":1,"seats":1,"guildId":"123456789012345678"}' \
             http://127.0.0.1:8001/api/admin/licenses | python -c 'import json,sys; d=json.load(sys.stdin); assert d["ok"] and d["licenseKey"].startswith("OMNI-")'
-          python -c 'from pymongo import MongoClient; d=MongoClient("mongodb://127.0.0.1:27017").omnifm_ci_fastapi; e=d.server_entitlements.find_one({"_serverId":"123456789012345678"}); assert e and e["licenseId"].startswith("OMNI-")'
+          python -c 'from pymongo import MongoClient; d=MongoClient("mongodb://127.0.0.1:27017").omnifm_ci_contract; e=d.server_entitlements.find_one({"_serverId":"123456789012345678"}); assert e and e["licenseId"].startswith("OMNI-")'
           curl -fsS -H 'X-Admin-Token: ci-owner-token' 'http://127.0.0.1:8001/api/admin/licenses?full=1' | python -c 'import json,sys; d=json.load(sys.stdin); s=d["licenses"][0]["linkedServers"][0]; assert s["licenseResolved"] and s["effectivePlan"] == "pro"'
           license_key="$(curl -fsS -H 'X-Admin-Token: ci-owner-token' 'http://127.0.0.1:8001/api/admin/licenses?full=1' | python -c 'import json,sys; print(json.load(sys.stdin)["licenses"][0]["licenseKey"])')"
           archive_id="$(curl -fsS -X DELETE -H 'X-Admin-Token: ci-owner-token' "http://127.0.0.1:8001/api/admin/licenses/${license_key}" | python -c 'import json,sys; d=json.load(sys.stdin); assert d["ok"] and d["archiveId"].startswith("arc_"); print(d["archiveId"])')"
-          python -c 'from pymongo import MongoClient; d=MongoClient("mongodb://127.0.0.1:27017").omnifm_ci_fastapi; assert d.licenses.count_documents({}) == 0; assert d.data_archive.count_documents({"operationId":"'"$archive_id"'"}) == 2'
+          python -c 'from pymongo import MongoClient; d=MongoClient("mongodb://127.0.0.1:27017").omnifm_ci_contract; assert d.licenses.count_documents({}) == 0; assert d.data_archive.count_documents({"operationId":"'"$archive_id"'"}) == 2'
           curl -fsS -H 'X-Admin-Token: ci-owner-token' http://127.0.0.1:8001/api/admin/archive | python -c 'import json,sys; d=json.load(sys.stdin); assert d["count"] == 1 and d["archive"][0]["recordCount"] == 2'
           curl -fsS -X POST -H 'X-Admin-Token: ci-owner-token' -H 'Content-Type: application/json' --data '{}' "http://127.0.0.1:8001/api/admin/archive/${archive_id}/restore" | python -c 'import json,sys; d=json.load(sys.stdin); assert d["ok"] and d["restored"] == 2'
-          python -c 'from pymongo import MongoClient; d=MongoClient("mongodb://127.0.0.1:27017").omnifm_ci_fastapi; assert d.licenses.find_one({"_licenseId":"'"$license_key"'"}); assert d.server_entitlements.find_one({"_serverId":"123456789012345678"})'
-          python -c 'from datetime import datetime,timezone; from pymongo import MongoClient; d=MongoClient("mongodb://127.0.0.1:27017").omnifm_ci_fastapi; d.runtime_health.replace_one({"_id":"latest"},{"_id":"latest","at":datetime.now(timezone.utc).isoformat(),"process":{"cpuPct":7,"ramMb":128,"uptimeSec":60,"resourceModel":"shared-process"},"nodes":[{"botId":"1476192449721274472","index":1,"name":"OmniFM DJ","role":"commander","status":"online","pingMs":23,"guilds":1,"voiceConnections":1,"listeners":4,"guildDetails":[]}]},upsert=True)'
+          python -c 'from pymongo import MongoClient; d=MongoClient("mongodb://127.0.0.1:27017").omnifm_ci_contract; assert d.licenses.find_one({"_licenseId":"'"$license_key"'"}); assert d.server_entitlements.find_one({"_serverId":"123456789012345678"})'
+          python -c 'from datetime import datetime,timezone; from pymongo import MongoClient; d=MongoClient("mongodb://127.0.0.1:27017").omnifm_ci_contract; d.runtime_health.replace_one({"_id":"latest"},{"_id":"latest","at":datetime.now(timezone.utc).isoformat(),"process":{"cpuPct":7,"ramMb":128,"uptimeSec":60,"resourceModel":"shared-process"},"nodes":[{"botId":"1476192449721274472","index":1,"name":"OmniFM DJ","role":"commander","status":"online","pingMs":23,"guilds":1,"voiceConnections":1,"listeners":4,"guildDetails":[]}]},upsert=True)'
           curl -fsS -H 'X-Admin-Token: ci-owner-token' http://127.0.0.1:8001/api/admin/workers | python -c 'import json,sys; d=json.load(sys.stdin); w=d["workers"][0]; assert d["live"] and w["ready"] and w["servers"] == 1 and w["listeners"] == 4 and w["connections"] == 1'
           curl -fsS -H 'X-Admin-Token: ci-owner-token' http://127.0.0.1:8001/api/admin/monitoring | python -c 'import json,sys; d=json.load(sys.stdin); n=d["nodes"][0]; assert d["live"] and n["resourceScope"] == "shared-process" and n["cpuPct"] is None and n["ramMb"] is None and n["listeners"] == 4'
           test "$(curl -sS -o /tmp/invalid-license.json -w '%{http_code}' -X POST -H 'X-Admin-Token: ci-owner-token' -H 'Content-Type: application/json' --data '{"email":"invalid-guild@example.test","tier":"pro","months":1,"seats":1,"guildId":"1"}' http://127.0.0.1:8001/api/admin/licenses)" = "400"
           curl -sS -D /tmp/oauth-headers.txt -o /dev/null 'http://127.0.0.1:8001/api/auth/discord/login?redirect=1&nextPage=dashboard'
           grep -Eiq '^location: https://discord.com/' /tmp/oauth-headers.txt
-          # The owner contract suite of backend/tests against the same server (#229).
+          # The contract suite of test/contract against the same API (#229).
           # Its fixtures write their own data into this CI database.
-          OMNIFM_RUN_BACKEND_CONTRACT_TESTS=1 OMNIFM_TEST_BASE_URL=http://127.0.0.1:8001             REACT_APP_BACKEND_URL=http://127.0.0.1:8001 OMNIFM_TEST_ADMIN_TOKEN=ci-owner-token             python -m pytest backend/tests -q -rfE -p no:cacheprovider
+          OMNIFM_RUN_BACKEND_CONTRACT_TESTS=1 OMNIFM_TEST_BASE_URL=http://127.0.0.1:8001 \
+            REACT_APP_BACKEND_URL=http://127.0.0.1:8001 OMNIFM_TEST_ADMIN_TOKEN=ci-owner-token \
+            python -m pytest test/contract -q -rfE -p no:cacheprovider
+      - name: Node API log
+        if: failure()
+        run: cat node-api.log || true

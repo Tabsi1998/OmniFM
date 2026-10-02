@@ -31,7 +31,7 @@ describe('owner console sign-in', () => {
     expect(screen.getByTestId('admin-token-input')).toBeTruthy();
   });
 
-  it('keeps only the token where the server has no Discord sign-in (FastAPI, way back of #290)', async () => {
+  it('keeps only the token where the server has no Discord sign-in', async () => {
     mockSession(404, { detail: 'Not Found' });
     render(<OwnerAdmin />);
     expect(await screen.findByTestId('admin-token-input')).toBeTruthy();

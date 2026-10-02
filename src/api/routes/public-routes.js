@@ -16,11 +16,11 @@ import { normalizeOwnerSeasons } from "../../lib/seasons.js";
 import { websiteChart, websiteCover, websiteMarketing } from "../../lib/public-images.js";
 import { ownerSettings } from "../../lib/owner-settings-cache.js";
 
-/** The API contract the owner console and start.sh expect; FastAPI's BACKEND_CONTRACT_VERSION. */
+/** The API contract the owner console and start.sh expect. */
 export const BACKEND_CONTRACT_VERSION = "owner-live-v5";
 
 /**
- * The live numbers for the website, like FastAPI: the bots' health document
+ * The live numbers for the website: the bots' health document
  * in MongoDB (all processes of a split setup, fresh for 30 seconds). Without
  * one (no MongoDB, or right after the start) the ready bots of this process
  * stand in; with none of them the numbers stay 0.
@@ -266,7 +266,7 @@ export function createPublicRoutesHandler(deps) {
         methodNotAllowed(res, ["GET"]);
         return true;
       }
-      // FastAPI's answer (contract, release, services, 503 when MongoDB is gone),
+      // Contract, release and services, 503 when MongoDB is gone,
       // plus the bots of this process. MongoDB counts when MONGO_URL names it
       // and this process asked for it; a process on the JSON files stays ready.
       const readyBots = runtimes.filter((runtime) => runtime.client.isReady()).length;
@@ -284,7 +284,7 @@ export function createPublicRoutesHandler(deps) {
           api: true,
           mongo,
           dashboardBackend: "node",
-          // The public entry reports whether the commander answers (FastAPI's dashboardApi).
+          // The public entry reports whether the commander answers.
           ...await getRuntimeApiStatus?.().then((reachable) => (reachable === null ? {} : { dashboardApi: reachable })),
         },
         timestamp: new Date().toISOString(),

@@ -16,7 +16,7 @@ def pytest_configure(config):
         return
 
     pytest.exit(
-        "backend/tests expects a running isolated FastAPI/Mongo test stack. "
+        "test/contract expects a running isolated Node API and MongoDB test stack. "
         "Set OMNIFM_RUN_BACKEND_CONTRACT_TESTS=1 and OMNIFM_TEST_BASE_URL to run it intentionally.",
         returncode=5,
     )
@@ -37,7 +37,7 @@ def _admin_session():
 
 @pytest.fixture(scope="session")
 def contract_db():
-    """The MongoDB database of the FastAPI under test."""
+    """The MongoDB database of the API under test."""
     url = os.environ.get("MONGO_URL")
     name = os.environ.get("DB_NAME")
     if not url or not name:
@@ -138,15 +138,18 @@ def configured_bot(contract_db):
 
 @pytest.fixture
 def discord_oauth(contract_db):
-    """A Discord OAuth application in the owner configuration."""
+    """A Discord OAuth application in the owner configuration.
+
+    Saved through the owner API, the way the console saves it: the API takes
+    the new values at once. Written straight into MongoDB they would only
+    arrive with its next periodic read, half a minute later.
+    """
     before = (contract_db.owner_config.find_one({"_id": "global"}, {"system": 1}) or {}).get("system") or {}
-    contract_db.owner_config.update_one(
-        {"_id": "global"},
-        {"$set": {"system.discordOAuth": {"clientId": CI_BOT_CLIENT_ID, "clientSecret": "ci-secret",
-                                          "redirectUri": "https://example.test/api/auth/discord/callback",
-                                          "scopes": "identify guilds"}}},
-        upsert=True,
-    )
+    oauth = {"clientId": CI_BOT_CLIENT_ID, "clientSecret": "ci-secret",
+             "redirectUri": "https://example.test/api/auth/discord/callback", "scopes": "identify guilds"}
+    response = _admin_session().put(f"{_base_url()}/api/admin/config",
+                                    json={"section": "system", "data": {"discordOAuth": oauth}}, timeout=10)
+    assert response.status_code == 200, f"saving the OAuth application failed: {response.status_code} {response.text[:200]}"
     yield
     if "discordOAuth" in before:
         contract_db.owner_config.update_one({"_id": "global"}, {"$set": {"system.discordOAuth": before["discordOAuth"]}})

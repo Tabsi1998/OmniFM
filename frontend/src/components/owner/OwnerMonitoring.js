@@ -29,11 +29,10 @@ export default function OwnerMonitoring({
         <div data-testid="monitoring-panel">
           {(() => {
             const live = monitoring.live;
-            const sim = monitoring.simulated;
-            const bg = live ? 'rgba(16,185,129,0.12)' : sim ? 'rgba(245,158,11,0.12)' : 'rgba(100,116,139,0.12)';
-            const bd = live ? 'rgba(16,185,129,0.4)' : sim ? 'rgba(245,158,11,0.4)' : '#2a3450';
-            const col = live ? '#4ade80' : sim ? '#fbbf24' : '#94a3b8';
-            const label = live ? 'LIVE · echte Node-Telemetrie' : sim ? 'DEMO · simulierte Werte (SEED_DEMO_DATA)' : 'KEINE LIVE-DATEN';
+            const bg = live ? 'rgba(16,185,129,0.12)' : 'rgba(100,116,139,0.12)';
+            const bd = live ? 'rgba(16,185,129,0.4)' : '#2a3450';
+            const col = live ? '#4ade80' : '#94a3b8';
+            const label = live ? 'LIVE · echte Node-Telemetrie' : 'KEINE LIVE-DATEN';
             return (
               <div data-testid="monitoring-banner" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: bg, border: `1px solid ${bd}`, color: col, fontSize: 12.5, fontWeight: 700, marginBottom: 16, fontFamily: "'JetBrains Mono',monospace" }}>
                 <span className="oa-dot" style={{ background: col }} /> {label}
@@ -49,8 +48,8 @@ export default function OwnerMonitoring({
           <div className="oa-grid cols-4">
             <StatTile testid="mon-nodes" label="Healthy Nodes" value={`${monitoring.health.healthyNodes}/${monitoring.health.totalNodes}`} icon={HeartPulse} accent="#10b981"
               foot={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span className="oa-dot" style={{ background: '#10b981' }} /> Echtzeit · alle 5s</span>} />
-            <StatTile testid="mon-uptime" label={monitoring.live ? 'Prozess-Uptime' : 'Uptime'} value={monitoring.live ? fmtUptime(monitoring.health.uptimeSec) : (monitoring.simulated ? `${monitoring.health.uptimePct}%` : '—')} icon={TrendingUp} accent="#00e5ff" foot={<span>{monitoring.live ? 'seit letztem Start' : '30-Tage rollierend'}</span>} />
-            <StatTile testid="mon-latency" label={monitoring.live ? (monitoring.process?.resourceModel === 'split-processes' ? 'RAM (alle Bots)' : 'RAM (Prozess)') : 'API-Latenz'} value={monitoring.live ? `${monitoring.process?.totalRamMb ?? monitoring.process?.ramMb ?? 0} MB` : (monitoring.simulated ? `${monitoring.health.apiLatencyMs} ms` : '—')} icon={Gauge} accent="#ff6b00" foot={<span>{monitoring.live ? (monitoring.process?.resourceModel === 'split-processes' ? `${monitoring.process?.processCount || 0} getrennte Prozesse` : 'geteilt für alle Bots') : 'Commander → API'}</span>} />
+            <StatTile testid="mon-uptime" label={monitoring.live ? 'Prozess-Uptime' : 'Uptime'} value={monitoring.live ? fmtUptime(monitoring.health.uptimeSec) : '—'} icon={TrendingUp} accent="#00e5ff" foot={<span>{monitoring.live ? 'seit letztem Start' : '30-Tage rollierend'}</span>} />
+            <StatTile testid="mon-latency" label={monitoring.live ? (monitoring.process?.resourceModel === 'split-processes' ? 'RAM (alle Bots)' : 'RAM (Prozess)') : 'API-Latenz'} value={monitoring.live ? `${monitoring.process?.totalRamMb ?? monitoring.process?.ramMb ?? 0} MB` : '—'} icon={Gauge} accent="#ff6b00" foot={<span>{monitoring.live ? (monitoring.process?.resourceModel === 'split-processes' ? `${monitoring.process?.processCount || 0} getrennte Prozesse` : 'geteilt für alle Bots') : 'Commander → API'}</span>} />
             <StatTile testid="mon-incidents" label="Offene Incidents" value={monitoring.health.openIncidents} icon={AlertTriangle} accent={monitoring.health.openIncidents ? '#ff2a5f' : '#10b981'} foot={<span>{monitoring.incidents.length} in Historie</span>} />
           </div>
 
@@ -224,7 +223,7 @@ export default function OwnerMonitoring({
             </div>
           </div>
           <div style={{ marginTop: 12, color: '#94a3b8', fontSize: 11 }} className="oa-mono">
-            {monitoring.simulated ? 'SIMULIERTE TELEMETRIE · echte Node-Runtime-Daten überschreiben diese Werte automatisch' : 'LIVE NODE TELEMETRY'} · Stand {new Date(monitoring.generatedAt).toLocaleTimeString('de-DE')}
+            LIVE NODE TELEMETRY · Stand {new Date(monitoring.generatedAt).toLocaleTimeString('de-DE')}
           </div>
         </div>
       )}
