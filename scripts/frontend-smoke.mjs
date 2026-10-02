@@ -177,6 +177,28 @@ try {
     await context.close();
   }
 
+  // #497: the header's menu switches the start page to French in place, and
+  // the choice still counts on the next visit, whatever the browser says.
+  {
+    const context = await browser.newContext({ locale: "de-DE", serviceWorkers: "block" });
+    const tab = await context.newPage();
+    try {
+      await tab.goto(`${base}/`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+      await tab.click('[data-testid="language-menu-button"]', { timeout: 20_000 });
+      await tab.click('[data-testid="language-option-fr"]', { timeout: 5_000 });
+      // In the page: globalThis is its window.
+      await tab.waitForFunction(() => globalThis.document.documentElement.lang === "fr"
+        && new URL(globalThis.location.href).searchParams.get("lang") === "fr", null, { timeout: 10_000 });
+      await tab.goto(`${base}/`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+      await tab.waitForFunction(() => globalThis.document.documentElement.lang === "fr", null, { timeout: 10_000 });
+      console.log("ok  Sprachwahl (/): Französisch gewählt, beim nächsten Besuch noch da");
+    } catch (error) {
+      problems.push(`Sprachwahl (/): ${String(error.message).split("\n")[0]}`);
+    } finally {
+      await context.close();
+    }
+  }
+
   // #305: Chrome's own check whether the site installs as an app, and the
   // service worker that keeps the build files takes over.
   const context = await browser.newContext({ locale: "de-DE" });

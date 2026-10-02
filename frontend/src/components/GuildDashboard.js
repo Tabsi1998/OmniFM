@@ -23,6 +23,7 @@ import { PLAN_LIMITS, PLAN_NAMES } from '../../../src/config/plan-features.js';
 import PlanLock from './PlanLock.js';
 import GuildStreamControls from './overview/GuildStreamControls.js';
 import SeasonBadge from './season/SeasonBadge.js';
+import { LanguageSelect } from './LanguageMenu.js';
 
 const NAV = [
   { id: 'overview', icon: LayoutDashboard },
@@ -539,6 +540,7 @@ export default function GuildDashboard() {
       <p style={{ color: '#94a3b8', fontSize: 14, lineHeight: 1.55 }}>{t('Melde dich mit Discord an. Alle angezeigten Daten stammen live aus OmniFM und deiner Lizenz.', 'Sign in with Discord. All displayed data comes live from OmniFM and your license.')}</p>
       <a href={buildApiUrl('/api/auth/discord/login?redirect=1&nextPage=dashboard')} className="oa-btn primary" style={{ width: '100%', marginTop: 18, background: 'linear-gradient(135deg,#5865f2,#4752c4)', color: '#fff' }} data-testid="guild-discord-login">{t('Mit Discord anmelden', 'Continue with Discord')}</a>
       <div style={{ marginTop: 16, textAlign: 'center' }}><a href="/" className="oa-mono" style={{ fontSize: 11, color: '#8190a8' }}>← {t('Zurück zur Website', 'Back to website')}</a></div>
+      <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center' }}><LanguageSelect /></div>
     </div></div></div>
   );
 
@@ -574,6 +576,7 @@ export default function GuildDashboard() {
             {/* The season's badge asks the server for the owner's switches; the preview asks nothing. */}
             {demo ? null : <SeasonBadge />}
             <span className="oa-pill" style={{ background: `${tm.color}22`, color: tm.color, border: `1px solid ${tm.color}55` }} data-testid="guild-active-tier"><tm.icon size={13} /> {tm.name}</span>
+            <LanguageSelect />
             <select className="oa-input" style={{ height: 40, width: 'auto', maxWidth: 'min(360px, 100%)', minWidth: 0 }} value={guildId} onChange={(event) => setGuildId(event.target.value)} aria-label={t('Server', 'Server')} data-testid="guild-switcher">{session.guilds.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.id}</option>)}</select>
           </div>
         </div>
