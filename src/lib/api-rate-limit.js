@@ -83,6 +83,15 @@ export function getApiRateLimitSpec(pathname) {
       windowMs: parseEnvInt("API_RATE_LIMIT_ACTIVITY_WINDOW_MS", 60_000, 1_000, 10 * 60_000),
     };
   }
+  if (pathname.startsWith("/api/dashboard/")) {
+    // A signed-in server admin: the live view alone asks every few seconds,
+    // every area loads several answers; 60 a minute ran out while clicking (#485).
+    return {
+      scope: "dashboard",
+      max: parseEnvInt("API_RATE_LIMIT_DASHBOARD_MAX", 300, 1, 10_000),
+      windowMs: parseEnvInt("API_RATE_LIMIT_DASHBOARD_WINDOW_MS", 60_000, 1_000, 10 * 60_000),
+    };
+  }
   if (pathname.startsWith("/api/premium/")) {
     return {
       scope: "premium",
@@ -136,6 +145,8 @@ export function enforceApiRateLimit(req, res, pathname) {
 
   entry.count += 1;
   if (entry.count > spec.max) {
+    // When to ask again: the website waits that long instead of asking on (#485).
+    res.setHeader?.("Retry-After", String(Math.max(1, Math.ceil((entry.windowStart + spec.windowMs - now) / 1000))));
     sendJson(res, 429, { error: "Too many requests. Please try again later." });
     return false;
   }

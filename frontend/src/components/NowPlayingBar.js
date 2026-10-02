@@ -4,7 +4,7 @@ import { resolvePrimaryInviteUrl } from '../lib/invite.js';
 import { useI18n } from '../i18n.js';
 import { useShowcaseStations } from '../lib/showcase.js';
 import { audioErrorText, usePlayer } from '../lib/player.js';
-import { buildApiUrl } from '../lib/api.js';
+import { coverFor } from '../lib/coverCache.js';
 
 const barCss = `
 @keyframes npbar-eq { 0%,100%{transform:scaleY(0.3);} 50%{transform:scaleY(1);} }
@@ -62,9 +62,8 @@ export default function NowPlayingBar({ bots = [] }) {
     let stop = false;
     setCover(null);
     if (!stationName) return undefined;
-    fetch(buildApiUrl(`/api/cover?term=${encodeURIComponent(stationName)}`))
-      .then((r) => r.json()).then((d) => { if (!stop && d && d.ok && d.artwork) setCover(d.artwork); })
-      .catch(() => {});
+    // Each name once per visit, shared with the player above (#485).
+    coverFor(stationName).then((artwork) => { if (!stop && artwork) setCover(artwork); });
     return () => { stop = true; };
   }, [stationName]);
 
