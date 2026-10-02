@@ -31,7 +31,7 @@ function SiteFooter({ legal }) {
         >
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-              <img src="/brand/omnifm-wordmark-dark.png" alt="OmniFM" style={{ height: 30, width: 'auto', display: 'block' }} data-testid="footer-logo" />
+              <img src="/brand/omnifm-wordmark-dark.png" alt="OmniFM" width={104} height={30} loading="lazy" decoding="async" style={{ height: 30, width: 'auto', display: 'block' }} data-testid="footer-logo" />
             </div>
             {operatorName && (
               <p data-testid="footer-operator" style={{ margin: 0, color: '#80808A', fontSize: 12, lineHeight: 1.6 }}>
