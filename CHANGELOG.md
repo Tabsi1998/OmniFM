@@ -6,6 +6,45 @@ folgt [SemVer](https://semver.org/lang/de/): Die erste Zahl steigt bei
 Funktionen, die dritte bei reinen Fehlerbehebungen. Wie ein Release entsteht,
 steht in `scripts/release.mjs`.
 
+## 3.16.0 – 2026-10-02
+
+Die Bitrate des Plans kommt jetzt wirklich bei Discord an, und die Website
+lädt nichts mehr von Google, Apple oder den Sendern: schneller und ohne
+Datenweitergabe.
+
+### Neu
+
+- **Schriften vom eigenen Server:** Die Website lädt ihre Schriften nicht
+  mehr bei Google Fonts. Bisher ging bei jedem Besuch die IP-Adresse an
+  Google, und das fremde Stylesheet hielt den Seitenaufbau auf. Jetzt ist
+  der erste Inhalt der Startseite auf dem Handy nach 2,1 statt 3,2 Sekunden
+  da (Lighthouse 89 statt rund 81). Die Cookie-Leiste erscheint zusammen
+  mit der Seite statt einen Moment später. (#467)
+- **Cover und Logos vom eigenen Server:** Cover (bisher von Apple),
+  Senderlogos (von den Sendern) und Partner-Logos lädt die Website jetzt
+  über omnifm.xyz. Der Browser der Besucher verbindet sich dafür mit
+  niemandem sonst. Der Server holt nur Bilder, die er selbst kennt, und hält
+  sie einen Tag vor. (#469)
+- **Jingle-Prototyp:** ein Messwerkzeug für eigene Senderkennungen. Ein
+  Jingle über laufender Musik verursacht keine Aussetzer; die Messwerte
+  stehen in #309. Am Bot ändert sich dadurch noch nichts. (#309)
+
+### Behoben
+
+- **Die Bitrate des Plans kommt bei Discord an:** Bisher sendeten alle
+  Pläne mit rund 99 kbit/s, weil der Bot das Audio für die Lautstärke neu
+  kodiert und dieser Encoder immer mit seinem Standardwert lief. Jetzt sind
+  es 64 kbit/s (Free), 128 kbit/s (Pro) und bis 320 kbit/s (Ultimate), wie
+  die Pläne es versprechen. ffmpeg liefert dafür standardmäßig PCM: Das
+  Audio wird nur noch einmal kodiert, und ffmpeg braucht weniger als halb so
+  viel CPU. Mit `TRANSCODE_MODE=opus` geht es zurück zum alten Weg, die
+  richtige Bitrate bleibt auch dann. (#464)
+- **Sicherheitsupdate:** brace-expansion 1.1.21 in beiden Teilen
+  (drei neue Warnungen, zwei davon hoch). (#466)
+- **Dashboard-Tour:** Sie lädt das Dashboard erst, wenn sie einen Moment im
+  Bild bleibt. Die Preisseite lädt es dadurch nicht mehr nebenbei, und wer
+  vorbeiscrollt, lädt nichts. (#467)
+
 ## 3.15.0 – 2026-09-29
 
 Melden direkt aus Discord, zuerst privat beim Team, und die Ostereiersuche
