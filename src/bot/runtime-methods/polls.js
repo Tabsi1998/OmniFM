@@ -103,7 +103,7 @@ const pollMethods = {
       if (resolved.unknown.length) {
         await this.respondInteraction(interaction, buildNoticePayload({
           t, language, tone: "warning", title: t("Sender nicht gefunden", "Station not found"),
-          description: t(`Diese Sender kenne ich (auf eurem Plan) nicht: ${resolved.unknown.join(", ")}`, `I do not know these stations (on your plan): ${resolved.unknown.join(", ")}`),
+          description: t("Diese Sender kenne ich (auf eurem Plan) nicht: {stations}", "I do not know these stations (on your plan): {stations}", { stations: resolved.unknown.join(", ") }),
         }));
         return;
       }

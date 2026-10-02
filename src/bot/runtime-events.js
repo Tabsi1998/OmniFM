@@ -177,8 +177,8 @@ export function resolveStationForGuild(runtime, guildId, rawStationKey, language
       return {
         ok: false,
         message: anyInCatalog
-          ? t(`Dein Plan hat gerade keinen ${name}.`, `Your plan has no ${name} right now.`)
-          : t(`Im Katalog steht gerade kein ${name}.`, `The catalogue has no ${name} right now.`),
+          ? t("Dein Plan hat gerade keinen {station}.", "Your plan has no {station} right now.", { station: name })
+          : t("Im Katalog steht gerade kein {station}.", "The catalogue has no {station} right now.", { station: name }),
       };
     }
     const key = keys[Math.min(keys.length - 1, Math.floor(random() * keys.length))];
@@ -209,7 +209,7 @@ export function resolveStationForGuild(runtime, guildId, rawStationKey, language
       const validation = validateCustomStationUrl(custom.url);
       if (!validation.ok) {
         const translated = translateCustomStationErrorMessage(validation.error, language);
-        return { ok: false, message: t(`Custom-Station kann nicht genutzt werden: ${translated}`, `Custom station cannot be used: ${translated}`) };
+        return { ok: false, message: t("Custom-Station kann nicht genutzt werden: {reason}", "Custom station cannot be used: {reason}", { reason: translated }) };
       }
       const station = { name: custom.name, url: validation.url, tier: "ultimate", genre: custom.genre || "", logo: customStationLogoUrl(guildId, stationRef.lookupKey, custom) };
       const resolvedKey = buildCustomStationReference(stationRef.lookupKey) || stationRef.key;
@@ -227,16 +227,16 @@ export function resolveStationForGuild(runtime, guildId, rawStationKey, language
     return {
       ok: false,
       message: t(
-        `Station \`${stationRef.key}\` ist in deinem Plan nicht verfügbar.`,
-        `Station \`${stationRef.key}\` is not available in your plan.`
+        "Station `{station}` ist in deinem Plan nicht verfügbar.",
+        "Station `{station}` is not available in your plan.", { station: stationRef.key }
       )
     };
   }
   return {
     ok: false,
     message: t(
-      `Station \`${stationRef.key}\` wurde nicht gefunden.`,
-      `Station \`${stationRef.key}\` was not found.`
+      "Station `{station}` wurde nicht gefunden.",
+      "Station `{station}` was not found.", { station: stationRef.key }
     )
   };
 }
@@ -365,18 +365,19 @@ export function validateDiscordScheduledEventPermissions(runtime, guild, channel
   if (!missing.length && isStageChannel(channel) && missingStageModeratorPermissions(channel, me).length) {
     // Checked in the channel: Discord gives these rights as "Stage moderator"
     // there, so checking the server-wide role blocked Stage events.
-    return languagePick(
+    return `${languagePick(
       language,
-      `Für ein Discord-Server-Event in ${channel.toString()} muss ${runtime.config?.name || "OmniFM"} dort Stage-Moderator sein.\n${stageModeratorHowTo("de")}`,
-      `For a Discord server event in ${channel.toString()}, ${runtime.config?.name || "OmniFM"} has to be a Stage moderator there.\n${stageModeratorHowTo("en")}`
-    );
+      "Für ein Discord-Server-Event in {channel} muss {bot} dort Stage-Moderator sein.",
+      "For a Discord server event in {channel}, {bot} has to be a Stage moderator there.",
+      { channel: channel.toString(), bot: runtime.config?.name || "OmniFM" }
+    )}\n${stageModeratorHowTo(language)}`;
   }
 
   if (!missing.length) return null;
   return languagePick(
     language,
-    `Discord-Server-Event nicht möglich. Fehlende Rechte: ${missing.join(", ")}.`,
-    `Discord server event is not possible. Missing permissions: ${missing.join(", ")}.`
+    "Discord-Server-Event nicht möglich. Fehlende Rechte: {missing}.",
+    "Discord server event is not possible. Missing permissions: {missing}.", { missing: missing.join(", ") }
   );
 }
 
@@ -390,7 +391,7 @@ export function buildScheduledEventSummary(runtime, event, stationName, language
   const status = !event?.enabled
     ? languagePick(language, "pausiert", "paused")
     : isActive
-      ? `${languagePick(language, "aktiv bis", "active until")} ${runtime.formatDiscordTimestamp(effectiveEndAtMs, "F")}`
+      ? languagePick(language, "aktiv bis {date}", "active until {date}", { date: runtime.formatDiscordTimestamp(effectiveEndAtMs, "F") })
       : languagePick(language, "geplant", "scheduled");
   const stationLine = stationName && stationName !== event?.stationKey
     ? `\`${event?.stationKey || "-"}\` (${stationName})`
@@ -516,7 +517,9 @@ export function buildScheduledEventsListEmbed(runtime, events, guildId, language
     .setColor(BRAND.color)
     .setAuthor(brandAuthor(languagePick(language, "OmniFM · Events", "OmniFM · Events")))
     .setTitle(languagePick(language, "🗓️ Geplante Events", "🗓️ Scheduled events"))
-    .setDescription(`${events.length} ${languagePick(language, "Eintrag(e) auf diesem Server", "item(s) on this server")}`)
+    .setDescription(events.length === 1
+      ? languagePick(language, "1 Eintrag auf diesem Server", "1 event on this server")
+      : languagePick(language, "{count} Einträge auf diesem Server", "{count} events on this server", { count: events.length }))
     .setFooter(brandFooter(`${runtime.config.name} · /event list`))
     .setTimestamp(new Date());
 
@@ -545,8 +548,8 @@ export function buildScheduledEventsListEmbed(runtime, events, guildId, language
       name: languagePick(language, "Weitere Events", "More events"),
       value: languagePick(
         language,
-        `${events.length - fields.length} weitere Events sind vorhanden. Nutze \`/event edit\` oder \`/event delete\` mit der Event-ID.`,
-        `${events.length - fields.length} more events exist. Use \`/event edit\` or \`/event delete\` with the event ID.`
+        "{count} weitere Events sind vorhanden. Nutze `/event edit` oder `/event delete` mit der Event-ID.",
+        "{count} more events exist. Use `/event edit` or `/event delete` with the event ID.", { count: events.length - fields.length }
       ),
       inline: false,
     });

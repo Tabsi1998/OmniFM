@@ -56,9 +56,10 @@ const shareMethods = {
         guildName: interaction.guild?.name || "",
         color: station.color,
         coverUrl: song.artworkUrl || station.logo || null,
+        language,
         t,
       })
-      : await renderStationCard({ key: stationKey, name: stationName, genre: station.genre, color: station.color, logoUrl: station.logo, t });
+      : await renderStationCard({ key: stationKey, name: stationName, genre: station.genre, color: station.color, logoUrl: station.logo, language, t });
 
     const components = [];
     if (official) {
@@ -69,7 +70,7 @@ const shareMethods = {
     }
     const content = song
       ? `🎧 **${song.title || song.displayTitle}**${song.title && song.artist ? ` – ${song.artist}` : ""} · 📻 ${stationName}`
-      : t(`📻 Gerade läuft **${stationName}**`, `📻 Now playing **${stationName}**`);
+      : t("📻 Gerade läuft **{station}**", "📻 Now playing **{station}**", { station: stationName });
     await interaction.editReply({
       content: content.slice(0, 1900),
       files: [{ attachment: png, name: "omnifm-jetzt-laeuft.png" }],

@@ -29,6 +29,7 @@ import {
   buildStreamingRuntimeSelectionPayload,
   getLicense,
 } from "./command-helpers.js";
+import { botLocale } from "../../lib/bot-i18n.js";
 
 /** /help */
 async function handleHelpCommand({ runtime, interaction }) {
@@ -125,7 +126,7 @@ async function handleInviteCommand({ runtime, interaction, t, language }) {
       language,
       tone: "warning",
       title: t("🔎 Worker nicht gefunden", "🔎 Worker not found"),
-      description: t(`Worker ${workerIndex} ist nicht konfiguriert.`, `Worker ${workerIndex} is not configured.`),
+      description: t("Worker {worker} ist nicht konfiguriert.", "Worker {worker} is not configured.", { worker: workerIndex }),
     }));
     return;
   }
@@ -138,8 +139,8 @@ async function handleInviteCommand({ runtime, interaction, t, language }) {
       tone: "info",
       title: t("💎 Höherer Plan nötig", "💎 Higher plan required"),
       description: t(
-        `Worker ${workerIndex} erfordert mindestens **${requiredTier}**. Dein Plan erlaubt Worker 1-${maxIndex}.`,
-        `Worker ${workerIndex} requires at least **${requiredTier}**. Your plan allows workers 1-${maxIndex}.`
+        "Worker {worker} erfordert mindestens **{plan}**. Dein Plan erlaubt Worker 1-{max}.",
+        "Worker {worker} requires at least **{plan}**. Your plan allows workers 1-{max}.", { worker: workerIndex, plan: requiredTier, max: maxIndex }
       ),
       supportActions: { includeDashboard: true, includePremium: true, includeSupport: true },
     }));
@@ -169,8 +170,8 @@ async function handleInviteCommand({ runtime, interaction, t, language }) {
       tone: "info",
       title: t("✅ Worker bereits eingeladen", "✅ Worker already invited"),
       description: t(
-        `**${worker.config.name}** ist bereits auf diesem Server.`,
-        `**${worker.config.name}** is already on this server.`
+        "**{worker}** ist bereits auf diesem Server.",
+        "**{worker}** is already on this server.", { worker: worker.config.name }
       ),
       extraComponents: [row],
     }));
@@ -178,7 +179,7 @@ async function handleInviteCommand({ runtime, interaction, t, language }) {
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setStyle(ButtonStyle.Link)
-        .setLabel(t(`Invite ${worker.config.name}`, `Invite ${worker.config.name}`))
+        .setLabel(t("Invite {worker}", "Invite {worker}", { worker: worker.config.name }))
         .setURL(inviteUrl),
       new ButtonBuilder()
         .setCustomId(INVITE_COMPONENT_ID_OPEN)
@@ -191,8 +192,8 @@ async function handleInviteCommand({ runtime, interaction, t, language }) {
       tone: "success",
       title: t("📨 Worker bereit", "📨 Worker ready"),
       description: t(
-        `Worker **${worker.config.name}** ist bereit zum Einladen.`,
-        `Worker **${worker.config.name}** is ready to invite.`
+        "Worker **{worker}** ist bereit zum Einladen.",
+        "Worker **{worker}** is ready to invite.", { worker: worker.config.name }
       ),
       fields: [
         {
@@ -312,7 +313,7 @@ async function handleHistoryCommand({ runtime, interaction, t, language }) {
   const payload = runtime.buildSongHistoryEmbed(history, interaction.guildId, playback.runtime, language);
   const proSongs = PLAN_LIMITS.pro.historySongs;
   const more = requestedLimit > planSongs && planSongs < proSongs
-    ? t(`Mit **Pro** siehst du die letzten ${proSongs} Songs.`, `With **Pro** you see the last ${proSongs} songs.`)
+    ? t("Mit **Pro** siehst du die letzten {count} Songs.", "With **Pro** you see the last {count} songs.", { count: proSongs })
     : "";
   await interaction.reply({ ...payload, ...(more ? { content: more } : {}), flags: MessageFlags.Ephemeral });
   return;
@@ -326,11 +327,10 @@ async function handlePremiumCommand({ runtime, interaction, t, language }) {
 
   let licenseSummary = t("Keine aktive Lizenz.", "No active license.");
   if (license && !license.expired) {
-    const expDate = new Date(license.expiresAt).toLocaleDateString(t("de-DE", "en-US"));
-    licenseSummary = t(
-      `Aktiv bis ${expDate} (${license.remainingDays} Tage übrig)`,
-      `Active until ${expDate} (${license.remainingDays} day${license.remainingDays === 1 ? "" : "s"} left)`
-    );
+    const expDate = new Date(license.expiresAt).toLocaleDateString(botLocale(language));
+    licenseSummary = license.remainingDays === 1
+      ? t("Aktiv bis {date} (1 Tag übrig)", "Active until {date} (1 day left)", { date: expDate })
+      : t("Aktiv bis {date} ({days} Tage übrig)", "Active until {date} ({days} days left)", { date: expDate, days: license.remainingDays });
   } else if (license && license.expired) {
     licenseSummary = t("Abgelaufen", "Expired");
   }
@@ -375,7 +375,7 @@ async function handlePremiumCommand({ runtime, interaction, t, language }) {
     // #413: what the next plan adds, the same lines as on the website.
     const next = tierConfig.tier === "free" ? "pro" : "ultimate";
     premiumEmbed.addFields({
-      name: t(`Das bringt ${PLAN_NAMES[next]} dazu`, `What ${PLAN_NAMES[next]} adds`),
+      name: t("Das bringt {plan} dazu", "What {plan} adds", { plan: PLAN_NAMES[next] }),
       value: [
         planBulletLines(next, language, catalogPlanContext()),
         shop.enabled && buyable.length
@@ -453,8 +453,8 @@ async function handleHealthCommand({ runtime, interaction, t, language }) {
             name: t("Recovery", "Recovery"),
             value: networkHoldMs > 0
               ? t(
-                `Netz-Cooldown aktiv (${Math.round(networkHoldMs)}ms). Der Stream stabilisiert sich gerade erneut.`,
-                `Network cooldown active (${Math.round(networkHoldMs)}ms). The stream is stabilizing again right now.`
+                "Netz-Cooldown aktiv ({ms}ms). Der Stream stabilisiert sich gerade erneut.",
+                "Network cooldown active ({ms}ms). The stream is stabilizing again right now.", { ms: Math.round(networkHoldMs) }
               )
               : t("Kein zusätzlicher Netz-Cooldown aktiv.", "No extra network cooldown is active."),
             inline: false,

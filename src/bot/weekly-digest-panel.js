@@ -60,8 +60,8 @@ export function buildWeeklyDigestPayload({ t, guildName = "", report, audience =
       blocks: [
         head,
         ui.text(t(
-          `Diese Woche lief auf **${name}** kein Radio. Startet mit /play oder dem Schnellstart – nächste Woche stehen hier eure Zahlen.`,
-          `No radio ran on **${name}** this week. Start with /play or the quick start; next week your numbers show up here.`
+          "Diese Woche lief auf **{server}** kein Radio. Startet mit /play oder dem Schnellstart – nächste Woche stehen hier eure Zahlen.",
+          "No radio ran on **{server}** this week. Start with /play or the quick start; next week your numbers show up here.", { server: name }
         )),
         ui.brandLine(t("Wochenrückblick", "Weekly recap")),
       ],
@@ -77,7 +77,7 @@ export function buildWeeklyDigestPayload({ t, guildName = "", report, audience =
     tile(`👥 ${week.peakListeners}`, t("Meiste Hörer gleichzeitig", "Most listeners at once"), formatDigestChange(changes.peakListeners, t)),
   ];
   if (report.peakTime) {
-    blocks.push(tile(`⏰ <t:${seconds(report.peakTime.atMs)}:f>`, t(`Spitzenzeit mit ${report.peakTime.listeners} Hörern`, `Busiest moment, ${report.peakTime.listeners} listeners`)));
+    blocks.push(tile(`⏰ <t:${seconds(report.peakTime.atMs)}:f>`, t("Spitzenzeit mit {listeners} Hörern", "Busiest moment, {listeners} listeners", { listeners: report.peakTime.listeners })));
   }
   blocks.push(tile(`📅 ${week.activeDays} / 7`, t("Tage mit Radio", "Days with radio")));
   if (report.firstWeek) {

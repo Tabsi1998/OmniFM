@@ -19,7 +19,15 @@ export const SEASON_COLORS = Object.freeze({
   newyear: 0xFBBF24,
 });
 
-const ADVENT_EN = ["Advent, week 1", "Advent, week 2", "Advent, week 3", "Advent, week 4"];
+/** "2. Advent" and the like; English says which week. */
+function adventLabel(lit, t) {
+  switch (lit) {
+    case 1: return t("1. Advent", "Advent, week 1");
+    case 2: return t("2. Advent", "Advent, week 2");
+    case 3: return t("3. Advent", "Advent, week 3");
+    default: return t("4. Advent", "Advent, week 4");
+  }
+}
 
 /** What a server shows now, from its cached settings and the owner's switches; null outside a season. */
 export function serverSeason(guildId, settings, now = new Date()) {
@@ -64,7 +72,7 @@ export function seasonPanelLook(season, { t, appId = null, nowMs = Date.now() })
   if (season.season === "advent") {
     const lit = Math.max(1, Math.min(4, season.candles || 1));
     const candles = `${icon("candle").repeat(lit)}${icon("candle_off").repeat(4 - lit)}`;
-    return { color: SEASON_COLORS.advent, line: `${candles} **${t(`${lit}. Advent`, ADVENT_EN[lit - 1])}**` };
+    return { color: SEASON_COLORS.advent, line: `${candles} **${adventLabel(lit, t)}**` };
   }
   if (season.season === "christmas") {
     return season.phase === "greeting"
@@ -78,12 +86,12 @@ export function seasonPanelLook(season, { t, appId = null, nowMs = Date.now() })
       const midnight = Math.floor(nowMs / 1000) + season.secondsToMidnight;
       return {
         color: SEASON_COLORS.newyear,
-        line: `${icon("fireworks")} **${t(`${season.year} beginnt <t:${midnight}:R>`, `${season.year} starts <t:${midnight}:R>`)}**`,
+        line: `${icon("fireworks")} **${t("{year} beginnt <t:{unix}:R>", "{year} starts <t:{unix}:R>", { year: season.year, unix: midnight })}**`,
       };
     }
     return {
       color: SEASON_COLORS.newyear,
-      line: `🥂 **${t(`Frohes neues Jahr ${season.year}!`, `Happy New Year ${season.year}!`)}** ${icon("fireworks")}`,
+      line: `🥂 **${t("Frohes neues Jahr {year}!", "Happy New Year {year}!", { year: season.year })}** ${icon("fireworks")}`,
     };
   }
   return null;

@@ -53,8 +53,8 @@ async function handleEventCommand(runtime, interaction, { formInput = null } = {
       tone: "info",
       title: t("📅 Ein Event hast du schon", "📅 You already have an event"),
       description: t(
-        `Mit Free geht ${eventLimit} geplantes Event. Lösch das vorhandene mit \`/event delete\` oder hol dir **Pro** für beliebig viele.`,
-        `Free comes with ${eventLimit} scheduled event. Delete the one you have with \`/event delete\`, or get **Pro** for as many as you like.`
+        "Mit Free geht {limit} geplantes Event. Lösch das vorhandene mit `/event delete` oder hol dir **Pro** für beliebig viele.",
+        "Free comes with {limit} scheduled event. Delete the one you have with `/event delete`, or get **Pro** for as many as you like.", { limit: eventLimit }
       ),
       fields: [
         {
@@ -94,7 +94,7 @@ async function handleEventCommand(runtime, interaction, { formInput = null } = {
     }
     const perms = channel.permissionsFor(me);
     if (!perms?.has(PermissionFlagsBits.ViewChannel) || !perms?.has(PermissionFlagsBits.SendMessages)) {
-      return t(`Ich kann in ${channel.toString()} nicht schreiben.`, `I cannot send messages in ${channel.toString()}.`);
+      return t("Ich kann in {channel} nicht schreiben.", "I cannot send messages in {channel}.", { channel: channel.toString() });
     }
     return null;
   };
@@ -114,10 +114,10 @@ async function handleEventCommand(runtime, interaction, { formInput = null } = {
     }
     const perms = channel.permissionsFor(me);
     if (!perms?.has(PermissionFlagsBits.Connect)) {
-      return t(`Ich habe keine Connect-Berechtigung für ${channel.toString()}.`, `I do not have Connect permission for ${channel.toString()}.`);
+      return t("Ich habe keine Connect-Berechtigung für {channel}.", "I do not have Connect permission for {channel}.", { channel: channel.toString() });
     }
     if (channel.type !== ChannelType.GuildStageVoice && !perms?.has(PermissionFlagsBits.Speak)) {
-      return t(`Ich habe keine Speak-Berechtigung für ${channel.toString()}.`, `I do not have Speak permission for ${channel.toString()}.`);
+      return t("Ich habe keine Speak-Berechtigung für {channel}.", "I do not have Speak permission for {channel}.", { channel: channel.toString() });
     }
     // Stage channels: a playing bot must be Stage moderator there, or it stays silent.
     const stageError = await validateStageEventSpeakers(runtime, guild, channel, getTier(guildId), language);
@@ -620,7 +620,7 @@ async function handleEventCommand(runtime, interaction, { formInput = null } = {
         buildOmniEmbed({
           tone: "warning",
           title: t("🧹 Event entfernt", "🧹 Event removed"),
-          description: `${t("Event", "Event")} \`${id}\` ${t("entfernt", "removed")}.${removedDiscordEvent ? ` ${t("Discord-Server-Event ebenfalls entfernt.", "Discord server event was removed too.")}` : ""}`,
+          description: `${t("Event `{id}` entfernt.", "Event `{id}` removed.", { id })}${removedDiscordEvent ? ` ${t("Discord-Server-Event ebenfalls entfernt.", "Discord server event was removed too.")}` : ""}`,
         }),
       ],
       components: buildEventActionRows(language, { includePlayback: false }),

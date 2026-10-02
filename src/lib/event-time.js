@@ -6,9 +6,9 @@ import {
   GuildScheduledEventRecurrenceRuleMonth,
   GuildScheduledEventRecurrenceRuleWeekday,
 } from "discord.js";
-import { normalizeLanguage, getDefaultLanguage } from "../i18n.js";
+import { getDefaultLanguage } from "../i18n.js";
 import { languagePick } from "./language.js";
-import { botLocale, normalizeBotLanguage } from "./bot-i18n.js";
+import { botLocale, botTranslator, normalizeBotLanguage } from "./bot-i18n.js";
 
 const REPEAT_MODES = new Set([
   "none",
@@ -483,18 +483,6 @@ function normalizeRepeatMode(raw) {
   return "none";
 }
 
-function formatOrdinal(value, language = "de") {
-  const number = Number.parseInt(String(value || 0), 10);
-  if (!Number.isFinite(number) || number <= 0) return String(value || "");
-  if (normalizeLanguage(language, getDefaultLanguage()) === "de") return `${number}.`;
-  const mod10 = number % 10;
-  const mod100 = number % 100;
-  if (mod10 === 1 && mod100 !== 11) return `${number}st`;
-  if (mod10 === 2 && mod100 !== 12) return `${number}nd`;
-  if (mod10 === 3 && mod100 !== 13) return `${number}rd`;
-  return `${number}th`;
-}
-
 function formatMonthDay(utcMs, language = "de", timeZone = EVENT_FALLBACK_TIME_ZONE) {
   if (!Number.isFinite(Number(utcMs)) || Number(utcMs) <= 0) return null;
   const locale = botLocale(normalizeBotLanguage(language, getDefaultLanguage()));
@@ -597,35 +585,25 @@ function buildDiscordScheduledEventRecurrenceRule(runAtMs, repeat, timeZone = nu
 
 function getRepeatLabel(raw, language = "de", { runAtMs = null, timeZone = null } = {}) {
   const repeat = normalizeRepeatMode(raw);
-  const isDe = normalizeLanguage(language, getDefaultLanguage()) === "de";
+  const t = botTranslator(normalizeBotLanguage(language, getDefaultLanguage()));
   const weekday = Number.isFinite(Number(runAtMs)) && Number(runAtMs) > 0
     ? getWeekdayName(Number(runAtMs), language, timeZone || EVENT_FALLBACK_TIME_ZONE)
     : null;
   const monthDay = formatMonthDay(runAtMs, language, timeZone || EVENT_FALLBACK_TIME_ZONE);
+  const day = weekday || t("Wochentag", "weekday");
 
-  if (repeat === "daily") return isDe ? "Jeden Tag" : "Every day";
-  if (repeat === "weekdays") return isDe ? "Werktäglich (Montag bis Freitag)" : "Weekdays (Monday to Friday)";
-  if (repeat === "weekly") {
-    return weekday
-      ? (isDe ? `Jeden ${weekday}` : `Every ${weekday}`)
-      : (isDe ? "Wöchentlich" : "Weekly");
-  }
-  if (repeat === "biweekly") {
-    return weekday
-      ? (isDe ? `Alle 2 Wochen (${weekday})` : `Every 2 weeks (${weekday})`)
-      : (isDe ? "Alle 2 Wochen" : "Every 2 weeks");
-  }
-  if (repeat === "monthly_first_weekday") return isDe ? `Jeden ${formatOrdinal(1, language)} ${weekday || "Wochentag"} im Monat` : `Every ${formatOrdinal(1, language)} ${weekday || "weekday"} of the month`;
-  if (repeat === "monthly_second_weekday") return isDe ? `Jeden ${formatOrdinal(2, language)} ${weekday || "Wochentag"} im Monat` : `Every ${formatOrdinal(2, language)} ${weekday || "weekday"} of the month`;
-  if (repeat === "monthly_third_weekday") return isDe ? `Jeden ${formatOrdinal(3, language)} ${weekday || "Wochentag"} im Monat` : `Every ${formatOrdinal(3, language)} ${weekday || "weekday"} of the month`;
-  if (repeat === "monthly_fourth_weekday") return isDe ? `Jeden ${formatOrdinal(4, language)} ${weekday || "Wochentag"} im Monat` : `Every ${formatOrdinal(4, language)} ${weekday || "weekday"} of the month`;
-  if (repeat === "monthly_last_weekday") return isDe ? `Jeden letzten ${weekday || "Wochentag"} im Monat` : `Every last ${weekday || "weekday"} of the month`;
-  if (repeat === "yearly") {
-    return monthDay
-      ? (isDe ? `Jährlich am ${monthDay}` : `Yearly on ${monthDay}`)
-      : (isDe ? "Jährlich" : "Yearly");
-  }
-  return isDe ? "Einmalig" : "Once";
+  if (repeat === "daily") return t("Jeden Tag", "Every day");
+  if (repeat === "weekdays") return t("Werktäglich (Montag bis Freitag)", "Weekdays (Monday to Friday)");
+  if (repeat === "weekly") return weekday ? t("Jeden {weekday}", "Every {weekday}", { weekday }) : t("Wöchentlich", "Weekly");
+  if (repeat === "biweekly") return weekday ? t("Alle 2 Wochen ({weekday})", "Every 2 weeks ({weekday})", { weekday }) : t("Alle 2 Wochen", "Every 2 weeks");
+  // The number is part of each text: every language says "first", "second", … its own way.
+  if (repeat === "monthly_first_weekday") return t("Jeden 1. {weekday} im Monat", "Every 1st {weekday} of the month", { weekday: day });
+  if (repeat === "monthly_second_weekday") return t("Jeden 2. {weekday} im Monat", "Every 2nd {weekday} of the month", { weekday: day });
+  if (repeat === "monthly_third_weekday") return t("Jeden 3. {weekday} im Monat", "Every 3rd {weekday} of the month", { weekday: day });
+  if (repeat === "monthly_fourth_weekday") return t("Jeden 4. {weekday} im Monat", "Every 4th {weekday} of the month", { weekday: day });
+  if (repeat === "monthly_last_weekday") return t("Jeden letzten {weekday} im Monat", "Every last {weekday} of the month", { weekday: day });
+  if (repeat === "yearly") return monthDay ? t("Jährlich am {date}", "Yearly on {date}", { date: monthDay }) : t("Jährlich", "Yearly");
+  return t("Einmalig", "Once");
 }
 
 function computeNextEventRunAtMs(runAtMs, repeat, nowMs = Date.now(), timeZone = null) {

@@ -10,6 +10,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 
 import * as ui from "../discord/ui/index.js";
 import { getZonedPartsFromUtcMs } from "../lib/event-time.js";
+import { botLocale, normalizeBotLanguage } from "../lib/bot-i18n.js";
 
 export const YEAR_REVIEW_PREFIX = "omnifm:review:";
 export const YEAR_REVIEW_PAGES = Object.freeze(["overview", "stations", "songs", "time", "share"]);
@@ -42,20 +43,20 @@ export function isEmptyReview(review) {
 }
 
 function numberFormat(language) {
-  return new Intl.NumberFormat(language === "de" ? "de-DE" : "en-GB");
+  return new Intl.NumberFormat(reviewLocale(language));
 }
 
 /** @param {"short" | "long"} [style] */
 function monthName(monthKey, language, style = "short") {
   const [year, month] = String(monthKey).split("-").map(Number);
-  return new Intl.DateTimeFormat(language === "de" ? "de-DE" : "en-GB", { month: style, timeZone: "UTC" })
+  return new Intl.DateTimeFormat(reviewLocale(language), { month: style, timeZone: "UTC" })
     .format(new Date(Date.UTC(year, month - 1, 15)));
 }
 
 function dateText(value, language) {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat(language === "de" ? "de-DE" : "en-GB", { day: "numeric", month: "long", timeZone: TIME_ZONE }).format(date);
+  return new Intl.DateTimeFormat(reviewLocale(language), { day: "numeric", month: "long", timeZone: TIME_ZONE }).format(date);
 }
 
 function bar(value, most, width = 10) {
@@ -108,11 +109,39 @@ function navigation(page, t) {
  * @param {boolean} [input.paid] Pro and up: the picture and the post
  * @param {number} [input.now]
  */
+/** Dates and numbers of the review in the reader's format; English as in Britain, as before. */
+function reviewLocale(language) {
+  const code = normalizeBotLanguage(language, "de");
+  return code === "en" ? "en-GB" : botLocale(code);
+}
+
+/** The page's title: with the server's name or without, the year so far or the whole year. */
+function reviewTitle({ t, final, guildName, year }) {
+  if (guildName) {
+    return final
+      ? t("🎧 {server}: euer Jahr {year}", "🎧 {server}: your year {year}", { server: guildName, year })
+      : t("🎧 {server}: euer Jahr {year} bisher", "🎧 {server}: your {year} so far", { server: guildName, year });
+  }
+  return final
+    ? t("🎧 Euer Jahr {year}", "🎧 Your year {year}", { year })
+    : t("🎧 Euer Jahr {year} bisher", "🎧 Your {year} so far", { year });
+}
+
+/** The longest session, with its station and day when known. */
+function longestSessionText({ t, hours, station, when }) {
+  if (station && when) return t("**Längste Sitzung:** {hours} h mit {station} am {date}.", "**Longest session:** {hours} h with {station} on {date}.", { hours, station, date: when });
+  if (station) return t("**Längste Sitzung:** {hours} h mit {station}.", "**Longest session:** {hours} h with {station}.", { hours, station });
+  if (when) return t("**Längste Sitzung:** {hours} h am {date}.", "**Longest session:** {hours} h on {date}.", { hours, date: when });
+  return t("**Längste Sitzung:** {hours} h.", "**Longest session:** {hours} h.", { hours });
+}
+
 export function buildYearReviewPage({ t, language = "de", review, page = 0, final = false, guildName = "", paid = false, now = Date.now() }) {
   const year = review?.year;
   if (isEmptyReview(review)) {
     return ui.reply(ui.notice("info", {
-      title: t(`Noch keine Hörzeit ${year || ""}`.trim(), `No listening time in ${year || "this year"} yet`),
+      title: year
+        ? t("Noch keine Hörzeit {year}", "No listening time in {year} yet", { year })
+        : t("Noch keine Hörzeit", "No listening time this year yet"),
       body: t(
         "Sobald auf dem Server Radio läuft, füllt sich der Rückblick von selbst. Starte einen Sender mit /play.",
         "Once radio plays on the server, the review fills up by itself. Start a station with /play."
@@ -121,23 +150,21 @@ export function buildYearReviewPage({ t, language = "de", review, page = 0, fina
   }
   const current = Math.min(Math.max(0, Number(page) || 0), YEAR_REVIEW_PAGES.length - 1);
   const format = numberFormat(language);
-  const title = final
-    ? t(`🎧 ${guildName ? `${guildName}: ` : ""}euer Jahr ${year}`, `🎧 ${guildName ? `${guildName}: ` : ""}your year ${year}`)
-    : t(`🎧 ${guildName ? `${guildName}: ` : ""}euer Jahr ${year} bisher`, `🎧 ${guildName ? `${guildName}: ` : ""}your ${year} so far`);
+  const title = reviewTitle({ t, final, guildName, year });
   const body = [];
   const actions = [navigation(current, t)];
 
   if (YEAR_REVIEW_PAGES[current] === "overview") {
     body.push(ui.text(t(
-      `## ${format.format(review.listeningHours)} Stunden Radio\n${format.format(review.sessions)} Hör-Sitzungen`,
-      `## ${format.format(review.listeningHours)} hours of radio\n${format.format(review.sessions)} listening sessions`
+      "## {hours} Stunden Radio\n{sessions} Hör-Sitzungen",
+      "## {hours} hours of radio\n{sessions} listening sessions", { hours: format.format(review.listeningHours), sessions: format.format(review.sessions) }
     )));
     const chart = monthChart(review, language, { final, now });
     if (chart) body.push(ui.text(chart));
     if (review.stationsFrom && review.stationsFrom > `${year}-01`) {
       body.push(ui.subtext(t(
-        `Stunden zählen das ganze Jahr; Sender, Songs und Uhrzeiten erst seit ${monthName(review.stationsFrom, language, "long")}.`,
-        `Hours count the whole year; stations, songs and times since ${monthName(review.stationsFrom, language, "long")}.`
+        "Stunden zählen das ganze Jahr; Sender, Songs und Uhrzeiten erst seit {month}.",
+        "Hours count the whole year; stations, songs and times since {month}.", { month: monthName(review.stationsFrom, language, "long") }
       )));
     }
   } else if (YEAR_REVIEW_PAGES[current] === "stations") {
@@ -148,30 +175,34 @@ export function buildYearReviewPage({ t, language = "de", review, page = 0, fina
   } else if (YEAR_REVIEW_PAGES[current] === "songs") {
     const songs = (review.topSongs || []).map((song, index) => `${index + 1}. **${song.title}** · ${format.format(song.plays)}×`);
     body.push(ui.text(`### ${t("🎵 Eure Songs", "🎵 Your songs")}\n${songs.join("\n") || t("Noch keine Songs gezählt.", "No songs counted yet.")}`));
-    if (review.songsFrom) body.push(ui.subtext(t(`Songs zählen seit ${dateText(review.songsFrom, language)}.`, `Songs count since ${dateText(review.songsFrom, language)}.`)));
+    if (review.songsFrom) body.push(ui.subtext(t("Songs zählen seit {date}.", "Songs count since {date}.", { date: dateText(review.songsFrom, language) })));
   } else if (YEAR_REVIEW_PAGES[current] === "time") {
     const lines = [`### ${t("🕗 Wann ihr hört", "🕗 When you listen")}`];
     if (Number.isInteger(review.busiestHour)) {
       lines.push(t(
-        `Am liebsten zwischen **${review.busiestHour} und ${(review.busiestHour + 1) % 24} Uhr**.`,
-        `Most of all between **${review.busiestHour}:00 and ${(review.busiestHour + 1) % 24}:00**.`
+        "Am liebsten zwischen **{hour} und {next} Uhr**.",
+        "Most of all between **{hour}:00 and {next}:00**.", { hour: review.busiestHour, next: (review.busiestHour + 1) % 24 }
       ));
     }
     body.push(ui.text(lines.join("\n")));
     body.push(ui.text(dayPartChart(review, t)));
     if (review.longest) {
       const when = dateText(review.longest.startedAt, language);
-      body.push(ui.text(t(
-        `**Längste Sitzung:** ${format.format(review.longest.hours)} h${review.longest.stationName ? ` mit ${review.longest.stationName}` : ""}${when ? ` am ${when}` : ""}.`,
-        `**Longest session:** ${format.format(review.longest.hours)} h${review.longest.stationName ? ` with ${review.longest.stationName}` : ""}${when ? ` on ${when}` : ""}.`
-      )));
+      body.push(ui.text(longestSessionText({ t, hours: format.format(review.longest.hours), station: review.longest.stationName, when })));
     }
   } else {
     const top = review.topStations?.[0]?.name;
-    body.push(ui.text(t(
-      `### 🎉 Danke fürs Zuhören\n${format.format(review.listeningHours)} Stunden${top ? `, am meisten ${top}` : ""}. Teilt euer Jahr mit dem Server.`,
-      `### 🎉 Thanks for listening\n${format.format(review.listeningHours)} hours${top ? `, most of all ${top}` : ""}. Share your year with the server.`
-    )));
+    body.push(ui.text(top
+      ? t(
+        "### 🎉 Danke fürs Zuhören\n{hours} Stunden, am meisten {station}. Teilt euer Jahr mit dem Server.",
+        "### 🎉 Thanks for listening\n{hours} hours, most of all {station}. Share your year with the server.",
+        { hours: format.format(review.listeningHours), station: top }
+      )
+      : t(
+        "### 🎉 Danke fürs Zuhören\n{hours} Stunden. Teilt euer Jahr mit dem Server.",
+        "### 🎉 Thanks for listening\n{hours} hours. Share your year with the server.",
+        { hours: format.format(review.listeningHours) }
+      )));
     actions.push(new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(yearReviewCustomId("image")).setStyle(ButtonStyle.Primary)
         .setLabel(paid ? t("🖼️ Als Bild", "🖼️ As a picture") : t("🖼️ Bild ab Pro", "🖼️ Picture with Pro")).setDisabled(!paid),
@@ -192,13 +223,15 @@ export function buildYearReviewPage({ t, language = "de", review, page = 0, fina
 export function buildYearReviewAnnouncement({ t, language = "de", review, guildName = "" }) {
   const format = numberFormat(language);
   const lines = [
-    t(`## ${format.format(review.listeningHours)} Stunden Radio`, `## ${format.format(review.listeningHours)} hours of radio`),
-    review.topStations?.[0] ? t(`📻 Top-Sender: **${review.topStations[0].name}**`, `📻 Top station: **${review.topStations[0].name}**`) : null,
-    review.topSongs?.[0] ? t(`🎵 Top-Song: **${review.topSongs[0].title}**`, `🎵 Top song: **${review.topSongs[0].title}**`) : null,
-    Number.isInteger(review.busiestHour) ? t(`🕗 Am liebsten um ${review.busiestHour} Uhr`, `🕗 Most of all at ${review.busiestHour}:00`) : null,
+    t("## {hours} Stunden Radio", "## {hours} hours of radio", { hours: format.format(review.listeningHours) }),
+    review.topStations?.[0] ? t("📻 Top-Sender: **{station}**", "📻 Top station: **{station}**", { station: review.topStations[0].name }) : null,
+    review.topSongs?.[0] ? t("🎵 Top-Song: **{song}**", "🎵 Top song: **{song}**", { song: review.topSongs[0].title }) : null,
+    Number.isInteger(review.busiestHour) ? t("🕗 Am liebsten um {hour} Uhr", "🕗 Most of all at {hour}:00", { hour: review.busiestHour }) : null,
   ].filter(Boolean);
   return ui.message(ui.panel({
-    title: t(`🎧 ${guildName || "Unser Server"}: unser Jahr ${review.year} auf OmniFM`, `🎧 ${guildName || "Our server"}: our ${review.year} on OmniFM`),
+    title: guildName
+      ? t("🎧 {server}: unser Jahr {year} auf OmniFM", "🎧 {server}: our {year} on OmniFM", { server: guildName, year: review.year })
+      : t("🎧 Unser Jahr {year} auf OmniFM", "🎧 Our {year} on OmniFM", { year: review.year }),
     body: [ui.text(lines.join("\n"))],
     actions: [new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(yearReviewCustomId("open")).setStyle(ButtonStyle.Primary)

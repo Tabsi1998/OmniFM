@@ -59,20 +59,20 @@ function describeRecoverySettings(env = process.env, t = botTranslator("de")) {
   const values = Object.fromEntries(getEffectiveRecoverySettings(env).map((item) => [item.key, item.value]));
   return [
     t(
-      `Ersatzsender: nach ${values.failoverMinFailures} Fehlern und ${formatDuration(values.failoverMinUnstableMs, t)} ohne Ton`,
-      `Backup station: after ${values.failoverMinFailures} failures and ${formatDuration(values.failoverMinUnstableMs, t)} without audio`
+      "Ersatzsender: nach {failures} Fehlern und {silence} ohne Ton",
+      "Backup station: after {failures} failures and {silence} without audio", { failures: values.failoverMinFailures, silence: formatDuration(values.failoverMinUnstableMs, t) }
     ),
     t(
-      `Zurück: Prüfung alle ${formatDuration(values.failbackCheckMs, t)} (bis ${formatDuration(values.failbackMaxMs, t)}), ${values.failbackConfirmations}× erreichbar`,
-      `Back: check every ${formatDuration(values.failbackCheckMs, t)} (up to ${formatDuration(values.failbackMaxMs, t)}), ${values.failbackConfirmations}× reachable`
+      "Zurück: Prüfung alle {every} (bis {max}), {confirmations}× erreichbar",
+      "Back: check every {every} (up to {max}), {confirmations}× reachable", { every: formatDuration(values.failbackCheckMs, t), max: formatDuration(values.failbackMaxMs, t), confirmations: values.failbackConfirmations }
     ),
     t(
-      `Neustart nach ${formatDuration(values.healthcheckStallMs, t)} Stille · Pause ${formatDuration(values.errorCooldownMs, t)} ab ${values.errorCooldownThreshold} Fehlern`,
-      `Restart after ${formatDuration(values.healthcheckStallMs, t)} of silence · pause ${formatDuration(values.errorCooldownMs, t)} from ${values.errorCooldownThreshold} failures`
+      "Neustart nach {stall} Stille · Pause {pause} ab {failures} Fehlern",
+      "Restart after {stall} of silence · pause {pause} from {failures} failures", { stall: formatDuration(values.healthcheckStallMs, t), pause: formatDuration(values.errorCooldownMs, t), failures: values.errorCooldownThreshold }
     ),
     t(
-      `Verbindungssperre nach ${values.reconnectCircuitAttempts} Versuchen für ${formatDuration(values.reconnectCircuitMs, t)} · Pausiert: neuer Versuch alle ${formatDuration(values.voiceParkedRetryMs, t)}`,
-      `Connection lock after ${values.reconnectCircuitAttempts} attempts for ${formatDuration(values.reconnectCircuitMs, t)} · Paused: retry every ${formatDuration(values.voiceParkedRetryMs, t)}`
+      "Verbindungssperre nach {attempts} Versuchen für {lock} · Pausiert: neuer Versuch alle {retry}",
+      "Connection lock after {attempts} attempts for {lock} · Paused: retry every {retry}", { attempts: values.reconnectCircuitAttempts, lock: formatDuration(values.reconnectCircuitMs, t), retry: formatDuration(values.voiceParkedRetryMs, t) }
     ),
   ];
 }

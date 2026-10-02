@@ -33,7 +33,7 @@ export function eggSignature(egg) {
   return `${egg.id}:${egg.foundAt ? "found" : "open"}`;
 }
 
-const eggs = (count, t) => (count === 1 ? t("1 Ei", "1 egg") : t(`${count} Eier`, `${count} eggs`));
+const eggs = (count, t) => (count === 1 ? t("1 Ei", "1 egg") : t("{count} Eier", "{count} eggs", { count }));
 
 /** The private answer to a click on the egg; reason as claimEgg and the runtime give it. */
 export function eggAnswer({ t, result, golden = false, appId = null }) {
@@ -41,8 +41,8 @@ export function eggAnswer({ t, result, golden = false, appId = null }) {
   let content;
   if (result?.ok) {
     content = golden
-      ? `🌟 ${t(`Du hast ein goldenes Ei gefunden! Es zählt ${GOLDEN_POINTS}. (${result.count} dieses Jahr)`, `You found a golden egg! It counts ${GOLDEN_POINTS}. (${result.count} this year)`)}`
-      : `${egg} ${t(`Du hast ein Ei gefunden! (${result.count} dieses Jahr)`, `You found an egg! (${result.count} this year)`)}`;
+      ? `🌟 ${t("Du hast ein goldenes Ei gefunden! Es zählt {points}. ({count} dieses Jahr)", "You found a golden egg! It counts {points}. ({count} this year)", { points: GOLDEN_POINTS, count: result.count })}`
+      : `${egg} ${t("Du hast ein Ei gefunden! ({count} dieses Jahr)", "You found an egg! ({count} this year)", { count: result.count })}`;
     content += `\n-# ${t("`/ostereier` zeigt die Bestenliste des Servers.", "`/eggs` shows the server's leaderboard.")}`;
   } else {
     content = {
@@ -83,19 +83,19 @@ export function buildEggBoard({ t, board, running = false, off = false, next = n
     blocks.push(ui.text([heading, t("Hier hat noch niemand ein Ei gefunden.", "Nobody here has found an egg yet.")].join("\n")));
   }
   const own = board?.own
-    ? t(`Dein Platz: ${board.own.rank} · ${eggs(board.own.count, t)}`, `Your place: ${board.own.rank} · ${eggs(board.own.count, t)}`)
+    ? t("Dein Platz: {rank} · {eggs}", "Your place: {rank} · {eggs}", { rank: board.own.rank, eggs: eggs(board.own.count, t) })
     : t("Du hast noch kein Ei gefunden.", "You have not found an egg yet.");
-  blocks.push(ui.text(`**${own}**${board?.finders ? ` · ${t(`${board.finders} Finder`, `${board.finders} finders`)}` : ""}`));
+  blocks.push(ui.text(`**${own}**${board?.finders ? ` · ${t("{finders} Finder", "{finders} finders", { finders: board.finders })}` : ""}`));
   let note;
   if (off) {
     note = t("Die Ostereiersuche ist auf diesem Server ausgeschaltet (Dashboard → Saison-Deko).", "The Easter egg hunt is switched off on this server (dashboard → Seasonal decoration).");
   } else if (running) {
     note = t(
-      `Bis Ostermontag bringt etwa jeder achte Song ein Ei ins Panel; wer zuerst klickt, bekommt es. Ein goldenes Ei zählt ${GOLDEN_POINTS}.`,
-      `Until Easter Monday about every eighth song brings an egg into the panel; whoever clicks first gets it. A golden egg counts ${GOLDEN_POINTS}.`,
+      "Bis Ostermontag bringt etwa jeder achte Song ein Ei ins Panel; wer zuerst klickt, bekommt es. Ein goldenes Ei zählt {points}.",
+      "Until Easter Monday about every eighth song brings an egg into the panel; whoever clicks first gets it. A golden egg counts {points}.", { points: GOLDEN_POINTS },
     );
   } else if (next) {
-    note = t(`Die nächste Ostereiersuche beginnt am Palmsonntag, ${discordDate(next)}.`, `The next Easter egg hunt starts on Palm Sunday, ${discordDate(next)}.`);
+    note = t("Die nächste Ostereiersuche beginnt am Palmsonntag, {date}.", "The next Easter egg hunt starts on Palm Sunday, {date}.", { date: discordDate(next) });
   }
   if (note) blocks.push(ui.text(ui.subtext(note)));
   blocks.push(ui.brandLine());

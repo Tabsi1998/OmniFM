@@ -29,8 +29,9 @@ export const suggestionMethods = {
     const test = await testStream(form.url).catch((error) => ({ ok: false, message: error?.message || "test_failed" }));
     if (!test?.ok) {
       await warn(t("Kein Stream gefunden", "No stream found"), t(
-        `Unter der URL kam kein Audio-Stream (${test?.message || "keine Antwort"}). Nichts gespeichert – prüf den Link, es muss der direkte Stream sein.`,
-        `No audio stream came from the URL (${test?.message || "no answer"}). Nothing saved – check the link, it has to be the direct stream.`
+        "Unter der URL kam kein Audio-Stream ({error}). Nichts gespeichert – prüf den Link, es muss der direkte Stream sein.",
+        "No audio stream came from the URL ({error}). Nothing saved – check the link, it has to be the direct stream.",
+        { error: test?.message || t("keine Antwort", "no answer") }
       ));
       return true;
     }
@@ -46,13 +47,14 @@ export const suggestionMethods = {
         name: t("Der Name braucht mindestens zwei Zeichen.", "The name needs at least two characters."),
         url: t("Die Stream-URL muss mit http:// oder https:// beginnen.", "The stream URL must start with http:// or https://."),
         homepage: t("Die Webseite muss mit https:// beginnen.", "The website must start with https://."),
-        "in-catalog": t(`Den Sender gibt es schon im Katalog${result.station ? `: **${result.station}**` : ""}. Du findest ihn mit \`/play\`.`,
-          `The station is already in the catalogue${result.station ? `: **${result.station}**` : ""}. Find it with \`/play\`.`),
+        "in-catalog": result.station
+          ? t("Den Sender gibt es schon im Katalog: **{station}**. Du findest ihn mit `/play`.", "The station is already in the catalogue: **{station}**. Find it with `/play`.", { station: result.station })
+          : t("Den Sender gibt es schon im Katalog. Du findest ihn mit `/play`.", "The station is already in the catalogue. Find it with `/play`."),
         "already-suggested": result.status === "accepted"
           ? t("Diesen Sender hat schon jemand vorgeschlagen, und er ist schon angenommen.", "Someone suggested this station already, and it was accepted.")
           : t("Diesen Sender hat schon jemand vorgeschlagen; er wartet auf die Prüfung.", "Someone suggested this station already; it is waiting to be checked."),
-        "too-many": t(`Du hast schon ${MAX_PENDING_PER_PERSON} Vorschläge in der Prüfung. Sobald einer entschieden ist, geht der nächste.`,
-          `You have ${MAX_PENDING_PER_PERSON} suggestions waiting already. Once one is decided, the next one can go in.`),
+        "too-many": t("Du hast schon {max} Vorschläge in der Prüfung. Sobald einer entschieden ist, geht der nächste.",
+          "You have {max} suggestions waiting already. Once one is decided, the next one can go in.", { max: MAX_PENDING_PER_PERSON }),
         unavailable: t("Vorschläge gehen gerade nicht. Bitte später noch einmal.", "Suggestions do not work right now. Please try again later."),
       };
       await warn(t("Nicht eingereicht", "Not sent"), messages[result.error] || messages.unavailable);
@@ -63,8 +65,8 @@ export const suggestionMethods = {
     await this.respondInteraction(interaction, buildNoticePayload({
       t, language, tone: "success", title: t("Danke für den Vorschlag!", "Thanks for the suggestion!"),
       description: t(
-        `**${result.suggestion.name}** wartet jetzt auf die Prüfung. Der Stream lief beim Test; wir hören ihn uns an und sagen dir per Direktnachricht Bescheid.`,
-        `**${result.suggestion.name}** is now waiting to be checked. The stream worked in the test; we will listen to it and tell you by direct message.`
+        "**{station}** wartet jetzt auf die Prüfung. Der Stream lief beim Test; wir hören ihn uns an und sagen dir per Direktnachricht Bescheid.",
+        "**{station}** is now waiting to be checked. The stream worked in the test; we will listen to it and tell you by direct message.", { station: result.suggestion.name }
       ),
     }));
     log("INFO", `[${this.config?.name}] Sender-Vorschlag "${result.suggestion.name}" eingereicht.`);

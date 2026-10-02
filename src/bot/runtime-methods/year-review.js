@@ -94,6 +94,7 @@ export const yearReviewMethods = {
         return true;
       }
       const png = await (options.renderCard || renderYearReviewCard)({
+        language,
         guildName: interaction.guild?.name || "",
         year: review.year,
         hours: review.listeningHours,

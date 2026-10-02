@@ -39,12 +39,12 @@ export function buildSleepWarningPayload({ t, sleepUntilMs }) {
   return ui.message(ui.notice("info", {
     title: t("Gleich ist Schluss", "Almost bedtime"),
     body: t(
-      `😴 Der Sleep-Timer schaltet OmniFM <t:${seconds(sleepUntilMs)}:R> leise aus.`,
-      `😴 The sleep timer turns OmniFM off quietly <t:${seconds(sleepUntilMs)}:R>.`
+      "😴 Der Sleep-Timer schaltet OmniFM <t:{unix}:R> leise aus.",
+      "😴 The sleep timer turns OmniFM off quietly <t:{unix}:R>.", { unix: seconds(sleepUntilMs) }
     ),
     actions: [new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(NP_SLEEP_EXTEND_ID).setStyle(ButtonStyle.Primary)
-        .setLabel(t(`+${SLEEP_EXTEND_MINUTES} min`, `+${SLEEP_EXTEND_MINUTES} min`)),
+        .setLabel(t("+{minutes} min", "+{minutes} min", { minutes: SLEEP_EXTEND_MINUTES })),
       new ButtonBuilder().setCustomId(NP_SLEEP_OFF_ID).setStyle(ButtonStyle.Secondary)
         .setLabel(t("Timer aus, weiterspielen", "Timer off, keep playing")),
     )],
@@ -56,7 +56,7 @@ export function buildSleepStatePayload({ t, kind, sleepUntilMs = 0 }) {
   if (kind === "extended") {
     return ui.message(ui.notice("success", {
       title: t("Verlängert", "Extended"),
-      body: t(`😴 Jetzt ist um <t:${seconds(sleepUntilMs)}:t> Schluss.`, `😴 Now it ends at <t:${seconds(sleepUntilMs)}:t>.`),
+      body: t("😴 Jetzt ist um <t:{unix}:t> Schluss.", "😴 Now it ends at <t:{unix}:t>.", { unix: seconds(sleepUntilMs) }),
     }));
   }
   if (kind === "off") {
@@ -68,8 +68,8 @@ export function buildSleepStatePayload({ t, kind, sleepUntilMs = 0 }) {
   return ui.message(ui.notice("info", {
     title: t("Gute Nacht", "Good night"),
     body: t(
-      `😴 Der Sleep-Timer hat OmniFM um <t:${seconds(sleepUntilMs || Date.now())}:t> ausgeschaltet.`,
-      `😴 The sleep timer turned OmniFM off at <t:${seconds(sleepUntilMs || Date.now())}:t>.`
+      "😴 Der Sleep-Timer hat OmniFM um <t:{unix}:t> ausgeschaltet.",
+      "😴 The sleep timer turned OmniFM off at <t:{unix}:t>.", { unix: seconds(sleepUntilMs || Date.now()) }
     ),
   }));
 }

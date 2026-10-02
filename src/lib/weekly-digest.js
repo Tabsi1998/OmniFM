@@ -144,8 +144,8 @@ function buildWeeklyDigestPreview({
   return {
     title: t("Wöchentlicher Radio-Report", "Weekly radio report"),
     description: t(
-      `Hier ist die Zusammenfassung der letzten 7 Tage für **${safeGuildName}**:`,
-      `Here is the summary for the last 7 days on **${safeGuildName}**:`
+      "Hier ist die Zusammenfassung der letzten 7 Tage für **{server}**:",
+      "Here is the summary for the last 7 days on **{server}**:", { server: safeGuildName }
     ),
     generatedAt: generatedAt.toISOString(),
     footerText: "OmniFM Weekly Digest",

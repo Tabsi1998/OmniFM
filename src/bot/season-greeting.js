@@ -44,7 +44,7 @@ export function buildNewYearGreeting({ year, t, appId = null }) {
     accent: SEASON_COLORS.newyear,
     blocks: [
       ui.text([
-        ui.heading(`🥂 ${t(`Frohes neues Jahr ${year}!`, `Happy New Year ${year}!`)}`),
+        ui.heading(`🥂 ${t("Frohes neues Jahr {year}!", "Happy New Year {year}!", { year })}`),
         `${fireworks} ${t(
           "Danke, dass ihr mit OmniFM ins neue Jahr feiert. Auf ein Jahr voller guter Musik!",
           "Thanks for celebrating the new year with OmniFM. Here's to a year full of good music!",
