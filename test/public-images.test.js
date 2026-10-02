@@ -14,6 +14,7 @@ process.env.LOGS_DIR = path.join(scratchDir, "logs");
 const images = await import("../src/lib/public-images.js");
 const { createImageRoutesHandler, IMAGE_MAX_BYTES } = await import("../src/api/routes/image-routes.js");
 const { enforceApiRateLimit } = await import("../src/lib/api-rate-limit.js");
+const { coverLookup } = await import("../src/lib/owner-public.js");
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
 const STATIONS = {
@@ -159,4 +160,49 @@ test("the pictures have their own request budget, larger than the API's 60 a min
   const other = { headers: {}, socket: { remoteAddress: "203.0.113.78" } };
   for (let index = 0; index < 61; index += 1) enforceApiRateLimit(other, res, "/api/stations");
   assert.deepEqual(blocked, [429], "while the API's own budget stops at 60");
+});
+
+test("a cover is one the website's own search found: a picture request never searches iTunes", async () => {
+  const fetched = [];
+  const handle = createImageRoutesHandler({
+    stations: () => STATIONS,
+    marketing: async () => ({ sponsors: [] }),
+    fetchImpl: async (url) => {
+      fetched.push(url);
+      return picture(PNG, "image/jpeg");
+    },
+  });
+  assert.equal((await get(handle, "/api/image/cover?term=Never%20Searched%20Song")).status, 404);
+  assert.deepEqual(fetched, [], "no search, no download");
+
+  // The website asks /api/cover first; that search is what the picture may show.
+  const itunes = async () => ({ status: 200, json: async () => ({ results: [{ artworkUrl100: "https://is1.example/searched/100x100bb.jpg", trackName: "Song" }] }) });
+  const found = await coverLookup({ term: "Searched   Artist Song" }, { fetchImpl: itunes });
+  assert.equal(found.ok, true);
+  assert.equal((await get(handle, "/api/image/cover?term=Searched%20Artist%20Song&size=600")).status, 200);
+  assert.deepEqual(fetched, ["https://is1.example/searched/600x600bb.jpg"]);
+});
+
+test("the kept pictures stay within their budget; the longest unused goes first", async () => {
+  const fetched = [];
+  const handle = createImageRoutesHandler({
+    stations: () => ({ stations: {
+      one: { tier: "free", logo: "https://logos.example/one.png" },
+      two: { tier: "free", logo: "https://logos.example/two.png" },
+      three: { tier: "free", logo: "https://logos.example/three.png" },
+    } }),
+    lookupCover: async () => null,
+    marketing: async () => ({ sponsors: [] }),
+    fetchImpl: async (url) => {
+      fetched.push(url);
+      return picture();
+    },
+    cacheBytes: PNG.length * 2,
+  });
+  for (const key of ["one", "two", "one", "three", "one", "two"]) {
+    // eslint-disable-next-line no-await-in-loop -- in this order
+    assert.equal((await get(handle, `/api/image/station/${key}`)).status, 200);
+  }
+  // Room for two: "two" was the longest unused when "three" came, so it was fetched again.
+  assert.deepEqual(fetched.map((url) => url.split("/").pop()), ["one.png", "two.png", "three.png", "two.png"]);
 });

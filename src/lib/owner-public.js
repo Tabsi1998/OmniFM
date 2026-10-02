@@ -355,9 +355,25 @@ export function marketingResponse(raw) {
 const COVER_CACHE_MAX = 500;
 const coverCache = new Map();
 
+/** The term as the cover search keeps it: one space between words, at most 120 characters. */
+function coverQuery({ artist = "", title = "", term = "" } = {}) {
+  return String(term || `${artist} ${title}`).trim().replace(/\s+/g, " ").slice(0, 120);
+}
+
+/**
+ * What the cover search already found for a term, without asking iTunes:
+ * /api/image shows only covers the website looked up itself (#469), so a
+ * request for a picture never becomes a search.
+ * @param {{ artist?: string, title?: string, term?: string }} [input]
+ */
+export function cachedCover(input = {}) {
+  const query = coverQuery(input);
+  return query ? coverCache.get(query.toLowerCase()) || null : null;
+}
+
 /** GET /api/cover: the first iTunes match for a song, cached like FastAPI (500 entries, then cleared). */
 export async function coverLookup({ artist = "", title = "", term = "" } = {}, { fetchImpl = safeFetch } = {}) {
-  const query = String(term || `${artist} ${title}`).trim().replace(/\s+/g, " ").slice(0, 120);
+  const query = coverQuery({ artist, title, term });
   if (!query) return { ok: false, error: "Kein Suchbegriff." };
   const cacheKey = query.toLowerCase();
   if (coverCache.has(cacheKey)) return coverCache.get(cacheKey);
