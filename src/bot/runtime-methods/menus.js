@@ -45,6 +45,7 @@ import { HELP_COMPONENT_PREFIX, HELP_SECTION_SELECT_ID } from "../help-panel.js"
 import {
   NP_PREFIX,
 } from "../runtime-shared.js";
+import { botText } from "../../lib/bot-i18n.js";
 
 const menuMethods = {
   pruneInteractiveUiSessions(now = Date.now()) {
@@ -121,20 +122,11 @@ const menuMethods = {
   },
 
   getStreamingRuntimeSelectionMessage(reason, language = "de") {
-    const isDe = String(language || "de").toLowerCase() === "de";
     const messages = {
-      none: isDe
-        ? "Auf diesem Server streamt gerade kein Worker. Starte zuerst `/play`."
-        : "No worker is currently streaming on this server. Start `/play` first.",
-      multiple: isDe
-        ? "Mehrere Worker streamen aktuell. Tritt dem Ziel-Voice-Channel bei, damit ich den richtigen Stream wähle."
-        : "Multiple workers are currently streaming. Join the target voice channel so I can select the correct stream.",
-      multiple_in_channel: isDe
-        ? "In deinem Voice-Channel sind mehrere Worker aktiv. Stoppe einen davon oder wähle einen eindeutigen Ziel-Channel."
-        : "Multiple workers are active in your voice channel. Stop one of them or choose a unique target channel.",
-      requested_missing: isDe
-        ? "Der gewählte Worker streamt aktuell nicht auf diesem Server."
-        : "The selected worker is not currently streaming on this server.",
+      none: botText(language, "Auf diesem Server streamt gerade kein Worker. Starte zuerst `/play`.", "No worker is currently streaming on this server. Start `/play` first."),
+      multiple: botText(language, "Mehrere Worker streamen aktuell. Tritt dem Ziel-Voice-Channel bei, damit ich den richtigen Stream wähle.", "Multiple workers are currently streaming. Join the target voice channel so I can select the correct stream."),
+      multiple_in_channel: botText(language, "In deinem Voice-Channel sind mehrere Worker aktiv. Stoppe einen davon oder wähle einen eindeutigen Ziel-Channel.", "Multiple workers are active in your voice channel. Stop one of them or choose a unique target channel."),
+      requested_missing: botText(language, "Der gewählte Worker streamt aktuell nicht auf diesem Server.", "The selected worker is not currently streaming on this server."),
     };
     return messages[reason] || messages.none;
   },
@@ -271,11 +263,11 @@ const menuMethods = {
     return "ultimate";
   },
 
-  formatTierLabel(tier, language) {
+  formatTierLabel(tier, _language) {
     const normalized = String(tier || "free").toLowerCase();
     if (normalized === "ultimate") return "Ultimate";
     if (normalized === "pro") return "Pro";
-    return language === "de" ? "Free" : "Free";
+    return "Free";
   },
 
   async isWorkerAlreadyInvited(guild, worker) {
@@ -345,13 +337,13 @@ const menuMethods = {
     return `#${worker.slot}${botIndexLabel}`;
   },
 
-  formatWorkerList(items = [], maxLines = 8, moreLabel = "weitere") {
+  formatWorkerList(items = [], maxLines = 8, more = (count) => `+${count}`) {
     if (!Array.isArray(items) || !items.length) return "-";
     const lines = items.slice(0, maxLines).map((item) => {
       return `\`${this.formatWorkerBadge(item)}\` ${item.name}`;
     });
     if (items.length > maxLines) {
-      lines.push(`+${items.length - maxLines} ${moreLabel}`);
+      lines.push(more(items.length - maxLines));
     }
     return lines.join("\n");
   },
@@ -368,7 +360,7 @@ const menuMethods = {
     }
 
     const inviteState = await this.collectInviteWorkerState(guild);
-    const moreLabel = t("weitere", "more");
+    const moreLabel = (count) => t("+{count} weitere", "+{count} more", { count });
     const selectedWorker = inviteState.selectableWorkers.find((worker) => worker.slot === Number(selectedWorkerSlot))
       || inviteState.selectableWorkers[0]
       || null;
@@ -379,8 +371,8 @@ const menuMethods = {
       .setTitle(t("Worker-Bots einladen", "Invite worker bots"))
       .setDescription(
         t(
-          `Plan: **${this.formatTierLabel(inviteState.guildTier, language)}** | Verfügbare Worker: **1-${inviteState.maxIndex}**\nWähle einen Worker unten aus und nutze den Invite-Button.`,
-          `Plan: **${this.formatTierLabel(inviteState.guildTier, language)}** | Available workers: **1-${inviteState.maxIndex}**\nSelect a worker below and use the invite button.`
+          "Plan: **{plan}** | Verfügbare Worker: **1-{max}**\nWähle einen Worker unten aus und nutze den Invite-Button.",
+          "Plan: **{plan}** | Available workers: **1-{max}**\nSelect a worker below and use the invite button.", { plan: this.formatTierLabel(inviteState.guildTier, language), max: inviteState.maxIndex }
         )
       )
       .addFields(
@@ -403,8 +395,8 @@ const menuMethods = {
 
     if (selectedWorker) {
       embed.setFooter(brandFooter(t(
-        `Ausgewählt: ${selectedWorker.name} (${this.formatWorkerBadge(selectedWorker)})`,
-        `Selected: ${selectedWorker.name} (${this.formatWorkerBadge(selectedWorker)})`
+        "Ausgewählt: {worker} ({badge})",
+        "Selected: {worker} ({badge})", { worker: selectedWorker.name, badge: this.formatWorkerBadge(selectedWorker) }
       )));
     } else {
       embed.setFooter(brandFooter(t(
@@ -444,8 +436,8 @@ const menuMethods = {
           .setStyle(ButtonStyle.Link)
           .setLabel(
             t(
-              `Invite ${selectedWorker.name}`,
-              `Invite ${selectedWorker.name}`
+              "Invite {worker}",
+              "Invite {worker}", { worker: selectedWorker.name }
             )
           )
           .setURL(selectedWorker.inviteUrl)

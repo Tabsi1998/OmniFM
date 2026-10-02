@@ -136,8 +136,8 @@ function translateCustomStationErrorMessage(message, language = "de") {
   if (maxStationsMatch) {
     return languagePick(
       language,
-      `Maximum ${maxStationsMatch[1]} Custom-Stationen erreicht.`,
-      `Maximum of ${maxStationsMatch[1]} custom stations reached.`
+      "Maximum {max} Custom-Stationen erreicht.",
+      "Maximum of {max} custom stations reached.", { max: maxStationsMatch[1] }
     );
   }
 
@@ -145,8 +145,8 @@ function translateCustomStationErrorMessage(message, language = "de") {
   if (duplicateKeyMatch) {
     return languagePick(
       language,
-      `Station mit Key '${duplicateKeyMatch[1]}' existiert bereits.`,
-      `Station with key '${duplicateKeyMatch[1]}' already exists.`
+      "Station mit Key '{key}' existiert bereits.",
+      "Station with key '{key}' already exists.", { key: duplicateKeyMatch[1] }
     );
   }
 

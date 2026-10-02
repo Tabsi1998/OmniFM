@@ -31,7 +31,7 @@ function escapeHtml(value) {
 export function buildSharePageHtml({ language = "de", title, description, imageUrl, url, target, color = "#FF6B00" }) {
   const e = escapeHtml;
   return `<!doctype html>
-<html lang="${language === "en" ? "en" : "de"}">
+<html lang="${language === "de" ? "de" : "en"}">
 <head>
 <meta charset="utf-8">
 <title>${e(title)}</title>
@@ -95,7 +95,7 @@ export function createShareRoutesHandler({ websiteUrl, getInviteUrl = () => null
       }
       const color = /^#[0-9a-f]{6}$/i.test(String(station.color || "")) ? station.color : "#FF6B00";
       if (stationMatch[2]) {
-        const png = await renderStationCard({ key, name: station.name, genre: station.genre, color, logoUrl: station.logo, t, fetchImage });
+        const png = await renderStationCard({ key, name: station.name, genre: station.genre, color, logoUrl: station.logo, language, t, fetchImage });
         send(res, 200, "image/png", png, { maxAge: 86400, headOnly });
         return true;
       }
@@ -136,7 +136,7 @@ export function createShareRoutesHandler({ websiteUrl, getInviteUrl = () => null
       };
       const entry = pages[page];
       if (pageMatch[2]) {
-        const png = await renderPageCard({ page, title: entry.title, subtitle: entry.subtitle, t });
+        const png = await renderPageCard({ page, title: entry.title, subtitle: entry.subtitle, language, t });
         send(res, 200, "image/png", png, { maxAge: 86400, headOnly });
         return true;
       }

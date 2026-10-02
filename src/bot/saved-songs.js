@@ -93,7 +93,7 @@ export function buildSaveSongReply({ t, song, duplicate = false, dmSent = false,
   if (duplicate) {
     return ui.reply(ui.notice("info", {
       title: t("Schon gemerkt", "Already saved"),
-      body: t(`${name} steht schon auf deiner Merkliste (/merkliste).`, `${name} is already on your list (/saved).`),
+      body: t("{song} steht schon auf deiner Merkliste (/merkliste).", "{song} is already on your list (/saved).", { song: name }),
       applicationId,
     }));
   }
@@ -101,8 +101,8 @@ export function buildSaveSongReply({ t, song, duplicate = false, dmSent = false,
     return ui.reply(ui.notice("success", {
       title: t("Gemerkt", "Saved"),
       body: t(
-        `${name} liegt jetzt in deinen Direktnachrichten und auf deiner Merkliste (/merkliste).`,
-        `${name} is now in your direct messages and on your list (/saved).`
+        "{song} liegt jetzt in deinen Direktnachrichten und auf deiner Merkliste (/merkliste).",
+        "{song} is now in your direct messages and on your list (/saved).", { song: name }
       ),
       applicationId,
     }));
@@ -175,8 +175,8 @@ export function buildSavedSongsListPayload({ t, songs = [], page = 0, applicatio
   return ui.reply(ui.panel({
     title: `${ui.icon("save", applicationId)} ${t("Deine Merkliste", "Your saved songs")}`,
     subtitle: ui.subtext(t(
-      `${songs.length} von höchstens ${SAVED_SONGS_MAX_PER_USER} · nur du siehst sie`,
-      `${songs.length} of at most ${SAVED_SONGS_MAX_PER_USER} · only you see them`
+      "{count} von höchstens {max} · nur du siehst sie",
+      "{count} of at most {max} · only you see them", { count: songs.length, max: SAVED_SONGS_MAX_PER_USER }
     )),
     body: [ui.text(body)],
     actions,
@@ -187,8 +187,8 @@ export function buildClearSavedSongsConfirm({ t, count = 0, page = 0 }) {
   return ui.reply(ui.confirm({
     title: t("Ganze Merkliste löschen?", "Delete your whole list?"),
     body: t(
-      `Alle ${count} Songs werden gelöscht. Danach ist nichts mehr davon bei OmniFM gespeichert, das lässt sich nicht rückgängig machen.`,
-      `All ${count} songs will be deleted. After that OmniFM keeps nothing of them; this cannot be undone.`
+      "Alle {count} Songs werden gelöscht. Danach ist nichts mehr davon bei OmniFM gespeichert, das lässt sich nicht rückgängig machen.",
+      "All {count} songs will be deleted. After that OmniFM keeps nothing of them; this cannot be undone.", { count }
     ),
     confirmId: savedSongsCustomId("clearyes", page),
     cancelId: savedSongsCustomId("clearno", page),
@@ -202,8 +202,8 @@ export function buildSavedSongsClearedPayload({ t, deleted = 0, applicationId = 
   return ui.reply(ui.notice("success", {
     title: t("Merkliste gelöscht", "List deleted"),
     body: t(
-      `${deleted} Songs gelöscht. Von deiner Merkliste ist nichts mehr gespeichert.`,
-      `${deleted} songs deleted. Nothing of your list is stored any more.`
+      "{count} Songs gelöscht. Von deiner Merkliste ist nichts mehr gespeichert.",
+      "{count} songs deleted. Nothing of your list is stored any more.", { count: deleted }
     ),
     applicationId,
   }));

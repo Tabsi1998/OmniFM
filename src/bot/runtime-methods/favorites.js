@@ -89,7 +89,7 @@ const favoriteMethods = {
     log("INFO", `[${this.config?.name}] Favorit guild=${guildId} -> ${stationKey}`);
     await this.respondInteraction(interaction, buildNoticePayload({
       t, language, tone: "success", title: t("Sender gewechselt", "Station switched"),
-      description: t(`📻 Jetzt läuft **${station.name || stationKey}**.`, `📻 Now playing **${station.name || stationKey}**.`),
+      description: t("📻 Jetzt läuft **{station}**.", "📻 Now playing **{station}**.", { station: station.name || stationKey }),
     }));
     return true;
   },

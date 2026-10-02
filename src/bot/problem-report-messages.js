@@ -138,14 +138,28 @@ export function buildReportAnswerModal(decision, id) {
 
 // ---- the reporter ----
 
+/** The title of the answer, per kind of report (#477: whole sentences per language). */
+function reporterTitle(kind, done, t) {
+  if (kind === "idea") {
+    return done
+      ? t("✅ Deine Meldung an OmniFM ist erledigt", "✅ Your idea for OmniFM is done")
+      : t("🚫 Deine Meldung an OmniFM wurde abgelehnt", "🚫 Your idea for OmniFM was turned down");
+  }
+  if (kind === "feedback") {
+    return done
+      ? t("✅ Deine Meldung an OmniFM ist erledigt", "✅ Your feedback for OmniFM is done")
+      : t("🚫 Deine Meldung an OmniFM wurde abgelehnt", "🚫 Your feedback for OmniFM was turned down");
+  }
+  return done
+    ? t("✅ Deine Meldung an OmniFM ist erledigt", "✅ Your problem report to OmniFM is done")
+    : t("🚫 Deine Meldung an OmniFM wurde abgelehnt", "🚫 Your problem report to OmniFM was turned down");
+}
+
 /** The direct message for somebody who asked to hear back, in their language: done or rejected, and the team's answer. */
 export function buildReporterNotice(report) {
   const t = botTranslator(report.language || "en");
-  const look = KIND_LOOK[report.kind] || KIND_LOOK.problem;
   const done = report.status === "done";
-  const title = done
-    ? t(`✅ Deine Meldung an OmniFM ist erledigt`, `✅ Your ${look.en} for OmniFM is done`)
-    : t(`🚫 Deine Meldung an OmniFM wurde abgelehnt`, `🚫 Your ${look.en} for OmniFM was turned down`);
+  const title = reporterTitle(report.kind, done, t);
   const payload = ui.message(ui.panel({
     accent: done ? ui.UI_COLORS.success : ui.UI_COLORS.neutral,
     title,

@@ -79,8 +79,9 @@ const formMethods = {
       await this.respondInteraction(interaction, buildNoticePayload({
         t, language, tone: "warning", title: t("Stream antwortet nicht", "Stream does not answer"),
         description: t(
-          `Unter der URL kam kein Stream (${test?.error || "keine Antwort"}). Nichts gespeichert – prüf den Link und versuch es noch einmal.`,
-          `No stream came from the URL (${test?.error || "no answer"}). Nothing saved – check the link and try again.`
+          "Unter der URL kam kein Stream ({error}). Nichts gespeichert – prüf den Link und versuch es noch einmal.",
+          "No stream came from the URL ({error}). Nothing saved – check the link and try again.",
+          { error: test?.error || t("keine Antwort", "no answer") }
         ),
       }));
       return true;
@@ -97,8 +98,8 @@ const formMethods = {
     await this.respondInteraction(interaction, buildNoticePayload({
       t, language, tone: "success", title: t("Sender gespeichert", "Station saved"),
       description: t(
-        `**${result.station?.name || form.station.name}** ist jetzt als \`${result.key}\` da (${countGuildStations(guildId)}/${MAX_STATIONS_PER_GUILD} Plätze). Der Stream-Test war erfolgreich.`,
-        `**${result.station?.name || form.station.name}** is now available as \`${result.key}\` (${countGuildStations(guildId)}/${MAX_STATIONS_PER_GUILD} slots). The stream test passed.`
+        "**{station}** ist jetzt als `{key}` da ({count}/{max} Plätze). Der Stream-Test war erfolgreich.",
+        "**{station}** is now available as `{key}` ({count}/{max} slots). The stream test passed.", { station: result.station?.name || form.station.name, key: result.key, count: countGuildStations(guildId), max: MAX_STATIONS_PER_GUILD }
       ) + logoNote,
       quickActions: { includePlay: true, includeStations: true },
     }));
@@ -125,7 +126,7 @@ const formMethods = {
           ? t("es ist kein PNG-, JPG- oder WebP-Bild", "it is not a PNG, JPG or WebP picture")
           : t("es ließ sich nicht öffnen", "it could not be opened");
       return `
-${t(`Das Logo wurde nicht übernommen: ${reason}.`, `The logo was not taken: ${reason}.`)}`;
+${t("Das Logo wurde nicht übernommen: {reason}.", "The logo was not taken: {reason}.", { reason })}`;
     }
     const saved = await saveStationLogo(guildId, key, processed.png)
       .catch((error) => ({ ok: /** @type {const} */ (false), error: String(error?.message || "save_failed") }));

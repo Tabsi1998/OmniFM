@@ -10,6 +10,7 @@
 import { randomBytes } from "node:crypto";
 import { getDb, isConnected } from "./lib/db.js";
 import { REPORT_DECISIONS, REPORT_SOURCES, cleanReportText, isReportKind } from "./lib/problem-reports.js";
+import { normalizeBotLanguage } from "./lib/bot-i18n.js";
 
 export const PROBLEM_REPORTS_COLLECTION = "problem_reports";
 const DAY_MS = 86_400_000;
@@ -81,7 +82,7 @@ export async function createProblemReport(input, { now = Date.now() } = {}) {
     station: stationName ? { key: clip(input?.station?.key, 80), name: stationName } : null,
     plan: PLANS.includes(input?.plan) ? input.plan : "free",
     phases: Array.isArray(input?.phases) ? input.phases.slice(0, 5).map((line) => clip(line, 160)) : [],
-    language: input?.language === "de" ? "de" : "en",
+    language: normalizeBotLanguage(input?.language, "en"),
     consent,
     ...(reporterId ? { reporter: { userId: reporterId, name: clip(input?.reporter?.name, 80) } } : {}),
     status: "new",

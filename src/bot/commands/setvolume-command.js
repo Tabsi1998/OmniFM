@@ -28,10 +28,10 @@ export async function handleSetvolumeCommand({ runtime, interaction, t, language
       const check = runtime.workerManager.canUseWorker(requestedBot, interaction.guildId, guildTier, { prefer: "slot", strict: true });
       if (!check.ok) {
         const reasons = {
-          tier: t(`Worker ${requestedBot} erfordert ein höheres Abo (max: ${check.maxIndex}).`, `Worker ${requestedBot} requires a higher plan (max: ${check.maxIndex}).`),
-          not_configured: t(`Worker ${requestedBot} ist nicht konfiguriert.`, `Worker ${requestedBot} is not configured.`),
-          offline: t(`Worker ${requestedBot} ist offline.`, `Worker ${requestedBot} is offline.`),
-          not_invited: t(`Worker ${requestedBot} ist nicht auf diesem Server eingeladen.`, `Worker ${requestedBot} is not invited on this server.`),
+          tier: t("Worker {worker} erfordert ein höheres Abo (max: {max}).", "Worker {worker} requires a higher plan (max: {max}).", { worker: requestedBot, max: check.maxIndex }),
+          not_configured: t("Worker {worker} ist nicht konfiguriert.", "Worker {worker} is not configured.", { worker: requestedBot }),
+          offline: t("Worker {worker} ist offline.", "Worker {worker} is offline.", { worker: requestedBot }),
+          not_invited: t("Worker {worker} ist nicht auf diesem Server eingeladen.", "Worker {worker} is not invited on this server.", { worker: requestedBot }),
         };
         await runtime.respondInteraction(interaction, buildNoticePayload({
           t,
@@ -166,7 +166,7 @@ export async function handleSetvolumeCommand({ runtime, interaction, t, language
       language,
       tone: failures.length > 0 ? "warning" : "success",
       title: t("🎚 Lautstärke aktualisiert", "🎚 Volume updated"),
-      description: t(`Zielwert: **${value}**`, `Target value: **${value}**`),
+      description: t("Zielwert: **{value}**", "Target value: **{value}**", { value }),
       fields: [
         ...(appliedWorkers.length > 0 ? [{
           name: t("Direkt angewendet", "Applied live"),
@@ -194,7 +194,7 @@ export async function handleSetvolumeCommand({ runtime, interaction, t, language
       language,
       tone: "danger",
       title: t("✖ Lautstärke konnte nicht gesetzt werden", "✖ Could not change volume"),
-      description: t(`Fehler: ${result?.error || "setvolume_failed"}`, `Error: ${result?.error || "setvolume_failed"}`),
+      description: t("Fehler: {error}", "Error: {error}", { error: result?.error || "setvolume_failed" }),
     }));
     return;
   }
@@ -204,10 +204,10 @@ export async function handleSetvolumeCommand({ runtime, interaction, t, language
     tone: "success",
     title: t("🎚 Lautstärke aktualisiert", "🎚 Volume updated"),
     description: result.appliedLive
-      ? t(`Lautstärke gesetzt: **${value}**`, `Volume set to: **${value}**`)
+      ? t("Lautstärke gesetzt: **{value}**", "Volume set to: **{value}**", { value })
       : t(
-        `Lautstärke gespeichert: **${value}**. Wird beim nächsten Start verwendet.`,
-        `Volume saved: **${value}**. It will be used for the next playback.`
+        "Lautstärke gespeichert: **{value}**. Wird beim nächsten Start verwendet.",
+        "Volume saved: **{value}**. It will be used for the next playback.", { value }
       ),
   }));
   return;

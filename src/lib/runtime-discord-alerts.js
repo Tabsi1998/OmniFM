@@ -105,12 +105,12 @@ function buildRuntimeIncidentAlertCopy(eventKey, payload, t) {
         color: 0xF59E0B,
         description: replacementStation && payload?.stopped !== true
           ? t(
-            `${previousStation} ist auf diesem Server nicht mehr verfügbar. OmniFM spielt stattdessen ${replacementStation}.`,
-            `${previousStation} is no longer available on this server. OmniFM is playing ${replacementStation} instead.`
+            "{previousStation} ist auf diesem Server nicht mehr verfügbar. OmniFM spielt stattdessen {replacementStation}.",
+            "{previousStation} is no longer available on this server. OmniFM is playing {replacementStation} instead.", { previousStation, replacementStation }
           )
           : t(
-            `${previousStation} ist auf diesem Server nicht mehr verfügbar. OmniFM hat die Wiedergabe beendet; /play startet einen anderen Sender.`,
-            `${previousStation} is no longer available on this server. OmniFM stopped playback; /play starts another station.`
+            "{previousStation} ist auf diesem Server nicht mehr verfügbar. OmniFM hat die Wiedergabe beendet; /play startet einen anderen Sender.",
+            "{previousStation} is no longer available on this server. OmniFM stopped playback; /play starts another station.", { previousStation }
           ),
       };
     case "stream_failback_completed":
@@ -118,8 +118,8 @@ function buildRuntimeIncidentAlertCopy(eventKey, payload, t) {
         title: t("Wunschsender läuft wieder", "Preferred station is back"),
         color: 0x22C55E,
         description: t(
-          `${restoredStation} ist wieder erreichbar. OmniFM spielt ihn wieder statt ${previousStation}.`,
-          `${restoredStation} is reachable again. OmniFM is playing it again instead of ${previousStation}.`
+          "{restoredStation} ist wieder erreichbar. OmniFM spielt ihn wieder statt {previousStation}.",
+          "{restoredStation} is reachable again. OmniFM is playing it again instead of {previousStation}.", { restoredStation, previousStation }
         ),
       };
     case "stream_failover_activated":
@@ -127,8 +127,8 @@ function buildRuntimeIncidentAlertCopy(eventKey, payload, t) {
         title: t("Ersatzsender läuft", "Backup station playing"),
         color: 0xF59E0B,
         description: t(
-          `${previousStation} ist gerade nicht erreichbar. OmniFM spielt vorübergehend ${failoverStation} und wechselt von selbst zurück, sobald ${previousStation} wieder läuft.`,
-          `${previousStation} is not reachable right now. OmniFM plays ${failoverStation} for the time being and switches back on its own once ${previousStation} works again.`
+          "{previousStation} ist gerade nicht erreichbar. OmniFM spielt vorübergehend {failoverStation} und wechselt von selbst zurück, sobald {previousStation} wieder läuft.",
+          "{previousStation} is not reachable right now. OmniFM plays {failoverStation} for the time being and switches back on its own once {previousStation} works again.", { previousStation, failoverStation }
         ),
       };
     case "stream_healthcheck_stalled":
@@ -136,8 +136,8 @@ function buildRuntimeIncidentAlertCopy(eventKey, payload, t) {
         title: t("Kein Ton mehr", "No audio"),
         color: 0xF59E0B,
         description: t(
-          `Von ${previousStation} kommt gerade kein Ton mehr. OmniFM startet den Stream neu.`,
-          `${previousStation} stopped sending audio. OmniFM restarts the stream.`
+          "Von {previousStation} kommt gerade kein Ton mehr. OmniFM startet den Stream neu.",
+          "{previousStation} stopped sending audio. OmniFM restarts the stream.", { previousStation }
         ),
       };
     case "stream_failover_exhausted":
@@ -145,8 +145,8 @@ function buildRuntimeIncidentAlertCopy(eventKey, payload, t) {
         title: t("Kein Sender erreichbar", "No station reachable"),
         color: 0xEF4444,
         description: t(
-          `${previousStation} ist nicht erreichbar, und auch kein Ersatzsender ließ sich starten. OmniFM versucht es weiter.`,
-          `${previousStation} is not reachable, and no backup station could be started either. OmniFM keeps trying.`
+          "{previousStation} ist nicht erreichbar, und auch kein Ersatzsender ließ sich starten. OmniFM versucht es weiter.",
+          "{previousStation} is not reachable, and no backup station could be started either. OmniFM keeps trying.", { previousStation }
         ),
       };
     default:

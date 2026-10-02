@@ -57,8 +57,8 @@ export function pickGenreStations(entries = [], genre = "", count = 5, random = 
 export function buildStationPollMessage({ t, stations, minutes, endsAt }) {
   return {
     content: t(
-      `📻 Abstimmung bis <t:${Math.floor(endsAt / 1000)}:t> – der Gewinner läuft danach.`,
-      `📻 Voting until <t:${Math.floor(endsAt / 1000)}:t> – the winner plays afterwards.`
+      "📻 Abstimmung bis <t:{unix}:t> – der Gewinner läuft danach.",
+      "📻 Voting until <t:{unix}:t> – the winner plays afterwards.", { unix: Math.floor(endsAt / 1000) }
     ),
     poll: {
       question: { text: t("Welcher Sender als Nächstes?", "Which station next?") },
@@ -92,23 +92,24 @@ export function buildStationPollResultPayload({ t, outcome, stations = [], curre
   if (outcome.kind === "none") {
     kind = "info";
     title = t("Keine Stimmen", "No votes");
-    body = t(`Niemand hat abgestimmt – es bleibt bei **${clip(currentName || "-", 80)}**.`, `Nobody voted – **${clip(currentName || "-", 80)}** stays on.`);
+    body = t("Niemand hat abgestimmt – es bleibt bei **{station}**.", "Nobody voted – **{station}** stays on.", { station: clip(currentName || "-", 80) });
   } else {
     const winner = name(outcome.index);
     const tieNote = outcome.kind === "tie"
       ? t(
-        `Gleichstand zwischen ${outcome.tied.map(name).join(" und ")} – ${winner} gewinnt, weil er zuerst in der Umfrage stand. `,
-        `A tie between ${outcome.tied.map(name).join(" and ")} – ${winner} wins because it stood first in the poll. `
+        "Gleichstand zwischen {stations} – {winner} gewinnt, weil er zuerst in der Umfrage stand. ",
+        "A tie between {stations} – {winner} wins because it stood first in the poll. ",
+        { stations: outcome.tied.map(name).join(t(" und ", " and ")), winner }
       )
       : "";
     if (error) {
       kind = "error";
       title = t("Wechsel hat nicht geklappt", "Could not switch");
-      body = `${tieNote}${t(`${winner} hat gewonnen, aber der Wechsel ging nicht: ${clip(error, 200)}`, `${winner} won, but switching failed: ${clip(error, 200)}`)}`;
+      body = `${tieNote}${t("{winner} hat gewonnen, aber der Wechsel ging nicht: {error}", "{winner} won, but switching failed: {error}", { winner, error: clip(error, 200) })}`;
     } else if (switched) {
-      body = `${tieNote}${t(`📻 Jetzt läuft ${winner}.`, `📻 Now playing ${winner}.`)}`;
+      body = `${tieNote}${t("📻 Jetzt läuft {winner}.", "📻 Now playing {winner}.", { winner })}`;
     } else {
-      body = `${tieNote}${t(`${winner} läuft schon – es bleibt dabei.`, `${winner} is already on – it stays.`)}`;
+      body = `${tieNote}${t("{winner} läuft schon – es bleibt dabei.", "{winner} is already on – it stays.", { winner })}`;
     }
   }
   return ui.message(ui.notice(kind, { title, body }));

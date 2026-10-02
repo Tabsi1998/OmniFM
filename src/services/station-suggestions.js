@@ -51,18 +51,25 @@ export function buildSuggestionAnswer(suggestion) {
     return ui.message(ui.notice("success", {
       title: t("Dein Sender-Vorschlag ist im Katalog", "Your station suggestion is in the catalogue"),
       body: t(
-        `**${name}** ist jetzt bei OmniFM. Danke! Du spielst ihn mit \`/play\` und dem Sender \`${suggestion.stationKey}\`.`,
-        `**${name}** is now on OmniFM. Thank you! Play it with \`/play\` and the station \`${suggestion.stationKey}\`.`,
+        "**{station}** ist jetzt bei OmniFM. Danke! Du spielst ihn mit `/play` und dem Sender `{key}`.",
+        "**{station}** is now on OmniFM. Thank you! Play it with `/play` and the station `{key}`.", { station: name, key: suggestion.stationKey },
       ),
     }));
   }
   const note = String(suggestion?.decisionNote || "").trim();
   return ui.message(ui.notice("info", {
     title: t("Dein Sender-Vorschlag", "Your station suggestion"),
-    body: t(
-      `**${name}** kommt nicht in den Katalog.${note ? ` Grund: ${note}` : ""} Danke fürs Vorschlagen!`,
-      `**${name}** does not go into the catalogue.${note ? ` Reason: ${note}` : ""} Thanks for suggesting it!`,
-    ),
+    body: note
+      ? t(
+        "**{station}** kommt nicht in den Katalog. Grund: {reason} Danke fürs Vorschlagen!",
+        "**{station}** does not go into the catalogue. Reason: {reason} Thanks for suggesting it!",
+        { station: name, reason: note },
+      )
+      : t(
+        "**{station}** kommt nicht in den Katalog. Danke fürs Vorschlagen!",
+        "**{station}** does not go into the catalogue. Thanks for suggesting it!",
+        { station: name },
+      ),
   }));
 }
 

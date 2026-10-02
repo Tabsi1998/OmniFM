@@ -166,7 +166,7 @@ export function buildChartsMessage(chart, { language = "de" } = {}) {
   const hours = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 });
   const [firstDay, lastDay] = [new Date(chart.week.start), new Date(Date.parse(chart.week.end) - 86_400_000)];
   const dates = new Intl.DateTimeFormat(language === "en" ? "en-GB" : "de-DE", { day: "2-digit", month: "2-digit", timeZone: "UTC" });
-  const servers = (count) => t(`${count} Server`, `${count} servers`);
+  const servers = (count) => t("{count} Server", "{count} servers", { count });
   const stations = (chart.stations || []).slice(0, POSTED_STATIONS).map((entry, index) => {
     const content = `**${entry.rank}. ${entry.name}**${entry.genre ? ` · ${entry.genre}` : ""}\n`
       + `${movementLabel(entry, t)} · ${hours.format(entry.hours)} ${t("Hörstunden", "listening hours")} · ${servers(entry.servers)}`;
@@ -179,10 +179,10 @@ export function buildChartsMessage(chart, { language = "de" } = {}) {
     .setLabel(t("Alle Charts auf omnifm.xyz", "All charts on omnifm.xyz"))
     .setURL(withLanguageParam(`${String(WEBSITE_URL).replace(/\/+$/, "")}/charts`, language));
   return ui.message(ui.panel({
-    title: t(`📻 OmniFM-Charts · KW ${chart.week.week}`, `📻 OmniFM Charts · week ${chart.week.week}`),
+    title: t("📻 OmniFM-Charts · KW {week}", "📻 OmniFM Charts · week {week}", { week: chart.week.week }),
     subtitle: t(
-      `Vom ${dates.format(firstDay)} bis ${dates.format(lastDay)}, über alle Server.`,
-      `From ${dates.format(firstDay)} to ${dates.format(lastDay)}, across all servers.`,
+      "Vom {from} bis {to}, über alle Server.",
+      "From {from} to {to}, across all servers.", { from: dates.format(firstDay), to: dates.format(lastDay) },
     ),
     body: [
       stations.length ? ui.text(ui.heading(t("Meistgehörte Sender", "Most listened stations"), 3)) : null,

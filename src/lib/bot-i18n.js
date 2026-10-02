@@ -1,12 +1,12 @@
 // ============================================================
 // OmniFM: the bot's nine languages (#477)
 // ============================================================
-// The bot writes every text as t("Deutsch", "English"). The other seven
+// The bot writes every text in German and English with t(de, en). The other seven
 // languages of the website (#306) look the English text up in
 // src/i18n/bot/<code>.json, like the dashboard's tables; a text a table does
 // not have yet shows in English. Values go into a text as placeholders, so
 // each language keeps its own word order:
-//   t("Läuft jetzt: {station}", "Now playing: {station}", { station })
+//   German "Läuft jetzt: {station}", English "Now playing: {station}", params { station }
 // scripts/extract-bot-strings.mjs finds every text; test/bot-languages.test.js
 // checks the tables.
 import fs from "node:fs";

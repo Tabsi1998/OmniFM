@@ -387,12 +387,12 @@ async function notifyRuntimeStationUnavailable(runtime, guildId, state, payload 
   const reason = payload.reason ? ` (${clipText(payload.reason, 140)})` : "";
   const text = payload.stopped === true || !replacement
     ? t(
-      `\u26a0\ufe0f Sender **${previous}** ist auf diesem Server nicht mehr verf\u00fcgbar${reason}. OmniFM hat die Wiedergabe beendet. Starte mit /play einen anderen Sender.`,
-      `\u26a0\ufe0f Station **${previous}** is no longer available on this server${reason}. OmniFM stopped playback. Use /play to start another station.`
+      "⚠️ Sender **{previous}** ist auf diesem Server nicht mehr verfügbar{reason}. OmniFM hat die Wiedergabe beendet. Starte mit /play einen anderen Sender.",
+      "⚠️ Station **{previous}** is no longer available on this server{reason}. OmniFM stopped playback. Use /play to start another station.", { previous, reason }
     )
     : t(
-      `\u26a0\ufe0f Sender **${previous}** ist auf diesem Server nicht mehr verf\u00fcgbar${reason}. OmniFM spielt stattdessen **${replacement}**. Mit /play kannst du jederzeit einen anderen Sender w\u00e4hlen.`,
-      `\u26a0\ufe0f Station **${previous}** is no longer available on this server${reason}. OmniFM is playing **${replacement}** instead. Use /play any time to pick another station.`
+      "⚠️ Sender **{previous}** ist auf diesem Server nicht mehr verfügbar{reason}. OmniFM spielt stattdessen **{replacement}**. Mit /play kannst du jederzeit einen anderen Sender wählen.",
+      "⚠️ Station **{previous}** is no longer available on this server{reason}. OmniFM is playing **{replacement}** instead. Use /play any time to pick another station.", { previous, reason, replacement }
     );
 
   void emitRuntimeReliabilityAlert(runtime, guildId, "station_unavailable", {

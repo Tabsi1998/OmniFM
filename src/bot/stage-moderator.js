@@ -87,11 +87,12 @@ async function validateStageEventSpeakers(runtime, guild, channel, tier, languag
   const { moderators, others } = await splitStageModeratorBots(guild, channel, bots);
   if (moderators.length) return null;
   const names = others.map((bot) => bot?.config?.name).filter(Boolean).join(", ") || "OmniFM";
-  return languagePick(
+  return `${languagePick(
     language,
-    `In ${channel.toString()} darf ${names} noch nicht sprechen. Damit das Event dort läuft, muss der Bot in diesem Stage-Kanal Stage-Moderator sein.\n${stageModeratorHowTo("de")}`,
-    `${names} may not speak in ${channel.toString()} yet. For the event to play there, the bot has to be a Stage moderator in this Stage channel.\n${stageModeratorHowTo("en")}`
-  );
+    "In {channel} darf {bots} noch nicht sprechen. Damit das Event dort läuft, muss der Bot in diesem Stage-Kanal Stage-Moderator sein.",
+    "{bots} may not speak in {channel} yet. For the event to play there, the bot has to be a Stage moderator in this Stage channel.",
+    { channel: channel.toString(), bots: names }
+  )}\n${stageModeratorHowTo(language)}`;
 }
 
 export {

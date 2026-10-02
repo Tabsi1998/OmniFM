@@ -94,15 +94,16 @@ export async function purgeServerData(guildId) {
 function dmPayload({ language, guildName, deleteAfter, inviteUrl }) {
   const t = botTranslator(language);
   const when = `<t:${Math.floor(new Date(deleteAfter).getTime() / 1000)}:D>`;
-  const name = guildName ? `„${guildName}“` : t("deinem Server", "your server");
   const actions = inviteUrl
     ? [new ActionRowBuilder().addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(inviteUrl).setLabel(t("OmniFM wieder einladen", "Invite OmniFM again")))]
     : [];
   return ui.message(ui.notice("info", {
-    title: t(`OmniFM wurde von ${name} entfernt`, `OmniFM was removed from ${guildName ? `“${guildName}”` : "your server"}`),
+    title: guildName
+      ? t("OmniFM wurde von „{server}“ entfernt", "OmniFM was removed from “{server}”", { server: guildName })
+      : t("OmniFM wurde von deinem Server entfernt", "OmniFM was removed from your server"),
     body: t(
-      `Die Einstellungen, eigenen Sender, Events, Statistiken und den Song-Verlauf dieses Servers löschen wir am ${when}. Lädst du OmniFM vorher wieder ein, bleibt alles, wie es war. Premium-Lizenzen bleiben in jedem Fall erhalten.`,
-      `We delete this server's settings, own stations, events, statistics and song history on ${when}. If you invite OmniFM again before then, everything stays as it was. Premium licenses are kept in any case.`
+      "Die Einstellungen, eigenen Sender, Events, Statistiken und den Song-Verlauf dieses Servers löschen wir am {when}. Lädst du OmniFM vorher wieder ein, bleibt alles, wie es war. Premium-Lizenzen bleiben in jedem Fall erhalten.",
+      "We delete this server's settings, own stations, events, statistics and song history on {when}. If you invite OmniFM again before then, everything stays as it was. Premium licenses are kept in any case.", { when }
     ),
     actions,
   }));

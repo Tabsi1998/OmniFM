@@ -114,8 +114,8 @@ const permissionMethods = {
         enforced: true,
         decision,
         message: t(
-          `Du darfst \`/${command}\` nicht nutzen. Deine Rolle ist dafür gesperrt (${blocked}).`,
-          `You are not allowed to use \`/${command}\`. Your role is blocked for this command (${blocked}).`
+          "Du darfst `/{command}` nicht nutzen. Deine Rolle ist dafür gesperrt ({blocked}).",
+          "You are not allowed to use `/{command}`. Your role is blocked for this command ({blocked}).", { command, blocked }
         ),
       };
     }
@@ -126,8 +126,8 @@ const permissionMethods = {
       enforced: true,
       decision,
       message: t(
-        `Du darfst \`/${command}\` nicht nutzen. Erlaubte Rollen: ${requiredRoles}.`,
-        `You are not allowed to use \`/${command}\`. Allowed roles: ${requiredRoles}.`
+        "Du darfst `/{command}` nicht nutzen. Erlaubte Rollen: {roles}.",
+        "You are not allowed to use `/{command}`. Allowed roles: {roles}.", { command, roles: requiredRoles }
       ),
     };
   },
@@ -162,8 +162,8 @@ const permissionMethods = {
     if (command && !isPermissionManagedCommand(command)) {
       await interaction.reply({
         content: t(
-          `Unbekannter Command: \`${rawCommand}\``,
-          `Unknown command: \`${rawCommand}\``
+          "Unbekannter Command: `{command}`",
+          "Unknown command: `{command}`", { command: rawCommand }
         ),
         flags: MessageFlags.Ephemeral,
       });
@@ -180,7 +180,9 @@ const permissionMethods = {
       }
       await this.respondLongInteraction(
         interaction,
-        `${t("Rolle", "Role")} ${role.toString()} ${t("ist jetzt für", "is now")} \`/${command}\` ${sub === "allow" ? t("erlaubt", "allowed") : t("gesperrt", "blocked")}.\n` +
+        `${sub === "allow"
+          ? t("Rolle {role} ist jetzt für `/{command}` erlaubt.", "Role {role} is now allowed for `/{command}`.", { role: role.toString(), command })
+          : t("Rolle {role} ist jetzt für `/{command}` gesperrt.", "Role {role} is now blocked for `/{command}`.", { role: role.toString(), command })}\n` +
           `Allow: ${this.formatPermissionRoleMentions(result.rule.allowRoleIds)}\n` +
           `Deny: ${this.formatPermissionRoleMentions(result.rule.denyRoleIds)}`,
         { ephemeral: true }
@@ -198,7 +200,9 @@ const permissionMethods = {
       }
       await this.respondLongInteraction(
         interaction,
-        `${t("Regel für", "Rule for")} ${role.toString()} ${t("bei", "on")} \`/${command}\` ${result.changed ? t("entfernt", "removed") : t("war nicht gesetzt", "was not set")}.\n` +
+        `${result.changed
+          ? t("Regel für {role} bei `/{command}` entfernt.", "Rule for {role} on `/{command}` removed.", { role: role.toString(), command })
+          : t("Regel für {role} bei `/{command}` war nicht gesetzt.", "Rule for {role} on `/{command}` was not set.", { role: role.toString(), command })}\n` +
           `Allow: ${this.formatPermissionRoleMentions(result.rule.allowRoleIds)}\n` +
           `Deny: ${this.formatPermissionRoleMentions(result.rule.denyRoleIds)}`,
         { ephemeral: true }
@@ -217,8 +221,8 @@ const permissionMethods = {
       if (command) {
         await interaction.reply({
           content: result.changed
-            ? t(`Regeln für \`/${command}\` wurden zurückgesetzt.`, `Rules for \`/${command}\` were reset.`)
-            : t(`Für \`/${command}\` waren keine Regeln gesetzt.`, `No rules were configured for \`/${command}\`.`),
+            ? t("Regeln für `/{command}` wurden zurückgesetzt.", "Rules for `/{command}` were reset.", { command })
+            : t("Für `/{command}` waren keine Regeln gesetzt.", "No rules were configured for `/{command}`.", { command }),
           flags: MessageFlags.Ephemeral,
         });
       } else {
@@ -250,7 +254,7 @@ const permissionMethods = {
       if (!lines.length) {
         await interaction.reply({
           content: command
-            ? t(`Für \`/${command}\` sind keine Rollenregeln gesetzt.`, `No role rules are configured for \`/${command}\`.`)
+            ? t("Für `/{command}` sind keine Rollenregeln gesetzt.", "No role rules are configured for `/{command}`.", { command })
             : t("Keine Command-Rollenregeln gesetzt.", "No command role rules are configured."),
           flags: MessageFlags.Ephemeral,
         });
@@ -258,8 +262,8 @@ const permissionMethods = {
       }
 
       const header = command
-        ? t(`Regeln für \`/${command}\`:`, `Rules for \`/${command}\`:`)
-        : t(`Aktive Command-Rollenregeln (${lines.length}):`, `Active command role rules (${lines.length}):`);
+        ? t("Regeln für `/{command}`:", "Rules for `/{command}`:", { command })
+        : t("Aktive Command-Rollenregeln ({count}):", "Active command role rules ({count}):", { count: lines.length });
       await this.respondLongInteraction(interaction, `${header}\n${lines.join("\n")}`, { ephemeral: true });
       return;
     }
@@ -276,8 +280,8 @@ const permissionMethods = {
     const clientLanguage = resolveLanguageFromDiscordLocale(interaction.locale, language);
     const suggestOverride = !override && clientLanguage !== effectiveLanguage
       ? `\n${t(
-        `Tipp: Mit \`/language set value:${clientLanguage}\` kannst du OmniFM für diesen Server fest auf \`${clientLanguage}\` stellen.`,
-        `Tip: Use \`/language set value:${clientLanguage}\` to force OmniFM to \`${clientLanguage}\` for this server.`
+        "Tipp: Mit `/language set value:{language}` kannst du OmniFM für diesen Server fest auf `{language}` stellen.",
+        "Tip: Use `/language set value:{language}` to force OmniFM to `{language}` for this server.", { language: clientLanguage }
       )}`
       : "";
 
@@ -286,7 +290,7 @@ const permissionMethods = {
         content:
           `**${t("OmniFM Sprache", "OmniFM language")}**\n` +
           `${t("Aktiv", "Active")}: \`${effectiveLanguage}\`\n` +
-          `${t("Quelle", "Source")}: ${override ? t("Manuell gesetzt", "Manually set") : t("Sprache des Discord-Servers (Deutsch, sonst Englisch)", "The Discord server's language (German, otherwise English)")}\n` +
+          `${t("Quelle", "Source")}: ${override ? t("Manuell gesetzt", "Manually set") : t("Sprache des Discord-Servers (wenn OmniFM sie spricht, sonst Englisch)", "The Discord server's language (if OmniFM speaks it, otherwise English)")}\n` +
           `${t("Deine Discord-Client-Sprache", "Your Discord client language")}: \`${clientLanguage}\`` +
           suggestOverride,
         flags: MessageFlags.Ephemeral,
@@ -310,8 +314,8 @@ const permissionMethods = {
       setGuildLanguage(guildId, value);
       await interaction.reply({
         content: t(
-          `Sprache für diesen Server wurde auf \`${value}\` gesetzt.`,
-          `Language for this server was set to \`${value}\`.`
+          "Sprache für diesen Server wurde auf `{language}` gesetzt.",
+          "Language for this server was set to `{language}`.", { language: value }
         ),
         flags: MessageFlags.Ephemeral,
       });
@@ -324,12 +328,12 @@ const permissionMethods = {
       await interaction.reply({
         content: changed
           ? t(
-            `Manuelle Sprache entfernt. OmniFM nutzt jetzt wieder Discord-Server oder Client-Sprache (\`${next}\`).`,
-            `Manual language override removed. OmniFM now uses the Discord server or client locale again (\`${next}\`).`
+            "Manuelle Sprache entfernt. OmniFM nutzt jetzt wieder Discord-Server oder Client-Sprache (`{language}`).",
+            "Manual language override removed. OmniFM now uses the Discord server or client locale again (`{language}`).", { language: next }
           )
           : t(
-            `Es war keine manuelle Sprache gesetzt. Aktive Sprache bleibt \`${next}\`.`,
-            `No manual language override was set. Active language remains \`${next}\`.`
+            "Es war keine manuelle Sprache gesetzt. Aktive Sprache bleibt `{language}`.",
+            "No manual language override was set. Active language remains `{language}`.", { language: next }
           ),
         flags: MessageFlags.Ephemeral,
       });
