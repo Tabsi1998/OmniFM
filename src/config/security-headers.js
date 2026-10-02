@@ -67,8 +67,17 @@ export const PERMISSIONS_POLICY = [
 
 export const HSTS_BASE = "max-age=31536000; includeSubDomains";
 
-export function buildContentSecurityPolicy() {
-  return Object.entries(CSP_DIRECTIVES)
+// The one page another site may frame: the Discord Activity (#308), which
+// Discord shows inside its own client. Everything else keeps 'none'.
+export const ACTIVITY_FRAME_ANCESTORS = Object.freeze([
+  "https://discord.com",
+  "https://*.discord.com",
+  "https://*.discordsays.com",
+]);
+
+/** The policy; overrides replace single directives (only the Activity does that). */
+export function buildContentSecurityPolicy(overrides = {}) {
+  return Object.entries({ ...CSP_DIRECTIVES, ...overrides })
     .map(([directive, values]) => `${directive} ${values.join(" ")}`)
     .join("; ");
 }

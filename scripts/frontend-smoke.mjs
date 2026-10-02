@@ -52,6 +52,8 @@ const PAGES = [
   { name: "Charts", path: "/charts", shows: '[data-testid="charts-content"][aria-busy="false"]', lean: true },
   { name: "Dashboard (angemeldet)", path: "/dashboard", shows: '[data-testid="guild-nav-overview"]', mockDashboard: true },
   { name: "Owner-Konsole (Login)", path: "/admin", shows: '[data-testid="admin-token-input"]' },
+  // #308: the Activity outside Discord shows where it runs; Discord alone may frame it.
+  { name: "Discord-Activity", path: "/activity/", shows: '[data-testid="activity-outside"]', lean: true, activity: true },
 ];
 
 // #296: the public pages load neither the charts nor the dashboard nor the
@@ -95,6 +97,15 @@ try {
       // eslint-disable-next-line no-await-in-loop
       const response = await tab.goto(`${base}${page.path}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
       if (!response || response.status() >= 400) errors.push(`HTTP ${response ? response.status() : "keine Antwort"}`);
+      // Only the Activity may be framed, and only by Discord (#308); every other page never.
+      const headers = response?.headers() || {};
+      const ancestors = /frame-ancestors ([^;]*)/.exec(headers["content-security-policy"] || "")?.[1] || "";
+      if (page.activity) {
+        if (headers["x-frame-options"]) errors.push(`X-Frame-Options ${headers["x-frame-options"]} sperrt Discord aus`);
+        if (!ancestors.includes("https://discord.com")) errors.push(`frame-ancestors erlaubt Discord nicht (${ancestors || "fehlt"})`);
+      } else if (headers["x-frame-options"] !== "DENY" || ancestors !== "'none'") {
+        errors.push(`darf in einem Frame erscheinen (X-Frame-Options ${headers["x-frame-options"] || "fehlt"}, frame-ancestors ${ancestors || "fehlt"})`);
+      }
       // eslint-disable-next-line no-await-in-loop
       await tab.waitForSelector(page.shows, { state: "visible", timeout: 20_000 });
       // A moment for effects that run after the first paint.
@@ -106,6 +117,10 @@ try {
           const code = await script.text().catch(() => "");
           for (const [marker, what] of LEAN_MARKERS) {
             if (code.includes(marker)) errors.push(`lädt ${what} mit (${new URL(script.url()).pathname})`);
+          }
+          // The Activity is a page of its own: none of the website's chunks.
+          if (page.activity && /\/assets\/(vendor|index)-/.test(new URL(script.url()).pathname)) {
+            errors.push(`lädt Website-Code mit (${new URL(script.url()).pathname})`);
           }
         }
       }

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 import { SERVE_CONFIG_PATH, buildServeConfig, renderServeConfig } from "../scripts/write-serve-config.mjs";
-import { buildContentSecurityPolicy } from "../src/config/security-headers.js";
+import { ACTIVITY_FRAME_ANCESTORS, buildContentSecurityPolicy } from "../src/config/security-headers.js";
 import { getCommonSecurityHeaders } from "../src/lib/api-helpers.js";
 
 function headersFor(config, source) {
@@ -17,7 +17,8 @@ test("frontend/serve.json is written from src/config/security-headers.js", () =>
 });
 
 test("the website sends the headers the live smoke check expects", () => {
-  const headers = headersFor(buildServeConfig(), "**");
+  const config = buildServeConfig();
+  const headers = { ...headersFor(config, "**"), ...headersFor(config, "!activity/**") };
   assert.equal(headers["X-Content-Type-Options"], "nosniff");
   assert.equal(headers["X-Frame-Options"], "DENY");
   assert.equal(headers["Referrer-Policy"], "no-referrer");
@@ -29,13 +30,16 @@ test("the website sends the headers the live smoke check expects", () => {
 });
 
 test("the website and the Node API share one content security policy", () => {
-  assert.equal(headersFor(buildServeConfig(), "**")["Content-Security-Policy"], buildContentSecurityPolicy());
+  assert.equal(headersFor(buildServeConfig(), "!activity/**")["Content-Security-Policy"], buildContentSecurityPolicy());
   assert.equal(getCommonSecurityHeaders()["Content-Security-Policy"], buildContentSecurityPolicy());
 });
 
 test("only page paths fall back to index.html, hashed assets are cached for good", () => {
   const config = buildServeConfig();
-  assert.deepEqual(config.rewrites, [{ source: "/:path([^.]+)", destination: "/index.html" }]);
+  assert.deepEqual(config.rewrites, [
+    { source: "/activity", destination: "/activity/index.html" },
+    { source: "/:path([^.]+)", destination: "/index.html" },
+  ]);
   assert.match(headersFor(config, "assets/**")["Cache-Control"], /immutable/);
   assert.equal(headersFor(config, "favicon.ico")["Content-Type"], "image/x-icon");
 });
@@ -53,4 +57,22 @@ test("the website's fonts come from this site, and every font it names is there 
     const licence = fs.readFileSync(new URL(`../frontend/public/assets/fonts/OFL-${slug}.txt`, import.meta.url), "utf8");
     assert.match(licence, /SIL OPEN FONT LICENSE/, `licence of ${slug}`);
   }
+});
+
+test("only the Discord Activity may be framed, and only by Discord (#308)", () => {
+  const config = buildServeConfig();
+  const common = headersFor(config, "**");
+  assert.equal(common["X-Frame-Options"], undefined, "the frame rules are not in the rule for everything");
+  assert.equal(common["Content-Security-Policy"], undefined);
+  const site = headersFor(config, "!activity/**");
+  assert.equal(site["X-Frame-Options"], "DENY");
+  assert.match(site["Content-Security-Policy"], /frame-ancestors 'none'/);
+  const activity = headersFor(config, "activity/**");
+  assert.equal(activity["X-Frame-Options"], undefined, "a DENY would contradict the frame rule");
+  assert.deepEqual(ACTIVITY_FRAME_ANCESTORS, ["https://discord.com", "https://*.discord.com", "https://*.discordsays.com"]);
+  assert.match(activity["Content-Security-Policy"], /frame-ancestors https:\/\/discord\.com https:\/\/\*\.discord\.com https:\/\/\*\.discordsays\.com;/);
+  // Everything else in the Activity's policy is the site's.
+  assert.equal(activity["Content-Security-Policy"].replace(/frame-ancestors [^;]*/, "frame-ancestors 'none'"), buildContentSecurityPolicy());
+  // The rule for the site comes before the Activity's, the rule for everything first.
+  assert.deepEqual(config.headers.slice(0, 3).map((rule) => rule.source), ["**", "!activity/**", "activity/**"]);
 });

@@ -7,7 +7,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildWebsiteSecurityHeaders } from "../src/config/security-headers.js";
+import { ACTIVITY_FRAME_ANCESTORS, buildContentSecurityPolicy, buildWebsiteSecurityHeaders } from "../src/config/security-headers.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const SERVE_CONFIG_PATH = path.join(ROOT, "frontend", "serve.json");
@@ -17,20 +17,41 @@ function toHeaderList(headers) {
 }
 
 export function buildServeConfig() {
+  const {
+    "X-Frame-Options": frameOptions,
+    "Content-Security-Policy": contentSecurityPolicy,
+    ...common
+  } = buildWebsiteSecurityHeaders();
   return {
-    // Page paths of the single-page app never contain a dot, files always do.
-    // Only page paths get index.html; a missing file stays a 404 instead of
-    // being answered with the start page.
-    rewrites: [{ source: "/:path([^.]+)", destination: "/index.html" }],
+    rewrites: [
+      // The Discord Activity (#308) is a page of its own, build/activity/index.html.
+      // serve picks header rules by the file it sends, so only a file of its own
+      // can have its own frame rules.
+      { source: "/activity", destination: "/activity/index.html" },
+      // Page paths of the single-page app never contain a dot, files always do.
+      // Only page paths get index.html; a missing file stays a 404 instead of
+      // being answered with the start page.
+      { source: "/:path([^.]+)", destination: "/index.html" },
+    ],
     headers: [
       {
         source: "**",
         headers: toHeaderList({
-          ...buildWebsiteSecurityHeaders(),
+          ...common,
           // index.html and the files next to it: ask the server each time, so
           // a new release is picked up at once.
           "Cache-Control": "no-cache",
         }),
+      },
+      {
+        // Every file but the Activity's may never be shown in a frame.
+        source: "!activity/**",
+        headers: toHeaderList({ "X-Frame-Options": frameOptions, "Content-Security-Policy": contentSecurityPolicy }),
+      },
+      {
+        // The Discord Activity (#308): Discord shows it in its client, nobody else may frame it.
+        source: "activity/**",
+        headers: toHeaderList({ "Content-Security-Policy": buildContentSecurityPolicy({ "frame-ancestors": ACTIVITY_FRAME_ANCESTORS }) }),
       },
       {
         // Vite puts a content hash into every file name below assets/.

@@ -60,10 +60,12 @@ import {
   handleStationLogoRoutes,
   handleImageRoutes,
   handleLinkedRolesRoutes,
+  handleActivityRoutes,
   handleTopGGRoutes,
   handleVoteEventsRoutes,
   setRuntimeForwardTarget,
 } from "./route-handlers.js";
+import { isActivityRequest } from "./routes/activity-routes.js";
 
 const SPA_ENTRY_PATHS = new Set([
   "/",
@@ -210,8 +212,9 @@ function startWebServer(runtimes, { forwardRuntimeTo = "" } = {}) {
       }
     }
 
-    // CORS
-    const originAllowed = applyCors(req, res, publicUrl);
+    // CORS. The Discord Activity (#308) calls from its own address inside
+    // Discord (<app>.discordsays.com); that one origin counts for /api/activity only.
+    const originAllowed = isActivityRequest(req, requestUrl.pathname) || applyCors(req, res, publicUrl);
     if (req.method === "OPTIONS") {
       if (!originAllowed) {
         sendJson(res, 403, { error: "Origin nicht erlaubt." });
@@ -300,6 +303,9 @@ function startWebServer(runtimes, { forwardRuntimeTo = "" } = {}) {
     }
 
     if (await handleLinkedRolesRoutes({ req, res, requestUrl, runtimes })) {
+      return;
+    }
+    if (await handleActivityRoutes({ req, res, requestUrl, readJsonBody, runtimes })) {
       return;
     }
     if (await handleAuthRoutes({ req, res, requestUrl, publicUrl })) {

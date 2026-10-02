@@ -2,6 +2,27 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig, searchForWorkspaceRoot, transformWithOxc } from 'vite';
 import react from '@vitejs/plugin-react';
 
+// Which pages reach a module: the website, the Discord Activity (#308) or
+// both. The Activity is its own page; it must not pull the site's vendor chunk.
+const reach = new Map();
+function pagesReaching(id, getModuleInfo, path = new Set()) {
+  const known = reach.get(id);
+  if (known) return known;
+  const clean = id.replaceAll('\\', '/');
+  if (clean.includes('/src/activity/') || clean.endsWith('/activity/index.html')) return new Set(['activity']);
+  if (path.has(id)) return new Set();
+  path.add(id);
+  const info = getModuleInfo(id);
+  const importers = [...(info?.importers || []), ...(info?.dynamicImporters || [])];
+  const pages = new Set(importers.length ? [] : ['site']);
+  for (const importer of importers) {
+    for (const page of pagesReaching(importer, getModuleInfo, path)) pages.add(page);
+  }
+  path.delete(id);
+  reach.set(id, pages);
+  return pages;
+}
+
 const jsxInJs = {
   name: 'omnifm:jsx-in-js',
   enforce: 'pre',
@@ -68,8 +89,15 @@ export default defineConfig({
     emptyOutDir: true,
     chunkSizeWarningLimit: 700,
     rollupOptions: {
+      // The website, and the Discord Activity as a page of its own (#308): it
+      // loads none of the site's code, and build/activity/ gets its own frame
+      // rules in serve.json.
+      input: {
+        index: fileURLToPath(new URL('./index.html', import.meta.url)),
+        activity: fileURLToPath(new URL('./activity/index.html', import.meta.url)),
+      },
       output: {
-        manualChunks(id) {
+        manualChunks(id, { getModuleInfo }) {
           if (!id.includes('/node_modules/')) return undefined;
           // recharts goes with the pages that draw charts (#296); forcing it into a
           // chunk of its own put a shared helper there, and the start page loaded it all.
@@ -81,6 +109,10 @@ export default defineConfig({
           ) {
             return 'react';
           }
+          // The Activity's SDK goes with the Activity; what the site uses too
+          // (a few small helpers) gets a small chunk of its own.
+          const pages = pagesReaching(id, getModuleInfo);
+          if (pages.has('activity')) return pages.has('site') ? 'shared' : undefined;
           return 'vendor';
         },
       },

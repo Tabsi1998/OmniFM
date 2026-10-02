@@ -7,6 +7,7 @@
     "node": ">=22.12 <23"
   },
   "dependencies": {
+    "@discord/embedded-app-sdk": "^2.5.0",
     "axios": "^1.20.0",
     "lucide-react": "^1.48.0",
     "react": "^19.3.0",

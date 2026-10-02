@@ -43,7 +43,7 @@ export function getClientIp(req, proxyOptions = undefined) {
   return forwarded || peerIp || req?.socket?.remoteAddress || "unknown";
 }
 
-function getApiRateLimitSpec(pathname) {
+export function getApiRateLimitSpec(pathname) {
   if (
     pathname === "/api/premium/webhook"
     || pathname === "/api/discordbotlist/vote"
@@ -71,6 +71,15 @@ function getApiRateLimitSpec(pathname) {
       scope: "image",
       max: parseEnvInt("API_RATE_LIMIT_IMAGE_MAX", 600, 1, 10_000),
       windowMs: parseEnvInt("API_RATE_LIMIT_IMAGE_WINDOW_MS", 60_000, 1_000, 10 * 60_000),
+    };
+  }
+  // The Discord Activity (#308): everyone in it comes through Discord's
+  // proxy, so few addresses carry many people, each asking every 10 seconds.
+  if (pathname.startsWith("/api/activity/")) {
+    return {
+      scope: "activity",
+      max: parseEnvInt("API_RATE_LIMIT_ACTIVITY_MAX", 600, 1, 10_000),
+      windowMs: parseEnvInt("API_RATE_LIMIT_ACTIVITY_WINDOW_MS", 60_000, 1_000, 10 * 60_000),
     };
   }
   if (pathname.startsWith("/api/premium/")) {

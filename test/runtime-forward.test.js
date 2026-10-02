@@ -6,7 +6,7 @@ import { once } from "node:events";
 import { forwardRequestHeaders, forwardToRuntime, isRuntimePath, RUNTIME_UNAVAILABLE } from "../src/api/runtime-forward.js";
 
 test("only the paths that need the bots go to the commander (#290)", () => {
-  for (const path of ["/api/auth/session", "/api/dashboard", "/api/dashboard/stats", "/api/share/station/x", "/api/station-logos/a.png", "/api/owner/status"]) {
+  for (const path of ["/api/auth/session", "/api/dashboard", "/api/dashboard/stats", "/api/share/station/x", "/api/station-logos/a.png", "/api/owner/status", "/api/activity/now"]) {
     assert.equal(isRuntimePath(path), true, path);
   }
   for (const path of ["/api/admin/config", "/api/stats", "/api/premium/webhook", "/api/authx", "/api/dashboards"]) {
