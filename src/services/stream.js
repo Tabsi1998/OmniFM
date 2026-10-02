@@ -12,6 +12,7 @@ import { log, shouldLogFfmpegStderrLine } from "../lib/logging.js";
 import {
   clipText,
   applyVolumeTransformerLevel,
+  applyEncoderBitrate,
   sanitizeUrlForLog,
   buildTranscodeProfile,
   isLikelyNetworkFailureLine,
@@ -43,7 +44,9 @@ async function createResource(url, volume, qualityPreset, botName, bitrateOverri
 
   const transcode = String(process.env.TRANSCODE || "0") === "1" || preset !== "custom" || !!bitrateOverride;
   if (transcode) {
-    const mode = String(process.env.TRANSCODE_MODE || "opus").toLowerCase();
+    // PCM (#464): discord.js encodes once, at the plan's bitrate. "opus" makes
+    // ffmpeg encode first, which discord.js decodes again for the volume.
+    const mode = String(process.env.TRANSCODE_MODE || "pcm").toLowerCase();
     const args = [
       "-loglevel", "warning",
       "-fflags", "+genpts+discardcorrupt",
@@ -142,6 +145,8 @@ async function createResource(url, volume, qualityPreset, botName, bitrateOverri
       metadata,
     });
     applyVolumeTransformerLevel(resource.volume, volume);
+    // The volume makes discord.js encode again; its encoder gets the plan's bitrate (#464).
+    applyEncoderBitrate(resource, profile.requestedKbps);
 
     return { resource, process: ffmpeg };
   }
@@ -164,6 +169,7 @@ async function createResource(url, volume, qualityPreset, botName, bitrateOverri
 
   const resource = createAudioResource(probe.stream, { inputType: probe.type, inlineVolume: true, metadata });
   applyVolumeTransformerLevel(resource.volume, volume);
+  applyEncoderBitrate(resource, profile.requestedKbps);
 
   return { resource, process: null };
 }
