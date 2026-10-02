@@ -18,6 +18,7 @@ import { ROLE_CONNECTION_METADATA, PLATFORM_NAME, premiumCustomerIds, roleConnec
 import { getListeningHours } from "../listening-hours-store.js";
 import {
   deleteSupportRoleRecord,
+  forgetLinkedRoles,
   getLinkedRoleInfo,
   getLinkedRoleTokens,
   listLinkedUserIds,
@@ -119,7 +120,14 @@ export function premiumCustomersOf(runtime, tierOf = getTier) {
  */
 export async function syncLinkedRoleUser(userId, { premiumIds, credentials = linkedRolesCredentials(), fetchImpl = fetch, now = new Date(), force = false }) {
   let tokens = await getLinkedRoleTokens(userId);
-  if (!tokens) return { ok: false, error: "not-linked" };
+  if (!tokens) {
+    // Stored, but no key opens it any more (a new OMNIFM_TOKEN_KEY): the person connects again.
+    if (await getLinkedRoleInfo(userId)) {
+      await forgetLinkedRoles(userId);
+      return { ok: false, error: "ended" };
+    }
+    return { ok: false, error: "not-linked" };
+  }
   const hours = await getListeningHours(userId);
   const connection = roleConnectionFor({ listenedMs: hours.listenedMs, counting: hours.counting, premium: premiumIds.has(String(userId)) });
   const info = await getLinkedRoleInfo(userId);

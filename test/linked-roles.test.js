@@ -289,6 +289,12 @@ test("stored: tokens only encrypted; a day's values go once, a refresh before th
     assert.equal(result.error, attempt < 3 ? "role_connection_failed:401" : "ended");
   }
   assert.equal(await store.getLinkedRoleInfo(PERSON), null, "the connection ended after three failures");
+
+  // A new key opens none of the stored tokens: the connection ends at the next round.
+  await store.saveLinkedRoleTokens(PERSON, { accessToken: "a", refreshToken: "r", expiresAt: later }, { key: randomBytes(32) });
+  assert.deepEqual(await service.syncLinkedRoleUser(PERSON, { premiumIds, fetchImpl: revoked.fetchImpl, now: later }), { ok: false, error: "ended" });
+  assert.equal(await store.getLinkedRoleInfo(PERSON), null);
+  assert.deepEqual(await service.syncLinkedRoleUser(PERSON, { premiumIds, fetchImpl: revoked.fetchImpl, now: later }), { ok: false, error: "not-linked" });
   await hours.setListeningConsent(PERSON, false);
 });
 
