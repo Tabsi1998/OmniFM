@@ -32,7 +32,7 @@ describe('owner console: sponsor logo upload', () => {
   it('refuses a file over 2 MB before anything is sent, and shows what the server says', async () => {
     const apiSend = vi.fn(async () => { throw new Error('Nur PNG, JPEG, WebP oder GIF.'); });
     render(<SponsorLogoUpload index={1} value={`upload:${'c'.repeat(32)}`} apiSend={apiSend} onUploaded={() => {}} />);
-    expect(screen.getByTestId('cfg-sponsor-1-preview').getAttribute('src')).toBe('/api/image/sponsor/1');
+    expect(screen.queryByTestId('cfg-sponsor-1-preview')).toBeNull();
     expect(screen.getByTestId('cfg-sponsor-1-uploaded')).toBeTruthy();
 
     const big = new File([new Uint8Array(2 * 1024 * 1024 + 1)], 'big.png', { type: 'image/png' });

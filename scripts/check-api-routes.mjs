@@ -34,7 +34,8 @@ function walk(directory, extensions, found = []) {
 /** Paths as the frontend writes them; a template placeholder becomes ":param". */
 function frontendPaths() {
   const paths = new Map();
-  for (const file of walk(path.join(root, "frontend", "src"), new Set([".js", ".jsx", ".ts", ".tsx"]))) {
+  // Tests are left out: the addresses in them are test data, not calls.
+  for (const file of walk(path.join(root, "frontend", "src"), new Set([".js", ".jsx", ".ts", ".tsx"])).filter((name) => !/\.test\.[jt]sx?$/.test(name))) {
     const text = fs.readFileSync(file, "utf8");
     for (const match of text.matchAll(/["'`](\/api\/[A-Za-z0-9_\-/.]*(?:\$\{[^}]*\}[A-Za-z0-9_\-/.]*)*)/g)) {
       let apiPath = match[1].replace(/\$\{[^}]*\}/g, ":param").replace(/\/+$/, "");
@@ -99,7 +100,8 @@ const routes = fastapiRoutes();
 const missing = [];
 for (const [apiPath, file] of [...frontendPaths()].sort(([a], [b]) => a.localeCompare(b))) {
   const viaNode = NODE_PREFIXES.some((prefix) => `${apiPath}/`.startsWith(prefix));
-  const ok = viaNode ? existsInNode(apiPath, nodeSource) : existsInFastapi(apiPath, routes);
+  // Since #290 the public entry on :8001 is Node: a route Node answers counts.
+  const ok = viaNode ? existsInNode(apiPath, nodeSource) : (existsInFastapi(apiPath, routes) || existsInNode(apiPath, nodeSource));
   if (list) console.log(`${ok ? "ok     " : "MISSING"} ${viaNode ? "node   " : "fastapi"} ${apiPath}`);
   if (!ok) missing.push(`${apiPath} (${viaNode ? "Node API" : "FastAPI"}, called in ${file})`);
 }

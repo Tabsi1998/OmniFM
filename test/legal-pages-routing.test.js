@@ -260,7 +260,9 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
 
     const notFoundPageResponse = await fetch(`http://127.0.0.1:${port}/definitely-missing-page`);
     assert.equal(notFoundPageResponse.status, 404);
-    assert.match(await notFoundPageResponse.text(), /404/);
+    // Without a build the plain answer; with one its 404.html, the app with noindex (#487).
+    const notFoundBody = await notFoundPageResponse.text();
+    assert.ok(/404/.test(notFoundBody) || /<meta name="robots" content="noindex/.test(notFoundBody), notFoundBody.slice(0, 200));
 
     // The owner console is the React app; the old HTML admin page, its cookie
     // login and the ?token= address are gone (#288). /api/admin/* takes the

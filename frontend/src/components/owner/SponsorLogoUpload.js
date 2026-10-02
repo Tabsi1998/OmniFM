@@ -42,8 +42,9 @@ export default function SponsorLogoUpload({ index, value, apiSend, onUploaded })
     }
   };
 
-  // Uploaded earlier and saved: the website's own address shows it.
-  const shown = preview || (String(value || '').startsWith('upload:') ? `/api/image/sponsor/${index}` : '');
+  // The picture just chosen. A saved one is named, not shown: the website's
+  // address counts partners by their place, which may have moved since.
+  const shown = preview;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', margin: '0 0 14px' }}>
       <label className="oa-btn ghost" style={{ cursor: busy ? 'wait' : 'pointer', height: 32 }}>
