@@ -1,0 +1,182 @@
+/* The OmniFM Activity (#308): dark like the site, readable on a phone in
+   portrait and in Discord's small activity panel. */
+:root {
+  color-scheme: dark;
+  --act-bg: #050505;
+  --act-card: #0f1117;
+  --act-line: #1f2433;
+  --act-text: #f3f4f8;
+  --act-muted: #94a3b8;
+  --act-accent: #00e5ff;
+  --act-warn: #f59e0b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--act-bg);
+  color: var(--act-text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.act-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.act-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.act-brand {
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--act-accent);
+}
+
+.act-channel {
+  color: var(--act-muted);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.act-stream {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  padding: 16px;
+  margin-bottom: 14px;
+  background: var(--act-card);
+  border: 1px solid var(--act-line);
+  border-radius: 14px;
+}
+
+.act-logo {
+  flex: 0 0 auto;
+  width: min(34vw, 180px);
+  aspect-ratio: 1;
+  border-radius: 12px;
+  object-fit: cover;
+  background: #111;
+}
+
+.act-logo-initial {
+  display: grid;
+  place-items: center;
+  font-size: 56px;
+  font-weight: 800;
+  color: var(--act-accent);
+  background: linear-gradient(135deg, #10202a, #1a1030);
+}
+
+.act-stream-text {
+  min-width: 0;
+}
+
+.act-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--act-muted);
+}
+
+.act-station {
+  margin: 2px 0 6px;
+  font-size: clamp(20px, 5vw, 30px);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.act-song {
+  margin: 0;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.act-bot {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--act-muted);
+}
+
+.act-listeners ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.act-listeners li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 4px 10px 4px 4px;
+  background: var(--act-card);
+  border: 1px solid var(--act-line);
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.act-listeners li span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.act-listeners img,
+.act-avatar-initial {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.act-avatar-initial {
+  display: grid;
+  place-items: center;
+  background: #1a1d29;
+  color: var(--act-muted);
+  font-weight: 700;
+}
+
+.act-note {
+  color: var(--act-muted);
+}
+
+.act-problem {
+  color: var(--act-warn);
+}
+
+.act-outside {
+  text-align: center;
+  padding-top: 18vh;
+}
+
+.act-outside a {
+  color: var(--act-accent);
+}
+
+@media (max-width: 420px) {
+  .act-stream {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .act-logo {
+    width: min(60vw, 220px);
+  }
+}

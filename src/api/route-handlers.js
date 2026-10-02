@@ -4,6 +4,7 @@ import { createDashboardChannelsRouteHandler } from "./routes/dashboard-channels
 import { createDashboardPlaybackRouteHandler } from "./routes/dashboard-playback.js";
 import { createAuthRoutesHandler } from "./routes/auth-routes.js";
 import { createLinkedRolesRoutes } from "./routes/linked-roles-routes.js";
+import { createActivityRoutes } from "./routes/activity-routes.js";
 import { createDashboardCustomStationsRouteHandler } from "./routes/dashboard-custom-stations.js";
 import { createDashboardAccessRouteHandler } from "./routes/dashboard-access.js";
 import { createDashboardEmojisRouteHandler } from "./routes/dashboard-emojis.js";
@@ -331,6 +332,8 @@ export const handleStationLogoRoutes = createStationLogoRoutesHandler();
 export const handleImageRoutes = createImageRoutesHandler();
 // The sign-in for the linked roles (#302).
 export const handleLinkedRolesRoutes = createLinkedRolesRoutes();
+// The Discord Activity in the voice channel (#308).
+export const handleActivityRoutes = createActivityRoutes({ sendJson, methodNotAllowed });
 
 // The owner cockpit (#355).
 export const handleOwnerStatusRoutes = createOwnerStatusRoutesHandler({ getService: getOwnerStatusService });

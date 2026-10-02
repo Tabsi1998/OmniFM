@@ -386,6 +386,25 @@ async function inspectSecurityHeaders(baseUrl) {
     logLine("OK", `security ${check.name}: hardened headers present`);
   }
 
+  // The Discord Activity (#308) is the one page Discord may frame. Before it
+  // is deployed, /activity/ is the website's start page; then nothing to check.
+  const activity = await fetchText(baseUrl, "/activity/");
+  if (!/<meta name="omnifm-page" content="activity"/i.test(activity.text || "")) {
+    logLine("OK", "security activity: not deployed yet");
+  } else {
+    const ancestors = /frame-ancestors ([^;]*)/i.exec(activity.headers?.get?.("content-security-policy") || "")?.[1] || "";
+    const failures = [];
+    if (activity.headers?.get?.("x-frame-options")) failures.push("x-frame-options keeps Discord out");
+    if (!/(^|\s)https:\/\/discord\.com(\s|$)/.test(ancestors)) failures.push(`frame-ancestors without discord.com (${ancestors || "missing"})`);
+    if (/\*(\s|$)|'none'/.test(ancestors)) failures.push(`frame-ancestors too wide or none (${ancestors})`);
+    if (failures.length) {
+      ok = false;
+      logLine("FAIL", `security activity: ${failures.join("; ")}`);
+    } else {
+      logLine("OK", "security activity: only Discord may frame it");
+    }
+  }
+
   return { ok };
 }
 

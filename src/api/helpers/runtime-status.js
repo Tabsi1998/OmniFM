@@ -180,6 +180,30 @@ export function collectGuildLiveDetails(runtimes, guildId) {
   return rows;
 }
 
+/**
+ * What plays in one voice channel of a server, per bot (the Discord
+ * Activity, #308): the station and the song, nothing about the stream's health.
+ */
+export function collectChannelNowPlaying(runtimes, guildId, channelId) {
+  const rows = [];
+  for (const runtime of sortDashboardRuntimes(runtimes)) {
+    if (typeof runtime?.getPublicStatus !== "function" && typeof runtime?.getDashboardStatus !== "function") continue;
+    const status = getDashboardStatusSnapshot(runtime);
+    const detail = resolveDashboardGuildDetail(runtime, guildId, status);
+    if (!detail || String(detail.channelId || "") !== String(channelId)) continue;
+    if (detail.playing !== true && detail.recovering !== true) continue;
+    const meta = detail.meta && typeof detail.meta === "object" ? detail.meta : {};
+    rows.push({
+      botName: status.name || "OmniFM",
+      stationKey: detail.stationKey || null,
+      stationName: detail.stationName || detail.stationKey || null,
+      recovering: detail.recovering === true,
+      song: clipText(meta.displayTitle || [meta.artist, meta.title].filter(Boolean).join(" - ") || "", 160) || null,
+    });
+  }
+  return rows;
+}
+
 function collectGuildBotHealthRows(runtimes, guildId) {
   const rows = [];
   for (const runtime of sortDashboardRuntimes(runtimes)) {
