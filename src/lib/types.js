@@ -53,6 +53,9 @@
  * @property {string | null} [restoreBlockReason]
  * @property {{ id: string, golden: boolean, year: number, song: string, shownAt: number, foundAt: number, finder: string } | null} [easterEgg]
  *   the song's egg in the Easter egg hunt (#429); lives in memory only
+ * @property {import("./jingle-mixer.js").JingleMixer | null} [jingleMixer]  the running stream's jingle mixer (#309), null without PCM
+ * @property {string | null} [jingleHourKey]  the full hour whose jingle is done, "2026-10-02T14"
+ * @property {number} [lastJingleAt]          epoch ms of the last jingle
  */
 
 export {};

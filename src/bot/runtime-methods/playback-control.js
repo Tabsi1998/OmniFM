@@ -65,6 +65,7 @@ const playbackControlMethods = {
         await this.playStation(state, stationsData, stationKey, guildId, {
           countAsStart: true,
           resumeSession: false,
+          jingle: true,
         });
         this.updatePresence();
 

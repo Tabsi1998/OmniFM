@@ -385,6 +385,7 @@ export async function executeRuntimePlay(runtime, interaction, {
       await runtime.playStation(state, playable.playStations, playable.key, guildId, {
         countAsStart: true,
         resumeSession: false,
+        jingle: true,
       });
       const tierConfig = getTierConfig(guildId);
       const tierLabel = tierConfig.tier !== "free" ? ` [${tierConfig.name} ${tierConfig.bitrate}]` : "";

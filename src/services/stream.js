@@ -19,6 +19,7 @@ import {
 } from "../lib/helpers.js";
 import { networkRecoveryCoordinator } from "../core/network-recovery.js";
 import { safeFetch } from "../lib/safe-outbound-http.js";
+import { JingleMixer } from "../lib/jingle-mixer.js";
 
 async function createResource(url, volume, qualityPreset, botName, bitrateOverride, networkScope = null, options = {}) {
   const metadata = options?.metadata && typeof options.metadata === "object" ? options.metadata : null;
@@ -139,7 +140,14 @@ async function createResource(url, volume, qualityPreset, botName, bitrateOverri
       log("ERROR", `[${botName}] ffmpeg process error: ${err?.message || err}`);
     });
 
-    const resource = createAudioResource(ffmpeg.stdout, {
+    // PCM passes the server's jingle mixer (#309); without a jingle it stays untouched.
+    let mixer = null;
+    if (inputType === StreamType.Raw) {
+      mixer = new JingleMixer();
+      ffmpeg.stdout.once("error", (error) => mixer.destroy(error));
+      ffmpeg.stdout.pipe(mixer);
+    }
+    const resource = createAudioResource(mixer || ffmpeg.stdout, {
       inputType,
       inlineVolume: true,
       metadata,
@@ -148,7 +156,7 @@ async function createResource(url, volume, qualityPreset, botName, bitrateOverri
     // The volume makes discord.js encode again; its encoder gets the plan's bitrate (#464).
     applyEncoderBitrate(resource, profile.requestedKbps);
 
-    return { resource, process: ffmpeg };
+    return { resource, process: ffmpeg, mixer };
   }
 
   const stream = Readable.fromWeb(/** @type {import("node:stream/web").ReadableStream} */ (streamResponse.body));
@@ -171,7 +179,7 @@ async function createResource(url, volume, qualityPreset, botName, bitrateOverri
   applyVolumeTransformerLevel(resource.volume, volume);
   applyEncoderBitrate(resource, profile.requestedKbps);
 
-  return { resource, process: null };
+  return { resource, process: null, mixer: null };
 }
 
 export { createResource };

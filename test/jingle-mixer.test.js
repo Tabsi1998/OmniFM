@@ -2,9 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Readable } from "node:stream";
 
-// The jingle prototype (#309): the mixer ducks the music under a jingle and
+// The jingle mixer (#309): it ducks the music under a jingle and
 // brings it back, whatever sizes the PCM chunks come in.
-const { JingleMixer, toSamples } = await import("../scripts/jingle-prototype/jingle-mixer.mjs");
+const { JingleMixer, toSamples } = await import("../src/lib/jingle-mixer.js");
 
 /** Stereo PCM with every sample at `value`. */
 function pcm(frames, value) {
@@ -70,4 +70,14 @@ test("loud music and a loud jingle are clipped, not wrapped around", async () =>
 test("an incomplete last frame is dropped, never half played", async () => {
   const out = await run(new JingleMixer(), [pcm(3, 500), Buffer.from([1, 2, 3])]);
   assert.equal(out.length, 12);
+});
+
+test("a jingle at the start of a stream: the music is down from the first sample", async () => {
+  const mixer = new JingleMixer({ duck: 0.5, fadeMs: 10 });
+  assert.equal(mixer.flowing, false);
+  assert.equal(mixer.play(new Int16Array(0)), false, "nothing to play");
+  assert.equal(mixer.play(pcm(100, 200), { fadeIn: false }), true);
+  const out = toSamples(await run(mixer, [pcm(300, 1000)]));
+  assert.equal(out[0], 1000 * 0.5 + 200, "no fade down first");
+  assert.equal(mixer.flowing, true);
 });

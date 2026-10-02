@@ -36,6 +36,8 @@ export const PLAN_CAPABILITIES = Object.freeze({
   failover_rules: Object.freeze({ apiKey: "failoverRules", minPlan: "ultimate", de: "Eigene Ersatzsender-Ketten", en: "Your own fallback chains" }),
   exports_webhooks: Object.freeze({ apiKey: "exportsWebhooks", minPlan: "ultimate", de: "Webhooks und Exporte", en: "Webhooks and exports" }),
   voice_guard: Object.freeze({ apiKey: "voiceGuard", minPlan: "free", de: "Voice Guard", en: "Voice guard" }),
+  // #309: the server's own jingle over the music.
+  jingles: Object.freeze({ apiKey: "jingles", minPlan: "ultimate", de: "Eigener Jingle", en: "Your own jingle" }),
 });
 
 /** Slash commands that need more than Free; every other command is Free. */
@@ -213,6 +215,12 @@ export const PLAN_FEATURES = Object.freeze([
     highlight: true,
     de: (plan) => (plan === "ultimate" ? "Eigenes Bot-Aussehen pro Server" : null),
     en: (plan) => (plan === "ultimate" ? "Your own bot look per server" : null),
+  },
+  {
+    key: "jingle",
+    highlight: true,
+    de: (plan) => (plan === "ultimate" ? "Eigener Jingle (bis 10 s) beim Senderwechsel oder zur vollen Stunde" : null),
+    en: (plan) => (plan === "ultimate" ? "Your own jingle (up to 10 s) on a station switch or on the hour" : null),
   },
   {
     key: "failoverRules",

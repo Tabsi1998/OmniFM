@@ -289,6 +289,7 @@ export function clearRuntimeStreamHealthTimer(state) {
 
 export function clearRuntimeCurrentProcess(runtime, state) {
   clearRuntimeStreamHealthTimer(state);
+  state.jingleMixer = null;
   state.lastAudioPacketAt = 0;
   state.streamHealthStartedAt = 0;
   if (state.currentProcess) {

@@ -21,7 +21,7 @@ import { Readable } from "node:stream";
 import { setTimeout as delay } from "node:timers/promises";
 import { parseArgs } from "node:util";
 import { StreamType, createAudioResource } from "@discordjs/voice";
-import { JingleMixer, SAMPLE_RATE, toSamples } from "./jingle-mixer.mjs";
+import { JingleMixer, SAMPLE_RATE, toSamples } from "../../src/lib/jingle-mixer.js";
 
 // --seconds per way, --every seconds between jingles, --switches against the
 // test radio, --stations real stream URLs separated by commas ("" skips them).

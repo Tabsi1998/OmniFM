@@ -33,6 +33,7 @@ import {
   handleBotsGGRoutes,
   handleDashboardAccessRoute,
   handleDashboardBotProfileRoute,
+  handleDashboardJingleRoute,
   handleDashboardChannelsRoute,
   handleDashboardPlaybackRoute,
   handleDashboardCustomStationsRoute,
@@ -336,6 +337,9 @@ function startWebServer(runtimes, { forwardRuntimeTo = "" } = {}) {
       return;
     }
     if (await handleDashboardBotProfileRoute({ req, res, requestUrl, readJsonBody, runtimes })) {
+      return;
+    }
+    if (await handleDashboardJingleRoute({ req, res, requestUrl, readJsonBody, runtimes })) {
       return;
     }
 

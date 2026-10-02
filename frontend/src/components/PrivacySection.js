@@ -78,6 +78,7 @@ function PrivacySection({ legal, privacy }) {
     ['suggestions', sections.suggestionsTitle, sections.suggestionsBody],
     ['reports', sections.reportsTitle, sections.reportsBody],
     ['egg-hunt', sections.eggHuntTitle, sections.eggHuntBody],
+    ['jingles', sections.jinglesTitle, sections.jinglesBody],
     ['saved-songs', sections.savedSongsTitle, sections.savedSongsBody],
     ['my-data', sections.selfServiceTitle, sections.selfServiceBody],
     ['premium', sections.premiumTitle, sections.premiumBody({ smtpEnabled: features.smtpEnabled })],

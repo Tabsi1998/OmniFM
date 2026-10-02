@@ -113,6 +113,9 @@ class WorkerBridgeService {
         return this.runtime.restartStationFromDashboard(guildId);
       case "reconnectVoice":
         return this.runtime.reconnectVoiceFromDashboard(guildId);
+      // The dashboard's button that plays the server's jingle now (#309).
+      case "playJingle":
+        return this.runtime.playJingleFromDashboard(guildId);
       case "setGuildProfile":
         return this.runtime.applyGuildBotProfile(guildId, payload.changes || {});
       case "setVolume": {

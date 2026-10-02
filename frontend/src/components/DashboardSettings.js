@@ -28,6 +28,7 @@ import {
   normalizeDashboardVoiceGuardConfig,
 } from '../lib/dashboardVoiceGuard.js';
 import DashboardBotProfile from './DashboardBotProfile.js';
+import DashboardJingle from './DashboardJingle.js';
 import DashboardPanelDesigner from './DashboardPanelDesigner.js';
 import { renderVoiceStatusTemplate } from '../../../src/lib/voice-status-template.js';
 import { VOICE_STATUS_SAMPLE } from './settings/settingsShared.js';
@@ -575,6 +576,8 @@ export default function DashboardSettings({
       <DashboardPanelDesigner apiRequest={apiRequest} selectedGuildId={selectedGuildId} t={t} />
 
       <DashboardBotProfile apiRequest={apiRequest} selectedGuildId={selectedGuildId} t={t} />
+
+      <DashboardJingle apiRequest={apiRequest} selectedGuildId={selectedGuildId} t={t} />
 
     <SettingsIncidentAlerts
       canManageIncidentAlerts={canManageIncidentAlerts}

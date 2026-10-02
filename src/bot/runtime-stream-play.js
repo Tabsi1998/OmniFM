@@ -52,7 +52,7 @@ export async function playRuntimeStation(runtime, state, stations, key, guildId,
   const createStreamResource = typeof runtime.createStreamResource === "function"
     ? runtime.createStreamResource.bind(runtime)
     : createResource;
-  const { resource, process } = await createStreamResource(
+  const { resource, process, mixer = null } = await createStreamResource(
     station.url,
     state.volume,
     stations.qualityPreset,
@@ -70,6 +70,8 @@ export async function playRuntimeStation(runtime, state, stations, key, guildId,
   clearRuntimeFailbackTimer(state);
   clearRuntimeStreamHealthTimer(state);
   state.currentProcess = process;
+  // The server's jingle mixes in here (#309); null when ffmpeg sends Opus.
+  state.jingleMixer = mixer || null;
   runtime.trackProcessLifecycle(guildId, state, process);
 
   state.player.play(resource);
@@ -125,6 +127,13 @@ export async function playRuntimeStation(runtime, state, stations, key, guildId,
     resumeSession: options?.resumeSession === true,
   });
   armRuntimeFailbackProbe(runtime, guildId, state);
+  // Someone started or switched the station: the server's jingle plays over
+  // it (#309). Restarts, fallbacks and restores never pass `jingle`.
+  if (options?.jingle === true && state.jingleMixer && typeof runtime.playGuildJingle === "function") {
+    runtime.playGuildJingle(guildId, { reason: "switch" }).catch((err) => {
+      log("WARN", `[${runtime.config.name}] Jingle guild=${guildId}: ${err?.message || err}`);
+    });
+  }
 
   const fetchInfo = typeof runtime.fetchStreamInfo === "function"
     ? runtime.fetchStreamInfo.bind(runtime)
