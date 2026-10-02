@@ -4,6 +4,7 @@
 import { PLANS } from "../config/plans.js";
 import { sanitizeUrlForLog } from "./redact-sensitive.js";
 import { ownerPlanPriceCents } from "./owner-settings-cache.js";
+import { botTranslator, normalizeBotLanguage } from "./bot-i18n.js";
 
 // ---- Constants ----
 const YEARLY_DISCOUNT_MONTHS = 10;
@@ -202,19 +203,19 @@ function sanitizeOfferCode(rawCode) {
 }
 
 function translateOfferReason(reason, language = "de") {
-  const lang = String(language || "de").toLowerCase().startsWith("de") ? "de" : "en";
-  const map = {
-    "coupon_not_found": lang === "de" ? "Gutscheincode nicht gefunden." : "Coupon code not found.",
-    "coupon_inactive": lang === "de" ? "Gutscheincode ist nicht aktiv." : "Coupon code is not active.",
-    "coupon_expired": lang === "de" ? "Gutscheincode ist abgelaufen." : "Coupon code has expired.",
-    "coupon_max_uses": lang === "de" ? "Gutscheincode wurde bereits zu oft eingelöst." : "Coupon code has already been redeemed too many times.",
-    "coupon_wrong_tier": lang === "de" ? "Gutscheincode gilt nicht für diesen Plan." : "Coupon code is not valid for this plan.",
-    "referral_not_found": lang === "de" ? "Empfehlungscode nicht gefunden." : "Referral code not found.",
-    "referral_inactive": lang === "de" ? "Empfehlungscode ist nicht aktiv." : "Referral code is not active.",
-    "referral_self": lang === "de" ? "Eigenen Empfehlungscode kann man nicht nutzen." : "You cannot use your own referral code.",
-    "referral_wrong_tier": lang === "de" ? "Empfehlungscode gilt nicht für diesen Plan." : "Referral code is not valid for this plan.",
-  };
-  return map[reason] || String(reason || "");
+  const t = botTranslator(normalizeBotLanguage(language, "de"));
+  switch (reason) {
+    case "coupon_not_found": return t("Gutscheincode nicht gefunden.", "Coupon code not found.");
+    case "coupon_inactive": return t("Gutscheincode ist nicht aktiv.", "Coupon code is not active.");
+    case "coupon_expired": return t("Gutscheincode ist abgelaufen.", "Coupon code has expired.");
+    case "coupon_max_uses": return t("Gutscheincode wurde bereits zu oft eingelöst.", "Coupon code has already been redeemed too many times.");
+    case "coupon_wrong_tier": return t("Gutscheincode gilt nicht für diesen Plan.", "Coupon code is not valid for this plan.");
+    case "referral_not_found": return t("Empfehlungscode nicht gefunden.", "Referral code not found.");
+    case "referral_inactive": return t("Empfehlungscode ist nicht aktiv.", "Referral code is not active.");
+    case "referral_self": return t("Eigenen Empfehlungscode kann man nicht nutzen.", "You cannot use your own referral code.");
+    case "referral_wrong_tier": return t("Empfehlungscode gilt nicht für diesen Plan.", "Referral code is not valid for this plan.");
+    default: return String(reason || "");
+  }
 }
 
 // ---- Text ----

@@ -2,5 +2,5 @@
   "note": "Bot texts not yet in every table (#477). Only ever shorter: node scripts/record-bot-missing.mjs",
   "texts": [],
   "dynamic": [],
-  "languageSwitches": 96
+  "languageSwitches": 16
 }

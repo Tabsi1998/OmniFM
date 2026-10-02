@@ -8,10 +8,11 @@ import {
   isValidEmailAddress,
   isProTrialEnabled,
 } from "../lib/helpers.js";
-import { normalizeLanguage, getDefaultLanguage } from "../i18n.js";
+import { getDefaultLanguage } from "../i18n.js";
 import {
   isConfigured as isEmailConfigured,
   buildPurchaseEmail,
+  buildPurchaseSubject,
   buildAdminNotification,
 } from "../email.js";
 import {
@@ -23,10 +24,10 @@ import {
 } from "../premium-store.js";
 import { buildInviteOverviewForTier, resolvePublicWebsiteUrl } from "../lib/api-helpers.js";
 import { sendMailWithRetry } from "./payment.js";
-import { botTranslator } from "../lib/bot-i18n.js";
+import { botTranslator, normalizeBotLanguage } from "../lib/bot-i18n.js";
 
 export async function activateProTrial({ email, language, runtimes, source = "trial" }) {
-  const customerLanguage = normalizeLanguage(language, getDefaultLanguage());
+  const customerLanguage = normalizeBotLanguage(language, getDefaultLanguage());
   const t = botTranslator(customerLanguage);
   const customerEmail = String(email || "").trim().toLowerCase();
 
@@ -126,11 +127,10 @@ export async function activateProTrial({ email, language, runtimes, source = "tr
 
   if (emailDelivery.smtpConfigured) {
     const tierConfig = TIERS.pro;
-    const isDe = customerLanguage === "de";
     const inviteOverview = buildInviteOverviewForTier(runtimes, "pro");
     const purchaseHtml = buildPurchaseEmail({
       tier: "pro",
-      tierName: isDe ? `${tierConfig.name} Testmonat` : `${tierConfig.name} Trial Month`,
+      tierName: t("{plan}-Testmonat", "{plan} trial month", { plan: tierConfig.name }),
       months: PRO_TRIAL_MONTHS,
       licenseKey: license.id,
       seats: PRO_TRIAL_SEATS,
@@ -143,9 +143,7 @@ export async function activateProTrial({ email, language, runtimes, source = "tr
       currency: "eur",
       language: customerLanguage,
     });
-    const purchaseSubject = isDe
-      ? "OmniFM Pro Testmonat - Dein Lizenz-Key"
-      : "OmniFM Pro Trial Month - Your license key";
+    const purchaseSubject = buildPurchaseSubject({ planName: tierConfig.name, language: customerLanguage, trial: true });
 
     const purchaseResult = await sendMailWithRetry({
       to: customerEmail,
@@ -163,16 +161,14 @@ export async function activateProTrial({ email, language, runtimes, source = "tr
     if (adminEmail) {
       const adminHtml = buildAdminNotification({
         tier: "pro",
-        tierName: isDe ? "Pro Testmonat" : "Pro Trial Month",
+        tierName: botTranslator(getDefaultLanguage())("{plan}-Testmonat", "{plan} trial month", { plan: tierConfig.name }),
         months: PRO_TRIAL_MONTHS,
         serverId: "-",
         expiresAt: license.expiresAt,
         pricePaid: 0,
-        language: customerLanguage,
       });
-      const adminSubject = isDe
-        ? "OmniFM Pro-Testmonat aktiviert"
-        : "OmniFM Pro trial activated";
+      // The operator's mail is in the installation's language, not the customer's.
+      const adminSubject = botTranslator(getDefaultLanguage())("OmniFM-Pro-Testmonat aktiviert", "OmniFM Pro trial month activated");
       const adminResult = await sendMailWithRetry({
         to: adminEmail,
         subject: adminSubject,
@@ -195,18 +191,24 @@ export async function activateProTrial({ email, language, runtimes, source = "tr
     `[Trial] Pro-Test aktiviert: ${license.id} für ${customerEmail} | email purchase=${emailDelivery.purchaseSent} admin=${emailDelivery.adminSent}`
   );
 
-  let message = customerLanguage === "de"
-    ? `Pro-Testmonat aktiviert! Lizenz-Key: ${license.id} - Prüfe deine E-Mail (${customerEmail}).`
-    : `Pro trial month activated! License key: ${license.id} - Check your email (${customerEmail}).`;
-
+  const values = { key: license.id, email: customerEmail };
+  let message = t(
+    "Pro-Testmonat aktiviert! Lizenz-Key: {key}. Schau in dein Postfach ({email}).",
+    "Pro trial month activated! License key: {key}. Check your inbox ({email}).",
+    values,
+  );
   if (!emailDelivery.smtpConfigured) {
-    message = customerLanguage === "de"
-      ? `Pro-Testmonat aktiviert! Lizenz-Key: ${license.id}. Hinweis: SMTP ist nicht konfiguriert, daher wurde keine E-Mail versendet.`
-      : `Pro trial month activated! License key: ${license.id}. Note: SMTP is not configured, so no email was sent.`;
+    message = t(
+      "Pro-Testmonat aktiviert! Lizenz-Key: {key}. Hinweis: Es ist kein Mailserver eingerichtet, deshalb kam keine E-Mail.",
+      "Pro trial month activated! License key: {key}. Note: no mail server is set up, so no email was sent.",
+      values,
+    );
   } else if (!emailDelivery.purchaseSent) {
-    message = customerLanguage === "de"
-      ? `Pro-Testmonat aktiviert! Lizenz-Key: ${license.id}. Achtung: Die Lizenz-Mail konnte nicht zugestellt werden. Bitte Support kontaktieren.`
-      : `Pro trial month activated! License key: ${license.id}. Warning: The license email could not be delivered. Please contact support.`;
+    message = t(
+      "Pro-Testmonat aktiviert! Lizenz-Key: {key}. Achtung: Die Lizenz-Mail kam nicht an. Bitte melde dich beim Support.",
+      "Pro trial month activated! License key: {key}. Warning: the license email could not be delivered. Please contact support.",
+      values,
+    );
   }
 
   return {

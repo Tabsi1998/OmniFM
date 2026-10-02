@@ -13,11 +13,12 @@ import {
   waitMs,
   calculatePrice,
 } from "../lib/helpers.js";
-import { normalizeLanguage, getDefaultLanguage } from "../i18n.js";
+import { getDefaultLanguage } from "../i18n.js";
 import {
   isConfigured as isEmailConfigured,
   sendMail,
   buildPurchaseEmail,
+  buildPurchaseSubject,
   buildAdminNotification,
 } from "../email.js";
 import {
@@ -30,7 +31,7 @@ import {
 import { markOfferRedemption, previewCheckoutOffer } from "../coupon-store.js";
 import { buildInviteOverviewForTier, resolvePublicWebsiteUrl } from "../lib/api-helpers.js";
 import { activateProTrial } from "./payment-trial.js";
-import { botTranslator } from "../lib/bot-i18n.js";
+import { botTranslator, normalizeBotLanguage } from "../lib/bot-i18n.js";
 
 async function sendMailWithRetry({ to, subject, html, label, maxAttempts = 2 }) {
   let lastError = "";
@@ -63,7 +64,7 @@ function resolveCheckoutOfferForRequest({
   baseAmountCents,
   language,
 }) {
-  const checkoutLanguage = normalizeLanguage(language, getDefaultLanguage());
+  const checkoutLanguage = normalizeBotLanguage(language, getDefaultLanguage());
   const normalizedCouponCode = sanitizeOfferCode(couponCode);
   const normalizedReferralCode = sanitizeOfferCode(referralCode);
 
@@ -135,7 +136,7 @@ async function activateOfferGrant({
   runtimes,
   source = "offer-grant",
 }) {
-  const customerLanguage = normalizeLanguage(language, getDefaultLanguage());
+  const customerLanguage = normalizeBotLanguage(language, getDefaultLanguage());
   const t = botTranslator(customerLanguage);
   const customerEmail = String(email || "").trim().toLowerCase();
   const appliedOfferCode = sanitizeOfferCode(preview?.applied?.code);
@@ -211,9 +212,11 @@ async function activateOfferGrant({
       appliedOfferCode,
       appliedOfferKind,
       referralCode: referralCode || null,
-      message: customerLanguage === "de"
-        ? `Code ${appliedOfferCode} wurde bereits für ${customerEmail} eingelöst. Die vorhandene Lizenz bleibt aktiv.`
-        : `Code ${appliedOfferCode} has already been redeemed for ${customerEmail}. The existing license remains active.`,
+      message: t(
+        "Code {code} wurde bereits für {email} eingelöst. Die vorhandene Lizenz bleibt aktiv.",
+        "Code {code} was already redeemed for {email}. The existing license stays active.",
+        { code: appliedOfferCode, email: customerEmail },
+      ),
       emailStatus: {
         smtpConfigured: isEmailConfigured(),
         purchaseSent: false,
@@ -326,9 +329,7 @@ async function activateOfferGrant({
       currency: "eur",
       language: customerLanguage,
     });
-    const purchaseSubject = customerLanguage === "de"
-      ? `OmniFM ${tierConfig?.name || grantPlan} - Gratis-Lizenz aktiviert`
-      : `OmniFM ${tierConfig?.name || grantPlan} - Free license activated`;
+    const purchaseSubject = buildPurchaseSubject({ planName: tierConfig?.name || grantPlan, language: customerLanguage });
     const purchaseResult = await sendMailWithRetry({
       to: customerEmail,
       subject: purchaseSubject,
@@ -350,11 +351,13 @@ async function activateOfferGrant({
         serverId: "-",
         expiresAt: license.expiresAt,
         pricePaid: 0,
-        language: customerLanguage,
       });
-      const adminSubject = customerLanguage === "de"
-        ? `OmniFM Gratis-Lizenz eingelöst (${appliedOfferCode})`
-        : `OmniFM free license redeemed (${appliedOfferCode})`;
+      // The operator's mail is in the installation's language, not the customer's.
+      const adminSubject = botTranslator(getDefaultLanguage())(
+        "OmniFM-Gratis-Lizenz eingelöst ({code})",
+        "OmniFM free license redeemed ({code})",
+        { code: appliedOfferCode },
+      );
       const adminResult = await sendMailWithRetry({
         to: adminEmail,
         subject: adminSubject,
@@ -389,9 +392,11 @@ async function activateOfferGrant({
     appliedOfferKind,
     referralCode: referralCode || null,
     emailStatus: emailDelivery,
-    message: customerLanguage === "de"
-      ? `Code ${appliedOfferCode} eingelöst. ${TIERS[effectiveTier]?.name || effectiveTier} wurde kostenlos aktiviert und an ${customerEmail} gesendet.`
-      : `Code ${appliedOfferCode} redeemed. ${TIERS[effectiveTier]?.name || effectiveTier} was activated for free and sent to ${customerEmail}.`,
+    message: t(
+      "Code {code} eingelöst. {plan} ist kostenlos aktiviert, die Lizenz ging an {email}.",
+      "Code {code} redeemed. {plan} is activated for free; the license went to {email}.",
+      { code: appliedOfferCode, plan: TIERS[effectiveTier]?.name || effectiveTier, email: customerEmail },
+    ),
     created: Boolean(licenseChange?.created),
     renewed: isRenewal,
     upgraded: isUpgrade,
