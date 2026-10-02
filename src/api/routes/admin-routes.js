@@ -80,6 +80,7 @@ import { createAdminSuggestionRoutes } from "./admin-suggestion-routes.js";
 import { createAdminReportRoutes } from "./admin-report-routes.js";
 import { createAdminLinkedRolesRoutes } from "./admin-linked-roles-routes.js";
 import { normalizeLinkedRolesSettings } from "../../lib/linked-roles.js";
+import { normalizeStatusPostSettings } from "../../services/status-posts.js";
 import { createAdminEggHuntRoutes } from "./admin-egg-hunt-routes.js";
 import { createAdminStationRoutes, loadCatalogFileStations } from "./admin-station-routes.js";
 
@@ -685,6 +686,8 @@ export function createAdminRoutesHandler(deps) {
       if (section === "reports") saveData = normalizeReportSettings(data);
       // Server and role IDs only (#302).
       if (section === "linkedRoles") saveData = normalizeLinkedRolesSettings(data);
+      // A channel ID, the switch only with it, one of the bot's languages (#478).
+      if (section === "statusPosts") saveData = normalizeStatusPostSettings(data);
       if (!isConnected() || !getDb()) {
         sendJson(res, 503, { error: "Keine Datenbank verbunden \u2013 Speichern nicht m\u00f6glich." });
         return true;

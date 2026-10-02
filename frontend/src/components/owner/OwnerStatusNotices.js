@@ -4,6 +4,7 @@
 // and planned maintenance.
 import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ExternalLink, Pencil, Plus, RotateCcw, Save, Trash2, Wrench, X as CloseIcon } from 'lucide-react';
+import OwnerStatusPosts from './OwnerStatusPosts.js';
 
 function fmtDateTime(value) {
   if (!value) return '—';
@@ -218,6 +219,8 @@ export default function OwnerStatusNotices({ apiGet, apiSend }) {
           <div style={{ color: '#94a3b8', fontSize: 13 }}>Keine Meldung. Die Statusseite zeigt nur die gemessene Verfügbarkeit der Bots.</div>
         )}
       </div>
+
+      <OwnerStatusPosts apiGet={apiGet} apiSend={apiSend} />
     </div>
   );
 }

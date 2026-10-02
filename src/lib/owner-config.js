@@ -226,6 +226,8 @@ export function ownerConfigResponse(raw, env = process.env) {
     reports: configSectionFrom(raw, "reports"),
     // The linked roles (#302): the support server and its premium role.
     linkedRoles: configSectionFrom(raw, "linkedRoles"),
+    // The status page in Discord (#478): switch, channel, language.
+    statusPosts: configSectionFrom(raw, "statusPosts"),
     recoverySettings: RECOVERY_SETTINGS,
   };
 }
