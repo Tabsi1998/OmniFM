@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { I18nProvider } from '../i18n.js';
 import { PlayerProvider } from '../lib/player.js';
 import CommunitySection from './CommunitySection.js';
@@ -79,7 +79,8 @@ describe('the page "Erste Schritte"', () => {
     const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView');
     window.history.replaceState(null, '', '/start?lang=de#help');
     await guide();
-    expect(scroll).toHaveBeenCalledTimes(1);
+    // The scroll runs in an effect after the first paint; under load that is a moment later.
+    await waitFor(() => expect(scroll).toHaveBeenCalledTimes(1));
     expect(scroll.mock.instances[0].id).toBe('help');
   });
 });
