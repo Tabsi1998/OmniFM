@@ -57,6 +57,7 @@ import {
   handlePublicRoutes,
   handleShareRoutes,
   handleStationLogoRoutes,
+  handleImageRoutes,
   handleTopGGRoutes,
   handleVoteEventsRoutes,
   setRuntimeForwardTarget,
@@ -283,6 +284,9 @@ function startWebServer(runtimes, { forwardRuntimeTo = "" } = {}) {
       return;
     }
     if (await handleStationLogoRoutes({ req, res, requestUrl })) {
+      return;
+    }
+    if (await handleImageRoutes({ req, res, requestUrl })) {
       return;
     }
     if (await handleOwnerStatusRoutes({ req, res, requestUrl, readJsonBody })) {

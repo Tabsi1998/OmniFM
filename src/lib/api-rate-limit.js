@@ -64,6 +64,15 @@ function getApiRateLimitSpec(pathname) {
       windowMs: parseEnvInt("API_RATE_LIMIT_OWNER_WINDOW_MS", 60_000, 1_000, 10 * 60_000),
     };
   }
+  // The website's pictures (#469): the charts page alone shows twenty, and
+  // most come from the server's cache.
+  if (pathname.startsWith("/api/image/")) {
+    return {
+      scope: "image",
+      max: parseEnvInt("API_RATE_LIMIT_IMAGE_MAX", 600, 1, 10_000),
+      windowMs: parseEnvInt("API_RATE_LIMIT_IMAGE_WINDOW_MS", 60_000, 1_000, 10 * 60_000),
+    };
+  }
   if (pathname.startsWith("/api/premium/")) {
     return {
       scope: "premium",
