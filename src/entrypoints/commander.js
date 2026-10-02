@@ -18,8 +18,11 @@ import {
   sendMail,
   buildExpiryWarningEmail,
   buildExpiryEmail,
+  buildExpiryWarningSubject,
+  buildExpirySubject,
 } from "../email.js";
-import { normalizeLanguage, getDefaultLanguage } from "../i18n.js";
+import { getDefaultLanguage } from "../i18n.js";
+import { normalizeBotLanguage } from "../lib/bot-i18n.js";
 import {
   getBotsGGIntervals,
   isBotsGGEnabled,
@@ -372,7 +375,7 @@ setInterval(async () => {
       const serverId = String((license.linkedServerIds || [])[0] || "-");
       const tierKey = String(license.plan || license.tier || "free");
       const tierName = TIERS[tierKey]?.name || tierKey;
-      const emailLanguage = normalizeLanguage(license.preferredLanguage || license.language, getDefaultLanguage());
+      const emailLanguage = normalizeBotLanguage(license.preferredLanguage || license.language, getDefaultLanguage());
       const contactEmail = String(license.contactEmail || "").trim().toLowerCase();
       const daysUntilExpiry = Math.ceil((new Date(license.expiresAt).getTime() - Date.now()) / 86400000);
 
@@ -394,9 +397,7 @@ setInterval(async () => {
             daysLeft: Math.max(1, daysUntilExpiry),
             language: emailLanguage,
           });
-          const warningSubject = emailLanguage === "de"
-            ? `Premium ${tierName} läuft in ${Math.max(1, daysUntilExpiry)} ${Math.max(1, daysUntilExpiry) === 1 ? "Tag" : "Tagen"} ab!`
-            : `Premium ${tierName} expires in ${Math.max(1, daysUntilExpiry)} day${Math.max(1, daysUntilExpiry) === 1 ? "" : "s"}!`;
+          const warningSubject = buildExpiryWarningSubject({ planName: tierName, daysLeft: Math.max(1, daysUntilExpiry), language: emailLanguage });
           // eslint-disable-next-line no-await-in-loop -- one mail after the other, gentle on the mail server
           const result = await sendMail(contactEmail, warningSubject, html);
           if (result?.success) {
@@ -412,9 +413,7 @@ setInterval(async () => {
       const expiredAlreadyNotified = license._expiredNotifiedForExpiryAt === license.expiresAt || license._expiredNotified === true;
       if (daysUntilExpiry <= 0 && contactEmail && !expiredAlreadyNotified) {
         const html = buildExpiryEmail({ tierName, serverId, language: emailLanguage });
-        const expiredSubject = emailLanguage === "de"
-          ? `Premium ${tierName} abgelaufen`
-          : `Premium ${tierName} expired`;
+        const expiredSubject = buildExpirySubject({ planName: tierName, language: emailLanguage });
         // eslint-disable-next-line no-await-in-loop -- one mail after the other, gentle on the mail server
         const result = await sendMail(contactEmail, expiredSubject, html);
         if (result?.success) {
