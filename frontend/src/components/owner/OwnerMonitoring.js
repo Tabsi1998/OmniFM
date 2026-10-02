@@ -15,7 +15,7 @@ export default function OwnerMonitoring({
   return (
     <>
       {!monitoring ? (
-        <div className="oa-card" style={{ textAlign: 'center', color: '#64748b', padding: 40 }} data-testid="monitoring-loading">
+        <div className="oa-card" style={{ textAlign: 'center', color: '#8190a8', padding: 40 }} data-testid="monitoring-loading">
           <Equalizer /> <div className="oa-mono" style={{ marginTop: 12, fontSize: 12 }}>TELEMETRIE WIRD GELADEN…</div>
         </div>
       ) : monitoring.waiting ? (
@@ -37,7 +37,7 @@ export default function OwnerMonitoring({
             return (
               <div data-testid="monitoring-banner" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: bg, border: `1px solid ${bd}`, color: col, fontSize: 12.5, fontWeight: 700, marginBottom: 16, fontFamily: "'JetBrains Mono',monospace" }}>
                 <span className="oa-dot" style={{ background: col }} /> {label}
-                {monitoring.process && <span style={{ marginLeft: 'auto', color: '#64748b', fontWeight: 500 }}>
+                {monitoring.process && <span style={{ marginLeft: 'auto', color: '#8190a8', fontWeight: 500 }}>
                   {monitoring.process.resourceModel === 'split-processes'
                     ? `${monitoring.process.processCount || 0} getrennte Bot-Prozesse · echte Werte je Node`
                     : 'Prozess: 1 Node · CPU/RAM geteilt'}
@@ -90,7 +90,7 @@ export default function OwnerMonitoring({
                       </div>
                       <div>
                         <div style={{ fontWeight: 700, fontSize: 14 }}>{n.name}</div>
-                        <div className="oa-mono" style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{n.role} · {String(n.requiredTier || 'free').toUpperCase()}</div>
+                        <div className="oa-mono" style={{ fontSize: 10, color: '#8190a8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{n.role} · {String(n.requiredTier || 'free').toUpperCase()}</div>
                       </div>
                     </div>
                     <span className={`oa-pill ${n.status === 'online' ? 'green' : n.status === 'offline' ? 'red' : 'amber'}`}>{n.status === 'online' ? 'Online' : n.status === 'offline' ? 'Offline' : 'Degraded'}</span>
@@ -103,14 +103,14 @@ export default function OwnerMonitoring({
                       <div className="oa-progress"><i style={{ width: `${m.pct}%`, background: m.color }} /></div>
                     </div>
                   ))}
-                  <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#64748b' }} className="oa-mono">
+                  <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#8190a8' }} className="oa-mono">
                     <span>{n.voiceConnections} VOICE · {n.listeners || 0} LISTENERS</span><span>{n.guilds} GUILDS</span>
                   </div>
                   {(n.guildDetails || []).filter((detail) => detail.playing || detail.voiceConnected).length > 0 && <div style={{ marginTop: 10, paddingTop: 9, borderTop: '1px solid #1b2133', display: 'flex', flexDirection: 'column', gap: 5 }}>
                     {(n.guildDetails || []).filter((detail) => detail.playing || detail.voiceConnected).slice(0, 4).map((detail) => <div key={`${detail.guildId}-${detail.channelId || ''}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 10.5 }}><span style={{ color: '#cbd5e1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{detail.stationName || detail.stationKey || detail.channelName || detail.guildName}</span><span className="oa-mono" style={{ color: detail.recovering ? '#fbbf24' : '#4ade80', flexShrink: 0 }}>{detail.recovering ? 'RECOVERY' : `${detail.listenerCount || 0} HÖRER`}</span></div>)}
-                    {(n.guildDetails || []).filter((detail) => detail.playing || detail.voiceConnected).length > 4 && <div className="oa-mono" style={{ color: '#64748b', fontSize: 10 }}>+{(n.guildDetails || []).filter((detail) => detail.playing || detail.voiceConnected).length - 4} weitere Streams</div>}
+                    {(n.guildDetails || []).filter((detail) => detail.playing || detail.voiceConnected).length > 4 && <div className="oa-mono" style={{ color: '#8190a8', fontSize: 10 }}>+{(n.guildDetails || []).filter((detail) => detail.playing || detail.voiceConnected).length - 4} weitere Streams</div>}
                   </div>}
-                  {monitoring.live && n.resourceScope === 'shared-process' && <div style={{ marginTop: 8, fontSize: 10.5, color: '#64748b' }}>CPU/RAM werden oben einmal für den gemeinsamen Node-Prozess angezeigt.</div>}
+                  {monitoring.live && n.resourceScope === 'shared-process' && <div style={{ marginTop: 8, fontSize: 10.5, color: '#8190a8' }}>CPU/RAM werden oben einmal für den gemeinsamen Node-Prozess angezeigt.</div>}
                 </div>
               );
             })}
@@ -146,7 +146,7 @@ export default function OwnerMonitoring({
               <button className="oa-btn ghost" style={{ padding: '4px 10px' }} onClick={loadFailoverHistory}>Aktualisieren</button>
             </div>
             {failoverHistory === null && <div className="oa-sub">Lade…</div>}
-            {failoverHistory && failoverHistory.length === 0 && <div style={{ color: '#64748b', fontSize: 13, padding: 12 }}>Noch keine Umschaltung aufgezeichnet.</div>}
+            {failoverHistory && failoverHistory.length === 0 && <div style={{ color: '#8190a8', fontSize: 13, padding: 12 }}>Noch keine Umschaltung aufgezeichnet.</div>}
             {failoverHistory && failoverHistory.length > 0 && (
               <div className="oa-table-wrap" style={{ maxHeight: 360, overflowY: 'auto' }}>
                 <table className="oa-table">
@@ -173,7 +173,7 @@ export default function OwnerMonitoring({
           <div className="oa-grid cols-2" style={{ marginTop: 18 }}>
             <div className="oa-card oa-fade" data-testid="mon-incidents-list">
               <div className="oa-stat-label" style={{ marginBottom: 6 }}>Incidents</div>
-              {monitoring.incidents.length === 0 && <div style={{ color: '#64748b', fontSize: 13, padding: 16 }}>Keine Incidents</div>}
+              {monitoring.incidents.length === 0 && <div style={{ color: '#8190a8', fontSize: 13, padding: 16 }}>Keine Incidents</div>}
               {monitoring.incidents.map((inc, i) => {
                 const sev = inc.severity === 'critical' ? 'red' : inc.severity === 'warning' ? 'amber' : 'cyan';
                 return (
@@ -182,7 +182,7 @@ export default function OwnerMonitoring({
                       <span className={`oa-pill ${sev}`} style={{ textTransform: 'uppercase' }}>{inc.severity}</span>
                       <span style={{ minWidth: 0 }}>
                         <span style={{ fontSize: 13, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inc.message}</span>
-                        <span className="oa-mono" style={{ fontSize: 11, color: '#64748b' }}>{inc.source} · {relTime(inc.at)}</span>
+                        <span className="oa-mono" style={{ fontSize: 11, color: '#8190a8' }}>{inc.source} · {relTime(inc.at)}</span>
                       </span>
                     </span>
                     <span className={`oa-pill ${inc.resolved ? 'green' : 'slate'}`}>{inc.resolved ? 'behoben' : 'offen'}</span>
@@ -213,9 +213,9 @@ export default function OwnerMonitoring({
                   const c = l.level === 'WARN' ? '#fbbf24' : l.level === 'ERROR' ? '#ff8fab' : '#4ade80';
                   return (
                     <div key={i} className="oa-mono" style={{ fontSize: 11.5, padding: '5px 0', borderBottom: '1px solid #12151f', display: 'flex', gap: 8, lineHeight: 1.4 }} data-testid={`mon-log-${i}`}>
-                      <span style={{ color: '#475569', flexShrink: 0 }}>{new Date(l.at).toLocaleTimeString('de-DE')}</span>
+                      <span style={{ color: '#8190a8', flexShrink: 0 }}>{new Date(l.at).toLocaleTimeString('de-DE')}</span>
                       <span style={{ color: c, flexShrink: 0, fontWeight: 700 }}>{l.level}</span>
-                      <span style={{ color: '#64748b', flexShrink: 0 }}>[{l.source}]</span>
+                      <span style={{ color: '#8190a8', flexShrink: 0 }}>[{l.source}]</span>
                       <span style={{ color: '#cbd5e1', minWidth: 0 }}>{l.message}</span>
                     </div>
                   );

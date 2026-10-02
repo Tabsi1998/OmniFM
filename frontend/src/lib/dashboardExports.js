@@ -53,7 +53,7 @@ export function buildDashboardExportsWebhookSummary(rawConfig, t) {
   if (!config.url) {
     return {
       statusLabel: t('Nicht konfiguriert', 'Not configured'),
-      statusAccent: '#71717A',
+      statusAccent: '#8e8e97',
       description: t(
         'Lege eine URL fest, um Exporte sowie Stall-, Recovery- und Failover-Alerts an deine Automationen weiterzugeben.',
         'Add a URL to forward exports as well as stall, recovery, and failover alerts to your automations.'
@@ -74,7 +74,7 @@ export function buildDashboardExportsWebhookSummary(rawConfig, t) {
 
   return {
     statusLabel: t('Bereit', 'Ready'),
-    statusAccent: '#8B5CF6',
+    statusAccent: '#A78BFA',
     description: t(
       'Das Webhook-Ziel ist gespeichert, aber automatische Export- und Reliability-Ereignisse sind aktuell deaktiviert.',
       'The webhook target is saved, but automatic export and reliability events are currently disabled.'

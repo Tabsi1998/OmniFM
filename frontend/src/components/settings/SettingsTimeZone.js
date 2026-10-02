@@ -14,7 +14,7 @@ export default function SettingsTimeZone({ serverTimeZone, setServerTimeZone, t 
         <Clock size={18} color="#00E5FF" />
         <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20 }}>{t('Zeitzone des Servers', 'Server time zone')}</h3>
       </div>
-      <p style={{ color: '#52525B', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
+      <p style={{ color: '#8e8e97', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
         {t(
           'Danach richten sich die Saison-Deko und ihre Mitternacht, zum Beispiel der Silvester-Countdown.',
           'The seasonal decoration and its midnight follow it, for example the New Year countdown.'

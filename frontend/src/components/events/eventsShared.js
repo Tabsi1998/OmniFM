@@ -5,7 +5,7 @@ import { DASHBOARD_EVENT_REPEAT_OPTIONS } from '../../lib/dashboardEvents.js';
 export function InputRow({ label, children, testId }) {
   return (
     <div data-testid={testId}>
-      <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</label>
+      <label style={{ display: 'block', fontSize: 11, color: '#8e8e97', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</label>
       {children}
     </div>
   );
@@ -37,7 +37,7 @@ export function resolveRepeatLabel(repeat, t) {
 
 export function getDiscordSyncState(event, t) {
   if (!event?.createDiscordEvent) {
-    return { label: t('Aus', 'Off'), color: '#71717A' };
+    return { label: t('Aus', 'Off'), color: '#8e8e97' };
   }
   if (event?.discordSyncError) {
     return { label: t('Fehlgeschlagen', 'Failed'), color: '#FCA5A5' };

@@ -26,6 +26,7 @@ export default function OwnerLicenses({
           <input
             className="oa-input"
             placeholder="Suche: Lizenz-ID (GUID), E-Mail oder Server-ID…"
+            aria-label="Lizenzen durchsuchen"
             value={licQuery}
             onChange={(e) => setLicQuery(e.target.value)}
             data-testid="license-search"
@@ -50,7 +51,7 @@ export default function OwnerLicenses({
             <div style={{ fontWeight: 700, fontFamily: "'Syne','Outfit',sans-serif", fontSize: 17 }}>
               {licForm._isNew ? 'Neue Lizenz' : <>Lizenz bearbeiten · <span className="oa-mono" style={{ fontSize: 13, color: '#00e5ff' }}>{licForm.licenseKey}</span></>}
             </div>
-            <button className="oa-btn ghost" style={{ height: 34, padding: '0 12px' }} onClick={closeLicForm} data-testid="license-form-close"><CloseIcon size={15} /></button>
+            <button className="oa-btn ghost" style={{ height: 34, padding: '0 12px' }} onClick={closeLicForm} aria-label="Schließen" title="Schließen" data-testid="license-form-close"><CloseIcon size={15} /></button>
           </div>
 
           <div className="oa-grid cols-2" style={{ gap: 14 }}>
@@ -117,14 +118,14 @@ export default function OwnerLicenses({
               <div style={{ marginTop: 18 }}>
                 <label className="oa-stat-label">Verknüpfte Server ({(licForm.linkedServerIds || []).length})</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '8px 0' }}>
-                  {(licForm.linkedServerIds || []).length === 0 && <span style={{ color: '#64748b', fontSize: 13 }}>Keine Server verknüpft</span>}
+                  {(licForm.linkedServerIds || []).length === 0 && <span style={{ color: '#8190a8', fontSize: 13 }}>Keine Server verknüpft</span>}
                   {(licForm.linkedServerIds || []).map((sid) => {
                     const server = (licForm.linkedServers || []).find((item) => item.id === sid) || knownGuilds.find((item) => item.id === sid) || { id: sid, name: sid, valid: /^\d{17,22}$/.test(sid) };
                     return (
                       <span key={sid} className={`oa-pill ${server.valid === false ? 'red' : server.known === false ? 'amber' : 'slate'}`} style={{ padding: '6px 9px', display: 'inline-flex', alignItems: 'center', gap: 7 }}>
                         <span><strong>{server.name}</strong> <span className="oa-mono" style={{ opacity: 0.75 }}>{sid}</span></span>
                         {server.discordUrl && <a href={server.discordUrl} target="_blank" rel="noreferrer" style={{ color: '#00e5ff' }} title="Server in Discord öffnen"><Globe size={13} /></a>}
-                        <button style={{ background: 'none', border: 'none', color: '#ff8fab', cursor: 'pointer', padding: 0, lineHeight: 0 }} disabled={licBusy} onClick={() => patchLicense({ removeServerId: sid }, 'Server entfernt')} data-testid={`license-guild-remove-${sid}`}><CloseIcon size={13} /></button>
+                        <button style={{ background: 'none', border: 'none', color: '#ff8fab', cursor: 'pointer', padding: 0, lineHeight: 0 }} disabled={licBusy} onClick={() => patchLicense({ removeServerId: sid }, 'Server entfernt')} aria-label={`Server ${sid} entfernen`} title="Server entfernen" data-testid={`license-guild-remove-${sid}`}><CloseIcon size={13} /></button>
                       </span>
                     );
                   })}
@@ -166,7 +167,7 @@ export default function OwnerLicenses({
                 return key.includes(q) || email.includes(q) || guilds.includes(q);
               });
               if (rows.length === 0) {
-                return <tr><td colSpan={8} style={{ textAlign: 'center', color: '#64748b', padding: 28 }}>{licQuery ? 'Keine Treffer' : 'Keine Lizenzen vorhanden'}</td></tr>;
+                return <tr><td colSpan={8} style={{ textAlign: 'center', color: '#8190a8', padding: 28 }}>{licQuery ? 'Keine Treffer' : 'Keine Lizenzen vorhanden'}</td></tr>;
               }
               return rows.map((l) => {
                 const key = l.licenseKey || l.id;
@@ -180,15 +181,15 @@ export default function OwnerLicenses({
                       {(l.linkedServers || []).length ? (l.linkedServers || []).map((server) => (
                         <div key={server.id} style={{ marginBottom: 3 }}>
                           {server.discordUrl ? <a href={server.discordUrl} target="_blank" rel="noreferrer" style={{ color: server.valid === false ? '#ff8fab' : '#00e5ff' }}>{server.name}</a> : server.name}
-                          <span className="oa-mono" style={{ display: 'block', fontSize: 10, color: '#64748b' }}>{server.id}</span>
+                          <span className="oa-mono" style={{ display: 'block', fontSize: 10, color: '#8190a8' }}>{server.id}</span>
                         </div>
                       )) : '—'}
                     </td>
-                    <td style={{ color: '#94a3b8' }}>{fmtDate(l.expiresAt)}{typeof l.daysLeft === 'number' && !l.expired && <span style={{ color: l.daysLeft <= 7 ? '#fbbf24' : '#64748b', marginLeft: 6, fontSize: 11 }}>({l.daysLeft}d)</span>}</td>
+                    <td style={{ color: '#94a3b8' }}>{fmtDate(l.expiresAt)}{typeof l.daysLeft === 'number' && !l.expired && <span style={{ color: l.daysLeft <= 7 ? '#fbbf24' : '#8190a8', marginLeft: 6, fontSize: 11 }}>({l.daysLeft}d)</span>}</td>
                     <td><span className={`oa-pill ${l.expired ? 'red' : l.active ? 'green' : 'slate'}`}>{l.expired ? 'Abgelaufen' : l.active ? 'Aktiv' : 'Inaktiv'}</span></td>
                     <td style={{ display: 'flex', gap: 6 }}>
-                      <button className="oa-btn ghost" style={{ height: 32, padding: '0 10px' }} onClick={() => openEditLicense(l)} data-testid={`license-edit-${key}`}><Pencil size={13} /></button>
-                      <button className="oa-btn ghost" style={{ height: 32, padding: '0 10px', color: '#ff8fab' }} onClick={() => deleteLicense(key)} data-testid={`license-delete-${key}`}><Trash2 size={13} /></button>
+                      <button className="oa-btn ghost" style={{ height: 32, padding: '0 10px' }} onClick={() => openEditLicense(l)} aria-label="Lizenz bearbeiten" title="Lizenz bearbeiten" data-testid={`license-edit-${key}`}><Pencil size={13} /></button>
+                      <button className="oa-btn ghost" style={{ height: 32, padding: '0 10px', color: '#ff8fab' }} onClick={() => deleteLicense(key)} aria-label="Lizenz löschen" title="Lizenz löschen" data-testid={`license-delete-${key}`}><Trash2 size={13} /></button>
                     </td>
                   </tr>
                 );

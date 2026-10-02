@@ -51,7 +51,7 @@ export default function OwnerSignIn({
             {loggingIn ? 'Verbinde…' : <><ShieldCheck size={16} /> Anmelden</>}
           </button>
           <div style={{ marginTop: 16, textAlign: 'center' }}>
-            <a href="/" className="oa-mono" style={{ fontSize: 11, color: '#64748b' }}>← Zurück zur Website</a>
+            <a href="/" className="oa-mono" style={{ fontSize: 11, color: '#8190a8' }}>← Zurück zur Website</a>
           </div>
         </form>
       </div>

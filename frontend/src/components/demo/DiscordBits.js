@@ -6,7 +6,7 @@ import { accentHex, BUTTON_STYLE_COLORS, parseDiscordMarkdown } from '../../lib/
 
 export const DISCORD = {
   rail: '#1E1F22', side: '#2B2D31', chat: '#313338', input: '#383A40', line: '#26272B',
-  text: '#DBDEE1', muted: '#949BA4', bright: '#F2F3F5', blurple: '#5865F2', green: '#23A55A', mention: '#00A8FC',
+  text: '#DBDEE1', muted: '#949BA4', placeholder: '#A3A9B2', bright: '#F2F3F5', blurple: '#5865F2', green: '#23A55A', mention: '#00A8FC',
 };
 const FONT = "'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif";
 
@@ -115,6 +115,7 @@ export function Button({ data, pressed = false, marker }) {
   return (
     <span
       data-demo-target={marker}
+      aria-disabled={data.disabled ? 'true' : undefined}
       style={{ ...colors, opacity: data.disabled ? 0.5 : 1, borderRadius: 3, padding: '4px 11px', fontSize: 12.5, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 5, minHeight: 24, transform: pressed ? 'scale(0.95)' : 'none', filter: pressed ? 'brightness(0.85)' : 'none', transition: 'transform 0.12s, filter 0.12s' }}
     >
       {data.emoji?.name ? <span>{data.emoji.name}</span> : null}
@@ -193,7 +194,7 @@ export function DiscordWindow({ labels, compact, height, voice = [], typed = '',
         </div>
         <div style={{ position: 'relative', padding: '0 12px 12px', flexShrink: 0 }}>
           {popup}
-          <div style={{ background: DISCORD.input, borderRadius: 8, padding: '9px 12px', fontSize: 13.5, color: typed ? DISCORD.text : DISCORD.muted, minHeight: 18, whiteSpace: 'nowrap', overflow: 'hidden' }}>
+          <div style={{ background: DISCORD.input, borderRadius: 8, padding: '9px 12px', fontSize: 13.5, color: typed ? DISCORD.text : DISCORD.placeholder, minHeight: 18, whiteSpace: 'nowrap', overflow: 'hidden' }}>
             {typed || labels.messagePlaceholder}
             {typing ? <span style={{ display: 'inline-block', width: 1, height: 15, background: DISCORD.text, marginLeft: 1, verticalAlign: '-2px', animation: 'demo-caret 0.9s steps(1) infinite' }} /> : null}
           </div>

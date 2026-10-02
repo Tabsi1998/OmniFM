@@ -24,7 +24,7 @@ export default function SettingsIncidentAlerts({
         <strong style={{ color: '#F4F4F5', fontSize: 14 }}>{t('Ausfall-Meldungen in Discord', 'Outage alerts in Discord')}</strong>
         {!canManageIncidentAlerts && <span style={{ fontSize: 11, color: '#00e5ff', border: '1px solid rgba(0,229,255,0.3)', padding: '2px 8px' }}>PRO</span>}
       </div>
-      <p style={{ color: '#71717A', fontSize: 12, marginBottom: 14, lineHeight: 1.6 }}>
+      <p style={{ color: '#8e8e97', fontSize: 12, marginBottom: 14, lineHeight: 1.6 }}>
         {t(
           'Meldet Aussetzer, Wiederherstellungen und Senderwechsel direkt in einen Discord-Kanal deiner Wahl.',
           'Posts stalls, recoveries and station switches straight into a Discord channel of your choice.'
@@ -41,7 +41,7 @@ export default function SettingsIncidentAlerts({
         </div>
 
         <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#8e8e97' }}>
             {t('Alert-Channel', 'Alert channel')}
           </div>
           <div data-testid="incident-alert-channel-label" style={{ marginTop: 6, fontSize: 14, fontWeight: 600, color: '#D4D4D8', wordBreak: 'break-word' }}>
@@ -50,13 +50,13 @@ export default function SettingsIncidentAlerts({
         </div>
 
         <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#8e8e97' }}>
             {t('Auslöser', 'Triggers')}
           </div>
           <div data-testid="incident-alert-events-count" style={{ marginTop: 6, fontSize: 16, fontWeight: 600, color: '#D4D4D8' }}>
             {incidentAlerts.events.length} / {DASHBOARD_INCIDENT_ALERT_EVENTS.length}
           </div>
-          <div style={{ marginTop: 6, fontSize: 12, color: '#71717A' }}>
+          <div style={{ marginTop: 6, fontSize: 12, color: '#8e8e97' }}>
             {incidentAlerts.enabled ? t('Automatisch aktiv', 'Automatic delivery enabled') : t('Noch nicht aktiviert', 'Not enabled yet')}
           </div>
         </div>
@@ -75,9 +75,10 @@ export default function SettingsIncidentAlerts({
         </label>
 
         <div>
-          <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Text-Channel', 'Text channel')}</label>
+          <label style={{ display: 'block', fontSize: 11, color: '#8e8e97', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Text-Channel', 'Text channel')}</label>
           <select
             data-testid="incident-alert-channel-select"
+            aria-label={t('Text-Channel', 'Text channel')}
             disabled={!canManageIncidentAlerts}
             value={incidentAlerts.channelId}
             onChange={(e) => updateIncidentAlerts({ channelId: e.target.value })}
@@ -95,7 +96,7 @@ export default function SettingsIncidentAlerts({
 
       <div data-testid="incident-alert-event-list" style={{ display: 'grid', gap: 8, marginBottom: 6 }}>
         {DASHBOARD_INCIDENT_ALERT_EVENTS.map((event) => (
-          <label key={event.key} style={{ display: 'flex', alignItems: 'center', gap: 10, color: canManageIncidentAlerts ? '#D4D4D8' : '#52525B', fontSize: 13 }}>
+          <label key={event.key} style={{ display: 'flex', alignItems: 'center', gap: 10, color: canManageIncidentAlerts ? '#D4D4D8' : '#8e8e97', fontSize: 13 }}>
             <input
               type="checkbox"
               disabled={!canManageIncidentAlerts}

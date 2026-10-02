@@ -196,7 +196,7 @@ export default function DashboardSettings({
     }
   };
 
-  if (loading) return <div style={{ color: '#52525B', textAlign: 'center', padding: 40 }}>{t('Lade...', 'Loading...')}</div>;
+  if (loading) return <div style={{ color: '#8e8e97', textAlign: 'center', padding: 40 }}>{t('Lade...', 'Loading...')}</div>;
 
   const wd = settings?.weeklyDigest || { enabled: false, channelId: '', dayOfWeek: 1, hour: 9, language: 'de' };
   const incidentAlerts = normalizeDashboardIncidentAlertsConfig(settings?.incidentAlerts);

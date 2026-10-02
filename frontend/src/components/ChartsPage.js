@@ -9,7 +9,7 @@ import { usePlayer } from '../lib/player.js';
 // on at least `minServers` servers is there; the page shows no server and no
 // person. A station can be heard right here, like in the station browser.
 
-const MOVEMENT_COLORS = { new: '#00e5ff', up: '#22c55e', down: '#ef4444', same: '#71717A' };
+const MOVEMENT_COLORS = { new: '#00e5ff', up: '#22c55e', down: '#ef4444', same: '#8e8e97' };
 
 /** "Artist - Title" as title and artist; without a dash all of it is the title. */
 export function splitTitle(displayTitle = '') {
@@ -33,7 +33,7 @@ function Movement({ entry, s }) {
       data-movement={entry.movement}
       style={{
         minWidth: 40, textAlign: 'center', fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', flexShrink: 0,
-        color: MOVEMENT_COLORS[entry.movement] || '#71717A', fontFamily: "'JetBrains Mono', monospace",
+        color: MOVEMENT_COLORS[entry.movement] || '#8e8e97', fontFamily: "'JetBrains Mono', monospace",
       }}
     >
       {symbol}
@@ -80,7 +80,7 @@ function StationRow({ entry, s, formatNumber, player }) {
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ fontWeight: 700, color: '#F4F4F5', overflowWrap: 'break-word', hyphens: 'auto', lineHeight: 1.3 }}>{entry.name}</div>
         {entry.genre ? <div style={{ color: '#D4D4D8', fontSize: 13 }}>{entry.genre}</div> : null}
-        <div style={{ color: '#71717A', fontSize: 12, marginTop: 2 }}>
+        <div style={{ color: '#8e8e97', fontSize: 12, marginTop: 2 }}>
           {s.hours({ count: hours })} · {s.servers({ count: formatNumber(entry.servers) })}
         </div>
       </div>
@@ -114,7 +114,7 @@ function SongRow({ entry, s, formatNumber }) {
         {/* Titles wrap on a phone instead of losing their end; the numbers keep their own line. */}
         <div style={{ fontWeight: 700, color: '#F4F4F5', overflowWrap: 'break-word', hyphens: 'auto', lineHeight: 1.3 }}>{title}</div>
         {artist ? <div style={{ color: '#D4D4D8', fontSize: 13, overflowWrap: 'break-word' }}>{artist}</div> : null}
-        <div style={{ color: '#71717A', fontSize: 12, marginTop: 2 }}>
+        <div style={{ color: '#8e8e97', fontSize: 12, marginTop: 2 }}>
           {s.plays({ count: formatNumber(entry.plays) })} · {s.servers({ count: formatNumber(entry.servers) })}
         </div>
       </div>
@@ -197,7 +197,7 @@ export default function ChartsPage() {
                 ) : <p data-testid="charts-empty" style={{ margin: 0, color: '#A1A1AA' }}>{s.empty}</p>}
               </div>
             ) : null}
-            {data ? <p style={{ margin: 0, color: '#71717A', fontSize: 12, lineHeight: 1.6 }}>{s.note({ min: data.minServers || 3 })}</p> : null}
+            {data ? <p style={{ margin: 0, color: '#8e8e97', fontSize: 12, lineHeight: 1.6 }}>{s.note({ min: data.minServers || 3 })}</p> : null}
           </div>
         )}
       </div>

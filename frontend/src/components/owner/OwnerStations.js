@@ -48,9 +48,9 @@ export default function OwnerStations({
         <StatTile testid="station-stat-pro" label="Pro Stationen" value={stations.pro} icon={Music2} accent="#00e5ff" />
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '28px 0 14px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between', alignItems: 'center', margin: '28px 0 14px' }}>
         <div className="oa-section-title" style={{ margin: 0 }}><ListMusic size={15} /> Katalog verwalten ({stationList.length})</div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
           <button className="oa-btn ghost" style={{ height: 40 }} disabled={stHealthBusy || !stationList.length} onClick={() => checkStationHealth()} data-testid="station-check-all-button"><SignalHigh size={16} /> {stHealthBusy ? `Prüfe… ${stHealthProg ? `${stHealthProg.done}/${stHealthProg.total}` : ''}` : 'Live-Status prüfen'}</button>
           <button className="oa-btn ghost" style={{ height: 40 }} disabled={stHealthBusy} title="Browser-Playability-Cache leeren (erzwingt neue Prüfung)" onClick={() => { writeBrowserCache({}); setStMsg({ ok: true, text: 'Browser-Cache geleert – nächste Prüfung testet alle Sender neu.' }); }} data-testid="station-cache-clear-button"><RefreshCw size={15} /></button>
           <button className="oa-btn primary" style={{ height: 40 }} onClick={openNewStation} data-testid="station-add-button"><Plus size={16} /> Station hinzufügen</button>
@@ -68,7 +68,7 @@ export default function OwnerStations({
       <div className="oa-card" style={{ margin: '12px 0 16px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }} data-testid="station-auto-health">
         <span className={`oa-pill ${stHealthSummary?.automatic === false ? 'amber' : 'green'}`}><span className="oa-dot" /> Automatische Prüfung {stHealthSummary?.automatic === false ? 'deaktiviert' : 'aktiv'}</span>
         <span style={{ color: '#94a3b8', fontSize: 12 }}>{stHealthSummary?.automatic === false ? 'Unter System-Konfiguration aktivierbar' : `Ressourcenschonend gestaffelt · ${stHealthSummary?.batchSize || 2} Sender alle ${Math.round((stHealthSummary?.intervalMs || 5000) / 1000)}s · Alarm nach zwei Fehlern · Recovery im Live-Log`}</span>
-        {stHealthSummary && <span className="oa-mono" style={{ marginLeft: 'auto', color: '#64748b', fontSize: 11 }}>{stHealthSummary.up || 0} UP · {stHealthSummary.down || 0} DOWN · {stHealthSummary.pending || 0} AUSSTEHEND</span>}
+        {stHealthSummary && <span className="oa-mono" style={{ marginLeft: 'auto', color: '#8190a8', fontSize: 11 }}>{stHealthSummary.up || 0} UP · {stHealthSummary.down || 0} DOWN · {stHealthSummary.pending || 0} AUSSTEHEND</span>}
       </div>
 
       {stMsg && (
@@ -81,7 +81,7 @@ export default function OwnerStations({
         <div className="oa-card oa-fade" style={{ marginBottom: 18, borderColor: 'rgba(255,107,0,0.35)' }} data-testid="station-form">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <div style={{ fontWeight: 700, fontFamily: "'Syne','Outfit',sans-serif", fontSize: 17 }}>{stForm._isNew ? 'Neue Station' : `Station bearbeiten: ${stForm.key}`}</div>
-            <button className="oa-btn ghost" style={{ height: 34, padding: '0 12px' }} onClick={closeStationForm} data-testid="station-form-close"><CloseIcon size={15} /></button>
+            <button className="oa-btn ghost" style={{ height: 34, padding: '0 12px' }} onClick={closeStationForm} aria-label="Schließen" title="Schließen" data-testid="station-form-close"><CloseIcon size={15} /></button>
           </div>
           <div className="oa-grid cols-2" style={{ gap: 14 }}>
             <div>
@@ -168,11 +168,11 @@ export default function OwnerStations({
         </div>
       )}
 
-      <div className="oa-table-wrap oa-fade" data-testid="stations-table">
+      <div className="oa-table-wrap oa-fade" tabIndex={0} role="region" aria-label="Senderkatalog" data-testid="stations-table">
         <table className="oa-table">
           <thead><tr><th>Key</th><th>Name</th><th>Genre</th><th>Tier</th><th>Live-Status</th><th style={{ textAlign: 'right' }}>Aktionen</th></tr></thead>
           <tbody>
-            {stationList.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', color: '#64748b', padding: 24 }}>Lade Katalog…</td></tr>}
+            {stationList.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', color: '#8190a8', padding: 24 }}>Lade Katalog…</td></tr>}
             {stationList.map((s, i) => {
               const h = stHealth[s.key];
               return (

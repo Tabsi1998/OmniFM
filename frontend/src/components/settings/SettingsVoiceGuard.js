@@ -17,7 +17,7 @@ export default function SettingsVoiceGuard({
         <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20 }}>{t('Voice Guard', 'Voice guard')}</h3>
         {!canManageVoiceGuard && <span style={{ fontSize: 11, color: '#8B5CF6', border: '1px solid rgba(139,92,246,0.3)', padding: '2px 8px' }}>LOCKED</span>}
       </div>
-      <p style={{ color: '#52525B', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
+      <p style={{ color: '#8e8e97', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
         {canManageVoiceGuard
           ? t(
             'Steuert, wie OmniFM auf Fremdverschiebungen in andere Voice-Channels reagiert. Für bewusstes Umziehen gibt es zusätzlich `/voiceguard unlock`.',
@@ -41,34 +41,35 @@ export default function SettingsVoiceGuard({
         </div>
 
         <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#8e8e97' }}>
             {t('Policy', 'Policy')}
           </div>
           <div data-testid="voice-guard-policy-summary" style={{ marginTop: 6, fontSize: 16, fontWeight: 600, color: '#D4D4D8' }}>
             {voiceGuardSummary.policyLabel}
           </div>
-          <div style={{ marginTop: 6, fontSize: 12, color: '#71717A' }}>
+          <div style={{ marginTop: 6, fontSize: 12, color: '#8e8e97' }}>
             {t('Aktiv', 'Active')}: {voiceGuardSummary.effectiveLabel}
           </div>
         </div>
 
         <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#8e8e97' }}>
             {t('Guard-Regeln', 'Guard rules')}
           </div>
           <div data-testid="voice-guard-thresholds" style={{ marginTop: 6, fontSize: 13, color: '#D4D4D8', lineHeight: 1.7 }}>
             {voiceGuardSummary.thresholdsLabel}
           </div>
-          <div style={{ marginTop: 6, fontSize: 12, color: '#71717A' }}>
+          <div style={{ marginTop: 6, fontSize: 12, color: '#8e8e97' }}>
             {voiceGuardSummary.escalationLabel}
           </div>
         </div>
       </div>
 
       <div style={{ maxWidth: 280 }}>
-        <label style={{ display: 'block', fontSize: 11, color: '#71717A', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Server-Policy', 'Server policy')}</label>
+        <label style={{ display: 'block', fontSize: 11, color: '#8e8e97', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('Server-Policy', 'Server policy')}</label>
         <select
           data-testid="voice-guard-policy-select"
+          aria-label={t('Server-Policy', 'Server policy')}
           value={voiceGuard.policy}
           onChange={(e) => setSettings((current) => ({ ...(current || {}), voiceGuard: normalizeDashboardVoiceGuardConfig({ ...(current?.voiceGuard || {}), policy: e.target.value }) }))}
           style={{ width: '100%', height: 40, padding: '0 10px', border: '1px solid #1A1A2E', background: '#050505', color: '#fff', boxSizing: 'border-box', fontSize: 13 }}

@@ -628,7 +628,7 @@ export default function OwnerAdmin() {
             <div className="oa-sub">
               Zentrale Steuerung der OmniFM Broadcast-Plattform
               {ov?.release?.version && (
-                <span data-testid="admin-release" style={{ marginLeft: 8, color: '#64748b' }}>
+                <span data-testid="admin-release" style={{ marginLeft: 8, color: '#8190a8' }}>
                   · Version {ov.release.version}{ov.release.commit && ov.release.commit !== 'unknown' ? ` (${ov.release.commit})` : ''}
                 </span>
               )}

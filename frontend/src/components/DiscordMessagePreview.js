@@ -45,6 +45,7 @@ function Button({ data, pressed }) {
   return (
     <span
       data-testid={`preview-button-${data.custom_id || data.label}`}
+      aria-disabled={data.disabled ? 'true' : undefined}
       style={{ ...colors, opacity: data.disabled ? 0.5 : 1, borderRadius: 4, padding: '4px 12px', fontSize: 13, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 24, transform: down ? 'scale(0.95)' : 'none', filter: down ? 'brightness(0.85)' : 'none', transition: 'transform 0.12s, filter 0.12s' }}
     >
       {emoji?.id && <img src={emojiImageUrl(emoji.id, emoji.animated)} alt="" width={16} height={16} />}

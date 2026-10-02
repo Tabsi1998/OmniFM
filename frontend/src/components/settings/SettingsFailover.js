@@ -26,7 +26,7 @@ export default function SettingsFailover({
         <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20 }}>{t('Eigene Ersatzsender-Kette', 'Your own fallback chain')}</h3>
         {!canManageFallbackStation && <span style={{ fontSize: 11, color: '#8B5CF6', border: '1px solid rgba(139,92,246,0.3)', padding: '2px 8px' }}>ULTIMATE</span>}
       </div>
-      <p style={{ color: '#52525B', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
+      <p style={{ color: '#8e8e97', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
         {t(
           'Fällt ein Stream aus, springt OmniFM auf jedem Plan von selbst auf einen Ersatzsender, zuerst aus demselben Genre, und wechselt zurück, sobald der Sender wieder läuft. Mit Ultimate legst du hier selbst fest, welche Sender zuerst drankommen.',
           'When a stream fails, OmniFM switches to a fallback station on every plan by itself, from the same genre first, and switches back once the station plays again. With Ultimate you choose here which stations come first.'
@@ -51,7 +51,7 @@ export default function SettingsFailover({
         </div>
 
         <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#8e8e97' }}>
             {t('Aktuelle Station', 'Current station')}
           </div>
           <div data-testid="fallback-current-station" style={{ marginTop: 6, fontSize: 16, fontWeight: 600, color: '#D4D4D8' }}>
@@ -65,20 +65,20 @@ export default function SettingsFailover({
         </div>
 
         <div style={{ border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px' }}>
-          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#8e8e97' }}>
             {t('Kettenstatus', 'Chain status')}
           </div>
           <div data-testid="failover-chain-status" style={{ marginTop: 6, fontSize: 16, fontWeight: 600, color: '#D4D4D8' }}>
             {fallbackSummary.chainLabel}
           </div>
-          <div style={{ marginTop: 6, fontSize: 12, color: '#71717A' }}>
+          <div style={{ marginTop: 6, fontSize: 12, color: '#8e8e97' }}>
             {t('Maximal 5 Stationen', 'Up to 5 stations')}
           </div>
         </div>
       </div>
       <div data-testid="failover-chain-list" style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
         {configuredFailoverChain.length === 0 && (
-          <div style={{ border: '1px dashed #27272A', background: '#050505', padding: '12px 14px', color: '#71717A', fontSize: 13 }}>
+          <div style={{ border: '1px dashed #27272A', background: '#050505', padding: '12px 14px', color: '#8e8e97', fontSize: 13 }}>
             {t(
               'Noch keine eigene Kette. Ohne Einträge wählt OmniFM den Ersatzsender selbst, zuerst aus demselben Genre.',
               'No chain of your own yet. Without entries OmniFM picks the fallback station itself, from the same genre first.'
@@ -98,7 +98,7 @@ export default function SettingsFailover({
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, border: '1px solid #1A1A2E', background: '#050505', padding: '12px 14px', flexWrap: 'wrap' }}
             >
               <div style={{ minWidth: 0, flex: '1 1 220px' }}>
-                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#71717A' }}>
+                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#8e8e97' }}>
                   {t('Schritt', 'Step')} {index + 1}
                 </div>
                 <div style={{ marginTop: 4, fontSize: 15, fontWeight: 600, color: '#F4F4F5' }}>
@@ -121,6 +121,7 @@ export default function SettingsFailover({
                   type="button"
                   disabled={!canManageFallbackStation || index === 0}
                   onClick={() => moveFailoverStation(index, -1)}
+                  aria-label={t('Schritt nach oben', 'Move step up')}
                   style={{ width: 34, height: 34, border: '1px solid #1A1A2E', background: '#09090B', color: canManageFallbackStation && index > 0 ? '#F4F4F5' : '#3F3F46', cursor: canManageFallbackStation && index > 0 ? 'pointer' : 'not-allowed' }}
                 >
                   <ArrowUp size={14} />
@@ -129,6 +130,7 @@ export default function SettingsFailover({
                   type="button"
                   disabled={!canManageFallbackStation || index === configuredFailoverChain.length - 1}
                   onClick={() => moveFailoverStation(index, 1)}
+                  aria-label={t('Schritt nach unten', 'Move step down')}
                   style={{ width: 34, height: 34, border: '1px solid #1A1A2E', background: '#09090B', color: canManageFallbackStation && index < configuredFailoverChain.length - 1 ? '#F4F4F5' : '#3F3F46', cursor: canManageFallbackStation && index < configuredFailoverChain.length - 1 ? 'pointer' : 'not-allowed' }}
                 >
                   <ArrowDown size={14} />
@@ -137,6 +139,7 @@ export default function SettingsFailover({
                   type="button"
                   disabled={!canManageFallbackStation}
                   onClick={() => removeFailoverStation(index)}
+                  aria-label={t('Schritt entfernen', 'Remove step')}
                   style={{ width: 34, height: 34, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(127,29,29,0.12)', color: canManageFallbackStation ? '#FCA5A5' : '#3F3F46', cursor: canManageFallbackStation ? 'pointer' : 'not-allowed' }}
                 >
                   <X size={14} />
@@ -150,6 +153,7 @@ export default function SettingsFailover({
       <div style={{ display: 'flex', gap: 10, alignItems: 'stretch', flexWrap: 'wrap' }}>
         <select
           data-testid="failover-chain-add-select"
+          aria-label={t('Sender für die Kette', 'Station for the chain')}
           disabled={!canManageFallbackStation || configuredFailoverChain.length >= FAILOVER_CHAIN_LIMIT}
           value={pendingFailoverStation}
           onChange={(e) => setPendingFailoverStation(e.target.value)}

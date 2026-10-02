@@ -137,7 +137,7 @@ export default function GuildLiveView({ apiRequest, guildId, t, locale = 'de-DE'
                 ) : null}
               </div>
               <Timeline bot={bot} windowStart={view.windowStart} windowEnd={view.windowEnd} t={t} locale={locale} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: '#64748b', marginTop: 4 }} className="oa-mono">
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: '#8190a8', marginTop: 4 }} className="oa-mono">
                 <span>{t('vor 24 h', '24 h ago')}</span><span>{t('vor 12 h', '12 h ago')}</span><span>{t('jetzt', 'now')}</span>
               </div>
               {bot.events.length ? (
@@ -146,9 +146,9 @@ export default function GuildLiveView({ apiRequest, guildId, t, locale = 'de-DE'
                   <ul style={{ listStyle: 'none', margin: '8px 0 0', padding: 0, display: 'grid', gap: 4, fontSize: 12 }}>
                     {bot.events.map((event) => (
                       <li key={`${event.at}-${event.phase}`} style={{ color: event.unexpected ? '#fbbf24' : '#cbd5e1' }}>
-                        <span className="oa-mono" style={{ color: '#64748b' }}>{clock(event.at, locale)}</span>{' '}
+                        <span className="oa-mono" style={{ color: '#8190a8' }}>{clock(event.at, locale)}</span>{' '}
                         {phaseLabel(event.from, t)} → {phaseLabel(event.phase, t)}{event.station ? ` · ${event.station}` : ''}
-                        {event.reason ? <span className="oa-mono" style={{ color: '#64748b' }}> ({event.reason})</span> : null}
+                        {event.reason ? <span className="oa-mono" style={{ color: '#8190a8' }}> ({event.reason})</span> : null}
                         {event.unexpected ? ` · ${t('unerwartet', 'unexpected')}` : ''}
                       </li>
                     ))}

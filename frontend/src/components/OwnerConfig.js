@@ -128,8 +128,8 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
             <Field label="OAuth Client Secret" value={secretValue(oauth, 'clientSecret')} onChange={(v) => setGroup('discordOAuth', 'clientSecret', v)} type="password" hint={secretHint(oauth, 'clientSecret')} testid="cfg-oauth-secret" />
             <div style={{ marginBottom: 14 }}>
               <label style={labelStyle}>Redirect URI (automatisch)</label>
-              <input className="oa-input" data-testid="cfg-oauth-redirect" readOnly value={discordRedirectUriFor(window.location.origin)} onFocus={(e) => e.target.select()} />
-              <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>Wird von OmniFM gebildet. Im Discord Developer Portal unter OAuth2 → Redirects genau so eintragen.</div>
+              <input className="oa-input" aria-label="Redirect URI (automatisch)" data-testid="cfg-oauth-redirect" readOnly value={discordRedirectUriFor(window.location.origin)} onFocus={(e) => e.target.select()} />
+              <div style={{ fontSize: 11, color: '#8190a8', marginTop: 6 }}>Wird von OmniFM gebildet. Im Discord Developer Portal unter OAuth2 → Redirects genau so eintragen.</div>
             </div>
             <Field label="Scopes" value={oauth.scopes} onChange={(v) => setGroup('discordOAuth', 'scopes', v)} placeholder="identify guilds" testid="cfg-oauth-scopes" />
           </div>
@@ -207,7 +207,7 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
               {alertTest.message}
             </div>
           )}
-          <div style={{ fontSize: 12, color: '#64748b', marginTop: 8 }}>Der Testalarm nutzt die gespeicherte URL: erst speichern, dann testen.</div>
+          <div style={{ fontSize: 12, color: '#8190a8', marginTop: 8 }}>Der Testalarm nutzt die gespeicherte URL: erst speichern, dann testen.</div>
         </div>
         )}
 
@@ -306,7 +306,7 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
                   {hasWebhook && <Field label="Webhook Secret" value={secretValue(directory, 'webhookSecret')} onChange={(v) => setDirectory(key, 'webhookSecret', v)} type="password" hint={secretHint(directory, 'webhookSecret')} />}
                   <div style={{ marginBottom: 14 }}>
                     <label style={labelStyle}>Statistik-Umfang</label>
-                    <select className="oa-input" value={directory.statsScope || 'aggregate'} onChange={(e) => setDirectory(key, 'statsScope', e.target.value)}>
+                    <select className="oa-input" aria-label="Statistik-Umfang" value={directory.statsScope || 'aggregate'} onChange={(e) => setDirectory(key, 'statsScope', e.target.value)}>
                       <option value="aggregate">Alle Bots zusammen</option>
                       <option value="commander">Nur Commander</option>
                     </select>
@@ -508,11 +508,11 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
               <Info size={14} /> {logs.note}
             </div>
           )}
-          <div style={{ background: '#0b0e16', borderRadius: 10, padding: 14, fontFamily: 'JetBrains Mono, monospace', fontSize: 12, maxHeight: 280, overflowY: 'auto' }} data-testid="cfg-discord-logs">
-            {(logs?.logs || []).length === 0 && <div style={{ color: '#64748b' }}>Keine Log-Einträge.</div>}
+          <div style={{ background: '#0b0e16', borderRadius: 10, padding: 14, fontFamily: 'JetBrains Mono, monospace', fontSize: 12, maxHeight: 280, overflowY: 'auto' }} tabIndex={0} role="region" aria-label="Discord-Logs" data-testid="cfg-discord-logs">
+            {(logs?.logs || []).length === 0 && <div style={{ color: '#8190a8' }}>Keine Log-Einträge.</div>}
             {(logs?.logs || []).map((l, i) => (
               <div key={i} style={{ display: 'flex', gap: 10, padding: '4px 0', borderBottom: '1px solid #161b28' }}>
-                <span style={{ color: '#475569', minWidth: 132 }}>{new Date(l.at).toLocaleString('de-DE')}</span>
+                <span style={{ color: '#8190a8', minWidth: 132 }}>{new Date(l.at).toLocaleString('de-DE')}</span>
                 <span style={{ color: l.status === 'error' ? '#ff8fab' : l.status === 'warn' ? '#f59e0b' : '#00e5ff', minWidth: 110 }}>{l.action}</span>
                 <span style={{ color: '#cbd5e1' }}>{l.target || ''} {l.detail ? `· ${l.detail}` : ''}</span>
               </div>
@@ -542,7 +542,7 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
             <div className="oa-section-title" style={{ margin: 0 }}><Star size={15} /> Öffentliche Bot-Profilseiten ({listings.length})</div>
             <button className="oa-btn ghost" onClick={addListing} data-testid="cfg-listing-add"><Plus size={15} /> Seite</button>
           </div>
-          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14 }}>Nur öffentliche Profil- und Werbelinks für Website und Marketing. API-Tokens, Webhooks und Statistik-Sync gehören in die System-Konfiguration unter „Technische Bot-Verzeichnis-Integrationen“.</div>
+          <div style={{ fontSize: 12, color: '#8190a8', marginBottom: 14 }}>Nur öffentliche Profil- und Werbelinks für Website und Marketing. API-Tokens, Webhooks und Statistik-Sync gehören in die System-Konfiguration unter „Technische Bot-Verzeichnis-Integrationen“.</div>
           {listings.map((b, i) => (
             <div key={i} style={{ background: 'var(--oa-bg)', border: '1px solid var(--oa-border-active)', borderRadius: 12, padding: 14, marginBottom: 12 }} data-testid={`cfg-listing-${i}`}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -563,13 +563,13 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
             <div className="oa-section-title" style={{ margin: 0 }}><Heart size={15} /> Sponsoren / Partner ({sponsors.length})</div>
             <button className="oa-btn ghost" onClick={addSponsor} data-testid="cfg-sponsor-add"><Plus size={15} /> Sponsor</button>
           </div>
-          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14 }}>Erscheinen als Logo-Wand auf der Startseite („Unterstützt von“). Ohne Logo wird der Name als Text angezeigt. Ein hochgeladenes Logo kommt von diesem Server; eine Logo-URL holt der Server beim Partner ab.</div>
+          <div style={{ fontSize: 12, color: '#8190a8', marginBottom: 14 }}>Erscheinen als Logo-Wand auf der Startseite („Unterstützt von“). Ohne Logo wird der Name als Text angezeigt. Ein hochgeladenes Logo kommt von diesem Server; eine Logo-URL holt der Server beim Partner ab.</div>
           {sponsors.map((s, i) => (
             <div key={i} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr)) 44px', gap: '0 14px', alignItems: 'end', marginBottom: 6 }} data-testid={`cfg-sponsor-${i}`}>
               <Field label="Name" value={s.name} onChange={(v) => setSponsor(i, 'name', v)} testid={`cfg-sponsor-${i}-name`} />
               <Field label="Logo-URL" value={s.logoUrl} onChange={(v) => setSponsor(i, 'logoUrl', v)} placeholder="https://…/logo.png" testid={`cfg-sponsor-${i}-logo`} />
               <Field label="Link" value={s.url} onChange={(v) => setSponsor(i, 'url', v)} placeholder="https://…" testid={`cfg-sponsor-${i}-url`} />
-              <button className="oa-btn ghost" style={{ color: '#ff8fab', marginBottom: 14 }} onClick={() => removeSponsor(i)} data-testid={`cfg-sponsor-${i}-remove`}><Trash2 size={14} /></button>
+              <button className="oa-btn ghost" style={{ color: '#ff8fab', marginBottom: 14 }} onClick={() => removeSponsor(i)} aria-label="Partner entfernen" title="Partner entfernen" data-testid={`cfg-sponsor-${i}-remove`}><Trash2 size={14} /></button>
               <div style={{ gridColumn: '1 / -1' }}>
                 <SponsorLogoUpload index={i} value={s.logoUrl} apiSend={apiSend} onUploaded={(ref) => setSponsor(i, 'logoUrl', ref)} />
               </div>
@@ -589,8 +589,8 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
       <div className="oa-fade" data-testid="config-charts">
         <div className="oa-card" style={{ marginBottom: 18 }}>
           <div className="oa-section-title">OmniFM-Charts</div>
-          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14, lineHeight: 1.6 }}>
-            Die meistgehörten Sender und die meistgespielten Songs der letzten Woche über alle Server stehen auf <a href="/charts" target="_blank" rel="noopener noreferrer" style={{ color: '#00e5ff' }}>omnifm.xyz/charts</a>.
+          <div style={{ fontSize: 12, color: '#8190a8', marginBottom: 14, lineHeight: 1.6 }}>
+            Die meistgehörten Sender und die meistgespielten Songs der letzten Woche über alle Server stehen auf <a href="/charts" target="_blank" rel="noopener noreferrer" style={{ color: '#00e5ff', textDecoration: 'underline' }}>omnifm.xyz/charts</a>.
             Hinein kommt nur, was auf mindestens 3 Servern lief, bei den Sendern nur solche aus dem OmniFM-Katalog; so lässt sich kein einzelner Server erkennen.
             Ist der Post an, schickt der Commander die Charts jeden Montag ab 10 Uhr in den Kanal unten: die Top 5 Sender (die ersten drei mit Logo) und die Top 3 Songs.
           </div>
@@ -606,7 +606,7 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
               </select>
             </label>
           </div>
-          <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.6, marginTop: 10 }}>
+          <div style={{ fontSize: 12, color: '#8190a8', lineHeight: 1.6, marginTop: 10 }}>
             Die Kanal-ID findest du in Discord mit eingeschaltetem Entwicklermodus: Rechtsklick auf den Kanal → „Kanal-ID kopieren“. Der Commander muss auf dem Server sein und in den Kanal schreiben dürfen.
           </div>
         </div>
@@ -625,7 +625,7 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
       <div className="oa-fade" data-testid="config-discord-shop">
         <div className="oa-card" style={{ marginBottom: 18 }}>
           <div className="oa-section-title">Premium in Discord</div>
-          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14, lineHeight: 1.6 }}>
+          <div style={{ fontSize: 12, color: '#8190a8', marginBottom: 14, lineHeight: 1.6 }}>
             Premium wird direkt in Discord verkauft: als Abo pro Server, monatlich. Discord ist der Verkäufer, kassiert, führt die Umsatzsteuer ab und behält 15 %; du bekommst Auszahlungen.
             Einschalten geht erst, wenn Discord die App freigibt: verifizierte App (ab 75 Servern) und Monetarisierung im Developer Portal eingerichtet.
             Solange der Schalter aus ist, zeigt die Website „Kaufen bald direkt in Discord“ und <span className="oa-mono">/premium</span> hat keine Kaufknöpfe.
@@ -636,7 +636,7 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
             <Field label="SKU-ID Pro" value={skus.pro || ''} onChange={(v) => setSku('pro', v)} placeholder="123456789012345678" testid="cfg-shop-sku-pro" />
             <Field label="SKU-ID Ultimate" value={skus.ultimate || ''} onChange={(v) => setSku('ultimate', v)} placeholder="123456789012345678" testid="cfg-shop-sku-ultimate" />
           </div>
-          <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.6 }}>
+          <div style={{ fontSize: 12, color: '#8190a8', lineHeight: 1.6 }}>
             Die SKUs legst du im Developer Portal unter Monetization → Manage SKUs an: je ein Server-Abo (Guild Subscription) für Pro und Ultimate. Die ID kopierst du von dort.
             Wer kauft, bekommt die Lizenz für seinen Server sofort; endet das Abo, bekommt der Server eine Lizenz von vorher zurück, solange sie noch gilt.
           </div>
@@ -661,7 +661,7 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
             <div className="oa-section-title" style={{ margin: 0 }}><Users size={15} /> Discord-Konten mit Zugang ({accounts.length})</div>
             <button className="oa-btn ghost" onClick={addAccount} data-testid="cfg-access-add"><Plus size={15} /> Konto</button>
           </div>
-          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 12, color: '#8190a8', marginBottom: 14, lineHeight: 1.5 }}>
             Diese Konten melden sich mit „Mit Discord anmelden“ an. <b>Owner</b> darf alles. <b>Support</b> sieht alles und darf prüfen (Cockpit, Sender-Test), aber nichts ändern. <b>Abrechnung</b> sieht alles und darf Lizenzen, Zahlungen und Preise ändern.
             Die Discord-ID findest du in Discord unter Einstellungen → Erweitert → Entwicklermodus, dann Rechtsklick auf das Profil → „ID kopieren“.
           </div>
@@ -677,13 +677,13 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
                   <option value="billing">Abrechnung</option>
                 </select>
               </div>
-              <button className="oa-btn ghost" style={{ color: '#ff8fab', marginBottom: 14 }} onClick={() => removeAccount(i)} data-testid={`cfg-access-${i}-remove`}><Trash2 size={14} /></button>
+              <button className="oa-btn ghost" style={{ color: '#ff8fab', marginBottom: 14 }} onClick={() => removeAccount(i)} aria-label="Zugang entfernen" title="Zugang entfernen" data-testid={`cfg-access-${i}-remove`}><Trash2 size={14} /></button>
             </div>
           ))}
         </div>
         <div className="oa-card" style={{ marginBottom: 18 }}>
           <div className="oa-section-title"><KeyRound size={15} /> Owner-Token für Skripte</div>
-          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 12, color: '#8190a8', marginBottom: 12, lineHeight: 1.5 }}>
             Der Token aus <span className="oa-mono">API_ADMIN_TOKEN</span> (backend/.env) ist für Skripte wie den Live-Check gedacht. Ausschalten geht erst, wenn mindestens ein Discord-Konto die Rolle Owner hat. Neuen Token: Wert in backend/.env ändern und <span className="oa-mono">./update.sh</span> ausführen.
           </div>
           <Toggle label="Token erlaubt" checked={access.tokenEnabled !== false} onChange={(v) => setAccess((p) => ({ ...p, tokenEnabled: v || !hasOwner }))} testid="cfg-access-token" />

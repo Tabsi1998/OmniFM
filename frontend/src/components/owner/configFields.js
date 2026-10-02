@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { CheckCircle2, Save, XCircle } from 'lucide-react';
 
 // The form building blocks of the owner console's settings pages (OwnerConfig.js and its topic modules).
@@ -7,22 +8,27 @@ export const labelStyle = {
 };
 
 export function Field({ label, value, onChange, placeholder, type = 'text', textarea, testid, hint, width }) {
+  // The label belongs to its field, so a screen reader names it (#490).
+  const id = useId();
+  const hintId = hint ? `${id}-hint` : undefined;
   return (
     <div style={{ marginBottom: 14, gridColumn: width === 'full' ? '1 / -1' : 'auto' }}>
-      <label style={labelStyle}>{label}</label>
+      <label style={labelStyle} htmlFor={id}>{label}</label>
       {textarea ? (
         <textarea
+          id={id} aria-describedby={hintId}
           className="oa-input" data-testid={testid} value={value || ''} placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
           style={{ height: 96, padding: '12px 14px', resize: 'vertical', lineHeight: 1.5 }}
         />
       ) : (
         <input
+          id={id} aria-describedby={hintId}
           className="oa-input" data-testid={testid} type={type} value={value || ''} placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
         />
       )}
-      {hint && <div style={{ fontSize: 11, color: '#64748b', marginTop: 5 }}>{hint}</div>}
+      {hint && <div id={hintId} style={{ fontSize: 11, color: '#8190a8', marginTop: 5 }}>{hint}</div>}
     </div>
   );
 }
@@ -30,7 +36,7 @@ export function Field({ label, value, onChange, placeholder, type = 'text', text
 export function Toggle({ label, checked, onChange, testid }) {
   return (
     <button
-      type="button" data-testid={testid} onClick={() => onChange(!checked)}
+      type="button" role="switch" aria-checked={!!checked} data-testid={testid} onClick={() => onChange(!checked)}
       className="oa-card" style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14,
         cursor: 'pointer', padding: '12px 16px', marginBottom: 14, width: '100%', textAlign: 'left',

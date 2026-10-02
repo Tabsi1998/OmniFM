@@ -9,7 +9,7 @@ export default function LegalLanguageNote({ page }) {
   return (
     <p
       data-testid="legal-language-note"
-      style={{ margin: '14px 0 0', maxWidth: 760, color: '#71717A', fontSize: 14, lineHeight: 1.6 }}
+      style={{ margin: '14px 0 0', maxWidth: 760, color: '#8e8e97', fontSize: 14, lineHeight: 1.6 }}
     >
       {copy.legalNote.text}{' '}
       <a href={buildPageHref('de', page)} style={{ color: '#00E5FF' }}>{copy.legalNote.link}</a>

@@ -60,7 +60,7 @@ export function buildDashboardIncidentAlertsSummary(rawConfig, channelName, t) {
   if (!hasChannel) {
     return {
       statusLabel: t('Nicht konfiguriert', 'Not configured'),
-      statusAccent: '#71717A',
+      statusAccent: '#8e8e97',
       description: t(
         'Lege einen Text-Channel fest, um Stream-Stalls, Recoverys und Failover-Vorfälle direkt in Discord zu sehen.',
         'Choose a text channel to see stream stalls, recoveries, and failover incidents directly in Discord.'
@@ -93,7 +93,7 @@ export function buildDashboardIncidentAlertsSummary(rawConfig, channelName, t) {
 
   return {
     statusLabel: t('Bereit', 'Ready'),
-    statusAccent: '#8B5CF6',
+    statusAccent: '#A78BFA',
     description: t(
       'Der Channel {channel} ist gespeichert und kann bei Bedarf für Incident-Alerts aktiviert werden.',
       'The channel {channel} is saved and can be enabled for incident alerts when needed.',

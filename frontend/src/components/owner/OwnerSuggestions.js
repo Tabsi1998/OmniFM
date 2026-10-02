@@ -160,7 +160,7 @@ export default function OwnerSuggestions({ apiGet, apiSend }) {
               <tbody>
                 {decided.map((item) => (
                   <tr key={item.id}>
-                    <td>{item.name}{item.stationKey ? <span className="oa-mono" style={{ color: '#64748b' }}> · {item.stationKey}</span> : null}</td>
+                    <td>{item.name}{item.stationKey ? <span className="oa-mono" style={{ color: '#8190a8' }}> · {item.stationKey}</span> : null}</td>
                     <td><span className={`oa-pill ${item.status === 'accepted' ? 'green' : 'slate'}`}>{item.status === 'accepted' ? 'angenommen' : 'abgelehnt'}</span></td>
                     <td>{fmtDate(item.decidedAt)}</td>
                     <td>{!item.answered ? '—' : item.answered.pending ? 'kommt gleich' : item.answered.delivered ? 'per DM' : 'DM nicht möglich'}</td>

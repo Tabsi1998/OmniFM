@@ -60,7 +60,7 @@ function StationCard({ station, index, isPlaying, onPlay, onStop, copy }) {
           <div style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {station.name}
           </div>
-          <div style={{ fontSize: 12, color: '#52525B', fontFamily: "'JetBrains Mono', monospace", marginTop: 2 }}>
+          <div style={{ fontSize: 12, color: '#8e8e97', fontFamily: "'JetBrains Mono', monospace", marginTop: 2 }}>
             {station.key}
           </div>
         </div>
@@ -280,7 +280,7 @@ function StationBrowser({ stations, loading }) {
                   cursor: 'pointer',
                 }}
               />
-              <span style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: '#52525B', width: 28, textAlign: 'right' }}>
+              <span style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: '#8e8e97', width: 28, textAlign: 'right' }}>
                 {muted ? 0 : volume}
               </span>
             </div>
@@ -346,7 +346,7 @@ function StationBrowser({ stations, loading }) {
               );
             })}
           </div>
-          <p style={{ fontSize: 12, color: '#52525B', marginTop: 8 }}>
+          <p style={{ fontSize: 12, color: '#8e8e97', marginTop: 8 }}>
             {finalFilterSummaryText}
           </p>
         </div>
@@ -377,9 +377,9 @@ function StationBrowser({ stations, loading }) {
         )}
 
         {loading ? (
-          <div style={{ color: '#52525B', padding: 40 }}>{copy.stations.loading}</div>
+          <div style={{ color: '#8e8e97', padding: 40 }}>{copy.stations.loading}</div>
         ) : filtered.length === 0 ? (
-          <div data-testid="no-stations" style={{ color: '#52525B', padding: 40, textAlign: 'center', borderRadius: 16, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div data-testid="no-stations" style={{ color: '#8e8e97', padding: 40, textAlign: 'center', borderRadius: 16, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <Music size={32} style={{ marginBottom: 12, opacity: 0.3 }} />
             <p>{copy.stations.empty}</p>
           </div>
@@ -429,7 +429,7 @@ function StationBrowser({ stations, loading }) {
                     remaining: formatNumber(remaining),
                   })}
                 </button>
-                <p style={{ fontSize: 11, color: '#52525B', marginTop: 8 }}>
+                <p style={{ fontSize: 11, color: '#8e8e97', marginTop: 8 }}>
                   {copy.stations.visible({
                     visible: formatNumber(Math.min(visibleCount, filtered.length)),
                     total: formatNumber(filtered.length),

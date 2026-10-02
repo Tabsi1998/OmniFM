@@ -10,15 +10,15 @@ import { LEGAL_PAGES, legalChecklist, legalPageLight } from '../../../../src/con
 const LIGHTS = {
   green: { icon: '✓', color: '#0ca30c', label: 'Vollständig' },
   yellow: { icon: '!', color: '#fab219', label: 'Prüfen' },
-  red: { icon: '✕', color: '#d03b3b', label: 'Pflichtangaben fehlen' },
+  red: { icon: '✕', color: '#f87171', label: 'Pflichtangaben fehlen' },
 };
 
 const STATES = {
   ok: { icon: '✓', color: '#0ca30c', label: 'Eingetragen' },
-  missing: { icon: '✕', color: '#d03b3b', label: 'Fehlt, muss rein' },
+  missing: { icon: '✕', color: '#f87171', label: 'Fehlt, muss rein' },
   open: { icon: '?', color: '#fab219', label: 'Nur wenn es auf dich zutrifft' },
-  na: { icon: '–', color: '#64748b', label: 'Trifft nicht zu' },
-  optional: { icon: '○', color: '#64748b', label: 'Freiwillig' },
+  na: { icon: '–', color: '#8190a8', label: 'Trifft nicht zu' },
+  optional: { icon: '○', color: '#8190a8', label: 'Freiwillig' },
 };
 // Within a page: what is missing first, then what may apply, then the rest.
 const ORDER = { missing: 0, open: 1, ok: 2, na: 3, optional: 4 };
@@ -43,7 +43,7 @@ function Requirement({ item, notApplicable, onNotApplicable }) {
       <div>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 10px' }}>
           <span style={{ color: open ? '#f8fafc' : '#cbd5e1', fontWeight: 700, fontSize: open ? 14 : 13 }}>{item.label}</span>
-          <span style={{ color: meta.color === '#64748b' ? '#94a3b8' : meta.color, fontSize: 12, fontWeight: 700 }}>{meta.label}</span>
+          <span style={{ color: meta.color === '#8190a8' ? '#94a3b8' : meta.color, fontSize: 12, fontWeight: 700 }}>{meta.label}</span>
         </div>
         {open && <div style={{ color: '#cbd5e1', fontSize: 13, lineHeight: 1.5, marginTop: 2 }}>{item.why}</div>}
         {open && item.source ? <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 2 }}>{item.source}</div> : null}
