@@ -6,6 +6,55 @@ folgt [SemVer](https://semver.org/lang/de/): Die erste Zahl steigt bei
 Funktionen, die dritte bei reinen Fehlerbehebungen. Wie ein Release entsteht,
 steht in `scripts/release.mjs`.
 
+## 3.19.0 – 2026-10-03
+
+Die Website lässt sich in jeder der neun Sprachen lesen, egal was der Browser
+sagt. Dazu die Ergebnisse des Audits vom Oktober: keine leeren Senderlisten
+mehr durch zu viele Anfragen, eine echte „Seite nicht gefunden“, ein
+hochladbares Partner-Logo, und Website, Dashboard und Owner-Konsole sind mit
+Screenreader und Tastatur bedienbar.
+
+### Neu
+
+- **Sprache selbst wählen:** In der Kopfzeile öffnet eine Weltkugel die neun
+  Sprachen, im Handy-Menü und in der Fußzeile stehen sie als Links, im
+  Dashboard als Auswahl „Sprache der Seite“. Die Seite wechselt sofort, und
+  der Browser merkt sich die Wahl für den nächsten Besuch. Ein Link mit
+  `?lang=` gewinnt weiter, damit ein geteilter Link in seiner Sprache
+  aufgeht. Die Owner-Konsole bleibt Deutsch. (#497)
+- **Partner-Logo hochladen:** In der Owner-Konsole unter Listings & Partner
+  lädt „Logo hochladen“ ein Bild (PNG, JPEG, WebP, GIF, höchstens 2 MB) direkt
+  auf den eigenen Server. Ein Logo von einer Adresse, die der Server nicht
+  erreicht, fällt damit weg; lädt ein Logo nicht, zeigt die Website den
+  Namen des Partners. (#486)
+
+### Verbessert
+
+- **Weniger Anfragen, keine leeren Listen:** Die Website fragt nur noch ab,
+  was die Seite zeigt. Auf der Startseite sind es in der ersten Minute 16
+  statt 59 Anfragen, danach 2 pro Minute, und nur solange der Tab sichtbar
+  ist. Cover holt sie einmal pro Name. Vorher lief ein Besucher nach einer
+  Minute in die Grenze von 60 Anfragen, und Senderliste und Preise blieben
+  leer. Das Dashboard hat ein eigenes Budget von 300 Anfragen pro Minute.
+  (#485)
+- **Barrierefreiheit:** Jeder Knopf, jede Liste und jedes Feld hat einen
+  Namen, die Schalter sagen, ob sie an sind, und graue Hinweistexte sind gut
+  lesbar (mindestens 4,5 : 1). Auf dem Handy scrollt keine Seite mehr zur
+  Seite. Ein Wächter im lokalen Check prüft jede Seite mit axe. (#488, #489,
+  #490)
+- **Owner-Cockpit „Besucher-Adressen“:** Steht vor OmniFM ein Proxy, dem die
+  API nicht vertraut, teilen sich alle Besucher ein Limit. Das Cockpit zeigt
+  das jetzt gelb an, mit den zwei Zeilen für `backend/.env`. (#484)
+
+### Behoben
+
+- **Unbekannte Adressen:** `omnifm.xyz/gibt-es-nicht` zeigte die Startseite
+  und durfte in Suchmaschinen. Jetzt kommt eine Seite „Nicht gefunden“ mit
+  HTTP 404, die Suchmaschinen nicht aufnehmen. (#487)
+- **Texte:** Der Hinweis zum ausgeschalteten Song-Verlauf schickt
+  Server-Admins nicht mehr zu einer Einstellung, die nur der Betreiber
+  ändern kann. Die README beschreibt die neun Sprachen. (#491)
+
 ## 3.18.0 – 2026-10-02
 
 Der Bot und die Kauf-E-Mails sprechen jetzt neun Sprachen, und Störungen,
