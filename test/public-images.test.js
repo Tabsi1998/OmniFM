@@ -61,6 +61,7 @@ async function get(handle, url, method = "GET") {
 test("the website's answers name pictures by what they show; nothing points elsewhere", () => {
   const cover = images.websiteCover({ ok: true, query: "Artist Song", artwork: "https://is1.example/600.jpg", artworkSmall: "https://is1.example/100.jpg", title: "Song" });
   assert.equal(cover.artwork, "/api/image/cover?term=Artist+Song&size=600");
+  assert.equal(cover.artworkMedium, "/api/image/cover?term=Artist+Song&size=300");
   assert.equal(cover.artworkSmall, "/api/image/cover?term=Artist+Song&size=100");
   assert.equal(cover.title, "Song");
   assert.deepEqual(images.websiteCover({ ok: false, query: "x" }), { ok: false, query: "x" });
@@ -121,17 +122,18 @@ test("only what the site names is fetched: no other station, no address from the
   assert.equal(post.status, 405);
 });
 
-test("covers in two sizes, and partner logos by their number", async () => {
+test("covers in three sizes, and partner logos by their number", async () => {
   const { handle, fetched } = handler({
-    cover: { artwork: "https://is1.example/600.jpg", artworkSmall: "https://is1.example/100.jpg" },
+    cover: { artwork: "https://is1.example/600.jpg", artworkMedium: "https://is1.example/300.jpg", artworkSmall: "https://is1.example/100.jpg" },
     sponsors: [{ name: "A", logoUrl: "https://a.example/logo.webp" }],
     fetchImpl: (url) => picture(PNG, url.endsWith(".webp") ? "image/webp" : "image/jpeg"),
   });
   assert.equal((await get(handle, "/api/image/cover?term=Artist%20Song&size=600")).status, 200);
   assert.equal((await get(handle, "/api/image/cover?term=Artist%20Song&size=100")).headers["Content-Type"], "image/jpeg");
+  assert.equal((await get(handle, "/api/image/cover?term=Artist%20Song&size=300")).status, 200);
   assert.equal((await get(handle, "/api/image/sponsor/0")).headers["Content-Type"], "image/webp");
   assert.equal((await get(handle, "/api/image/sponsor/1")).status, 404);
-  assert.deepEqual(fetched, ["https://is1.example/600.jpg", "https://is1.example/100.jpg", "https://a.example/logo.webp"]);
+  assert.deepEqual(fetched, ["https://is1.example/600.jpg", "https://is1.example/100.jpg", "https://is1.example/300.jpg", "https://a.example/logo.webp"]);
 });
 
 test("pictures only, at most 2 MB; an SVG runs in a sandbox", async () => {

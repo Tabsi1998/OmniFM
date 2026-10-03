@@ -10,16 +10,16 @@ import { createHash } from "node:crypto";
 import { splitDisplayTitle } from "./charts.js";
 
 export const IMAGE_PATH = "/api/image";
-export const COVER_SIZES = Object.freeze([100, 600]);
+export const COVER_SIZES = Object.freeze([100, 300, 600]);
 
 /** A catalogue station's logo. */
 export function stationImagePath(key) {
   return `${IMAGE_PATH}/station/${encodeURIComponent(String(key || ""))}`;
 }
 
-/** The cover the song search finds for a term, small (100) or large (600). */
+/** The cover the song search finds for a term: small (100), medium (300) or large (600). */
 export function coverImagePath(term, size = 600) {
-  const params = new URLSearchParams({ term: String(term || "").trim().slice(0, 120), size: String(size === 100 ? 100 : 600) });
+  const params = new URLSearchParams({ term: String(term || "").trim().slice(0, 120), size: String(COVER_SIZES.includes(size) ? size : 600) });
   return `${IMAGE_PATH}/cover?${params}`;
 }
 
@@ -48,6 +48,7 @@ export function websiteCover(result) {
   return {
     ...result,
     artwork: result.artwork ? coverImagePath(result.query, 600) : null,
+    artworkMedium: result.artwork ? coverImagePath(result.query, 300) : null,
     artworkSmall: result.artworkSmall ? coverImagePath(result.query, 100) : null,
   };
 }

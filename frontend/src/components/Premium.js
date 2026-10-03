@@ -5,6 +5,7 @@ import { buildApiUrl } from '../lib/api.js';
 import { resolvePrimaryInviteUrl } from '../lib/invite.js';
 import { CheckoutModal } from './PremiumCodeModal.js';
 import { planCardLinesIn } from '../../../src/config/plan-feature-texts.js';
+import { fetchAfterFirstPaint } from '../lib/firstPaint.js';
 
 const PLAN_ORDER = ['free', 'pro', 'ultimate'];
 const PLAN_META = {
@@ -140,7 +141,7 @@ function Premium({ bots = [], planContext = {} }) {
     const loadPricing = async () => {
       try {
         const pricingUrl = `${buildApiUrl('/api/premium/pricing')}?lang=${encodeURIComponent(locale)}`;
-        const response = await fetch(pricingUrl, { cache: 'no-store', signal: controller.signal });
+        const response = await fetchAfterFirstPaint(pricingUrl, { cache: 'no-store', signal: controller.signal });
         const payload = await response.json();
         if (!response.ok || payload?.error) throw new Error(payload?.error || `HTTP ${response.status}`);
         setRawPricing(payload);

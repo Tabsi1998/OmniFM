@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { buildApiUrl } from './api.js';
+import { fetchAfterFirstPaint } from './firstPaint.js';
 
 // Bitrate pro Tarif (ehrlich, keine erfundenen Werte).
 const TIER_BITRATE = { free: '64 kbps', pro: '128 kbps', ultimate: '320 kbps' };
@@ -10,7 +11,7 @@ const TIER_BITRATE = { free: '64 kbps', pro: '128 kbps', ultimate: '320 kbps' };
 // failed answer lets the next showcase ask again.
 let catalogueRequest = null;
 function loadCatalogueOnce() {
-  catalogueRequest ||= fetch(buildApiUrl('/api/stations'))
+  catalogueRequest ||= fetchAfterFirstPaint(buildApiUrl('/api/stations'))
     .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
     .catch((error) => {
       catalogueRequest = null;

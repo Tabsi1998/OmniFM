@@ -19,6 +19,7 @@ import { PlayerProvider } from './lib/player.js';
 import { buildApiUrl } from './lib/api.js';
 import { getSectionAnchorForPage, resolvePageFromUrl } from './lib/pageRouting.js';
 import { startSiteData } from './lib/siteData.js';
+import { fetchAfterFirstPaint } from './lib/firstPaint.js';
 import SeasonLayer from './components/season/SeasonLayer.js';
 
 // Loaded only on their own pages (#296): the start page carries neither the
@@ -42,7 +43,7 @@ function PageLoading() {
 }
 
 async function fetchJson(path, signal) {
-  const res = await fetch(buildApiUrl(path), {
+  const res = await fetchAfterFirstPaint(buildApiUrl(path), {
     cache: 'no-store',
     signal,
   });
@@ -80,14 +81,36 @@ function AppContent() {
     ? 'home'
     : resolvePageFromUrl(window.location.href);
 
+  // /preise, /sender, /faq or a #section of the start page (#501): the
+  // sections above draw only when they come near, and grow when their data
+  // comes. The section stays at the top while that happens, until the reader
+  // scrolls or for three seconds.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const sectionId = getSectionAnchorForPage(currentPage);
-    if (!sectionId) return;
-    const frame = window.requestAnimationFrame(() => {
-      document.getElementById(sectionId)?.scrollIntoView({ block: 'start' });
-    });
-    return () => window.cancelAnimationFrame(frame);
+    if (typeof window === 'undefined') return undefined;
+    const sectionId = getSectionAnchorForPage(currentPage)
+      || (currentPage === 'home' ? decodeURIComponent(window.location.hash.slice(1)) : '');
+    if (!sectionId || sectionId === 'top') return undefined;
+    let held = true;
+    const jump = () => {
+      if (held) document.getElementById(sectionId)?.scrollIntoView({ block: 'start' });
+    };
+    const frame = window.requestAnimationFrame(jump);
+    const main = document.querySelector('main');
+    const resizes = typeof ResizeObserver === 'function' && main ? new ResizeObserver(jump) : null;
+    resizes?.observe(main);
+    const READER_MOVES = ['wheel', 'touchstart', 'keydown', 'pointerdown'];
+    const release = () => {
+      held = false;
+      resizes?.disconnect();
+      READER_MOVES.forEach((name) => window.removeEventListener(name, release));
+    };
+    READER_MOVES.forEach((name) => window.addEventListener(name, release, { passive: true }));
+    const timer = window.setTimeout(release, 3000);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+      release();
+    };
   }, [currentPage]);
 
   // What the page shows, and nothing else (#485): src/lib/siteData.js.
@@ -283,15 +306,16 @@ function AppContent() {
       <Navbar page={currentPage} />
       <main>
         <Hero stats={stats} bots={bots} />
-        <TrustBar stats={stats} />
-        <DiscordShowcase />
-        <HowToDiscord bots={bots} />
-        <StationBrowser stations={stations} loading={loading} />
-        <WhyOmniFM />
-        <DashboardPreview />
-        <Premium bots={bots} planContext={{ freeStations: stats.freeStations, allStations: stats.stations }} />
-        <CommunitySection />
-        <FaqSection />
+        {/* Below the first screen: drawn when it comes near (#501). */}
+        <div className="render-later"><TrustBar stats={stats} /></div>
+        <div className="render-later"><DiscordShowcase /></div>
+        <div className="render-later"><HowToDiscord bots={bots} /></div>
+        <div className="render-later"><StationBrowser stations={stations} loading={loading} /></div>
+        <div className="render-later"><WhyOmniFM /></div>
+        <div className="render-later"><DashboardPreview /></div>
+        <div className="render-later"><Premium bots={bots} planContext={{ freeStations: stats.freeStations, allStations: stats.stations }} /></div>
+        <div className="render-later"><CommunitySection /></div>
+        <div className="render-later"><FaqSection /></div>
       </main>
       <SeasonLayer />
       <SiteFooter legal={legal} />

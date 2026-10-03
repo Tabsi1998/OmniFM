@@ -1,6 +1,7 @@
 // OmniFM: the window on the premium page: redeem a code, start the trial.
 // Split out of frontend/src/components/Premium.js (#296).
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { buildApiUrl } from '../lib/api.js';
 
@@ -142,7 +143,9 @@ export function CheckoutModal(props) {
     }
   };
 
-  return (
+  // On <body>: the premium section draws only near the screen (#501), and
+  // its containment would hold a fixed window inside the section.
+  return createPortal((
     <div
       data-testid="checkout-modal-overlay"
       onClick={onClose}
@@ -359,5 +362,5 @@ export function CheckoutModal(props) {
         </button>
       </div>
     </div>
-  );
+  ), document.body);
 }

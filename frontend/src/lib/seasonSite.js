@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { seasonAt, seasonPreview } from '../../../src/lib/seasons.js';
 import { buildApiUrl } from './api.js';
+import { fetchAfterFirstPaint } from './firstPaint.js';
 
 export const DECOR_HIDDEN_KEY = 'omnifm.seasonDecor.hidden';
 
@@ -58,7 +59,7 @@ let switchesRequest = null;
 /** The owner's main switches, asked once per page; {} when the server does not answer. */
 export function loadOwnerSeasonSwitches() {
   if (!switchesRequest) {
-    switchesRequest = fetch(buildApiUrl('/api/season'), { cache: 'no-store' })
+    switchesRequest = fetchAfterFirstPaint(buildApiUrl('/api/season'), { cache: 'no-store' })
       .then((response) => (response.ok ? response.json() : null))
       .then((body) => body?.enabled || {})
       .catch(() => ({}));

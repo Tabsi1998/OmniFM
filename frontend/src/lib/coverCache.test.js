@@ -13,9 +13,10 @@ const answer = (status, body) => ({ ok: status < 400, status, json: async () => 
 
 describe('covers', () => {
   it('asks once per name, however often the showcase turns', async () => {
-    const fetchImpl = vi.fn(async () => answer(200, { ok: true, artwork: '/api/image/cover?term=Groove%20Salad&size=600' }));
+    const fetchImpl = vi.fn(async () => answer(200, { ok: true, artwork: '/api/image/cover?term=Groove%20Salad&size=600', artworkMedium: '/api/image/cover?term=Groove%20Salad&size=300' }));
     const results = await Promise.all([1, 2, 3].map(() => coverFor('Groove Salad', { fetchImpl })));
-    expect(results).toEqual(Array(3).fill('/api/image/cover?term=Groove%20Salad&size=600'));
+    // The medium size: player and bar show the cover small (#501).
+    expect(results).toEqual(Array(3).fill('/api/image/cover?term=Groove%20Salad&size=300'));
     await coverFor('Groove Salad', { fetchImpl });
     await coverFor('Drone Zone', { fetchImpl });
     expect(fetchImpl).toHaveBeenCalledTimes(2);

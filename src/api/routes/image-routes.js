@@ -45,7 +45,9 @@ async function sourceFor(requestUrl, { stations, lookupCover, marketing }) {
     const term = String(requestUrl.searchParams.get("term") || "").trim();
     if (!term) return "";
     const found = await lookupCover({ term });
-    const url = requestUrl.searchParams.get("size") === "100" ? found?.artworkSmall : found?.artwork;
+    const size = requestUrl.searchParams.get("size");
+    // A cover found before the medium size existed has none: then the large one.
+    const url = size === "100" ? found?.artworkSmall : size === "300" ? (found?.artworkMedium || found?.artwork) : found?.artwork;
     return found?.ok && /^https:\/\//i.test(String(url || "")) ? String(url) : "";
   }
   const sponsor = SPONSOR_PATH.exec(path);
