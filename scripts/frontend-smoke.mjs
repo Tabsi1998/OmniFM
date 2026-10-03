@@ -42,6 +42,7 @@ const DASHBOARD_ANSWERS = {
   "/api/dashboard/custom-stations": { stations: [], limit: 50 },
   "/api/dashboard/settings": { settings: {} },
 };
+const DASHBOARD_LIVE = { serverId: SERVER, streams: [], listenersNow: 0, activeStreams: 0, runtimeUptimeSec: 0 };
 const DASHBOARD_AREAS = ["overview", "stations", "events", "roles", "stats", "subscription", "settings"];
 
 const PAGES = [
@@ -119,6 +120,10 @@ try {
       // eslint-disable-next-line no-await-in-loop
       await tab.route(/\/api\/(auth|dashboard)\//, (route) => {
         const path = new URL(route.request().url()).pathname;
+        // The overview listens on a stream of events (#502), not JSON.
+        if (path === "/api/dashboard/live") {
+          return route.fulfill({ status: 200, contentType: "text/event-stream", body: `retry: 60000\n\nevent: live\ndata: ${JSON.stringify(DASHBOARD_LIVE)}\n\n` });
+        }
         return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(DASHBOARD_ANSWERS[path] ?? {}) });
       });
     }

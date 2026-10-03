@@ -2,6 +2,8 @@
 // Split out of src/api/server.js (#293).
 import { createDashboardChannelsRouteHandler } from "./routes/dashboard-channels.js";
 import { createDashboardPlaybackRouteHandler } from "./routes/dashboard-playback.js";
+import { createDashboardLiveRouteHandler } from "./routes/dashboard-live.js";
+import { getClientIp } from "../lib/api-rate-limit.js";
 import { createAuthRoutesHandler } from "./routes/auth-routes.js";
 import { createLinkedRolesRoutes } from "./routes/linked-roles-routes.js";
 import { createActivityRoutes } from "./routes/activity-routes.js";
@@ -226,6 +228,7 @@ import {
 } from "./helpers/stations.js";
 import {
   buildDashboardDetailStatsPayload,
+  buildDashboardLiveSnapshot,
   buildDashboardStatsForGuild,
   buildDashboardWeeklyDigestPreviewPayload,
   normalizeDashboardTelemetryPayload,
@@ -624,6 +627,19 @@ export const handleDashboardChannelsRoute = createDashboardChannelsRouteHandler(
   resolveDashboardGuildForSession,
   resolveRuntimeForGuild,
   sendJson,
+  sendLocalizedError,
+  serverHasCapability,
+});
+
+// The overview listens instead of asking every five seconds (#502).
+export const handleDashboardLiveRoute = createDashboardLiveRouteHandler({
+  buildDashboardLiveSnapshot,
+  getClientIp,
+  getCommonSecurityHeaders,
+  getDashboardRequestTranslator,
+  getDashboardSession,
+  methodNotAllowed,
+  resolveDashboardGuildForSession,
   sendLocalizedError,
   serverHasCapability,
 });

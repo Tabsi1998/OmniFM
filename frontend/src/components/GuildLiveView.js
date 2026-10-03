@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { Activity, RefreshCw, RotateCcw, Unplug } from 'lucide-react';
 
 // The live view of a server (#304): every bot's playback over the last 24
@@ -6,7 +6,8 @@ import { Activity, RefreshCw, RotateCcw, Unplug } from 'lucide-react';
 // now, the last changes, and two buttons for when it hangs. Refreshes every
 // 15 seconds while the overview is open.
 
-const REFRESH_MS = 15_000;
+// The day's timeline changes slowly; what plays now arrives with the overview's live messages (#502).
+const REFRESH_MS = 60_000;
 
 // Status colours; each phase also has its name in the legend and the tooltip.
 export const PHASE_COLORS = {
@@ -67,7 +68,7 @@ function Timeline({ bot, windowStart, windowEnd, t, locale }) {
   );
 }
 
-export default function GuildLiveView({ apiRequest, guildId, t, locale = 'de-DE' }) {
+export default function GuildLiveView({ apiRequest, guildId, t, locale = 'de-DE', liveTick = 0 }) {
   const [view, setView] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
@@ -84,9 +85,21 @@ export default function GuildLiveView({ apiRequest, guildId, t, locale = 'de-DE'
 
   useEffect(() => {
     load();
-    const timer = setInterval(load, REFRESH_MS);
+    const timer = setInterval(() => {
+      if (typeof document === 'undefined' || document.visibilityState !== 'hidden') load();
+    }, REFRESH_MS);
     return () => clearInterval(timer);
   }, [load]);
+
+  // Something changed on the server: the view follows a moment later, once
+  // per burst; not for the messages it saw before it opened.
+  const seenTick = useRef(liveTick);
+  useEffect(() => {
+    if (liveTick === seenTick.current) return undefined;
+    seenTick.current = liveTick;
+    const timer = setTimeout(load, 1000);
+    return () => clearTimeout(timer);
+  }, [liveTick, load]);
 
   const act = async (bot, action) => {
     setBusy(`${bot.botId}:${action}`);

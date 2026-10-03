@@ -12,6 +12,7 @@ import {
 import { buildApiUrl } from '../lib/api.js';
 import { dashboardApiRequest } from '../lib/dashboardApi.js';
 import { isDashboardDemo, isDashboardTour } from '../lib/dashboardDemoMode.js';
+import { watchDashboardLive } from '../lib/dashboardLive.js';
 import { buildPageHref } from '../lib/pageRouting.js';
 import { useI18n } from '../i18n.js';
 import DashboardEvents from './DashboardEvents.js';
@@ -257,6 +258,8 @@ export default function GuildDashboard() {
   const [eventForm, setEventForm] = useState(() => emptyEventForm());
   const [editingEventId, setEditingEventId] = useState('');
   const [msg, setMsg] = useState(null);
+  // Counts the live messages: the live view reloads when something changed (#502).
+  const [liveTick, setLiveTick] = useState(0);
   const [reportOpen, setReportOpen] = useState(false);
   const { locale, formatDate, t } = useI18n();
   const navLabel = useCallback((id) => ({
@@ -374,27 +377,39 @@ export default function GuildDashboard() {
             };
           }) }
           : await apiRequest(`/api/dashboard/stats?serverId=${encodeURIComponent(guildId)}`);
-        if (stopped) return;
-        const basic = stats?.basic || {};
-        setStore((current) => {
-          const previous = current[guildId] || EMPTY_DATA;
-          return {
-            ...current,
-            [guildId]: {
-              ...previous,
-              listeners: Number(basic.listenersNow || 0),
-              activeStreams: Number(basic.activeStreams || 0),
-              liveStreams: Array.isArray(basic.activeStreamDetails) ? basic.activeStreamDetails : [],
-              uptimeSec: Number(basic.runtimeUptimeSec || 0),
-              minutesMonth: basic.totalListeningMs === undefined ? previous.minutesMonth : Math.round(Number(basic.totalListeningMs) / 60000),
-              setupStatus: basic.setupStatus || previous.setupStatus || null,
-            },
-          };
-        });
+        applyLive(stats?.basic || {});
       } catch { /* keep the latest valid live snapshot */ }
     };
-    const timer = setInterval(refreshLive, 5000);
-    return () => { stopped = true; clearInterval(timer); };
+    const applyLive = (basic) => {
+      if (stopped) return;
+      setStore((current) => {
+        const previous = current[guildId] || EMPTY_DATA;
+        return {
+          ...current,
+          [guildId]: {
+            ...previous,
+            listeners: Number(basic.listenersNow || 0),
+            activeStreams: Number(basic.activeStreams || 0),
+            liveStreams: Array.isArray(basic.activeStreamDetails) ? basic.activeStreamDetails : [],
+            uptimeSec: Number(basic.runtimeUptimeSec || 0),
+            minutesMonth: basic.totalListeningMs === undefined ? previous.minutesMonth : Math.round(Number(basic.totalListeningMs) / 60000),
+            setupStatus: basic.setupStatus || previous.setupStatus || null,
+          },
+        };
+      });
+      setLiveTick((count) => count + 1);
+    };
+    // The preview answers from the page itself and keeps its five seconds (#432).
+    if (isDashboardDemo()) {
+      const timer = setInterval(refreshLive, 5000);
+      return () => { stopped = true; clearInterval(timer); };
+    }
+    // #502: the server says what changed; asking every 30 s only where the stream does not work.
+    const stop = watchDashboardLive(guildId, {
+      onData: (data) => applyLive({ ...data, activeStreamDetails: data.streams }),
+      poll: refreshLive,
+    });
+    return () => { stopped = true; stop(); };
   }, [guildId, session.authenticated]);
 
   const guild = useMemo(() => session.guilds.find((item) => item.id === guildId) || null, [session.guilds, guildId]);
@@ -617,7 +632,7 @@ export default function GuildDashboard() {
             </div>
           </div>
           {/* The playback of every bot over the last 24 hours (#304), from Pro on like the health view. */}
-          {guildCapabilities?.basicHealth && <GuildLiveView apiRequest={apiRequest} guildId={guildId} t={t} locale={locale} />}
+          {guildCapabilities?.basicHealth && <GuildLiveView apiRequest={apiRequest} guildId={guildId} t={t} locale={locale} liveTick={liveTick} />}
         </>}
 
         {section === 'events' && <>{tier === 'free' ? <div className="oa-sub" style={{ marginBottom: 12 }} data-testid="guild-events-free-note">{t('Mit Free geht {count} geplantes Event, mit Pro beliebig viele.', 'Free comes with {count} scheduled event, Pro with as many as you like.', { count: PLAN_LIMITS.free.events })}</div> : null}<>

@@ -88,6 +88,11 @@ export function forwardToRuntime(req, res, target, { securityHeaders = {}, readT
     res.writeHead(answer.statusCode || 502, headers);
     answer.pipe(res);
   });
+  // The visitor left before the answer ended (a closed tab, a live stream
+  // of the dashboard, #502): the commander's side goes too.
+  res.on("close", () => {
+    if (!res.writableFinished) upstream.destroy();
+  });
 
   let connected = false;
   const connectTimer = setTimeout(() => { if (!connected) upstream.destroy(new Error("connect timeout")); }, connectTimeoutMs);
