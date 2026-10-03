@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState, useEffect } from 'react';
+import { Suspense, lazy, useState, useEffect, useRef } from 'react';
 import Hero from './components/Hero.js';
 import TrustBar from './components/TrustBar.js';
 import WhyOmniFM from './components/WhyOmniFM.js';
@@ -77,14 +77,16 @@ function AppContent() {
   const [privacy, setPrivacy] = useState(null);
   const [terms, setTerms] = useState(null);
   const [loading, setLoading] = useState(true);
+  const loadingRef = useRef(loading);
+  useEffect(() => { loadingRef.current = loading; }, [loading]);
   const currentPage = typeof window === 'undefined'
     ? 'home'
     : resolvePageFromUrl(window.location.href);
 
   // /preise, /sender, /faq or a #section of the start page (#501): the
   // sections above draw only when they come near, and grow when their data
-  // comes. The section stays at the top while that happens, until the reader
-  // scrolls or for three seconds.
+  // comes. The section stays at the top until the data is there and nothing
+  // moved for a second, or the reader scrolls; ten seconds at most.
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     const sectionId = getSectionAnchorForPage(currentPage)
@@ -92,23 +94,38 @@ function AppContent() {
     if (!sectionId || sectionId === 'top') return undefined;
     let held = true;
     const jump = () => {
-      if (held) document.getElementById(sectionId)?.scrollIntoView({ block: 'start' });
+      // At once: a smooth scroll (the page's CSS) passes every section on the
+      // way, each draws and grows, and the section runs away from it.
+      if (held) document.getElementById(sectionId)?.scrollIntoView({ block: 'start', behavior: 'instant' });
     };
     const frame = window.requestAnimationFrame(jump);
-    const main = document.querySelector('main');
-    const resizes = typeof ResizeObserver === 'function' && main ? new ResizeObserver(jump) : null;
-    resizes?.observe(main);
     const READER_MOVES = ['wheel', 'touchstart', 'keydown', 'pointerdown'];
+    let quiet = 0;
+    let resizes = null;
     const release = () => {
       held = false;
+      window.clearTimeout(quiet);
       resizes?.disconnect();
       READER_MOVES.forEach((name) => window.removeEventListener(name, release));
     };
+    const settleSoon = () => {
+      window.clearTimeout(quiet);
+      quiet = window.setTimeout(() => (loadingRef.current ? settleSoon() : release()), 1000);
+    };
+    const main = document.querySelector('main');
+    if (typeof ResizeObserver === 'function' && main) {
+      resizes = new ResizeObserver(() => {
+        jump();
+        settleSoon();
+      });
+      resizes.observe(main);
+    }
     READER_MOVES.forEach((name) => window.addEventListener(name, release, { passive: true }));
-    const timer = window.setTimeout(release, 3000);
+    settleSoon();
+    const longest = window.setTimeout(release, 10_000);
     return () => {
       window.cancelAnimationFrame(frame);
-      window.clearTimeout(timer);
+      window.clearTimeout(longest);
       release();
     };
   }, [currentPage]);
