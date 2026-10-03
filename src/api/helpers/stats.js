@@ -165,6 +165,50 @@ function buildEventInsights(events, listeningStats, nowMs = Date.now()) {
   };
 }
 
+/** One stream as every plan's dashboard lists it (#413): the bot, where it plays, what and how. */
+export function dashboardStreamRow(row) {
+  return {
+    botId: row.botId,
+    botName: row.botName,
+    stationKey: row.stationKey,
+    stationName: row.stationName,
+    channelId: row.channelId,
+    channelName: row.channelName,
+    listeners: row.listeners,
+    recovering: row.recovering === true,
+    failoverActive: row.failoverActive === true,
+    desiredStationKey: row.desiredStationKey || null,
+    desiredStationName: row.desiredStationName || null,
+    failbackNextProbeAt: row.failbackNextProbeAt || 0,
+    parkedReason: row.parkedReason || null,
+    serverMuted: row.serverMuted === true,
+    uptimeSec: row.uptimeSec || 0,
+  };
+}
+
+/**
+ * What the overview shows live (#502), from memory only, no database: the
+ * streams for every plan (as /api/dashboard/playback/now); with the stats of
+ * Pro and up (as /api/dashboard/stats) the full rows, the minutes listened
+ * and the setup status.
+ */
+export function buildDashboardLiveSnapshot(serverId, tier, runtimes, { withStats = false } = {}) {
+  const liveRows = collectGuildLiveDetails(runtimes, serverId);
+  const snapshot = {
+    serverId,
+    streams: withStats ? liveRows : liveRows.map(dashboardStreamRow),
+    listenersNow: liveRows.reduce((sum, row) => sum + (Number(row.listeners || 0) || 0), 0),
+    activeStreams: liveRows.length,
+    runtimeUptimeSec: liveRows.reduce((most, row) => Math.max(most, Number(row.uptimeSec || 0) || 0), 0),
+  };
+  if (withStats) {
+    const listeningStats = getGuildListeningStats(serverId) || {};
+    snapshot.totalListeningMs = Number(listeningStats.currentTotalListeningMs || listeningStats.totalListeningMs || 0);
+    snapshot.setupStatus = buildDashboardSetupStatus(serverId, tier, runtimes, { liveRows });
+  }
+  return snapshot;
+}
+
 export async function buildDashboardStatsForGuild(serverId, tier, runtimes) {
   const listeningStats = getGuildListeningStats(serverId) || {};
   const telemetry = normalizeDashboardTelemetryPayload(getDashboardTelemetry(serverId));

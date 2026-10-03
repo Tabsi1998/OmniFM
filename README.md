@@ -116,6 +116,13 @@ TRUSTED_PROXY_IPS=192.168.2.100   # die Adresse des Proxys; nginx auf demselben 
 ```
 Fehlt das, zeigt das Owner-Cockpit unter „Besucher-Adressen“ eine gelbe Ampel mit genau diesen Zeilen.
 
+**4. Live-Verbindung des Dashboards** (#502): Pro offenem Tab hält das Dashboard eine Verbindung
+offen, über die der Server Änderungen schickt (Server-Sent Events, `/api/dashboard/live`).
+nginx reicht sie dank `X-Accel-Buffering: no` sofort weiter; `deploy/nginx/omnifm.conf` braucht
+nichts Zusätzliches. Ein anderer Proxy darf diese Antworten nicht puffern und eine Verbindung
+nicht nach weniger als 30 Sekunden Stille schließen (der Server schickt alle 25 Sekunden ein
+Lebenszeichen). Klappt das nicht, fragt das Dashboard von selbst alle 30 Sekunden.
+
 > Sonderfälle:
 > - `PUBLIC_URL=https://omnifm.xyz ./start.sh` – erzwingt die absolute Domain (auch Same-Origin).
 > - `DIRECT_IP=1 ./start.sh` – direkter Website-Zugriff ohne Proxy über `http://<server-ip>:3000`; die SPA nutzt dabei die API auf `:8001`.

@@ -6,6 +6,7 @@
 import { readPlaybackTimeline } from "../../playback-timeline-store.js";
 import { buildLiveView } from "../../lib/playback-timeline.js";
 import { collectGuildLiveDetails } from "../helpers/runtime-status.js";
+import { dashboardStreamRow } from "../helpers/stats.js";
 
 const ACTIONS = Object.freeze({
   "/api/dashboard/playback/restart": { action: "restart", capability: "basic_health" },
@@ -26,27 +27,6 @@ export async function playingBots(runtimes, guildId) {
     return commander.workerManager.getStreamingWorkers(guildId) || [];
   }
   return runtimes.filter((runtime) => runtime?.getState?.(guildId)?.currentStationKey);
-}
-
-/** One stream as the dashboard lists it: the bot, where it plays, what and how. */
-function streamRow(row) {
-  return {
-    botId: row.botId,
-    botName: row.botName,
-    stationKey: row.stationKey,
-    stationName: row.stationName,
-    channelId: row.channelId,
-    channelName: row.channelName,
-    listeners: row.listeners,
-    recovering: row.recovering === true,
-    failoverActive: row.failoverActive === true,
-    desiredStationKey: row.desiredStationKey || null,
-    desiredStationName: row.desiredStationName || null,
-    failbackNextProbeAt: row.failbackNextProbeAt || 0,
-    parkedReason: row.parkedReason || null,
-    serverMuted: row.serverMuted === true,
-    uptimeSec: row.uptimeSec || 0,
-  };
 }
 
 export function createDashboardPlaybackRouteHandler(deps) {
@@ -104,7 +84,7 @@ export function createDashboardPlaybackRouteHandler(deps) {
     }
     if (requestUrl.pathname === "/api/dashboard/playback/now") {
       await playingBots(runtimes, guildInfo.id);
-      sendJson(res, 200, { streams: collectGuildLiveDetails(runtimes, guildInfo.id).map(streamRow) });
+      sendJson(res, 200, { streams: collectGuildLiveDetails(runtimes, guildInfo.id).map(dashboardStreamRow) });
       return true;
     }
 

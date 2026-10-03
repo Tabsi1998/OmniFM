@@ -36,6 +36,7 @@ import {
   handleDashboardJingleRoute,
   handleDashboardChannelsRoute,
   handleDashboardPlaybackRoute,
+  handleDashboardLiveRoute,
   handleDashboardCustomStationsRoute,
   handleDashboardEmojisRoute,
   handleDashboardEventsRoute,
@@ -363,6 +364,9 @@ function startWebServer(runtimes, { forwardRuntimeTo = "" } = {}) {
       return;
     }
     if (await handleDashboardPlaybackRoute({ req, res, requestUrl, readJsonBody, runtimes })) {
+      return;
+    }
+    if (await handleDashboardLiveRoute({ req, res, requestUrl, runtimes })) {
       return;
     }
     if (await handleDashboardEmojisRoute({ req, res, requestUrl, runtimes })) {
