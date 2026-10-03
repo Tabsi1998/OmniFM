@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ExternalLink, Star, Heart } from 'lucide-react';
 import { buildApiUrl } from '../lib/api.js';
 import { useI18n } from '../i18n.js';
+import { fetchAfterFirstPaint } from '../lib/firstPaint.js';
 
 export default function CommunitySection() {
   const { t } = useI18n();
@@ -11,7 +12,7 @@ export default function CommunitySection() {
 
   useEffect(() => {
     let alive = true;
-    fetch(buildApiUrl('/api/marketing'), { cache: 'no-store' })
+    fetchAfterFirstPaint(buildApiUrl('/api/marketing'), { cache: 'no-store' })
       .then((r) => r.json())
       .then((d) => { if (alive) setData({ sponsors: d.sponsors || [], botListings: d.botListings || [] }); })
       .catch(() => {});

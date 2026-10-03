@@ -129,6 +129,7 @@ test("the cover lookup asks iTunes once per song and keeps the answer", async ()
   const first = await pub.coverLookup({ artist: "Artist", title: "Song" }, { fetchImpl });
   const again = await pub.coverLookup({ term: "  artist   song " }, { fetchImpl });
   assert.equal(first.artwork, "https://img/600x600bb.jpg");
+  assert.equal(first.artworkMedium, "https://img/300x300bb.jpg");
   assert.equal(again.title, "Song");
   assert.equal(calls, 1);
   assert.deepEqual(await pub.coverLookup({}, { fetchImpl }), { ok: false, error: "Kein Suchbegriff." });

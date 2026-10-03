@@ -32,6 +32,13 @@ a {
   background-size: 200px;
 }
 
+/* #501: the sections below the first screen are styled, laid out and drawn
+   only when they come near it; once drawn, the browser keeps their height. */
+.render-later {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 900px;
+}
+
 .section-container {
   max-width: 1200px;
   margin: 0 auto;

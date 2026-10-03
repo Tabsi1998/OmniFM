@@ -5,12 +5,13 @@
 // asked once and both share the answer. A failed answer (a 429, say) is
 // forgotten after a minute, so the cover can still come later.
 import { buildApiUrl } from './api.js';
+import { fetchAfterFirstPaint } from './firstPaint.js';
 
 const FORGET_FAILED_MS = 60_000;
 const covers = new Map();
 
 /** The artwork address for a station or song name, or null. */
-export function coverFor(term, { fetchImpl = (...args) => fetch(...args), timers = globalThis } = {}) {
+export function coverFor(term, { fetchImpl = fetchAfterFirstPaint, timers = globalThis } = {}) {
   const key = String(term || '').trim();
   if (!key) return Promise.resolve(null);
   if (!covers.has(key)) {
@@ -18,7 +19,7 @@ export function coverFor(term, { fetchImpl = (...args) => fetch(...args), timers
     covers.set(key, Promise.resolve()
       .then(() => fetchImpl(buildApiUrl(`/api/cover?term=${encodeURIComponent(key)}`)))
       .then((response) => (response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`))))
-      .then((data) => (data && data.ok && data.artwork ? data.artwork : null))
+      .then((data) => (data && data.ok && data.artwork ? data.artworkMedium || data.artwork : null))
       .catch(() => {
         forgetLater();
         return null;

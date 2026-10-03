@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState, useEffect } from 'react';
+import { Suspense, lazy, useState, useEffect, useRef } from 'react';
 import Hero from './components/Hero.js';
 import TrustBar from './components/TrustBar.js';
 import WhyOmniFM from './components/WhyOmniFM.js';
@@ -19,6 +19,7 @@ import { PlayerProvider } from './lib/player.js';
 import { buildApiUrl } from './lib/api.js';
 import { getSectionAnchorForPage, resolvePageFromUrl } from './lib/pageRouting.js';
 import { startSiteData } from './lib/siteData.js';
+import { fetchAfterFirstPaint } from './lib/firstPaint.js';
 import SeasonLayer from './components/season/SeasonLayer.js';
 
 // Loaded only on their own pages (#296): the start page carries neither the
@@ -42,7 +43,7 @@ function PageLoading() {
 }
 
 async function fetchJson(path, signal) {
-  const res = await fetch(buildApiUrl(path), {
+  const res = await fetchAfterFirstPaint(buildApiUrl(path), {
     cache: 'no-store',
     signal,
   });
@@ -76,18 +77,57 @@ function AppContent() {
   const [privacy, setPrivacy] = useState(null);
   const [terms, setTerms] = useState(null);
   const [loading, setLoading] = useState(true);
+  const loadingRef = useRef(loading);
+  useEffect(() => { loadingRef.current = loading; }, [loading]);
   const currentPage = typeof window === 'undefined'
     ? 'home'
     : resolvePageFromUrl(window.location.href);
 
+  // /preise, /sender, /faq or a #section of the start page (#501): the
+  // sections above draw only when they come near, and grow when their data
+  // comes. The section stays at the top until the data is there and nothing
+  // moved for a second, or the reader scrolls; ten seconds at most.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const sectionId = getSectionAnchorForPage(currentPage);
-    if (!sectionId) return;
-    const frame = window.requestAnimationFrame(() => {
-      document.getElementById(sectionId)?.scrollIntoView({ block: 'start' });
-    });
-    return () => window.cancelAnimationFrame(frame);
+    if (typeof window === 'undefined') return undefined;
+    const sectionId = getSectionAnchorForPage(currentPage)
+      || (currentPage === 'home' ? decodeURIComponent(window.location.hash.slice(1)) : '');
+    if (!sectionId || sectionId === 'top') return undefined;
+    let held = true;
+    const jump = () => {
+      // At once: a smooth scroll (the page's CSS) passes every section on the
+      // way, each draws and grows, and the section runs away from it.
+      if (held) document.getElementById(sectionId)?.scrollIntoView({ block: 'start', behavior: 'instant' });
+    };
+    const frame = window.requestAnimationFrame(jump);
+    const READER_MOVES = ['wheel', 'touchstart', 'keydown', 'pointerdown'];
+    let quiet = 0;
+    let resizes = null;
+    const release = () => {
+      held = false;
+      window.clearTimeout(quiet);
+      resizes?.disconnect();
+      READER_MOVES.forEach((name) => window.removeEventListener(name, release));
+    };
+    const settleSoon = () => {
+      window.clearTimeout(quiet);
+      quiet = window.setTimeout(() => (loadingRef.current ? settleSoon() : release()), 1000);
+    };
+    const main = document.querySelector('main');
+    if (typeof ResizeObserver === 'function' && main) {
+      resizes = new ResizeObserver(() => {
+        jump();
+        settleSoon();
+      });
+      resizes.observe(main);
+    }
+    READER_MOVES.forEach((name) => window.addEventListener(name, release, { passive: true }));
+    settleSoon();
+    const longest = window.setTimeout(release, 10_000);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(longest);
+      release();
+    };
   }, [currentPage]);
 
   // What the page shows, and nothing else (#485): src/lib/siteData.js.
@@ -283,15 +323,16 @@ function AppContent() {
       <Navbar page={currentPage} />
       <main>
         <Hero stats={stats} bots={bots} />
-        <TrustBar stats={stats} />
-        <DiscordShowcase />
-        <HowToDiscord bots={bots} />
-        <StationBrowser stations={stations} loading={loading} />
-        <WhyOmniFM />
-        <DashboardPreview />
-        <Premium bots={bots} planContext={{ freeStations: stats.freeStations, allStations: stats.stations }} />
-        <CommunitySection />
-        <FaqSection />
+        {/* Below the first screen: drawn when it comes near (#501). */}
+        <div className="render-later"><TrustBar stats={stats} /></div>
+        <div className="render-later"><DiscordShowcase /></div>
+        <div className="render-later"><HowToDiscord bots={bots} /></div>
+        <div className="render-later"><StationBrowser stations={stations} loading={loading} /></div>
+        <div className="render-later"><WhyOmniFM /></div>
+        <div className="render-later"><DashboardPreview /></div>
+        <div className="render-later"><Premium bots={bots} planContext={{ freeStations: stats.freeStations, allStations: stats.stations }} /></div>
+        <div className="render-later"><CommunitySection /></div>
+        <div className="render-later"><FaqSection /></div>
       </main>
       <SeasonLayer />
       <SiteFooter legal={legal} />

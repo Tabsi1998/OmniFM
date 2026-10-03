@@ -398,10 +398,13 @@ export async function coverLookup({ artist = "", title = "", term = "" } = {}, {
       if (item) {
         const art = String(item.artworkUrl100 || "");
         const artHi = art.replace("100x100bb", "600x600bb").replace("100x100", "600x600");
+        // The website's player shows the cover at 92 px: 300 is sharp enough (#501).
+        const artMid = art.includes("100x100") ? art.replace("100x100bb", "300x300bb").replace("100x100", "300x300") : artHi;
         result = {
           ok: true,
           query,
           artwork: artHi || null,
+          artworkMedium: artMid || null,
           artworkSmall: art || null,
           artist: item.artistName ?? null,
           title: item.trackName ?? null,

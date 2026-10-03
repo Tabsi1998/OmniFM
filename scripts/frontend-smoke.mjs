@@ -199,6 +199,32 @@ try {
     }
   }
 
+  // #501: the sections below the first screen draw only when they come near
+  // and grow when their data comes; /preise and /#faq still land on them.
+  for (const [where, selector] of [["/preise", '[data-testid="premium-section"]'], ["/#faq", "#faq"]]) {
+    // eslint-disable-next-line no-await-in-loop -- one address after the other
+    const context = await browser.newContext({ locale: "de-DE", serviceWorkers: "block" });
+    // eslint-disable-next-line no-await-in-loop
+    const tab = await context.newPage();
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await tab.goto(`${base}${where}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+      // eslint-disable-next-line no-await-in-loop
+      await tab.waitForSelector(selector, { timeout: 20_000 });
+      // eslint-disable-next-line no-await-in-loop
+      await tab.waitForTimeout(1500);
+      // eslint-disable-next-line no-await-in-loop
+      const top = await tab.evaluate((wanted) => Math.round(globalThis.document.querySelector(wanted).getBoundingClientRect().top), selector);
+      if (Math.abs(top) > 120) problems.push(`Sprung (${where}): ${selector} steht bei ${top} px statt oben`);
+      else console.log(`ok  Sprung (${where}): ${selector} oben (${top} px)`);
+    } catch (error) {
+      problems.push(`Sprung (${where}): ${String(error.message).split("\n")[0]}`);
+    } finally {
+      // eslint-disable-next-line no-await-in-loop
+      await context.close();
+    }
+  }
+
   // #305: Chrome's own check whether the site installs as an app, and the
   // service worker that keeps the build files takes over.
   const context = await browser.newContext({ locale: "de-DE" });
