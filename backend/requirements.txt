@@ -1,8 +1,8 @@
 # Production FastAPI backend. Direct dependencies are pinned so deployments
 # and CI install the same versions.
-fastapi==0.141.1
-uvicorn==0.53.0
-python-dotenv==1.2.3
+fastapi==0.142.2
+uvicorn==0.54.0
+python-dotenv==1.2.4
 pymongo==4.18.2
 requests==2.34.2
 pytest==9.1.1
