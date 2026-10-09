@@ -1,21 +1,19 @@
 ## Summary
 
-- What changed?
+- What changes for users, server admins or the operator?
 - Why was it necessary?
+
+Closes #
 
 ## Verification
 
-- [ ] `npm test`
-- [ ] `npm --prefix frontend run build`
-- [ ] FastAPI, React, Discord runtime, and update-flow checks were considered
+- [ ] `python scripts/local_check.py --only repository,node,backend`
+- [ ] `python scripts/local_check.py --only frontend,extra`
+- [ ] New or changed behaviour has a test
 
 ## Risk Check
 
-- [ ] reconnect / restore behavior considered
-- [ ] voice-channel status and now-playing impact considered
-- [ ] dashboard or billing/API impact considered
-
-## Notes
-
-- follow-up work
-- rollout considerations
+- [ ] reconnect / restore and voice playback considered
+- [ ] dashboard, owner console or API impact considered
+- [ ] privacy and who receives a message considered
+- Rollback:

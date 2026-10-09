@@ -72,3 +72,6 @@ credentials.json
 # Local VS Code test environments and generated results
 /.local-testing/
 /*.code-workspace
+
+# Claude Code: machine-local pointer to the owner's notes (#508)
+/CLAUDE.local.md
