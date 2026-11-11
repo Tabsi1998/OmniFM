@@ -9,6 +9,7 @@ import {
   installProcessHandlers,
   resolveBotTopology,
   resolveWorkerConfig,
+  resolveWorkerSlot,
 } from "./shared.js";
 import { startWorkerAutohealMonitor } from "./worker-autoheal.js";
 import { startRuntimeLogShipper } from "../services/runtime-health-reporter.js";
@@ -30,7 +31,9 @@ if (Number(workerConfig?.index || 0) === Number(topology.commanderConfig?.index 
   throw new Error(`BOT_${workerIndex} ist als Commander konfiguriert und kann nicht als Worker gestartet werden.`);
 }
 
-const runtime = new BotRuntime(workerConfig, { role: "worker" });
+// Slot as the commander counts it, not the BOT number (#520).
+const workerSlot = resolveWorkerSlot(topology.workerConfigs, workerConfig);
+const runtime = new BotRuntime(workerConfig, { role: "worker", workerSlot });
 const bridgeService = new WorkerBridgeService(runtime);
 let autohealMonitor = null;
 

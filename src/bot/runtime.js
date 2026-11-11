@@ -73,11 +73,13 @@ import { startLinkedRolesService } from "../services/linked-roles.js";
 const RuntimeMixinBase = /** @type {any} */ (class {});
 
 class BotRuntime extends RuntimeMixinBase {
-  constructor(config, { role = "worker", workerManager = null } = {}) {
+  constructor(config, { role = "worker", workerManager = null, workerSlot = null } = {}) {
     super();
     this.config = config;
     this.role = role; // "commander" or "worker"
-    this.workerSlot = role === "worker" ? (Number(config?.index || 0) || null) : null;
+    // A worker in its own process gets its slot from the entry point (#520);
+    // in one process the WorkerManager sets it.
+    this.workerSlot = role === "worker" ? (Number(workerSlot || config?.index || 0) || null) : null;
     this.workerManager = workerManager;
     this.voiceGroup = `bot-${this.config.clientId}`;
     this.rest = new REST({ version: "10" }).setToken(this.config.token);

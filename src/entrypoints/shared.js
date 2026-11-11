@@ -158,6 +158,18 @@ function resolveWorkerConfig(botConfigs = [], workerIndex) {
   return workerConfig;
 }
 
+/**
+ * The plan slot of one worker, counted the way the commander's WorkerManager
+ * counts it: workers ordered by BOT number, the first is slot 1. BOT_n itself
+ * is not the slot, because BOT_1 is usually the commander (#520).
+ */
+function resolveWorkerSlot(workerConfigs = [], workerConfig) {
+  const index = Number(workerConfig?.index || 0);
+  const ordered = [...workerConfigs].map((config) => Number(config?.index || 0)).sort((a, b) => a - b);
+  const position = ordered.indexOf(index);
+  return position >= 0 ? position + 1 : null;
+}
+
 function installProcessHandlers({
   localRuntimes = [],
   webServer = null,
@@ -256,5 +268,6 @@ export {
   initializeSharedServices,
   resolveBotTopology,
   resolveWorkerConfig,
+  resolveWorkerSlot,
   installProcessHandlers,
 };
