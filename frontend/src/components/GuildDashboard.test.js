@@ -67,4 +67,18 @@ describe('server dashboard', () => {
     const reactErrors = consoleErrors.filter((line) => /error occurred in|Uncaught|is not defined|Cannot read/i.test(line));
     expect(reactErrors).toEqual([]);
   });
+
+  it('sends a plan change to the plans page in the dashboard language (#521)', async () => {
+    render(<I18nProvider><GuildDashboard /></I18nProvider>);
+    await screen.findByTestId('guild-nav-overview', {}, { timeout: 5000 });
+    await act(async () => { fireEvent.click(screen.getByTestId('guild-nav-subscription')); });
+    await screen.findByTestId('guild-subscription', {}, { timeout: 5000 });
+    // The test server is Ultimate: both other plans are a step down.
+    for (const plan of ['free', 'pro']) {
+      const link = screen.getByTestId(`guild-plan-change-${plan}`);
+      expect(link.getAttribute('href')).toBe('/premium?lang=de');
+      expect(link.textContent).toContain('Downgrade');
+    }
+    expect(screen.queryByTestId('guild-plan-change-ultimate')).toBeNull();
+  });
 });
