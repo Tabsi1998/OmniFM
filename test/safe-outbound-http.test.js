@@ -199,6 +199,40 @@ test("a radio server with a bare-LF status line plays with the lenient parser on
   });
 });
 
+test("a station that redirects to a bare-LF StreamABC target plays, and each restart starts at the station URL (#536)", async () => {
+  await withBareLfRadioServer(async (radio) => {
+    const firstHops = [];
+    let signature = 0;
+    const fetchStation = (options) => safeFetch("https://stream.liferadio.example/live/mp3-192/link", {
+      ...options,
+      lookupFn: async () => [{ address: "1.1.1.1", family: 4 }],
+      requestImpl: async (target, request) => {
+        if (target.hostname === "stream.liferadio.example") {
+          firstHops.push(target.url.toString());
+          signature += 1;
+          return createIncomingResponse(302, {
+            headers: { location: `https://liferadio.streamabc.example/43-mp3-192?sABC=sig${signature}` },
+            statusMessage: "Found",
+          });
+        }
+        // The signed StreamABC target, answered by a real socket with its bare-LF status line.
+        return requestPinnedTarget(radio, request);
+      },
+    });
+
+    await assert.rejects(() => fetchStation({}), (error) => error?.code === "OUTBOUND_REQUEST_FAILED");
+    const response = await fetchStation({ lenientHttpParser: true });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("content-type"), "audio/mpeg");
+    assert.equal(Buffer.from(await response.arrayBuffer()).toString("hex"), "fffbb064");
+    // Never the signed target from before: every start asks the station URL again.
+    assert.deepEqual(firstHops, [
+      "https://stream.liferadio.example/live/mp3-192/link",
+      "https://stream.liferadio.example/live/mp3-192/link",
+    ]);
+  });
+});
+
 test("safe fetch hands the lenient parser to every redirect hop and keeps it off by default (#536)", async () => {
   const run = async (options) => {
     const seen = [];
