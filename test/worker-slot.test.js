@@ -68,11 +68,13 @@ test("the commander's BOT number cannot start as a worker", () => {
   assert.throws(() => createWorkerRuntime(splitEnv(3, 1), BotRuntime), /als Commander konfiguriert/);
 });
 
-test("a worker without a slot takes none, not its BOT number", (t) => {
+test("a worker without a slot takes none and is turned away, not let in by its BOT number", (t) => {
   const runtime = new BotRuntime({ token: "t", clientId: "100000000000000002", index: 2, name: "OmniFM 1" }, { role: "worker" });
   t.after(() => {
     runtime.unsubscribeNetworkRecovery?.();
     runtime.client.destroy();
   });
   assert.equal(runtime.workerSlot, null);
+  // BOT_2 would fit Free's two workers by its number; without a slot it must not.
+  assert.equal(runtime.getGuildAccess(SERVER.free).withinBotLimit, false);
 });

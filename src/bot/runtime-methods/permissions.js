@@ -389,7 +389,6 @@ const permissionMethods = {
     const withinBotLimit = isWithinWorkerPlanLimit({
       role: this.role,
       workerSlot,
-      botIndex,
       maxBots,
     });
 

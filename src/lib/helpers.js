@@ -327,18 +327,14 @@ function applyJitter(baseMs, ratio = 0.2) {
   return Math.max(0, Math.round(ms * factor));
 }
 
-function isWithinWorkerPlanLimit({ role = "worker", workerSlot = null, botIndex = null, maxBots = 0 } = {}) {
+// Only the worker slot counts against the plan; a worker without one is turned
+// away, because its BOT number is not its slot (#520).
+function isWithinWorkerPlanLimit({ role = "worker", workerSlot = null, maxBots = 0 } = {}) {
   const limit = Math.max(0, Number(maxBots) || 0);
   if (String(role || "").toLowerCase() === "commander") return true;
 
   const slot = Number(workerSlot);
-  if (Number.isFinite(slot) && slot > 0) {
-    return slot <= limit;
-  }
-
-  const index = Number(botIndex);
-  if (!Number.isFinite(index) || index <= 0) return false;
-  return index <= limit;
+  return Number.isFinite(slot) && slot > 0 && slot <= limit;
 }
 
 function isLikelyNetworkFailureLine(line) {
