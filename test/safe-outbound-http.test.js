@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import net from "node:net";
 import { Readable } from "node:stream";
 import test from "node:test";
 
 import {
   isPublicOutboundAddress,
+  requestPinnedTarget,
   safeFetch,
   validateOutboundUrl,
   validateOutboundUrlWithDns,
@@ -164,4 +166,55 @@ test("safe fetch does not expose low-level transport details", async () => {
       && error?.message === "Ziel-URL konnte nicht erreicht werden."
       && !error.message.includes("127.0.0.1")
   );
+});
+
+// StreamABC (Life Radio Tirol, SUNSHINE LIVE) ends its status line with a bare
+// LF and every header line with CRLF, captured byte for byte on 11.11.2026 (#536).
+async function withBareLfRadioServer(run) {
+  const server = net.createServer((socket) => {
+    socket.once("data", () => {
+      socket.end("HTTP/1.1 200 OK\nContent-Type: audio/mpeg\r\nContent-Length: 4\r\n\r\n\xff\xfb\xb0\x64", "latin1");
+    });
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = /** @type {import("node:net").AddressInfo} */ (server.address());
+  const target = { url: new URL(`http://127.0.0.1:${port}/live`), hostname: "127.0.0.1", address: "127.0.0.1", family: 4 };
+  try {
+    return await run(target);
+  } finally {
+    server.close();
+  }
+}
+
+test("a radio server with a bare-LF status line plays with the lenient parser only (#536)", async () => {
+  await withBareLfRadioServer(async (target) => {
+    await assert.rejects(() => requestPinnedTarget(target), (error) => error?.code === "OUTBOUND_REQUEST_FAILED");
+
+    const incoming = await requestPinnedTarget(target, { lenientHttpParser: true });
+    const chunks = [];
+    for await (const chunk of incoming) chunks.push(chunk);
+    assert.equal(incoming.statusCode, 200);
+    assert.equal(incoming.headers["content-type"], "audio/mpeg");
+    assert.equal(Buffer.concat(chunks).toString("hex"), "fffbb064");
+  });
+});
+
+test("safe fetch hands the lenient parser to every redirect hop and keeps it off by default (#536)", async () => {
+  const run = async (options) => {
+    const seen = [];
+    await safeFetch("https://stream.radio.example/live", {
+      ...options,
+      lookupFn: async () => [{ address: "1.1.1.1", family: 4 }],
+      requestImpl: async (_target, request) => {
+        seen.push(request.lenientHttpParser);
+        return seen.length === 1
+          ? createIncomingResponse(302, { headers: { location: "https://radio.streamabc.example/live?sABC=x" }, statusMessage: "Found" })
+          : createIncomingResponse(200, { body: "audio" });
+      },
+    });
+    return seen;
+  };
+
+  assert.deepEqual(await run({ lenientHttpParser: true }), [true, true]);
+  assert.deepEqual(await run({}), [false, false]);
 });

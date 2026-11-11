@@ -72,6 +72,7 @@ export async function probeStationUrl(url, { timeoutMs = 5000, fetchImpl = safeF
       method: "GET",
       headers: { Range: "bytes=0-2047", "User-Agent": "OmniFM-StreamTest/1.0", "Icy-MetaData": "1" },
       redirect: "follow",
+      lenientHttpParser: true, // radio servers, #536
       timeoutMs,
       signal: AbortSignal.timeout(timeoutMs),
     });

@@ -125,6 +125,7 @@ async function probeRuntimeStreamUrl(url, { timeoutMs = STREAM_FAILBACK_PROBE_TI
   const response = await safeFetch(url, {
     method: "GET",
     redirect: "follow",
+    lenientHttpParser: true, // radio servers, #536
     headers: { "User-Agent": "OmniFM/3.0 failback-probe" },
     timeoutMs,
   });

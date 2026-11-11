@@ -162,6 +162,7 @@ async function checkStation(key, name, url) {
         "Icy-MetaData": "1",
       },
       redirect: "follow",
+      lenientHttpParser: true, // radio servers, #536
       timeoutMs: STATION_HEALTH_TIMEOUT_MS,
     });
 
@@ -173,6 +174,7 @@ async function checkStation(key, name, url) {
         signal: controller.signal,
         headers: { "User-Agent": "OmniFM-HealthCheck/1.0", "Icy-MetaData": "1" },
         redirect: "follow",
+        lenientHttpParser: true, // radio servers, #536
         timeoutMs: STATION_HEALTH_TIMEOUT_MS,
       });
       if (HEAD_FALLBACK_STATUS_CODES.has(Number(response?.status || 0))) {
