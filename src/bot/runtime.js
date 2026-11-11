@@ -78,8 +78,8 @@ class BotRuntime extends RuntimeMixinBase {
     this.config = config;
     this.role = role; // "commander" or "worker"
     // A worker in its own process gets its slot from the entry point (#520);
-    // in one process the WorkerManager sets it.
-    this.workerSlot = role === "worker" ? (Number(workerSlot || config?.index || 0) || null) : null;
+    // in one process the WorkerManager sets it. The BOT number is never the slot.
+    this.workerSlot = role === "worker" ? (Number(workerSlot || 0) || null) : null;
     this.workerManager = workerManager;
     this.voiceGroup = `bot-${this.config.clientId}`;
     this.rest = new REST({ version: "10" }).setToken(this.config.token);
