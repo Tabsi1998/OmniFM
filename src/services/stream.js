@@ -162,18 +162,7 @@ async function createResource(url, volume, qualityPreset, botName, bitrateOverri
   const stream = Readable.fromWeb(/** @type {import("node:stream/web").ReadableStream} */ (streamResponse.body));
   networkRecoveryCoordinator.noteSuccess(`${botName} fetch-stream`, recoveryOptions);
 
-  // ---- Fix: demuxProbe() kann bei kaputten Streams ewig haengen ----
-  // Promise.race() mit Timeout verhindert dass der Bot haengt.
-  const DEMUX_TIMEOUT_MS = 15_000;
-  const probe = await Promise.race([
-    demuxProbe(stream),
-    new Promise((_resolve, reject) =>
-      setTimeout(
-        () => reject(new Error(`demuxProbe Timeout nach ${DEMUX_TIMEOUT_MS}ms`)),
-        DEMUX_TIMEOUT_MS
-      )
-    ),
-  ]);
+  const probe = await probeWithTimeout(stream);
 
   const resource = createAudioResource(probe.stream, { inputType: probe.type, inlineVolume: true, metadata });
   applyVolumeTransformerLevel(resource.volume, volume);
@@ -182,4 +171,28 @@ async function createResource(url, volume, qualityPreset, botName, bitrateOverri
   return { resource, process: null, mixer: null };
 }
 
-export { createResource };
+const DEMUX_TIMEOUT_MS = 15_000;
+
+/**
+ * demuxProbe() can hang forever on a broken stream. The timer is always
+ * cleared, and on a timeout or a failed probe the incoming stream is closed,
+ * so the HTTP connection does not stay open behind the next attempt (#539).
+ */
+async function probeWithTimeout(stream, { timeoutMs = DEMUX_TIMEOUT_MS, probe = demuxProbe } = {}) {
+  let timer = null;
+  try {
+    return await Promise.race([
+      probe(stream),
+      new Promise((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(`demuxProbe Timeout nach ${timeoutMs}ms`)), timeoutMs);
+      }),
+    ]);
+  } catch (error) {
+    stream.destroy();
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export { createResource, probeWithTimeout };
