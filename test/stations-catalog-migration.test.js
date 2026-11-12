@@ -14,7 +14,7 @@ import {
   STATION_CATALOG_MIGRATIONS,
 } from "../src/stations-store.js";
 
-const [tomorrowlandMigration] = STATION_CATALOG_MIGRATIONS;
+const tomorrowlandMigration = STATION_CATALOG_MIGRATIONS.find((migration) => migration.id === "2026-08-22-tomorrowland-anthems-url");
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const execFile = promisify(execFileCallback);
 
@@ -41,8 +41,13 @@ function createStationsCollection(documents, { failUpdate = null } = {}) {
   };
 }
 
+// These tests are about the Tomorrowland step; the later steps (#549) count as already done.
+const otherMigrationIds = STATION_CATALOG_MIGRATIONS
+  .filter((migration) => migration !== tomorrowlandMigration)
+  .map((migration) => migration.id);
+
 function createMigrationsCollection({ markerIds = [], alwaysReportMissing = false, insertAcknowledged = true } = {}) {
-  const markers = new Map(markerIds.map((id) => [id, { _id: id }]));
+  const markers = new Map([...otherMigrationIds, ...markerIds].map((id) => [id, { _id: id }]));
   const calls = [];
 
   return {
@@ -50,7 +55,7 @@ function createMigrationsCollection({ markerIds = [], alwaysReportMissing = fals
     markers,
     async findOne(filter) {
       calls.push({ type: "findOne", filter });
-      if (alwaysReportMissing) return null;
+      if (alwaysReportMissing && filter._id === tomorrowlandMigration.id) return null;
       return markers.get(filter._id) || null;
     },
     async insertOne(document) {
@@ -111,7 +116,7 @@ test("catalog migration changes only the known stale Tomorrowland URL", async ()
     update: { $set: { url: tomorrowlandMigration.toUrl } },
     options: [],
   });
-  assert.equal(migrations.markers.size, 1);
+  assert.equal(migrations.markers.size, STATION_CATALOG_MIGRATIONS.length);
   assert.equal(migrations.markers.get(tomorrowlandMigration.id).matchedCount, 2);
   assert.equal(migrations.markers.get(tomorrowlandMigration.id).modifiedCount, 2);
   assert.deepEqual(migrations.markers.get(tomorrowlandMigration.id).keys, ["protml03", "pro_tml_03"]);
@@ -127,10 +132,9 @@ test("catalog migration does not run again after its completion marker exists", 
 
   assert.equal(stations.calls.length, 0);
   assert.equal(migrations.calls.filter((call) => call.type === "insertOne").length, 0);
-  assert.deepEqual(result, {
-    applied: [],
-    skipped: [{ id: tomorrowlandMigration.id, reason: "already-applied" }],
-  });
+  assert.deepEqual(result.applied, []);
+  assert.ok(result.skipped.some((entry) => entry.id === tomorrowlandMigration.id && entry.reason === "already-applied"));
+  assert.equal(result.skipped.length, STATION_CATALOG_MIGRATIONS.length);
 });
 
 test("catalog migration never writes its marker when the catalog update fails", async () => {
@@ -143,7 +147,7 @@ test("catalog migration never writes its marker when the catalog update fails", 
   );
 
   assert.equal(migrations.calls.filter((call) => call.type === "insertOne").length, 0);
-  assert.equal(migrations.markers.size, 0);
+  assert.equal(migrations.markers.size, otherMigrationIds.length);
 });
 
 test("catalog migration does not report completion when MongoDB does not acknowledge the marker", async () => {
@@ -157,7 +161,7 @@ test("catalog migration does not report completion when MongoDB does not acknowl
   );
 
   assert.equal(documents[0].url, tomorrowlandMigration.toUrl);
-  assert.equal(migrations.markers.size, 0);
+  assert.equal(migrations.markers.size, otherMigrationIds.length);
 });
 
 test("concurrent startup attempts remain idempotent and accept a duplicate marker", async () => {
@@ -171,7 +175,7 @@ test("concurrent startup attempts remain idempotent and accept a duplicate marke
   ]);
 
   assert.equal(documents[0].url, tomorrowlandMigration.toUrl);
-  assert.equal(migrations.markers.size, 1);
+  assert.equal(migrations.markers.size, otherMigrationIds.length + 1);
   assert.equal(
     results.filter((result) => result.applied[0]?.markerWritten).length,
     1,

@@ -1,0 +1,101 @@
+// Built-in catalog migrations for the 12 Nov 2026 catalog clean-up (#549):
+// SomaFM stations replaced (SomaFM blocks non-browser clients), http:// streams
+// moved to https://, path remnants and ?ref= tails dropped, expiring token removed.
+//
+// Generated from the before/after of stations.json. Row format:
+//   [key, fromUrl, toUrl]                    only the URL changes
+//   [key, fromUrl, toUrl, set, unset]        station replaced: extra fields to set / to remove
+// stations-store.js turns each row into one migration with its own marker, so a
+// row runs once and only touches a row whose URL still equals fromUrl.
+
+const ROWS = [
+  ["groovesalad", "https://ice4.somafm.com/groovesalad-128-mp3", "https://stream.epic-lounge.com/chillout-lounge", {"name": "Chillout Lounge", "country": "DE", "homepage": "https://epic-lounge.com/"}, ["logo"]],
+  ["dronezone", "https://ice4.somafm.com/dronezone-128-mp3", "https://radio.stereoscenic.com/asp-h", {"name": "Ambient Sleeping Pill", "country": "US", "homepage": "https://ambientsleepingpill.com/"}, ["logo"]],
+  ["deepspaceone", "https://ice4.somafm.com/deepspaceone-128-mp3", "https://stream.epic-lounge.com/sleep-meditation", {"name": "Sleep & Meditation", "country": "DE", "homepage": "https://epic-lounge.com/"}, ["logo"]],
+  ["spacestation", "https://ice4.somafm.com/spacestation-128-mp3", "https://stream.nightride.fm/spacesynth.mp3", {"name": "Spacesynth", "country": "DE", "homepage": "https://nightride.fm/"}, ["logo"]],
+  ["beatblender", "https://ice4.somafm.com/beatblender-128-mp3", "https://stream.epic-lounge.com/soft-house-lounge", {"name": "Soft House Lounge", "country": "DE", "homepage": "https://epic-lounge.com/"}, ["logo"]],
+  ["poptron", "https://ice4.somafm.com/poptron-128-mp3", "https://stream.nightride.fm/nightride.mp3", {"name": "Synthwave", "country": "DE", "homepage": "https://nightride.fm/?station=nightride"}, ["logo"]],
+  ["u80s", "https://ice4.somafm.com/u80s-128-mp3", "https://premium.shoutcastsolutions.com/radio/8050/256.mp3", {"name": "80s Wave", "country": "CH", "homepage": "https://www.80sforever.radio/"}, ["logo"]],
+  ["metal", "https://ice4.somafm.com/metal-128-mp3", "https://metalonly.sp.radio.fm/stream", {"name": "Metal Only", "country": "DE", "homepage": "https://www.metal-only.de/"}, ["logo"]],
+  ["lush", "https://ice4.somafm.com/lush-128-mp3", "https://listen.reyfm.de/chillout_192kbps.mp3", {"name": "Vocal Chillout", "country": "DE", "homepage": "https://www.reyfm.de/"}, ["logo"]],
+  ["thetrip", "https://ice4.somafm.com/thetrip-128-mp3", "https://trance-high.rautemusik.fm/", {"name": "Trance Journey", "country": "DE", "homepage": "https://www.rm.fm/trance"}, ["logo"]],
+  ["reggaeradio", "https://ice1.somafm.com/reggae-128-mp3", "https://l.rootslegacy.fr/;", {"name": "Reggae Radio", "country": "FR", "homepage": "https://www.rootslegacy.fr/"}, []],
+  ["loungebot", "https://ice4.somafm.com/secretagent-128-mp3", "https://fr1.streamhosting.ch/lounge128.mp3", {"name": "Lounge Radio", "country": "CH", "homepage": "https://lounge-radio.com/"}, []],
+  ["pro_edm_02", "http://streams.bigfm.de/nitrox-128-mp3", "https://streams.bigfm.de/nitrox-128-mp3"],
+  ["pro_edm_03", "http://stream.sunshine-live.de/edm/mp3-192/stream.sunshine-live.de/", "https://stream.sunshine-live.de/edm/mp3-192/"],
+  ["pro_sl_01", "http://stream.sunshine-live.de/live/mp3-192/", "https://stream.sunshine-live.de/live/mp3-192/"],
+  ["pro_charts_01", "http://streams.bigfm.de/bigfm-charts-128-mp3", "https://streams.bigfm.de/bigfm-charts-128-mp3"],
+  ["pro_edm_05", "https://stream.technolovers.fm/electro-house?ref=radiobrowser", "https://stream.technolovers.fm/electro-house"],
+  ["pro_edm_08", "http://streams.bigfm.de/bigfm-dance-128-mp3", "https://streams.bigfm.de/bigfm-dance-128-mp3"],
+  ["pro_edm_10", "https://stream.technolovers.fm/ibiza-house?ref=radiobrowser", "https://stream.technolovers.fm/ibiza-house"],
+  ["pro_malle_01", "https://n17a-eu.rcs.revma.com/fmmmpr?rj-ttl=5&rj-tok=AAABnIY51kkAmUHAFcAIi5ej2w", "https://n17a-eu.rcs.revma.com/fmmmpr"],
+  ["pro_edm_15", "https://breakz-high.rautemusik.fm/?ref=radiobrowser-top100-djcharts", "https://breakz-high.rautemusik.fm/"],
+  ["pro_edm_18", "https://stream.sunshine-live.de/hard/mp3-192/stream.sunshine-live.de/", "https://stream.sunshine-live.de/hard/mp3-192/"],
+  ["pro_tech_01", "http://stream.sunshine-live.de/techno/mp3-192/stream.sunshine-live.de/", "https://stream.sunshine-live.de/techno/mp3-192/"],
+  ["pro_tech_02", "https://stream.technolovers.fm/hypertechno?ref=radiobrowser", "https://stream.technolovers.fm/hypertechno"],
+  ["pro_tech_03", "https://stream.technolovers.fm/minimal?ref=radiobrowser", "https://stream.technolovers.fm/minimal"],
+  ["pro_tech_04", "https://stream.technolovers.fm/melodic-house-techno?ref=radiobrowser-2", "https://stream.technolovers.fm/melodic-house-techno"],
+  ["pro_tech_06", "http://streams.90s90s.de/techno/mp3-192/radiode/", "https://streams.90s90s.de/techno/mp3-192/radiode/"],
+  ["pro_tech_07", "https://stream.technolovers.fm/techhouse?ref=radiobrowser", "https://stream.technolovers.fm/techhouse"],
+  ["pro_tech_10", "https://streams.rautemusik.fm/techno/mp3-192?ref=radiobrowser", "https://streams.rautemusik.fm/techno/mp3-192"],
+  ["pro_tech_11", "https://ice1.somafm.com/suburbsofgoa-128-mp3", "https://stream.radioparadise.com/world-etc-320", {"name": "World Mix", "country": "US", "homepage": "https://radioparadise.com/"}, ["logo"]],
+  ["pro_tech_12", "https://stream.technolovers.fm/techno?ref=radiobrowser", "https://stream.technolovers.fm/techno"],
+  ["pro_tech_13", "http://strm112.1.fm/deeptech_mobile_mp3", "https://strm112.1.fm/deeptech_mobile_mp3"],
+  ["pro_tech_19", "https://ice4.somafm.com/cliqhop-128-mp3", "https://stream.nightride.fm/datawave.mp3", {"name": "IDM & Glitch", "country": "AU", "homepage": "https://nightride.fm/?station=datawave"}, []],
+  ["pro_trance_01", "https://stream.technolovers.fm/uplifting-trance?ref=radiobrowser", "https://stream.technolovers.fm/uplifting-trance"],
+  ["pro_trance_02", "https://stream.technolovers.fm/vocal-trance?ref=radiobrowser", "https://stream.technolovers.fm/vocal-trance"],
+  ["pro_trance_03", "http://listen.trancebase.fm/tunein-aac-hd-pls", "https://listen.trancebase.fm/tunein-aac-hd-pls"],
+  ["pro_trance_05", "https://stream.technolovers.fm/psytrance?ref=radiobrowser", "https://stream.technolovers.fm/psytrance"],
+  ["pro_trance_06", "http://cast.magicstreams.gr:9111/stream", "https://cast.magicstreams.gr:9111/stream"],
+  ["pro_trance_07", "https://stream.technolovers.fm/trance?ref=radiobrowser", "https://stream.technolovers.fm/trance"],
+  ["pro_trance_08", "http://cast.streams.ovh:8008/stream", "https://cast.streams.ovh:8008/stream"],
+  ["pro_hard_01", "https://stream.technolovers.fm/hardstyle?ref=radiobrowser", "https://stream.technolovers.fm/hardstyle"],
+  ["pro_hard_04", "https://stream.technolovers.fm/frenchcore?ref=radiobrowser", "https://stream.technolovers.fm/frenchcore"],
+  ["pro_hard_05", "https://stream.technolovers.fm/gabber?ref=radiobrowser", "https://stream.technolovers.fm/gabber"],
+  ["pro_hard_09", "http://listen.hardbase.fm/tunein-aac-hd-pls", "https://listen.hardbase.fm/tunein-aac-hd-pls"],
+  ["pro_hard_10", "http://79.111.14.76:8002/hardstyle", "https://stream.technolovers.fm/hardcore", {"name": "Harder Reloaded", "country": "DE", "homepage": "https://technolovers.fm/"}, []],
+  ["pro_house_01", "https://stream.technolovers.fm/deep-house?ref=radiobrowser", "https://stream.technolovers.fm/deep-house"],
+  ["pro_house_02", "http://stream.sunshine-live.de/sp4/mp3-192/stream.sunshine-live.de/", "https://stream.sunshine-live.de/sp4/mp3-192/"],
+  ["pro_house_03", "https://stream.technolovers.fm/afro-house?ref=radiobrowser", "https://stream.technolovers.fm/afro-house"],
+  ["pro_house_04", "https://stream.technolovers.fm/tropical-house?ref=radiobrowser", "https://stream.technolovers.fm/tropical-house"],
+  ["pro_house_05", "http://streams.bigfm.de/bigfm-sunsetlounge-128-mp3", "https://streams.bigfm.de/bigfm-sunsetlounge-128-mp3"],
+  ["pro_house_08", "https://stream.technolovers.fm/funky-house?ref=radiobrowser", "https://stream.technolovers.fm/funky-house"],
+  ["pro_house_10", "https://stream.technolovers.fm/latinhouse?ref=radiobrowser", "https://stream.technolovers.fm/latinhouse"],
+  ["pro_house_12", "http://radio.edm1.fm/proxy/15_clubhouse?mp=/stream", "https://listen.reyfm.de/houseparty_192kbps.mp3", {"name": "Club House", "country": "DE", "homepage": "https://www.reyfm.de/"}, []],
+  ["pro_house_13", "https://stream.technolovers.fm/future-house?ref=radiobrowser", "https://stream.technolovers.fm/future-house"],
+  ["pro_house_14", "https://stream.technolovers.fm/house?ref=radiobrowser", "https://stream.technolovers.fm/house"],
+  ["pro_house_15", "http://listen.housetime.fm/tunein-aac-hd-pls", "https://listen.housetime.fm/tunein-aac-hd-pls"],
+  ["pro_urban_01", "http://streams.bigfm.de/bigfm-usrap-128-aac", "https://streams.bigfm.de/bigfm-usrap-128-aac"],
+  ["pro_urban_02", "http://streams.bigfm.de/bigfm-deutschrap-128-mp3", "https://streams.bigfm.de/bigfm-deutschrap-128-mp3"],
+  ["pro_urban_03", "https://stream.technolovers.fm/trap?ref=radiobrowser", "https://stream.technolovers.fm/trap"],
+  ["pro_urban_05", "http://streams.bigfm.de/bigfm-rnb-128-mp3", "https://streams.bigfm.de/bigfm-rnb-128-mp3"],
+  ["pro_urban_08", "http://streams.bigfm.de/bigfm-oldschool-128-mp3", "https://streams.bigfm.de/bigfm-oldschool-128-mp3"],
+  ["pro_urban_10", "http://streams.bigfm.de/bigfm-latinbeats-128-mp3", "https://streams.bigfm.de/bigfm-latinbeats-128-mp3"],
+  ["pro_urban_11", "http://streams.bigfm.de/bigfm-urbanclubbeats-128-mp3", "https://streams.bigfm.de/bigfm-urbanclubbeats-128-mp3"],
+  ["pro_urban_12", "http://streams.bigfm.de/bigfm-groovenight-128-mp3", "https://streams.bigfm.de/bigfm-groovenight-128-mp3"],
+  ["pro_urban_15", "http://listen.181fm.com/181-beat_128k.mp3", "https://listen.181fm.com/181-beat_128k.mp3"],
+  ["pro_rock_01", "http://streams.radiobob.de/bob-classicrock/mp3-192/streams.radiobob.de/", "https://streams.radiobob.de/bob-classicrock/mp3-192/"],
+  ["pro_rock_02", "http://streams.radiobob.de/bob-hartesaite/mp3-192/streams.radiobob.de/", "https://streams.radiobob.de/bob-hartesaite/mp3-192/"],
+  ["pro_rock_03", "https://ice4.somafm.com/indiepop-128-mp3", "https://bytefm.stream14.radiohost.de/bytefm-mainhq_mp3-320", {"name": "Indie Rock", "country": "DE", "homepage": "https://byte.fm/"}, []],
+  ["pro_rock_04", "http://streams.radiobob.de/bob-alternative/mp3-192/streams.radiobob.de/", "https://streams.radiobob.de/bob-alternative/mp3-192/"],
+  ["pro_rock_05", "http://streams.radiobob.de/bob-metal/mp3-192/streams.radiobob.de/", "https://streams.radiobob.de/bob-metal/mp3-192/"],
+  ["pro_rock_07", "http://streams.radiobob.de/bob-punk/mp3-192/streams.radiobob.de/", "https://streams.radiobob.de/bob-punk/mp3-192/"],
+  ["pro_rock_08", "http://streams.radiobob.de/bob-grunge/mp3-192/streams.radiobob.de/", "https://streams.radiobob.de/bob-grunge/mp3-192/"],
+  ["pro_rock_10", "http://streams.radiobob.de/bob-bestofrock/mp3-192/streams.radiobob.de/", "https://streams.radiobob.de/bob-bestofrock/mp3-192/"],
+];
+
+function catalogKeys(key) {
+  // MongoDB stores the sanitized key (lowercase a-z0-9), the seed file the raw one.
+  const sanitized = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return sanitized === key ? [key] : [sanitized, key];
+}
+
+export const CATALOG_549_MIGRATIONS = Object.freeze(ROWS.map(([key, fromUrl, toUrl, set, unset]) => Object.freeze({
+  id: `2026-11-12-catalog-549-${key}`,
+  key: catalogKeys(key)[0],
+  keys: Object.freeze(catalogKeys(key)),
+  fromUrl,
+  toUrl,
+  ...(set ? { set: Object.freeze({ ...set }) } : {}),
+  ...(unset?.length ? { unset: Object.freeze([...unset]) } : {}),
+})));
