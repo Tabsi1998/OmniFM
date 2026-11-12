@@ -47,3 +47,35 @@ def test_325_the_duplicates_get_a_stream_that_matches_their_name():
 
     owner_stream = {**drill, "url": "https://my.own/drill"}
     assert "url" not in server.catalog_updates_for(owner_stream, {"genre": "Hip Hop & Rap"})
+
+
+def test_549_rows_apply_like_the_node_side_and_only_on_the_old_url():
+    # Same list as src/station-catalog-migrations.json: a replaced SomaFM station.
+    soma = {"key": "groovesalad", "url": "https://ice4.somafm.com/groovesalad-128-mp3", "name": "Groove Salad",
+            "logo": "https://api.somafm.com/logos/512/groovesalad512.png", "genre": "Ambient"}
+    updates = server.catalog_updates_for(soma, {"genre": "Ambient"})
+    assert updates["url"] == "https://stream.epic-lounge.com/chillout-lounge"
+    assert updates["name"] == "Chillout Lounge" and updates["country"] == "DE"
+    assert server.catalog_unsets_for(soma) == ["logo"]
+
+    # The sanitized key MongoDB stores matches too; only the URL changes for an https move.
+    bigfm = {"key": "proedm02", "url": "http://streams.bigfm.de/nitrox-128-mp3", "genre": "EDM & Festival"}
+    assert server.catalog_updates_for(bigfm, {"genre": "EDM & Festival"}) == {"url": "https://streams.bigfm.de/nitrox-128-mp3"}
+    assert server.catalog_unsets_for(bigfm) == []
+
+    # An operator's own URL stays, with every field.
+    own = {**soma, "url": "https://my.own/stream"}
+    assert server.catalog_updates_for(own, {"genre": "Ambient"}) == {}
+    assert server.catalog_unsets_for(own) == []
+
+
+def test_the_reggae_country_follows_only_together_with_its_url():
+    reggae = {"key": "reggaeradio", "url": "http://streams.bigfm.de/bigfm-reggaevibes-128-mp3", "country": "DE", "genre": "Reggae & Dancehall"}
+    assert server.catalog_updates_for(reggae, {"genre": "Reggae & Dancehall"}) == {"url": "https://l.rootslegacy.fr/;", "country": "FR"}
+
+    soma_reggae = {**reggae, "url": "https://ice1.somafm.com/reggae-128-mp3", "country": "US"}
+    updates = server.catalog_updates_for(soma_reggae, {"genre": "Reggae & Dancehall"})
+    assert updates["url"] == "https://l.rootslegacy.fr/;" and updates["country"] == "FR"
+
+    own = {**reggae, "url": "https://my.reggae/stream"}
+    assert server.catalog_updates_for(own, {"genre": "Reggae & Dancehall"}) == {}

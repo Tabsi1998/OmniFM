@@ -5,6 +5,7 @@ Moved out of server.py (#200). server.py calls bind() with itself; names
 defined in server.py are read as core.<name> at call time, and server.py
 offers every function here as server.<name> again.
 """
+from pathlib import Path
 from urllib.parse import urlparse
 from datetime import datetime
 from datetime import timezone
@@ -135,6 +136,41 @@ REPLACED_STREAMS = {
     "pro_house_12": ("https://radio.edm1.fm/proxy/15_clubhouse?mp=/stream", "https://listen.reyfm.de/houseparty_192kbps.mp3"),
 }
 
+# #549: the catalog clean-up of 2026-11-12, the same rows the Node side applies
+# (src/station-catalog-migrations.json): [key, fromUrl, toUrl, set?, unset?].
+# Applied only where the stored URL is still fromUrl; the fields go with it.
+_MIGRATIONS_FILE = Path(__file__).resolve().parents[2] / "src" / "station-catalog-migrations.json"
+
+
+def _sanitized_key(key):
+    return re.sub(r"[^a-z0-9]", "", str(key or "").lower())
+
+
+def _load_catalog_migrations():
+    try:
+        rows = json.loads(_MIGRATIONS_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    migrations = {}
+    for row in rows:
+        key, from_url, to_url = row[0], row[1], row[2]
+        entry = {"from": from_url, "to": to_url, "set": dict(row[3]) if len(row) > 3 else {}, "unset": list(row[4]) if len(row) > 4 else []}
+        migrations.setdefault(_sanitized_key(key), []).append(entry)
+    return migrations
+
+
+CATALOG_MIGRATIONS = _load_catalog_migrations()
+
+
+def catalog_migration_for(doc):
+    """The #549 row for a stored station whose URL is still the old one:
+    (fields to set, fields to remove), or None."""
+    url = str(doc.get("url") or "").strip()
+    for entry in CATALOG_MIGRATIONS.get(_sanitized_key(doc.get("key")), []):
+        if url == entry["from"]:
+            return {**entry["set"], "url": entry["to"]}, entry["unset"]
+    return None
+
 
 # Decisions of #325 on streams that only roughly matched their name: corrected
 # in MongoDB only where the old value is still stored, so an owner's own
@@ -144,8 +180,9 @@ CATALOG_CORRECTIONS = {
     "pro_tech_19": {"name": ("Minimal Grooves", "IDM & Glitch")},
     "pro_urban_14": {"name": ("Chill R&B", "2000er Hits"), "genre": ("R&B", "Pop & Charts"), "color": ("#A855F7", "#EC4899")},
     "pro_tech_16": {"name": ("Deep Underground", "Deep Tech House"), "genre": ("Techno", "House"), "color": ("#7C3AED", "#06B6D4")},
-    # #549: SomaFM blocks non-browser clients, the reggae station is Roots Legacy now.
-    "reggaeradio": {"url": ("http://streams.bigfm.de/bigfm-reggaevibes-128-mp3", "https://l.rootslegacy.fr/;"), "country": ("DE", "FR")},
+    # The old bigFM reggae stream goes straight to the #549 station (SomaFM
+    # blocks non-browser clients); its country follows only together with the URL.
+    "reggaeradio": {"url": ("http://streams.bigfm.de/bigfm-reggaevibes-128-mp3", "https://l.rootslegacy.fr/;")},
     # These two played the stream of another catalog station; now what their name says.
     "pro_urban_04": {"url": ("http://streams.bigfm.de/bigfm-rapfeature-128-mp3?usid=0-0-H-M-D-60", "https://stream.laut.fm/drill"), "language": ("de", "")},
     "pro_hard_06": {"url": ("http://mp3.stream.tb-group.fm/hb.mp3?", "https://stream.laut.fm/hardstyle"), "country": ("DE", "")},
@@ -195,7 +232,20 @@ def catalog_updates_for(doc, file_station):
     for field, (old, new) in CATALOG_CORRECTIONS.get(str(doc.get("key") or ""), {}).items():
         if str(doc.get(field) or "").strip() == old:
             updates[field] = new
+    if updates.get("url") == "https://l.rootslegacy.fr/;" and str(doc.get("key") or "") == "reggaeradio":
+        updates["country"] = "FR"
+    migration = catalog_migration_for({**doc, **({"url": updates["url"]} if "url" in updates else {})})
+    if migration is None:
+        migration = catalog_migration_for(doc)
+    if migration:
+        updates.update(migration[0])
     return updates
+
+
+def catalog_unsets_for(doc):
+    """Fields a #549 row removes (old logos), only where the old URL is still stored."""
+    migration = catalog_migration_for(doc)
+    return list(migration[1]) if migration else []
 
 
 def fill_station_catalog_fields():
@@ -208,9 +258,13 @@ def fill_station_catalog_fields():
         changed = 0
         for doc in core.db.stations.find({"key": {"$in": list(file_stations.keys())}}):
             updates = catalog_updates_for(doc, file_stations.get(doc.get("key")) or {})
-            if updates:
+            unsets = catalog_unsets_for(doc)
+            if updates or unsets:
                 updates["updated_at"] = datetime.now(timezone.utc).isoformat()
-                core.db.stations.update_one({"_id": doc["_id"]}, {"$set": updates})
+                operation = {"$set": updates}
+                if unsets:
+                    operation["$unset"] = {field: "" for field in unsets}
+                core.db.stations.update_one({"_id": doc["_id"]}, operation)
                 changed += 1
         return changed
     except Exception:
@@ -406,6 +460,8 @@ __all__ = [
     "seed_stations_if_empty",
     "station_catalog_fields",
     "catalog_updates_for",
+    "catalog_unsets_for",
+    "catalog_migration_for",
     "fill_station_catalog_fields",
     "seed_premium_if_needed",
     "seed_demo_enabled",
