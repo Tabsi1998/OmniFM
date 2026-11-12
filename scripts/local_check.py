@@ -768,25 +768,27 @@ def describe_counts(counts: dict) -> str:
 
 # -------------------------------------------------------------------- runner
 
-def changed_files(base_ref: str = "origin/main") -> tuple[list[str], str]:
+def changed_files(base_ref: str = "origin/main", root: Path = ROOT) -> tuple[list[str], str]:
     """Files that differ from the merge base with base_ref, new ones included.
 
     Committed, staged, unstaged and untracked changes all count: the check
-    runs on the working tree, so that is what it has to cover.
+    runs on the working tree, so that is what it has to cover. --no-renames:
+    a moved file counts with both paths, or moving backend/x.py to docs/
+    would read as a documentation change.
     """
     binary = shutil.which("git")
     if not binary:
         raise RuntimeError("git is not installed")
 
     def ask(*arguments: str) -> str:
-        completed = subprocess.run([binary, *arguments], cwd=str(ROOT), capture_output=True,
+        completed = subprocess.run([binary, *arguments], cwd=str(root), capture_output=True,
                                    text=True, encoding="utf-8", errors="replace")
         if completed.returncode != 0:
             raise RuntimeError(f"git {' '.join(arguments)}: {(completed.stderr or completed.stdout).strip()}")
         return completed.stdout
 
     base = ask("merge-base", "HEAD", base_ref).strip()
-    listed = ask("diff", "--name-only", "-z", base).split("\0")
+    listed = ask("diff", "--no-renames", "--name-only", "-z", base).split("\0")
     listed += ask("ls-files", "--others", "--exclude-standard", "-z").split("\0")
     return sorted({name for name in listed if name}), base[:10]
 

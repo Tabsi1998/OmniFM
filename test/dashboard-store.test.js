@@ -6,11 +6,12 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { resolveRuntimeDataPath } from "../src/lib/runtime-data-path.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
-const dashboardFile = path.join(repoRoot, "dashboard.json");
-const dashboardBackupFile = path.join(repoRoot, "dashboard.json.bak");
+const dashboardFile = resolveRuntimeDataPath("dashboard.json");
+const dashboardBackupFile = resolveRuntimeDataPath("dashboard.json.bak");
 const execFileAsync = promisify(execFile);
 
 async function snapshotFile(filePath) {

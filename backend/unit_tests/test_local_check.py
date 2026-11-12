@@ -7,6 +7,7 @@ local_check.py needs nothing but the standard library.
 import hashlib
 import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -94,3 +95,25 @@ def test_a_partly_deleted_tree_installs_again(tmp_path):
     modules = make_install(tmp_path)
     (modules / "@scope" / "b" / "package.json").unlink()
     assert local_check.install_is_current(tmp_path, FINGERPRINT) == (False, "node_modules/@scope/b is missing")
+
+
+def git(repo, *arguments):
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false",
+                    *arguments], cwd=repo, check=True, capture_output=True)
+
+
+def test_a_moved_file_counts_with_both_paths(tmp_path):
+    # Without --no-renames, backend/x.py moved to docs/x.md read as documentation only.
+    git(tmp_path, "init", "-q", "-b", "main")
+    (tmp_path / "backend").mkdir()
+    (tmp_path / "backend" / "x.py").write_text("value = 1\n" * 20, encoding="utf-8")
+    git(tmp_path, "add", ".")
+    git(tmp_path, "commit", "-q", "-m", "base")
+    git(tmp_path, "checkout", "-q", "-b", "feature")
+    (tmp_path / "docs").mkdir()
+    git(tmp_path, "mv", "backend/x.py", "docs/x.md")
+    git(tmp_path, "commit", "-q", "-m", "move")
+
+    files, _ = local_check.changed_files("main", root=tmp_path)
+    assert files == ["backend/x.py", "docs/x.md"]
+    assert local_check.changed_groups(files)[0] == EVERYTHING

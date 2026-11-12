@@ -14,6 +14,7 @@ import {
   resolvePageFromUrl,
 } from "../frontend/src/lib/pageRouting.js";
 import { upsertOffer } from "../src/coupon-store.js";
+import { resolveRuntimeDataPath } from "../src/lib/runtime-data-path.js";
 
 // The version comes from package.json, so a release does not break the tests.
 const PACKAGE_VERSION = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
@@ -27,8 +28,8 @@ const frontendSitemapPath = path.join(frontendBuildDir, "sitemap.xml");
 const frontendManifestPath = path.join(frontendBuildDir, "manifest.json");
 const frontendBotIconDir = path.join(frontendBuildDir, "img");
 const frontendBotIconPath = path.join(frontendBotIconDir, "bot-1.png");
-const couponsPath = path.join(repoRoot, "coupons.json");
-const couponsBackupPath = path.join(repoRoot, "coupons.json.bak");
+const couponsPath = resolveRuntimeDataPath("coupons.json");
+const couponsBackupPath = resolveRuntimeDataPath("coupons.json.bak");
 
 // The end-to-end routing test alone sends about 60 API requests from 127.0.0.1,
 // which is the default per-minute limit shared by every test in this file.

@@ -36,8 +36,10 @@ python scripts/local_check.py --list                  # the steps, without runni
   affected. The full run stays the gate before a release.
 - The unit suite runs its files in parallel (`npm run test:unit`, at most 8 at
   once); `test/support/isolate-test-file.mjs` gives every file its own
-  `DB_NAME` and always a fresh runtime data directory; afterwards the databases
-  are dropped and leftovers reported on stderr. One after the other:
+  database (`<DB_NAME>_unit_<file>`) and always a fresh runtime data
+  directory; afterwards the runner drops only the databases it recorded in this
+  run and reports leftovers on stderr. Tests reach store files through
+  `resolveRuntimeDataPath(...)`, never the repository root. One after the other:
   `npm run test:unit -- --test-concurrency=1`.
 
 Results in `.local-testing/` (ignored by Git). Tools: Docker Desktop, Git,

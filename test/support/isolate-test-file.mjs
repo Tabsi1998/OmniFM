@@ -6,7 +6,7 @@
 // OMNIFM_RUNTIME_DATA_DIR). This gives each file both of its own, derived from
 // its name, before any test code runs, so files cannot see each other's data:
 //
-//   DB_NAME                   <DB_NAME or omnifm_test>_<file name>
+//   DB_NAME                   <DB_NAME or omnifm_test>_unit_<file name>
 //   OMNIFM_RUNTIME_DATA_DIR   always a fresh temporary directory, removed on
 //                             exit (the logs of a test run go to logs/test in it)
 //
@@ -14,13 +14,12 @@
 // Outside the test runner (no NODE_TEST_CONTEXT) nothing changes. The runner
 // drops the databases after the run and reports what could not be removed.
 import fs from "node:fs";
-import os from "node:os";
 
 import { isolateTestFile } from "./test-isolation.js";
 
 if (process.env.NODE_TEST_CONTEXT) {
-  const isolated = isolateTestFile(process.env, process.argv[1],
-    process.env.OMNIFM_TEST_TMP_ROOT || os.tmpdir());
+  // The run's folder from run-unit-tests.mjs; without it the system temp folder.
+  const isolated = isolateTestFile(process.env, process.argv[1], process.env.OMNIFM_TEST_TMP_ROOT || "");
   if (isolated) {
     process.on("exit", () => {
       try {
