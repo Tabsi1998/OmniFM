@@ -83,7 +83,7 @@ class TestPublicRegressions:
         assert isinstance(stations, list)
         assert len(stations) >= 100, len(stations)
         keys = {s["key"] for s in stations}
-        for k in SOMA + PLAYABLE:
+        for k in CATALOG_SAMPLE + PLAYABLE:
             assert k in keys, f"{k} missing from catalog"
 
     def test_admin_stations_list(self):
