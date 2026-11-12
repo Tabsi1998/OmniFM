@@ -6,6 +6,7 @@
 // every server from its sessions, and a server's year from its months.
 // Servers only, never people.
 import { getZonedPartsFromUtcMs, zonedDateTimeToUtcMs } from "./event-time.js";
+import { isAdvertTitle } from "./advert-titles.js";
 
 export const REVIEW_TIME_ZONE = "Europe/Berlin";
 /** How far back MongoDB keeps the listening sessions a month is counted from. */
@@ -196,7 +197,8 @@ export function buildYearReview(months, { year, dailyByMonth = null, top = 5 }) 
       stations.set(station.key, entry);
     }
     for (const genre of month.genres || []) genres.set(genre.genre, (genres.get(genre.genre) || 0) + (Number(genre.ms) || 0));
-    for (const song of month.songs || []) {
+    // #548: a month stored before still may hold an advert.
+    for (const song of (month.songs || []).filter((entry) => !isAdvertTitle(entry.title))) {
       const entry = songs.get(song.trackKey) || { title: song.title, plays: 0 };
       entry.plays += Number(song.plays) || 0;
       entry.title = song.title || entry.title;

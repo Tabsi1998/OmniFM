@@ -15,7 +15,7 @@ import { configSectionFrom, loadOwnerConfigRaw } from "../lib/owner-config.js";
 import { coverLookup } from "../lib/owner-public.js";
 import { CHART_MIN_SERVERS, CHART_SIZE, STATION_CHART_SIZE, chartWeek, rankChart, rankStations, splitDisplayTitle } from "../lib/charts.js";
 import { getPublicStationEntries } from "../lib/public-stations.js";
-import { SONG_PLAYS_COLLECTION } from "../song-plays-store.js";
+import { ADVERT_HEADROOM, SONG_PLAYS_COLLECTION } from "../song-plays-store.js";
 import { loadStations } from "../stations-store.js";
 import { WEBSITE_URL, withLanguageParam } from "../bot/runtime-links.js";
 import * as ui from "../discord/ui/index.js";
@@ -44,7 +44,8 @@ async function weekRows(db, week) {
     { $project: { _id: 0, trackKey: "$_id", plays: 1, displayTitle: 1, servers: { $size: "$guilds" } } },
     { $match: { servers: { $gte: CHART_MIN_SERVERS } } },
     { $sort: { plays: -1, servers: -1, displayTitle: 1 } },
-    { $limit: CHART_SIZE },
+    // Room for the adverts still stored; rankChart drops them (#548).
+    { $limit: CHART_SIZE * ADVERT_HEADROOM },
   ], { allowDiskUse: true }).toArray();
 }
 
