@@ -9,7 +9,11 @@ description: OmniFM's own rules for touching the Discord bot, its messages, text
 `docs/discord-design.md` (message building blocks and rules) are the source.
 This skill is the checklist for doing it right the first time.
 
-## 1. Every Discord message goes through `src/discord/ui/`
+## 1. Every bot message goes through `src/discord/ui/`
+
+This covers what the bot sends in channels and as interaction answers.
+Operator alerts posted to a webhook (`src/services/operator-webhook.js`)
+build their own embeds on purpose; that is the one transport exception.
 
 - The top level of a message is `ui.panel`, `ui.notice`, `ui.confirm`, or
   the `.container` that `ui.list(...)` returns (it returns
@@ -68,11 +72,14 @@ This skill is the checklist for doing it right the first time.
 
 - Every request to a user- or catalog-supplied URL goes through `safeFetch`
   (`src/lib/safe-outbound-http.js`): SSRF check and DNS pinning on every hop,
-  redirect limit, credentials stripped on origin change. Operator webhooks
-  (`src/services/operator-webhook.js`) use `safeFetch` too, after checking the
-  URL is a Discord webhook. The one plain `fetch` on a URL from outside is the
-  Discord CDN attachment download in `src/bot/runtime-methods/forms.js`, after
-  checking the host; do not add more.
+  redirect limit, credentials stripped on origin change. That is the rule for
+  every URL a user, a server admin, the owner or the station catalog supplies;
+  the operator webhook service (`src/services/operator-webhook.js`) uses it
+  too. Plain `fetch` exists only for fixed third-party API hosts (iTunes,
+  MusicBrainz and similar in `src/services/now-playing.js`) and two older
+  checked paths (the Discord CDN download in `src/bot/runtime-methods/forms.js`,
+  the owner console's test alert in `src/api/routes/admin-routes.js`). New code
+  that fetches a supplied URL uses `safeFetch`.
 - `lenientHttpParser: true` **only** for radio streams (some servers end the
   status line with a bare LF, StreamABC, #536). `test/stream-fetch-parser.test.js`
   checks the files in its `STREAM_FETCHERS` list: **a new file that opens
@@ -102,6 +109,8 @@ This skill is the checklist for doing it right the first time.
 
 ## 6. Checks and known traps
 
+- Every setting the code reads is documented in `.env.example`; the local
+  check compares them.
 - Run the local check per `CLAUDE.md`, both groups, one run at a time on the
   whole machine. Never two checks in parallel.
 - Each worktree gets its own `npm ci`; never link `node_modules`.
