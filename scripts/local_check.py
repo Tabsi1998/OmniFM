@@ -69,9 +69,10 @@ BACKEND = ROOT / "backend"
 CACHE = Path.home() / ".local-ci" / ROOT.name
 VENV = CACHE / "venv"
 
-# The versions the CI uses. package.json pins Node ">=22.23.4 <23"; the FastAPI job
-# sets up Python 3.12.
+# The versions the CI uses. package.json pins Node ">=22.23.4 <23" (the first 22
+# with undici 6.29.1, #543); the FastAPI job sets up Python 3.12.
 NODE_MAJOR = 22
+NODE_MINIMUM = (22, 23, 4)
 BACKEND_PYTHON = "3.12"
 
 # Ports of their own: a developer's own MongoDB on 27017, or another
@@ -952,7 +953,13 @@ def mongo_env(context: Context) -> dict:
 
 def node_version(context: Context) -> str:
     node = node_of(context, NODE_MAJOR)
-    return f"Node {context.run(node, '--version', timeout=60).stdout.strip()} from {Path(node).parent}"
+    version = context.run(node, "--version", timeout=60).stdout.strip()
+    parts = tuple(int(part) for part in version.lstrip("v").split(".")[:3] if part.isdigit())
+    if parts < NODE_MINIMUM:
+        minimum = ".".join(str(part) for part in NODE_MINIMUM)
+        raise StepFailed(f"Node {version} from {Path(node).parent} is older than {minimum}, which package.json requires "
+                         f"(its bundled undici has the TLS fix, #543). Unpack node-v{minimum} or newer into {TOOLCHAIN}")
+    return f"Node {version} from {Path(node).parent}"
 
 
 def node_install(context: Context) -> str:
