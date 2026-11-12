@@ -131,7 +131,8 @@ REPLACED_STREAMS = {
     "pro_tech_15": ("http://lw2.mp3.tb-group.fm/tb.mp3", "https://streams.rautemusik.fm/harder/mp3-192/"),
     "pro_tech_20": ("https://ice4.somafm.com/scanner-128-mp3", "https://stream.technolovers.fm/dark-techno"),
     "pro_house_06": ("https://ice4.somafm.com/7soul-128-mp3", "https://streams.rautemusik.fm/house/mp3-192/"),
-    "pro_house_12": ("https://radio.edm1.fm/proxy/15_clubhouse?mp=/stream", "http://radio.edm1.fm/proxy/15_clubhouse?mp=/stream"),
+    # #549: edm1.fm only gave 32k over http with an expired certificate.
+    "pro_house_12": ("https://radio.edm1.fm/proxy/15_clubhouse?mp=/stream", "https://listen.reyfm.de/houseparty_192kbps.mp3"),
 }
 
 
@@ -143,7 +144,8 @@ CATALOG_CORRECTIONS = {
     "pro_tech_19": {"name": ("Minimal Grooves", "IDM & Glitch")},
     "pro_urban_14": {"name": ("Chill R&B", "2000er Hits"), "genre": ("R&B", "Pop & Charts"), "color": ("#A855F7", "#EC4899")},
     "pro_tech_16": {"name": ("Deep Underground", "Deep Tech House"), "genre": ("Techno", "House"), "color": ("#7C3AED", "#06B6D4")},
-    "reggaeradio": {"url": ("http://streams.bigfm.de/bigfm-reggaevibes-128-mp3", "https://ice1.somafm.com/reggae-128-mp3"), "country": ("DE", "US")},
+    # #549: SomaFM blocks non-browser clients, the reggae station is Roots Legacy now.
+    "reggaeradio": {"url": ("http://streams.bigfm.de/bigfm-reggaevibes-128-mp3", "https://l.rootslegacy.fr/;"), "country": ("DE", "FR")},
     # These two played the stream of another catalog station; now what their name says.
     "pro_urban_04": {"url": ("http://streams.bigfm.de/bigfm-rapfeature-128-mp3?usid=0-0-H-M-D-60", "https://stream.laut.fm/drill"), "language": ("de", "")},
     "pro_hard_06": {"url": ("http://mp3.stream.tb-group.fm/hb.mp3?", "https://stream.laut.fm/hardstyle"), "country": ("DE", "")},

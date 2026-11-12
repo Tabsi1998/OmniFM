@@ -36,7 +36,7 @@ def test_325_corrections_only_where_the_old_value_is_still_stored():
     assert "name" not in server.catalog_updates_for(owner_name, {"genre": "House"})
 
     reggae = {"key": "reggaeradio", "url": "http://streams.bigfm.de/bigfm-reggaevibes-128-mp3", "country": "DE", "genre": "Reggae & Dancehall"}
-    assert server.catalog_updates_for(reggae, {"genre": "Reggae & Dancehall"})["url"] == "https://ice1.somafm.com/reggae-128-mp3"
+    assert server.catalog_updates_for(reggae, {"genre": "Reggae & Dancehall"})["url"] == "https://l.rootslegacy.fr/;"
 
 
 def test_325_the_duplicates_get_a_stream_that_matches_their_name():

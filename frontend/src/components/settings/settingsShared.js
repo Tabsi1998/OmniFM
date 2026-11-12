@@ -3,7 +3,7 @@
 
 
 export const VOICE_STATUS_SAMPLE = {
-  station: 'Groove Salad',
+  station: 'Chillout Lounge',
   title: 'Cafe del Mar',
   artist: 'Energy 52',
   listeners: 5,
