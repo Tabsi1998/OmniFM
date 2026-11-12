@@ -310,9 +310,9 @@ test("song history: adverts are never saved, and the ones saved before never sho
   await history.stopSongHistoryStore();
   // Spots saved before #548, newer than the song.
   await songs.insertMany([
-    ...Array.from({ length: 30 }, (_, index) => ({ guildId, displayTitle: `www.shop${index}.at - Angebot`, timestampMs: now + index })),
+    ...Array.from({ length: 30 }, (_, index) => ({ guildId, id: `old_ad_${index}`, displayTitle: `www.shop${index}.at - Angebot`, timestampMs: now + index })),
     // Saved with a harmless display title, the spot only in the stream title.
-    { guildId, displayTitle: "Radio Tirol", streamTitle: "www.lutz.at - Ein bisschen Verbraucherinformationen ...", timestampMs: now + 100 },
+    { guildId, id: "old_ad_stream", displayTitle: "Radio Tirol", streamTitle: "www.lutz.at - Ein bisschen Verbraucherinformationen ...", timestampMs: now + 100 },
   ]);
   assert.deepEqual((await history.readSongHistory(guildId, { limit: 5 })).map((row) => row.displayTitle), ["Wanda - Bologna"]);
   assert.deepEqual(history.getSongHistory(guildId, { limit: 5 }).map((row) => row.displayTitle), ["Wanda - Bologna"]);
