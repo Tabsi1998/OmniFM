@@ -1000,31 +1000,75 @@ def install_fingerprint(context: Context, where: Path) -> dict:
             "platform": f"{platform.system()}-{platform.machine()}"}
 
 
-def locked_install(context: Context, where: Path, log_name: str) -> str:
-    """npm ci, unless the last one in where was for the same package files, Node and npm.
+def installed_tree(where: Path) -> dict:
+    """What npm says it installed in where: the hash of node_modules/.package-lock.json.
 
-    The skip is checked twice: the marker must match, and `npm ls` must find
-    every dependency in place, so a node_modules someone changed by hand is
-    installed again. --fresh always installs.
+    npm writes that hidden lockfile on every install and every change through
+    npm; a hand-made change leaves it alone, which the package check catches.
+    """
+    hidden = where / "node_modules" / ".package-lock.json"
+    return {"hidden-lockfile": hashlib.sha256(hidden.read_bytes()).hexdigest()} if hidden.is_file() else {}
+
+
+def install_is_current(where: Path, fingerprint: dict) -> tuple[bool, str]:
+    """Whether node_modules in where is still the one the last npm ci left (#553).
+
+    Three things must hold, each cheap (well under a second for both trees):
+    the marker names the same package files, Node, npm and platform; npm's
+    hidden lockfile is unchanged since that install; and every package it
+    lists is on disk with its package.json, so a partly deleted tree fails.
+    npm ls --depth=0 runs afterwards as a last check.
+    """
+    marker = where / "node_modules" / INSTALL_MARKER
+    if not marker.is_file():
+        return False, "no install marker"
+    try:
+        recorded = json.loads(marker.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False, "the install marker is unreadable"
+    if recorded.get("fingerprint") != fingerprint:
+        return False, "package files, Node or npm changed"
+    tree = installed_tree(where)
+    if not tree or recorded.get("installed") != tree:
+        return False, "node_modules/.package-lock.json changed"
+    try:
+        packages = json.loads((where / "node_modules" / ".package-lock.json").read_text(encoding="utf-8"))["packages"]
+    except (OSError, ValueError, KeyError) as error:
+        return False, f"node_modules/.package-lock.json is unreadable: {error}"
+    for name, entry in packages.items():
+        if not name.startswith("node_modules/"):
+            continue
+        target = where / name
+        present = target.exists() if entry.get("link") else (target / "package.json").is_file()
+        if not present:
+            return False, f"{name} is missing"
+    return True, "unchanged"
+
+
+def locked_install(context: Context, where: Path, log_name: str) -> str:
+    """npm ci, unless node_modules is still exactly what the last one installed.
+
+    install_is_current() decides, then `npm ls --depth=0` must be clean.
+    --fresh always installs; the check before a release uses it.
     """
     marker = where / "node_modules" / INSTALL_MARKER
     fingerprint = install_fingerprint(context, where)
-    if not context.fresh and marker.is_file():
-        try:
-            recorded = json.loads(marker.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            recorded = None
-        if recorded == fingerprint:
+    reason = "--fresh"
+    if not context.fresh:
+        current, reason = install_is_current(where, fingerprint)
+        if current:
             listed = npm(context, "ls", "--depth=0", cwd=where, check=False, timeout=600)
             if listed.returncode == 0:
-                context.log(log_name, "skipped: unchanged package files, Node and npm\n" + listed.stdout)
+                context.log(log_name, "skipped: unchanged package files, Node, npm and node_modules\n" + listed.stdout)
                 return (f"unchanged since the last install (Node {fingerprint['node']}, npm {fingerprint['npm']}),"
                         " npm ls clean; --fresh installs anyway")
+            reason = "npm ls found problems"
     completed = npm(context, "ci", "--no-audit", "--no-fund", cwd=where, check=False, timeout=2400)
     where_name = where.relative_to(ROOT).as_posix() if where != ROOT else "the repository"
     npm_step_result(context, log_name, completed, f"npm ci in {where_name} failed")
-    marker.write_text(json.dumps(fingerprint, indent=2), encoding="utf-8")
-    return "npm ci"
+    marker.write_text(json.dumps({"fingerprint": fingerprint, "installed": installed_tree(where)}, indent=2),
+                      encoding="utf-8")
+    return f"npm ci ({reason})"
 
 
 # ---------------------------------------------------------------- repository

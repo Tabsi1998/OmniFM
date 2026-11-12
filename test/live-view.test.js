@@ -142,7 +142,10 @@ test("every phase change of a bot lands in the timeline, and the timeline reads 
   Object.assign(state, { voiceConnectInFlight: false, connection: {}, player: { state: { status: "playing" } } });
   recordPlaybackPhase(runtime, GUILD, state, "player");
   let rows = [];
-  for (let attempt = 0; attempt < 20 && rows.length < 2; attempt += 1) {
+  // Up to 10 s: on a busy machine (the unit suite runs files in parallel, #553)
+  // the unawaited writes can take far longer than a second.
+  const deadline = Date.now() + 10_000;
+  while (rows.length < 2 && Date.now() < deadline) {
     // eslint-disable-next-line no-await-in-loop -- the writes are not awaited by the playback
     await new Promise((resolve) => { setTimeout(resolve, 50); });
     // eslint-disable-next-line no-await-in-loop

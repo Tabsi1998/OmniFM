@@ -24,8 +24,10 @@ python scripts/local_check.py --list                  # the steps, without runni
 
 - `npm ci` (root and `frontend/`) is skipped while `package.json`,
   `package-lock.json`, Node and npm match the last successful install
-  (`node_modules/.omnifm-install.json`) and `npm ls --depth=0` is clean.
-  `--fresh` installs anyway.
+  (`node_modules/.omnifm-install.json`), npm's `node_modules/.package-lock.json`
+  is unchanged with every package it lists on disk, and `npm ls --depth=0` is
+  clean. `--fresh` installs anyway; the full check before a release always
+  runs with `--all --fresh`.
 - `--changed` picks the groups from the files changed against the merge base
   with `origin/main` (new and uncommitted files included): only documentation
   (`*.md` but `CHANGELOG.md`, `docs/`, `.claude/`, `LICENSE`) → repository;
@@ -34,7 +36,8 @@ python scripts/local_check.py --list                  # the steps, without runni
   affected. The full run stays the gate before a release.
 - The unit suite runs its files in parallel (`npm run test:unit`, at most 8 at
   once); `test/support/isolate-test-file.mjs` gives every file its own
-  `DB_NAME` and runtime data directory. One after the other:
+  `DB_NAME` and always a fresh runtime data directory; afterwards the databases
+  are dropped and leftovers reported on stderr. One after the other:
   `npm run test:unit -- --test-concurrency=1`.
 
 Results in `.local-testing/` (ignored by Git). Tools: Docker Desktop, Git,
