@@ -1,0 +1,44 @@
+Copyright © 2026 IT-Tabelander (Inhaber: Fabian Tabelander). Alle Rechte vorbehalten.
+
+Dieses Repository – OmniFM, der Discord-Radio-Bot mit Website, Dashboard, Owner-Konsole und Server – und alle
+darin enthaltenen Dateien (Quelltext, Texte, Gestaltung, Grafiken, Emojis, Skripte und Dokumentation) sind
+urheberrechtlich geschützt. Mit dieser Datei wird keine Lizenz erteilt.
+
+Ohne vorherige schriftliche Zustimmung von IT-Tabelander ist es nicht erlaubt,
+
+- den Inhalt ganz oder in Teilen zu nutzen, zu kopieren, zu verändern oder weiterzugeben,
+- ihn selbst zu betreiben, zu veröffentlichen oder in andere Projekte zu übernehmen,
+- ihn für Text- und Data-Mining zu verwenden, zum Beispiel zum Training von KI-Modellen. Dieser Vorbehalt gilt
+  ausdrücklich im Sinne von § 42h des österreichischen Urheberrechtsgesetzes und Art. 4 Abs. 3 der
+  Richtlinie (EU) 2019/790.
+
+Dass das Repository öffentlich einsehbar ist, ändert daran nichts. Die Nutzungsbedingungen von GitHub erlauben
+anderen GitHub-Nutzern nur, es auf GitHub anzusehen und dort eine Kopie („Fork“) anzulegen. Weitere Rechte
+entstehen daraus nicht.
+
+Nutzungsrechte vergibt ausschließlich IT-Tabelander (Fabian Tabelander); Anfragen über
+https://github.com/Tabsi1998.
+
+Diese Datei regelt nur das Repository selbst. Die Premium-Lizenzen, die OmniFM für Discord-Server verkauft, sind
+etwas anderes und richten sich nach den Bedingungen auf https://omnifm.xyz.
+
+Ausgenommen sind:
+
+- Bestandteile Dritter mit eigener Lizenz. Sie liegt jeweils daneben, zum Beispiel bei den Schriften in
+  `assets/fonts/` und `frontend/public/assets/fonts/` (SIL Open Font License, Dateien `OFL*.txt`). Bibliotheken,
+  die über npm oder pip geladen werden, sind nicht Teil dieses Repositorys und stehen unter ihren eigenen Lizenzen.
+- Namen, Marken, Logos und Streams Dritter (zum Beispiel Discord, Radiosender und ihre Logos). Sie gehören ihren
+  jeweiligen Inhabern und werden mit dieser Datei nicht freigegeben.
+
+-------------------------------------------------------------------------------------------------------------------
+
+English summary (the German text above is binding)
+
+Copyright © 2026 IT-Tabelander (owner: Fabian Tabelander). All rights reserved. No licence is granted. Without
+prior written permission you may not use, copy, modify, distribute, host, publish or incorporate any part of this
+repository, nor use it for text and data mining such as training AI models (reservation under § 42h of the
+Austrian Copyright Act and Art. 4(3) of Directive (EU) 2019/790). Public visibility on GitHub only allows viewing
+and forking on GitHub under GitHub's Terms of Service and grants no further rights. This file covers the
+repository only; the premium licences OmniFM sells for Discord servers follow the terms on https://omnifm.xyz.
+Third-party components keep their own licences (fonts: SIL Open Font License; packages installed via npm or pip).
+Names, trademarks, logos and streams of third parties belong to their owners and are not licensed here.
