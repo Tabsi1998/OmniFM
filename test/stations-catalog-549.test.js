@@ -1,6 +1,7 @@
 import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { MongoClient } from "mongodb";
@@ -156,4 +157,40 @@ test("#549 migration against MongoDB: $set and $unset apply together", { skip: !
   assert.equal(drone.logo, "https://operator.example/logo.png");
   assert.equal((await stations.findOne({ key: "proedm02" })).url, bigfm.toUrl);
   assert.equal(await markers.countDocuments({ _id: groove.id }), 1);
+});
+
+// File fallback (no MongoDB, or runtime-data/stations.json preferred): same rows.
+async function runFileMigration(catalog) {
+  const { migrateStationsFileCatalog } = await import("../src/stations-store.js");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "omnifm-549-file-"));
+  const file = path.join(dir, "stations.json");
+  fs.writeFileSync(file, JSON.stringify(catalog, null, 2), "utf8");
+  const first = migrateStationsFileCatalog(file);
+  const afterFirst = fs.readFileSync(file, "utf8");
+  const second = migrateStationsFileCatalog(file);
+  const result = { first, second, data: JSON.parse(afterFirst), unchanged: fs.readFileSync(file, "utf8") === afterFirst };
+  fs.rmSync(dir, { recursive: true, force: true });
+  return result;
+}
+
+test("#549 file fallback: replaced station, URL-only change, operator override, second run", async () => {
+  const { first, second, data, unchanged } = await runFileMigration({
+    defaultStationKey: "groovesalad",
+    stations: {
+      groovesalad: { name: "Groove Salad", url: groove.fromUrl, tier: "free", country: "US", logo: "https://api.somafm.com/logos/512/groovesalad512.png", homepage: "https://somafm.com/groovesalad/", note: "keep" },
+      dronezone: { name: "Own Drone", url: "https://operator.example/own.mp3", tier: "free", logo: "https://operator.example/logo.png" },
+      pro_edm_02: { name: "bigFM EDM", url: bigfm.fromUrl, tier: "pro" },
+      other: { name: "Other", url: bigfm.fromUrl, tier: "free" },
+    },
+  });
+  assert.deepEqual(first, { changed: true, matchedCount: 2 });
+  assert.deepEqual(data.stations.groovesalad, {
+    name: seed.stations.groovesalad.name, url: seed.stations.groovesalad.url, tier: "free",
+    country: seed.stations.groovesalad.country, homepage: seed.stations.groovesalad.homepage, note: "keep",
+  });
+  assert.deepEqual(data.stations.dronezone, { name: "Own Drone", url: "https://operator.example/own.mp3", tier: "free", logo: "https://operator.example/logo.png" });
+  assert.deepEqual(data.stations.pro_edm_02, { name: "bigFM EDM", url: bigfm.toUrl, tier: "pro" });
+  assert.equal(data.stations.other.url, bigfm.fromUrl);
+  assert.deepEqual(second, { changed: false, matchedCount: 0 });
+  assert.equal(unchanged, true);
 });

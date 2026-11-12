@@ -146,8 +146,9 @@ function writeStationsFileAtomically(filePath, data) {
 
 /**
  * Migrates the mutable runtime-data catalog when MongoDB is unavailable.
- * Only the sanitized key protml03 with the exact retired URL is changed; all
- * other catalog fields and operator overrides are preserved unchanged.
+ * Applies the same STATION_CATALOG_MIGRATIONS rows as the MongoDB path: only a
+ * station whose URL is still exactly the retired one changes (url, plus set/unset
+ * fields); operator overrides and all other fields are preserved unchanged.
  */
 export function migrateStationsFileCatalog(filePath = stationsPath) {
   if (!fs.existsSync(filePath)) return { changed: false, reason: "missing-file" };
@@ -163,12 +164,22 @@ export function migrateStationsFileCatalog(filePath = stationsPath) {
       return { changed: false, reason: "invalid-catalog" };
     }
 
+    // Same rows as the MongoDB path. File keys may be raw ("pro_tml_03"), so they
+    // are matched by their sanitized form, like the loader does.
+    const bySanitizedKey = new Map();
+    for (const migration of STATION_CATALOG_MIGRATIONS) {
+      const sanitized = sanitizeKey(migration.key);
+      if (!bySanitizedKey.has(sanitized)) bySanitizedKey.set(sanitized, []);
+      bySanitizedKey.get(sanitized).push(migration);
+    }
+
     let matchedCount = 0;
     for (const [rawKey, station] of Object.entries(data.stations)) {
       if (!isRecord(station)) continue;
-      if (sanitizeKey(rawKey) !== "protml03") continue;
-      if (station.url !== TOMORROWLAND_ANTHEMS_LEGACY_URL) continue;
-      station.url = TOMORROWLAND_ANTHEMS_URL;
+      const migration = (bySanitizedKey.get(sanitizeKey(rawKey)) || []).find((entry) => entry.fromUrl === station.url);
+      if (!migration) continue;
+      Object.assign(station, migration.set, { url: migration.toUrl });
+      for (const field of migration.unset || []) delete station[field];
       matchedCount += 1;
     }
 
@@ -237,7 +248,7 @@ function loadStationsFromFile() {
   try {
     const migration = migrateStationsFileCatalog();
     if (migration.changed) {
-      log("INFO", `Stations-Dateikatalogmigration abgeschlossen: ${migration.matchedCount} Tomorrowland-Anthems-URL(s) aktualisiert`);
+      log("INFO", `Stations-Dateikatalogmigration abgeschlossen: ${migration.matchedCount} Sender-URL(s) aktualisiert`);
     }
   } catch (err) {
     // Keep the existing file fallback available; a failed migration never overwrites it.
