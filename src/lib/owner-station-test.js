@@ -82,6 +82,7 @@ async function testOwnerStationStream(station, { timeoutMs = DEFAULT_TIMEOUT_MS,
       response = await fetchImpl(url, {
         method,
         redirect: "follow",
+        lenientHttpParser: true, // radio servers, #536
         signal: controller.signal,
         headers: { "User-Agent": "OmniFM-OwnerStationTest/1.0" },
         timeoutMs: safeTimeoutMs,
@@ -96,6 +97,7 @@ async function testOwnerStationStream(station, { timeoutMs = DEFAULT_TIMEOUT_MS,
         response = await fetchImpl(url, {
           method,
           redirect: "follow",
+          lenientHttpParser: true, // radio servers, #536
           signal: controller.signal,
           headers: {
             "User-Agent": "OmniFM-OwnerStationTest/1.0",
@@ -110,6 +112,7 @@ async function testOwnerStationStream(station, { timeoutMs = DEFAULT_TIMEOUT_MS,
       response = await fetchImpl(url, {
         method,
         redirect: "follow",
+        lenientHttpParser: true, // radio servers, #536
         signal: controller.signal,
         headers: {
           "User-Agent": "OmniFM-OwnerStationTest/1.0",

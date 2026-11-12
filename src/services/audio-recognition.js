@@ -414,6 +414,7 @@ async function captureFingerprintAttempt(url) {
     const response = await safeFetch(url, {
       method: "GET",
       redirect: "follow",
+      lenientHttpParser: true, // radio servers, #536
       headers: { "User-Agent": USER_AGENT },
       timeoutMs: Math.min(RECOGNITION_TIMEOUT_MS, 15_000),
     });

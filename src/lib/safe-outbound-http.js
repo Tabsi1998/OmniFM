@@ -249,7 +249,7 @@ function toSafeOutboundTransportError(error) {
 /**
  * @param {any} target
  * @param {{ method?: string, headers?: Record<string, any>, body?: any, signal?: AbortSignal,
- *   timeoutMs?: number }} [options]
+ *   timeoutMs?: number, lenientHttpParser?: boolean }} [options]
  */
 function requestPinnedTarget(target, {
   method = "GET",
@@ -257,6 +257,7 @@ function requestPinnedTarget(target, {
   body = null,
   signal,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  lenientHttpParser = false,
 } = {}) {
   const requestBody = serializeRequestBody(body);
   const isHttps = target.url.protocol === "https:";
@@ -287,6 +288,10 @@ function requestPinnedTarget(target, {
       method: String(method || "GET").toUpperCase(),
       headers,
       agent: false,
+      // Some radio servers end the status line with a bare LF (StreamABC,
+      // #536); curl, browsers and FFmpeg accept that, Node's strict parser
+      // does not. Only stream fetches ask for it, each on its own socket.
+      insecureHTTPParser: lenientHttpParser === true,
       family: target.family,
       servername: isHttps && !hostnameIsIp ? target.hostname : undefined,
       lookup: (_hostname, _options, callback) => callback(null, target.address, target.family),
@@ -359,7 +364,7 @@ function stripSensitiveRedirectHeaders(headers) {
  * @param {string | URL} rawUrl
  * @param {{ method?: string, headers?: Record<string, any>, body?: any, signal?: AbortSignal,
  *   timeoutMs?: number, redirect?: string, maxRedirects?: number, requestImpl?: Function,
- *   [policyOption: string]: any }} [options]
+ *   lenientHttpParser?: boolean, [policyOption: string]: any }} [options]
  */
 async function safeFetch(rawUrl, {
   method = "GET",
@@ -370,6 +375,7 @@ async function safeFetch(rawUrl, {
   redirect = "follow",
   maxRedirects = DEFAULT_MAX_REDIRECTS,
   requestImpl = requestPinnedTarget,
+  lenientHttpParser = false,
   ...policyOptions
 } = {}) {
   const normalizedMethod = String(method || "GET").toUpperCase();
@@ -392,6 +398,7 @@ async function safeFetch(rawUrl, {
         body,
         signal,
         timeoutMs,
+        lenientHttpParser,
       });
     } catch (error) {
       throw toSafeOutboundTransportError(error);

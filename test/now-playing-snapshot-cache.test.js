@@ -118,6 +118,21 @@ test("concurrent requests for one station are deduplicated while the fetch is in
   }
 });
 
+test("the song title is read with the lenient parser StreamABC radios need (#536)", async () => {
+  clearNowPlayingSnapshotCache();
+  const { fetcher } = createFakeFetcher();
+  let options = null;
+  setNowPlayingFetchImplementationForTests((url, init) => { options = init; return fetcher(url, init); });
+  try {
+    const snapshot = await fetchStreamSnapshot("https://liferadio.example.test/live");
+    assert.equal(snapshot.displayTitle, "Artist - Song");
+    assert.equal(options?.lenientHttpParser, true);
+  } finally {
+    setNowPlayingFetchImplementationForTests(null);
+    clearNowPlayingSnapshotCache();
+  }
+});
+
 test("a failed provider answer is cached briefly and never mutates into a track", async () => {
   clearNowPlayingSnapshotCache();
   const { fetcher, calls } = createFakeFetcher({ fail: true });

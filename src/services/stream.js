@@ -26,6 +26,7 @@ async function createResource(url, volume, qualityPreset, botName, bitrateOverri
   const streamResponse = await safeFetch(url, {
     method: "GET",
     redirect: "follow",
+    lenientHttpParser: true, // radio servers, #536
     headers: { "User-Agent": "OmniFM/3.0" },
     timeoutMs: 10_000,
   });

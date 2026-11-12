@@ -440,6 +440,7 @@ async function fetchStreamSnapshotUncached(url, { allowRecognition = true } = {}
         "User-Agent": "OmniFM/3.0"
       },
       redirect: "follow",
+      lenientHttpParser: true, // radio servers, #536
       signal: AbortSignal.timeout(NOW_PLAYING_FETCH_TIMEOUT_MS),
       timeoutMs: NOW_PLAYING_FETCH_TIMEOUT_MS,
     });
