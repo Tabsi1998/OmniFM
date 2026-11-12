@@ -19,8 +19,8 @@ entstehen daraus nicht.
 Nutzungsrechte vergibt ausschließlich IT-Tabelander (Fabian Tabelander); Anfragen über
 https://github.com/Tabsi1998.
 
-Diese Datei regelt nur das Repository selbst. Die Premium-Lizenzen, die OmniFM für Discord-Server verkauft, sind
-etwas anderes und richten sich nach den Bedingungen auf https://omnifm.xyz.
+Diese Datei regelt nur das Repository selbst. Für die Nutzung des Dienstes OmniFM und seiner Premium-Pläne gelten
+davon getrennt die jeweiligen Nutzungsbedingungen auf https://omnifm.xyz.
 
 Ausgenommen sind:
 
@@ -39,6 +39,7 @@ prior written permission you may not use, copy, modify, distribute, host, publis
 repository, nor use it for text and data mining such as training AI models (reservation under § 42h of the
 Austrian Copyright Act and Art. 4(3) of Directive (EU) 2019/790). Public visibility on GitHub only allows viewing
 and forking on GitHub under GitHub's Terms of Service and grants no further rights. This file covers the
-repository only; the premium licences OmniFM sells for Discord servers follow the terms on https://omnifm.xyz.
+repository only; using the OmniFM service and its premium plans is governed separately by the terms on
+https://omnifm.xyz.
 Third-party components keep their own licences (fonts: SIL Open Font License; packages installed via npm or pip).
 Names, trademarks, logos and streams of third parties belong to their owners and are not licensed here.
