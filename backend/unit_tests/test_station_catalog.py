@@ -79,3 +79,41 @@ def test_the_reggae_country_follows_only_together_with_its_url():
 
     own = {**reggae, "url": "https://my.reggae/stream"}
     assert server.catalog_updates_for(own, {"genre": "Reggae & Dancehall"}) == {}
+
+
+class _FakeStations:
+    """A tiny stand-in for the MongoDB collection fill_station_catalog_fields uses."""
+
+    def __init__(self, docs):
+        self.docs = [dict(doc, _id=index) for index, doc in enumerate(docs)]
+        self.operations = {}
+
+    def find(self, query):
+        keys = set(query["key"]["$in"])
+        return [dict(doc) for doc in self.docs if doc["key"] in keys]
+
+    def update_one(self, selector, operation):
+        self.operations[selector["_id"]] = operation
+
+
+def test_the_start_migrates_sanitized_and_raw_keys_alike(monkeypatch):
+    from backend.services import catalog
+
+    stations = _FakeStations([
+        {"key": "proedm02", "url": "http://streams.bigfm.de/nitrox-128-mp3", "genre": "EDM & Festival"},  # written by Node
+        {"key": "pro_edm_08", "url": "http://streams.bigfm.de/bigfm-dance-128-mp3", "genre": "EDM & Festival"},  # written by FastAPI
+        {"key": "groovesalad", "url": "https://ice4.somafm.com/groovesalad-128-mp3", "genre": "Ambient", "logo": "https://api.somafm.com/x.png"},
+    ])
+    seed = {"stations": {
+        "pro_edm_02": {"genre": "EDM & Festival"},
+        "pro_edm_08": {"genre": "EDM & Festival"},
+        "groovesalad": {"genre": "Ambient"},
+    }}
+    monkeypatch.setattr(catalog.core, "db", type("Db", (), {"stations": stations})())
+    monkeypatch.setattr(catalog.core, "load_stations_from_file", lambda: seed)
+
+    assert catalog.fill_station_catalog_fields() == 3
+    assert stations.operations[0]["$set"]["url"] == "https://streams.bigfm.de/nitrox-128-mp3"
+    assert stations.operations[1]["$set"]["url"] == "https://streams.bigfm.de/bigfm-dance-128-mp3"
+    assert stations.operations[2]["$set"]["name"] == "Chillout Lounge"
+    assert stations.operations[2]["$unset"] == {"logo": ""}

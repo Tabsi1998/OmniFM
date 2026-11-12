@@ -255,9 +255,13 @@ def fill_station_catalog_fields():
         return 0
     try:
         file_stations = (core.load_stations_from_file() or {}).get("stations", {})
+        # The Node side stores sanitized keys ("proedm02"), this API the raw ones
+        # ("pro_edm_02"): find both, match the seed entry by the sanitized key.
+        by_key = {_sanitized_key(key): station for key, station in file_stations.items()}
+        wanted = sorted(set(file_stations) | set(by_key))
         changed = 0
-        for doc in core.db.stations.find({"key": {"$in": list(file_stations.keys())}}):
-            updates = catalog_updates_for(doc, file_stations.get(doc.get("key")) or {})
+        for doc in core.db.stations.find({"key": {"$in": wanted}}):
+            updates = catalog_updates_for(doc, by_key.get(_sanitized_key(doc.get("key"))) or {})
             unsets = catalog_unsets_for(doc)
             if updates or unsets:
                 updates["updated_at"] = datetime.now(timezone.utc).isoformat()
