@@ -30,7 +30,6 @@
     "test": "vitest run"
   },
   "overrides": {
-    "compression": "^1.8.2",
-    "zod": "^4.6.6"
+    "compression": "^1.8.2"
   }
 }

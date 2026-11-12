@@ -9,8 +9,13 @@
   "line-endings": [],
   "live-smoke": [],
   "node-contract-suite": [],
-  "npm-audit": [],
-  "osv": [],
+  "npm-audit": [
+    "frontend: @discord/embedded-app-sdk (high)",
+    "frontend: zod (high)"
+  ],
+  "osv": [
+    "frontend/package-lock.json: zod 3.25.76 GHSA-mrhx-c7xc-m3w5"
+  ],
   "semgrep": [
     "backend/routers/admin_stations.py: ssrf-requests: lambda: requests.get(url, stream=True, timeout=6, headers={\"Range\": \"bytes=0-2047\", \"User-Agent\": \"OmniFM-StreamTest/1.0\", \"Icy-MetaData\": \"",
     "backend/routers/dashboard.py: ssrf-requests: resp = requests.get( f\"https://discord.com/api/v10/guilds/{guild.get('id')}/emojis\", headers={\"Authorization\": f\"Bot {bot_token}\"}, timeout=",
