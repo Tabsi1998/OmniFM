@@ -20,27 +20,40 @@ const DOMAIN = `(?:^|[\\s(\\[/|"'])[a-z0-9][a-z0-9-]*(?:\\.[a-z0-9-]+)*\\.${TLD}
 const LETTER = "a-zäöüß";
 // Words only adverts use, anywhere in the title.
 const AD_WORDS = `(?:^|[^${LETTER}])(?:werbespot|werbepause|werbeblock|dauerwerbesendung|verbraucherinfo[${LETTER}]*)(?![${LETTER}])`;
-// Words a song title may carry too: only when they are the whole artist or title.
+// Words a song may carry too ("Commercial Break - Remastered"): they mark a
+// spot only as a whole artist or title field, and in a combined
+// "artist - title" only as its first or last part.
 const DASH = "\\s(?:-|–)\\s";
-const AD_LABELS = `(?:^|${DASH})\\s*(?:werbung|advertisement|commercial break)\\s*(?:$|${DASH})`;
-const WORDS = `${AD_WORDS}|${AD_LABELS}`;
+const LABEL = "(?:werbung|advertisement|commercial break)";
+const LABEL_OUTER = `^\\s*${LABEL}\\s*(?:$|${DASH})|${DASH}\\s*${LABEL}\\s*$`;
+const LABEL_EXACT = `^\\s*${LABEL}\\s*$`;
 
-/** Case-insensitive; usable in MongoDB queries: `{ displayTitle: { $not: ADVERT_TITLE_REGEX } }`. */
-export const ADVERT_TITLE_REGEX = new RegExp(`${LINK}|${DOMAIN}|${WORDS}`, "i");
+/**
+ * For a combined title (display or stream title). Case-insensitive; usable
+ * in MongoDB queries: `{ displayTitle: { $not: ADVERT_TITLE_REGEX } }`.
+ */
+export const ADVERT_TITLE_REGEX = new RegExp(`${LINK}|${DOMAIN}|${AD_WORDS}|${LABEL_OUTER}`, "i");
+/** For a single artist or title field. */
+export const ADVERT_FIELD_REGEX = new RegExp(`${LINK}|${DOMAIN}|${AD_WORDS}|${LABEL_EXACT}`, "i");
 
 function textOf(value) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
 }
 
+function matches(regex, value) {
+  const text = textOf(value);
+  return Boolean(text) && regex.test(text);
+}
+
 /**
- * True when a now-playing title is an advert, not a song.
+ * True when a now-playing title is an advert, not a song. A string is read
+ * as a combined title.
  * @param {{ artist?: string, title?: string, displayTitle?: string, streamTitle?: string } | string} song
  */
 export function isAdvertTitle(song) {
-  const parts = typeof song === "string"
-    ? [song]
-    : [song?.artist, song?.title, song?.displayTitle, song?.streamTitle];
-  return parts.map(textOf).filter(Boolean).some((text) => ADVERT_TITLE_REGEX.test(text));
+  if (typeof song === "string") return matches(ADVERT_TITLE_REGEX, song);
+  return matches(ADVERT_FIELD_REGEX, song?.artist) || matches(ADVERT_FIELD_REGEX, song?.title)
+    || matches(ADVERT_TITLE_REGEX, song?.displayTitle) || matches(ADVERT_TITLE_REGEX, song?.streamTitle);
 }
 
 /** A MongoDB filter on `displayTitle` that leaves adverts out (plays counted before #548). */
@@ -48,7 +61,12 @@ export const NOT_ADVERT_FILTER = Object.freeze({ displayTitle: { $not: ADVERT_TI
 
 /** The same for the song history, whose entries keep every title field. */
 export const NOT_ADVERT_HISTORY_FILTER = Object.freeze({
-  $nor: ["displayTitle", "streamTitle", "artist", "title"].map((field) => ({ [field]: ADVERT_TITLE_REGEX })),
+  $nor: [
+    { displayTitle: ADVERT_TITLE_REGEX },
+    { streamTitle: ADVERT_TITLE_REGEX },
+    { artist: ADVERT_FIELD_REGEX },
+    { title: ADVERT_FIELD_REGEX },
+  ],
 });
 
 /**

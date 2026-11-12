@@ -21,6 +21,8 @@ const ADVERTS = [
   "www.mazda.at - Ein bisschen Verbraucherinformationen ...",
   { artist: "mazda.at", title: "Jetzt Probe fahren" },
   { artist: "XXXLutz", title: "Mehr unter lutz.at/angebote" },
+  { artist: "Werbung", title: "Möbel Ludwig" },
+  { artist: "Radio Tirol", title: "Advertisement" },
   "Hofer - https://www.hofer.at",
   "Werbung",
   "Radio Tirol - Werbepause",
@@ -55,6 +57,8 @@ const SONGS = [
   "Pharrell Williams - Happy (From Despicable Me 2)",
   { artist: "R.E.M.", title: "Losing My Religion" },
   { artist: "Will Smith", title: "Men In Black" },
+  { artist: "Band", title: "Commercial Break - Remastered", displayTitle: "Band - Commercial Break - Remastered" },
+  { artist: "Band", title: "Werbung - Live", streamTitle: "Band - Werbung - Live" },
 ];
 
 test("the adverts of week 45 and their kind are recognised", () => {
