@@ -8,6 +8,7 @@
 // the year review counts it for the last time.
 import { getDb, isConnected } from "./lib/db.js";
 import { log } from "./lib/logging.js";
+import { NOT_ADVERT_FILTER, isAdvertTitle } from "./lib/advert-titles.js";
 
 export const SONG_PLAYS_COLLECTION = "song_plays";
 const RETENTION_SECONDS = 45 * 24 * 60 * 60;
@@ -83,6 +84,8 @@ export async function recordSongPlay(guildId, song = {}, { now = new Date() } = 
   const gid = sanitizeGuildId(guildId);
   const trackKey = songPlayKey(song);
   const plays = collection();
+  // #548: an ad break's spot is no song.
+  if (gid && trackKey && isAdvertTitle(song)) return { ok: false, reason: "advert" };
   if (!gid || !trackKey || !plays) return { ok: false };
   const displayTitle = cleanText(song.displayTitle, 220)
     || [cleanText(song.artist, 120), cleanText(song.title, 160)].filter(Boolean).join(" - ");
@@ -116,7 +119,8 @@ export async function getTopSongPlays(guildId, { sinceMs, untilMs = Date.now(), 
   if (!gid || !plays) return [];
   try {
     const rows = await plays.aggregate([
-      { $match: { guildId: gid, day: { $gte: songPlayDay(sinceMs), $lt: new Date(untilMs) } } },
+      // #548: adverts counted before are left out before the list is cut.
+      { $match: { guildId: gid, day: { $gte: songPlayDay(sinceMs), $lt: new Date(untilMs) }, ...NOT_ADVERT_FILTER } },
       { $group: { _id: "$trackKey", count: { $sum: "$count" }, displayTitle: { $last: "$displayTitle" } } },
       { $sort: { count: -1, displayTitle: 1 } },
       { $limit: Math.max(1, Math.min(20, Number(limit) || 5)) },

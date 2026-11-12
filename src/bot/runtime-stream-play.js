@@ -3,6 +3,7 @@
 import { log } from "../lib/logging.js";
 import { createResource } from "../services/stream.js";
 import { fetchStreamInfo } from "../services/now-playing.js";
+import { nowPlayingTrackFields } from "./now-playing/track-fields.js";
 import { normalizeFailoverChain, buildFailoverCandidateChain } from "../lib/failover-chain.js";
 import {
   clearActiveFailover,
@@ -142,11 +143,8 @@ export async function playRuntimeStation(runtime, state, stations, key, guildId,
     .then((meta) => {
       if (state.currentStationKey === key) {
         const prevMeta = state.currentMeta || {};
-        const artist = runtime.normalizeNowPlayingValue(meta.artist, station, meta, 120);
-        const title = runtime.normalizeNowPlayingValue(meta.title, station, meta, 120);
-        const streamTitle = runtime.normalizeNowPlayingValue(meta.streamTitle, station, meta, 180);
-        const displayTitle = runtime.normalizeNowPlayingValue(meta.displayTitle || meta.streamTitle, station, meta, 180)
-          || ([artist, title].filter(Boolean).join(" - ") || null);
+        // #548: an ad break's spot is no song.
+        const { artist, title, streamTitle, displayTitle } = nowPlayingTrackFields(runtime, station, meta);
         const hasTrack = Boolean(displayTitle || artist || title);
         state.currentMeta = {
           ...prevMeta,

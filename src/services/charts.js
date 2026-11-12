@@ -16,6 +16,7 @@ import { coverLookup } from "../lib/owner-public.js";
 import { CHART_MIN_SERVERS, CHART_SIZE, STATION_CHART_SIZE, chartWeek, rankChart, rankStations, splitDisplayTitle } from "../lib/charts.js";
 import { getPublicStationEntries } from "../lib/public-stations.js";
 import { SONG_PLAYS_COLLECTION } from "../song-plays-store.js";
+import { NOT_ADVERT_FILTER } from "../lib/advert-titles.js";
 import { loadStations } from "../stations-store.js";
 import { WEBSITE_URL, withLanguageParam } from "../bot/runtime-links.js";
 import * as ui from "../discord/ui/index.js";
@@ -31,7 +32,8 @@ let cached = null;
 
 async function weekRows(db, week) {
   return db.collection(SONG_PLAYS_COLLECTION).aggregate([
-    { $match: { day: { $gte: new Date(week.start), $lt: new Date(week.end) } } },
+    // #548: adverts counted before never take a place.
+    { $match: { day: { $gte: new Date(week.start), $lt: new Date(week.end) }, ...NOT_ADVERT_FILTER } },
     { $sort: { lastPlayedAt: 1 } },
     {
       $group: {

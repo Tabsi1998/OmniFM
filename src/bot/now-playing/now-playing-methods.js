@@ -16,6 +16,7 @@ import {
   getNowPlayingCandidateIds,
 } from "../../lib/now-playing-target.js";
 import { recordSongPlay } from "../../song-plays-store.js";
+import { nowPlayingTrackFields } from "./track-fields.js";
 import {
   clipText,
   applyJitter,
@@ -507,11 +508,8 @@ const nowPlayingMethods = {
       if (state.currentStationKey !== stationKey) return;
 
       const previousMeta = state.currentMeta || {};
-      const artist = this.normalizeNowPlayingValue(snapshot.artist, station, snapshot, 120);
-      const title = this.normalizeNowPlayingValue(snapshot.title, station, snapshot, 120);
-      const streamTitle = this.normalizeNowPlayingValue(snapshot.streamTitle, station, snapshot, 180);
-      const displayTitle = this.normalizeNowPlayingValue(snapshot.displayTitle || snapshot.streamTitle, station, snapshot, 180)
-        || ([artist, title].filter(Boolean).join(" - ") || null);
+      // #548: during an ad break the spot is no song; the panel keeps the station.
+      const { artist, title, streamTitle, displayTitle } = nowPlayingTrackFields(this, station, snapshot);
       const hasFreshTrack = Boolean(displayTitle || artist || title);
       const keepPreviousTrack = !hasFreshTrack && this.isFreshNowPlayingTrack(previousMeta);
       const sameTrackAsPrevious = Boolean(

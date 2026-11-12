@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { NOT_ADVERT_HISTORY_FILTER, isAdvertTitle } from "./lib/advert-titles.js";
 import { getDb, isConnected } from "./lib/db.js";
 import { log } from "./lib/logging.js";
 import path from "node:path";
@@ -189,7 +190,7 @@ function queueMongo(task) {
 function warmGuild(gid) {
   if (warming.has(gid) || recentByGuild.has(gid) || !isConnected()) return;
   warming.add(gid);
-  getDb().collection(COLLECTION).find({ guildId: gid }, { projection: { _id: 0 } }).sort({ timestampMs: -1 }).limit(DEFAULT_MAX_PER_GUILD).toArray()
+  getDb().collection(COLLECTION).find({ guildId: gid, ...NOT_ADVERT_HISTORY_FILTER }, { projection: { _id: 0 } }).sort({ timestampMs: -1 }).limit(DEFAULT_MAX_PER_GUILD).toArray()
     .then((rows) => { if (!recentByGuild.has(gid)) recentByGuild.set(gid, rows.reverse()); })
     .catch(() => null)
     .finally(() => warming.delete(gid));
@@ -202,7 +203,8 @@ export async function readSongHistory(guildId, options = {}) {
   if (!mongoActive || !isConnected()) return getSongHistory(gid, options);
   const limitRaw = Number.parseInt(String(options.limit ?? DEFAULT_LIMIT), 10);
   const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(MAX_LIMIT, limitRaw)) : DEFAULT_LIMIT;
-  return getDb().collection(COLLECTION).find({ guildId: gid }, { projection: { _id: 0 } }).sort({ timestampMs: -1 }).limit(limit).toArray();
+  // #548: adverts saved before are left out before the list is cut.
+  return getDb().collection(COLLECTION).find({ guildId: gid, ...NOT_ADVERT_HISTORY_FILTER }, { projection: { _id: 0 } }).sort({ timestampMs: -1 }).limit(limit).toArray();
 }
 
 /** MongoDB becomes the store; the songs of the history files are copied once. */
@@ -263,6 +265,8 @@ export function appendSongHistory(guildId, track, options = {}) {
 
   const baseTitle = normalizeText(track?.displayTitle || track?.streamTitle, 220);
   if (!baseTitle) return { saved: false, reason: "empty-track" };
+  // #548: an ad break's spot is no song of the history.
+  if (isAdvertTitle(track)) return { saved: false, reason: "advert" };
 
   const maxPerGuildRaw = Number.parseInt(String(options.maxPerGuild ?? DEFAULT_MAX_PER_GUILD), 10);
   const maxPerGuild = Number.isFinite(maxPerGuildRaw)
@@ -343,14 +347,15 @@ export function getSongHistory(guildId, options = {}) {
   if (mongoActive) {
     // This process's memory; after a restart it is filled from MongoDB in the background.
     if (!recentByGuild.has(gid)) warmGuild(gid);
-    return (recentByGuild.get(gid) || []).slice(-limit).reverse().map((entry) => ({ ...entry }));
+    return (recentByGuild.get(gid) || []).filter((entry) => !isAdvertTitle(entry)).slice(-limit).reverse().map((entry) => ({ ...entry }));
   }
 
   const state = SPLIT_HISTORY_STORAGE_ENABLED
     ? readSplitGuildState(gid)
     : ensureState();
   const entries = Array.isArray(state.guilds[gid]) ? state.guilds[gid] : [];
-  return entries.slice(-limit).reverse().map((entry) => ({ ...entry }));
+  // #548: adverts saved before never show.
+  return entries.filter((entry) => !isAdvertTitle(entry)).slice(-limit).reverse().map((entry) => ({ ...entry }));
 }
 
 export function clearSongHistory(guildId) {

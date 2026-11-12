@@ -8,6 +8,8 @@
 // week is a calendar week, Monday to Monday in UTC: the days the song plays
 // are counted in.
 
+import { isAdvertTitle } from "./advert-titles.js";
+
 export const CHART_MIN_SERVERS = 3;
 export const CHART_SIZE = 20;
 const DAY_MS = 86_400_000;
@@ -43,6 +45,8 @@ export function chartWeek(now = Date.now(), weeksBack = 1) {
 function ranked(rows, { minServers, size }) {
   return rows
     .filter((row) => Number(row?.servers) >= minServers && Number(row?.plays) > 0 && String(row?.displayTitle || "").trim())
+    // #548: an advert never enters the charts, not even from plays counted before.
+    .filter((row) => !isAdvertTitle(row.displayTitle))
     .sort((a, b) => b.plays - a.plays || b.servers - a.servers || String(a.displayTitle).localeCompare(String(b.displayTitle)))
     .slice(0, size);
 }
