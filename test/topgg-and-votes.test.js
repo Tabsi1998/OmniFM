@@ -1,9 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import path from "node:path";
 import crypto from "node:crypto";
-import { fileURLToPath } from "node:url";
 
 import {
   buildTopGGCommandsPayload,
@@ -16,10 +14,12 @@ import {
   syncTopGGVotes,
 } from "../src/services/topgg.js";
 import { getVoteEventsState } from "../src/vote-events-store.js";
+import { resolveRuntimeDataPath } from "../src/lib/runtime-data-path.js";
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const topGGStatePath = path.join(repoRoot, "topgg.json");
-const voteEventsPath = path.join(repoRoot, "vote-events.json");
+// Where the stores write: the runtime data directory, which the unit runner
+// gives every test file of its own (#553).
+const topGGStatePath = resolveRuntimeDataPath("topgg.json");
+const voteEventsPath = resolveRuntimeDataPath("vote-events.json");
 
 function restoreEnvSnapshot(snapshot) {
   for (const [key, value] of Object.entries(snapshot)) {

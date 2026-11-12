@@ -70,6 +70,7 @@ import {
   shouldLogRecognitionFailure,
 } from "../src/services/audio-recognition.js";
 import { getDefaultLanguage } from "../src/i18n.js";
+import { resolveRuntimeDataPath } from "../src/lib/runtime-data-path.js";
 import {
   getBotState,
   getBotGuildVolume,
@@ -180,11 +181,11 @@ test("remote slash controls acknowledge Discord before refreshing worker state",
 });
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const botStatePath = path.join(repoRoot, "bot-state.json");
+const botStatePath = resolveRuntimeDataPath("bot-state.json");
 const botStateBackupPath = `${botStatePath}.bak`;
-const runtimeIncidentsPath = path.join(repoRoot, "runtime-incidents.json");
+const runtimeIncidentsPath = resolveRuntimeDataPath("runtime-incidents.json");
 const runtimeIncidentsBackupPath = `${runtimeIncidentsPath}.bak`;
-const scheduledEventsPath = path.join(repoRoot, "scheduled-events.json");
+const scheduledEventsPath = resolveRuntimeDataPath("scheduled-events.json");
 
 function snapshotOptionalTextFile(filePath) {
   return fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf8") : null;
@@ -297,7 +298,7 @@ test("logging isolates test runs into logs/test by default", async () => {
     const logging = await importFreshLoggingModule();
     assert.equal(
       path.normalize(logging.logsDir),
-      path.normalize(path.join(repoRoot, "logs", "test"))
+      path.normalize(resolveRuntimeDataPath("logs/test"))
     );
   } finally {
     restoreEnv();

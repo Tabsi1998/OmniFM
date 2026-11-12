@@ -1,8 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolveRuntimeDataPath } from "../src/lib/runtime-data-path.js";
 
 import { buildCustomStationReference } from "../src/custom-stations.js";
 import { normalizeScheduledEventInput } from "../src/scheduled-events-store.js";
@@ -21,8 +20,8 @@ import {
   syncDiscordBotListStats,
 } from "../src/services/discordbotlist.js";
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const botsGGStatePath = path.join(repoRoot, "botsgg.json");
+// The runtime data directory, which the unit runner gives every test file of its own (#553).
+const botsGGStatePath = resolveRuntimeDataPath("botsgg.json");
 
 test("scheduled events keep custom station references intact", () => {
   const customStationKey = buildCustomStationReference("nightshift");

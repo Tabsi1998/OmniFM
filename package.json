@@ -31,7 +31,7 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p tsconfig.json",
     "test:voice-codec": "node scripts/check-voice-codec.mjs",
-    "test:unit": "node --test --test-concurrency=1 test/*.test.js"
+    "test:unit": "node scripts/run-unit-tests.mjs"
   },
   "dependencies": {
     "@discordjs/opus": "^0.11.0",
