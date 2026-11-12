@@ -11,11 +11,14 @@ This skill is the checklist for doing it right the first time.
 
 ## 1. Every Discord message goes through `src/discord/ui/`
 
-- The top level of a message is always `ui.panel`, `ui.notice`, `ui.list` or
-  `ui.confirm` (`src/discord/ui/builders.js`): only they add the brand line
-  with the version that `docs/discord-design.md` requires. Inside them use
-  `ui.section`, `ui.text`, `ui.field`, `ui.statusLine`, `ui.separator`.
-  Never hand-build embeds or raw components.
+- The top level of a message is `ui.panel`, `ui.notice`, `ui.confirm`, or
+  the `.container` that `ui.list(...)` returns (it returns
+  `{ container, page, pages }`) (`src/discord/ui/builders.js`): they add the
+  brand line with the version that `docs/discord-design.md` requires. A raw
+  `ui.container({ blocks })` does not; if you need it, add
+  `ui.brandLine(...)` yourself. Inside use `ui.section`, `ui.text`,
+  `ui.field`, `ui.statusLine`, `ui.separator`. Never hand-build embeds or raw
+  components.
 - Send with `ui.reply(...)` (private, the default answer to a command) or
   `ui.message(...)` (public panels only).
 - Components V2 messages cannot become embeds again: buttons on them answer
@@ -65,10 +68,11 @@ This skill is the checklist for doing it right the first time.
 
 - Every request to a user- or catalog-supplied URL goes through `safeFetch`
   (`src/lib/safe-outbound-http.js`): SSRF check and DNS pinning on every hop,
-  redirect limit, credentials stripped on origin change. Plain `fetch` only
-  where the host is fixed and checked first (Discord CDN attachments in
-  `src/bot/runtime-methods/forms.js`, a validated Discord webhook URL for
-  operator alerts); anything a user or the catalog supplies uses `safeFetch`.
+  redirect limit, credentials stripped on origin change. Operator webhooks
+  (`src/services/operator-webhook.js`) use `safeFetch` too, after checking the
+  URL is a Discord webhook. The one plain `fetch` on a URL from outside is the
+  Discord CDN attachment download in `src/bot/runtime-methods/forms.js`, after
+  checking the host; do not add more.
 - `lenientHttpParser: true` **only** for radio streams (some servers end the
   status line with a bare LF, StreamABC, #536). `test/stream-fetch-parser.test.js`
   checks the files in its `STREAM_FETCHERS` list: **a new file that opens
@@ -83,9 +87,13 @@ This skill is the checklist for doing it right the first time.
 ## 5. Stations
 
 - `stations.json` is only the seed. The live catalog is the MongoDB
-  collection `stations`. A change to an existing catalog station reaches live
-  servers through `STATION_CATALOG_MIGRATIONS` in `src/stations-store.js`
-  (writes only where the old URL is still stored, so operator edits stay).
+  collection `stations`; without MongoDB the bot falls back to
+  `runtime-data/stations.json`. A change to an existing catalog station needs
+  an entry in `STATION_CATALOG_MIGRATIONS` (`src/stations-store.js`); check
+  that both paths apply it, MongoDB (`applyStationCatalogMigrations`) and the
+  file fallback (`migrateStationsFileCatalog`, which applies the same list
+  since #549). Both write only where the old URL is still stored, so operator
+  edits stay.
 - Keys never change: favourites and server settings reference them.
 - Prefer https, the highest bitrate the station offers (OmniFM transcodes per
   plan), and URLs without tokens or tracking tails.
