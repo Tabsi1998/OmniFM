@@ -46,12 +46,12 @@ describe('the dashboard preview', () => {
     await openPreview();
     expect(screen.getByTestId('guild-active-tier').textContent).toContain('Ultimate');
     const overview = screen.getByTestId('guild-dashboard').textContent;
-    for (const station of ['LoFi Beats', 'Groove Salad', 'Melodic Techno']) expect(overview).toContain(station);
+    for (const station of ['LoFi Beats', 'Chillout Lounge', 'Melodic Techno']) expect(overview).toContain(station);
     await screen.findByTestId('guild-live-view');
 
     await openArea('stations');
     expect(screen.getByText('Café Beats')).toBeTruthy();
-    expect(screen.getByTestId('guild-preset-stations').textContent).toContain('Groove Salad');
+    expect(screen.getByTestId('guild-preset-stations').textContent).toContain('Chillout Lounge');
 
     await openArea('events');
     expect(await screen.findByText('Lofi Night')).toBeTruthy();
