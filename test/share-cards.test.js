@@ -96,7 +96,7 @@ test("a station link carries title, text, colour and card, then sends people to 
   assert.equal(res.status, 200);
   assert.match(res.headers["Content-Type"], /text\/html/);
   const html = res.body;
-  assert.match(html, /<meta property="og:title" content="Groove Salad – 24\/7 in Discord">/);
+  assert.match(html, /<meta property="og:title" content="Chillout Lounge – 24\/7 in Discord">/);
   assert.match(html, /<meta property="og:image" content="https:\/\/omnifm\.xyz\/api\/share\/station\/groovesalad\.png\?lang=de">/);
   assert.match(html, new RegExp(`<meta name="theme-color" content="${catalog.groovesalad.color}">`));
   assert.match(html, /http-equiv="refresh" content="0; url=https:\/\/omnifm\.xyz\/stations\?station=groovesalad"/);

@@ -19,10 +19,10 @@ export const DEMO_TIME_ZONE = 'Europe/Vienna';
 /** Real stations of the catalogue (stations.json): key, name, genre. */
 export const DEMO_STATIONS = Object.freeze({
   free: [
-    ['groovesalad', 'Groove Salad', 'Ambient'], ['dronezone', 'Drone Zone', 'Ambient'], ['deepspaceone', 'Deep Space One', 'Ambient'],
-    ['spacestation', 'Space Station', 'Electronic'], ['beatblender', 'Beat Blender', 'Electronic'], ['poptron', 'PopTron', 'Indie & Alternative'],
-    ['u80s', 'Underground 80s', '80s & Synthpop'], ['metal', 'Metal Detector', 'Metal'], ['lush', 'Lush', 'Electronic'],
-    ['thetrip', 'The Trip', 'Electronic'], ['classicalradio', 'Classical Radio', 'Classical'], ['bluesradio', 'Blues Radio', 'Blues'],
+    ['groovesalad', 'Chillout Lounge', 'Ambient'], ['dronezone', 'Ambient Sleeping Pill', 'Ambient'], ['deepspaceone', 'Sleep & Meditation', 'Ambient'],
+    ['spacestation', 'Spacesynth', 'Electronic'], ['beatblender', 'Soft House Lounge', 'Electronic'], ['poptron', 'Synthwave', 'Electronic'],
+    ['u80s', '80s Wave', '80s & Synthpop'], ['metal', 'Metal Only', 'Metal'], ['lush', 'Vocal Chillout', 'Electronic'],
+    ['thetrip', 'Trance Journey', 'Electronic'], ['classicalradio', 'Classical Radio', 'Classical'], ['bluesradio', 'Blues Radio', 'Blues'],
     ['jazzradio', 'Jazz Radio', 'Jazz'], ['reggaeradio', 'Reggae Radio', 'Reggae & Dancehall'], ['chartsradio', 'Charts Radio', 'Pop & Charts'],
     ['technoradio', 'Dance Radio', 'EDM & Festival'], ['rockradio', 'Rock Radio', 'Rock'], ['chilloutradio', 'Chillout Radio', 'Chillout'],
     ['hiphopradio', 'Hip Hop Radio', 'Hip Hop & Rap'], ['loungebot', 'Lounge Radio', 'Lounge'],
@@ -124,7 +124,7 @@ const SERVERS = {
     streams: [{ bot: 1, voice: 0, station: 'groovesalad', listeners: 3, volume: 50, uptimeMin: 45 }],
     history: { 1: [[45, 0, 'playing', 'groovesalad']] },
     events: [
-      { id: 'demo-study-night', title: 'Study Night', station: 'groovesalad', voice: 0, text: 0, repeat: 'weekly', weekday: 1, hour: 19, minutes: 120, announce: '📚 Study Night: Groove Salad in the study room.' },
+      { id: 'demo-study-night', title: 'Study Night', station: 'groovesalad', voice: 0, text: 0, repeat: 'weekly', weekday: 1, hour: 19, minutes: 120, announce: '📚 Study Night: Chillout Lounge in the study room.' },
     ],
     custom: [],
     stored: { favoriteStations: ['groovesalad', 'jazzradio'], timeZone: DEMO_TIME_ZONE },

@@ -55,9 +55,9 @@ test("genre and search narrow the list", () => {
   const entries = buildBrowserEntries({ stations: catalog, guildTier: "pro" });
   const techno = filterBrowserEntries(entries, { genre: "Techno" });
   assert.ok(techno.length >= 10 && techno.every((entry) => entry.genre === "Techno"));
-  const groove = filterBrowserEntries(entries, { query: "GROOVE" });
+  const groove = filterBrowserEntries(entries, { query: "CHILLOUT LOUNGE" });
   assert.ok(groove.some((entry) => entry.key === "groovesalad"));
-  assert.ok(groove.every((entry) => /groove/i.test(entry.name)), "case does not matter");
+  assert.ok(groove.every((entry) => /chillout lounge/i.test(entry.name)), "case does not matter");
   assert.ok(filterBrowserEntries(entries, { query: "lounge" }).length >= 2, "the genre matches too");
 });
 
@@ -161,10 +161,10 @@ test("choosing a genre, searching and closing all happen in the same message", a
 
   const submit = interaction(runtime, `${STATIONS_COMPONENT_PREFIX}searchform:${session.id}`, {
     isModalSubmit: () => true,
-    fields: { getTextInputValue: () => "drone" },
+    fields: { getTextInputValue: () => "sleeping" },
   });
   await handleRuntimePanelInteraction(runtime, submit);
-  assert.match(texts(tree(submit.calls[0][1])).join("\n"), /Drone Zone/);
+  assert.match(texts(tree(submit.calls[0][1])).join("\n"), /Ambient Sleeping Pill/);
 
   const close = interaction(runtime, `${STATIONS_COMPONENT_PREFIX}close:${session.id}`);
   await handleRuntimePanelInteraction(runtime, close);
@@ -178,13 +178,13 @@ test("the search form's submit arrives through the real entry point", async () =
   const submit = interaction(runtime, `${STATIONS_COMPONENT_PREFIX}searchform:${session.id}`, {
     isButton: () => false,
     isModalSubmit: () => true,
-    fields: { getTextInputValue: () => "drone" },
+    fields: { getTextInputValue: () => "sleeping" },
   });
   // Before, handleComponentInteraction let only buttons and menus through,
   // so the submitted search never reached the browser.
   assert.equal(await runtime.handleComponentInteraction(submit), true);
   assert.equal(submit.calls[0][0], "update");
-  assert.match(texts(tree(submit.calls[0][1])).join("\n"), /Drone Zone/);
+  assert.match(texts(tree(submit.calls[0][1])).join("\n"), /Ambient Sleeping Pill/);
 });
 
 test("play without a voice channel opens the quick start as its own message", async () => {
