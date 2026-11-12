@@ -8,9 +8,12 @@
 // the year review counts it for the last time.
 import { getDb, isConnected } from "./lib/db.js";
 import { log } from "./lib/logging.js";
+import { isAdvertTitle } from "./lib/advert-titles.js";
 
 export const SONG_PLAYS_COLLECTION = "song_plays";
 const RETENTION_SECONDS = 45 * 24 * 60 * 60;
+/** Rows read per wanted row, so the adverts already stored can drop out of a full list (#548). */
+export const ADVERT_HEADROOM = 3;
 
 let indexesReady = null;
 
@@ -83,6 +86,8 @@ export async function recordSongPlay(guildId, song = {}, { now = new Date() } = 
   const gid = sanitizeGuildId(guildId);
   const trackKey = songPlayKey(song);
   const plays = collection();
+  // #548: an ad break's spot is no song.
+  if (gid && trackKey && isAdvertTitle(song)) return { ok: false, reason: "advert" };
   if (!gid || !trackKey || !plays) return { ok: false };
   const displayTitle = cleanText(song.displayTitle, 220)
     || [cleanText(song.artist, 120), cleanText(song.title, 160)].filter(Boolean).join(" - ");
@@ -119,9 +124,11 @@ export async function getTopSongPlays(guildId, { sinceMs, untilMs = Date.now(), 
       { $match: { guildId: gid, day: { $gte: songPlayDay(sinceMs), $lt: new Date(untilMs) } } },
       { $group: { _id: "$trackKey", count: { $sum: "$count" }, displayTitle: { $last: "$displayTitle" } } },
       { $sort: { count: -1, displayTitle: 1 } },
-      { $limit: Math.max(1, Math.min(20, Number(limit) || 5)) },
+      { $limit: Math.max(1, Math.min(20, Number(limit) || 5)) * ADVERT_HEADROOM },
     ]).toArray();
-    return rows.map((row) => ({ displayTitle: row.displayTitle || row._id, count: Number(row.count) || 0 }));
+    return rows.map((row) => ({ displayTitle: row.displayTitle || row._id, count: Number(row.count) || 0 }))
+      .filter((row) => !isAdvertTitle(row.displayTitle))
+      .slice(0, Math.max(1, Math.min(20, Number(limit) || 5)));
   } catch {
     return [];
   }
