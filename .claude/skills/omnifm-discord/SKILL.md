@@ -12,8 +12,9 @@ This skill is the checklist for doing it right the first time.
 ## 1. Every bot message goes through `src/discord/ui/`
 
 This covers every new or changed message the bot sends in channels and as
-interaction answers. Some older paths still build raw embeds (for example in
-`src/bot/commands/server-commands.js` and `src/bot/runtime-failback.js`):
+interaction answers. Some older paths still send hand-built embeds
+(`src/bot/commands/server-commands.js`) or plain text messages
+(`src/bot/runtime-failback.js`):
 when you touch one, move it to `src/discord/ui/`. Operator alerts posted to a
 webhook (`src/services/operator-webhook.js`) build their own embeds on purpose.
 
