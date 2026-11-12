@@ -5,6 +5,7 @@ import { isAdvertTitle } from "../src/lib/advert-titles.js";
 import { CHART_SIZE, chartWeek, rankChart } from "../src/lib/charts.js";
 import { buildYearReview } from "../src/lib/year-review.js";
 import { recordSongPlay } from "../src/song-plays-store.js";
+import { appendSongHistory } from "../src/song-history-store.js";
 import { weeklyChart } from "../src/services/charts.js";
 
 // #548: the charts of week 45 had two adverts on top. An ad break's spot is
@@ -41,6 +42,8 @@ const SONGS = [
   "Seiler und Speer - Ham kummst",
   "Wanda - Bologna",
   "Bewerbung - Kraftklub Cover",
+  "Prozzäk - www.nevergetoveryou",
+  "Pharrell Williams - Happy (From Despicable Me 2)",
   { artist: "R.E.M.", title: "Losing My Religion" },
   { artist: "Will Smith", title: "Men In Black" },
 ];
@@ -55,11 +58,11 @@ test("real songs, also with dots and signs, are no adverts", () => {
   assert.equal(isAdvertTitle({}), false);
 });
 
-test("an advert is not counted", async () => {
-  assert.deepEqual(
-    await recordSongPlay("123456789012345678", { displayTitle: "www.lutz.at - Ein bisschen Verbraucherinformationen ..." }),
-    { ok: false, reason: "advert" },
-  );
+test("an advert is neither counted nor kept in the song history", async () => {
+  const spot = { displayTitle: "www.lutz.at - Ein bisschen Verbraucherinformationen ..." };
+  assert.deepEqual(await recordSongPlay("123456789012345678", spot), { ok: false, reason: "advert" });
+  assert.deepEqual(appendSongHistory("123456789012345678", spot), { saved: false, reason: "advert" });
+  assert.deepEqual(appendSongHistory("123456789012345678", { streamTitle: "mazda.at - Jetzt Probe fahren" }), { saved: false, reason: "advert" });
 });
 
 test("the charts drop adverts counted before and stay full", () => {
@@ -98,8 +101,8 @@ test("MongoDB: adverts already stored neither show in the charts nor push songs 
   const servers = ["300000000000000001", "300000000000000002", "300000000000000003"];
   const row = (guildId, trackKey, displayTitle, count) => ({ guildId, day, trackKey, displayTitle, count, lastPlayedAt: day });
   await database.collection("song_plays").insertMany([
-    // More adverts than the chart has places, all played more than any song.
-    ...servers.flatMap((guildId) => Array.from({ length: CHART_SIZE + 5 }, (_, index) => row(guildId, `ad${index}`, `www.shop${index}.at - Angebot der Woche`, 500))),
+    // Far more adverts than the chart has places, all played more than any song.
+    ...servers.flatMap((guildId) => Array.from({ length: CHART_SIZE * 4 }, (_, index) => row(guildId, `ad${index}`, `www.shop${index}.at - Angebot der Woche`, 500))),
     ...servers.map((guildId) => row(guildId, "summer cem|killy manjaro", "SUMMER CEM & BILLA JOE - KILLY MANJARO", 171)),
     ...servers.map((guildId) => row(guildId, "wanda|bologna", "Wanda - Bologna", 20)),
   ]);
@@ -126,7 +129,7 @@ test("MongoDB: the weekly recap's top songs leave adverts out", async (t) => {
   const guildId = "123456789012345678";
   const day = new Date(Date.UTC(2026, 10, 3));
   await database.collection(songPlays.SONG_PLAYS_COLLECTION).insertMany([
-    ...Array.from({ length: 12 }, (_, index) => ({ guildId, day, trackKey: `ad${index}`, displayTitle: `www.shop${index}.at - Angebot`, count: 99, lastPlayedAt: day })),
+    ...Array.from({ length: 40 }, (_, index) => ({ guildId, day, trackKey: `ad${index}`, displayTitle: `www.shop${index}.at - Angebot`, count: 99, lastPlayedAt: day })),
     { guildId, day, trackKey: "wanda|bologna", displayTitle: "Wanda - Bologna", count: 4, lastPlayedAt: day },
   ]);
   const top = await songPlays.getTopSongPlays(guildId, { sinceMs: Date.UTC(2026, 10, 2), untilMs: Date.UTC(2026, 10, 9), limit: 5 });

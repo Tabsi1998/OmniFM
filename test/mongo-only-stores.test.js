@@ -289,6 +289,31 @@ test("song history: one document per song, /history reads MongoDB, duplicates st
   assert.equal(fs.existsSync(path.join(dataDir, "song-history.json")), false, "no song-history.json in production");
 });
 
+test("song history: adverts are never saved, and the ones saved before never show (#548)", { skip: !hasMongoConfig }, async (t) => {
+  const previousEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = "production";
+  const guildId = "923456789012345622";
+  const { connect, getDb } = await import("../src/lib/db.js");
+  await connect();
+  const songs = getDb().collection("song_history");
+  await songs.deleteMany({ guildId });
+  const history = await import("../src/song-history-store.js");
+  t.after(async () => {
+    await history.stopSongHistoryStore();
+    await songs.deleteMany({ guildId });
+    process.env.NODE_ENV = previousEnv;
+  });
+  await history.initSongHistoryStore();
+  const now = Date.now();
+  assert.equal(history.appendSongHistory(guildId, { displayTitle: "Wanda - Bologna", timestampMs: now - 60_000 }).saved, true);
+  assert.equal(history.appendSongHistory(guildId, { displayTitle: "www.lutz.at - Ein bisschen Verbraucherinformationen ...", timestampMs: now - 30_000 }).reason, "advert");
+  await history.stopSongHistoryStore();
+  // Spots saved before #548, newer than the song.
+  await songs.insertMany(Array.from({ length: 30 }, (_, index) => ({ guildId, displayTitle: `www.shop${index}.at - Angebot`, timestampMs: now + index })));
+  assert.deepEqual((await history.readSongHistory(guildId, { limit: 5 })).map((row) => row.displayTitle), ["Wanda - Bologna"]);
+  assert.deepEqual(history.getSongHistory(guildId, { limit: 5 }).map((row) => row.displayTitle), ["Wanda - Bologna"]);
+});
+
 // #292 acceptance: after every store above ran with production settings,
 // runtime-data holds only the two files this test put there itself.
 test("production wrote no store file at all", { skip: !hasMongoConfig }, () => {

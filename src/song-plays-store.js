@@ -8,12 +8,10 @@
 // the year review counts it for the last time.
 import { getDb, isConnected } from "./lib/db.js";
 import { log } from "./lib/logging.js";
-import { isAdvertTitle } from "./lib/advert-titles.js";
+import { NOT_ADVERT_FILTER, isAdvertTitle } from "./lib/advert-titles.js";
 
 export const SONG_PLAYS_COLLECTION = "song_plays";
 const RETENTION_SECONDS = 45 * 24 * 60 * 60;
-/** Rows read per wanted row, so the adverts already stored can drop out of a full list (#548). */
-export const ADVERT_HEADROOM = 3;
 
 let indexesReady = null;
 
@@ -121,14 +119,13 @@ export async function getTopSongPlays(guildId, { sinceMs, untilMs = Date.now(), 
   if (!gid || !plays) return [];
   try {
     const rows = await plays.aggregate([
-      { $match: { guildId: gid, day: { $gte: songPlayDay(sinceMs), $lt: new Date(untilMs) } } },
+      // #548: adverts counted before are left out before the list is cut.
+      { $match: { guildId: gid, day: { $gte: songPlayDay(sinceMs), $lt: new Date(untilMs) }, ...NOT_ADVERT_FILTER } },
       { $group: { _id: "$trackKey", count: { $sum: "$count" }, displayTitle: { $last: "$displayTitle" } } },
       { $sort: { count: -1, displayTitle: 1 } },
-      { $limit: Math.max(1, Math.min(20, Number(limit) || 5)) * ADVERT_HEADROOM },
+      { $limit: Math.max(1, Math.min(20, Number(limit) || 5)) },
     ]).toArray();
-    return rows.map((row) => ({ displayTitle: row.displayTitle || row._id, count: Number(row.count) || 0 }))
-      .filter((row) => !isAdvertTitle(row.displayTitle))
-      .slice(0, Math.max(1, Math.min(20, Number(limit) || 5)));
+    return rows.map((row) => ({ displayTitle: row.displayTitle || row._id, count: Number(row.count) || 0 }));
   } catch {
     return [];
   }

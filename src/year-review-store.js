@@ -9,8 +9,8 @@
 // Servers only, never people. MongoDB only.
 import { getDb, isConnected } from "./lib/db.js";
 import { TOP_SONGS, buildYearReview, createMonthCounter, monthRange, monthSettled, monthsToCount } from "./lib/year-review.js";
-import { ADVERT_HEADROOM, SONG_PLAYS_COLLECTION } from "./song-plays-store.js";
-import { isAdvertTitle } from "./lib/advert-titles.js";
+import { SONG_PLAYS_COLLECTION } from "./song-plays-store.js";
+import { NOT_ADVERT_FILTER } from "./lib/advert-titles.js";
 
 export const YEAR_REVIEW_COLLECTION = "year_review_months";
 const RUNS_COLLECTION = "year_review_runs";
@@ -43,18 +43,15 @@ async function ensureIndexes(db) {
 async function monthSongs(db, month) {
   const [year, number] = month.split("-").map(Number);
   const rows = await db.collection(SONG_PLAYS_COLLECTION).aggregate([
-    { $match: { day: { $gte: new Date(Date.UTC(year, number - 1, 1)), $lt: new Date(Date.UTC(year, number, 1)) } } },
+    // #548: adverts counted before are no top song.
+    { $match: { day: { $gte: new Date(Date.UTC(year, number - 1, 1)), $lt: new Date(Date.UTC(year, number, 1)) }, ...NOT_ADVERT_FILTER } },
     { $sort: { lastPlayedAt: 1 } },
     { $group: { _id: { guildId: "$guildId", trackKey: "$trackKey" }, plays: { $sum: "$count" }, title: { $last: "$displayTitle" }, firstDay: { $min: "$day" } } },
     { $sort: { plays: -1, title: 1 } },
     { $group: { _id: "$_id.guildId", songs: { $push: { trackKey: "$_id.trackKey", title: "$title", plays: "$plays" } }, songsFrom: { $min: "$firstDay" } } },
-    { $project: { songs: { $slice: ["$songs", TOP_SONGS * ADVERT_HEADROOM] }, songsFrom: 1 } },
+    { $project: { songs: { $slice: ["$songs", TOP_SONGS] }, songsFrom: 1 } },
   ], { allowDiskUse: true }).toArray();
-  // #548: the adverts drop out before the top songs are cut.
-  return new Map(rows.map((row) => [String(row._id), {
-    songs: (row.songs || []).filter((song) => !isAdvertTitle(song.title)).slice(0, TOP_SONGS),
-    songsFrom: row.songsFrom || null,
-  }]));
+  return new Map(rows.map((row) => [String(row._id), { songs: row.songs, songsFrom: row.songsFrom || null }]));
 }
 
 /**
