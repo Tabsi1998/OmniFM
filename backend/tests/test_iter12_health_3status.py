@@ -12,7 +12,7 @@ BASE_URL = base_url.rstrip("/")
 TOKEN = os.environ.get("OMNIFM_TEST_ADMIN_TOKEN", "omnifm-owner-dev-token")
 HDR = {"X-Admin-Token": TOKEN, "Content-Type": "application/json"}
 
-SOMA = ["groovesalad", "dronezone", "beatblender"]
+CATALOG_SAMPLE = ["groovesalad", "dronezone", "beatblender"]
 PLAYABLE = ["chartsradio", "chilloutradio", "bluesradio"]
 
 
@@ -27,7 +27,7 @@ class TestStationHealth:
                           headers={"X-Admin-Token": "nope"}, timeout=60)
         assert r.status_code in (401, 403)
 
-    @pytest.mark.parametrize("keys", [SOMA, PLAYABLE])
+    @pytest.mark.parametrize("keys", [CATALOG_SAMPLE, PLAYABLE])
     def test_health_returns_discordok_field(self, keys):
         r = requests.post(f"{BASE_URL}/api/admin/stations/health", json={"keys": keys}, headers=HDR, timeout=180)
         assert r.status_code == 200, r.text
