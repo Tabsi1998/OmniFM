@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { NOT_ADVERT_FILTER, isAdvertTitle } from "./lib/advert-titles.js";
+import { NOT_ADVERT_HISTORY_FILTER, isAdvertTitle } from "./lib/advert-titles.js";
 import { getDb, isConnected } from "./lib/db.js";
 import { log } from "./lib/logging.js";
 import path from "node:path";
@@ -190,7 +190,7 @@ function queueMongo(task) {
 function warmGuild(gid) {
   if (warming.has(gid) || recentByGuild.has(gid) || !isConnected()) return;
   warming.add(gid);
-  getDb().collection(COLLECTION).find({ guildId: gid, ...NOT_ADVERT_FILTER }, { projection: { _id: 0 } }).sort({ timestampMs: -1 }).limit(DEFAULT_MAX_PER_GUILD).toArray()
+  getDb().collection(COLLECTION).find({ guildId: gid, ...NOT_ADVERT_HISTORY_FILTER }, { projection: { _id: 0 } }).sort({ timestampMs: -1 }).limit(DEFAULT_MAX_PER_GUILD).toArray()
     .then((rows) => { if (!recentByGuild.has(gid)) recentByGuild.set(gid, rows.reverse()); })
     .catch(() => null)
     .finally(() => warming.delete(gid));
@@ -204,7 +204,7 @@ export async function readSongHistory(guildId, options = {}) {
   const limitRaw = Number.parseInt(String(options.limit ?? DEFAULT_LIMIT), 10);
   const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(MAX_LIMIT, limitRaw)) : DEFAULT_LIMIT;
   // #548: adverts saved before are left out before the list is cut.
-  return getDb().collection(COLLECTION).find({ guildId: gid, ...NOT_ADVERT_FILTER }, { projection: { _id: 0 } }).sort({ timestampMs: -1 }).limit(limit).toArray();
+  return getDb().collection(COLLECTION).find({ guildId: gid, ...NOT_ADVERT_HISTORY_FILTER }, { projection: { _id: 0 } }).sort({ timestampMs: -1 }).limit(limit).toArray();
 }
 
 /** MongoDB becomes the store; the songs of the history files are copied once. */

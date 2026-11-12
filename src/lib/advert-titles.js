@@ -40,3 +40,20 @@ export function isAdvertTitle(song) {
 
 /** A MongoDB filter on `displayTitle` that leaves adverts out (plays counted before #548). */
 export const NOT_ADVERT_FILTER = Object.freeze({ displayTitle: { $not: ADVERT_TITLE_REGEX } });
+
+/** The same for the song history, whose entries keep every title field. */
+export const NOT_ADVERT_HISTORY_FILTER = Object.freeze({
+  $nor: ["displayTitle", "streamTitle", "artist", "title"].map((field) => ({ [field]: ADVERT_TITLE_REGEX })),
+});
+
+/**
+ * The track fields of a now-playing update, all empty when they are an
+ * advert: the panel, the share card and the song counts never show a spot.
+ * @template {{ artist?: any, title?: any, streamTitle?: any, displayTitle?: any }} T
+ * @param {T} track
+ * @returns {T}
+ */
+export function withoutAdvertTrack(track) {
+  if (!isAdvertTitle(track)) return track;
+  return { ...track, artist: null, title: null, streamTitle: null, displayTitle: null };
+}

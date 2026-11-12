@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { MongoClient } from "mongodb";
-import { isAdvertTitle } from "../src/lib/advert-titles.js";
+import { ADVERT_TITLE_REGEX, NOT_ADVERT_FILTER, isAdvertTitle, withoutAdvertTrack } from "../src/lib/advert-titles.js";
 import { CHART_SIZE, chartWeek, rankChart } from "../src/lib/charts.js";
 import { buildYearReview } from "../src/lib/year-review.js";
 import { recordSongPlay } from "../src/song-plays-store.js";
@@ -56,6 +56,15 @@ test("real songs, also with dots and signs, are no adverts", () => {
   for (const song of SONGS) assert.equal(isAdvertTitle(song), false, JSON.stringify(song));
   assert.equal(isAdvertTitle(""), false);
   assert.equal(isAdvertTitle({}), false);
+});
+
+test("now playing: an advert empties every track field, a song stays as it is", () => {
+  const song = { artist: "Wanda", title: "Bologna", streamTitle: "Wanda - Bologna", displayTitle: "Wanda - Bologna" };
+  assert.equal(withoutAdvertTrack(song), song);
+  assert.deepEqual(
+    withoutAdvertTrack({ artist: "XXXLutz", title: "Mehr unter lutz.at/angebote", streamTitle: null, displayTitle: "XXXLutz - Mehr unter lutz.at/angebote", source: "icy" }),
+    { artist: null, title: null, streamTitle: null, displayTitle: null, source: "icy" },
+  );
 });
 
 test("an advert is neither counted nor kept in the song history", async () => {
@@ -134,4 +143,31 @@ test("MongoDB: the weekly recap's top songs leave adverts out", async (t) => {
   ]);
   const top = await songPlays.getTopSongPlays(guildId, { sinceMs: Date.UTC(2026, 10, 2), untilMs: Date.UTC(2026, 10, 9), limit: 5 });
   assert.deepEqual(top, [{ displayTitle: "Wanda - Bologna", count: 4 }]);
+});
+
+test("MongoDB reads the advert pattern exactly like JavaScript (case, umlauts, endings)", { skip: !hasMongoConfig }, async (t) => {
+  const client = new MongoClient(process.env.MONGO_URL);
+  await client.connect();
+  const database = client.db(`omnifm_adverts_regex_${process.pid}`);
+  t.after(async () => {
+    await database.dropDatabase().catch(() => null);
+    await client.close();
+  });
+  const titles = [
+    ...ADVERTS.filter((entry) => typeof entry === "string"),
+    ...SONGS.filter((entry) => typeof entry === "string"),
+    "MÖBELHAUS - VERBRAUCHERINFORMATIONEN",
+    "Jetzt bei mazda.at.",
+    "WWW.LUTZ.AT - Angebot",
+    "Ärzte - Bewerbungsgespräch",
+    "Die Werbung ist vorbei - Song",
+    "Werbungsfrei - Band",
+  ];
+  await database.collection("titles").insertMany(titles.map((displayTitle) => ({ displayTitle })));
+  const kept = (await database.collection("titles").find(NOT_ADVERT_FILTER).toArray()).map((row) => row.displayTitle).sort();
+  const matched = (await database.collection("titles").find({ displayTitle: ADVERT_TITLE_REGEX }).toArray()).map((row) => row.displayTitle).sort();
+  assert.deepEqual(kept, titles.filter((title) => !isAdvertTitle(title)).sort());
+  assert.deepEqual(matched, titles.filter((title) => isAdvertTitle(title)).sort());
+  assert.ok(matched.includes("MÖBELHAUS - VERBRAUCHERINFORMATIONEN") && matched.includes("Die Werbung ist vorbei - Song"));
+  assert.ok(kept.includes("Prozzäk - www.nevergetoveryou") && kept.includes("Ärzte - Bewerbungsgespräch") && kept.includes("Werbungsfrei - Band"));
 });

@@ -190,6 +190,8 @@ test("counted from the sessions and song plays in MongoDB, settled months are no
   await db.collection("song_plays").insertMany([
     { guildId, day: today, trackKey: "a|one", displayTitle: "A - One", count: 4, lastPlayedAt: new Date(now) },
     { guildId, day: today, trackKey: "b|two", displayTitle: "B - Two", count: 6, lastPlayedAt: new Date(now) },
+    // #548: more spots counted before than the review keeps songs, all played more often.
+    ...Array.from({ length: 60 }, (_, index) => ({ guildId, day: today, trackKey: `ad${index}`, displayTitle: `www.shop${index}.at - Angebot`, count: 90, lastPlayedAt: new Date(now) })),
   ]);
   const year = Number(month.slice(0, 4));
   await db.collection("daily_stats").insertMany([
