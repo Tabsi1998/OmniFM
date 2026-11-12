@@ -69,7 +69,7 @@ BACKEND = ROOT / "backend"
 CACHE = Path.home() / ".local-ci" / ROOT.name
 VENV = CACHE / "venv"
 
-# The versions the CI uses. package.json pins Node ">=22 <23"; the FastAPI job
+# The versions the CI uses. package.json pins Node ">=22.23.4 <23"; the FastAPI job
 # sets up Python 3.12.
 NODE_MAJOR = 22
 BACKEND_PYTHON = "3.12"

@@ -65,7 +65,7 @@ MongoDB muss erreichbar sein (siehe `.env`).
 ## 🖥️ Deployment auf Ubuntu 24.04 (kompletter Stack inkl. Discord-Bot)
 
 **Keine manuellen Voraussetzungen mehr.** `start.sh` installiert beim ersten Lauf automatisch
-alles Nötige: **Node.js 22 LTS (mindestens 22.12), MongoDB 8.0 Community (lokal), FFmpeg, Python-venv und
+alles Nötige: **Node.js 22 LTS (mindestens 22.23.4), MongoDB 8.0 Community (lokal), FFmpeg, Python-venv und
 Build-Tools**. Außerdem erzeugt es beim ersten Lauf automatisch `backend/.env` + `frontend/.env`.
 
 Klonen → einmalig `./start.sh` → ab dann Updates per `./update.sh`:
