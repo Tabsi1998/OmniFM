@@ -11,9 +11,11 @@ This skill is the checklist for doing it right the first time.
 
 ## 1. Every bot message goes through `src/discord/ui/`
 
-This covers what the bot sends in channels and as interaction answers.
-Operator alerts posted to a webhook (`src/services/operator-webhook.js`)
-build their own embeds on purpose; that is the one transport exception.
+This covers every new or changed message the bot sends in channels and as
+interaction answers. Some older paths still build raw embeds (for example in
+`src/bot/commands/server-commands.js` and `src/bot/runtime-failback.js`):
+when you touch one, move it to `src/discord/ui/`. Operator alerts posted to a
+webhook (`src/services/operator-webhook.js`) build their own embeds on purpose.
 
 - The top level of a message is `ui.panel`, `ui.notice`, `ui.confirm`, or
   the `.container` that `ui.list(...)` returns (it returns
@@ -109,6 +111,10 @@ build their own embeds on purpose; that is the one transport exception.
 
 ## 6. Checks and known traps
 
+- Options (#553, once merged): `--changed` picks the groups from the files
+  you changed (docs only: `repository`), `--fresh` forces a clean `npm ci`;
+  the unit suite runs in parallel with one database per test file. See
+  `CLAUDE.md`.
 - Every setting the code reads is documented in `.env.example`; the local
   check compares them.
 - Run the local check per `CLAUDE.md`, both groups, one run at a time on the
