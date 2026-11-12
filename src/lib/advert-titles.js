@@ -12,13 +12,18 @@
 // One pattern for JavaScript and MongoDB alike (no \p classes, no lookbehind),
 // so the stored plays can be left out before they are counted and cut.
 
-const TLD = "(?:at|de|ch|li|eu|com|net|org|info|biz|shop|online|store)";
+const TLD = "(?:at|de|ch|li|eu|com|net|org|info|biz|shop|online|store|fm|tv|io|app|it|fr|nl|be|lu|pl|cz|hu|es|uk)";
 // A link, or a "www." host that has a real ending: "www.lutz.at", not "www.nevergetoveryou".
 const LINK = "(?:^|[^a-z0-9])(?:https?://|www\\.[a-z0-9-]+(?:\\.[a-z0-9-]+)*\\.[a-z]{2,})";
 // A bare domain as its own word: "mazda.at", "lutz.at/angebot".
 const DOMAIN = `(?:^|[\\s(\\[/|"'])[a-z0-9][a-z0-9-]*(?:\\.[a-z0-9-]+)*\\.${TLD}(?=$|[\\s)\\]/|,!?:;"']|\\.(?:\\s|$))`;
 const LETTER = "a-zäöüß";
-const WORDS = `(?:^|[^${LETTER}])(?:werbung|werbespot|werbepause|werbeblock|dauerwerbesendung|verbraucherinfo[${LETTER}]*|advertisement|commercial break)(?![${LETTER}])`;
+// Words only adverts use, anywhere in the title.
+const AD_WORDS = `(?:^|[^${LETTER}])(?:werbespot|werbepause|werbeblock|dauerwerbesendung|verbraucherinfo[${LETTER}]*)(?![${LETTER}])`;
+// Words a song title may carry too: only when they are the whole artist or title.
+const DASH = "\\s(?:-|–)\\s";
+const AD_LABELS = `(?:^|${DASH})\\s*(?:werbung|advertisement|commercial break)\\s*(?:$|${DASH})`;
+const WORDS = `${AD_WORDS}|${AD_LABELS}`;
 
 /** Case-insensitive; usable in MongoDB queries: `{ displayTitle: { $not: ADVERT_TITLE_REGEX } }`. */
 export const ADVERT_TITLE_REGEX = new RegExp(`${LINK}|${DOMAIN}|${WORDS}`, "i");

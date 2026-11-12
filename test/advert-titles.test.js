@@ -7,6 +7,8 @@ import { buildYearReview } from "../src/lib/year-review.js";
 import { recordSongPlay } from "../src/song-plays-store.js";
 import { appendSongHistory } from "../src/song-history-store.js";
 import { weeklyChart } from "../src/services/charts.js";
+import { nowPlayingTrackFields } from "../src/bot/now-playing/track-fields.js";
+import fs from "node:fs";
 
 // #548: the charts of week 45 had two adverts on top. An ad break's spot is
 // no song: never counted, and the ones counted before never show.
@@ -24,6 +26,10 @@ const ADVERTS = [
   "Radio Tirol - Werbepause",
   "Spar - Verbraucherinformation",
   "Advertisement - Coca-Cola",
+  "Radio Tirol - Werbung",
+  "marke.co.uk - Jetzt entdecken",
+  "Mehr Infos: marke.at",
+  "laut.fm - Jingle",
 ];
 
 // Real songs and artists with dots, signs and lookalike words: none may fall out.
@@ -43,6 +49,9 @@ const SONGS = [
   "Wanda - Bologna",
   "Bewerbung - Kraftklub Cover",
   "Prozzäk - www.nevergetoveryou",
+  "Die Werbung ist vorbei - Song",
+  "Commercial - Song X",
+  "Wir sind Helden - Guten Tag (Werbung)",
   "Pharrell Williams - Happy (From Despicable Me 2)",
   { artist: "R.E.M.", title: "Losing My Religion" },
   { artist: "Will Smith", title: "Men In Black" },
@@ -65,6 +74,30 @@ test("now playing: an advert empties every track field, a song stays as it is", 
     withoutAdvertTrack({ artist: "XXXLutz", title: "Mehr unter lutz.at/angebote", streamTitle: null, displayTitle: "XXXLutz - Mehr unter lutz.at/angebote", source: "icy" }),
     { artist: null, title: null, streamTitle: null, displayTitle: null, source: "icy" },
   );
+});
+
+test("the song fields of a now-playing update: a spot is dropped, a song stays, the title is built from artist and title", () => {
+  const runtime = { normalizeNowPlayingValue: (value, station) => {
+    const text = String(value || "").trim();
+    return text && text.toLowerCase() !== String(station?.name || "").toLowerCase() ? text : null;
+  } };
+  const station = { name: "Life Radio Tirol" };
+  assert.deepEqual(nowPlayingTrackFields(runtime, station, { artist: "Wanda", title: "Bologna" }),
+    { artist: "Wanda", title: "Bologna", streamTitle: null, displayTitle: "Wanda - Bologna" });
+  assert.deepEqual(nowPlayingTrackFields(runtime, station, { streamTitle: "Wanda - Bologna" }),
+    { artist: null, title: null, streamTitle: "Wanda - Bologna", displayTitle: "Wanda - Bologna" });
+  assert.deepEqual(nowPlayingTrackFields(runtime, station, { streamTitle: "Life Radio Tirol" }),
+    { artist: null, title: null, streamTitle: null, displayTitle: null });
+  assert.deepEqual(nowPlayingTrackFields(runtime, station, { artist: "www.lutz.at", title: "Ein bisschen Verbraucherinformationen ...", streamTitle: "www.lutz.at - Ein bisschen Verbraucherinformationen ..." }),
+    { artist: null, title: null, streamTitle: null, displayTitle: null });
+});
+
+test("both now-playing paths (poll and start) take their song fields from nowPlayingTrackFields", () => {
+  for (const file of ["src/bot/now-playing/now-playing-methods.js", "src/bot/runtime-stream-play.js"]) {
+    const source = fs.readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
+    assert.match(source, /nowPlayingTrackFields\((this|runtime), station, (snapshot|meta)\)/, file);
+    assert.doesNotMatch(source, /normalizeNowPlayingValue\((snapshot|meta)\.(artist|title)\b/, `${file} builds no song field itself`);
+  }
 });
 
 test("an advert is neither counted nor kept in the song history", async () => {
@@ -160,14 +193,15 @@ test("MongoDB reads the advert pattern exactly like JavaScript (case, umlauts, e
     "Jetzt bei mazda.at.",
     "WWW.LUTZ.AT - Angebot",
     "Ärzte - Bewerbungsgespräch",
-    "Die Werbung ist vorbei - Song",
     "Werbungsfrei - Band",
+    "Werbung – Ö3",
   ];
   await database.collection("titles").insertMany(titles.map((displayTitle) => ({ displayTitle })));
   const kept = (await database.collection("titles").find(NOT_ADVERT_FILTER).toArray()).map((row) => row.displayTitle).sort();
   const matched = (await database.collection("titles").find({ displayTitle: ADVERT_TITLE_REGEX }).toArray()).map((row) => row.displayTitle).sort();
   assert.deepEqual(kept, titles.filter((title) => !isAdvertTitle(title)).sort());
   assert.deepEqual(matched, titles.filter((title) => isAdvertTitle(title)).sort());
-  assert.ok(matched.includes("MÖBELHAUS - VERBRAUCHERINFORMATIONEN") && matched.includes("Die Werbung ist vorbei - Song"));
+  assert.ok(matched.includes("MÖBELHAUS - VERBRAUCHERINFORMATIONEN") && matched.includes("Radio Tirol - Werbung") && matched.includes("Werbung – Ö3"));
+  assert.ok(kept.includes("Die Werbung ist vorbei - Song"));
   assert.ok(kept.includes("Prozzäk - www.nevergetoveryou") && kept.includes("Ärzte - Bewerbungsgespräch") && kept.includes("Werbungsfrei - Band"));
 });
