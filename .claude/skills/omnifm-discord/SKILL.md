@@ -11,9 +11,11 @@ This skill is the checklist for doing it right the first time.
 
 ## 1. Every Discord message goes through `src/discord/ui/`
 
-- Build with `ui.panel`, `ui.notice`, `ui.list`, `ui.confirm`, `ui.section`,
-  `ui.text`, `ui.field`, `ui.statusLine`, `ui.separator`
-  (`src/discord/ui/builders.js`). Never hand-build embeds or raw components.
+- The top level of a message is always `ui.panel`, `ui.notice`, `ui.list` or
+  `ui.confirm` (`src/discord/ui/builders.js`): only they add the brand line
+  with the version that `docs/discord-design.md` requires. Inside them use
+  `ui.section`, `ui.text`, `ui.field`, `ui.statusLine`, `ui.separator`.
+  Never hand-build embeds or raw components.
 - Send with `ui.reply(...)` (private, the default answer to a command) or
   `ui.message(...)` (public panels only).
 - Components V2 messages cannot become embeds again: buttons on them answer
@@ -43,9 +45,13 @@ This skill is the checklist for doing it right the first time.
 
 ## 3. Commander and workers
 
-- Live runs split: one commander process (slash commands, panels, the API
-  side) and worker processes (`src/entrypoints/worker.js`, started by
-  `split-supervisor.js` with `BOT_PROCESS_INDEX`). The commander drives
+- Two modes (`src/entrypoints/from-owner-config.mjs`): with more than one bot
+  (or `OMNIFM_DEPLOYMENT_MODE=split`) OmniFM runs split, which is how it runs
+  live: one commander process (slash commands, panels, the API side) and
+  worker processes (`src/entrypoints/worker.js`, started by
+  `split-supervisor.js` with `BOT_PROCESS_INDEX`). With one bot or
+  `OMNIFM_DEPLOYMENT_MODE=monolith` everything runs in `src/index.js`. A change
+  must work in both. The commander drives
   workers through the worker bridge (`src/core/worker-bridge.js`,
   `src/bot/remote-worker-handle.js`, `src/bot/worker-bridge-service.js`).
 - A feature that a worker needs must work across that bridge: no shared
@@ -59,15 +65,20 @@ This skill is the checklist for doing it right the first time.
 
 - Every request to a user- or catalog-supplied URL goes through `safeFetch`
   (`src/lib/safe-outbound-http.js`): SSRF check and DNS pinning on every hop,
-  redirect limit, credentials stripped on origin change. Never plain `fetch`.
+  redirect limit, credentials stripped on origin change. Plain `fetch` only
+  where the host is fixed and checked first (Discord CDN attachments in
+  `src/bot/runtime-methods/forms.js`, a validated Discord webhook URL for
+  operator alerts); anything a user or the catalog supplies uses `safeFetch`.
 - `lenientHttpParser: true` **only** for radio streams (some servers end the
   status line with a bare LF, StreamABC, #536). `test/stream-fetch-parser.test.js`
-  guards that every stream fetch carries it. Images, webhooks and APIs stay
-  strict.
+  checks the files in its `STREAM_FETCHERS` list: **a new file that opens
+  streams must be added to that list**, or the guard does not see it. Images,
+  webhooks and APIs stay strict.
 - A stream probe reads a few KB and stops; every timer is cleared and the
   body is cancelled on every path (#539).
-- SomaFM answers 403 to every non-browser client (#549): do not add SomaFM
-  streams and do not fake a browser user agent.
+- SomaFM answers 403 to every non-browser client (#542, #549): do not add new
+  SomaFM streams (the existing ones are being replaced in #549) and do not
+  fake a browser user agent.
 
 ## 5. Stations
 
