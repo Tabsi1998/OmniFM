@@ -129,7 +129,23 @@ function assertNoMojibake() {
   );
 }
 
+/** #540: the repository says who holds the rights; no open-source licence by accident. */
+function assertProprietaryLicense() {
+  const licensePath = path.join(repoRoot, "LICENSE");
+  assert.ok(fs.existsSync(licensePath), "LICENSE is missing (#540)");
+  const text = fs.readFileSync(licensePath, "utf8");
+  assert.match(text, /IT-Tabelander/, "LICENSE does not name IT-Tabelander as the rights holder (#540)");
+  assert.match(text, /Alle Rechte vorbehalten/, "LICENSE no longer reserves all rights (#540)");
+  assert.match(text, /Mit dieser Datei wird keine Lizenz erteilt/, "LICENSE no longer says that it grants no licence (#540)");
+  assert.match(text, /§ 42h/, "LICENSE lost the text and data mining reservation (#540)");
+  assert.doesNotMatch(text, /MIT License|Apache License|GNU (Affero |Lesser )?General Public License|Mozilla Public License|Creative Commons|Permission is hereby granted/i,
+    "LICENSE contains an open-source licence grant (#540)");
+  const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
+  assert.match(readme, /\]\(LICENSE\)/, "README.md does not link the LICENSE (#540)");
+}
+
 assertCleanGitignore();
 assertNoTrackedRuntimeArtifacts();
+assertProprietaryLicense();
 assertNoMojibake();
 console.log("Repo hygiene check passed.");

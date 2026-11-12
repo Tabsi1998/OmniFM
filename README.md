@@ -251,4 +251,6 @@ GET  /api/auth/session   GET/PUT /api/dashboard/perms   GET/POST/DELETE /api/das
 
 ## 📄 Lizenz
 
-Proprietär – © OmniFM. Alle Rechte vorbehalten.
+Proprietär – © 2026 IT-Tabelander (Inhaber: Fabian Tabelander). Alle Rechte vorbehalten.
+Das Repository ist öffentlich einsehbar, aber nicht frei nutzbar: keine Nutzung, Kopie, kein eigener Betrieb
+und kein Training von KI-Modellen ohne schriftliche Zustimmung. Die Einzelheiten stehen in [LICENSE](LICENSE).
