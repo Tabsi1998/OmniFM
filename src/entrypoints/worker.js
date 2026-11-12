@@ -7,8 +7,7 @@ import { log } from "../lib/logging.js";
 import {
   initializeSharedServices,
   installProcessHandlers,
-  resolveBotTopology,
-  resolveWorkerConfig,
+  createWorkerRuntime,
 } from "./shared.js";
 import { startWorkerAutohealMonitor } from "./worker-autoheal.js";
 import { startRuntimeLogShipper } from "../services/runtime-health-reporter.js";
@@ -22,15 +21,8 @@ await initCustomStationsStore();
 // needs the /perm role rules as well (#232).
 await initCommandPermissionsStore();
 
-const topology = resolveBotTopology(process.env);
-const workerIndex = Number.parseInt(String(process.env.BOT_PROCESS_INDEX || ""), 10);
-const workerConfig = resolveWorkerConfig(topology.botConfigs, workerIndex);
-
-if (Number(workerConfig?.index || 0) === Number(topology.commanderConfig?.index || 0)) {
-  throw new Error(`BOT_${workerIndex} ist als Commander konfiguriert und kann nicht als Worker gestartet werden.`);
-}
-
-const runtime = new BotRuntime(workerConfig, { role: "worker" });
+// Slot as the commander counts it, not the BOT number (#520).
+const { runtime, workerConfig, workerIndex } = createWorkerRuntime(process.env, BotRuntime);
 const bridgeService = new WorkerBridgeService(runtime);
 let autohealMonitor = null;
 

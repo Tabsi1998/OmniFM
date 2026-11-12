@@ -158,6 +158,35 @@ function resolveWorkerConfig(botConfigs = [], workerIndex) {
   return workerConfig;
 }
 
+/**
+ * The plan slot of one worker, counted the way the commander's WorkerManager
+ * counts it: workers ordered by BOT number, the first is slot 1. BOT_n itself
+ * is not the slot, because BOT_1 is usually the commander (#520).
+ */
+function resolveWorkerSlot(workerConfigs = [], workerConfig) {
+  const index = Number(workerConfig?.index || 0);
+  const ordered = [...workerConfigs].map((config) => Number(config?.index || 0)).sort((a, b) => a - b);
+  const position = ordered.indexOf(index);
+  return position >= 0 ? position + 1 : null;
+}
+
+/**
+ * The runtime of the worker process named by BOT_PROCESS_INDEX, with the plan
+ * slot the commander gives it. The runtime class comes in from the entry point
+ * so this module stays free of the Discord client.
+ */
+function createWorkerRuntime(env, RuntimeClass) {
+  const topology = resolveBotTopology(env);
+  const workerIndex = Number.parseInt(String(env.BOT_PROCESS_INDEX || ""), 10);
+  const workerConfig = resolveWorkerConfig(topology.botConfigs, workerIndex);
+  if (Number(workerConfig?.index || 0) === Number(topology.commanderConfig?.index || 0)) {
+    throw new Error(`BOT_${workerIndex} ist als Commander konfiguriert und kann nicht als Worker gestartet werden.`);
+  }
+  const workerSlot = resolveWorkerSlot(topology.workerConfigs, workerConfig);
+  const runtime = new RuntimeClass(workerConfig, { role: "worker", workerSlot });
+  return { runtime, workerConfig, workerIndex, workerSlot };
+}
+
 function installProcessHandlers({
   localRuntimes = [],
   webServer = null,
@@ -256,5 +285,7 @@ export {
   initializeSharedServices,
   resolveBotTopology,
   resolveWorkerConfig,
+  resolveWorkerSlot,
+  createWorkerRuntime,
   installProcessHandlers,
 };
