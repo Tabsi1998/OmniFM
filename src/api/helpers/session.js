@@ -54,7 +54,8 @@ export function isDiscordOauthConfigured() {
   return Boolean(getDiscordClientId() && getDiscordClientSecret() && getDiscordRedirectUri());
 }
 
-function hasManageGuildPermission(rawPermissions) {
+// The login's rule, and the rule of the later check (#523): Manage Server or Administrator.
+export function hasManageGuildPermission(rawPermissions) {
   try {
     const bitfield = BigInt(String(rawPermissions || "0").trim() || "0");
     return (bitfield & 0x20n) === 0x20n || (bitfield & 0x8n) === 0x8n;
