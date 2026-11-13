@@ -71,5 +71,6 @@
   ["pro_rock_05","http://streams.radiobob.de/bob-metal/mp3-192/streams.radiobob.de/","https://streams.radiobob.de/bob-metal/mp3-192/"],
   ["pro_rock_07","http://streams.radiobob.de/bob-punk/mp3-192/streams.radiobob.de/","https://streams.radiobob.de/bob-punk/mp3-192/"],
   ["pro_rock_08","http://streams.radiobob.de/bob-grunge/mp3-192/streams.radiobob.de/","https://streams.radiobob.de/bob-grunge/mp3-192/"],
-  ["pro_rock_10","http://streams.radiobob.de/bob-bestofrock/mp3-192/streams.radiobob.de/","https://streams.radiobob.de/bob-bestofrock/mp3-192/"]
+  ["pro_rock_10","http://streams.radiobob.de/bob-bestofrock/mp3-192/streams.radiobob.de/","https://streams.radiobob.de/bob-bestofrock/mp3-192/"],
+  ["pro_hard_03","http://shoutcast1.hardcoreradio.nl/","https://streams.rautemusik.fm/happyhardcore/mp3-192/",{"name":"Happy Hardcore","country":"DE","homepage":"https://www.rm.fm/happyhardcore"},[],"561"]
 ]

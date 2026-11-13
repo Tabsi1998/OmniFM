@@ -574,12 +574,13 @@
       "country": "RU"
     },
     "pro_hard_03": {
-      "name": "Hardcore",
-      "url": "http://shoutcast1.hardcoreradio.nl/",
+      "name": "Happy Hardcore",
+      "url": "https://streams.rautemusik.fm/happyhardcore/mp3-192/",
       "tier": "pro",
       "genre": "Hardstyle & Hardcore",
       "color": "#EF4444",
-      "country": "NL"
+      "country": "DE",
+      "homepage": "https://www.rm.fm/happyhardcore"
     },
     "pro_hard_04": {
       "name": "Frenchcore",
