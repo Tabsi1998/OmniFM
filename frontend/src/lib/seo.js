@@ -22,6 +22,10 @@ const PAGE_TYPES = {
   status: 'website',
 };
 
+// Behind a login: without one they only show the sign-in, so no search engine
+// shall keep them, and they stay out of the sitemap (#528).
+export const NOINDEX_PAGES = Object.freeze(['dashboard', 'dashboard-classic', 'dashboard-studio', 'admin']);
+
 function absoluteUrl(pathname = '/') {
   const path = String(pathname || '/').startsWith('/') ? pathname : `/${pathname}`;
   return `${SITE_ORIGIN}${path}`;
@@ -84,7 +88,7 @@ export function getPageSeo(page, locale = 'en') {
     canonicalUrl,
     image: DEFAULT_IMAGE,
     type: PAGE_TYPES[pageId] || 'website',
-    robots: 'index,follow',
+    robots: NOINDEX_PAGES.includes(pageId) ? 'noindex,follow' : 'index,follow',
   };
 }
 

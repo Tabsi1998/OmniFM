@@ -43,12 +43,14 @@ for (const expectedUrl of [
   "https://omnifm.xyz/stations",
   "https://omnifm.xyz/premium",
   "https://omnifm.xyz/faq",
-  "https://omnifm.xyz/dashboard",
   "https://omnifm.xyz/impressum",
   "https://omnifm.xyz/datenschutz",
   "https://omnifm.xyz/nutzungsbedingungen",
 ]) {
   assertIncludes(sitemap, `<loc>${expectedUrl}</loc>`, `sitemap.xml missing ${expectedUrl}`);
 }
+
+// Behind a login, so not for search engines (#528).
+assert.doesNotMatch(sitemap, /omnifm\.xyz\/(dashboard|admin)/, "sitemap.xml must not list the dashboard or /admin");
 
 console.log("Search Console readiness check passed.");

@@ -423,7 +423,7 @@ async function inspectSeo(baseUrl) {
       path: "/sitemap.xml",
       assertions: [
         { label: "home loc", regex: /<loc>https:\/\/omnifm\.xyz\/<\/loc>/i },
-        { label: "dashboard loc", regex: /<loc>https:\/\/omnifm\.xyz\/dashboard<\/loc>/i },
+        { label: "start loc", regex: /<loc>https:\/\/omnifm\.xyz\/start<\/loc>/i },
         { label: "stations loc", regex: /<loc>https:\/\/omnifm\.xyz\/stations<\/loc>/i },
         { label: "premium loc", regex: /<loc>https:\/\/omnifm\.xyz\/premium<\/loc>/i },
         { label: "faq loc", regex: /<loc>https:\/\/omnifm\.xyz\/faq<\/loc>/i },

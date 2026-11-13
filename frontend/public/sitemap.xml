@@ -6,11 +6,6 @@
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://omnifm.xyz/dashboard</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
     <loc>https://omnifm.xyz/stations</loc>
     <xhtml:link rel="alternate" hreflang="de" href="https://omnifm.xyz/stations" />
     <xhtml:link rel="alternate" hreflang="en" href="https://omnifm.xyz/stations" />

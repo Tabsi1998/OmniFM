@@ -56,6 +56,17 @@ test("Vite entry document references the React mount and module entry", () => {
   );
 });
 
+test("pages behind a login are noindex, public pages stay indexable (#528)", () => {
+  for (const page of ["dashboard", "dashboard-classic", "dashboard-studio", "admin"]) {
+    for (const language of ["de", "en", "fr"]) {
+      assert.equal(getPageSeo(page, language).robots, "noindex,follow", `${page} (${language})`);
+    }
+  }
+  for (const page of ["home", "stations", "premium", "faq", "start", "imprint", "privacy", "terms", "charts", "status"]) {
+    assert.equal(getPageSeo(page, "en").robots, "index,follow", page);
+  }
+});
+
 test("React SEO assets and base metadata are present", () => {
   const publicDir = path.join(repoRoot, "frontend", "public");
   const indexHtml = fs.readFileSync(path.join(repoRoot, "frontend", "index.html"), "utf8");
@@ -76,7 +87,7 @@ test("React SEO assets and base metadata are present", () => {
   assert.match(robotsTxt, /User-agent: \*/);
   assert.match(robotsTxt, /Sitemap: https:\/\/omnifm\.xyz\/sitemap\.xml/);
   assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/<\/loc>/);
-  assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/dashboard<\/loc>/);
+  assert.doesNotMatch(sitemapXml, /omnifm\.xyz\/(dashboard|admin)/);
   assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/stations<\/loc>/);
   assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/premium<\/loc>/);
   assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/faq<\/loc>/);
