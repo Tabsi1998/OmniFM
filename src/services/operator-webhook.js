@@ -121,6 +121,23 @@ function buildOperatorPayload(embedData, { mention = "", at = new Date() } = {})
 }
 
 /**
+ * The owner console's test alert (#555): the same payload and the same
+ * safeFetch path as a real operator alert, without the dedup window.
+ * @param {string} url
+ * @param {string} [mention]
+ * @param {{ fetchImpl?: typeof safeFetch }} [options]
+ * @returns {Promise<boolean>} true only when Discord took the message
+ */
+async function sendOperatorTestAlert(url, mention = "", { fetchImpl } = {}) {
+  const payload = buildOperatorPayload({
+    color: COLORS.info,
+    title: "🧪 Testalarm",
+    description: "So sehen Betreiber-Alarme von OmniFM aus. Die Einrichtung stimmt.",
+  }, { mention });
+  return postOperatorWebhook(url, payload, { fetchImpl });
+}
+
+/**
  * Sendet eine deduplizierte Operator-Nachricht.
  * @param {string} dedupKey Eindeutiger Key für Deduplizierung
  * @param {{ color?: number, title?: string, description?: string, fields?: { name: string, value: string, inline?: boolean }[] }} embedData
@@ -291,6 +308,7 @@ export {
   OPERATOR_WEBHOOK_ENABLED,
   isAllowedOperatorWebhookUrl,
   postOperatorWebhook,
+  sendOperatorTestAlert,
 };
 
 // Generic operator alerts beyond the fixed events above (#260), see

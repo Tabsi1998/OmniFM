@@ -79,9 +79,9 @@ webhook (`src/services/operator-webhook.js`) build their own embeds on purpose.
   every URL a user, a server admin, the owner or the station catalog supplies;
   the operator webhook service (`src/services/operator-webhook.js`) uses it
   too. Plain `fetch` exists only for fixed third-party API hosts (iTunes,
-  MusicBrainz and similar in `src/services/now-playing.js`) and two older
-  checked paths (the Discord CDN download in `src/bot/runtime-methods/forms.js`,
-  the owner console's test alert in `src/api/routes/admin-routes.js`). New code
+  MusicBrainz and similar in `src/services/now-playing.js`) and one older
+  checked path (the Discord CDN download in `src/bot/runtime-methods/forms.js`).
+  The owner console's test alert uses `sendOperatorTestAlert` (#555). New code
   that fetches a supplied URL uses `safeFetch`.
 - `lenientHttpParser: true` **only** for radio streams (some servers end the
   status line with a bare LF, StreamABC, #536). `test/stream-fetch-parser.test.js`
