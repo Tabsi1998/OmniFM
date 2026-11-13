@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { getDb, isConnected, isMongoRequested } from "../../lib/db.js";
 import { resolveRuntimeDataPath } from "../../lib/runtime-data-path.js";
 import { loadOwnerConfigRaw } from "../../lib/owner-config.js";
-import { loadConfiguredBots, readReleaseInfo, readRuntimeHealthFresh } from "../../lib/owner-monitoring.js";
+import { liveRuntimeTotals, loadConfiguredBots, readReleaseInfo, readRuntimeHealthFresh } from "../../lib/owner-monitoring.js";
 import {
   coverLookup,
   healthDocFromRuntimes,
@@ -31,6 +31,19 @@ async function readPublicLiveDoc(runtimes) {
     if (doc) return doc;
   }
   return runtimes.some((runtime) => runtime.client?.isReady?.()) ? healthDocFromRuntimes(runtimes) : null;
+}
+
+/**
+ * The bot counts of GET /api/health (#532): from the bots' health document in
+ * MongoDB, the source of /api/status, so the public entry without bots does
+ * not report 0. Without a fresh document a process with bots counts its own;
+ * a process without either leaves the fields out.
+ */
+export async function readHealthBotCounts(runtimes, db = isConnected() ? getDb() : null) {
+  const doc = db ? await readRuntimeHealthFresh(db) : null;
+  if (doc) return { bots: (doc.nodes || []).length, readyBots: liveRuntimeTotals(doc).botsOnline };
+  if (!runtimes.length) return {};
+  return { bots: runtimes.length, readyBots: runtimes.filter((runtime) => runtime.client.isReady()).length };
 }
 
 // GET /api/status is public: one answer for 15 seconds, so a crowd on the
@@ -267,9 +280,8 @@ export function createPublicRoutesHandler(deps) {
         return true;
       }
       // FastAPI's answer (contract, release, services, 503 when MongoDB is gone),
-      // plus the bots of this process. MongoDB counts when MONGO_URL names it
+      // plus the bot counts (#532). MongoDB counts when MONGO_URL names it
       // and this process asked for it; a process on the JSON files stays ready.
-      const readyBots = runtimes.filter((runtime) => runtime.client.isReady()).length;
       const mongo = isConnected();
       const mongoWanted = isMongoRequested() && Boolean(String(process.env.MONGO_URL || "").trim());
       const ready = mongo || !mongoWanted;
@@ -289,8 +301,7 @@ export function createPublicRoutesHandler(deps) {
         },
         timestamp: new Date().toISOString(),
         uptimeSec: Math.floor((Date.now() - appStartTime) / 1000),
-        bots: runtimes.length,
-        readyBots,
+        ...await readHealthBotCounts(runtimes),
       });
       return true;
     }

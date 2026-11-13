@@ -126,6 +126,12 @@ class TestLiveRuntimeTelemetry:
             assert s["servers"] == 12, s      # 7 + 5, offline node excluded
             assert s["connections"] == 5, s
 
+            # #532: the bot counts of /api/health come from the same document;
+            # FastAPI leaves them out.
+            h = client.get(f"{BASE_URL}/api/health", timeout=30).json()
+            if "readyBots" in h:
+                assert h["bots"] == 3 and h["readyBots"] == 2, h
+
             o = admin.get(f"{BASE_URL}/api/admin/overview", timeout=30).json()
             assert o["guilds"]["managed"] == 12, o["guilds"]
             assert o["guilds"]["live"] is True
@@ -151,6 +157,9 @@ class TestLiveRuntimeTelemetry:
         # cleanup verified: back to honest zeros
         s2 = client.get(f"{BASE_URL}/api/stats", timeout=30).json()
         assert s2["live"] is False and s2["servers"] == 0 and s2["bots"] == 0
+        # No document and no bot in the API process: no made-up "bots: 0" (#532).
+        h2 = client.get(f"{BASE_URL}/api/health", timeout=30).json()
+        assert "bots" not in h2 and "readyBots" not in h2, h2
 
     def test_stale_runtime_doc_is_ignored(self, client, mongo):
         stale = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()

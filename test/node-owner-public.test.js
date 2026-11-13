@@ -158,3 +158,23 @@ test("Node announces the same API contract as FastAPI", async () => {
   const fastapi = fs.readFileSync(new URL("../backend/server.py", import.meta.url), "utf8");
   assert.equal(fastapi.match(/^BACKEND_CONTRACT_VERSION = "([^"]+)"/m)?.[1], BACKEND_CONTRACT_VERSION);
 });
+
+test("/api/health counts the bots from the health document, not from this process (#532)", async () => {
+  const { readHealthBotCounts } = await import("../src/api/routes/public-routes.js");
+  const fakeDb = (doc) => ({ collection: () => ({ findOne: async () => doc }) });
+  const fresh = {
+    at: new Date().toISOString(),
+    nodes: [{ status: "online" }, { status: "online" }, { status: "offline" }],
+  };
+  const ownBot = { client: { isReady: () => true } };
+
+  // The public entry has no bots of its own: the document counts.
+  assert.deepEqual(await readHealthBotCounts([], fakeDb(fresh)), { bots: 3, readyBots: 2 });
+  // A process with one bot still reports all of them.
+  assert.deepEqual(await readHealthBotCounts([ownBot], fakeDb(fresh)), { bots: 3, readyBots: 2 });
+  // No fresh document: a process with bots counts its own, one without leaves the fields out.
+  const stale = { ...fresh, at: new Date(Date.now() - 10 * 60_000).toISOString() };
+  assert.deepEqual(await readHealthBotCounts([ownBot], fakeDb(stale)), { bots: 1, readyBots: 1 });
+  assert.deepEqual(await readHealthBotCounts([], fakeDb(null)), {});
+  assert.deepEqual(await readHealthBotCounts([], null), {});
+});
