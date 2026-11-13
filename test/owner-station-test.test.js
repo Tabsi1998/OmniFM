@@ -86,7 +86,7 @@ test("owner station stream test returns down result for fetch failures", async (
 
   assert.equal(result.ok, false);
   assert.equal(result.status, "down");
-  assert.equal(result.error, "network down");
+  assert.equal(result.error, "Nicht erreichbar (network down)");
   assert.equal(result.httpStatus, null);
   assert.equal(result.reachable, false);
 });

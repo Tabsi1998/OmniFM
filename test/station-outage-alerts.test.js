@@ -99,7 +99,7 @@ test("a station out for 15 minutes alerts once, and once more when it is back", 
   await run(failing); // 15 min
   assert.equal(sent.length, 1);
   assert.match(sent[0].embed.title, /ausgefallen/);
-  assert.match(sent[0].embed.description, /Gone FM\*\* \(`gone`\): offline – connect failed/);
+  assert.match(sent[0].embed.description, /Gone FM\*\* \(`gone`\): offline – Nicht erreichbar \(connect failed\)/);
   // eslint-disable-next-line no-await-in-loop -- the checks follow each other in time
   for (let check = 0; check < 4; check += 1) await run(failing);
   assert.equal(sent.length, 1, "no second alert while it stays out");

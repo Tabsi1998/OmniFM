@@ -146,13 +146,36 @@ function stationRecoveryText(label) {
   return `Sender ${label} ist wieder spielbar`;
 }
 
+// Node and undici name a failed connection in English; the owner reads German (#550).
+/** @type {Array<[RegExp, string]>} */
+const NETWORK_ERROR_LABELS = [
+  [/ENOTFOUND|EAI_AGAIN|OUTBOUND_DNS|getaddrinfo/i, "DNS-Name nicht gefunden"],
+  [/ECONNREFUSED/i, "Verbindung abgelehnt"],
+  [/ECONNRESET|EPIPE|socket hang up|UND_ERR_SOCKET|other side closed/i, "Verbindung abgebrochen"],
+  [/EHOSTUNREACH|ENETUNREACH/i, "Server nicht erreichbar"],
+  [/CERT|SSL|TLS|self[- ]signed|UNABLE_TO_VERIFY/i, "TLS-Zertifikat ungültig"],
+  [/OUTBOUND_(ADDRESS|HOST)_NOT_ALLOWED/i, "Adresse nicht erlaubt"],
+  [/OUTBOUND_REDIRECT/i, "Weiterleitung nicht erlaubt"],
+];
+
+/** "Verbindung abgelehnt (fetch failed: ECONNREFUSED)": the kind in German, the raw text short. */
+function describeNetworkError(error) {
+  const message = String(error?.message ?? error ?? "").replace(/\s+/g, " ").trim();
+  const causeCode = String(error?.cause?.code || "");
+  const raw = causeCode && !message.includes(causeCode) ? [message, causeCode].filter(Boolean).join(": ") : message;
+  const clipped = raw.length > 80 ? `${raw.slice(0, 79)}…` : raw;
+  const known = [String(error?.code || ""), causeCode, message].join(" ");
+  const label = NETWORK_ERROR_LABELS.find(([pattern]) => pattern.test(known))?.[1] || "Nicht erreichbar";
+  return clipped ? `${label} (${clipped})` : label;
+}
+
 /** One short German line for the owner: why this is not playable. */
 function describeProbeFailure(probe, rawError = "") {
   // The body stopped coming before there was enough to tell.
   const waited = probe.timedOut ? ` (nach ${probe.timeoutMs} ms)` : "";
   switch (probe.reasonCode) {
     case "timeout": return `Timeout nach ${probe.timeoutMs} ms`;
-    case "network_error": return String(rawError || "nicht erreichbar");
+    case "network_error": return describeNetworkError(rawError);
     case "unauthorized": return `HTTP ${probe.httpStatus} (Zugriff verweigert)`;
     case "http_error": return `HTTP ${probe.httpStatus}`;
     case "not_audio":
@@ -204,7 +227,8 @@ async function probeStreamAudio(url, {
   const aborted = new Promise((resolve) => { controller.signal.addEventListener("abort", () => resolve(null), { once: true }); });
   let response = null;
   let reader = null;
-  let rawError = "";
+  /** @type {any} */
+  let rawError = null;
   try {
     response = await fetchImpl(url, {
       method: "GET",
@@ -268,7 +292,7 @@ async function probeStreamAudio(url, {
     probe.timedOut = timedOut || err?.code === "OUTBOUND_TIMEOUT" || err?.name === "TimeoutError";
     probe.reasonCode = probe.timedOut ? "timeout" : "network_error";
     probe.responseTimeMs = Date.now() - startedAt;
-    rawError = String(err?.message || err || "");
+    rawError = err;
   } finally {
     clearTimeout(timer);
     // Closes the connection: a radio stream never ends by itself.
