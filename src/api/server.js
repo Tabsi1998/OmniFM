@@ -67,6 +67,7 @@ import {
   setRuntimeForwardTarget,
 } from "./route-handlers.js";
 import { isActivityRequest } from "./routes/activity-routes.js";
+import { enforceFreshDashboardPermission } from "./helpers/permission-recheck.js";
 
 const SPA_ENTRY_PATHS = new Set([
   "/",
@@ -272,8 +273,15 @@ function startWebServer(runtimes, { forwardRuntimeTo = "" } = {}) {
     }
 
     // A route may allow a larger body, e.g. the bot look's pictures (#280).
+    // Read once: the permission check (#523) may have read it before the route.
+    let jsonBody = null;
     /** @param {{ maxBytes?: number }} [options] */
-    async function readJsonBody({ maxBytes } = {}) {
+    function readJsonBody(options = {}) {
+      jsonBody ||= parseJsonBody(options);
+      return jsonBody;
+    }
+    /** @param {{ maxBytes?: number }} [options] */
+    async function parseJsonBody({ maxBytes } = {}) {
       const raw = await readRawBody(maxBytes);
       if (!raw.trim()) return {};
       try {
@@ -283,6 +291,11 @@ function startWebServer(runtimes, { forwardRuntimeTo = "" } = {}) {
         err.status = 400;
         throw err;
       }
+    }
+
+    // Rights from the login count only until DASHBOARD_PERMISSION_RECHECK_SECONDS (#523).
+    if (!(await enforceFreshDashboardPermission({ req, res, requestUrl, runtimes, readJsonBody }))) {
+      return;
     }
 
     // --- API routes ---

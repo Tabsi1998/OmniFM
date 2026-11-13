@@ -5,6 +5,7 @@
 // setup status, the same as /api/dashboard/playback/now and /api/dashboard/stats.
 import { createHash } from "node:crypto";
 import { LIVE_RETRY_MS, createLiveHub } from "../../lib/dashboard-live.js";
+import { freshPermissionRevoked } from "../helpers/permission-recheck.js";
 
 export function createDashboardLiveRouteHandler(deps) {
   const {
@@ -70,10 +71,11 @@ export function createDashboardLiveRouteHandler(deps) {
       snapshot: () => buildDashboardLiveSnapshot(guild.id, guild.tier, runtimes, {
         withStats: serverHasCapability(guild.id, "dashboard_access"),
       }),
-      // Signed out, or no longer allowed on the server: the stream ends.
+      // Signed out, or no longer allowed on the server (also by Discord, #523): the stream ends.
       stillAllowed: () => {
         const current = getDashboardSession(req).session;
-        return Boolean(current && resolveDashboardGuildForSession(current, guild.id) && serverHasCapability(guild.id, "dashboard_basic"));
+        return Boolean(current && resolveDashboardGuildForSession(current, guild.id) && serverHasCapability(guild.id, "dashboard_basic"))
+          && !freshPermissionRevoked(runtimes, current, guild.id);
       },
       write: (text) => res.write(text),
       end: () => res.end(),
