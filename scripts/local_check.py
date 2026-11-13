@@ -1325,6 +1325,8 @@ def fastapi_contract_suite(context: Context) -> str:
     env = context.cache.get("fastapi:env")
     if not env or not port_open(API_PORT):
         raise StepSkipped("the live FastAPI of backend/contract is not running")
+    if port_open(TEST_STREAM_PORT):
+        raise StepSkipped(f"port {TEST_STREAM_PORT} (the local test sender) is taken; stop what uses it and run again")
     base = f"http://127.0.0.1:{API_PORT}"
     completed = context.run(
         venv_python(), "-m", "pytest", BACKEND / "tests", "-q", "-p", "no:cacheprovider", "-rfE",
@@ -1354,6 +1356,8 @@ def node_contract_suite(context: Context) -> str:
         raise StepSkipped("the FastAPI environment of backend/contract is missing")
     if port_open(NODE_CONTRACT_PORT):
         raise StepSkipped(f"port {NODE_CONTRACT_PORT} is taken; stop what uses it and run again")
+    if port_open(TEST_STREAM_PORT):
+        raise StepSkipped(f"port {TEST_STREAM_PORT} (the local test sender) is taken; stop what uses it and run again")
     node = node_of(context, NODE_MAJOR)
     scratch = Path(tempfile.mkdtemp(prefix="omnifm-node-contract-"))
     base = f"http://127.0.0.1:{NODE_CONTRACT_PORT}"

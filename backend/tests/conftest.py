@@ -79,6 +79,14 @@ class _TestStreamHandler(BaseHTTPRequestHandler):
         pass
 
 
+class _TestStreamServer(ThreadingHTTPServer):
+    # On Windows SO_REUSEADDR lets a second process bind the same port; a
+    # taken port must fail here instead of serving the other process's answers.
+    allow_reuse_address = False
+    allow_reuse_port = False
+    daemon_threads = True
+
+
 @pytest.fixture(scope="session")
 def test_stream_url():
     """The URL of the local test sender; skips when the harness named none."""
@@ -86,8 +94,10 @@ def test_stream_url():
     if not origin:
         pytest.skip("OMNIFM_TEST_STREAM_ORIGIN is not set: no local test sender (scripts/local_check.py sets it)")
     parsed = urlparse(origin)
-    server = ThreadingHTTPServer((parsed.hostname, parsed.port), _TestStreamHandler)
-    server.daemon_threads = True
+    try:
+        server = _TestStreamServer((parsed.hostname, parsed.port), _TestStreamHandler)
+    except OSError as error:
+        pytest.fail(f"the local test sender cannot listen on {origin}: {error}")
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     yield f"{origin.rstrip('/')}/test.mp3"
