@@ -58,18 +58,29 @@ describe('browser probe of the station cockpit', () => {
     expect(await probeBrowserPlayable('')).toBe(false);
   });
 
-  it('loads at most three stations at the same time', async () => {
-    const items = Array.from({ length: 7 }, (_, index) => ({ key: `s${index}`, url: `https://stream.example.com/${index}.mp3` }));
+  it('keeps three stations loading: a finished one makes room at once', async () => {
+    const items = Array.from({ length: 6 }, (_, index) => ({ key: `s${index}`, url: `https://stream.example.com/${index}.mp3` }));
     const batch = probeBrowserBatch(items);
     await vi.advanceTimersByTimeAsync(0);
     expect(audios).toHaveLength(3);
-    audios.forEach((audio) => audio.fire('canplay'));
+    // One answers; the next starts although the other two are still loading.
+    audios[1].fire('canplay');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(audios).toHaveLength(4);
+    expect(audios.filter((audio) => !audio.released)).toHaveLength(3);
+    audios[3].fire('error');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(audios).toHaveLength(5);
+    audios[0].fire('canplay');
     await vi.advanceTimersByTimeAsync(0);
     expect(audios).toHaveLength(6);
-    audios.slice(3).forEach((audio) => audio.fire('error'));
-    await vi.advanceTimersByTimeAsync(0);
-    expect(audios).toHaveLength(7);
-    audios[6].fire('loadeddata');
-    expect(await batch).toEqual({ s0: true, s1: true, s2: true, s3: false, s4: false, s5: false, s6: true });
+    audios[2].fire('error');
+    audios[4].fire('loadeddata');
+    await vi.advanceTimersByTimeAsync(12000);
+    expect(await batch).toEqual({ s0: true, s1: true, s2: false, s3: false, s4: true, s5: false });
+  });
+
+  it('answers an empty list with an empty result', async () => {
+    expect(await probeBrowserBatch([])).toEqual({});
   });
 });

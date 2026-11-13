@@ -31,14 +31,22 @@ export const probeBrowserPlayable = (url) => new Promise((resolve) => {
   try { a.src = url; a.load(); } catch { finish(false); }
 });
 
-/** Probes [{ key, url }] a few at a time; returns { key: playable }. */
+/**
+ * Probes [{ key, url }]; returns { key: playable }. Up to three load at the
+ * same time, and a finished one makes room for the next at once: one slow
+ * station does not hold the others back.
+ */
 export const probeBrowserBatch = async (items) => {
   const flags = {};
-  for (let i = 0; i < items.length; i += BROWSER_PROBE_CONCURRENCY) {
-    const group = items.slice(i, i + BROWSER_PROBE_CONCURRENCY);
-    // eslint-disable-next-line no-await-in-loop
-    const results = await Promise.all(group.map((it) => probeBrowserPlayable(it.url)));
-    group.forEach((it, gi) => { flags[it.key] = results[gi]; });
-  }
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const item = items[next];
+      next += 1;
+      // eslint-disable-next-line no-await-in-loop -- each worker loads one station after the other
+      flags[item.key] = await probeBrowserPlayable(item.url);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(BROWSER_PROBE_CONCURRENCY, items.length) }, worker));
   return flags;
 };

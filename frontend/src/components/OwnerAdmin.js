@@ -424,10 +424,10 @@ export default function OwnerAdmin() {
         // 2) Browser-Probe (nur für in Discord spielbare Sender, #538) – mit 24h-Cache.
         const cache = readBrowserCache();
         const nowMs = Date.now();
-        const reachableItems = batch.filter((k) => serverResults[k] && (serverResults[k].discordOk || serverResults[k].ok)).map((k) => ({ key: k, url: urlByKey[k] }));
+        const playableItems = batch.filter((k) => serverResults[k] && (serverResults[k].discordOk || serverResults[k].ok)).map((k) => ({ key: k, url: urlByKey[k] }));
         const cachedFlags = {};
         const toProbe = [];
-        reachableItems.forEach((it) => {
+        playableItems.forEach((it) => {
           const c = cache[it.key];
           if (c && (nowMs - c.at) < BROWSER_CACHE_TTL && c.url === it.url) cachedFlags[it.key] = c.ok;
           else toProbe.push(it);
