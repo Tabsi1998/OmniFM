@@ -39,7 +39,6 @@ export const suggestionMethods = {
     const result = await createStationSuggestion(form, {
       userId: interaction.user?.id,
       userName: interaction.user?.globalName || interaction.user?.username,
-      guildId: interaction.guildId,
       language,
     }, { catalog: loadStations()?.stations || {} });
     if (result.error) {

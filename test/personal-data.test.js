@@ -117,7 +117,7 @@ test("after 'delete everything' the Discord ID is in no collection", { skip: !ha
   assert.ok(created?.ok, JSON.stringify(created));
   await db.collection("owner_audit").insertOne({ at: new Date().toISOString(), actor: `dashboard:${person}`, action: "guild.panelDesign.update", target: guildId, summary: "Panel-Design geändert" });
   const suggestionUrl = `https://stream.example.com/suggested-${Math.random().toString(36).slice(2)}.mp3`;
-  const suggested = await createStationSuggestion({ name: "Vorschlag FM", url: suggestionUrl }, { userId: person, userName: "person", guildId });
+  const suggested = await createStationSuggestion({ name: "Vorschlag FM", url: suggestionUrl }, { userId: person, userName: "person" });
   assert.ok(suggested.suggestion, JSON.stringify(suggested));
   // A report with "tell me" keeps the ID for the promised message (#437).
   const reported = await createProblemReport({ kind: "idea", text: "Mehr Jazz bitte", consent: { notify: true }, reporter: { userId: person, name: "person" } });

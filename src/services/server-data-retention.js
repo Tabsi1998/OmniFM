@@ -5,8 +5,9 @@
 // one DM with the date, the owner console lists it, and 30 days later the
 // commander deletes what OmniFM kept about the server: settings, own
 // stations and logos, permissions, language, events, polls, song history,
-// listening stats, telemetry, incidents and bot state. If OmniFM comes back
-// before that, nothing is deleted. Premium licenses stay (billing).
+// listening stats, telemetry, incidents and bot state. Reports and station
+// suggestions stay with the team, without the server (#522). If OmniFM comes
+// back before that, nothing is deleted. Premium licenses stay (billing).
 import { ButtonBuilder, ButtonStyle, ActionRowBuilder } from "discord.js";
 
 import { getDb, isConnected } from "../lib/db.js";
@@ -32,6 +33,9 @@ import { resetGuildStats } from "../listening-stats-store.js";
 import { deleteDashboardTelemetry } from "../dashboard-store.js";
 import { clearRuntimeIncidentsForGuild } from "../runtime-incidents-store.js";
 import { forgetGuildInBotStates } from "../bot-state.js";
+import { forgetReportGuild } from "../problem-reports-store.js";
+import { refreshTeamCards } from "./problem-reports.js";
+import { forgetStationSuggestionGuild } from "../station-suggestions-store.js";
 import { botTranslator } from "../lib/bot-i18n.js";
 
 const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
@@ -47,6 +51,8 @@ const DATA_PROBES = [
   ["guild_stats", "guildId"],
   ["song_history", "guildId"],
   ["guild_jingles", "guildId"],
+  ["problem_reports", "guild.id"],
+  ["station_suggestions", "submitter.guildId"],
 ];
 
 function db() {
@@ -64,8 +70,11 @@ export async function hasServerData(guildId) {
   return false;
 }
 
-/** Deletes what OmniFM keeps about one server; returns what went, per part. */
-export async function purgeServerData(guildId) {
+/**
+ * Deletes what OmniFM keeps about one server; returns what went, per part.
+ * With the commander's client, the posted team cards of its reports lose the server too.
+ */
+export async function purgeServerData(guildId, { client = null } = {}) {
   const gid = String(guildId || "").trim();
   const database = db();
   const counts = {};
@@ -80,6 +89,10 @@ export async function purgeServerData(guildId) {
   deleteDashboardTelemetry(gid);
   await clearRuntimeIncidentsForGuild(gid);
   counts.botStates = await forgetGuildInBotStates(gid);
+  const reports = await forgetReportGuild(gid);
+  counts.reports = reports.length;
+  if (client) await refreshTeamCards(client, reports);
+  counts.suggestions = await forgetStationSuggestionGuild(gid);
   if (database) {
     for (const collection of STATS_COLLECTIONS) {
       // eslint-disable-next-line no-await-in-loop -- one collection after the other
@@ -157,7 +170,7 @@ export async function runServerDataRetention(runtime, { now = new Date() } = {})
       continue;
     }
     // eslint-disable-next-line no-await-in-loop
-    const counts = await purgeServerData(guildId);
+    const counts = await purgeServerData(guildId, { client: runtime?.client });
     // eslint-disable-next-line no-await-in-loop
     await clearGuildDeparture(guildId);
     recordOwnerAudit({

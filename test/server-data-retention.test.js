@@ -91,6 +91,14 @@ test("removed: one DM, a return keeps it; 30 days later the server's data is gon
   await db.collection("runtime_guild_directory").insertOne({ _id: guildId, name: "Testserver" });
   await db.collection("bot_state").insertOne({ _id: botDocId, guilds: { [guildId]: { volume: 50 }, keep: { volume: 20 } }, updatedAt: new Date().toISOString() });
   await db.collection("server_entitlements").insertOne({ _serverId: guildId, licenseId: "OMNI-TEST" });
+  // A report and a station suggestion from the server stay with the team, without the server (#522).
+  const { createProblemReport } = await import("../src/problem-reports-store.js");
+  const { createStationSuggestion } = await import("../src/station-suggestions-store.js");
+  const reported = await createProblemReport({ kind: "problem", text: "Kein Ton seit gestern", guild: { id: guildId, name: "Testserver" }, reporter: { userId: ownerId, name: "Alex" }, consent: { notify: true } });
+  const suggested = await createStationSuggestion({ name: "Retention FM", url: `http://8.8.8.8:8000/omnifm-retention-${snowflake()}.mp3` }, { userId: ownerId, userName: "Alex" });
+  assert.ok(reported.report && suggested.suggestion, "report and suggestion kept");
+  // Suggestions from before #522 still hold the server.
+  await db.collection("station_suggestions").updateOne({ _id: suggested.suggestion._id }, { $set: { "submitter.guildId": guildId } });
 
   const { initCustomStationsStore } = await import("../src/custom-stations.js");
   const { initCommandPermissionsStore, setCommandRolePermission } = await import("../src/command-permissions-store.js");
@@ -161,6 +169,14 @@ test("removed: one DM, a return keeps it; 30 days later the server's data is gon
   };
   assert.ok(await eventually(async () => (await holding()).length === 0), `still holding the server: ${(await holding()).join(", ")}`);
   assert.ok(await db.collection("server_entitlements").findOne({ _serverId: guildId }), "premium stays");
+  const report = await db.collection("problem_reports").findOne({ _id: reported.report._id });
+  assert.equal(report?.text, "Kein Ton seit gestern", "the report stays");
+  assert.equal(report.guild, null);
+  assert.doesNotMatch(JSON.stringify(report), /Testserver/);
+  const suggestion = await db.collection("station_suggestions").findOne({ _id: suggested.suggestion._id });
+  assert.equal(suggestion?.name, "Retention FM", "the suggestion stays");
+  assert.equal(suggestion.submitter.guildId, null);
+  assert.equal(suggestion.submitter.userId, ownerId, "the person keeps their answer");
   assert.deepEqual((await db.collection("bot_state").findOne({ _id: botDocId }))?.guilds, { keep: { volume: 20 } });
 });
 
@@ -173,4 +189,112 @@ test("a due server the commander is back on is not deleted", { skip: !hasMongoCo
   await handleCommanderGuildLeft(fakeCommander(), { id: guildId, name: "Zurück", ownerId: snowflake() }, { now: new Date(Date.now() - 40 * DAY_MS) });
   assert.deepEqual(await runServerDataRetention(fakeCommander({ inGuilds: [guildId] })), []);
   assert.ok(await getDb().collection("guild_settings").findOne({ guildId }));
+});
+
+test("a server with only reports and suggestions is announced; purging leaves other servers alone (#522)", { skip: !hasMongoConfig }, async () => {
+  const { connect, getDb } = await import("../src/lib/db.js");
+  await connect();
+  const db = getDb();
+  const { createProblemReport } = await import("../src/problem-reports-store.js");
+  const { createStationSuggestion } = await import("../src/station-suggestions-store.js");
+  const { hasServerData, handleCommanderGuildLeft, purgeServerData } = await import("../src/services/server-data-retention.js");
+  const { clearGuildDeparture } = await import("../src/guild-departures-store.js");
+  const reportsOnly = snowflake();
+  const suggestionsOnly = snowflake();
+  const other = snowflake();
+  const report = (guildId, name, text) => createProblemReport({ kind: "problem", text, guild: { id: guildId, name } });
+  // A suggestion from before #522, which still holds the server.
+  const suggest = async (guildId) => {
+    const created = await createStationSuggestion({ name: "Only FM", url: `http://8.8.8.8:8000/omnifm-only-${snowflake()}.mp3` }, { userId: snowflake() });
+    await db.collection("station_suggestions").updateOne({ _id: created.suggestion._id }, { $set: { "submitter.guildId": guildId } });
+    return created;
+  };
+  const mine = [await report(reportsOnly, "Nur Meldungen", "Erste Meldung"), await report(reportsOnly, "Nur Meldungen", "Zweite Meldung")].map((r) => r.report._id);
+  const theirs = (await report(other, "Anderer Server", "Fremde Meldung")).report._id;
+  const mySuggestions = [await suggest(suggestionsOnly), await suggest(suggestionsOnly)].map((r) => r.suggestion._id);
+  const theirSuggestion = (await suggest(other)).suggestion._id;
+
+  assert.equal(await hasServerData(reportsOnly), true, "reports count as data");
+  assert.equal(await hasServerData(suggestionsOnly), true, "suggestions count as data");
+  const commander = fakeCommander();
+  assert.equal((await handleCommanderGuildLeft(commander, { id: reportsOnly, name: "Nur Meldungen", ownerId: snowflake() })).recorded, true);
+  assert.equal((await handleCommanderGuildLeft(commander, { id: suggestionsOnly, name: "Nur Vorschläge", ownerId: snowflake() })).recorded, true);
+  assert.equal(commander.dms.length, 2);
+  await clearGuildDeparture(reportsOnly);
+  await clearGuildDeparture(suggestionsOnly);
+
+  await purgeServerData(reportsOnly);
+  await purgeServerData(suggestionsOnly);
+  for (const doc of await db.collection("problem_reports").find({ _id: { $in: mine } }).toArray()) {
+    assert.equal(doc.guild, null);
+    assert.doesNotMatch(JSON.stringify(doc), new RegExp(`${reportsOnly}|Nur Meldungen`));
+  }
+  assert.equal(await db.collection("problem_reports").countDocuments({ _id: { $in: mine } }), 2, "the reports stay");
+  for (const doc of await db.collection("station_suggestions").find({ _id: { $in: mySuggestions } }).toArray()) {
+    assert.equal(doc.submitter.guildId, null);
+  }
+  assert.equal(await db.collection("station_suggestions").countDocuments({ _id: { $in: mySuggestions } }), 2, "the suggestions stay");
+  assert.deepEqual((await db.collection("problem_reports").findOne({ _id: theirs }))?.guild, { id: other, name: "Anderer Server" });
+  assert.equal((await db.collection("station_suggestions").findOne({ _id: theirSuggestion }))?.submitter?.guildId, other);
+  assert.equal(await hasServerData(reportsOnly), false);
+  assert.equal(await hasServerData(suggestionsOnly), false);
+});
+
+test("the posted team cards lose the server too; a card that is gone stops nothing; the server's own station goes (#522)", { skip: !hasMongoConfig }, async () => {
+  const { connect, getDb } = await import("../src/lib/db.js");
+  await connect();
+  const db = getDb();
+  const { createProblemReport, markReportPosted } = await import("../src/problem-reports-store.js");
+  const { purgeServerData } = await import("../src/services/server-data-retention.js");
+  const guildId = snowflake();
+  const teamChannelId = snowflake();
+  const cardId = snowflake();
+  const goneCardId = snowflake();
+  let at = Date.now() - 60_000;
+  const report = async (station, messageId) => {
+    at += 1000;
+    const { report: doc } = await createProblemReport({ kind: "problem", text: "Rauscht", guild: { id: guildId, name: "Kartenserver" }, station }, { now: at });
+    if (messageId) await markReportPosted(doc._id, { guildId: snowflake(), channelId: teamChannelId, messageId });
+    return doc._id;
+  };
+  // The card that is gone comes first: it must not keep the later one from being edited.
+  const official = await report({ key: "groovesalad", name: "Groove Salad" }, goneCardId);
+  const own = await report({ key: "custom:meinsender", name: "Mein eigener Sender" }, cardId);
+  const unposted = await report(null, null);
+
+  const edits = [];
+  const tried = [];
+  const client = {
+    channels: {
+      fetch: async (id) => (id !== teamChannelId ? null : {
+        messages: {
+          fetch: async (messageId) => {
+            tried.push(messageId);
+            if (messageId !== cardId) throw Object.assign(new Error("Unknown Message"), { code: 10008 });
+            return { edit: async (payload) => { edits.push(payload); } };
+          },
+        },
+      }),
+    },
+  };
+  await purgeServerData(guildId, { client });
+
+  assert.deepEqual(tried, [goneCardId, cardId], "the gone card was tried first");
+  assert.equal(edits.length, 1, "the card that is still there is edited");
+  const card = JSON.stringify(edits[0].components.map((c) => (c.toJSON ? c.toJSON() : c)));
+  assert.match(card, /Rauscht/);
+  assert.doesNotMatch(card, new RegExp(`${guildId}|Kartenserver|Mein eigener Sender`));
+  assert.deepEqual(edits[0].allowedMentions, { parse: [] }, "no pings");
+  const byId = async (id) => db.collection("problem_reports").findOne({ _id: id });
+  assert.equal((await byId(own)).station, null, "the server's own station goes with the server");
+  assert.deepEqual((await byId(official)).station, { key: "groovesalad", name: "Groove Salad" }, "a catalogue station stays");
+  for (const id of [own, official, unposted]) {
+    // eslint-disable-next-line no-await-in-loop
+    assert.equal((await byId(id)).guild, null, "every report lost the server, the gone card stopped nothing");
+  }
+  // Without a client only the database changes, and nothing fails.
+  const second = await report({ key: "custom:x", name: "X" }, cardId);
+  await purgeServerData(guildId);
+  assert.equal((await byId(second)).guild, null);
+  assert.equal(edits.length, 1);
 });
