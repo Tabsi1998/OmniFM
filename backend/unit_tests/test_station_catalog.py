@@ -69,6 +69,23 @@ def test_549_rows_apply_like_the_node_side_and_only_on_the_old_url():
     assert server.catalog_unsets_for(own) == []
 
 
+def test_561_hardcore_radio_moves_to_happy_hardcore_only_on_the_old_url():
+    # Same row as in src/station-catalog-migrations.json (its extra "561" element is the Node id series).
+    old = {"key": "prohard03", "url": "http://shoutcast1.hardcoreradio.nl/", "name": "Hardcore", "country": "NL", "genre": "Hardstyle & Hardcore"}
+    updates = server.catalog_updates_for(old, {"genre": "Hardstyle & Hardcore"})
+    assert updates["url"] == "https://streams.rautemusik.fm/happyhardcore/mp3-192/"
+    assert updates["name"] == "Happy Hardcore" and updates["country"] == "DE"
+    assert updates["homepage"] == "https://www.rm.fm/happyhardcore"
+    assert server.catalog_unsets_for(old) == []
+
+    raw_key = {**old, "key": "pro_hard_03"}
+    assert server.catalog_updates_for(raw_key, {"genre": "Hardstyle & Hardcore"})["url"] == updates["url"]
+
+    own = {**old, "url": "https://my.own/hardcore"}
+    own_updates = server.catalog_updates_for(own, {"genre": "Hardstyle & Hardcore"})
+    assert "url" not in own_updates and "name" not in own_updates
+
+
 def test_the_reggae_country_follows_only_together_with_its_url():
     reggae = {"key": "reggaeradio", "url": "http://streams.bigfm.de/bigfm-reggaevibes-128-mp3", "country": "DE", "genre": "Reggae & Dancehall"}
     assert server.catalog_updates_for(reggae, {"genre": "Reggae & Dancehall"}) == {"url": "https://l.rootslegacy.fr/;", "country": "FR"}

@@ -17,7 +17,7 @@ const hasMongoConfig = Boolean(String(process.env.MONGO_URL || "").trim());
 
 // Reachable only over http (checked 12 Nov 2026); every other stream must be https.
 const HTTP_ONLY_ALLOW_LIST = new Set([
-  "pro_tech_05", "pro_tech_08", "pro_tech_09", "pro_tech_14", "pro_hard_03", "pro_house_09",
+  "pro_tech_05", "pro_tech_08", "pro_tech_09", "pro_tech_14", "pro_house_09",
 ]);
 
 test("seed catalog: no SomaFM, no http except the allow-list, no token, no tracking tail", () => {

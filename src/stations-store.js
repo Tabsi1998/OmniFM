@@ -9,7 +9,7 @@ import { withFileStoreLock, withFileWriteRetry } from "./lib/file-store-lock.js"
 import { log, logStoreLoadError } from "./lib/logging.js";
 import { appRootDir, resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 import { normalizeStationCatalogFields } from "./lib/station-fields.js";
-import { CATALOG_549_MIGRATIONS } from "./station-catalog-migrations.js";
+import { CATALOG_549_MIGRATIONS, CATALOG_561_MIGRATIONS } from "./station-catalog-migrations.js";
 
 /**
  * The tracked stations.json in the repository is the shipped seed and is never
@@ -50,6 +50,7 @@ export const STATION_CATALOG_MIGRATIONS = Object.freeze([
     toUrl: TOMORROWLAND_ANTHEMS_URL,
   }),
   ...CATALOG_549_MIGRATIONS,
+  ...CATALOG_561_MIGRATIONS,
 ]);
 
 function col() { const db = getDb(); return db ? db.collection(COLLECTION) : null; }
