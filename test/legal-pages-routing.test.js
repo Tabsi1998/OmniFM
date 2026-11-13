@@ -23,6 +23,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const frontendBuildDir = path.join(repoRoot, "frontend", "build");
 const frontendIndexPath = path.join(frontendBuildDir, "index.html");
+const frontendNoindexPath = path.join(frontendBuildDir, "noindex.html");
 const frontendRobotsPath = path.join(frontendBuildDir, "robots.txt");
 const frontendSitemapPath = path.join(frontendBuildDir, "sitemap.xml");
 const frontendManifestPath = path.join(frontendBuildDir, "manifest.json");
@@ -181,6 +182,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     DISCORD_CLIENT_SECRET: undefined,
   });
   const indexSnapshot = await snapshotFile(frontendIndexPath);
+  const noindexSnapshot = await snapshotFile(frontendNoindexPath);
   const robotsSnapshot = await snapshotFile(frontendRobotsPath);
   const sitemapSnapshot = await snapshotFile(frontendSitemapPath);
   const manifestSnapshot = await snapshotFile(frontendManifestPath);
@@ -220,12 +222,24 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
     assertCommonSecurityHeaders(termsPageResponse.headers, { expectGoogleAssets: true });
     assert.match(await termsPageResponse.text(), /legal-routing-marker/);
 
+    // The pages behind a login (#528): X-Robots-Tag always; index.html while the
+    // build has no noindex.html, then noindex.html.
+    await fs.rm(frontendNoindexPath, { force: true });
     const dashboardPageResponse = await fetch(`http://127.0.0.1:${port}/dashboard`);
     assert.equal(dashboardPageResponse.status, 200);
+    assert.equal(dashboardPageResponse.headers.get("x-robots-tag"), "noindex");
     assert.match(await dashboardPageResponse.text(), /legal-routing-marker/);
+    await fs.writeFile(frontendNoindexPath, "<!doctype html><html><body>noindex-routing-marker</body></html>", "utf8");
+    await Promise.all(["/dashboard", "/dashboard/", "/dashboard/classic", "/dashboard/studio", "/admin", "/owner/"].map(async (loginPath) => {
+      const response = await fetch(`http://127.0.0.1:${port}${loginPath}`);
+      assert.equal(response.status, 200, loginPath);
+      assert.equal(response.headers.get("x-robots-tag"), "noindex", loginPath);
+      assert.match(await response.text(), /noindex-routing-marker/, loginPath);
+    }));
 
     const stationsPageResponse = await fetch(`http://127.0.0.1:${port}/stations?lang=de`);
     assert.equal(stationsPageResponse.status, 200);
+    assert.equal(stationsPageResponse.headers.get("x-robots-tag"), null, "public pages stay indexable");
     assert.match(await stationsPageResponse.text(), /legal-routing-marker/);
 
     const premiumPageResponse = await fetch(`http://127.0.0.1:${port}/premium?lang=en`);
@@ -397,6 +411,7 @@ test("startWebServer serves SPA entry for clean legal paths and exposes terms pa
   } finally {
     await new Promise((resolve) => server.close(resolve));
     await restoreFile(frontendIndexPath, indexSnapshot);
+    await restoreFile(frontendNoindexPath, noindexSnapshot);
     await restoreFile(frontendRobotsPath, robotsSnapshot);
     await restoreFile(frontendSitemapPath, sitemapSnapshot);
     await restoreFile(frontendManifestPath, manifestSnapshot);
