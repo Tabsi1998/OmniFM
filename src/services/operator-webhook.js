@@ -124,13 +124,15 @@ function buildOperatorPayload(embedData, { mention = "", at = new Date() } = {})
  * Sendet eine deduplizierte Operator-Nachricht.
  * @param {string} dedupKey Eindeutiger Key für Deduplizierung
  * @param {{ color?: number, title?: string, description?: string, fields?: { name: string, value: string, inline?: boolean }[] }} embedData
+ * @returns {Promise<boolean>} true only when Discord took the message: false
+ *   without a webhook, within the dedup window, on an HTTP error or an exception
  */
 async function notify(dedupKey, embedData) {
-  if (!OPERATOR_WEBHOOK_ENABLED) return;
+  if (!OPERATOR_WEBHOOK_ENABLED) return false;
 
   const now = Date.now();
   const lastSent = recentMessages.get(dedupKey) || 0;
-  if (now - lastSent < DEDUP_WINDOW_MS) return; // Deduplizierung
+  if (now - lastSent < DEDUP_WINDOW_MS) return false; // Deduplizierung
   recentMessages.set(dedupKey, now);
 
   // Alte Einträge bereinigen
@@ -138,7 +140,11 @@ async function notify(dedupKey, embedData) {
     if (now - ts > DEDUP_WINDOW_MS * 10) recentMessages.delete(key);
   }
 
-  await sendWebhook(buildOperatorPayload(embedData, { mention: OPERATOR_WEBHOOK_MENTION }));
+  try {
+    return await sendWebhook(buildOperatorPayload(embedData, { mention: OPERATOR_WEBHOOK_MENTION }));
+  } catch {
+    return false;
+  }
 }
 
 // ---- Öffentliche Notify-Funktionen ----

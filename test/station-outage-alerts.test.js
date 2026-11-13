@@ -9,7 +9,7 @@ import {
   STATION_COCKPIT_URL,
 } from "../src/services/operator-alerts.js";
 import { applyOperatorAlertSettingsToEnv } from "../src/services/operator-alert-settings.js";
-import { buildOperatorPayload, operatorAllowedMentions } from "../src/services/operator-webhook.js";
+import { buildOperatorPayload, notifyOperator, operatorAllowedMentions } from "../src/services/operator-webhook.js";
 import { checkStation } from "../src/services/station-health.js";
 import { mp3Frames, withStreamServer } from "./support/stream-probe-server.mjs";
 
@@ -18,7 +18,7 @@ import { mp3Frames, withStreamServer } from "./support/stream-probe-server.mjs";
 
 const MINUTE = 60_000;
 const START = 1_700_000_000_000;
-const SETTINGS = { confirmChecks: 3, confirmMs: 15 * MINUTE, cooldownMs: 15 * MINUTE };
+const SETTINGS = { confirmChecks: 3, confirmMs: 15 * MINUTE, cooldownMs: 15 * MINUTE, recoveryChecks: 2 };
 
 function down(key, { failures = 3, forMs = 20 * MINUTE, at = START, reachable = false, error = "Timeout nach 8000 ms", ...rest } = {}) {
   return {
@@ -28,18 +28,27 @@ function down(key, { failures = 3, forMs = 20 * MINUTE, at = START, reachable = 
 }
 
 function up(key, rest = {}) {
-  return { key, name: `Sender ${key}`, status: "up", consecutiveFailures: 0, downSince: null, lastCheckedAt: START, outageAlerted: false, ...rest };
+  return {
+    key, name: `Sender ${key}`, status: "up", consecutiveFailures: 0, consecutiveSuccesses: 2,
+    downSince: null, lastCheckedAt: START, outageAlerted: false, ...rest,
+  };
 }
 
-function alerter({ env = {}, at = START } = {}) {
+function alerter({ env = {}, at = START, delivered = () => true } = {}) {
   const sent = [];
+  const tried = [];
   const time = { at };
   const instance = createStationOutageAlerter({
     env,
     now: () => time.at,
-    send: async (key, embed) => { sent.push({ key, embed }); },
+    send: async (key, embed) => {
+      tried.push({ key, embed });
+      if (!delivered()) return false;
+      sent.push({ key, embed });
+      return true;
+    },
   });
-  return { sent, time, flush: (entries) => instance.flush(entries) };
+  return { sent, tried, time, flush: (entries) => instance.flush(entries) };
 }
 
 test("an outage counts only after enough checks over enough time", () => {
@@ -52,8 +61,10 @@ test("an outage counts only after enough checks over enough time", () => {
 test("the limits come from the environment, with defaults", () => {
   assert.deepEqual(stationAlertSettings({}), SETTINGS);
   assert.deepEqual(stationAlertSettings({
-    OPERATOR_STATION_ALERT_CHECKS: "5", OPERATOR_STATION_ALERT_MIN_MS: "600000", OPERATOR_STATION_ALERT_COOLDOWN_MS: "60000",
-  }), { confirmChecks: 5, confirmMs: 10 * MINUTE, cooldownMs: MINUTE });
+    OPERATOR_STATION_ALERT_CHECKS: "5", OPERATOR_STATION_ALERT_MIN_MS: "600000", OPERATOR_STATION_ALERT_COOLDOWN_MS: "120000",
+    OPERATOR_STATION_ALERT_RECOVERY_CHECKS: "4",
+  }), { confirmChecks: 5, confirmMs: 10 * MINUTE, cooldownMs: 2 * MINUTE, recoveryChecks: 4 });
+  assert.equal(stationAlertSettings({ OPERATOR_STATION_ALERT_COOLDOWN_MS: "1000" }).cooldownMs, MINUTE, "at least one minute");
 });
 
 test("every confirmed outage and every return goes out in one message", async () => {
@@ -109,6 +120,8 @@ test("a station out for 15 minutes alerts once, and once more when it is back", 
     res.end(mp3Frames());
   }, async (playing) => {
     await run(playing);
+    assert.equal(sent.length, 1, "one playable check is not a return yet");
+    await run(playing);
     assert.equal(sent.length, 2);
     assert.match(sent[1].embed.description, /Wieder spielbar \(1\)[\s\S]*Gone FM/);
     time.at += 30 * MINUTE;
@@ -126,6 +139,42 @@ test("the health check keeps when an outage started and whether it was reported"
     fetchImpl: failing, previous: { ...first, outageAlerted: true }, now: START + 5 * MINUTE,
   });
   assert.deepEqual([second.downSince, second.outageAlerted, second.consecutiveFailures], [START, true, 2]);
+});
+
+test("a reported station that plays once and drops again sends nothing", async () => {
+  const { sent, flush } = alerter();
+  assert.deepEqual(await flush([up("a", { outageAlerted: true, consecutiveSuccesses: 1 })]), []);
+  assert.deepEqual(await flush([down("a", { outageAlerted: true, failures: 3 })]), []);
+  assert.equal(sent.length, 0);
+});
+
+test("a webhook that fails marks nothing, keeps the cooldown free and tries again", async () => {
+  let ok = false;
+  const { sent, tried, time, flush } = alerter({ delivered: () => ok });
+  assert.deepEqual(await flush([down("a"), up("b", { outageAlerted: true })]), [], "nothing is marked as reported");
+  assert.equal(tried.length, 1);
+  time.at += MINUTE;
+  await flush([down("a")]);
+  assert.equal(tried.length, 1, "a short pause after a failure, no storm");
+  time.at += 5 * MINUTE;
+  ok = true;
+  assert.deepEqual(await flush([down("a"), up("b", { outageAlerted: true })]), [
+    { key: "a", outageAlerted: true },
+    { key: "b", outageAlerted: false },
+  ]);
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].embed.description, /Sender a[\s\S]*Wieder spielbar \(1\)/);
+});
+
+test("without a webhook the outage stays pending until one is set", async () => {
+  // The real notifyOperator without OPERATOR_WEBHOOK_URL answers false.
+  assert.equal(await notifyOperator("station-outages-test", { title: "x" }), false);
+  const quiet = createStationOutageAlerter({ env: {}, send: notifyOperator, now: () => START });
+  assert.deepEqual(await quiet.flush([down("a")]), []);
+  // A webhook entered later (the bot restarts with it): the outage is reported.
+  const { sent, flush } = alerter();
+  await flush([down("a")]);
+  assert.equal(sent.length, 1);
 });
 
 test("a short wobble reports nothing", async () => {

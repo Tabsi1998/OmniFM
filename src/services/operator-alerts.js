@@ -237,7 +237,10 @@ export function stationAlertSettings(env = process.env) {
   return {
     confirmChecks: intEnv(env, "OPERATOR_STATION_ALERT_CHECKS", 3),
     confirmMs: intEnv(env, "OPERATOR_STATION_ALERT_MIN_MS", 15 * MINUTE),
-    cooldownMs: intEnv(env, "OPERATOR_STATION_ALERT_COOLDOWN_MS", 15 * MINUTE),
+    // At least the webhook's 60 s dedup window, or a due alert would be swallowed.
+    cooldownMs: Math.max(MINUTE, intEnv(env, "OPERATOR_STATION_ALERT_COOLDOWN_MS", 15 * MINUTE)),
+    // Playable this many checks in a row before "wieder spielbar": no flapping.
+    recoveryChecks: intEnv(env, "OPERATOR_STATION_ALERT_RECOVERY_CHECKS", 2),
   };
 }
 
@@ -310,15 +313,20 @@ export function buildStationAlert({ down = [], back = [] }, { now = Date.now(), 
   };
 }
 
+// After a failed send: try again after this pause, not every round. A webhook
+// that stays broken (or is not set) then costs one attempt per five minutes.
+const STATION_ALERT_RETRY_MS = 5 * MINUTE;
+
 /**
  * Collects confirmed outages and returns out of the health entries and sends
  * them as one alert, at most once per cooldown. Whether an outage was
  * reported lives in the health entry (`outageAlerted`, stored in MongoDB), so
  * a restart neither repeats it nor loses the return line. `flush` returns the
- * marks to store: [{ key, outageAlerted }].
+ * marks to store: [{ key, outageAlerted }], and none when the message did not
+ * reach Discord, so the next round tries again.
  */
 export function createStationOutageAlerter({ env = process.env, send = notifyOperator, now = Date.now } = {}) {
-  const cooldown = createCooldown(now);
+  let nextAllowedAt = 0;
   return {
     async flush(entries = []) {
       const settings = stationAlertSettings(env);
@@ -326,17 +334,26 @@ export function createStationOutageAlerter({ env = process.env, send = notifyOpe
       const back = [];
       for (const entry of entries) {
         if (entry?.outageAlerted === true) {
-          if (entry.status === "up") back.push(entry);
+          if (entry.status === "up" && Number(entry.consecutiveSuccesses || 0) >= settings.recoveryChecks) back.push(entry);
         } else if (isStationOutageConfirmed(entry, settings)) {
           down.push(entry);
         }
       }
       // Switched off: nothing is sent; an outage reported before is closed quietly.
-      if (!alertEnabled("STATIONS", env)) return back.map((entry) => ({ key: entry.key, outageAlerted: false }));
+      if (!alertEnabled("STATIONS", env)) {
+        return entries.filter((entry) => entry?.outageAlerted === true && entry.status === "up")
+          .map((entry) => ({ key: entry.key, outageAlerted: false }));
+      }
       if (down.length === 0 && back.length === 0) return [];
-      if (!cooldown.ready("stations", settings.cooldownMs)) return [];
-      log("INFO", `[Operator-Alarm] Sender: ${down.length} ausgefallen, ${back.length} wieder spielbar`);
-      await send("station-outages", buildStationAlert({ down, back }, { now: now() }));
+      const at = now();
+      if (at < nextAllowedAt) return [];
+      const delivered = await send("station-outages", buildStationAlert({ down, back }, { now: at }));
+      if (delivered !== true) {
+        nextAllowedAt = at + Math.min(STATION_ALERT_RETRY_MS, settings.cooldownMs);
+        return [];
+      }
+      nextAllowedAt = at + settings.cooldownMs;
+      log("INFO", `[Operator-Alarm] Sender: ${down.length} ausgefallen, ${back.length} wieder spielbar gemeldet`);
       return [
         ...down.map((entry) => ({ key: entry.key, outageAlerted: true })),
         ...back.map((entry) => ({ key: entry.key, outageAlerted: false })),
