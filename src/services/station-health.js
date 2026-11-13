@@ -80,7 +80,7 @@ function reportTransition(previous, entry) {
     recordRuntimeIncident({ severity: "warning", source: "station-health", message: stationOutageText(`${entry.name} (${entry.key})`, entry) }).catch(() => null);
   } else if (recovered) {
     log("INFO", `[StationHealth] Station "${entry.name}" (${entry.key}) ist wieder UP nach ${previous.consecutiveFailures} Fehlern (${entry.responseTimeMs}ms)`);
-    recordRuntimeIncident({ severity: "info", source: "station-health", message: stationRecoveryText(`${entry.name} (${entry.key})`, previous), resolved: true }).catch(() => null);
+    recordRuntimeIncident({ severity: "info", source: "station-health", message: stationRecoveryText(`${entry.name} (${entry.key})`), resolved: true }).catch(() => null);
   }
 }
 

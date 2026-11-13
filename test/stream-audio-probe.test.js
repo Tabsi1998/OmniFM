@@ -190,7 +190,7 @@ test("a server that never answers is a timeout, not reachable", async () => {
       [probe.httpStatus, probe.reachable, probe.authorized, probe.playableAudio, probe.reasonCode, probe.timedOut],
       [null, false, null, false, "timeout", true],
     );
-    assert.equal(probe.error, "Timeout nach 300ms");
+    assert.equal(probe.error, "Timeout nach 300 ms");
   });
 });
 
@@ -251,7 +251,9 @@ test("signatures: only a real ID3v2 header counts as a tag", () => {
   // while more is coming, MP3 once the probe has read all it will read.
   const bigTag = Buffer.concat([Buffer.from([0x49, 0x44, 0x33, 3, 0, 0, 0, 0x02, 0x00, 0x00]), Buffer.alloc(4096, 0x01)]);
   assert.deepEqual(verdict(bigTag, false), { format: null, kind: "unknown" });
-  assert.deepEqual(verdict(bigTag, true), { format: "mp3", kind: "audio" });
+  assert.deepEqual(detectAudioFormat(bigTag, { final: true, full: true }), { format: "mp3", kind: "audio" });
+  // The body stopped before the probe was full: a tag header alone proves nothing.
+  assert.deepEqual(verdict(bigTag, true), { format: null, kind: "unknown" });
 });
 
 test("ICY metadata between the audio bytes does not hide the frames", async () => {
@@ -269,11 +271,11 @@ test("ICY metadata between the audio bytes does not hide the frames", async () =
 });
 
 test("words for the owner: not playable is not offline", () => {
-  assert.equal(stationOutageText("Test FM (test)", { reachable: false, error: "Timeout nach 8000ms" }), "Sender Test FM (test) ist offline: Timeout nach 8000ms");
+  assert.equal(stationOutageText("Test FM (test)", { reachable: false, error: "Timeout nach 8000 ms" }), "Sender Test FM (test) ist offline: Timeout nach 8000 ms");
   assert.equal(stationOutageText("Test FM (test)", { reachable: true, error: "Kein Audio (HTML-Seite)" }), "Sender Test FM (test) ist nicht spielbar: Kein Audio (HTML-Seite)");
   assert.equal(stationOutageText("x", {}), "Sender x ist offline: nicht erreichbar");
-  assert.equal(stationRecoveryText("Test FM (test)", { reachable: true }), "Sender Test FM (test) ist wieder spielbar");
-  assert.equal(stationRecoveryText("Test FM (test)", { reachable: false }), "Sender Test FM (test) ist wieder erreichbar");
+  // "up" means playable now, whatever was wrong before.
+  assert.equal(stationRecoveryText("Test FM (test)"), "Sender Test FM (test) ist wieder spielbar");
 });
 
 test("signatures: one stray sync word is not audio", () => {
@@ -305,7 +307,7 @@ test("an HLS playlist is reported as a playlist the bot cannot play", async () =
 });
 
 test("binary data without a known signature counts as audio only when it is sent as audio", async () => {
-  const body = Buffer.alloc(2048, 0x01);
+  const body = Buffer.alloc(8192, 0x01);
   const probeAs = (contentType) => withStreamServer((req, res) => {
     res.writeHead(200, { "Content-Type": contentType });
     res.end(body);
@@ -332,4 +334,38 @@ test("a few unknown bytes and then silence are not playable, whatever the Conten
   // Enough of it, and the stream counts even though it then stalls.
   const enough = await stalledAfter(8192);
   assert.deepEqual([enough.playableAudio, enough.format, enough.reasonCode], [true, "unknown", "ok"]);
+});
+
+test("an ID3 header and then nothing is not a station", async () => {
+  // A valid header that announces a 32 KB tag; the server hangs after it.
+  const header = Buffer.from([0x49, 0x44, 0x33, 3, 0, 0, 0, 0x02, 0x00, 0x00]);
+  await withStreamServer((req, res) => {
+    res.writeHead(200, { "Content-Type": "audio/mpeg" });
+    res.write(header);
+  }, async (fetchImpl) => {
+    const probe = await probeStreamAudio(URL_UNDER_TEST, { fetchImpl, timeoutMs: 300 });
+    assert.deepEqual([probe.playableAudio, probe.format, probe.timedOut, probe.bytesRead], [false, null, true, 10]);
+    assert.equal(probe.error, "Kein erkennbares Audioformat (nach 300 ms)");
+  });
+  // The same tag filling the whole probe is an MP3 file with a cover picture.
+  await withStreamServer((req, res) => {
+    res.writeHead(200, { "Content-Type": "audio/mpeg" });
+    res.end(Buffer.concat([header, Buffer.alloc(20 * 1024, 0x01)]));
+  }, async (fetchImpl) => {
+    const probe = await probeStreamAudio(URL_UNDER_TEST, { fetchImpl, maxBytes: 16 * 1024 });
+    assert.deepEqual([probe.playableAudio, probe.format, probe.bytesRead], [true, "mp3", 16 * 1024]);
+  });
+});
+
+test("a tiny finished file sent as audio is not a station", async () => {
+  await withStreamServer((req, res) => {
+    res.writeHead(200, { "Content-Type": "audio/mpeg" });
+    res.end(Buffer.alloc(300, 0x01));
+  }, async (fetchImpl) => {
+    const probe = await probeStreamAudio(URL_UNDER_TEST, { fetchImpl });
+    assert.deepEqual(
+      [probe.playableAudio, probe.format, probe.reasonCode, probe.timedOut, probe.error],
+      [false, null, "unknown_format", false, "Kein erkennbares Audioformat"],
+    );
+  });
 });

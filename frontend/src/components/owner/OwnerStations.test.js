@@ -44,7 +44,7 @@ describe('station cockpit: live status', () => {
       plays: { ok: true, reachable: true, authorized: true, playableAudio: true, discordOk: true, latencyMs: 80, browserOk: true },
       page: { ok: false, reachable: true, authorized: true, playableAudio: false, discordOk: false, format: 'html', error: 'Kein Audio (HTML-Seite)' },
       locked: { ok: false, reachable: true, authorized: false, playableAudio: false, discordOk: false, status: 401, error: 'HTTP 401 (Zugriff verweigert)' },
-      gone: { ok: false, reachable: false, authorized: null, playableAudio: false, discordOk: false, error: 'Timeout nach 5000ms' },
+      gone: { ok: false, reachable: false, authorized: null, playableAudio: false, discordOk: false, error: 'Timeout nach 5000 ms' },
     });
 
     expect(status('plays').textContent).toContain('Discord · 80ms');

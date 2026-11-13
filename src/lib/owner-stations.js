@@ -239,7 +239,7 @@ export async function runStationHealth(db, keys, { probe = probeStationUrl, now 
     if (failures === 2) {
       await incidents.insertOne({ at: stamp, severity: "warning", source: "station-health", message: clip(stationOutageText(key, doc), 240), resolved: false });
     } else if (ok && previous.status === "down" && parseIntLike(previous.consecutiveFailures, 0) >= 2) {
-      await incidents.insertOne({ at: stamp, severity: "info", source: "station-health", message: clip(stationRecoveryText(key, previous), 240), resolved: true });
+      await incidents.insertOne({ at: stamp, severity: "info", source: "station-health", message: clip(stationRecoveryText(key), 240), resolved: true });
     }
   }));
   return { results, count: Object.keys(results).length, truncated: requested.length > 25 };

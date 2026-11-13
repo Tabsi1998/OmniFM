@@ -163,7 +163,7 @@ test("the health run stores the result and raises an incident on the second fail
   // #538: a station that answers without audio is "not playable", not "offline".
   assert.deepEqual(db.data.runtime_incidents.map((row) => [row.severity, row.message, row.resolved]).sort((x, y) => x[1].localeCompare(y[1])), [
     ["warning", "Sender a ist offline: timeout", false],
-    ["info", "Sender b ist wieder erreichbar", true],
+    ["info", "Sender b ist wieder spielbar", true],
     ["warning", "Sender c ist nicht spielbar: Kein Audio (HTML-Seite)", false],
     ["info", "Sender d ist wieder spielbar", true],
   ]);

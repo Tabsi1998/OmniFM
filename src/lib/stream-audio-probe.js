@@ -89,11 +89,12 @@ function textVerdict(bytes) {
 /**
  * What the first bytes of a body are. `final` says nothing more is coming:
  * until then a short body that could still become anything stays undecided.
+ * `full` says the probe read all it is allowed to read.
  * @param {Uint8Array} input
- * @param {{ final?: boolean }} [options]
+ * @param {{ final?: boolean, full?: boolean }} [options]
  * @returns {AudioVerdict}
  */
-function detectAudioFormat(input, { final = false } = {}) {
+function detectAudioFormat(input, { final = false, full = false } = {}) {
   const bytes = Buffer.isBuffer(input) ? input : Buffer.from(input);
   const magic = bytes.subarray(0, 4).toString("latin1");
   if (magic === "OggS") {
@@ -107,9 +108,9 @@ function detectAudioFormat(input, { final = false } = {}) {
   // more as the four 7-bit size bytes say. Text that starts with "ID3" is no tag.
   if (magic.startsWith("ID3") && bytes.length >= 10 && bytes[3] >= 2 && bytes[3] <= 4 && bytes.subarray(6, 10).every((byte) => byte < 0x80)) {
     from = 10 + (bytes[6] << 21 | bytes[7] << 14 | bytes[8] << 7 | bytes[9]);
-    // A tag with a cover picture can fill the whole probe: wait for more,
-    // and call it MP3 once nothing more is read.
-    if (from >= bytes.length) return final ? { format: "mp3", kind: "audio" } : undecided();
+    // A tag with a cover picture can fill the whole probe: then it is an
+    // MP3. A header and a body that stops short of that proves nothing.
+    if (from >= bytes.length) return full ? { format: "mp3", kind: "audio" } : undecided();
   }
   const frames = findFrames(bytes, from);
   if (frames) return { format: frames, kind: "audio" };
@@ -140,9 +141,9 @@ function stationOutageText(label, { reachable = false, error = "" } = {}) {
   return `Sender ${label} ist ${reachable ? "nicht spielbar" : "offline"}: ${error || "nicht erreichbar"}`;
 }
 
-/** The matching all-clear for the state the station was in before. */
-function stationRecoveryText(label, previous = {}) {
-  return `Sender ${label} ist wieder ${previous?.reachable ? "spielbar" : "erreichbar"}`;
+/** The all-clear: "up" means the station plays again, whatever was wrong before. */
+function stationRecoveryText(label) {
+  return `Sender ${label} ist wieder spielbar`;
 }
 
 /** One short German line for the owner: why this is not playable. */
@@ -150,7 +151,7 @@ function describeProbeFailure(probe, rawError = "") {
   // The body stopped coming before there was enough to tell.
   const waited = probe.timedOut ? ` (nach ${probe.timeoutMs} ms)` : "";
   switch (probe.reasonCode) {
-    case "timeout": return `Timeout nach ${probe.timeoutMs}ms`;
+    case "timeout": return `Timeout nach ${probe.timeoutMs} ms`;
     case "network_error": return String(rawError || "nicht erreichbar");
     case "unauthorized": return `HTTP ${probe.httpStatus} (Zugriff verweigert)`;
     case "http_error": return `HTTP ${probe.httpStatus}`;
@@ -232,19 +233,15 @@ async function probeStreamAudio(url, {
       let raw = Buffer.alloc(0);
       let bytes = raw;
       let verdict = undecided();
-      let ended = !reader;
       while (reader && !verdict.format && raw.length < maxBytes) {
         // eslint-disable-next-line no-await-in-loop -- the body arrives chunk by chunk
         const next = await Promise.race([reader.read().catch(() => null), aborted]);
-        if (!next || next.done) {
-          ended = Boolean(next?.done);
-          break;
-        }
+        if (!next || next.done) break;
         raw = Buffer.concat([raw, next.value]).subarray(0, maxBytes);
         bytes = metaint > 0 ? stripIcyMetadata(raw, metaint) : raw;
         verdict = detectAudioFormat(bytes);
       }
-      if (!verdict.format) verdict = detectAudioFormat(bytes, { final: true });
+      if (!verdict.format) verdict = detectAudioFormat(bytes, { final: true, full: raw.length >= maxBytes });
       probe.bytesRead = raw.length;
       probe.format = verdict.format;
       if (verdict.kind === "audio") {
@@ -255,10 +252,10 @@ async function probeStreamAudio(url, {
         // The player pipes the body into FFmpeg (pipe:0); a playlist's
         // segments are never fetched, so this does not play.
         probe.reasonCode = "playlist";
-      } else if ((ended ? bytes.length > 0 : bytes.length >= Math.min(UNKNOWN_AUDIO_MIN_BYTES, maxBytes)) && /^(audio|video)\/|^application\/ogg/i.test(probe.contentType)) {
+      } else if (bytes.length >= Math.min(UNKNOWN_AUDIO_MIN_BYTES, maxBytes) && /^(audio|video)\/|^application\/ogg/i.test(probe.contentType)) {
         // Binary data no signature here knows (MP4, WAV, MPEG-TS …), sent as
         // audio: FFmpeg plays far more than this probe recognises. A few
-        // bytes and then silence are not a stream, though.
+        // bytes are not a station, though, whether the body stalled or ended.
         probe.format = "unknown";
         probe.reasonCode = "ok";
       } else {
