@@ -17,7 +17,7 @@ import OwnerCockpit from './OwnerCockpit.js';
 import {
   OWNER_AREAS,
   areaOfPage,
-  ownerPageFromSearch,
+  initialOwnerPage,
   pagesOfArea,
   searchOwnerPages,
   systemPartOf,
@@ -45,6 +45,8 @@ const TOKEN_KEY = 'omnifm_admin_token';
 // Set before the Discord sign-in; on the way back the console turns the
 // dashboard sign-in into an owner session (#283).
 const DISCORD_PENDING_KEY = 'omnifm_owner_discord_pending';
+// The page a link opened (#550), kept across the Discord login.
+const DISCORD_SECTION_KEY = 'omnifm_owner_discord_section';
 // Changes through the owner session cookie need this header (#283).
 const CSRF_HEADERS = { 'X-OmniFM-CSRF': 'owner-intent' };
 
@@ -69,7 +71,15 @@ export default function OwnerAdmin() {
   const [session, setSession] = useState(null);
   const [discordLogin, setDiscordLogin] = useState(false);
 
-  const [section, setSection] = useState(() => (typeof window !== 'undefined' ? ownerPageFromSearch(window.location.search) : 'cockpit'));
+  const [section, setSection] = useState(() => {
+    if (typeof window === 'undefined') return 'cockpit';
+    let remembered = null;
+    try {
+      remembered = window.sessionStorage.getItem(DISCORD_SECTION_KEY);
+      window.sessionStorage.removeItem(DISCORD_SECTION_KEY);
+    } catch { /* no storage: the linked page or the cockpit */ }
+    return initialOwnerPage(window.location.search, remembered);
+  });
   const [navQuery, setNavQuery] = useState('');
   const openPage = useCallback((pageId) => setSection(areaOfPage(pageId) ? pageId : 'cockpit'), []);
   const [overview, setOverview] = useState(null);
@@ -476,6 +486,7 @@ export default function OwnerAdmin() {
 
   const startDiscordLogin = () => {
     window.sessionStorage.setItem(DISCORD_PENDING_KEY, '1');
+    try { window.sessionStorage.setItem(DISCORD_SECTION_KEY, section); } catch { /* the cockpit then */ }
     window.location.href = buildApiUrl('/api/auth/discord/login?redirect=1&nextPage=admin');
   };
 
