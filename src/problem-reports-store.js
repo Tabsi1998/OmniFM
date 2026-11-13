@@ -205,13 +205,22 @@ export async function forgetReporter(userId) {
   return Number(result?.modifiedCount || 0);
 }
 
-/** OmniFM left the server 30 days ago (#285, #522): its reports stay with the team, without the server's ID and name. */
+/**
+ * OmniFM left the server 30 days ago (#285, #522): its reports stay with the
+ * team, without the server's ID and name, and without the server's own
+ * station (deleted with the server). Returns the changed reports, so that
+ * the posted team cards can follow.
+ */
 export async function forgetReportGuild(guildId) {
   const reports = collection();
   const id = cleanId(guildId);
-  if (!reports || !id) return 0;
-  const result = await reports.updateMany({ "guild.id": id }, { $set: { guild: null } });
-  return Number(result?.modifiedCount || 0);
+  if (!reports || !id) return [];
+  const ids = (await reports.find({ "guild.id": id }, { projection: { _id: 1 } }).toArray()).map((doc) => doc._id);
+  if (!ids.length) return [];
+  // "custom:" is the prefix of a server's own stations (src/custom-stations.js).
+  await reports.updateMany({ _id: { $in: ids }, "station.key": { $regex: "^custom:" } }, { $set: { station: null } });
+  await reports.updateMany({ _id: { $in: ids } }, { $set: { guild: null } });
+  return reports.find({ _id: { $in: ids } }).toArray();
 }
 
 /**

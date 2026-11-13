@@ -232,3 +232,56 @@ test("a server with only reports and suggestions is announced; purging leaves ot
   assert.equal(await hasServerData(reportsOnly), false);
   assert.equal(await hasServerData(suggestionsOnly), false);
 });
+
+test("the posted team cards lose the server too; a card that is gone stops nothing; the server's own station goes (#522)", { skip: !hasMongoConfig }, async () => {
+  const { connect, getDb } = await import("../src/lib/db.js");
+  await connect();
+  const db = getDb();
+  const { createProblemReport, markReportPosted } = await import("../src/problem-reports-store.js");
+  const { purgeServerData } = await import("../src/services/server-data-retention.js");
+  const guildId = snowflake();
+  const teamChannelId = snowflake();
+  const cardId = snowflake();
+  const goneCardId = snowflake();
+  const report = async (station, messageId) => {
+    const { report: doc } = await createProblemReport({ kind: "problem", text: "Rauscht", guild: { id: guildId, name: "Kartenserver" }, station });
+    if (messageId) await markReportPosted(doc._id, { guildId: snowflake(), channelId: teamChannelId, messageId });
+    return doc._id;
+  };
+  const own = await report({ key: "custom:meinsender", name: "Mein eigener Sender" }, cardId);
+  const official = await report({ key: "groovesalad", name: "Groove Salad" }, goneCardId);
+  const unposted = await report(null, null);
+
+  const edits = [];
+  const client = {
+    channels: {
+      fetch: async (id) => (id !== teamChannelId ? null : {
+        messages: {
+          fetch: async (messageId) => {
+            if (messageId !== cardId) throw Object.assign(new Error("Unknown Message"), { code: 10008 });
+            return { edit: async (payload) => { edits.push(payload); } };
+          },
+        },
+      }),
+    },
+  };
+  await purgeServerData(guildId, { client });
+
+  assert.equal(edits.length, 1, "the card that is still there is edited");
+  const card = JSON.stringify(edits[0].components.map((c) => (c.toJSON ? c.toJSON() : c)));
+  assert.match(card, /Rauscht/);
+  assert.doesNotMatch(card, new RegExp(`${guildId}|Kartenserver|Mein eigener Sender`));
+  assert.deepEqual(edits[0].allowedMentions, { parse: [] }, "no pings");
+  const byId = async (id) => db.collection("problem_reports").findOne({ _id: id });
+  assert.equal((await byId(own)).station, null, "the server's own station goes with the server");
+  assert.deepEqual((await byId(official)).station, { key: "groovesalad", name: "Groove Salad" }, "a catalogue station stays");
+  for (const id of [own, official, unposted]) {
+    // eslint-disable-next-line no-await-in-loop
+    assert.equal((await byId(id)).guild, null, "every report lost the server, the gone card stopped nothing");
+  }
+  // Without a client only the database changes, and nothing fails.
+  const second = await report({ key: "custom:x", name: "X" }, cardId);
+  await purgeServerData(guildId);
+  assert.equal((await byId(second)).guild, null);
+  assert.equal(edits.length, 1);
+});

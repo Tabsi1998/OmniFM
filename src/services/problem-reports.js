@@ -183,6 +183,30 @@ async function tagForumPost(client, report, settings) {
   }
 }
 
+/**
+ * Edits the cards already posted in the team channel to what the reports
+ * hold now, e.g. without the server after its data was deleted (#522). A
+ * card that is gone or cannot be edited is skipped.
+ */
+export async function refreshTeamCards(client, reports, { settings = reportSettings() } = {}) {
+  let edited = 0;
+  for (const report of reports || []) {
+    if (!report?.team?.channelId || !report.team.messageId) continue;
+    try {
+      // eslint-disable-next-line no-await-in-loop -- one card after the other
+      const channel = await client.channels.fetch(report.team.channelId);
+      // eslint-disable-next-line no-await-in-loop
+      const message = await channel.messages.fetch(report.team.messageId);
+      // eslint-disable-next-line no-await-in-loop
+      await message.edit(buildTeamReportMessage(report, { forumChannelId: settings.forums[report.kind] }));
+      edited += 1;
+    } catch (err) {
+      log("WARN", `[Meldungen] Team-Karte für ${report._id} nicht aktualisiert: ${err?.message || err}`);
+    }
+  }
+  return edited;
+}
+
 /** Publishes a report in the forum of its kind: only with consent, only once, without server and name. */
 async function publishReport(interaction, report, { settings, store }) {
   if (!report.consent?.public) return quiet("Die Person hat nicht zugestimmt; die Meldung bleibt beim Team.");

@@ -34,6 +34,7 @@ import { deleteDashboardTelemetry } from "../dashboard-store.js";
 import { clearRuntimeIncidentsForGuild } from "../runtime-incidents-store.js";
 import { forgetGuildInBotStates } from "../bot-state.js";
 import { forgetReportGuild } from "../problem-reports-store.js";
+import { refreshTeamCards } from "./problem-reports.js";
 import { forgetStationSuggestionGuild } from "../station-suggestions-store.js";
 import { botTranslator } from "../lib/bot-i18n.js";
 
@@ -69,8 +70,11 @@ export async function hasServerData(guildId) {
   return false;
 }
 
-/** Deletes what OmniFM keeps about one server; returns what went, per part. */
-export async function purgeServerData(guildId) {
+/**
+ * Deletes what OmniFM keeps about one server; returns what went, per part.
+ * With the commander's client, the posted team cards of its reports lose the server too.
+ */
+export async function purgeServerData(guildId, { client = null } = {}) {
   const gid = String(guildId || "").trim();
   const database = db();
   const counts = {};
@@ -85,7 +89,9 @@ export async function purgeServerData(guildId) {
   deleteDashboardTelemetry(gid);
   await clearRuntimeIncidentsForGuild(gid);
   counts.botStates = await forgetGuildInBotStates(gid);
-  counts.reports = await forgetReportGuild(gid);
+  const reports = await forgetReportGuild(gid);
+  counts.reports = reports.length;
+  if (client) await refreshTeamCards(client, reports);
   counts.suggestions = await forgetStationSuggestionGuild(gid);
   if (database) {
     for (const collection of STATS_COLLECTIONS) {
@@ -164,7 +170,7 @@ export async function runServerDataRetention(runtime, { now = new Date() } = {})
       continue;
     }
     // eslint-disable-next-line no-await-in-loop
-    const counts = await purgeServerData(guildId);
+    const counts = await purgeServerData(guildId, { client: runtime?.client });
     // eslint-disable-next-line no-await-in-loop
     await clearGuildDeparture(guildId);
     recordOwnerAudit({
