@@ -12,7 +12,9 @@ import { safeFetch } from "./safe-outbound-http.js";
 const PROBE_MAX_BYTES = 32 * 1024;
 const PROBE_TIMEOUT_MS = 8_000;
 const TEXT_SAMPLE_BYTES = 512;
-const UNDECIDED = Object.freeze({ format: null, kind: "unknown" });
+/** @typedef {{ format: string | null, kind: "audio" | "text" | "playlist" | "unknown" }} AudioVerdict */
+/** @returns {AudioVerdict} */
+const undecided = () => ({ format: null, kind: "unknown" });
 
 // kbit/s by bitrate index; MPEG-2 and 2.5 share their tables.
 const MPEG_BITRATES = {
@@ -67,7 +69,10 @@ function findFrames(bytes, from) {
   return null;
 }
 
-/** A page, JSON, a playlist or other plain text; null for anything binary. */
+/**
+ * A page, JSON, a playlist or other plain text; null for anything binary.
+ * @returns {AudioVerdict | null}
+ */
 function textVerdict(bytes) {
   const sample = bytes.subarray(0, TEXT_SAMPLE_BYTES);
   if (!sample.length || sample.some((byte) => byte < 0x09 || (byte > 0x0d && byte < 0x20) || byte === 0x7f || byte >= 0xf8)) return null;
@@ -84,7 +89,7 @@ function textVerdict(bytes) {
  * until then a short body that could still become anything stays undecided.
  * @param {Uint8Array} input
  * @param {{ final?: boolean }} [options]
- * @returns {{ format: string | null, kind: "audio" | "text" | "playlist" | "unknown" }}
+ * @returns {AudioVerdict}
  */
 function detectAudioFormat(input, { final = false } = {}) {
   const bytes = Buffer.isBuffer(input) ? input : Buffer.from(input);
@@ -103,8 +108,8 @@ function detectAudioFormat(input, { final = false } = {}) {
   }
   const frames = findFrames(bytes, from);
   if (frames) return { format: frames, kind: "audio" };
-  if (final || bytes.length >= TEXT_SAMPLE_BYTES) return textVerdict(bytes) || { ...UNDECIDED };
-  return { ...UNDECIDED };
+  if (final || bytes.length >= TEXT_SAMPLE_BYTES) return textVerdict(bytes) || undecided();
+  return undecided();
 }
 
 const NOT_AUDIO_LABELS = { html: "HTML-Seite", json: "JSON", text: "Text", hls: "HLS-Playlist", playlist: "Playlist" };
@@ -188,7 +193,7 @@ async function probeStreamAudio(url, {
     } else {
       reader = response.body?.getReader?.() || null;
       let bytes = Buffer.alloc(0);
-      let verdict = { ...UNDECIDED };
+      let verdict = undecided();
       while (reader && !verdict.format && bytes.length < maxBytes) {
         // eslint-disable-next-line no-await-in-loop -- the body arrives chunk by chunk
         const next = await Promise.race([reader.read().catch(() => null), aborted]);

@@ -69,6 +69,7 @@ export async function validateStationUrl(url) {
  * it let us in (authorized), and is what comes audio the bot can play
  * (playableAudio, also as ok/discordOk/isAudioStream)? The bytes decide, not
  * the Content-Type or an icy-name.
+ * @returns {Promise<Record<string, any>>}
  */
 export async function probeStationUrl(url, { timeoutMs = 5000, fetchImpl = safeFetch } = {}) {
   const probe = await probeStreamAudio(url, { timeoutMs, userAgent: "OmniFM-StreamTest/1.0", fetchImpl });
