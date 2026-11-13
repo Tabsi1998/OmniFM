@@ -12,6 +12,8 @@ import { safeFetch } from "./safe-outbound-http.js";
 const PROBE_MAX_BYTES = 32 * 1024;
 const PROBE_TIMEOUT_MS = 8_000;
 const TEXT_SAMPLE_BYTES = 512;
+// Unknown binary data sent as audio counts only with this much of it.
+const UNKNOWN_AUDIO_MIN_BYTES = 4 * 1024;
 /** @typedef {{ format: string | null, kind: "audio" | "text" | "playlist" | "unknown" }} AudioVerdict */
 /** @returns {AudioVerdict} */
 const undecided = () => ({ format: null, kind: "unknown" });
@@ -101,10 +103,13 @@ function detectAudioFormat(input, { final = false } = {}) {
   }
   if (magic === "fLaC") return { format: "flac", kind: "audio" };
   let from = 0;
-  if (magic.startsWith("ID3") && bytes.length >= 10) {
-    // ID3v2: ten bytes, then as many as the four 7-bit size bytes say.
-    from = 10 + ((bytes[6] & 0x7f) << 21 | (bytes[7] & 0x7f) << 14 | (bytes[8] & 0x7f) << 7 | (bytes[9] & 0x7f));
-    if (from >= bytes.length) return { format: "mp3", kind: "audio" }; // a tag with a cover picture fills the whole probe
+  // ID3v2: "ID3", a version from 2 to 4, then ten bytes in all and as many
+  // more as the four 7-bit size bytes say. Text that starts with "ID3" is no tag.
+  if (magic.startsWith("ID3") && bytes.length >= 10 && bytes[3] >= 2 && bytes[3] <= 4 && bytes.subarray(6, 10).every((byte) => byte < 0x80)) {
+    from = 10 + (bytes[6] << 21 | bytes[7] << 14 | bytes[8] << 7 | bytes[9]);
+    // A tag with a cover picture can fill the whole probe: wait for more,
+    // and call it MP3 once nothing more is read.
+    if (from >= bytes.length) return final ? { format: "mp3", kind: "audio" } : undecided();
   }
   const frames = findFrames(bytes, from);
   if (frames) return { format: frames, kind: "audio" };
@@ -114,8 +119,36 @@ function detectAudioFormat(input, { final = false } = {}) {
 
 const NOT_AUDIO_LABELS = { html: "HTML-Seite", json: "JSON", text: "Text", hls: "HLS-Playlist", playlist: "Playlist" };
 
+/**
+ * With Icy-MetaData the server puts a metadata block after every `metaint`
+ * audio bytes: one length byte (x16) and that many bytes. The player does
+ * not ask for them, so they are cut out before the bytes are judged.
+ */
+function stripIcyMetadata(bytes, metaint) {
+  const audio = [];
+  let at = 0;
+  while (at < bytes.length) {
+    audio.push(bytes.subarray(at, at + metaint));
+    at += metaint;
+    if (at < bytes.length) at += 1 + bytes[at] * 16;
+  }
+  return Buffer.concat(audio);
+}
+
+/** "offline" only when there was no answer; a page or a login wall is "not playable". */
+function stationOutageText(label, { reachable = false, error = "" } = {}) {
+  return `Sender ${label} ist ${reachable ? "nicht spielbar" : "offline"}: ${error || "nicht erreichbar"}`;
+}
+
+/** The matching all-clear for the state the station was in before. */
+function stationRecoveryText(label, previous = {}) {
+  return `Sender ${label} ist wieder ${previous?.reachable ? "spielbar" : "erreichbar"}`;
+}
+
 /** One short German line for the owner: why this is not playable. */
 function describeProbeFailure(probe, rawError = "") {
+  // The body stopped coming before there was enough to tell.
+  const waited = probe.timedOut ? ` (nach ${probe.timeoutMs} ms)` : "";
   switch (probe.reasonCode) {
     case "timeout": return `Timeout nach ${probe.timeoutMs}ms`;
     case "network_error": return String(rawError || "nicht erreichbar");
@@ -123,8 +156,8 @@ function describeProbeFailure(probe, rawError = "") {
     case "http_error": return `HTTP ${probe.httpStatus}`;
     case "not_audio":
     case "playlist": return `Kein Audio (${NOT_AUDIO_LABELS[probe.format] || probe.format})`;
-    case "no_data": return "Keine Audiodaten erhalten";
-    default: return "Kein erkennbares Audioformat";
+    case "no_data": return `Keine Audiodaten erhalten${waited}`;
+    default: return `Kein erkennbares Audioformat${waited}`;
   }
 }
 
@@ -192,17 +225,27 @@ async function probeStreamAudio(url, {
       probe.reasonCode = probe.authorized ? "http_error" : "unauthorized";
     } else {
       reader = response.body?.getReader?.() || null;
-      let bytes = Buffer.alloc(0);
+      // The probe asks for Icy-MetaData because some servers only then say
+      // who they are (icy-name, #325); what they mix into the audio for it
+      // is taken out again.
+      const metaint = Number.parseInt(String(response.headers?.get?.("icy-metaint") || ""), 10) || 0;
+      let raw = Buffer.alloc(0);
+      let bytes = raw;
       let verdict = undecided();
-      while (reader && !verdict.format && bytes.length < maxBytes) {
+      let ended = !reader;
+      while (reader && !verdict.format && raw.length < maxBytes) {
         // eslint-disable-next-line no-await-in-loop -- the body arrives chunk by chunk
         const next = await Promise.race([reader.read().catch(() => null), aborted]);
-        if (!next || next.done) break;
-        bytes = Buffer.concat([bytes, next.value]).subarray(0, maxBytes);
+        if (!next || next.done) {
+          ended = Boolean(next?.done);
+          break;
+        }
+        raw = Buffer.concat([raw, next.value]).subarray(0, maxBytes);
+        bytes = metaint > 0 ? stripIcyMetadata(raw, metaint) : raw;
         verdict = detectAudioFormat(bytes);
       }
       if (!verdict.format) verdict = detectAudioFormat(bytes, { final: true });
-      probe.bytesRead = bytes.length;
+      probe.bytesRead = raw.length;
       probe.format = verdict.format;
       if (verdict.kind === "audio") {
         probe.reasonCode = "ok";
@@ -212,9 +255,10 @@ async function probeStreamAudio(url, {
         // The player pipes the body into FFmpeg (pipe:0); a playlist's
         // segments are never fetched, so this does not play.
         probe.reasonCode = "playlist";
-      } else if (bytes.length && /^(audio|video)\/|^application\/ogg/i.test(probe.contentType)) {
+      } else if ((ended ? bytes.length > 0 : bytes.length >= Math.min(UNKNOWN_AUDIO_MIN_BYTES, maxBytes)) && /^(audio|video)\/|^application\/ogg/i.test(probe.contentType)) {
         // Binary data no signature here knows (MP4, WAV, MPEG-TS …), sent as
-        // audio: FFmpeg plays far more than this probe recognises.
+        // audio: FFmpeg plays far more than this probe recognises. A few
+        // bytes and then silence are not a stream, though.
         probe.format = "unknown";
         probe.reasonCode = "ok";
       } else {
@@ -246,4 +290,6 @@ export {
   describeProbeFailure,
   detectAudioFormat,
   probeStreamAudio,
+  stationOutageText,
+  stationRecoveryText,
 };

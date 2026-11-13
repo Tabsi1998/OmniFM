@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import test from "node:test";
 
-import { detectAudioFormat, probeStreamAudio } from "../src/lib/stream-audio-probe.js";
-import { HTML_PAGE, aacFrames, mp3Frames, withStreamServer } from "./support/stream-probe-server.mjs";
+import { detectAudioFormat, probeStreamAudio, stationOutageText, stationRecoveryText } from "../src/lib/stream-audio-probe.js";
+import { HTML_PAGE, aacFrames, mp3Frames, mpegFrames, withIcyMetadata, withStreamServer } from "./support/stream-probe-server.mjs";
 
 // #538: one small GET probe decides whether a station sends audio. The
 // answer keeps "the server answers", "we are let in" and "this plays in
@@ -94,17 +94,16 @@ test("a redirect to audio is followed", async () => {
   });
 });
 
-test("a server that does not support HEAD is still playable", async () => {
+test("403 means the server answers, but refuses us", async () => {
   await withStreamServer((req, res) => {
-    if (req.method === "HEAD") {
-      req.socket.destroy();
-      return;
-    }
-    res.writeHead(200, { "Content-Type": "audio/mpeg" });
-    res.end(mp3Frames());
+    res.writeHead(403);
+    res.end("forbidden");
   }, async (fetchImpl) => {
     const probe = await probeStreamAudio(URL_UNDER_TEST, { fetchImpl });
-    assert.equal(probe.playableAudio, true);
+    assert.deepEqual(
+      [probe.httpStatus, probe.reachable, probe.authorized, probe.playableAudio, probe.reasonCode, probe.error],
+      [403, true, false, false, "unauthorized", "HTTP 403 (Zugriff verweigert)"],
+    );
   });
 });
 
@@ -178,6 +177,7 @@ test("a server that sends headers and then nothing times out and is closed", asy
       [probe.httpStatus, probe.reachable, probe.playableAudio, probe.reasonCode, probe.timedOut, probe.bytesRead],
       [200, true, false, "no_data", true, 0],
     );
+    assert.equal(probe.error, "Keine Audiodaten erhalten (nach 300 ms)");
     await closed;
     assert.equal(activeTimers(), before, "no timer left behind");
   });
@@ -228,6 +228,54 @@ test("signatures: MP3, AAC, Ogg, FLAC", () => {
   assert.equal(format(Buffer.concat([Buffer.from("fLaC"), Buffer.alloc(60)])), "flac");
 });
 
+test("signatures: the other MPEG audio kinds, and padded frames", () => {
+  const format = (bytes) => detectAudioFormat(bytes, { final: true }).format;
+  assert.equal(format(mpegFrames([0xf3, 0x80, 0x00], 208)), "mp3", "MPEG-2 layer III, 64 kbit/s, 22.05 kHz");
+  assert.equal(format(mpegFrames([0xf3, 0x82, 0x00], 209)), "mp3", "the same with padding");
+  assert.equal(format(mpegFrames([0xe3, 0x40, 0x00], 208)), "mp3", "MPEG-2.5 layer III, 32 kbit/s, 11.025 kHz");
+  assert.equal(format(mpegFrames([0xfd, 0xa4, 0x00], 576)), "mp3", "MPEG-1 layer II, 192 kbit/s, 48 kHz");
+  // 128 kbit/s at 44.1 kHz: every few frames one is a byte longer.
+  const mixed = Buffer.concat([mpegFrames([0xfb, 0x90, 0x00], 417, 1), mpegFrames([0xfb, 0x92, 0x00], 418, 1), mpegFrames([0xfb, 0x90, 0x00], 417, 1)]);
+  assert.equal(format(mixed), "mp3", "padded and unpadded frames in a row");
+  // A header whose length is off by one is not followed by a second frame.
+  assert.equal(format(mpegFrames([0xf3, 0x80, 0x00], 209)), null);
+});
+
+test("signatures: only a real ID3v2 header counts as a tag", () => {
+  const verdict = (bytes, final = true) => detectAudioFormat(bytes, { final });
+  assert.deepEqual(verdict(Buffer.from("ID3 is a tag format for MP3 files. This page explains it.")), { format: "text", kind: "text" });
+  // Version 9 does not exist; size bytes never have the top bit set.
+  assert.equal(verdict(Buffer.concat([Buffer.from([0x49, 0x44, 0x33, 9, 0, 0, 0, 0, 0x7f, 0x7f]), Buffer.alloc(200, 0x01)])).kind, "unknown");
+  assert.equal(verdict(Buffer.concat([Buffer.from([0x49, 0x44, 0x33, 3, 0, 0, 0, 0, 0x80, 0x00]), Buffer.alloc(200, 0x01)])).kind, "unknown");
+  // A tag with a cover picture is longer than the whole probe: undecided
+  // while more is coming, MP3 once the probe has read all it will read.
+  const bigTag = Buffer.concat([Buffer.from([0x49, 0x44, 0x33, 3, 0, 0, 0, 0x02, 0x00, 0x00]), Buffer.alloc(4096, 0x01)]);
+  assert.deepEqual(verdict(bigTag, false), { format: null, kind: "unknown" });
+  assert.deepEqual(verdict(bigTag, true), { format: "mp3", kind: "audio" });
+});
+
+test("ICY metadata between the audio bytes does not hide the frames", async () => {
+  const body = withIcyMetadata(mp3Frames(8), 400);
+  await withStreamServer((req, res) => {
+    assert.equal(req.headers["icy-metadata"], "1");
+    res.writeHead(200, { "Content-Type": "audio/mpeg", "icy-metaint": "400", "icy-name": "Meta FM" });
+    res.end(body);
+  }, async (fetchImpl) => {
+    const probe = await probeStreamAudio(URL_UNDER_TEST, { fetchImpl });
+    assert.deepEqual([probe.playableAudio, probe.format, probe.icyName], [true, "mp3", "Meta FM"]);
+  });
+  // Without the icy-metaint header nothing is cut out of the body.
+  assert.equal(detectAudioFormat(body, { final: true }).format, null);
+});
+
+test("words for the owner: not playable is not offline", () => {
+  assert.equal(stationOutageText("Test FM (test)", { reachable: false, error: "Timeout nach 8000ms" }), "Sender Test FM (test) ist offline: Timeout nach 8000ms");
+  assert.equal(stationOutageText("Test FM (test)", { reachable: true, error: "Kein Audio (HTML-Seite)" }), "Sender Test FM (test) ist nicht spielbar: Kein Audio (HTML-Seite)");
+  assert.equal(stationOutageText("x", {}), "Sender x ist offline: nicht erreichbar");
+  assert.equal(stationRecoveryText("Test FM (test)", { reachable: true }), "Sender Test FM (test) ist wieder spielbar");
+  assert.equal(stationRecoveryText("Test FM (test)", { reachable: false }), "Sender Test FM (test) ist wieder erreichbar");
+});
+
 test("signatures: one stray sync word is not audio", () => {
   const stray = Buffer.alloc(2048, 0x01);
   stray.set([0xff, 0xfb, 0x90, 0x00], 100);
@@ -267,4 +315,21 @@ test("binary data without a known signature counts as audio only when it is sent
   assert.deepEqual([mp4.playableAudio, mp4.format, mp4.reasonCode], [true, "unknown", "ok"]);
   const download = await probeAs("application/octet-stream");
   assert.deepEqual([download.playableAudio, download.format, download.reasonCode], [false, null, "unknown_format"]);
+});
+
+test("a few unknown bytes and then silence are not playable, whatever the Content-Type says", async () => {
+  const stalledAfter = (size) => withStreamServer((req, res) => {
+    res.writeHead(200, { "Content-Type": "audio/mp4" });
+    res.write(Buffer.alloc(size, 0x01));
+  }, (fetchImpl) => probeStreamAudio(URL_UNDER_TEST, { fetchImpl, timeoutMs: 300 }));
+
+  const trickle = await stalledAfter(1024);
+  assert.deepEqual(
+    [trickle.playableAudio, trickle.format, trickle.reasonCode, trickle.timedOut, trickle.bytesRead],
+    [false, null, "unknown_format", true, 1024],
+  );
+  assert.equal(trickle.error, "Kein erkennbares Audioformat (nach 300 ms)");
+  // Enough of it, and the stream counts even though it then stalls.
+  const enough = await stalledAfter(8192);
+  assert.deepEqual([enough.playableAudio, enough.format, enough.reasonCode], [true, "unknown", "ok"]);
 });

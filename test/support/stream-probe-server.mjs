@@ -15,6 +15,35 @@ export function mp3Frames(count = 4) {
   return Buffer.concat(Array.from({ length: count }, () => frame));
 }
 
+/**
+ * Frames of one MPEG audio kind: the three header bytes after 0xFF and the
+ * frame length that header stands for (written out, not computed, so the
+ * probe's own arithmetic is what gets tested).
+ */
+export function mpegFrames(header, length, count = 3) {
+  const frame = Buffer.alloc(length);
+  frame.set([0xff, ...header]);
+  return Buffer.concat(Array.from({ length: count }, () => frame));
+}
+
+/**
+ * What a SHOUTcast/Icecast server sends to a client that asked for
+ * Icy-MetaData: after every `metaint` audio bytes one length byte (x16) and
+ * that many bytes of metadata.
+ */
+export function withIcyMetadata(audio, metaint, title = "StreamTitle='Artist - Song';") {
+  const block = Buffer.alloc(1 + 16 * Math.ceil(title.length / 16));
+  block[0] = (block.length - 1) / 16;
+  block.write(title, 1, "latin1");
+  const parts = [];
+  for (let at = 0; at < audio.length; at += metaint) {
+    parts.push(audio.subarray(at, at + metaint));
+    // Most blocks are empty: the title only changes with the song.
+    if (at + metaint <= audio.length) parts.push(parts.length % 4 === 1 ? block : Buffer.from([0]));
+  }
+  return Buffer.concat(parts);
+}
+
 /** ADTS AAC-LC, 44.1 kHz, stereo: 200 bytes per frame. */
 export function aacFrames(count = 4) {
   const frame = Buffer.alloc(200);
