@@ -114,7 +114,8 @@
       "workerAutoheal": true,
       "diskSpace": true,
       "backupFailed": true,
-      "updates": true
+      "updates": true,
+      "stationOutages": true
     },
     "audioRecognition": {
       "enabled": false,
