@@ -34,9 +34,9 @@ async function readPublicLiveDoc(runtimes) {
 }
 
 // GET /api/health is what outside monitors poll: the health document is read
-// at most every 10 seconds (like /api/status, #299), and a slow MongoDB gets
+// at most every 5 seconds (like /api/status, #299), and a slow MongoDB gets
 // 1.5 seconds before the answer goes out without the bot counts.
-const HEALTH_DOC_CACHE_MS = 10_000;
+export const HEALTH_DOC_CACHE_MS = 5_000;
 const HEALTH_DOC_TIMEOUT_MS = 1_500;
 const HEALTH_DOC_TIMED_OUT = Symbol("timed out");
 let healthDocCache = { db: null, at: 0, doc: null };

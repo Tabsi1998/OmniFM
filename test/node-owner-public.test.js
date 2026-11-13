@@ -179,17 +179,18 @@ test("/api/health counts the bots from the health document, not from this proces
   assert.deepEqual(await readHealthBotCounts([], null), {});
 });
 
-test("/api/health reads the health document at most every 10 seconds (#532)", async () => {
-  const { readHealthBotCounts } = await import("../src/api/routes/public-routes.js");
+test("/api/health reads the health document at most every 5 seconds (#532)", async () => {
+  const { readHealthBotCounts, HEALTH_DOC_CACHE_MS } = await import("../src/api/routes/public-routes.js");
+  assert.equal(HEALTH_DOC_CACHE_MS, 5_000);
   const now = Date.now();
   let reads = 0;
   const doc = { at: new Date(now).toISOString(), nodes: [{ status: "online" }] };
   const db = { collection: () => ({ findOne: async () => { reads += 1; return doc; } }) };
 
   assert.deepEqual(await readHealthBotCounts([], db, { now }), { bots: 1, readyBots: 1 });
-  assert.deepEqual(await readHealthBotCounts([], db, { now: now + 9_000 }), { bots: 1, readyBots: 1 });
+  assert.deepEqual(await readHealthBotCounts([], db, { now: now + 4_000 }), { bots: 1, readyBots: 1 });
   assert.equal(reads, 1);
-  await readHealthBotCounts([], db, { now: now + 10_000 });
+  await readHealthBotCounts([], db, { now: now + 5_000 });
   assert.equal(reads, 2);
 });
 

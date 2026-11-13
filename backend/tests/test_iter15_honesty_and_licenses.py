@@ -10,6 +10,7 @@ Modules covered:
                extend/shorten, guild link/unlink, search)
 """
 import os
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -127,7 +128,9 @@ class TestLiveRuntimeTelemetry:
             assert s["connections"] == 5, s
 
             # #532: the bot counts of /api/health come from the same document;
-            # FastAPI leaves them out.
+            # FastAPI leaves them out. The Node API keeps the document 5 s
+            # (HEALTH_DOC_CACHE_MS), so wait out an answer from before the seed.
+            time.sleep(5.2)
             h = client.get(f"{BASE_URL}/api/health", timeout=30).json()
             if "readyBots" in h:
                 assert h["bots"] == 3 and h["readyBots"] == 2, h
@@ -158,6 +161,7 @@ class TestLiveRuntimeTelemetry:
         s2 = client.get(f"{BASE_URL}/api/stats", timeout=30).json()
         assert s2["live"] is False and s2["servers"] == 0 and s2["bots"] == 0
         # No document and no bot in the API process: no made-up "bots: 0" (#532).
+        time.sleep(5.2)
         h2 = client.get(f"{BASE_URL}/api/health", timeout=30).json()
         assert "bots" not in h2 and "readyBots" not in h2, h2
 
