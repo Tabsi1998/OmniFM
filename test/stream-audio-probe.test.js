@@ -198,8 +198,20 @@ test("a failed request is a network error", async () => {
   const probe = await probeStreamAudio(URL_UNDER_TEST, { fetchImpl: async () => { throw new Error("network down"); } });
   assert.deepEqual(
     [probe.httpStatus, probe.reachable, probe.playableAudio, probe.reasonCode, probe.timedOut, probe.error],
-    [null, false, false, "network_error", false, "network down"],
+    [null, false, false, "network_error", false, "Nicht erreichbar (network down)"],
   );
+});
+
+test("a network error is named in German, the raw text short in brackets (#550)", async () => {
+  const fail = (error) => probeStreamAudio(URL_UNDER_TEST, { fetchImpl: async () => { throw error; } }).then((probe) => probe.error);
+  const coded = (message, code, cause) => Object.assign(new Error(message), code ? { code } : {}, cause ? { cause } : {});
+  assert.equal(await fail(coded("getaddrinfo ENOTFOUND radio.example", "ENOTFOUND")), "DNS-Name nicht gefunden (getaddrinfo ENOTFOUND radio.example)");
+  assert.equal(await fail(coded("fetch failed", null, { code: "ECONNREFUSED" })), "Verbindung abgelehnt (fetch failed: ECONNREFUSED)");
+  assert.equal(await fail(coded("socket hang up", "ECONNRESET")), "Verbindung abgebrochen (socket hang up)");
+  assert.equal(await fail(coded("unable to verify the first certificate", "UNABLE_TO_VERIFY_LEAF_SIGNATURE")), "TLS-Zertifikat ungültig (unable to verify the first certificate)");
+  assert.equal(await fail(coded("blocked", "OUTBOUND_ADDRESS_NOT_ALLOWED")), "Adresse nicht erlaubt (blocked)");
+  assert.equal(await fail(coded("x".repeat(300))), `Nicht erreichbar (${"x".repeat(79)}…)`);
+  assert.equal(await fail(coded("")), "Nicht erreichbar");
 });
 
 test("the stream fetch asks for the lenient parser and follows redirects (#536)", async () => {

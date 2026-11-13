@@ -16,6 +16,7 @@ export const OPERATOR_ALERT_SWITCHES = Object.freeze([
   ["diskSpace", "DISK_SPACE"],
   ["backupFailed", "BACKUP_FAILED"],
   ["updates", "UPDATES"],
+  ["stationOutages", "STATIONS"],
 ]);
 
 function isSet(value) {

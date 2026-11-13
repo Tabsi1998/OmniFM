@@ -85,16 +85,54 @@ async function sendWebhook(payload) {
 }
 
 /**
+ * Pings exactly the configured mention (#550): users and roles named in it,
+ * @everyone/@here only when written there, nothing from the embed.
+ * @param {string} mention
+ */
+function operatorAllowedMentions(mention) {
+  const text = String(mention || "");
+  return {
+    parse: /@(everyone|here)\b/.test(text) ? ["everyone"] : [],
+    users: [...text.matchAll(/<@!?(\d+)>/g)].map((match) => match[1]),
+    roles: [...text.matchAll(/<@&(\d+)>/g)].map((match) => match[1]),
+  };
+}
+
+/**
+ * The webhook payload of one operator alert.
+ * @param {{ color?: number, title?: string, description?: string, fields?: { name: string, value: string, inline?: boolean }[] }} embedData
+ * @param {{ mention?: string, at?: Date }} [options]
+ */
+function buildOperatorPayload(embedData, { mention = "", at = new Date() } = {}) {
+  return {
+    username: "OmniFM Operator",
+    avatar_url: "https://omnifm.xyz/img/bot-1.png",
+    content: mention || undefined,
+    allowed_mentions: operatorAllowedMentions(mention),
+    embeds: [{
+      color: embedData.color || COLORS.info,
+      title: embedData.title || "OmniFM Operator Alert",
+      description: embedData.description || "",
+      fields: embedData.fields || [],
+      footer: { text: `OmniFM Operator • ${at.toISOString()}` },
+      timestamp: at.toISOString(),
+    }],
+  };
+}
+
+/**
  * Sendet eine deduplizierte Operator-Nachricht.
  * @param {string} dedupKey Eindeutiger Key für Deduplizierung
  * @param {{ color?: number, title?: string, description?: string, fields?: { name: string, value: string, inline?: boolean }[] }} embedData
+ * @returns {Promise<boolean>} true only when Discord took the message: false
+ *   without a webhook, within the dedup window, on an HTTP error or an exception
  */
 async function notify(dedupKey, embedData) {
-  if (!OPERATOR_WEBHOOK_ENABLED) return;
+  if (!OPERATOR_WEBHOOK_ENABLED) return false;
 
   const now = Date.now();
   const lastSent = recentMessages.get(dedupKey) || 0;
-  if (now - lastSent < DEDUP_WINDOW_MS) return; // Deduplizierung
+  if (now - lastSent < DEDUP_WINDOW_MS) return false; // Deduplizierung
   recentMessages.set(dedupKey, now);
 
   // Alte Einträge bereinigen
@@ -102,23 +140,11 @@ async function notify(dedupKey, embedData) {
     if (now - ts > DEDUP_WINDOW_MS * 10) recentMessages.delete(key);
   }
 
-  const embed = {
-    color: embedData.color || COLORS.info,
-    title: embedData.title || "OmniFM Operator Alert",
-    description: embedData.description || "",
-    fields: embedData.fields || [],
-    footer: { text: `OmniFM Operator • ${new Date().toISOString()}` },
-    timestamp: new Date().toISOString(),
-  };
-
-  const payload = {
-    username: "OmniFM Operator",
-    avatar_url: "https://omnifm.xyz/img/bot-1.png",
-    content: OPERATOR_WEBHOOK_MENTION || undefined,
-    embeds: [embed],
-  };
-
-  await sendWebhook(payload);
+  try {
+    return await sendWebhook(buildOperatorPayload(embedData, { mention: OPERATOR_WEBHOOK_MENTION }));
+  } catch {
+    return false;
+  }
 }
 
 // ---- Öffentliche Notify-Funktionen ----
@@ -252,6 +278,8 @@ async function notifyStartup(botNames, totalBots) {
 }
 
 export {
+  buildOperatorPayload,
+  operatorAllowedMentions,
   notifyBackupFailed,
   notifyBotLoginFailed,
   notifyMongoDisconnected,

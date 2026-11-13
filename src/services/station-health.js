@@ -13,6 +13,7 @@
 import { log } from "../lib/logging.js";
 import { probeStreamAudio, stationOutageText, stationRecoveryText } from "../lib/stream-audio-probe.js";
 import { getDb, isConnected } from "../lib/db.js";
+import { createStationOutageAlerter } from "./operator-alerts.js";
 import { recordRuntimeIncident } from "./runtime-health-reporter.js";
 
 const STATION_HEALTH_ENABLED = String(process.env.STATION_HEALTH_ENABLED ?? "1") !== "0";
@@ -105,6 +106,8 @@ function reportTransition(previous, entry) {
  * @property {string} [reasonCode]          see StreamAudioProbe
  * @property {string | null} [streamName]      what the stream calls itself (icy-name), #325
  * @property {{ from: string, to: string, at: number } | null} [streamNameChange]
+ * @property {number | null} [downSince]    first failed check of the current outage, #550
+ * @property {boolean} [outageAlerted]      the operator webhook was told about this outage, #550
  */
 
 const STREAM_NAME_CHANGE_KEEP_MS = 24 * 60 * 60_000;
@@ -140,11 +143,11 @@ function trackStreamName(previous, streamName, url, now = Date.now()) {
  * @param {string} key
  * @param {string} name
  * @param {string} url
- * @param {{ fetchImpl?: Function }} [options]
+ * @param {{ fetchImpl?: Function, previous?: StationHealthEntry, now?: number }} [options]
  * @returns {Promise<StationHealthEntry>}
  */
-async function checkStation(key, name, url, { fetchImpl } = {}) {
-  const previous = healthReport.get(key) || {
+async function checkStation(key, name, url, { fetchImpl, previous: known, now } = {}) {
+  const previous = known || healthReport.get(key) || {
     key,
     name,
     url,
@@ -162,6 +165,7 @@ async function checkStation(key, name, url, { fetchImpl } = {}) {
     ...(fetchImpl ? { fetchImpl } : {}),
   });
   const ok = probe.playableAudio;
+  const checkedAt = now ?? Date.now();
 
   /** @type {StationHealthEntry} */
   const entry = {
@@ -177,16 +181,46 @@ async function checkStation(key, name, url, { fetchImpl } = {}) {
     httpStatus: probe.httpStatus,
     format: probe.format,
     reasonCode: probe.reasonCode,
-    lastCheckedAt: Date.now(),
+    lastCheckedAt: checkedAt,
     responseTimeMs: probe.responseTimeMs,
     error: probe.error,
     consecutiveFailures: ok ? 0 : previous.consecutiveFailures + 1,
     consecutiveSuccesses: ok ? previous.consecutiveSuccesses + 1 : 0,
+    downSince: ok ? null : (previous.consecutiveFailures > 0 && previous.downSince) || checkedAt,
+    // Stays set until the operator alert has named the return (#550).
+    outageAlerted: previous.outageAlerted === true,
     ...trackStreamName(previous, ok ? readStreamName(probe.icyName) : "", url),
   };
 
   reportTransition(previous, entry);
   return entry;
+}
+
+async function recordStationHealth(entry) {
+  healthReport.set(entry.key, entry);
+  await persistHealthEntry(entry);
+}
+
+// Only the process that runs the health check (the commander in split mode,
+// src/index.js otherwise) reports outages: workers never start this service.
+const stationAlerter = createStationOutageAlerter();
+
+/** One operator alert for the outages and returns since the last one (#550). */
+async function reportStationAlerts(alerter = stationAlerter) {
+  const marks = await alerter.flush([...healthReport.values()]);
+  for (const { key, outageAlerted } of marks) {
+    const entry = healthReport.get(key);
+    if (!entry) continue;
+    entry.outageAlerted = outageAlerted;
+    if (!isConnected()) continue;
+    try {
+      // eslint-disable-next-line no-await-in-loop -- a handful of marks after an alert
+      await getDb().collection("station_health").updateOne({ key }, { $set: { outageAlerted } });
+    } catch (err) {
+      log("WARN", `[StationHealth] Alarm-Stand für ${key} nicht gespeichert: ${err?.message || err}`);
+    }
+  }
+  return marks;
 }
 
 /**
@@ -206,9 +240,8 @@ async function runHealthChecks(stations) {
       try {
         // eslint-disable-next-line no-await-in-loop -- one station after the other, gentle on the stream hosts
         const result = await checkStation(station.key, station.name, station.url);
-        healthReport.set(station.key, result);
         // eslint-disable-next-line no-await-in-loop -- one station after the other, gentle on the stream hosts
-        await persistHealthEntry(result);
+        await recordStationHealth(result);
       } catch (err) {
         log("WARN", `[StationHealth] Unerwarteter Fehler bei "${station.key}": ${err?.message || err}`);
       }
@@ -262,6 +295,7 @@ function startStationHealthService(getStationsFn) {
           const downCount = [...healthReport.values()].filter((e) => e.status === "down" && e.consecutiveFailures >= 2).length;
           const upCount = [...healthReport.values()].filter((e) => e.status === "up").length;
           log("INFO", `[StationHealth] Katalogrunde fertig: ${upCount} UP, ${downCount} bestätigt DOWN, ${stationEntries.length} gesamt.`);
+          await reportStationAlerts();
         }
       }
     } catch (err) {
@@ -330,6 +364,9 @@ function isStationDown(key) {
 
 export {
   checkStation,
+  hydrateHealthReport,
+  recordStationHealth,
+  reportStationAlerts,
   trackStreamName,
   startStationHealthService,
   stopStationHealthService,

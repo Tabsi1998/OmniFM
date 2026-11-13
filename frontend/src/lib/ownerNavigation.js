@@ -88,3 +88,19 @@ export function searchOwnerPages(query) {
 export function systemPartOf(pageId) {
   return String(pageId || '').startsWith('cfg-') ? pageId.slice(4) : null;
 }
+
+/** The page a link into the console names (`?section=stations`, #550), else the cockpit. */
+export function ownerPageFromSearch(search) {
+  const pageId = new URLSearchParams(String(search || '')).get('section');
+  return OWNER_PAGES.some((page) => page.id === pageId) ? pageId : 'cockpit';
+}
+
+/**
+ * The page the console opens with: the linked one, else the one remembered
+ * before the Discord login (its way back drops `?section=`), else the cockpit.
+ */
+export function initialOwnerPage(search, rememberedPage) {
+  const linked = ownerPageFromSearch(search);
+  if (linked !== 'cockpit') return linked;
+  return OWNER_PAGES.some((page) => page.id === rememberedPage) ? rememberedPage : 'cockpit';
+}

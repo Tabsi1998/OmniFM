@@ -58,6 +58,6 @@ test("a station that cannot be reached is down and not reachable", async () => {
   const entry = await check("health-gone", async () => { throw new Error("connect failed"); });
   assert.deepEqual(
     [entry.status, entry.reachable, entry.authorized, entry.discordOk, entry.httpStatus, entry.error, entry.consecutiveFailures],
-    ["down", false, null, false, null, "connect failed", 1],
+    ["down", false, null, false, null, "Nicht erreichbar (connect failed)", 1],
   );
 });
