@@ -88,3 +88,9 @@ export function searchOwnerPages(query) {
 export function systemPartOf(pageId) {
   return String(pageId || '').startsWith('cfg-') ? pageId.slice(4) : null;
 }
+
+/** The page a link into the console names (`?section=stations`, #550), else the cockpit. */
+export function ownerPageFromSearch(search) {
+  const pageId = new URLSearchParams(String(search || '')).get('section');
+  return OWNER_PAGES.some((page) => page.id === pageId) ? pageId : 'cockpit';
+}

@@ -17,6 +17,7 @@ import OwnerCockpit from './OwnerCockpit.js';
 import {
   OWNER_AREAS,
   areaOfPage,
+  ownerPageFromSearch,
   pagesOfArea,
   searchOwnerPages,
   systemPartOf,
@@ -68,7 +69,7 @@ export default function OwnerAdmin() {
   const [session, setSession] = useState(null);
   const [discordLogin, setDiscordLogin] = useState(false);
 
-  const [section, setSection] = useState('cockpit');
+  const [section, setSection] = useState(() => (typeof window !== 'undefined' ? ownerPageFromSearch(window.location.search) : 'cockpit'));
   const [navQuery, setNavQuery] = useState('');
   const openPage = useCallback((pageId) => setSection(areaOfPage(pageId) ? pageId : 'cockpit'), []);
   const [overview, setOverview] = useState(null);

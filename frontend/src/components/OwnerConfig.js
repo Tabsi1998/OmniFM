@@ -170,7 +170,7 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
         <div className="oa-card" style={{ marginBottom: 18 }} data-testid="cfg-operator-alerts">
           <div className="oa-section-title"><BellRing size={15} /> Betreiber-Alarme (Discord)</div>
           <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 14 }}>
-            OmniFM meldet Probleme per Webhook in einen Discord-Kanal, den nur du siehst: Abstürze, Worker ohne Lebenszeichen, erschöpfte Failover-Ketten, Wiedergabe im Kreis, Autoheal-Neustarts, wenig Speicherplatz und fehlgeschlagene Backups. Änderungen gelten nach dem nächsten Bot-Neustart.
+            OmniFM meldet Probleme per Webhook in einen Discord-Kanal, den nur du siehst: Abstürze, Worker ohne Lebenszeichen, erschöpfte Failover-Ketten, Wiedergabe im Kreis, Autoheal-Neustarts, wenig Speicherplatz, fehlgeschlagene Backups und Sender, die länger ausfallen. Änderungen gelten nach dem nächsten Bot-Neustart.
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 18px' }}>
             <Field label="Webhook-URL" value={secretValue(alerts, 'webhookUrl')} onChange={(v) => setGroup('operatorAlerts', 'webhookUrl', v)} type="password" placeholder="https://discord.com/api/webhooks/…" hint={secretHint(alerts, 'webhookUrl')} testid="cfg-alerts-webhook" />
@@ -184,6 +184,7 @@ export default function OwnerConfig({ section, part = null, apiGet, apiSend, tok
             <Toggle label="Wenig Speicherplatz" checked={alerts.diskSpace !== false} onChange={(v) => setGroup('operatorAlerts', 'diskSpace', v)} testid="cfg-alerts-disk" />
             <Toggle label="Nächtliches Backup fehlgeschlagen" checked={alerts.backupFailed !== false} onChange={(v) => setGroup('operatorAlerts', 'backupFailed', v)} testid="cfg-alerts-backup" />
             <Toggle label="Update erfolgreich oder fehlgeschlagen" checked={alerts.updates !== false} onChange={(v) => setGroup('operatorAlerts', 'updates', v)} testid="cfg-alerts-updates" />
+            <Toggle label="Sender ausgefallen oder wieder spielbar" checked={alerts.stationOutages !== false} onChange={(v) => setGroup('operatorAlerts', 'stationOutages', v)} testid="cfg-alerts-stations" />
           </div>
           <button
             className="oa-btn ghost"
