@@ -3,10 +3,14 @@
 // ============================================================
 // The Node twin of backend/routers/admin_stations.py: list with health,
 // stream test, create/update, delete (archived first) and the health check
-// on demand. Same rules and answers as FastAPI; outbound requests go through
-// safeFetch, which also refuses redirects into the local network.
+// on demand. Same rules and answers as FastAPI, with one exception (#538):
+// whether a station plays is decided here by the bytes of the stream
+// (stream-audio-probe.js), while FastAPI (backend/services/catalog.py, only
+// the way back until #291) still goes by the Content-Type and icy-name.
+// Outbound requests go through safeFetch, which also refuses redirects into
+// the local network.
 import { safeFetch, validateOutboundUrlWithDns } from "./safe-outbound-http.js";
-import { probeStreamAudio } from "./stream-audio-probe.js";
+import { probeStreamAudio, stationOutageText, stationRecoveryText } from "./stream-audio-probe.js";
 import { parseIntLike } from "./owner-licenses.js";
 import { normalizeStationSeasons } from "./station-fields.js";
 
@@ -233,9 +237,9 @@ export async function runStationHealth(db, keys, { probe = probeStationUrl, now 
     await health.updateOne({ key }, { $set: doc }, { upsert: true });
     Object.assign(result, doc);
     if (failures === 2) {
-      await incidents.insertOne({ at: stamp, severity: "warning", source: "station-health", message: clip(`Sender ${key} ist offline: ${doc.error}`, 240), resolved: false });
+      await incidents.insertOne({ at: stamp, severity: "warning", source: "station-health", message: clip(stationOutageText(key, doc), 240), resolved: false });
     } else if (ok && previous.status === "down" && parseIntLike(previous.consecutiveFailures, 0) >= 2) {
-      await incidents.insertOne({ at: stamp, severity: "info", source: "station-health", message: clip(`Sender ${key} ist wieder erreichbar`, 240), resolved: true });
+      await incidents.insertOne({ at: stamp, severity: "info", source: "station-health", message: clip(stationRecoveryText(key, previous), 240), resolved: true });
     }
   }));
   return { results, count: Object.keys(results).length, truncated: requested.length > 25 };

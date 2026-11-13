@@ -11,7 +11,7 @@
 // ============================================================
 
 import { log } from "../lib/logging.js";
-import { probeStreamAudio } from "../lib/stream-audio-probe.js";
+import { probeStreamAudio, stationOutageText, stationRecoveryText } from "../lib/stream-audio-probe.js";
 import { getDb, isConnected } from "../lib/db.js";
 import { recordRuntimeIncident } from "./runtime-health-reporter.js";
 
@@ -76,11 +76,11 @@ function reportTransition(previous, entry) {
   const recovered = entry.status === "up" && previous.status === "down" && previous.consecutiveFailures >= 2;
   if (confirmedDown) {
     const detail = entry.error || "nicht erreichbar";
-    log("WARN", `[StationHealth] Station "${entry.name}" (${entry.key}) ist DOWN: ${detail} (${entry.responseTimeMs}ms, 2x in Folge)`);
-    recordRuntimeIncident({ severity: "warning", source: "station-health", message: `Sender ${entry.name} (${entry.key}) ist offline: ${detail}` }).catch(() => null);
+    log("WARN", `[StationHealth] Station "${entry.name}" (${entry.key}) ist ${entry.reachable ? "NICHT SPIELBAR" : "DOWN"}: ${detail} (${entry.responseTimeMs}ms, 2x in Folge)`);
+    recordRuntimeIncident({ severity: "warning", source: "station-health", message: stationOutageText(`${entry.name} (${entry.key})`, entry) }).catch(() => null);
   } else if (recovered) {
     log("INFO", `[StationHealth] Station "${entry.name}" (${entry.key}) ist wieder UP nach ${previous.consecutiveFailures} Fehlern (${entry.responseTimeMs}ms)`);
-    recordRuntimeIncident({ severity: "info", source: "station-health", message: `Sender ${entry.name} (${entry.key}) ist wieder erreichbar`, resolved: true }).catch(() => null);
+    recordRuntimeIncident({ severity: "info", source: "station-health", message: stationRecoveryText(`${entry.name} (${entry.key})`, previous), resolved: true }).catch(() => null);
   }
 }
 

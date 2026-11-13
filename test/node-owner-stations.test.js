@@ -138,15 +138,20 @@ test("the list shows each station's health and counts only confirmed outages", a
 
 test("the health run stores the result and raises an incident on the second failure", async () => {
   const db = memoryDb({
-    stations: [{ key: "a", url: "http://a" }, { key: "b", url: "http://b" }],
-    station_health: [{ key: "a", status: "down", consecutiveFailures: 1 }, { key: "b", status: "down", consecutiveFailures: 4 }],
+    stations: [{ key: "a", url: "http://a" }, { key: "b", url: "http://b" }, { key: "c", url: "http://c" }, { key: "d", url: "http://d" }],
+    station_health: [
+      { key: "a", status: "down", consecutiveFailures: 1 }, { key: "b", status: "down", consecutiveFailures: 4 },
+      { key: "c", status: "down", consecutiveFailures: 1 }, { key: "d", status: "down", consecutiveFailures: 3, reachable: true },
+    ],
   });
-  const probe = async (url) => (url === "http://a"
+  const probe = async (url) => (url === "http://c"
+    ? { ok: false, reachable: true, discordOk: false, status: 200, latencyMs: 9, message: "Kein Audio (HTML-Seite)", authorized: true, playableAudio: false, format: "html", reasonCode: "not_audio" }
+    : url === "http://a"
     ? { ok: false, reachable: false, discordOk: false, status: 0, latencyMs: 5, message: "timeout", timedOut: true, reason: "x" }
     : { ok: true, reachable: true, discordOk: true, status: 200, latencyMs: 40, contentType: "audio/mpeg", authorized: true, playableAudio: true, format: "mp3", reasonCode: "ok" });
   const run = await stations.runStationHealth(db, [], { probe, now: () => Date.parse("2026-09-25T12:00:00Z") });
 
-  assert.equal(run.count, 2);
+  assert.equal(run.count, 4);
   assert.equal(run.truncated, false);
   const [a, b] = ["a", "b"].map((key) => db.data.station_health.find((row) => row.key === key));
   assert.deepEqual([a.status, a.consecutiveFailures, a.error], ["down", 2, "timeout"]);
@@ -155,9 +160,12 @@ test("the health run stores the result and raises an incident on the second fail
   assert.equal(Object.hasOwn(b, "contentType"), false, "only the probe's health fields reach the health document");
   assert.deepEqual([b.authorized, b.playableAudio, b.format, b.reasonCode], [true, true, "mp3", "ok"], "#538");
   assert.equal(Object.hasOwn(a, "playableAudio"), false, "a probe without the new fields stores none");
-  assert.deepEqual(db.data.runtime_incidents.map((row) => [row.severity, row.message, row.resolved]), [
+  // #538: a station that answers without audio is "not playable", not "offline".
+  assert.deepEqual(db.data.runtime_incidents.map((row) => [row.severity, row.message, row.resolved]).sort((x, y) => x[1].localeCompare(y[1])), [
     ["warning", "Sender a ist offline: timeout", false],
     ["info", "Sender b ist wieder erreichbar", true],
+    ["warning", "Sender c ist nicht spielbar: Kein Audio (HTML-Seite)", false],
+    ["info", "Sender d ist wieder spielbar", true],
   ]);
 
   const many = Array.from({ length: 30 }, (_, index) => `k${index}`);
