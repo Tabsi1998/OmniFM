@@ -2,6 +2,16 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://omnifm.xyz/</loc>
+    <xhtml:link rel="alternate" hreflang="de" href="https://omnifm.xyz/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://omnifm.xyz/" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://omnifm.xyz/?lang=fr" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://omnifm.xyz/?lang=es" />
+    <xhtml:link rel="alternate" hreflang="it" href="https://omnifm.xyz/?lang=it" />
+    <xhtml:link rel="alternate" hreflang="pl" href="https://omnifm.xyz/?lang=pl" />
+    <xhtml:link rel="alternate" hreflang="tr" href="https://omnifm.xyz/?lang=tr" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://omnifm.xyz/?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="nl" href="https://omnifm.xyz/?lang=nl" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://omnifm.xyz/" />
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
@@ -9,6 +19,14 @@
     <loc>https://omnifm.xyz/stations</loc>
     <xhtml:link rel="alternate" hreflang="de" href="https://omnifm.xyz/stations" />
     <xhtml:link rel="alternate" hreflang="en" href="https://omnifm.xyz/stations" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://omnifm.xyz/stations?lang=fr" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://omnifm.xyz/stations?lang=es" />
+    <xhtml:link rel="alternate" hreflang="it" href="https://omnifm.xyz/stations?lang=it" />
+    <xhtml:link rel="alternate" hreflang="pl" href="https://omnifm.xyz/stations?lang=pl" />
+    <xhtml:link rel="alternate" hreflang="tr" href="https://omnifm.xyz/stations?lang=tr" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://omnifm.xyz/stations?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="nl" href="https://omnifm.xyz/stations?lang=nl" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://omnifm.xyz/stations" />
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -16,6 +34,14 @@
     <loc>https://omnifm.xyz/premium</loc>
     <xhtml:link rel="alternate" hreflang="de" href="https://omnifm.xyz/premium" />
     <xhtml:link rel="alternate" hreflang="en" href="https://omnifm.xyz/premium" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://omnifm.xyz/premium?lang=fr" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://omnifm.xyz/premium?lang=es" />
+    <xhtml:link rel="alternate" hreflang="it" href="https://omnifm.xyz/premium?lang=it" />
+    <xhtml:link rel="alternate" hreflang="pl" href="https://omnifm.xyz/premium?lang=pl" />
+    <xhtml:link rel="alternate" hreflang="tr" href="https://omnifm.xyz/premium?lang=tr" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://omnifm.xyz/premium?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="nl" href="https://omnifm.xyz/premium?lang=nl" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://omnifm.xyz/premium" />
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -23,6 +49,14 @@
     <loc>https://omnifm.xyz/faq</loc>
     <xhtml:link rel="alternate" hreflang="de" href="https://omnifm.xyz/faq" />
     <xhtml:link rel="alternate" hreflang="en" href="https://omnifm.xyz/faq" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://omnifm.xyz/faq?lang=fr" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://omnifm.xyz/faq?lang=es" />
+    <xhtml:link rel="alternate" hreflang="it" href="https://omnifm.xyz/faq?lang=it" />
+    <xhtml:link rel="alternate" hreflang="pl" href="https://omnifm.xyz/faq?lang=pl" />
+    <xhtml:link rel="alternate" hreflang="tr" href="https://omnifm.xyz/faq?lang=tr" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://omnifm.xyz/faq?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="nl" href="https://omnifm.xyz/faq?lang=nl" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://omnifm.xyz/faq" />
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -30,6 +64,14 @@
     <loc>https://omnifm.xyz/start</loc>
     <xhtml:link rel="alternate" hreflang="de" href="https://omnifm.xyz/start" />
     <xhtml:link rel="alternate" hreflang="en" href="https://omnifm.xyz/start" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://omnifm.xyz/start?lang=fr" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://omnifm.xyz/start?lang=es" />
+    <xhtml:link rel="alternate" hreflang="it" href="https://omnifm.xyz/start?lang=it" />
+    <xhtml:link rel="alternate" hreflang="pl" href="https://omnifm.xyz/start?lang=pl" />
+    <xhtml:link rel="alternate" hreflang="tr" href="https://omnifm.xyz/start?lang=tr" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://omnifm.xyz/start?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="nl" href="https://omnifm.xyz/start?lang=nl" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://omnifm.xyz/start" />
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -37,6 +79,14 @@
     <loc>https://omnifm.xyz/impressum</loc>
     <xhtml:link rel="alternate" hreflang="de" href="https://omnifm.xyz/impressum" />
     <xhtml:link rel="alternate" hreflang="en" href="https://omnifm.xyz/imprint" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://omnifm.xyz/imprint?lang=fr" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://omnifm.xyz/imprint?lang=es" />
+    <xhtml:link rel="alternate" hreflang="it" href="https://omnifm.xyz/imprint?lang=it" />
+    <xhtml:link rel="alternate" hreflang="pl" href="https://omnifm.xyz/imprint?lang=pl" />
+    <xhtml:link rel="alternate" hreflang="tr" href="https://omnifm.xyz/imprint?lang=tr" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://omnifm.xyz/imprint?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="nl" href="https://omnifm.xyz/imprint?lang=nl" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://omnifm.xyz/imprint" />
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
@@ -44,6 +94,14 @@
     <loc>https://omnifm.xyz/datenschutz</loc>
     <xhtml:link rel="alternate" hreflang="de" href="https://omnifm.xyz/datenschutz" />
     <xhtml:link rel="alternate" hreflang="en" href="https://omnifm.xyz/privacy" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://omnifm.xyz/privacy?lang=fr" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://omnifm.xyz/privacy?lang=es" />
+    <xhtml:link rel="alternate" hreflang="it" href="https://omnifm.xyz/privacy?lang=it" />
+    <xhtml:link rel="alternate" hreflang="pl" href="https://omnifm.xyz/privacy?lang=pl" />
+    <xhtml:link rel="alternate" hreflang="tr" href="https://omnifm.xyz/privacy?lang=tr" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://omnifm.xyz/privacy?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="nl" href="https://omnifm.xyz/privacy?lang=nl" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://omnifm.xyz/privacy" />
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -51,16 +109,44 @@
     <loc>https://omnifm.xyz/nutzungsbedingungen</loc>
     <xhtml:link rel="alternate" hreflang="de" href="https://omnifm.xyz/nutzungsbedingungen" />
     <xhtml:link rel="alternate" hreflang="en" href="https://omnifm.xyz/terms" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://omnifm.xyz/terms?lang=fr" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://omnifm.xyz/terms?lang=es" />
+    <xhtml:link rel="alternate" hreflang="it" href="https://omnifm.xyz/terms?lang=it" />
+    <xhtml:link rel="alternate" hreflang="pl" href="https://omnifm.xyz/terms?lang=pl" />
+    <xhtml:link rel="alternate" hreflang="tr" href="https://omnifm.xyz/terms?lang=tr" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://omnifm.xyz/terms?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="nl" href="https://omnifm.xyz/terms?lang=nl" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://omnifm.xyz/terms" />
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
     <loc>https://omnifm.xyz/charts</loc>
+    <xhtml:link rel="alternate" hreflang="de" href="https://omnifm.xyz/charts" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://omnifm.xyz/charts" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://omnifm.xyz/charts?lang=fr" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://omnifm.xyz/charts?lang=es" />
+    <xhtml:link rel="alternate" hreflang="it" href="https://omnifm.xyz/charts?lang=it" />
+    <xhtml:link rel="alternate" hreflang="pl" href="https://omnifm.xyz/charts?lang=pl" />
+    <xhtml:link rel="alternate" hreflang="tr" href="https://omnifm.xyz/charts?lang=tr" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://omnifm.xyz/charts?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="nl" href="https://omnifm.xyz/charts?lang=nl" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://omnifm.xyz/charts" />
     <changefreq>weekly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://omnifm.xyz/status</loc>
+    <xhtml:link rel="alternate" hreflang="de" href="https://omnifm.xyz/status" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://omnifm.xyz/status" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://omnifm.xyz/status?lang=fr" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://omnifm.xyz/status?lang=es" />
+    <xhtml:link rel="alternate" hreflang="it" href="https://omnifm.xyz/status?lang=it" />
+    <xhtml:link rel="alternate" hreflang="pl" href="https://omnifm.xyz/status?lang=pl" />
+    <xhtml:link rel="alternate" hreflang="tr" href="https://omnifm.xyz/status?lang=tr" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://omnifm.xyz/status?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="nl" href="https://omnifm.xyz/status?lang=nl" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://omnifm.xyz/status" />
     <changefreq>hourly</changefreq>
     <priority>0.3</priority>
   </url>
