@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { HTML_PAGE, mp3Frames } from "./support/stream-probe-server.mjs";
+
 const stations = await import("../src/lib/owner-stations.js");
 
 const PUBLIC_URL = "http://93.184.216.34/stream";
@@ -49,11 +51,7 @@ function memoryDb(seed = {}) {
   };
 }
 
-const fakeResponse = (status, headers = {}) => ({
-  status,
-  headers: { get: (name) => headers[name.toLowerCase()] ?? null },
-  body: { cancel: async () => {} },
-});
+const fakeResponse = (status, headers = {}, body = "") => new Response(body, { status, headers });
 
 test("station documents follow FastAPI's rules and keep the catalogue fields", async () => {
   const doc = await stations.buildStationDocument({
@@ -87,14 +85,28 @@ test("station documents follow FastAPI's rules and keep the catalogue fields", a
 });
 
 test("the stream test tells audio, a plain page and a timeout apart", async () => {
-  const audio = await stations.testStationStream(PUBLIC_URL, { fetchImpl: async () => fakeResponse(200, { "content-type": "audio/mpeg", "icy-name": "Lounge", "icy-br": "128" }) });
+  const audio = await stations.testStationStream(PUBLIC_URL, { fetchImpl: async () => fakeResponse(200, { "content-type": "audio/mpeg", "icy-name": "Lounge", "icy-br": "128" }, mp3Frames()) });
   assert.equal(audio.ok, true);
+  assert.deepEqual([audio.reachable, audio.authorized, audio.playableAudio, audio.isAudioStream, audio.format], [true, true, true, true, "mp3"]);
   assert.equal(audio.icyName, "Lounge");
   assert.equal(audio.bitrate, "128");
   assert.equal(audio.message, "Stream erreichbar und liefert Audio.");
 
-  const page = await stations.testStationStream(PUBLIC_URL, { fetchImpl: async () => fakeResponse(200, { "content-type": "text/html" }) });
-  assert.deepEqual([page.ok, page.reachable, page.message], [false, true, "Erreichbar, aber kein eindeutiger Audio-Stream."]);
+  const page = await stations.testStationStream(PUBLIC_URL, { fetchImpl: async () => fakeResponse(200, { "content-type": "text/html" }, HTML_PAGE) });
+  assert.deepEqual([page.ok, page.reachable, page.message], [false, true, "Server antwortet, aber in Discord nicht spielbar: Kein Audio (HTML-Seite)."]);
+
+  // #538: neither the Content-Type nor an icy-name makes a page a stream, and 401 is not "works".
+  const mislabelled = await stations.testStationStream(PUBLIC_URL, { fetchImpl: async () => fakeResponse(200, { "content-type": "audio/mpeg", "icy-name": "Lounge" }, HTML_PAGE) });
+  assert.deepEqual([mislabelled.ok, mislabelled.reachable, mislabelled.isAudioStream, mislabelled.playableAudio, mislabelled.format], [false, true, false, false, "html"]);
+  const wrongType = await stations.testStationStream(PUBLIC_URL, { fetchImpl: async () => fakeResponse(200, { "content-type": "text/plain" }, mp3Frames()) });
+  assert.deepEqual([wrongType.ok, wrongType.isAudioStream, wrongType.format], [true, true, "mp3"]);
+  const locked = await stations.testStationStream(PUBLIC_URL, { fetchImpl: async () => fakeResponse(401) });
+  assert.deepEqual(
+    [locked.ok, locked.reachable, locked.authorized, locked.playableAudio, locked.status, locked.message],
+    [false, true, false, false, 401, "Server antwortet, aber in Discord nicht spielbar: HTTP 401 (Zugriff verweigert)."],
+  );
+  const gone = await stations.testStationStream(PUBLIC_URL, { fetchImpl: async () => fakeResponse(404) });
+  assert.deepEqual([gone.ok, gone.reachable, gone.message], [false, false, "HTTP 404"]);
 
   const timeout = await stations.testStationStream(PUBLIC_URL, {
     fetchImpl: async () => { throw Object.assign(new Error("slow"), { code: "OUTBOUND_TIMEOUT" }); },
@@ -131,7 +143,7 @@ test("the health run stores the result and raises an incident on the second fail
   });
   const probe = async (url) => (url === "http://a"
     ? { ok: false, reachable: false, discordOk: false, status: 0, latencyMs: 5, message: "timeout", timedOut: true, reason: "x" }
-    : { ok: true, reachable: true, discordOk: true, status: 200, latencyMs: 40, contentType: "audio/mpeg" });
+    : { ok: true, reachable: true, discordOk: true, status: 200, latencyMs: 40, contentType: "audio/mpeg", authorized: true, playableAudio: true, format: "mp3", reasonCode: "ok" });
   const run = await stations.runStationHealth(db, [], { probe, now: () => Date.parse("2026-09-25T12:00:00Z") });
 
   assert.equal(run.count, 2);
@@ -140,7 +152,9 @@ test("the health run stores the result and raises an incident on the second fail
   assert.deepEqual([a.status, a.consecutiveFailures, a.error], ["down", 2, "timeout"]);
   assert.equal(Object.hasOwn(a, "timedOut"), false);
   assert.deepEqual([b.status, b.consecutiveFailures, b.consecutiveSuccesses, b.responseTimeMs], ["up", 0, 1, 40]);
-  assert.equal(Object.hasOwn(b, "contentType"), false, "only FastAPI's probe fields reach the health document");
+  assert.equal(Object.hasOwn(b, "contentType"), false, "only the probe's health fields reach the health document");
+  assert.deepEqual([b.authorized, b.playableAudio, b.format, b.reasonCode], [true, true, "mp3", "ok"], "#538");
+  assert.equal(Object.hasOwn(a, "playableAudio"), false, "a probe without the new fields stores none");
   assert.deepEqual(db.data.runtime_incidents.map((row) => [row.severity, row.message, row.resolved]), [
     ["warning", "Sender a ist offline: timeout", false],
     ["info", "Sender b ist wieder erreichbar", true],

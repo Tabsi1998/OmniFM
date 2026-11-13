@@ -12,8 +12,6 @@ const STREAM_FETCHERS = [
   "src/services/now-playing.js",
   "src/services/audio-recognition.js",
   "src/bot/runtime-failback.js",
-  "src/lib/owner-station-test.js",
-  "src/lib/owner-stations.js",
   "src/lib/stream-audio-probe.js",
 ];
 
