@@ -51,6 +51,11 @@ for (const expectedUrl of [
   assertIncludes(sitemap, `<loc>${expectedUrl}?lang=de</loc>`, `sitemap.xml missing ${expectedUrl}`);
 }
 
+// Each language address has a <url> of its own, not only German (#529).
+for (const expectedUrl of ["https://omnifm.xyz/?lang=en", "https://omnifm.xyz/imprint?lang=en", "https://omnifm.xyz/premium?lang=fr"]) {
+  assertIncludes(sitemap, `<loc>${expectedUrl}</loc>`, `sitemap.xml missing ${expectedUrl}`);
+}
+
 // Behind a login, so not for search engines (#528).
 assert.doesNotMatch(sitemap, /omnifm\.xyz\/(dashboard|admin)/, "sitemap.xml must not list the dashboard or /admin");
 

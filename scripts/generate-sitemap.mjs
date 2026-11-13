@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 // Writes frontend/public/sitemap.xml from the addresses the pages themselves
-// announce (getLanguageAlternates in frontend/src/lib/seo.js): every language
-// plus x-default, so sitemap and page always agree (#529).
+// announce (getLanguageAlternates in frontend/src/lib/seo.js): one <url> per
+// language address with every language plus x-default, so sitemap and page
+// always agree (#529).
 // After changing pages or languages: node scripts/generate-sitemap.mjs
 // test/sitemap.test.js fails while the checked-in file differs.
 
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { getLanguageAlternates, getPageSeo } from "../frontend/src/lib/seo.js";
+import { getLanguageAlternates } from "../frontend/src/lib/seo.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const SITEMAP_PATH = path.join(repoRoot, "frontend", "public", "sitemap.xml");
@@ -28,15 +29,22 @@ export const SITEMAP_PAGES = Object.freeze([
 ]);
 
 export function buildSitemapXml() {
-  const urls = SITEMAP_PAGES.map(({ page, changefreq, priority }) => [
-    "  <url>",
-    // German keeps the addresses the site always had (/impressum, ...).
-    `    <loc>${getPageSeo(page, "de").canonicalUrl}</loc>`,
-    ...getLanguageAlternates(page).map(({ hreflang, href }) => `    <xhtml:link rel="alternate" hreflang="${hreflang}" href="${href}" />`),
-    `    <changefreq>${changefreq}</changefreq>`,
-    `    <priority>${priority}</priority>`,
-    "  </url>",
-  ]);
+  // One <url> per language address, each listing every alternate plus
+  // x-default, as Google asks for; the bare address is only the x-default.
+  const urls = SITEMAP_PAGES.flatMap(({ page, changefreq, priority }) => {
+    const alternates = getLanguageAlternates(page);
+    const links = alternates.map(({ hreflang, href }) => `    <xhtml:link rel="alternate" hreflang="${hreflang}" href="${href}" />`);
+    return alternates
+      .filter(({ hreflang }) => hreflang !== "x-default")
+      .map(({ href }) => [
+        "  <url>",
+        `    <loc>${href}</loc>`,
+        ...links,
+        `    <changefreq>${changefreq}</changefreq>`,
+        `    <priority>${priority}</priority>`,
+        "  </url>",
+      ]);
+  });
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
