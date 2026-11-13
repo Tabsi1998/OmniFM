@@ -190,17 +190,33 @@ export function buildStructuredData(seo) {
   };
 }
 
+/** Whether the address names one of the site's languages with ?lang= (the same rule as i18n.js). */
+function hasLanguageParam(href) {
+  try {
+    return Boolean(normalizeLanguage(new URL(String(href), SITE_ORIGIN).searchParams.get('lang'), ''));
+  } catch {
+    return false;
+  }
+}
+
 export function applySeoMetadata({ locale = 'en', url = null } = {}) {
   if (typeof document === 'undefined') return null;
-  const page = resolvePageFromUrl(url || window.location.href);
+  const href = url || window.location.href;
+  const page = resolvePageFromUrl(href);
+  const alternates = getLanguageAlternates(page);
   // An address the site does not have: no search engine shall keep it (#487).
-  const seo = page === NOT_FOUND_PAGE ? { ...getPageSeo('home', locale), robots: 'noindex,follow' } : getPageSeo(page, locale);
+  let seo = page === NOT_FOUND_PAGE ? { ...getPageSeo('home', locale), robots: 'noindex,follow' } : getPageSeo(page, locale);
+  // Without ?lang= the address shows the browser's language (i18n.js): it is
+  // the page's x-default and its own canonical, not one language's (#529).
+  if (page !== NOT_FOUND_PAGE && !hasLanguageParam(href)) {
+    seo = { ...seo, canonicalUrl: alternates.find((entry) => entry.hreflang === 'x-default').href };
+  }
   document.documentElement.lang = seo.language;
   document.title = seo.title;
 
   upsertLink('canonical', seo.canonicalUrl);
   // Every language of this page, so search engines find each one (#306).
-  replaceAlternates(getLanguageAlternates(page));
+  replaceAlternates(alternates);
   upsertLink('manifest', '/manifest.json');
   upsertMeta('meta[name="description"]', { name: 'description', content: seo.description });
   upsertMeta('meta[name="robots"]', { name: 'robots', content: seo.robots });
