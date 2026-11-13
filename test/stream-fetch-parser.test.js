@@ -10,11 +10,11 @@ import test from "node:test";
 const STREAM_FETCHERS = [
   "src/services/stream.js",
   "src/services/now-playing.js",
-  "src/services/station-health.js",
   "src/services/audio-recognition.js",
   "src/bot/runtime-failback.js",
   "src/lib/owner-station-test.js",
   "src/lib/owner-stations.js",
+  "src/lib/stream-audio-probe.js",
 ];
 
 test("every radio stream fetch asks for the lenient HTTP parser (#536)", () => {
