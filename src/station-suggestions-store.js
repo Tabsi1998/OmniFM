@@ -27,6 +27,7 @@ async function ensureIndexes(suggestions) {
     indexesReady = Promise.all([
       suggestions.createIndex({ urlKey: 1 }, { name: "url_key" }),
       suggestions.createIndex({ "submitter.userId": 1 }, { name: "submitter" }),
+      suggestions.createIndex({ "submitter.guildId": 1 }, { name: "submitter_guild", partialFilterExpression: { "submitter.guildId": { $type: "string" } } }),
       suggestions.createIndex({ status: 1, createdAt: -1 }, { name: "queue" }),
       suggestions.createIndex({ expiresAt: 1 }, { name: "ttl", expireAfterSeconds: 0 }),
     ]).catch((error) => {

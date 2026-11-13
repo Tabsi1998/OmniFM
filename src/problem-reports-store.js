@@ -35,6 +35,7 @@ async function ensureIndexes(reports) {
       reports.createIndex({ "dispatch.state": 1, createdAt: 1 }, { name: "dispatch" }),
       reports.createIndex({ status: 1, createdAt: -1 }, { name: "queue" }),
       reports.createIndex({ "reporter.userId": 1 }, { name: "reporter" }),
+      reports.createIndex({ "guild.id": 1 }, { name: "guild", sparse: true }),
       reports.createIndex({ expiresAt: 1 }, { name: "ttl", expireAfterSeconds: 0 }),
     ]).catch((error) => {
       indexesReady = null;
