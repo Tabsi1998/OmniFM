@@ -6,7 +6,7 @@
   "description": "OmniFM - 24/7 Discord Radio Streaming mit Premium Tier-System",
   "main": "src/index.js",
   "engines": {
-    "node": ">=22 <23"
+    "node": ">=22.23.4 <23"
   },
   "scripts": {
     "start": "node src/index.js",
@@ -49,6 +49,10 @@
   "overrides": {
     "@discordjs/node-pre-gyp": {
       "tar": "7.5.22"
+    },
+    "minimatch@^10": "^11.0.1",
+    "lighthouse": {
+      "@sentry/node": "^10.78.0"
     }
   },
   "devDependencies": {

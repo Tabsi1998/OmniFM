@@ -35,9 +35,9 @@ doctor() {
   command -v mongodump >/dev/null 2>&1 || { log "FEHLT: mongodump (mongodb-database-tools)"; failed=1; }
   command -v mongorestore >/dev/null 2>&1 || { log "FEHLT: mongorestore (mongodb-database-tools)"; failed=1; }
   if command -v node >/dev/null 2>&1; then
-    node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major === 22 && minor >= 12 ? 0 : 1)' \
+    node -e 'const [major, minor, patch] = process.versions.node.split(".").map(Number); process.exit(major === 22 && (minor > 23 || (minor === 23 && patch >= 4)) ? 0 : 1)' \
       >/dev/null 2>&1 \
-      || { log "FALSCH: Node.js 22.12 oder neuer ist erforderlich (gefunden: $(node -v 2>/dev/null || echo unbekannt))"; failed=1; }
+      || { log "FALSCH: Node.js 22.23.4 oder neuer ist erforderlich (gefunden: $(node -v 2>/dev/null || echo unbekannt))"; failed=1; }
   fi
   if [ -f "$ROOT/backend/.env" ]; then
     grep -qE '^MONGO_URL=..+' "$ROOT/backend/.env" || { log "FEHLT: MONGO_URL in backend/.env"; failed=1; }
