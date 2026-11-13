@@ -47,7 +47,8 @@ for (const expectedUrl of [
   "https://omnifm.xyz/datenschutz",
   "https://omnifm.xyz/nutzungsbedingungen",
 ]) {
-  assertIncludes(sitemap, `<loc>${expectedUrl}</loc>`, `sitemap.xml missing ${expectedUrl}`);
+  // Every language has its own address with ?lang= (#529); German stands for them here.
+  assertIncludes(sitemap, `<loc>${expectedUrl}?lang=de</loc>`, `sitemap.xml missing ${expectedUrl}`);
 }
 
 // Behind a login, so not for search engines (#528).

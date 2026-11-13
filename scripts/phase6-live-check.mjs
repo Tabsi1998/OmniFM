@@ -422,12 +422,12 @@ async function inspectSeo(baseUrl) {
       name: "sitemap.xml",
       path: "/sitemap.xml",
       assertions: [
-        { label: "home loc", regex: /<loc>https:\/\/omnifm\.xyz\/<\/loc>/i },
-        { label: "start loc", regex: /<loc>https:\/\/omnifm\.xyz\/start<\/loc>/i },
-        { label: "stations loc", regex: /<loc>https:\/\/omnifm\.xyz\/stations<\/loc>/i },
-        { label: "premium loc", regex: /<loc>https:\/\/omnifm\.xyz\/premium<\/loc>/i },
-        { label: "faq loc", regex: /<loc>https:\/\/omnifm\.xyz\/faq<\/loc>/i },
-        { label: "privacy loc", regex: /<loc>https:\/\/omnifm\.xyz\/datenschutz<\/loc>/i },
+        { label: "home loc", regex: /<loc>https:\/\/omnifm\.xyz\/\?lang=de<\/loc>/i },
+        { label: "start loc", regex: /<loc>https:\/\/omnifm\.xyz\/start\?lang=de<\/loc>/i },
+        { label: "stations loc", regex: /<loc>https:\/\/omnifm\.xyz\/stations\?lang=de<\/loc>/i },
+        { label: "premium loc", regex: /<loc>https:\/\/omnifm\.xyz\/premium\?lang=de<\/loc>/i },
+        { label: "faq loc", regex: /<loc>https:\/\/omnifm\.xyz\/faq\?lang=de<\/loc>/i },
+        { label: "privacy loc", regex: /<loc>https:\/\/omnifm\.xyz\/datenschutz\?lang=de<\/loc>/i },
       ],
     },
     {

@@ -115,10 +115,13 @@ test("each language has its own titles, address and FAQ for search engines", asy
     assert.notEqual(seo.title, getPageSeo("premium", "en").title, `${code}: own title`);
     assert.equal(getFaqEntries(code).length, getFaqEntries("en").length);
   }
-  assert.equal(getPageSeo("imprint", "de").canonicalUrl, "https://omnifm.xyz/impressum", "German keeps its addresses");
+  // Every language has its own address with ?lang=; the bare one shows the browser's language (#529).
+  assert.equal(getPageSeo("imprint", "de").canonicalUrl, "https://omnifm.xyz/impressum?lang=de", "German keeps its paths");
+  assert.equal(getPageSeo("imprint", "en").canonicalUrl, "https://omnifm.xyz/imprint?lang=en");
   const alternates = Object.fromEntries(getLanguageAlternates("imprint").map((entry) => [entry.hreflang, entry.href]));
   assert.equal(Object.keys(alternates).length, LANGUAGE_CODES.length + 1, "every language plus x-default");
-  assert.equal(alternates.de, "https://omnifm.xyz/impressum");
+  assert.equal(alternates.de, "https://omnifm.xyz/impressum?lang=de");
+  assert.equal(alternates.en, "https://omnifm.xyz/imprint?lang=en");
   assert.equal(alternates.fr, "https://omnifm.xyz/imprint?lang=fr");
   assert.equal(alternates["pt-BR"], "https://omnifm.xyz/imprint?lang=pt");
   assert.equal(alternates["x-default"], "https://omnifm.xyz/imprint");

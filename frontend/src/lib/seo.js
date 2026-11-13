@@ -66,10 +66,13 @@ function upsertJsonLd(id, payload) {
   tag.textContent = JSON.stringify(payload);
 }
 
-/** The address of a page in a language: German and English keep theirs, every other language adds ?lang=. */
+/**
+ * The address of a page in a language: always with ?lang=, German and English
+ * too. The bare address shows the browser's language (i18n.js), so it is only
+ * the x-default, never one language's address (#529).
+ */
 function canonicalUrlFor(pageId, language) {
-  const path = getCanonicalPagePath(pageId, language);
-  return absoluteUrl(language === 'de' || language === 'en' ? path : `${path}?lang=${language}`);
+  return absoluteUrl(`${getCanonicalPagePath(pageId, language)}?lang=${language}`);
 }
 
 export function getPageSeo(page, locale = 'en') {
@@ -92,12 +95,12 @@ export function getPageSeo(page, locale = 'en') {
   };
 }
 
-/** hreflang -> address of the same page in every language, plus x-default (English). */
+/** hreflang -> address of the same page in every language, plus x-default (the bare address, language by browser). */
 export function getLanguageAlternates(page) {
   const pageId = normalizePageId(page, 'home');
   return [
     ...WEBSITE_LANGUAGES.map((entry) => ({ hreflang: entry.hreflang, href: canonicalUrlFor(pageId, entry.code) })),
-    { hreflang: 'x-default', href: canonicalUrlFor(pageId, 'en') },
+    { hreflang: 'x-default', href: absoluteUrl(getCanonicalPagePath(pageId, 'en')) },
   ];
 }
 
