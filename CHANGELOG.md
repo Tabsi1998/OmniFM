@@ -6,6 +6,86 @@ folgt [SemVer](https://semver.org/lang/de/): Die erste Zahl steigt bei
 Funktionen, die dritte bei reinen Fehlerbehebungen. Wie ein Release entsteht,
 steht in `scripts/release.mjs`.
 
+## 3.20.0 – 2026-11-13
+
+Die Sender laufen verlässlicher, und OmniFM sagt dem Betreiber Bescheid,
+wenn einer ausfällt. Dazu die Ergebnisse des Audits vom November:
+Plan-Plätze nach Reihenfolge, frisch geprüfte Dashboard-Rechte, eine
+vollständige Löschung nach dem Entfernen, ein sicherer Restore und
+geschlossene Sicherheitslücken in den Abhängigkeiten.
+
+### Neu
+
+- **Meldung bei Sender-Ausfall:** Fällt ein Katalog-Sender aus, kommt eine
+  gebündelte Discord-Nachricht an den Betreiber-Webhook, mit der
+  eingestellten Erwähnung, dem Grund („Zugriff verweigert“, „kein Audio“,
+  „DNS-Name nicht gefunden“ …) und einem Link ins Sender-Cockpit. Gemeldet
+  wird erst nach 3 Fehlprüfungen über mindestens 15 Minuten, „wieder
+  spielbar“ nach 2 guten Prüfungen. Ein Schalter steht in der Owner-Konsole
+  unter Einstellungen › Alarme, Schwellen und Sperrzeit lassen sich per
+  `OPERATOR_STATION_ALERT_*` einstellen. (#550)
+- **Dashboard hört zu statt zu fragen:** Die Übersicht und die Live-Ansicht
+  bekommen Änderungen über eine offene Verbindung (SSE) statt alle 5 bzw.
+  15 Sekunden neu zu fragen. Ein Tab im Hintergrund ruht. (#502)
+
+### Verbessert
+
+- **Echte Audio-Prüfung:** Ob ein Sender läuft, entscheidet jetzt eine kurze
+  Abfrage, die die ersten Bytes als MP3, AAC, Ogg oder FLAC erkennt. Eine
+  HTML-Seite oder „401 Zugriff verweigert“ zählt nicht mehr als „läuft“. Das
+  Sender-Cockpit zeigt „Antwortet · kein Audio“ und „Antwortet · Zugriff
+  verweigert“ getrennt von „spielbar“; die Browser-Probe hat mehr Zeit.
+  Dieselbe Prüfung nutzen der Stream-Test und die Sendervorschläge. (#538)
+- **Sender-Katalog:** Die 15 SomaFM-Sender, die jede Abfrage ohne Browser
+  ablehnen, sind durch ähnliche Sender ersetzt, dazu Club House, Harder
+  Reloaded und „Hardcore“. 30 Adressen laufen jetzt über https, Mallorca ohne
+  Token im Link. Bestehende Installationen bekommen das per Einmal-Migration,
+  aber nur dort, wo noch die alte Adresse steht. (#549, #561)
+- **Startseite schneller:** Der erste Bildschirm kommt zuerst, Lighthouse auf
+  dem Handy von 85–88 auf 93. (#501)
+
+### Behoben
+
+- **Werbung in den Charts:** Werbespots (etwa „lutz.at“ oder „mazda.at“ als
+  Titel) zählen nicht mehr als Songs, weder in den Charts noch in Wochen-
+  und Jahresrückblick, im Song-Verlauf, im Panel oder beim Teilen. (#548)
+- **Plan-Plätze:** Der letzte Worker eines Plans (bei Free „OmniFM 2“) wurde
+  abgewiesen, weil der Platz nach der BOT-Nummer statt nach der Reihenfolge
+  zählte. (#520)
+- **Upgrade-Knöpfe:** Sie führen auf die Premium-Seite statt ins Leere.
+  (#521)
+- **StreamABC-Sender** wie Life Radio Tirol und SUNSHINE LIVE spielen wieder;
+  ihr Server beendet die Statuszeile anders, als Node es verlangt. (#536)
+- **Hängende Streams** werden geschlossen, der Prüf-Timer räumt sich auf.
+  (#539)
+- **Dashboard-Rechte:** Wer auf einem Server „Server verwalten“ verliert oder
+  den Server verlässt, kann spätestens nach 10 Minuten nichts mehr ändern,
+  statt bis zu 24 Stunden. Der Bot prüft das bei Discord nach, auch auf
+  Servern, auf denen nur Worker-Bots sind (`DASHBOARD_PERMISSION_RECHECK_SECONDS`).
+  (#523)
+- **Löschung nach dem Entfernen:** Nach 30 Tagen verlieren auch Meldungen und
+  Sendervorschläge den Bezug zum Server, die Karte im Team-Kanal wird ohne
+  Server neu aufgebaut. Neue Sendervorschläge speichern keine Server-ID mehr.
+  Die Datenschutzerklärung sagt das in allen neun Sprachen. (#522)
+- **Restore der Datenbank** bricht ab, solange OmniFM oder das Nacht-Backup
+  läuft; Backup und Restore können nicht mehr gleichzeitig laufen. (#524)
+- **Sicherheit:** Abhängigkeiten mit bekannten Lücken sind aktualisiert
+  (`undici`, `compression`, `follow-redirects`, `fast-uri`). OmniFM braucht
+  jetzt **Node.js 22.23.4 oder neuer**; `./update.sh` installiert es bei
+  Bedarf selbst. (#543)
+
+### Intern
+
+- Lizenz: OmniFM ist proprietär, Rechteinhaber IT-Tabelander. (#540)
+- Lokaler Prüflauf schneller: Unit-Tests parallel (rund 47 statt 148 s),
+  `npm ci` nur bei geändertem Lockfile, `--changed`. (#553)
+- Projekt-Skill `omnifm-discord` für Nachrichten, Texte, Sender und Checks.
+  (#552)
+- Projektwissen liegt im Vault, `CLAUDE.md` behält die Grundlagen. (#508)
+- Gebündelte Paket-Updates, darunter `discord.js`, `@discordjs/opus` und
+  `@snazzah/davey` 0.2 für die Sprach-Verschlüsselung. (#505, #506, #507,
+  #517, #518, #519)
+
 ## 3.19.0 – 2026-10-03
 
 Die Website lässt sich in jeder der neun Sprachen lesen, egal was der Browser
