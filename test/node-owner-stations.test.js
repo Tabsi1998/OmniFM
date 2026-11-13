@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { HTML_PAGE, mp3Frames } from "./support/stream-probe-server.mjs";
+
 const stations = await import("../src/lib/owner-stations.js");
 
 const PUBLIC_URL = "http://93.184.216.34/stream";
@@ -49,11 +51,7 @@ function memoryDb(seed = {}) {
   };
 }
 
-const fakeResponse = (status, headers = {}) => ({
-  status,
-  headers: { get: (name) => headers[name.toLowerCase()] ?? null },
-  body: { cancel: async () => {} },
-});
+const fakeResponse = (status, headers = {}, body = "") => new Response(body, { status, headers });
 
 test("station documents follow FastAPI's rules and keep the catalogue fields", async () => {
   const doc = await stations.buildStationDocument({
@@ -87,14 +85,28 @@ test("station documents follow FastAPI's rules and keep the catalogue fields", a
 });
 
 test("the stream test tells audio, a plain page and a timeout apart", async () => {
-  const audio = await stations.testStationStream(PUBLIC_URL, { fetchImpl: async () => fakeResponse(200, { "content-type": "audio/mpeg", "icy-name": "Lounge", "icy-br": "128" }) });
+  const audio = await stations.testStationStream(PUBLIC_URL, { fetchImpl: async () => fakeResponse(200, { "content-type": "audio/mpeg", "icy-name": "Lounge", "icy-br": "128" }, mp3Frames()) });
   assert.equal(audio.ok, true);
+  assert.deepEqual([audio.reachable, audio.authorized, audio.playableAudio, audio.isAudioStream, audio.format], [true, true, true, true, "mp3"]);
   assert.equal(audio.icyName, "Lounge");
   assert.equal(audio.bitrate, "128");
   assert.equal(audio.message, "Stream erreichbar und liefert Audio.");
 
-  const page = await stations.testStationStream(PUBLIC_URL, { fetchImpl: async () => fakeResponse(200, { "content-type": "text/html" }) });
-  assert.deepEqual([page.ok, page.reachable, page.message], [false, true, "Erreichbar, aber kein eindeutiger Audio-Stream."]);
+  const page = await stations.testStationStream(PUBLIC_URL, { fetchImpl: async () => fakeResponse(200, { "content-type": "text/html" }, HTML_PAGE) });
+  assert.deepEqual([page.ok, page.reachable, page.message], [false, true, "Server antwortet, aber in Discord nicht spielbar: Kein Audio (HTML-Seite)."]);
+
+  // #538: neither the Content-Type nor an icy-name makes a page a stream, and 401 is not "works".
+  const mislabelled = await stations.testStationStream(PUBLIC_URL, { fetchImpl: async () => fakeResponse(200, { "content-type": "audio/mpeg", "icy-name": "Lounge" }, HTML_PAGE) });
+  assert.deepEqual([mislabelled.ok, mislabelled.reachable, mislabelled.isAudioStream, mislabelled.playableAudio, mislabelled.format], [false, true, false, false, "html"]);
+  const wrongType = await stations.testStationStream(PUBLIC_URL, { fetchImpl: async () => fakeResponse(200, { "content-type": "text/plain" }, mp3Frames()) });
+  assert.deepEqual([wrongType.ok, wrongType.isAudioStream, wrongType.format], [true, true, "mp3"]);
+  const locked = await stations.testStationStream(PUBLIC_URL, { fetchImpl: async () => fakeResponse(401) });
+  assert.deepEqual(
+    [locked.ok, locked.reachable, locked.authorized, locked.playableAudio, locked.status, locked.message],
+    [false, true, false, false, 401, "Server antwortet, aber in Discord nicht spielbar: HTTP 401 (Zugriff verweigert)."],
+  );
+  const gone = await stations.testStationStream(PUBLIC_URL, { fetchImpl: async () => fakeResponse(404) });
+  assert.deepEqual([gone.ok, gone.reachable, gone.message], [false, false, "HTTP 404"]);
 
   const timeout = await stations.testStationStream(PUBLIC_URL, {
     fetchImpl: async () => { throw Object.assign(new Error("slow"), { code: "OUTBOUND_TIMEOUT" }); },
@@ -126,24 +138,34 @@ test("the list shows each station's health and counts only confirmed outages", a
 
 test("the health run stores the result and raises an incident on the second failure", async () => {
   const db = memoryDb({
-    stations: [{ key: "a", url: "http://a" }, { key: "b", url: "http://b" }],
-    station_health: [{ key: "a", status: "down", consecutiveFailures: 1 }, { key: "b", status: "down", consecutiveFailures: 4 }],
+    stations: [{ key: "a", url: "http://a" }, { key: "b", url: "http://b" }, { key: "c", url: "http://c" }, { key: "d", url: "http://d" }],
+    station_health: [
+      { key: "a", status: "down", consecutiveFailures: 1 }, { key: "b", status: "down", consecutiveFailures: 4 },
+      { key: "c", status: "down", consecutiveFailures: 1 }, { key: "d", status: "down", consecutiveFailures: 3, reachable: true },
+    ],
   });
-  const probe = async (url) => (url === "http://a"
+  const probe = async (url) => (url === "http://c"
+    ? { ok: false, reachable: true, discordOk: false, status: 200, latencyMs: 9, message: "Kein Audio (HTML-Seite)", authorized: true, playableAudio: false, format: "html", reasonCode: "not_audio" }
+    : url === "http://a"
     ? { ok: false, reachable: false, discordOk: false, status: 0, latencyMs: 5, message: "timeout", timedOut: true, reason: "x" }
-    : { ok: true, reachable: true, discordOk: true, status: 200, latencyMs: 40, contentType: "audio/mpeg" });
+    : { ok: true, reachable: true, discordOk: true, status: 200, latencyMs: 40, contentType: "audio/mpeg", authorized: true, playableAudio: true, format: "mp3", reasonCode: "ok" });
   const run = await stations.runStationHealth(db, [], { probe, now: () => Date.parse("2026-09-25T12:00:00Z") });
 
-  assert.equal(run.count, 2);
+  assert.equal(run.count, 4);
   assert.equal(run.truncated, false);
   const [a, b] = ["a", "b"].map((key) => db.data.station_health.find((row) => row.key === key));
   assert.deepEqual([a.status, a.consecutiveFailures, a.error], ["down", 2, "timeout"]);
   assert.equal(Object.hasOwn(a, "timedOut"), false);
   assert.deepEqual([b.status, b.consecutiveFailures, b.consecutiveSuccesses, b.responseTimeMs], ["up", 0, 1, 40]);
-  assert.equal(Object.hasOwn(b, "contentType"), false, "only FastAPI's probe fields reach the health document");
-  assert.deepEqual(db.data.runtime_incidents.map((row) => [row.severity, row.message, row.resolved]), [
+  assert.equal(Object.hasOwn(b, "contentType"), false, "only the probe's health fields reach the health document");
+  assert.deepEqual([b.authorized, b.playableAudio, b.format, b.reasonCode], [true, true, "mp3", "ok"], "#538");
+  assert.equal(Object.hasOwn(a, "playableAudio"), false, "a probe without the new fields stores none");
+  // #538: a station that answers without audio is "not playable", not "offline".
+  assert.deepEqual(db.data.runtime_incidents.map((row) => [row.severity, row.message, row.resolved]).sort((x, y) => x[1].localeCompare(y[1])), [
     ["warning", "Sender a ist offline: timeout", false],
-    ["info", "Sender b ist wieder erreichbar", true],
+    ["info", "Sender b ist wieder spielbar", true],
+    ["warning", "Sender c ist nicht spielbar: Kein Audio (HTML-Seite)", false],
+    ["info", "Sender d ist wieder spielbar", true],
   ]);
 
   const many = Array.from({ length: 30 }, (_, index) => `k${index}`);

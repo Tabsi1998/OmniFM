@@ -11,7 +11,7 @@
 // ============================================================
 
 import { log } from "../lib/logging.js";
-import { safeFetch } from "../lib/safe-outbound-http.js";
+import { probeStreamAudio, stationOutageText, stationRecoveryText } from "../lib/stream-audio-probe.js";
 import { getDb, isConnected } from "../lib/db.js";
 import { recordRuntimeIncident } from "./runtime-health-reporter.js";
 
@@ -34,7 +34,6 @@ const STATION_HEALTH_CONCURRENCY = Math.max(
   1,
   Math.min(STATION_HEALTH_BATCH_SIZE, Number.parseInt(String(process.env.STATION_HEALTH_CONCURRENCY || "2"), 10) || 2)
 );
-const HEAD_FALLBACK_STATUS_CODES = new Set([403, 405, 501]);
 
 /** @type {Map<string, StationHealthEntry>} */
 const healthReport = new Map();
@@ -77,11 +76,11 @@ function reportTransition(previous, entry) {
   const recovered = entry.status === "up" && previous.status === "down" && previous.consecutiveFailures >= 2;
   if (confirmedDown) {
     const detail = entry.error || "nicht erreichbar";
-    log("WARN", `[StationHealth] Station "${entry.name}" (${entry.key}) ist DOWN: ${detail} (${entry.responseTimeMs}ms, 2x in Folge)`);
-    recordRuntimeIncident({ severity: "warning", source: "station-health", message: `Sender ${entry.name} (${entry.key}) ist offline: ${detail}` }).catch(() => null);
+    log("WARN", `[StationHealth] Station "${entry.name}" (${entry.key}) ist ${entry.reachable ? "NICHT SPIELBAR" : "DOWN"}: ${detail} (${entry.responseTimeMs}ms, 2x in Folge)`);
+    recordRuntimeIncident({ severity: "warning", source: "station-health", message: stationOutageText(`${entry.name} (${entry.key})`, entry) }).catch(() => null);
   } else if (recovered) {
     log("INFO", `[StationHealth] Station "${entry.name}" (${entry.key}) ist wieder UP nach ${previous.consecutiveFailures} Fehlern (${entry.responseTimeMs}ms)`);
-    recordRuntimeIncident({ severity: "info", source: "station-health", message: `Sender ${entry.name} (${entry.key}) ist wieder erreichbar`, resolved: true }).catch(() => null);
+    recordRuntimeIncident({ severity: "info", source: "station-health", message: stationRecoveryText(`${entry.name} (${entry.key})`), resolved: true }).catch(() => null);
   }
 }
 
@@ -96,9 +95,14 @@ function reportTransition(previous, entry) {
  * @property {string|null} error
  * @property {number} consecutiveFailures
  * @property {number} consecutiveSuccesses
- * @property {boolean} [ok]
- * @property {boolean} [reachable]
- * @property {boolean} [discordOk]
+ * @property {boolean} [ok]                 same as playableAudio
+ * @property {boolean} [reachable]          the server answered (401/403 included), #538
+ * @property {boolean | null} [authorized]  false on 401/403, null without an answer
+ * @property {boolean} [playableAudio]      the stream sends audio the bot can play
+ * @property {boolean} [discordOk]          same as playableAudio
+ * @property {number | null} [httpStatus]
+ * @property {string | null} [format]       mp3, aac, opus …; html, hls … when it is not audio
+ * @property {string} [reasonCode]          see StreamAudioProbe
  * @property {string | null} [streamName]      what the stream calls itself (icy-name), #325
  * @property {{ from: string, to: string, at: number } | null} [streamNameChange]
  */
@@ -106,8 +110,8 @@ function reportTransition(previous, entry) {
 const STREAM_NAME_CHANGE_KEEP_MS = 24 * 60 * 60_000;
 
 /** The name a stream sends about itself (icy-name), or "". */
-function readStreamName(response) {
-  const value = String(response?.headers?.get?.("icy-name") || "").replace(/\s+/g, " ").trim();
+function readStreamName(icyName) {
+  const value = String(icyName || "").replace(/\s+/g, " ").trim();
   return value.slice(0, 120);
 }
 
@@ -130,14 +134,16 @@ function trackStreamName(previous, streamName, url, now = Date.now()) {
 }
 
 /**
- * Prüft eine einzelne Station per HTTP HEAD (oder GET mit sofortigem Abbruch).
+ * Prüft eine einzelne Station mit der kleinen GET-Audio-Probe (#538): "up"
+ * und in Discord spielbar ist nur, was wirklich Audio sendet. Ein HEAD 200,
+ * eine HTML-Seite oder ein 401 reichen nicht.
  * @param {string} key
  * @param {string} name
  * @param {string} url
+ * @param {{ fetchImpl?: Function }} [options]
  * @returns {Promise<StationHealthEntry>}
  */
-async function checkStation(key, name, url) {
-  const startMs = Date.now();
+async function checkStation(key, name, url, { fetchImpl } = {}) {
   const previous = healthReport.get(key) || {
     key,
     name,
@@ -150,107 +156,37 @@ async function checkStation(key, name, url) {
     consecutiveSuccesses: 0,
   };
 
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), STATION_HEALTH_TIMEOUT_MS);
-    const fetchRangedGet = () => safeFetch(url, {
-      method: "GET",
-      signal: controller.signal,
-      headers: {
-        "User-Agent": "OmniFM-HealthCheck/1.0",
-        "Range": "bytes=0-0",
-        "Icy-MetaData": "1",
-      },
-      redirect: "follow",
-      lenientHttpParser: true, // radio servers, #536
-      timeoutMs: STATION_HEALTH_TIMEOUT_MS,
-    });
+  const probe = await probeStreamAudio(url, {
+    timeoutMs: STATION_HEALTH_TIMEOUT_MS,
+    userAgent: "OmniFM-HealthCheck/1.0",
+    ...(fetchImpl ? { fetchImpl } : {}),
+  });
+  const ok = probe.playableAudio;
 
-    let response;
-    try {
-      // HEAD-Request zuerst – spart Bandbreite
-      response = await safeFetch(url, {
-        method: "HEAD",
-        signal: controller.signal,
-        headers: { "User-Agent": "OmniFM-HealthCheck/1.0", "Icy-MetaData": "1" },
-        redirect: "follow",
-        lenientHttpParser: true, // radio servers, #536
-        timeoutMs: STATION_HEALTH_TIMEOUT_MS,
-      });
-      if (HEAD_FALLBACK_STATUS_CODES.has(Number(response?.status || 0))) {
-        try {
-          await response.body?.cancel?.();
-        } catch {
-          // ignore
-        }
-        response = await fetchRangedGet();
-      }
-    } catch (headErr) {
-      // Some streams reject HEAD, so use a small ranged GET instead.
-      if (!controller.signal.aborted) {
-        response = await fetchRangedGet();
-      } else {
-        throw headErr;
-      }
-    } finally {
-      clearTimeout(timeoutId);
-    }
+  /** @type {StationHealthEntry} */
+  const entry = {
+    key,
+    name,
+    url,
+    status: ok ? "up" : "down",
+    ok,
+    reachable: probe.reachable,
+    authorized: probe.authorized,
+    playableAudio: ok,
+    discordOk: ok,
+    httpStatus: probe.httpStatus,
+    format: probe.format,
+    reasonCode: probe.reasonCode,
+    lastCheckedAt: Date.now(),
+    responseTimeMs: probe.responseTimeMs,
+    error: probe.error,
+    consecutiveFailures: ok ? 0 : previous.consecutiveFailures + 1,
+    consecutiveSuccesses: ok ? previous.consecutiveSuccesses + 1 : 0,
+    ...trackStreamName(previous, ok ? readStreamName(probe.icyName) : "", url),
+  };
 
-    const responseTimeMs = Date.now() - startMs;
-    // HTTP 200, 206 (Partial Content), 301/302 (Redirect) = OK
-    // 4xx/5xx = down
-    const ok = response.status < 400 || response.status === 401; // 401 = Auth required aber Server läuft
-    const naming = trackStreamName(previous, ok ? readStreamName(response) : "", url);
-    try {
-      await response.body?.cancel?.();
-    } catch {
-      // ignore
-    }
-
-    /** @type {StationHealthEntry} */
-    const entry = {
-      key,
-      name,
-      url,
-      status: ok ? "up" : "down",
-      ok,
-      reachable: ok,
-      discordOk: ok,
-      lastCheckedAt: Date.now(),
-      responseTimeMs,
-      error: ok ? null : `HTTP ${response.status}`,
-      consecutiveFailures: ok ? 0 : previous.consecutiveFailures + 1,
-      consecutiveSuccesses: ok ? previous.consecutiveSuccesses + 1 : 0,
-      ...naming,
-    };
-
-    reportTransition(previous, entry);
-    return entry;
-  } catch (err) {
-    const responseTimeMs = Date.now() - startMs;
-    const isTimeout = err?.name === "AbortError" || String(err?.message || "").includes("abort");
-    const errorMsg = isTimeout ? `Timeout nach ${STATION_HEALTH_TIMEOUT_MS}ms` : String(err?.message || err);
-
-    /** @type {StationHealthEntry} */
-    const entry = {
-      key,
-      name,
-      url,
-      status: "down",
-      ok: false,
-      reachable: false,
-      discordOk: false,
-      lastCheckedAt: Date.now(),
-      responseTimeMs,
-      error: errorMsg,
-      consecutiveFailures: previous.consecutiveFailures + 1,
-      consecutiveSuccesses: 0,
-      ...trackStreamName(previous, "", url),
-    };
-
-    reportTransition(previous, entry);
-    return entry;
-  }
+  reportTransition(previous, entry);
+  return entry;
 }
 
 /**
@@ -393,6 +329,7 @@ function isStationDown(key) {
 }
 
 export {
+  checkStation,
   trackStreamName,
   startStationHealthService,
   stopStationHealthService,

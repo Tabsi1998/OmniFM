@@ -90,6 +90,11 @@ webhook (`src/services/operator-webhook.js`) build their own embeds on purpose.
   webhooks and APIs stay strict.
 - A stream probe reads a few KB and stops; every timer is cleared and the
   body is cancelled on every path (#539).
+- Whether a URL is a station that plays is asked in one place:
+  `probeStreamAudio` (`src/lib/stream-audio-probe.js`, #538). It does a small
+  GET and reads the bytes (MP3, AAC, Ogg, FLAC); a HEAD answer, a
+  Content-Type or a 401 never counts as playable. Use its `reachable`,
+  `authorized` and `playableAudio` instead of a new check.
 - SomaFM answers 403 to every non-browser client (#542, #549): do not add new
   SomaFM streams (the existing ones are being replaced in #549) and do not
   fake a browser user agent.

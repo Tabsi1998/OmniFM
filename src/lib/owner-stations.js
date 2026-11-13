@@ -3,15 +3,19 @@
 // ============================================================
 // The Node twin of backend/routers/admin_stations.py: list with health,
 // stream test, create/update, delete (archived first) and the health check
-// on demand. Same rules and answers as FastAPI; outbound requests go through
-// safeFetch, which also refuses redirects into the local network.
+// on demand. Same rules and answers as FastAPI, with one exception (#538):
+// whether a station plays is decided here by the bytes of the stream
+// (stream-audio-probe.js), while FastAPI (backend/services/catalog.py, only
+// the way back until #291) still goes by the Content-Type and icy-name.
+// Outbound requests go through safeFetch, which also refuses redirects into
+// the local network.
 import { safeFetch, validateOutboundUrlWithDns } from "./safe-outbound-http.js";
+import { probeStreamAudio, stationOutageText, stationRecoveryText } from "./stream-audio-probe.js";
 import { parseIntLike } from "./owner-licenses.js";
 import { normalizeStationSeasons } from "./station-fields.js";
 
 export const STATION_KEY = /^[a-z0-9][a-z0-9._-]{1,48}$/;
 export const VALID_STATION_TIERS = Object.freeze(["free", "pro", "ultimate"]);
-const AUDIO_TYPES = ["audio", "mpeg", "ogg", "aac", "octet-stream"];
 
 const clip = (value, max) => {
   const text = String(value ?? "").trim();
@@ -64,32 +68,28 @@ export async function validateStationUrl(url) {
   return checked.ok ? { ok: true } : { ok: false, error: checked.error || "Lokale/private Hosts sind nicht erlaubt." };
 }
 
-/** A GET of the first bytes: reachable, and does it send audio? (_probe_station_url) */
+/**
+ * A GET of the first bytes (#538): does the server answer (reachable), does
+ * it let us in (authorized), and is what comes audio the bot can play
+ * (playableAudio, also as ok/discordOk/isAudioStream)? The bytes decide, not
+ * the Content-Type or an icy-name.
+ * @returns {Promise<Record<string, any>>}
+ */
 export async function probeStationUrl(url, { timeoutMs = 5000, fetchImpl = safeFetch } = {}) {
-  const started = Date.now();
-  try {
-    const response = await fetchImpl(url, {
-      method: "GET",
-      headers: { Range: "bytes=0-2047", "User-Agent": "OmniFM-StreamTest/1.0", "Icy-MetaData": "1" },
-      redirect: "follow",
-      lenientHttpParser: true, // radio servers, #536
-      timeoutMs,
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    const latencyMs = Date.now() - started;
-    const contentType = String(response.headers?.get?.("content-type") || "");
-    const icyName = response.headers?.get?.("icy-name") || null;
-    const icyBitrate = response.headers?.get?.("icy-br") || null;
-    try { await response.body?.cancel?.(); } catch { /* the stream is closed either way */ }
-    const reachable = response.status < 400;
-    const isAudio = AUDIO_TYPES.some((type) => contentType.toLowerCase().includes(type)) || Boolean(icyName);
-    const discordOk = reachable && isAudio;
-    return { ok: discordOk, reachable, discordOk, isAudioStream: isAudio, status: response.status, latencyMs, contentType, icyName, bitrate: icyBitrate };
-  } catch (err) {
-    const timedOut = err?.code === "OUTBOUND_TIMEOUT" || err?.name === "AbortError" || err?.name === "TimeoutError";
-    const reason = String(err?.message || err || "");
-    return { ok: false, reachable: false, discordOk: false, status: 0, latencyMs: Date.now() - started, message: timedOut ? "timeout" : clip(reason, 80), timedOut, reason };
+  const probe = await probeStreamAudio(url, { timeoutMs, userAgent: "OmniFM-StreamTest/1.0", fetchImpl });
+  const playable = probe.playableAudio;
+  const verdict = { authorized: probe.authorized, playableAudio: playable, format: probe.format, reasonCode: probe.reasonCode };
+  if (probe.httpStatus === null) {
+    return {
+      ok: false, reachable: false, discordOk: false, status: 0, latencyMs: probe.responseTimeMs,
+      message: probe.timedOut ? "timeout" : clip(probe.error, 80), timedOut: probe.timedOut, reason: String(probe.error || ""), ...verdict,
+    };
   }
+  return {
+    ok: playable, reachable: probe.reachable, discordOk: playable, isAudioStream: playable, status: probe.httpStatus,
+    latencyMs: probe.responseTimeMs, contentType: probe.contentType, icyName: probe.icyName, bitrate: probe.bitrate,
+    ...(playable ? {} : { message: probe.error }), ...verdict,
+  };
 }
 
 /** POST /api/admin/stations/test: the answer the owner console shows. */
@@ -106,12 +106,16 @@ export async function testStationStream(url, options = {}) {
     ok: probe.ok,
     reachable: probe.reachable,
     isAudioStream: probe.isAudioStream,
+    authorized: probe.authorized,
+    playableAudio: probe.playableAudio,
+    format: probe.format,
+    reasonCode: probe.reasonCode,
     status: probe.status,
     contentType: probe.contentType,
     icyName: probe.icyName,
     bitrate: probe.bitrate,
     latencyMs: probe.latencyMs,
-    message: probe.ok ? "Stream erreichbar und liefert Audio." : (probe.reachable ? "Erreichbar, aber kein eindeutiger Audio-Stream." : `HTTP ${probe.status}`),
+    message: probe.ok ? "Stream erreichbar und liefert Audio." : (probe.reachable ? `Server antwortet, aber in Discord nicht spielbar: ${probe.message}.` : `HTTP ${probe.status}`),
   };
 }
 
@@ -198,9 +202,10 @@ export async function runStationHealth(db, keys, { probe = probeStationUrl, now 
   const query = requested.length ? { key: { $in: requested.slice(0, 25) } } : { key: { $not: /^custom:/ } };
   const stations = (await db.collection("stations").find(query, { projection: { _id: 0, key: 1, url: 1 } }).limit(25).toArray()).filter((row) => row.url);
   const results = {};
-  // Only what FastAPI's _probe_station_url stores, so both write the same health documents.
-  const healthFields = ({ ok, reachable, discordOk, status, latencyMs, message }) => ({
+  // What FastAPI's _probe_station_url stores, plus the probe's verdict (#538).
+  const healthFields = ({ ok, reachable, discordOk, status, latencyMs, message, authorized, playableAudio, format, reasonCode }) => ({
     ok, reachable, discordOk, status, latencyMs, ...(message === undefined ? {} : { message }),
+    ...(playableAudio === undefined ? {} : { authorized, playableAudio, format, reasonCode }),
   });
   // At most 10 at a time, like FastAPI's thread pool.
   for (let index = 0; index < stations.length; index += 10) {
@@ -232,9 +237,9 @@ export async function runStationHealth(db, keys, { probe = probeStationUrl, now 
     await health.updateOne({ key }, { $set: doc }, { upsert: true });
     Object.assign(result, doc);
     if (failures === 2) {
-      await incidents.insertOne({ at: stamp, severity: "warning", source: "station-health", message: clip(`Sender ${key} ist offline: ${doc.error}`, 240), resolved: false });
+      await incidents.insertOne({ at: stamp, severity: "warning", source: "station-health", message: clip(stationOutageText(key, doc), 240), resolved: false });
     } else if (ok && previous.status === "down" && parseIntLike(previous.consecutiveFailures, 0) >= 2) {
-      await incidents.insertOne({ at: stamp, severity: "info", source: "station-health", message: clip(`Sender ${key} ist wieder erreichbar`, 240), resolved: true });
+      await incidents.insertOne({ at: stamp, severity: "info", source: "station-health", message: clip(stationRecoveryText(key), 240), resolved: true });
     }
   }));
   return { results, count: Object.keys(results).length, truncated: requested.length > 25 };

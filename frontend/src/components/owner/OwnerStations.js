@@ -62,6 +62,7 @@ export default function OwnerStations({
         <span className="oa-pill green" style={{ padding: '2px 8px' }}>Discord = Bot kann streamen</span>
         <span className="oa-pill cyan" style={{ padding: '2px 8px' }}>Browser = Website-Player spielbar</span>
         <span className="oa-pill amber" style={{ padding: '2px 8px' }}>Nur Discord = Browser blockiert</span>
+        <span className="oa-pill amber" style={{ padding: '2px 8px' }}>Antwortet = Server antwortet, aber in Discord nicht spielbar</span>
         <span className="oa-pill red" style={{ padding: '2px 8px' }}>Offline = nicht erreichbar</span>
       </div>
 
@@ -195,7 +196,7 @@ export default function OwnerStations({
                   {!h && <span className="oa-pill slate" style={{ padding: '2px 8px' }}>—</span>}
                   {h && h.checking && <span className="oa-pill slate" style={{ padding: '2px 8px' }}>Prüfe…</span>}
                   {h && !h.checking && !h.reachable && <span className="oa-pill red" style={{ padding: '2px 8px' }}><XCircle size={11} /> Offline</span>}
-                  {h && !h.checking && h.reachable && !h.discordOk && !h.ok && <span className="oa-pill amber" style={{ padding: '2px 8px' }}><AlertTriangle size={11} /> Kein Audio</span>}
+                  {h && !h.checking && h.reachable && !h.discordOk && !h.ok && <span className="oa-pill amber" style={{ padding: '2px 8px' }} title={`Server antwortet, aber in Discord nicht spielbar${h.error || h.message ? `: ${h.error || h.message}` : ''}`}><AlertTriangle size={11} /> {h.authorized === false ? 'Antwortet · Zugriff verweigert' : 'Antwortet · kein Audio'}</span>}
                   {h && !h.checking && (h.discordOk || h.ok) && (
                     <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
                       <span className="oa-pill green" style={{ padding: '2px 8px' }} title="Server-seitig streambar – Discord-Bot kann diesen Sender abspielen"><CheckCircle2 size={11} /> Discord{typeof (h.latencyMs ?? h.responseTimeMs) === 'number' ? ` · ${h.latencyMs ?? h.responseTimeMs}ms` : ''}</span>

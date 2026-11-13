@@ -28,6 +28,7 @@ import {
   readBrowserCache,
   writeBrowserCache,
 } from './owner/ownerUi.js';
+import { probeBrowserBatch } from './owner/browserProbe.js';
 import OwnerOverview from './owner/OwnerOverview.js';
 import OwnerMonitoring from './owner/OwnerMonitoring.js';
 import OwnerStatusNotices from './owner/OwnerStatusNotices.js';
@@ -401,43 +402,6 @@ export default function OwnerAdmin() {
     }
   };
 
-  // Echte Browser-Abspielbarkeit: Audio-Element laden und auf canplay/error hören.
-  const probeBrowserPlayable = (url) => new Promise((resolve) => {
-    if (!url) { resolve(false); return; }
-    const a = new Audio();
-    a.muted = true;
-    a.preload = 'auto';
-    let done = false;
-    let timer = null;
-    const cleanup = () => {
-      a.removeEventListener('canplay', onOk);
-      a.removeEventListener('loadeddata', onOk);
-      a.removeEventListener('error', onErr);
-      try { a.pause(); a.removeAttribute('src'); a.load(); } catch { /* noop */ }
-      if (timer) clearTimeout(timer);
-    };
-    const finish = (ok) => { if (done) return; done = true; cleanup(); resolve(ok); };
-    const onOk = () => finish(true);
-    const onErr = () => finish(false);
-    a.addEventListener('canplay', onOk);
-    a.addEventListener('loadeddata', onOk);
-    a.addEventListener('error', onErr);
-    timer = setTimeout(() => finish(false), 6000);
-    try { a.src = url; a.load(); } catch { finish(false); }
-  });
-
-  const probeBrowserBatch = async (items) => {
-    const flags = {};
-    const CONCURRENCY = 6;
-    for (let i = 0; i < items.length; i += CONCURRENCY) {
-      const group = items.slice(i, i + CONCURRENCY);
-      // eslint-disable-next-line no-await-in-loop
-      const results = await Promise.all(group.map((it) => probeBrowserPlayable(it.url)));
-      group.forEach((it, gi) => { flags[it.key] = results[gi]; });
-    }
-    return flags;
-  };
-
   const checkStationHealth = async (keys) => {
     // Prüft Live-Status: Discord/erreichbar serverseitig (/health) + echte
     // Browser-Abspielbarkeit per Audio-Probe direkt im Owner-Browser
@@ -457,13 +421,13 @@ export default function OwnerAdmin() {
         // eslint-disable-next-line no-await-in-loop
         const r = await apiSend('/api/admin/stations/health', 'POST', { keys: batch });
         const serverResults = r.results || {};
-        // 2) Browser-Probe (nur für erreichbare Sender) – mit 24h-Cache.
+        // 2) Browser-Probe (nur für in Discord spielbare Sender, #538) – mit 24h-Cache.
         const cache = readBrowserCache();
         const nowMs = Date.now();
-        const reachableItems = batch.filter((k) => serverResults[k] && serverResults[k].reachable).map((k) => ({ key: k, url: urlByKey[k] }));
+        const playableItems = batch.filter((k) => serverResults[k] && (serverResults[k].discordOk || serverResults[k].ok)).map((k) => ({ key: k, url: urlByKey[k] }));
         const cachedFlags = {};
         const toProbe = [];
-        reachableItems.forEach((it) => {
+        playableItems.forEach((it) => {
           const c = cache[it.key];
           if (c && (nowMs - c.at) < BROWSER_CACHE_TTL && c.url === it.url) cachedFlags[it.key] = c.ok;
           else toProbe.push(it);

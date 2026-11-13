@@ -1,7 +1,7 @@
 import { safeFetch } from "./safe-outbound-http.js";
+import { probeStreamAudio } from "./stream-audio-probe.js";
 
 const DEFAULT_TIMEOUT_MS = 8_000;
-const HEAD_FALLBACK_STATUS_CODES = new Set([403, 405, 501]);
 
 function normalizeStationTestUrl(rawUrl) {
   const value = String(rawUrl || "").trim();
@@ -36,23 +36,11 @@ function normalizeStationTestUrl(rawUrl) {
   return parsed.toString();
 }
 
-function buildFailureResult(station, { url, startedAtMs, method, error, timeoutMs }) {
-  const isTimeout = error?.name === "AbortError" || String(error?.message || "").toLowerCase().includes("abort");
-  return {
-    ok: false,
-    key: station.key,
-    name: station.name,
-    url,
-    status: "down",
-    method,
-    httpStatus: null,
-    responseTimeMs: Date.now() - startedAtMs,
-    timeoutMs,
-    error: isTimeout ? `Timeout nach ${timeoutMs}ms` : (error?.message || String(error)),
-    checkedAt: new Date().toISOString(),
-  };
-}
-
+/**
+ * Tests a station's stream with the shared GET audio probe (#538): ok only
+ * when audio comes back. A page, a login wall (401) or a HEAD answer is not
+ * a stream; reachable, authorized and playableAudio say which it was.
+ */
 async function testOwnerStationStream(station, { timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl = safeFetch } = {}) {
   if (!station || typeof station !== "object") {
     /** @type {import("./types.js").HttpError} */
@@ -71,82 +59,30 @@ async function testOwnerStationStream(station, { timeoutMs = DEFAULT_TIMEOUT_MS,
   const name = String(station.name || key || "Station").trim();
   const url = normalizeStationTestUrl(station.url);
   const safeTimeoutMs = Math.max(1_000, Math.min(30_000, Number.parseInt(String(timeoutMs), 10) || DEFAULT_TIMEOUT_MS));
-  const startedAtMs = Date.now();
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), safeTimeoutMs);
-  let method = "HEAD";
-
-  try {
-    let response;
-    try {
-      response = await fetchImpl(url, {
-        method,
-        redirect: "follow",
-        lenientHttpParser: true, // radio servers, #536
-        signal: controller.signal,
-        headers: { "User-Agent": "OmniFM-OwnerStationTest/1.0" },
-        timeoutMs: safeTimeoutMs,
-      });
-      if (HEAD_FALLBACK_STATUS_CODES.has(Number(response?.status || 0))) {
-        try {
-          await response?.body?.cancel?.();
-        } catch {
-          // ignore
-        }
-        method = "GET";
-        response = await fetchImpl(url, {
-          method,
-          redirect: "follow",
-          lenientHttpParser: true, // radio servers, #536
-          signal: controller.signal,
-          headers: {
-            "User-Agent": "OmniFM-OwnerStationTest/1.0",
-            "Range": "bytes=0-0",
-          },
-          timeoutMs: safeTimeoutMs,
-        });
-      }
-    } catch (headError) {
-      if (controller.signal.aborted) throw headError;
-      method = "GET";
-      response = await fetchImpl(url, {
-        method,
-        redirect: "follow",
-        lenientHttpParser: true, // radio servers, #536
-        signal: controller.signal,
-        headers: {
-          "User-Agent": "OmniFM-OwnerStationTest/1.0",
-          "Range": "bytes=0-0",
-        },
-        timeoutMs: safeTimeoutMs,
-      });
-    }
-
-    const httpStatus = Number(response?.status || 0) || null;
-    const ok = httpStatus != null && (httpStatus < 400 || httpStatus === 401);
-    try {
-      await response?.body?.cancel?.();
-    } catch {
-      // ignore
-    }
-    return {
-      ok,
-      key,
-      name,
-      url,
-      status: ok ? "up" : "down",
-      method,
-      httpStatus,
-      responseTimeMs: Date.now() - startedAtMs,
-      timeoutMs: safeTimeoutMs,
-      error: ok ? null : `HTTP ${httpStatus || "unbekannt"}`,
-      checkedAt: new Date().toISOString(),
-    };
-  } catch (error) {
-    return buildFailureResult({ key, name }, { url, startedAtMs, method, error, timeoutMs: safeTimeoutMs });
-  } finally {
-    clearTimeout(timer);
-  }
+  const probe = await probeStreamAudio(url, {
+    timeoutMs: safeTimeoutMs,
+    userAgent: "OmniFM-OwnerStationTest/1.0",
+    fetchImpl,
+  });
+  const ok = probe.playableAudio;
+  return {
+    ok,
+    key,
+    name,
+    url,
+    status: ok ? "up" : "down",
+    method: "GET",
+    httpStatus: probe.httpStatus,
+    reachable: probe.reachable,
+    authorized: probe.authorized,
+    playableAudio: ok,
+    format: probe.format,
+    reasonCode: probe.reasonCode,
+    responseTimeMs: probe.responseTimeMs,
+    timeoutMs: safeTimeoutMs,
+    error: probe.error,
+    checkedAt: new Date().toISOString(),
+  };
 }
 
 export {
