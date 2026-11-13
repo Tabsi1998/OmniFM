@@ -273,16 +273,18 @@ function startWebServer(runtimes, { forwardRuntimeTo = "" } = {}) {
     }
 
     // A route may allow a larger body, e.g. the bot look's pictures (#280).
-    // Read once: the permission check (#523) may have read it before the route.
-    let jsonBody = null;
+    // Read once: the permission check (#523) reads it before the route, with
+    // the biggest limit of any route; each call still holds its own limit.
+    let rawJsonBody = null;
     /** @param {{ maxBytes?: number }} [options] */
-    function readJsonBody(options = {}) {
-      jsonBody ||= parseJsonBody(options);
-      return jsonBody;
-    }
-    /** @param {{ maxBytes?: number }} [options] */
-    async function parseJsonBody({ maxBytes } = {}) {
-      const raw = await readRawBody(maxBytes);
+    async function readJsonBody({ maxBytes = 1024 * 1024 } = {}) {
+      rawJsonBody ||= readRawBody(maxBytes);
+      const raw = await rawJsonBody;
+      if (Buffer.byteLength(raw) > maxBytes) {
+        const err = /** @type {Error & { status?: number }} */ (new Error("Body too large"));
+        err.status = 413;
+        throw err;
+      }
       if (!raw.trim()) return {};
       try {
         return JSON.parse(raw);

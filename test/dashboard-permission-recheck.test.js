@@ -24,53 +24,98 @@ Object.assign(process.env, env);
 const { startWebServer } = await import("../src/api/server.js");
 const { setLicenseProvider } = await import("../src/core/entitlements.js");
 const { setDashboardAuthSession, deleteDashboardAuthSession } = await import("../src/dashboard-store.js");
+const { setDashboardPermissionRestForTests, freshPermissionRevoked, checkFreshGuildPermission } = await import("../src/api/helpers/permission-recheck.js");
 
 const GUILD = "723456789012345678";
+const OTHER_GUILD = "723456789012345679";
+const WORKER_TOKEN = "worker-token-sentinel";
 const MANAGE_GUILD = 0x20n;
 const ADMINISTRATOR = 0x8n;
 const REVOKED_MESSAGE = /no longer manage this server/i;
 const UNAVAILABLE_MESSAGE = /could not be checked/i;
 
-/** What Discord says about each user on the server; counts every question. */
+const unknownMember = () => Object.assign(new Error("Unknown Member"), { code: 10007, status: 404 });
+
+/** What Discord says about each user on the servers; counts every question. */
 function fakeDiscord() {
-  const members = new Map();
+  const members = new Map(); // GUILD
+  const otherMembers = new Map(); // OTHER_GUILD
   const calls = [];
-  const guild = {
-    id: GUILD,
+  const guildOf = (id, answers) => ({
+    id,
     name: "Club",
     members: {
       async fetch(options) {
         calls.push(options);
-        const answer = members.get(String(options?.user || ""));
+        const answer = answers.get(String(options?.user || ""));
         if (answer instanceof Error) throw answer;
-        if (answer === undefined) throw Object.assign(new Error("Unknown Member"), { code: 10007, status: 404 });
+        if (answer === undefined) throw unknownMember();
         return { id: options.user, permissions: { bitfield: answer } };
       },
     },
-  };
+  });
   const runtime = {
     role: "commander",
     config: { id: "bot-commander", index: 1, name: "OmniFM", requiredTier: "free" },
-    client: { isReady: () => true, guilds: { cache: new Map([[GUILD, guild]]) } },
+    client: { isReady: () => true, guilds: { cache: new Map([[GUILD, guildOf(GUILD, members)], [OTHER_GUILD, guildOf(OTHER_GUILD, otherMembers)]]) } },
     getPublicStatus: () => ({ id: "bot-commander", ready: true, servers: 1 }),
     getDashboardStatus: () => ({ id: "bot-commander", ready: true, servers: 1, guildDetails: [] }),
     collectStats: () => ({ servers: 1, users: 1, connections: 0, listeners: 0 }),
     getPlayingGuildCount: () => 0,
     getState: () => null,
   };
-  return { members, calls, runtime };
+  return { members, otherMembers, calls, runtime };
+}
+
+/**
+ * A worker of the split mode as the commander sees it (RemoteWorkerHandle):
+ * a stand-in guild without members.fetch, Discord only over REST.
+ */
+function fakeWorker(t, { guild, members = new Map(), fail = null }) {
+  const calls = [];
+  const tokens = [];
+  setDashboardPermissionRestForTests((token) => {
+    tokens.push(token);
+    return {
+      async get(route) {
+        calls.push(route);
+        if (fail) throw fail;
+        const memberMatch = route.match(/^\/guilds\/(\d+)\/members\/(\d+)$/);
+        if (memberMatch) {
+          const roles = members.get(memberMatch[2]);
+          if (!roles) throw unknownMember();
+          return { user: { id: memberMatch[2] }, roles };
+        }
+        if (route === `/guilds/${GUILD}`) return guild;
+        throw Object.assign(new Error("Unknown Guild"), { code: 10004, status: 404 });
+      },
+    };
+  });
+  t.after(() => setDashboardPermissionRestForTests(null));
+  const runtime = {
+    role: "worker",
+    remote: true,
+    config: { id: "bot-worker-1", index: 2, name: "OmniFM 1", token: WORKER_TOKEN },
+    client: { isReady: () => true, guilds: { cache: new Map([[GUILD, { id: GUILD, name: "Club", members: { me: null, fetchMe: async () => null } }]]) } },
+    getPublicStatus: () => ({ id: "bot-worker-1", ready: true, servers: 1 }),
+    getDashboardStatus: () => ({ id: "bot-worker-1", ready: true, servers: 1, guildDetails: [] }),
+    collectStats: () => ({ servers: 1, users: 1, connections: 0, listeners: 0 }),
+    getPlayingGuildCount: () => 0,
+    getState: () => null,
+  };
+  return { calls, tokens, runtime, members };
 }
 
 let userCounter = 0;
 /** A session whose login is `ageSeconds` old; every test gets its own user. */
-function signIn(ageSeconds) {
+function signIn(ageSeconds, guildIds = [GUILD]) {
   userCounter += 1;
   const userId = String(523000000000000000n + BigInt(userCounter));
   const token = `recheck-${userId}-${Date.now()}`;
   const nowTs = Math.floor(Date.now() / 1000);
   setDashboardAuthSession(token, {
     user: { id: userId, username: "Vereinsadmin" },
-    guilds: [{ id: GUILD, name: "Club", permissions: "32", owner: false }],
+    guilds: guildIds.map((id) => ({ id, name: "Club", permissions: "32", owner: false })),
     createdAt: nowTs - ageSeconds,
     expiresAt: nowTs + 86_400,
   });
@@ -193,14 +238,128 @@ test("Discord not answering: changes fail closed, reads keep working, no storm o
   assert.equal(discord.calls.length, 1, "the failure is kept for a while, too");
 });
 
-test("the bot not on the server cannot confirm the rights: changes fail closed", async (t) => {
+test("no OmniFM bot on the server: changes are refused with a sign-in hint, reads keep working", async (t) => {
   const discord = fakeDiscord();
   discord.runtime.client.guilds.cache.clear();
   const base = await startServer(t, [discord.runtime]);
   const { token } = signIn(700);
   t.after(() => deleteDashboardAuthSession(token));
-  assert.equal((await stop(base, token)).status, 503);
+  const refused = await stop(base, token);
+  assert.equal(refused.status, 403);
+  assert.match(refused.error, /no OmniFM bot is on it\. Please sign in again/);
   assert.equal((await call(base, token, `/api/dashboard/capabilities?serverId=${GUILD}`)).status, 200);
+});
+
+test("split mode, only a worker on the server: its REST answers, the token stays inside", async (t) => {
+  const roleManage = "823456789012345678";
+  const roleAdmin = "823456789012345679";
+  const roleDj = "823456789012345680";
+  const guild = {
+    id: GUILD,
+    owner_id: "999999999999999999",
+    roles: [
+      { id: GUILD, permissions: "1024" }, // @everyone: view channels only
+      { id: roleManage, permissions: String(MANAGE_GUILD) },
+      { id: roleAdmin, permissions: String(ADMINISTRATOR) },
+      { id: roleDj, permissions: "2048" },
+    ],
+  };
+  const worker = fakeWorker(t, { guild });
+  const commander = fakeDiscord().runtime;
+  commander.client.guilds.cache.clear();
+  const base = await startServer(t, [commander, worker.runtime]);
+
+  const manager = signIn(700);
+  const admin = signIn(700);
+  const owner = signIn(700);
+  const dj = signIn(700);
+  const left = signIn(700);
+  for (const session of [manager, admin, owner, dj, left]) t.after(() => deleteDashboardAuthSession(session.token));
+  worker.members.set(manager.userId, [roleManage]);
+  worker.members.set(admin.userId, [roleDj, roleAdmin]);
+  worker.members.set(owner.userId, []);
+  worker.members.set(dj.userId, [roleDj]);
+  guild.owner_id = owner.userId;
+
+  assert.equal((await stop(base, manager.token)).status, 404, "Manage Server through a role");
+  assert.equal((await stop(base, admin.token)).status, 404, "Administrator through a role");
+  assert.equal((await stop(base, owner.token)).status, 404, "the owner, without any role");
+  const djAnswer = await stop(base, dj.token);
+  assert.equal(djAnswer.status, 403);
+  assert.match(djAnswer.error, REVOKED_MESSAGE);
+  assert.equal((await stop(base, left.token)).status, 403, "no longer on the server");
+  assert.ok(worker.tokens.length > 0 && worker.tokens.every((token) => token === WORKER_TOKEN));
+  assert.ok(worker.calls.includes(`/guilds/${GUILD}/members/${manager.userId}`));
+
+  const callsBefore = worker.calls.length;
+  assert.equal((await stop(base, manager.token)).status, 404);
+  assert.equal(worker.calls.length, callsBefore, "the answer is kept until the deadline");
+});
+
+test("@everyone with Manage Server counts too", async (t) => {
+  const worker = fakeWorker(t, { guild: { id: GUILD, owner_id: "1", roles: [{ id: GUILD, permissions: String(MANAGE_GUILD) }] } });
+  const base = await startServer(t, [worker.runtime]);
+  const { userId, token } = signIn(700);
+  t.after(() => deleteDashboardAuthSession(token));
+  worker.members.set(userId, []);
+  assert.equal((await stop(base, token)).status, 404);
+});
+
+test("split mode: a rate limit on the worker's REST fails closed with 503", async (t) => {
+  const worker = fakeWorker(t, { guild: { id: GUILD, roles: [] }, fail: Object.assign(new Error("rate limited"), { name: "RateLimitError" }) });
+  const base = await startServer(t, [worker.runtime]);
+  const { token } = signIn(700);
+  t.after(() => deleteDashboardAuthSession(token));
+  const refused = await stop(base, token);
+  assert.equal(refused.status, 503);
+  assert.match(refused.error, UNAVAILABLE_MESSAGE);
+  assert.equal(worker.calls.length, 1);
+  assert.equal((await stop(base, token)).status, 503);
+  assert.equal(worker.calls.length, 1, "no storm while Discord says wait");
+});
+
+test("playback: a server in the address does not cover another one in the body", async (t) => {
+  const discord = fakeDiscord();
+  const base = await startServer(t, [discord.runtime]);
+  const { userId, token } = signIn(700, [GUILD, OTHER_GUILD]);
+  t.after(() => deleteDashboardAuthSession(token));
+  discord.members.set(userId, 0n); // lost on GUILD
+  discord.otherMembers.set(userId, MANAGE_GUILD); // kept on OTHER_GUILD
+
+  for (const action of ["restart", "reconnect", "switch", "stop"]) {
+    // eslint-disable-next-line no-await-in-loop -- one request after the other
+    const answer = await call(base, token, `/api/dashboard/playback/${action}?serverId=${OTHER_GUILD}`, { method: "POST", body: { serverId: GUILD, botId: "bot-x" } });
+    assert.equal(answer.status, 403, action);
+    assert.match(answer.error, REVOKED_MESSAGE, action);
+  }
+  const foreign = await call(base, token, `/api/dashboard/playback/stop?serverId=${OTHER_GUILD}`, { method: "POST", body: { serverId: "723456789012345600", botId: "bot-x" } });
+  assert.equal(foreign.status, 403, "a body server outside the session");
+  assert.equal((await call(base, token, `/api/dashboard/playback/stop?serverId=${OTHER_GUILD}`, { method: "POST", body: { serverId: OTHER_GUILD, botId: "bot-x" } })).status, 404);
+});
+
+test("a big body keeps the route's own limit after the check read it (bot look, 8 MB)", async (t) => {
+  const discord = fakeDiscord();
+  const base = await startServer(t, [discord.runtime]);
+  const { token } = signIn(0);
+  t.after(() => deleteDashboardAuthSession(token));
+  const body = { slot: 1, avatar: `data:image/png;base64,${"A".repeat(3 * 1024 * 1024)}` };
+  const withQuery = await call(base, token, `/api/dashboard/bot-profile?serverId=${GUILD}`, { method: "PUT", body });
+  assert.notEqual(withQuery.status, 413);
+  const withoutQuery = await call(base, token, "/api/dashboard/bot-profile", { method: "PUT", body });
+  assert.notEqual(withoutQuery.status, 413);
+  const tooBig = await call(base, token, `/api/dashboard/reports?serverId=${GUILD}`, { method: "POST", body: { text: "x".repeat(64 * 1024) } });
+  assert.equal(tooBig.status, 413, "a small route still refuses a big body");
+});
+
+test("the live stream learns of a lost right without waiting for Discord", async () => {
+  const discord = fakeDiscord();
+  const userId = "523999999999999999";
+  const session = { user: { id: userId }, createdAt: Math.floor(Date.now() / 1000) - 700 };
+  assert.equal(freshPermissionRevoked([discord.runtime], { ...session, createdAt: Math.floor(Date.now() / 1000) }, GUILD), false, "fresh login");
+  assert.equal(freshPermissionRevoked([discord.runtime], session, GUILD), false, "asked, no answer yet");
+  await checkFreshGuildPermission([discord.runtime], userId, GUILD);
+  assert.equal(freshPermissionRevoked([discord.runtime], session, GUILD), true);
+  assert.equal(discord.calls.length, 1);
 });
 
 // Every dashboard path the routes know, so a new route is covered on its own.
@@ -234,4 +393,34 @@ test("every changing dashboard call goes through the check, before its route", a
   }
   assert.deepEqual(passed, []);
   assert.equal(discord.calls.length, 1, "one question for all of them");
+});
+
+test("an open live stream ends once Discord says the right is gone", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
+  const discord = fakeDiscord();
+  const base = await startServer(t, [discord.runtime]);
+  const { userId, token } = signIn(0);
+  t.after(() => deleteDashboardAuthSession(token));
+  discord.members.set(userId, 0n);
+
+  const controller = new AbortController();
+  t.after(() => controller.abort());
+  const response = await fetch(`${base}/api/dashboard/live?serverId=${GUILD}`, { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal });
+  assert.equal(response.status, 200);
+  t.mock.timers.tick(601_000);
+  const reader = response.body.getReader();
+  const ended = await new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), 8_000);
+    (async () => {
+      for (;;) {
+        // eslint-disable-next-line no-await-in-loop -- the stream comes piece by piece
+        const { done } = await reader.read().catch(() => ({ done: true }));
+        if (done) break;
+      }
+      clearTimeout(timer);
+      resolve(true);
+    })();
+  });
+  assert.equal(ended, true, "the stream was closed");
+  assert.equal(discord.calls.length, 1);
 });
