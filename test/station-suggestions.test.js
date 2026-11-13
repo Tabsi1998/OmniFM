@@ -182,7 +182,8 @@ test("a live stream goes into the queue; the same stream again and a fourth one 
   assert.ok(stored);
   created.push(stored._id);
   assert.equal(stored.status, "pending");
-  assert.deepEqual(stored.submitter, { userId: person, userName: "Hörerin", guildId: first.guildId, language: "de" });
+  // Only what the answer by DM needs: no server (#522).
+  assert.deepEqual(stored.submitter, { userId: person, userName: "Hörerin", language: "de" });
   assert.equal(stored.checks.length, 1, "the test at submit time counts as the first check");
   assert.equal(stored.checks[0].bitrate, 192);
 

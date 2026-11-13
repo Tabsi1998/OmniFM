@@ -95,8 +95,10 @@ test("removed: one DM, a return keeps it; 30 days later the server's data is gon
   const { createProblemReport } = await import("../src/problem-reports-store.js");
   const { createStationSuggestion } = await import("../src/station-suggestions-store.js");
   const reported = await createProblemReport({ kind: "problem", text: "Kein Ton seit gestern", guild: { id: guildId, name: "Testserver" }, reporter: { userId: ownerId, name: "Alex" }, consent: { notify: true } });
-  const suggested = await createStationSuggestion({ name: "Retention FM", url: `http://8.8.8.8:8000/omnifm-retention-${snowflake()}.mp3` }, { userId: ownerId, userName: "Alex", guildId });
+  const suggested = await createStationSuggestion({ name: "Retention FM", url: `http://8.8.8.8:8000/omnifm-retention-${snowflake()}.mp3` }, { userId: ownerId, userName: "Alex" });
   assert.ok(reported.report && suggested.suggestion, "report and suggestion kept");
+  // Suggestions from before #522 still hold the server.
+  await db.collection("station_suggestions").updateOne({ _id: suggested.suggestion._id }, { $set: { "submitter.guildId": guildId } });
 
   const { initCustomStationsStore } = await import("../src/custom-stations.js");
   const { initCommandPermissionsStore, setCommandRolePermission } = await import("../src/command-permissions-store.js");
@@ -201,7 +203,12 @@ test("a server with only reports and suggestions is announced; purging leaves ot
   const suggestionsOnly = snowflake();
   const other = snowflake();
   const report = (guildId, name, text) => createProblemReport({ kind: "problem", text, guild: { id: guildId, name } });
-  const suggest = (guildId) => createStationSuggestion({ name: "Only FM", url: `http://8.8.8.8:8000/omnifm-only-${snowflake()}.mp3` }, { userId: snowflake(), guildId });
+  // A suggestion from before #522, which still holds the server.
+  const suggest = async (guildId) => {
+    const created = await createStationSuggestion({ name: "Only FM", url: `http://8.8.8.8:8000/omnifm-only-${snowflake()}.mp3` }, { userId: snowflake() });
+    await db.collection("station_suggestions").updateOne({ _id: created.suggestion._id }, { $set: { "submitter.guildId": guildId } });
+    return created;
+  };
   const mine = [await report(reportsOnly, "Nur Meldungen", "Erste Meldung"), await report(reportsOnly, "Nur Meldungen", "Zweite Meldung")].map((r) => r.report._id);
   const theirs = (await report(other, "Anderer Server", "Fremde Meldung")).report._id;
   const mySuggestions = [await suggest(suggestionsOnly), await suggest(suggestionsOnly)].map((r) => r.suggestion._id);
@@ -243,21 +250,26 @@ test("the posted team cards lose the server too; a card that is gone stops nothi
   const teamChannelId = snowflake();
   const cardId = snowflake();
   const goneCardId = snowflake();
+  let at = Date.now() - 60_000;
   const report = async (station, messageId) => {
-    const { report: doc } = await createProblemReport({ kind: "problem", text: "Rauscht", guild: { id: guildId, name: "Kartenserver" }, station });
+    at += 1000;
+    const { report: doc } = await createProblemReport({ kind: "problem", text: "Rauscht", guild: { id: guildId, name: "Kartenserver" }, station }, { now: at });
     if (messageId) await markReportPosted(doc._id, { guildId: snowflake(), channelId: teamChannelId, messageId });
     return doc._id;
   };
-  const own = await report({ key: "custom:meinsender", name: "Mein eigener Sender" }, cardId);
+  // The card that is gone comes first: it must not keep the later one from being edited.
   const official = await report({ key: "groovesalad", name: "Groove Salad" }, goneCardId);
+  const own = await report({ key: "custom:meinsender", name: "Mein eigener Sender" }, cardId);
   const unposted = await report(null, null);
 
   const edits = [];
+  const tried = [];
   const client = {
     channels: {
       fetch: async (id) => (id !== teamChannelId ? null : {
         messages: {
           fetch: async (messageId) => {
+            tried.push(messageId);
             if (messageId !== cardId) throw Object.assign(new Error("Unknown Message"), { code: 10008 });
             return { edit: async (payload) => { edits.push(payload); } };
           },
@@ -267,6 +279,7 @@ test("the posted team cards lose the server too; a card that is gone stops nothi
   };
   await purgeServerData(guildId, { client });
 
+  assert.deepEqual(tried, [goneCardId, cardId], "the gone card was tried first");
   assert.equal(edits.length, 1, "the card that is still there is edited");
   const card = JSON.stringify(edits[0].components.map((c) => (c.toJSON ? c.toJSON() : c)));
   assert.match(card, /Rauscht/);

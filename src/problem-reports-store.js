@@ -221,7 +221,7 @@ export async function forgetReportGuild(guildId) {
   // "custom:" is the prefix of a server's own stations (src/custom-stations.js).
   await reports.updateMany({ _id: { $in: ids }, "station.key": { $regex: "^custom:" } }, { $set: { station: null } });
   await reports.updateMany({ _id: { $in: ids } }, { $set: { guild: null } });
-  return reports.find({ _id: { $in: ids } }).toArray();
+  return reports.find({ _id: { $in: ids } }).sort({ createdAt: 1 }).toArray();
 }
 
 /**

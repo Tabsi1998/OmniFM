@@ -27,7 +27,8 @@ async function ensureIndexes(suggestions) {
     indexesReady = Promise.all([
       suggestions.createIndex({ urlKey: 1 }, { name: "url_key" }),
       suggestions.createIndex({ "submitter.userId": 1 }, { name: "submitter" }),
-      suggestions.createIndex({ "submitter.guildId": 1 }, { name: "submitter_guild", partialFilterExpression: { "submitter.guildId": { $type: "string" } } }),
+      // Suggestions from before #522 still hold the server, until the retention takes it out.
+      suggestions.createIndex({ "submitter.guildId": 1 }, { name: "submitter_guild", sparse: true }),
       suggestions.createIndex({ status: 1, createdAt: -1 }, { name: "queue" }),
       suggestions.createIndex({ expiresAt: 1 }, { name: "ttl", expireAfterSeconds: 0 }),
     ]).catch((error) => {
@@ -45,7 +46,7 @@ const cleanId = (value) => (/^\d{17,22}$/.test(String(value || "")) ? String(val
  * form's "name" | "url" | "homepage", "in-catalog" (with the station's
  * name), "already-suggested", "too-many" (pending ones of the person).
  * @param {Record<string, any>} input the form
- * @param {{ userId?: string, userName?: string, guildId?: string, language?: string }} submitter
+ * @param {{ userId?: string, userName?: string, language?: string }} submitter only what the answer by DM needs
  * @param {{ now?: number, catalog?: Record<string, { name?: string, url?: string }> }} [options]
  */
 export async function createStationSuggestion(input, submitter = {}, { now = Date.now(), catalog = {} } = {}) {
@@ -73,7 +74,6 @@ export async function createStationSuggestion(input, submitter = {}, { now = Dat
       submitter: {
         userId,
         userName: String(submitter.userName || "").slice(0, 80),
-        guildId: cleanId(submitter.guildId) || null,
         language: normalizeBotLanguage(submitter.language, "en"),
       },
     } : {}),
@@ -183,7 +183,7 @@ export async function forgetStationSuggestionSubmitter(userId) {
   return result.modifiedCount || 0;
 }
 
-/** OmniFM left the server 30 days ago (#285, #522): the suggestions stay, without the server. */
+/** OmniFM left the server 30 days ago (#285, #522): older suggestions stay, without the server. */
 export async function forgetStationSuggestionGuild(guildId) {
   const suggestions = collection();
   const id = cleanId(guildId);
