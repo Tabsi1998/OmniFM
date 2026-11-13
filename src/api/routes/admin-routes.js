@@ -271,9 +271,11 @@ export function createAdminRoutesHandler(deps) {
         const mention = String(systemSetting(raw, "operatorAlerts", "mention", "OPERATOR_WEBHOOK_MENTION") || "").trim();
         // Same payload and safeFetch path as a real alert (#555); never throws.
         const sent = await sendOperatorTestAlert(url, mention);
-        results.operatorAlerts = sent
-          ? { ok: true, message: "Testalarm gesendet, schau in den Discord-Kanal." }
-          : { ok: false, message: "Discord hat den Testalarm nicht angenommen. Prüfe die Webhook-URL." };
+        if (sent.ok) {
+          results.operatorAlerts = { ok: true, message: "Testalarm gesendet, schau in den Discord-Kanal." };
+        } else {
+          results.operatorAlerts = { ok: false, message: sent.status ? `Discord antwortet mit HTTP ${sent.status}.` : clipMessage(sent.error) };
+        }
       }
     }
     const directories = {

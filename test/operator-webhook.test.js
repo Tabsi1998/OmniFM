@@ -58,11 +58,11 @@ test("owner console test alert goes through the operator webhook path (#555)", a
   const sent = await sendOperatorTestAlert("https://discord.com/api/webhooks/123/token", "<@&42>", {
     fetchImpl: async (url, options) => {
       request = { url, options };
-      return { ok: true, body: { cancel: async () => {} } };
+      return { ok: true, status: 204, body: { cancel: async () => {} } };
     },
   });
 
-  assert.equal(sent, true);
+  assert.deepEqual(sent, { ok: true, status: 204, error: null });
   assert.equal(request.url, "https://discord.com/api/webhooks/123/token");
   assert.equal(request.options.redirect, "error");
   assert.equal(request.options.requireHttps, true);
@@ -72,15 +72,28 @@ test("owner console test alert goes through the operator webhook path (#555)", a
   assert.equal(body.embeds[0].title, "🧪 Testalarm");
 });
 
-test("owner console test alert reports a refused webhook and never sends to other hosts (#555)", async () => {
+test("owner console test alert says why Discord did not take it (#555)", async () => {
   let calls = 0;
-  const fetchImpl = async () => {
+  const refused = async () => {
     calls += 1;
     return { ok: false, status: 404, body: { cancel: async () => {} } };
   };
-  assert.equal(await sendOperatorTestAlert("https://discord.com/api/webhooks/123/token", "", { fetchImpl }), false);
-  assert.equal(await sendOperatorTestAlert("https://127.0.0.1/api/webhooks/1/x", "", { fetchImpl }), false);
+  const url = "https://discord.com/api/webhooks/123/token";
+  assert.deepEqual(await sendOperatorTestAlert(url, "", { fetchImpl: refused }), { ok: false, status: 404, error: null });
+
+  const { SafeOutboundError } = await import("../src/lib/safe-outbound-http.js");
+  const timeout = async () => { throw new SafeOutboundError("OUTBOUND_TIMEOUT", "Ausgehende Anfrage hat das Zeitlimit überschritten."); };
+  assert.deepEqual(await sendOperatorTestAlert(url, "", { fetchImpl: timeout }),
+    { ok: false, status: null, error: "Ausgehende Anfrage hat das Zeitlimit überschritten." });
+  const broken = async () => { throw new TypeError("socket hang up"); };
+  assert.deepEqual(await sendOperatorTestAlert(url, "", { fetchImpl: broken }),
+    { ok: false, status: null, error: "Discord ist nicht erreichbar." });
+
+  // Never to another host; a real alert still gets a plain true/false.
+  assert.equal((await sendOperatorTestAlert("https://127.0.0.1/api/webhooks/1/x", "", { fetchImpl: refused })).ok, false);
   assert.equal(calls, 1);
+  assert.equal(await postOperatorWebhook(url, {}, { fetchImpl: refused }), false);
+  assert.equal(await postOperatorWebhook(url, {}, { fetchImpl: broken }), false);
 });
 
 test("owner console test alert has no plain fetch left (#555)", async () => {

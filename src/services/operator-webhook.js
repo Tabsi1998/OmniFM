@@ -51,13 +51,16 @@ function isAllowedOperatorWebhookUrl(rawUrl) {
 }
 
 /**
- * Sendet eine Webhook-Nachricht an Discord.
+ * Sends a webhook message to Discord and says how it went: `status` is the
+ * HTTP status when Discord answered, `error` a German reason otherwise.
  * @param {object} payload Discord Webhook Payload
- * @returns {Promise<boolean>}
+ * @returns {Promise<{ ok: boolean, status: number | null, error: string | null }>}
  */
-async function postOperatorWebhook(url, payload, { fetchImpl = safeFetch } = {}) {
+async function postOperatorWebhookResult(url, payload, { fetchImpl = safeFetch } = {}) {
   const targetUrl = String(url || "").trim();
-  if (!isAllowedOperatorWebhookUrl(targetUrl)) return false;
+  if (!isAllowedOperatorWebhookUrl(targetUrl)) {
+    return { ok: false, status: null, error: "Die URL ist kein Discord-Webhook." };
+  }
   try {
     const res = await fetchImpl(targetUrl, {
       method: "POST",
@@ -72,11 +75,22 @@ async function postOperatorWebhook(url, payload, { fetchImpl = safeFetch } = {})
     } catch {
       // The webhook result is already known; a body-cleanup failure is harmless.
     }
-    return Boolean(res.ok);
-  } catch {
-    // Webhook-Fehler dürfen den Bot nicht crashen
-    return false;
+    return { ok: Boolean(res.ok), status: Number(res.status) || null, error: null };
+  } catch (err) {
+    // Webhook-Fehler dürfen den Bot nicht crashen. safeFetch's own errors
+    // are German already; anything else gets a plain reason.
+    const error = err?.name === "SafeOutboundError" && err.message ? err.message : "Discord ist nicht erreichbar.";
+    return { ok: false, status: null, error };
   }
+}
+
+/**
+ * Sendet eine Webhook-Nachricht an Discord.
+ * @param {object} payload Discord Webhook Payload
+ * @returns {Promise<boolean>}
+ */
+async function postOperatorWebhook(url, payload, options = {}) {
+  return (await postOperatorWebhookResult(url, payload, options)).ok;
 }
 
 async function sendWebhook(payload) {
@@ -126,7 +140,7 @@ function buildOperatorPayload(embedData, { mention = "", at = new Date() } = {})
  * @param {string} url
  * @param {string} [mention]
  * @param {{ fetchImpl?: typeof safeFetch }} [options]
- * @returns {Promise<boolean>} true only when Discord took the message
+ * @returns {Promise<{ ok: boolean, status: number | null, error: string | null }>}
  */
 async function sendOperatorTestAlert(url, mention = "", { fetchImpl } = {}) {
   const payload = buildOperatorPayload({
@@ -134,7 +148,7 @@ async function sendOperatorTestAlert(url, mention = "", { fetchImpl } = {}) {
     title: "🧪 Testalarm",
     description: "So sehen Betreiber-Alarme von OmniFM aus. Die Einrichtung stimmt.",
   }, { mention });
-  return postOperatorWebhook(url, payload, { fetchImpl });
+  return postOperatorWebhookResult(url, payload, { fetchImpl });
 }
 
 /**
