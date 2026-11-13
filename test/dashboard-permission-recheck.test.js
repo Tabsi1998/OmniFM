@@ -24,7 +24,7 @@ Object.assign(process.env, env);
 const { startWebServer } = await import("../src/api/server.js");
 const { setLicenseProvider } = await import("../src/core/entitlements.js");
 const { setDashboardAuthSession, deleteDashboardAuthSession } = await import("../src/dashboard-store.js");
-const { setDashboardPermissionRestForTests, freshPermissionRevoked, checkFreshGuildPermission } = await import("../src/api/helpers/permission-recheck.js");
+const { setDashboardPermissionRestForTests, freshPermissionRevoked, checkFreshGuildPermission, BODY_SERVER_ID_PATHS, enforceFreshDashboardPermission } = await import("../src/api/helpers/permission-recheck.js");
 
 const GUILD = "723456789012345678";
 const OTHER_GUILD = "723456789012345679";
@@ -287,7 +287,9 @@ test("split mode, only a worker on the server: its REST answers, the token stays
   const djAnswer = await stop(base, dj.token);
   assert.equal(djAnswer.status, 403);
   assert.match(djAnswer.error, REVOKED_MESSAGE);
-  assert.equal((await stop(base, left.token)).status, 403, "no longer on the server");
+  const leftAnswer = await stop(base, left.token);
+  assert.equal(leftAnswer.status, 403, "no longer on the server");
+  for (const answer of [djAnswer, leftAnswer]) assert.ok(!answer.error.includes(WORKER_TOKEN), "the token is in no answer");
   assert.ok(worker.tokens.length > 0 && worker.tokens.every((token) => token === WORKER_TOKEN));
   assert.ok(worker.calls.includes(`/guilds/${GUILD}/members/${manager.userId}`));
 
@@ -313,9 +315,10 @@ test("split mode: a rate limit on the worker's REST fails closed with 503", asyn
   const refused = await stop(base, token);
   assert.equal(refused.status, 503);
   assert.match(refused.error, UNAVAILABLE_MESSAGE);
-  assert.equal(worker.calls.length, 1);
+  assert.ok(!refused.error.includes(WORKER_TOKEN));
+  assert.equal(worker.calls.length, 2, "member and server, in parallel");
   assert.equal((await stop(base, token)).status, 503);
-  assert.equal(worker.calls.length, 1, "no storm while Discord says wait");
+  assert.equal(worker.calls.length, 2, "no storm while Discord says wait");
 });
 
 test("playback: a server in the address does not cover another one in the body", async (t) => {
@@ -337,7 +340,7 @@ test("playback: a server in the address does not cover another one in the body",
   assert.equal((await call(base, token, `/api/dashboard/playback/stop?serverId=${OTHER_GUILD}`, { method: "POST", body: { serverId: OTHER_GUILD, botId: "bot-x" } })).status, 404);
 });
 
-test("a big body keeps the route's own limit after the check read it (bot look, 8 MB)", async (t) => {
+test("only playback bodies are read before the route, and only small ones", async (t) => {
   const discord = fakeDiscord();
   const base = await startServer(t, [discord.runtime]);
   const { token } = signIn(0);
@@ -349,6 +352,28 @@ test("a big body keeps the route's own limit after the check read it (bot look, 
   assert.notEqual(withoutQuery.status, 413);
   const tooBig = await call(base, token, `/api/dashboard/reports?serverId=${GUILD}`, { method: "POST", body: { text: "x".repeat(64 * 1024) } });
   assert.equal(tooBig.status, 413, "a small route still refuses a big body");
+  const bigPlayback = await call(base, token, "/api/dashboard/playback/stop", { method: "POST", body: { serverId: GUILD, botId: "bot-x", pad: "x".repeat(32 * 1024) } });
+  assert.equal(bigPlayback.status, 400, "over 16 KB the playback route refuses the body it cannot read");
+});
+
+test("every route that takes its server from the body is on the check's list", () => {
+  const dir = new URL("../src/api/routes/", import.meta.url);
+  const unlisted = [];
+  let found = 0;
+  for (const name of fs.readdirSync(dir)) {
+    if (!name.endsWith(".js")) continue;
+    const source = fs.readFileSync(new URL(name, dir), "utf8");
+    // Dashboard routes only; the owner console (/api/admin) has its own token.
+    if (!source.includes('"/api/dashboard/')) continue;
+    if (!/body\??\.serverId|body\??\.?\[\s*["'`]serverId["'`]\s*\]/.test(source)) continue;
+    found += 1;
+    const paths = [...source.matchAll(/"(\/api\/dashboard\/[a-z0-9/-]+)"/g)].map((match) => match[1]);
+    if (!paths.some((pathname) => BODY_SERVER_ID_PATHS.includes(pathname))) unlisted.push(name);
+  }
+  assert.deepEqual(unlisted, []);
+  assert.equal(found, 1, "today only dashboard-playback.js");
+  const playback = fs.readFileSync(new URL("dashboard-playback.js", dir), "utf8");
+  for (const pathname of BODY_SERVER_ID_PATHS) assert.ok(playback.includes(`"${pathname}"`), pathname);
 });
 
 test("the live stream learns of a lost right without waiting for Discord", async () => {
@@ -423,4 +448,28 @@ test("an open live stream ends once Discord says the right is gone", async (t) =
   });
   assert.equal(ended, true, "the stream was closed");
   assert.equal(discord.calls.length, 1);
+});
+
+test("the check reads no body but the playback actions, with a small limit", async (t) => {
+  const discord = fakeDiscord();
+  const { userId, token } = signIn(700);
+  t.after(() => deleteDashboardAuthSession(token));
+  discord.members.set(userId, MANAGE_GUILD);
+  const reads = [];
+  const readJsonBody = async (options) => {
+    reads.push(options?.maxBytes);
+    return { serverId: GUILD };
+  };
+  const req = { method: "PUT", headers: { authorization: `Bearer ${token}` } };
+  for (const pathname of ["/api/dashboard/bot-profile", "/api/dashboard/jingle", "/api/dashboard/settings"]) {
+    // eslint-disable-next-line no-await-in-loop -- one after the other
+    assert.equal(await enforceFreshDashboardPermission({ req, res: {}, requestUrl: new URL(`http://x${pathname}?serverId=${GUILD}`), runtimes: [discord.runtime], readJsonBody }), true);
+  }
+  assert.deepEqual(reads, []);
+  for (const pathname of BODY_SERVER_ID_PATHS) {
+    // eslint-disable-next-line no-await-in-loop -- one after the other
+    assert.equal(await enforceFreshDashboardPermission({ req: { ...req, method: "POST" }, res: {}, requestUrl: new URL(`http://x${pathname}`), runtimes: [discord.runtime], readJsonBody }), true);
+  }
+  assert.equal(reads.length, BODY_SERVER_ID_PATHS.length);
+  assert.ok(reads.every((maxBytes) => maxBytes <= 16 * 1024));
 });

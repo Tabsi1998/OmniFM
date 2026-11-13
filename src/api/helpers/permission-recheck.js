@@ -27,8 +27,15 @@ const REST_TIMEOUT_MS = 10_000;
 const GONE_CODES = new Set([10007, 10013]);
 // Unknown Guild, Missing Access: the bot itself is not on the server.
 const NO_BOT_CODES = new Set([10004, 50001]);
-// The biggest body a dashboard route takes (a jingle: about 8.1 MB as base64).
-export const DASHBOARD_BODY_MAX_BYTES = 9 * 1024 * 1024;
+// The only routes that name their server in the JSON body (dashboard-playback.js).
+// Their bodies are a few ids; nothing else is read before its route.
+export const BODY_SERVER_ID_PATHS = Object.freeze([
+  "/api/dashboard/playback/restart",
+  "/api/dashboard/playback/reconnect",
+  "/api/dashboard/playback/switch",
+  "/api/dashboard/playback/stop",
+]);
+const BODY_SERVER_ID_MAX_BYTES = 16 * 1024;
 
 const answers = new Map();
 const restClients = new Map();
@@ -71,8 +78,9 @@ async function askRest(token, guildId, userId) {
     restClients.set(token, rest);
   }
   try {
-    const member = /** @type {{ roles?: string[] }} */ (await rest.get(Routes.guildMember(guildId, userId)));
-    const guild = /** @type {{ owner_id?: string, roles?: { id: string, permissions?: string }[] }} */ (await rest.get(Routes.guild(guildId)));
+    const [member, guild] = /** @type {[{ roles?: string[] }, { owner_id?: string, roles?: { id: string, permissions?: string }[] }]} */ (
+      await Promise.all([rest.get(Routes.guildMember(guildId, userId)), rest.get(Routes.guild(guildId))])
+    );
     if (String(guild?.owner_id || "") === userId) return "allowed";
     const roleBits = new Map((guild?.roles || []).map((role) => [String(role.id), BigInt(String(role.permissions || "0"))]));
     let bits = roleBits.get(guildId) || 0n;
@@ -139,8 +147,8 @@ function refuse(res, status, language, de, en) {
 
 /**
  * Before every /api/dashboard/* route: false when it already answered.
- * A change is checked for every server it names, in the address and in the
- * JSON body. Requests without a session, or with one server outside the
+ * A change is checked for every server it names: in the address, and for the
+ * playback actions also in the JSON body. Requests without a session, or with one server outside the
  * session's list, are left to the route, which refuses them itself.
  */
 export async function enforceFreshDashboardPermission({ req, res, requestUrl, runtimes, readJsonBody }) {
@@ -151,12 +159,13 @@ export async function enforceFreshDashboardPermission({ req, res, requestUrl, ru
 
   const mutation = MUTATION_METHODS.has(String(req.method || "GET").toUpperCase());
   const named = [requestUrl.searchParams.get("serverId")];
-  if (mutation) {
+  if (mutation && BODY_SERVER_ID_PATHS.includes(pathname)) {
     try {
-      const body = await readJsonBody({ maxBytes: DASHBOARD_BODY_MAX_BYTES });
+      // The route gets the same body (read once in server.js).
+      const body = await readJsonBody({ maxBytes: BODY_SERVER_ID_MAX_BYTES });
       if (body && typeof body === "object" && body.serverId !== undefined && body.serverId !== null) named.push(body.serverId);
     } catch {
-      // A body that is too big or no JSON: the route answers 400/413 itself.
+      // Too big or no JSON: the route gets the same error and refuses it.
     }
   }
   const serverIds = [...new Set(named.map((value) => String(value ?? "").trim()).filter(Boolean))];
