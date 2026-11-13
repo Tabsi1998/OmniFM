@@ -92,9 +92,18 @@ class TestStationHealth:
                           json={"keys": ["groovesalad"]}, timeout=60)
         assert r.status_code in (401, 403), r.status_code
 
-    def test_health_specific_keys(self, client):
-        r = client.post(f"{BASE_URL}/api/admin/stations/health",
-                        json={"keys": ["groovesalad", "dronezone"]}, timeout=90)
+    def test_health_specific_keys(self, client, contract_db, test_stream_url):
+        # Both stations point at the local test sender while the check runs,
+        # not at a station on the internet (#542).
+        keys = ["groovesalad", "dronezone"]
+        stored = {row["key"]: row["url"] for row in contract_db.stations.find({"key": {"$in": keys}}, {"_id": 0, "key": 1, "url": 1})}
+        assert set(stored) == set(keys), stored
+        contract_db.stations.update_many({"key": {"$in": keys}}, {"$set": {"url": test_stream_url}})
+        try:
+            r = client.post(f"{BASE_URL}/api/admin/stations/health", json={"keys": keys}, timeout=90)
+        finally:
+            for key, url in stored.items():
+                contract_db.stations.update_one({"key": key}, {"$set": {"url": url}})
         assert r.status_code == 200, r.text[:300]
         d = r.json()
         res = d.get("results")
@@ -105,8 +114,8 @@ class TestStationHealth:
             assert isinstance(v["ok"], bool)
             assert isinstance(v["reachable"], bool)
             assert isinstance(v["latencyMs"], int)
-        # groovesalad is Epic Lounge in the seed catalog (SomaFM blocks non-browser clients, #542)
-        assert res["groovesalad"]["reachable"] is True, res["groovesalad"]
+        for key in keys:
+            assert res[key]["reachable"] is True and res[key]["ok"] is True, res[key]
 
     def test_health_batch_of_15(self, client):
         lst = client.get(f"{BASE_URL}/api/admin/stations/list", timeout=30).json()["stations"]

@@ -95,6 +95,10 @@ webhook (`src/services/operator-webhook.js`) build their own embeds on purpose.
   GET and reads the bytes (MP3, AAC, Ogg, FLAC); a HEAD answer, a
   Content-Type or a 401 never counts as playable. Use its `reachable`,
   `authorized` and `playableAudio` instead of a new check.
+- Contract tests that need a playing stream use the local test sender
+  (`test_stream_url` in `backend/tests/conftest.py`, #542), never a station
+  on the internet. `OMNIFM_TEST_STREAM_ORIGIN`, set only by
+  `scripts/local_check.py`, lets exactly that loopback origin through.
 - SomaFM answers 403 to every non-browser client (#542, #549): do not add new
   SomaFM streams (the existing ones are being replaced in #549) and do not
   fake a browser user agent.
