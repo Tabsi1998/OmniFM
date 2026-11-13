@@ -449,7 +449,6 @@ async function inspectSeo(baseUrl) {
       name: "home meta",
       path: "/",
       assertions: [
-        { label: "canonical", regex: /<link[^>]+rel=["']canonical["'][^>]+href=["']https:\/\/omnifm\.xyz\//i },
         { label: "og title", regex: /<meta[^>]+property=["']og:title["']/i },
         { label: "twitter card", regex: /<meta[^>]+name=["']twitter:card["']/i },
         { label: "json ld", regex: /application\/ld\+json/i },

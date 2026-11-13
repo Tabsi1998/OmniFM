@@ -74,7 +74,9 @@ test("React SEO assets and base metadata are present", () => {
   const sitemapXml = fs.readFileSync(path.join(publicDir, "sitemap.xml"), "utf8");
   const manifest = JSON.parse(fs.readFileSync(path.join(publicDir, "manifest.json"), "utf8"));
 
-  assert.match(indexHtml, /<link rel="canonical" href="https:\/\/omnifm\.xyz\/"/);
+  // No static canonical or og:url: the bare address is only the x-default,
+  // seo.js sets the page's own address (#529). 404.html and noindex.html are copies.
+  assert.doesNotMatch(indexHtml, /rel="canonical"|property="og:url"/);
   assert.match(indexHtml, /<meta name="google-site-verification" content="2ZCoKiPvrZJ_fKLyyE4SDbATwbL6yDX-iwI82ghmpSM" \/>/);
   assert.doesNotMatch(indexHtml, /googletagmanager\.com\/gtag\/js/i, "analytics must load only after explicit consent");
   assert.doesNotMatch(indexHtml, /gtag\(['"]config['"]/i, "the static document must not initialize tracking");
