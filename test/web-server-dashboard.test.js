@@ -4,8 +4,6 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import { once } from "node:events";
 import fs from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { startWebServer } from "../src/api/server.js";
 import { setLicenseProvider } from "../src/core/entitlements.js";
@@ -27,12 +25,11 @@ import {
 import { createScheduledEvent } from "../src/scheduled-events-store.js";
 import { recordRuntimeIncident } from "../src/runtime-incidents-store.js";
 import { setDashboardWebhookFetchForTests } from "../src/lib/dashboard-webhooks.js";
+import { resolveRuntimeDataPath } from "../src/lib/runtime-data-path.js";
 
 // The version comes from package.json, so a release does not break the tests.
 const PACKAGE_VERSION = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(__dirname, "..");
 const GUILD_ID = "123456789012345678";
 const SECOND_GUILD_ID = "123456789012345679";
 const BLOCKED_GUILD_ID = "123456789012345680";
@@ -301,25 +298,25 @@ async function requestJson(baseUrl, pathname, { method = "GET", headers = {}, bo
 
 test("dashboard capability, permissions, and health routes work end-to-end", async (t) => {
   const trackedFiles = [
-    path.join(repoRoot, "dashboard.json"),
-    path.join(repoRoot, "dashboard.json.bak"),
-    path.join(repoRoot, "command-permissions.json"),
-    path.join(repoRoot, "command-permissions.json.bak"),
-    path.join(repoRoot, "listening-stats.json"),
-    path.join(repoRoot, "listening-stats.json.bak"),
-    path.join(repoRoot, "runtime-incidents.json"),
-    path.join(repoRoot, "runtime-incidents.json.bak"),
-    path.join(repoRoot, "premium.json"),
-    path.join(repoRoot, "premium.json.bak"),
-    path.join(repoRoot, "coupons.json"),
-    path.join(repoRoot, "coupons.json.bak"),
-    path.join(repoRoot, "custom-stations.json"),
-    path.join(repoRoot, "custom-stations.json.bak"),
-    path.join(repoRoot, "botsgg.json"),
-    path.join(repoRoot, "discordbotlist.json"),
-    path.join(repoRoot, "topgg.json"),
-    path.join(repoRoot, "vote-events.json"),
-    path.join(repoRoot, "scheduled-events.json"),
+    resolveRuntimeDataPath("dashboard.json"),
+    resolveRuntimeDataPath("dashboard.json.bak"),
+    resolveRuntimeDataPath("command-permissions.json"),
+    resolveRuntimeDataPath("command-permissions.json.bak"),
+    resolveRuntimeDataPath("listening-stats.json"),
+    resolveRuntimeDataPath("listening-stats.json.bak"),
+    resolveRuntimeDataPath("runtime-incidents.json"),
+    resolveRuntimeDataPath("runtime-incidents.json.bak"),
+    resolveRuntimeDataPath("premium.json"),
+    resolveRuntimeDataPath("premium.json.bak"),
+    resolveRuntimeDataPath("coupons.json"),
+    resolveRuntimeDataPath("coupons.json.bak"),
+    resolveRuntimeDataPath("custom-stations.json"),
+    resolveRuntimeDataPath("custom-stations.json.bak"),
+    resolveRuntimeDataPath("botsgg.json"),
+    resolveRuntimeDataPath("discordbotlist.json"),
+    resolveRuntimeDataPath("topgg.json"),
+    resolveRuntimeDataPath("vote-events.json"),
+    resolveRuntimeDataPath("scheduled-events.json"),
   ];
   const snapshots = new Map();
   for (const filePath of trackedFiles) {
@@ -499,7 +496,7 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
     expiresAt: nowTs + 3600,
   });
 
-  const scheduledEventsFile = path.join(repoRoot, "scheduled-events.json");
+  const scheduledEventsFile = resolveRuntimeDataPath("scheduled-events.json");
   await fs.rm(scheduledEventsFile, { force: true });
   const conflictStartMs = Date.now() + (24 * 60 * 60 * 1000);
   const conflictStartLocal = formatLocalDateTimeForZone(conflictStartMs);
@@ -2355,15 +2352,15 @@ test("dashboard capability, permissions, and health routes work end-to-end", asy
 
 test("dashboard stats keep recovering workers visible even without an active voice connection", async (t) => {
   const trackedFiles = [
-    path.join(repoRoot, "dashboard.json"),
-    path.join(repoRoot, "dashboard.json.bak"),
-    path.join(repoRoot, "command-permissions.json"),
-    path.join(repoRoot, "command-permissions.json.bak"),
-    path.join(repoRoot, "listening-stats.json"),
-    path.join(repoRoot, "listening-stats.json.bak"),
-    path.join(repoRoot, "runtime-incidents.json"),
-    path.join(repoRoot, "runtime-incidents.json.bak"),
-    path.join(repoRoot, "scheduled-events.json"),
+    resolveRuntimeDataPath("dashboard.json"),
+    resolveRuntimeDataPath("dashboard.json.bak"),
+    resolveRuntimeDataPath("command-permissions.json"),
+    resolveRuntimeDataPath("command-permissions.json.bak"),
+    resolveRuntimeDataPath("listening-stats.json"),
+    resolveRuntimeDataPath("listening-stats.json.bak"),
+    resolveRuntimeDataPath("runtime-incidents.json"),
+    resolveRuntimeDataPath("runtime-incidents.json.bak"),
+    resolveRuntimeDataPath("scheduled-events.json"),
   ];
   const snapshots = new Map();
   for (const filePath of trackedFiles) {

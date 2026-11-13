@@ -25,6 +25,10 @@ Usage:
     python scripts/local_check.py --only node      some groups
     python scripts/local_check.py --list           the steps, without running
     python scripts/local_check.py --record         refresh the ratchet baseline
+    python scripts/local_check.py --changed        only the groups the changes
+                                                   against origin/main can affect
+    python scripts/local_check.py --fresh          reinstall node_modules even
+                                                   when the lockfile is unchanged
 
 Results go to .local-testing/, which Git ignores.
 """
@@ -34,6 +38,7 @@ from __future__ import annotations
 import argparse
 import fnmatch
 import functools
+import hashlib
 import json
 import os
 import platform
@@ -212,6 +217,8 @@ class Context:
     dropped: list
     log_dir: Path
     record: bool = False
+    # --fresh: installs run even when nothing they depend on changed.
+    fresh: bool = False
     containers: list = field(default_factory=list)
     processes: list = field(default_factory=list)
     cache: dict = field(default_factory=dict)
@@ -762,6 +769,31 @@ def describe_counts(counts: dict) -> str:
 
 # -------------------------------------------------------------------- runner
 
+def changed_files(base_ref: str = "origin/main", root: Path = ROOT) -> tuple[list[str], str]:
+    """Files that differ from the merge base with base_ref, new ones included.
+
+    Committed, staged, unstaged and untracked changes all count: the check
+    runs on the working tree, so that is what it has to cover. --no-renames:
+    a moved file counts with both paths, or moving backend/x.py to docs/
+    would read as a documentation change.
+    """
+    binary = shutil.which("git")
+    if not binary:
+        raise RuntimeError("git is not installed")
+
+    def ask(*arguments: str) -> str:
+        completed = subprocess.run([binary, *arguments], cwd=str(root), capture_output=True,
+                                   text=True, encoding="utf-8", errors="replace")
+        if completed.returncode != 0:
+            raise RuntimeError(f"git {' '.join(arguments)}: {(completed.stderr or completed.stdout).strip()}")
+        return completed.stdout
+
+    base = ask("merge-base", "HEAD", base_ref).strip()
+    listed = ask("diff", "--no-renames", "--name-only", "-z", base).split("\0")
+    listed += ask("ls-files", "--others", "--exclude-standard", "-z").split("\0")
+    return sorted({name for name in listed if name}), base[:10]
+
+
 def head_info() -> dict:
     binary = shutil.which("git")
     if not binary:
@@ -865,6 +897,10 @@ def main(argv: list | None = None) -> int:
     parser.add_argument("--list", action="store_true", help="show the steps without running them")
     parser.add_argument("--record", action="store_true", help="accept today's findings into the ratchet baseline")
     parser.add_argument("--keep-services", action="store_true", help="leave containers and servers running")
+    parser.add_argument("--changed", action="store_true",
+                        help="only the groups the changes against origin/main can affect (with --only: of those)")
+    parser.add_argument("--fresh", action="store_true",
+                        help="reinstall dependencies even when nothing they depend on changed")
     arguments = parser.parse_args(argv)
 
     if arguments.only:
@@ -877,6 +913,24 @@ def main(argv: list | None = None) -> int:
     else:
         groups = set(DEFAULT_GROUPS)
 
+    if arguments.changed:
+        try:
+            files, base = changed_files()
+        except RuntimeError as error:
+            print(f"--changed: {error}; every group stays selected", flush=True)
+        else:
+            affected, reason = changed_groups(files)
+            print(f"--changed: {len(files)} files differ from {base} (merge base with origin/main); "
+                  f"{reason}: {', '.join(group for group in GROUPS if group in affected)}", flush=True)
+            if not arguments.only:
+                groups = set(affected)
+            else:
+                groups &= affected
+            if not groups:
+                # Still a run, with an empty report: an older report must not
+                # stand in for this one.
+                print("Nothing to check in the chosen groups for these changes.", flush=True)
+
     steps = plan(groups)
     if arguments.list:
         for step in steps:
@@ -884,6 +938,7 @@ def main(argv: list | None = None) -> int:
         return 0
 
     context = build_context(record=arguments.record)
+    context.fresh = arguments.fresh
     print(f"{ROOT.name}: {', '.join(group for group in GROUPS if group in groups)}", flush=True)
     if context.dropped:
         print("Withheld from every step (names only): " + ", ".join(context.dropped), flush=True)
@@ -925,6 +980,100 @@ def npm_step_result(context: Context, name: str, completed: subprocess.Completed
         raise StepFailed(f"{failure}. Full output: {path}\n" + tail(completed, 30))
 
 
+# #553: written into node_modules after a locked install went through. It holds
+# what the install depended on; npm ci removes node_modules first, so a failed
+# or interrupted install leaves no marker behind.
+INSTALL_MARKER = ".omnifm-install.json"
+
+
+def install_fingerprint(context: Context, where: Path) -> dict:
+    """What a locked install in where depends on: both package files, Node and npm."""
+    node = node_of(context, NODE_MAJOR)
+    digest = hashlib.sha256()
+    for name in ("package.json", "package-lock.json"):
+        digest.update(name.encode())
+        digest.update((where / name).read_bytes())
+    key = "versions:" + node
+    if key not in context.cache:
+        npm_version = npm(context, "--version", cwd=where, timeout=120).stdout.strip()
+        node_version_text = context.run(node, "--version", timeout=60).stdout.strip()
+        context.cache[key] = (node_version_text, npm_version)
+    node_version_text, npm_version = context.cache[key]
+    return {"packages": digest.hexdigest(), "node": node_version_text, "npm": npm_version,
+            "platform": f"{platform.system()}-{platform.machine()}"}
+
+
+def installed_tree(where: Path) -> dict:
+    """What npm says it installed in where: the hash of node_modules/.package-lock.json.
+
+    npm writes that hidden lockfile on every install and every change through
+    npm; a hand-made change leaves it alone, which the package check catches.
+    """
+    hidden = where / "node_modules" / ".package-lock.json"
+    return {"hidden-lockfile": hashlib.sha256(hidden.read_bytes()).hexdigest()} if hidden.is_file() else {}
+
+
+def install_is_current(where: Path, fingerprint: dict) -> tuple[bool, str]:
+    """Whether node_modules in where is still the one the last npm ci left (#553).
+
+    Three things must hold, each cheap (well under a second for both trees):
+    the marker names the same package files, Node, npm and platform; npm's
+    hidden lockfile is unchanged since that install; and every package it
+    lists is on disk with its package.json, so a partly deleted tree fails.
+    npm ls --depth=0 runs afterwards as a last check.
+    """
+    marker = where / "node_modules" / INSTALL_MARKER
+    if not marker.is_file():
+        return False, "no install marker"
+    try:
+        recorded = json.loads(marker.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False, "the install marker is unreadable"
+    if recorded.get("fingerprint") != fingerprint:
+        return False, "package files, Node or npm changed"
+    tree = installed_tree(where)
+    if not tree or recorded.get("installed") != tree:
+        return False, "node_modules/.package-lock.json changed"
+    try:
+        packages = json.loads((where / "node_modules" / ".package-lock.json").read_text(encoding="utf-8"))["packages"]
+    except (OSError, ValueError, KeyError) as error:
+        return False, f"node_modules/.package-lock.json is unreadable: {error}"
+    for name, entry in packages.items():
+        if not name.startswith("node_modules/"):
+            continue
+        target = where / name
+        present = target.exists() if entry.get("link") else (target / "package.json").is_file()
+        if not present:
+            return False, f"{name} is missing"
+    return True, "unchanged"
+
+
+def locked_install(context: Context, where: Path, log_name: str) -> str:
+    """npm ci, unless node_modules is still exactly what the last one installed.
+
+    install_is_current() decides, then `npm ls --depth=0` must be clean.
+    --fresh always installs; the check before a release uses it.
+    """
+    marker = where / "node_modules" / INSTALL_MARKER
+    fingerprint = install_fingerprint(context, where)
+    reason = "--fresh"
+    if not context.fresh:
+        current, reason = install_is_current(where, fingerprint)
+        if current:
+            listed = npm(context, "ls", "--depth=0", cwd=where, check=False, timeout=600)
+            if listed.returncode == 0:
+                context.log(log_name, "skipped: unchanged package files, Node, npm and node_modules\n" + listed.stdout)
+                return (f"unchanged since the last install (Node {fingerprint['node']}, npm {fingerprint['npm']}),"
+                        " npm ls clean; --fresh installs anyway")
+            reason = "npm ls found problems"
+    completed = npm(context, "ci", "--no-audit", "--no-fund", cwd=where, check=False, timeout=2400)
+    where_name = where.relative_to(ROOT).as_posix() if where != ROOT else "the repository"
+    npm_step_result(context, log_name, completed, f"npm ci in {where_name} failed")
+    marker.write_text(json.dumps({"fingerprint": fingerprint, "installed": installed_tree(where)}, indent=2),
+                      encoding="utf-8")
+    return f"npm ci ({reason})"
+
+
 # ---------------------------------------------------------------- repository
 
 def repo_hygiene(context: Context) -> str:
@@ -963,9 +1112,7 @@ def node_version(context: Context) -> str:
 
 
 def node_install(context: Context) -> str:
-    completed = npm(context, "ci", "--no-audit", "--no-fund", check=False, timeout=2400)
-    npm_step_result(context, "npm-ci", completed, "npm ci failed")
-    return "npm ci"
+    return locked_install(context, ROOT, "npm-ci")
 
 
 def syntax_checks(context: Context) -> str:
@@ -1559,9 +1706,7 @@ def build_output() -> Path:
 def frontend_install(context: Context) -> str:
     if not (FRONTEND / "package-lock.json").is_file():
         raise StepSkipped("frontend/package-lock.json is missing")
-    completed = npm(context, "ci", "--no-audit", "--no-fund", cwd=FRONTEND, check=False, timeout=2400)
-    npm_step_result(context, "frontend-npm-ci", completed, "npm ci in frontend/ failed")
-    return "npm ci"
+    return locked_install(context, FRONTEND, "frontend-npm-ci")
 
 
 def frontend_build(context: Context) -> str:
@@ -1962,6 +2107,38 @@ def extra_steps() -> list:
 
 
 # -------------------------------------------------------------------- wiring
+
+# #553, --changed: which groups a change can affect. Deliberately coarse; a
+# file that fits no rule selects everything.
+LICENCE_FILES = ("LICENSE", "LICENSE.md", "LICENSE.txt")
+
+
+def documentation_only(name: str) -> bool:
+    """Read by the repository group only (hygiene, links, Gitleaks).
+
+    CHANGELOG.md is not: test/release.test.js reads it in the unit suite.
+    """
+    if name == "CHANGELOG.md":
+        return False
+    return name.endswith(".md") or name.startswith(("docs/", ".claude/")) or name in LICENCE_FILES
+
+
+def changed_groups(files: list) -> tuple[set, str]:
+    """The groups to run for these changed files, and why.
+
+    frontend/ alone still runs node: ESLint lints frontend/src, and the unit
+    suite reads the frontend (file sizes, translations, umlauts, the legal
+    pages, serve.json). Only backend is left out.
+    """
+    if not files:
+        return {"repository"}, "no changes"
+    rest = [name for name in files if not documentation_only(name)]
+    if not rest:
+        return {"repository"}, "documentation only"
+    if all(name.startswith("frontend/") for name in rest):
+        return {"repository", "node", "frontend", "extra"}, "frontend/ and documentation only"
+    return set(GROUPS), "changes beyond documentation and frontend/"
+
 
 def plan(groups: set) -> list:
     builders = {"repository": repository_steps, "node": node_steps, "backend": backend_steps,

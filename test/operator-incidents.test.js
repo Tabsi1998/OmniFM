@@ -1,8 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { logError } from "../src/lib/logging.js";
 import {
@@ -14,10 +12,9 @@ import {
   resetOperatorIncidentStateForTests,
   summarizeRecentOperatorIncidents,
 } from "../src/operator-incidents-store.js";
+import { resolveRuntimeDataPath } from "../src/lib/runtime-data-path.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(__dirname, "..");
-const storePath = path.join(repoRoot, "operator-incidents.json");
+const storePath = resolveRuntimeDataPath("operator-incidents.json");
 const backupPath = `${storePath}.bak`;
 
 function snapshotOptionalFile(filePath) {

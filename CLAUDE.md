@@ -22,6 +22,26 @@ python scripts/local_check.py --only frontend,extra   # Lighthouse needs fronten
 python scripts/local_check.py --list                  # the steps, without running them
 ```
 
+- `npm ci` (root and `frontend/`) is skipped while `package.json`,
+  `package-lock.json`, Node and npm match the last successful install
+  (`node_modules/.omnifm-install.json`), npm's `node_modules/.package-lock.json`
+  is unchanged with every package it lists on disk, and `npm ls --depth=0` is
+  clean. `--fresh` installs anyway; the full check before a release always
+  runs with `--all --fresh`.
+- `--changed` picks the groups from the files changed against the merge base
+  with `origin/main` (new and uncommitted files included): only documentation
+  (`*.md` but `CHANGELOG.md`, `docs/`, `.claude/`, `LICENSE`) → repository;
+  only `frontend/` (plus documentation) → everything but backend; anything else
+  → all five groups. With `--only` it keeps the chosen groups that are
+  affected. The full run stays the gate before a release.
+- The unit suite runs its files in parallel (`npm run test:unit`, at most 8 at
+  once); `test/support/isolate-test-file.mjs` gives every file its own
+  database (`<DB_NAME>_unit_<file>`) and always a fresh runtime data
+  directory; afterwards the runner drops only the databases it recorded in this
+  run and reports leftovers on stderr. Tests reach store files through
+  `resolveRuntimeDataPath(...)`, never the repository root. One after the other:
+  `npm run test:unit -- --test-concurrency=1`.
+
 Results in `.local-testing/` (ignored by Git). Tools: Docker Desktop, Git,
 gitleaks, Python 3.12, Node 22 (a missing tool skips its steps with a hint).
 Ports: API 18001, MongoDB 27019 (container `omnifm-local-check-mongo`).

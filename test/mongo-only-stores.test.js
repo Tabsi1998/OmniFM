@@ -21,6 +21,19 @@ after(async () => {
   fs.rmSync(dataDir, { recursive: true, force: true, maxRetries: 3 });
 });
 
+/** Polls until check() returns something truthy, at most 10 s; returns the last result. */
+async function waitFor(check, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs;
+  let result = await check();
+  while (!result && Date.now() < deadline) {
+    // eslint-disable-next-line no-await-in-loop -- polling, one step after the other
+    await new Promise((resolve) => { setTimeout(resolve, 100); });
+    // eslint-disable-next-line no-await-in-loop
+    result = await check();
+  }
+  return result;
+}
+
 test("file stores: everywhere but production, there only on request", () => {
   assert.equal(fileStoresAllowed({}), true);
   assert.equal(fileStoresAllowed({ NODE_ENV: "development" }), true);
@@ -201,7 +214,8 @@ test("guild languages: a language set by the commander reaches the other process
   store.setGuildLanguage(ids[0], "de");
   // The commander (another process) sets a language for another server.
   await languages.updateOne({ _id: ids[1] }, { $set: { language: "en" } }, { upsert: true });
-  await new Promise((resolve) => { setTimeout(resolve, 1600); });
+  // The refresh runs every second; up to 10 s on a busy machine (#553).
+  await waitFor(() => store.getGuildLanguage(ids[1]) === "en");
   assert.equal(store.getGuildLanguage(ids[1]), "en", "picked up by the refresh, no restart needed");
   assert.equal((await languages.findOne({ _id: ids[0] }))?.language, "de");
   assert.equal(fs.existsSync(path.join(dataDir, "guild-languages.json")), false, "no guild-languages.json in production");
@@ -221,8 +235,8 @@ test("owner audit in production: MongoDB only, with the person and the address",
   });
   const { recordOwnerAudit } = await import("../src/lib/owner-audit-store.js");
   recordOwnerAudit({ actor: "Olli (1)", action: "test.292", status: "success", summary: "wave 3a", metadata: { ip: "203.0.113.9" } });
-  await new Promise((resolve) => { setTimeout(resolve, 300); });
-  const row = await audit.findOne({ action: "test.292" });
+  // The audit write is not awaited; up to 10 s on a busy machine (#553).
+  const row = await waitFor(() => audit.findOne({ action: "test.292" }));
   assert.deepEqual([row?.actor, row?.ip], ["Olli (1)", "203.0.113.9"]);
   assert.equal(fs.existsSync(path.join(dataDir, "owner-audit.json")), false, "no owner-audit.json in production");
 });

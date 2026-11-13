@@ -1,17 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import {
   getOffer,
   previewCheckoutOffer,
   upsertOffer,
 } from "../src/coupon-store.js";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(__dirname, "..");
+import { resolveRuntimeDataPath } from "../src/lib/runtime-data-path.js";
 
 async function snapshotFile(filePath) {
   try {
@@ -34,8 +30,8 @@ async function restoreFile(filePath, snapshot) {
 
 test("direct grant offers require explicit plan, seats, and months", async (t) => {
   const trackedFiles = [
-    path.join(repoRoot, "coupons.json"),
-    path.join(repoRoot, "coupons.json.bak"),
+    resolveRuntimeDataPath("coupons.json"),
+    resolveRuntimeDataPath("coupons.json.bak"),
   ];
   const snapshots = new Map();
   for (const filePath of trackedFiles) {
@@ -60,8 +56,8 @@ test("direct grant offers require explicit plan, seats, and months", async (t) =
 
 test("direct grant offers preview as zero-charge license grants", async (t) => {
   const trackedFiles = [
-    path.join(repoRoot, "coupons.json"),
-    path.join(repoRoot, "coupons.json.bak"),
+    resolveRuntimeDataPath("coupons.json"),
+    resolveRuntimeDataPath("coupons.json.bak"),
   ];
   const snapshots = new Map();
   for (const filePath of trackedFiles) {

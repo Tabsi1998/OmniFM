@@ -1,19 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import {
   acknowledgeRuntimeIncident,
   getRecentRuntimeIncidents,
   recordRuntimeIncident,
 } from "../src/runtime-incidents-store.js";
+import { resolveRuntimeDataPath } from "../src/lib/runtime-data-path.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(__dirname, "..");
-const storePath = path.join(repoRoot, "runtime-incidents.json");
-const backupPath = path.join(repoRoot, "runtime-incidents.json.bak");
+const storePath = resolveRuntimeDataPath("runtime-incidents.json");
+const backupPath = resolveRuntimeDataPath("runtime-incidents.json.bak");
 
 function snapshotOptionalFile(filePath) {
   try {
