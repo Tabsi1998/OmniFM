@@ -181,3 +181,12 @@ export async function forgetStationSuggestionSubmitter(userId) {
   const result = await suggestions.updateMany({ "submitter.userId": id }, { $unset: { submitter: "", notify: "" } });
   return result.modifiedCount || 0;
 }
+
+/** OmniFM left the server 30 days ago (#285, #522): the suggestions stay, without the server. */
+export async function forgetStationSuggestionGuild(guildId) {
+  const suggestions = collection();
+  const id = cleanId(guildId);
+  if (!suggestions || !id) return 0;
+  const result = await suggestions.updateMany({ "submitter.guildId": id }, { $set: { "submitter.guildId": null } });
+  return result.modifiedCount || 0;
+}

@@ -205,6 +205,15 @@ export async function forgetReporter(userId) {
   return Number(result?.modifiedCount || 0);
 }
 
+/** OmniFM left the server 30 days ago (#285, #522): its reports stay with the team, without the server's ID and name. */
+export async function forgetReportGuild(guildId) {
+  const reports = collection();
+  const id = cleanId(guildId);
+  if (!reports || !id) return 0;
+  const result = await reports.updateMany({ "guild.id": id }, { $set: { guild: null } });
+  return Number(result?.modifiedCount || 0);
+}
+
 /**
  * Publishing in three steps, so that two clicks never make two posts: hold
  * the place (only with the reporter's consent), post, note the post; a
