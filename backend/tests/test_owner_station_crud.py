@@ -13,8 +13,8 @@ if not base_url:
 BASE_URL = base_url.rstrip("/")
 TOKEN = os.environ.get("OMNIFM_TEST_ADMIN_TOKEN", "omnifm-owner-dev-token")
 QA_KEY = "qa-station"
-GOOD_URL = "https://ice4.somafm.com/dronezone-128-mp3"
-TEST_URL = "https://ice4.somafm.com/groovesalad-128-mp3"
+GOOD_URL = "https://stream.epic-lounge.com/sleep-meditation"
+TEST_URL = "https://stream.epic-lounge.com/chillout-lounge"
 
 
 @pytest.fixture(scope="module")

@@ -19,8 +19,8 @@ test("every catalog station has a real genre and a colour (#267)", () => {
 });
 
 test("logos and homepages are https links only", () => {
-  const withLogo = stations.filter(([, station]) => station.logo);
-  assert.ok(withLogo.length >= 10, "the SomaFM channels carry their official logo");
+  // Since #549 no catalog station carries a logo (the SomaFM ones were the only ones); the field stays optional.
+  for (const [key, station] of stations) assert.ok(station.logo === undefined || typeof station.logo === "string", `${key}: logo`);
   for (const [key, station] of stations) {
     for (const field of ["logo", "homepage"]) {
       if (station[field]) assert.match(station[field], /^https:\/\//, `${key}: ${field}`);
@@ -48,13 +48,12 @@ test("catalog fields are cleaned: bad colours and non-https links are dropped", 
 test("the station store keeps the catalog fields instead of dropping them", () => {
   const data = normalizeStationsData(catalog);
   assert.deepEqual(data.stations.groovesalad, {
-    name: "Groove Salad",
-    url: "https://ice4.somafm.com/groovesalad-128-mp3",
+    name: "Chillout Lounge",
+    url: "https://stream.epic-lounge.com/chillout-lounge",
     tier: "free",
     genre: "Ambient",
-    country: "US",
+    country: "DE",
     color: "#14B8A6",
-    logo: "https://api.somafm.com/logos/512/groovesalad512.png",
-    homepage: "https://somafm.com/groovesalad/",
+    homepage: "https://epic-lounge.com/",
   });
 });

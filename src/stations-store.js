@@ -9,6 +9,7 @@ import { withFileStoreLock, withFileWriteRetry } from "./lib/file-store-lock.js"
 import { log, logStoreLoadError } from "./lib/logging.js";
 import { appRootDir, resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 import { normalizeStationCatalogFields } from "./lib/station-fields.js";
+import { CATALOG_549_MIGRATIONS } from "./station-catalog-migrations.js";
 
 /**
  * The tracked stations.json in the repository is the shipped seed and is never
@@ -48,6 +49,7 @@ export const STATION_CATALOG_MIGRATIONS = Object.freeze([
     fromUrl: TOMORROWLAND_ANTHEMS_LEGACY_URL,
     toUrl: TOMORROWLAND_ANTHEMS_URL,
   }),
+  ...CATALOG_549_MIGRATIONS,
 ]);
 
 function col() { const db = getDb(); return db ? db.collection(COLLECTION) : null; }
@@ -87,7 +89,10 @@ export async function applyStationCatalogMigrations(stationsCollection, migratio
     // eslint-disable-next-line no-await-in-loop -- the migration steps run in order, each once
     const updateResult = await stationsCollection.updateMany(
       { key: { $in: migration.keys }, url: migration.fromUrl },
-      { $set: { url: migration.toUrl } }
+      {
+        $set: { ...migration.set, url: migration.toUrl },
+        ...(migration.unset?.length ? { $unset: Object.fromEntries(migration.unset.map((field) => [field, ""])) } : {}),
+      }
     );
     if (updateResult?.acknowledged === false) {
       throw new Error(`Katalogmigration ${migration.id} wurde von MongoDB nicht bestätigt.`);
@@ -100,6 +105,8 @@ export async function applyStationCatalogMigrations(stationsCollection, migratio
       keys: migration.keys,
       fromUrl: migration.fromUrl,
       toUrl: migration.toUrl,
+      ...(migration.set ? { set: migration.set } : {}),
+      ...(migration.unset ? { unset: migration.unset } : {}),
       matchedCount: Number(updateResult?.matchedCount || 0),
       modifiedCount: Number(updateResult?.modifiedCount || 0),
     };
@@ -139,8 +146,9 @@ function writeStationsFileAtomically(filePath, data) {
 
 /**
  * Migrates the mutable runtime-data catalog when MongoDB is unavailable.
- * Only the sanitized key protml03 with the exact retired URL is changed; all
- * other catalog fields and operator overrides are preserved unchanged.
+ * Applies the same STATION_CATALOG_MIGRATIONS rows as the MongoDB path: only a
+ * station whose URL is still exactly the retired one changes (url, plus set/unset
+ * fields); operator overrides and all other fields are preserved unchanged.
  */
 export function migrateStationsFileCatalog(filePath = stationsPath) {
   if (!fs.existsSync(filePath)) return { changed: false, reason: "missing-file" };
@@ -156,12 +164,22 @@ export function migrateStationsFileCatalog(filePath = stationsPath) {
       return { changed: false, reason: "invalid-catalog" };
     }
 
+    // Same rows as the MongoDB path. File keys may be raw ("pro_tml_03"), so they
+    // are matched by their sanitized form, like the loader does.
+    const bySanitizedKey = new Map();
+    for (const migration of STATION_CATALOG_MIGRATIONS) {
+      const sanitized = sanitizeKey(migration.key);
+      if (!bySanitizedKey.has(sanitized)) bySanitizedKey.set(sanitized, []);
+      bySanitizedKey.get(sanitized).push(migration);
+    }
+
     let matchedCount = 0;
     for (const [rawKey, station] of Object.entries(data.stations)) {
       if (!isRecord(station)) continue;
-      if (sanitizeKey(rawKey) !== "protml03") continue;
-      if (station.url !== TOMORROWLAND_ANTHEMS_LEGACY_URL) continue;
-      station.url = TOMORROWLAND_ANTHEMS_URL;
+      const migration = (bySanitizedKey.get(sanitizeKey(rawKey)) || []).find((entry) => entry.fromUrl === station.url);
+      if (!migration) continue;
+      Object.assign(station, migration.set, { url: migration.toUrl });
+      for (const field of migration.unset || []) delete station[field];
       matchedCount += 1;
     }
 
@@ -230,7 +248,7 @@ function loadStationsFromFile() {
   try {
     const migration = migrateStationsFileCatalog();
     if (migration.changed) {
-      log("INFO", `Stations-Dateikatalogmigration abgeschlossen: ${migration.matchedCount} Tomorrowland-Anthems-URL(s) aktualisiert`);
+      log("INFO", `Stations-Dateikatalogmigration abgeschlossen: ${migration.matchedCount} Sender-URL(s) aktualisiert`);
     }
   } catch (err) {
     // Keep the existing file fallback available; a failed migration never overwrites it.

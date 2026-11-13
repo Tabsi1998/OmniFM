@@ -24,7 +24,7 @@ export function normalizePollMinutes(value) {
 }
 
 /**
- * "Groove Salad, drone" -> catalog entries, by key or name (exact first,
+ * "Chillout Lounge, ambient" -> catalog entries, by key or name (exact first,
  * then "contains"); each station once. { stations, unknown }.
  */
 export function resolvePollStations(text, entries = []) {

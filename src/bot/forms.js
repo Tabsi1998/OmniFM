@@ -205,7 +205,7 @@ export function buildEventFormModal({ t, repeatChoices = [], language = "de" }) 
       label(t("Name", "Name"))
         .setTextInputComponent(text("name", { max: 120, min: 2, placeholder: t("z. B. Morgenshow", "e.g. Morning show") })),
       label(t("Sender", "Station"), t("Name oder Kurzname des Senders", "Name or key of the station"))
-        .setTextInputComponent(text("station", { max: 120, placeholder: "Groove Salad" })),
+        .setTextInputComponent(text("station", { max: 120, placeholder: "Chillout Lounge" })),
       label(t("Sprachkanal", "Voice channel"))
         .setChannelSelectMenuComponent(new ChannelSelectMenuBuilder().setCustomId("voice")
           .setChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice).setMinValues(1).setMaxValues(1)),

@@ -17,7 +17,7 @@ test("the catalog after #325: names that say what plays, no stream twice", () =>
   assert.equal(stations.protech19.name, "IDM & Glitch");
   assert.deepEqual([stations.prourban14.name, stations.prourban14.genre], ["2000er Hits", "Pop & Charts"]);
   assert.deepEqual([stations.protech16.name, stations.protech16.genre], ["Deep Tech House", "House"]);
-  assert.equal(stations.reggaeradio.url, "https://ice1.somafm.com/reggae-128-mp3");
+  assert.equal(stations.reggaeradio.url, "https://l.rootslegacy.fr/;");
   assert.equal(stations.prourban04.url, "https://stream.laut.fm/drill", "Drill Beats plays drill, no longer Deutschrap");
   assert.equal(stations.prohard06.url, "https://stream.laut.fm/hardstyle", "Hard Dance is no second HardBase.FM");
   const urls = Object.values(stations).map((station) => station.url.replace(/\?.*$/, "").replace(/\/+$/, ""));

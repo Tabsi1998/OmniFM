@@ -105,7 +105,7 @@ class TestStationHealth:
             assert isinstance(v["ok"], bool)
             assert isinstance(v["reachable"], bool)
             assert isinstance(v["latencyMs"], int)
-        # somafm streams should be genuinely reachable
+        # groovesalad is Epic Lounge in the seed catalog (SomaFM blocks non-browser clients, #542)
         assert res["groovesalad"]["reachable"] is True, res["groovesalad"]
 
     def test_health_batch_of_15(self, client):
@@ -130,7 +130,7 @@ class TestStationCRUD:
 
     def test_create_list_delete(self, client):
         payload = {"key": self.KEY, "name": "Test Live",
-                   "url": "https://ice4.somafm.com/groovesalad-128-mp3", "tier": "free"}
+                   "url": "https://stream.epic-lounge.com/chillout-lounge", "tier": "free"}
         c = client.post(f"{BASE_URL}/api/admin/stations", json=payload, timeout=30)
         assert c.status_code in (200, 201), c.text[:300]
 
@@ -156,10 +156,10 @@ class TestStationCRUD:
         key = "testlive2"
         client.post(f"{BASE_URL}/api/admin/stations",
                     json={"key": key, "name": "TEST_A",
-                          "url": "https://ice4.somafm.com/dronezone-128-mp3", "tier": "free"}, timeout=30)
+                          "url": "https://stream.epic-lounge.com/sleep-meditation", "tier": "free"}, timeout=30)
         u = client.post(f"{BASE_URL}/api/admin/stations",
                         json={"key": key, "name": "TEST_B",
-                              "url": "https://ice4.somafm.com/dronezone-128-mp3", "tier": "pro"}, timeout=30)
+                              "url": "https://stream.epic-lounge.com/sleep-meditation", "tier": "pro"}, timeout=30)
         assert u.status_code in (200, 201), u.text[:300]
         lst = client.get(f"{BASE_URL}/api/admin/stations/list", timeout=30).json()["stations"]
         row = next((s for s in lst if s["key"] == key), None)

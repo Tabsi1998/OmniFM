@@ -182,7 +182,7 @@ def test_admin_endpoints_ok(client, path):
 class TestStationCrud:
     def test_create_update_delete_station(self, client):
         payload = {"key": "test-qa-iter6", "name": "TEST_QA Station",
-                   "url": "https://ice4.somafm.com/beatblender-128-mp3",
+                   "url": "https://stream.epic-lounge.com/soft-house-lounge",
                    "genre": "test", "tier": "free"}
         r = client.post(f"{BASE_URL}/api/admin/stations", json=payload, timeout=30)
         assert r.status_code in (200, 201), r.text[:300]
