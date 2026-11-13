@@ -157,39 +157,61 @@ ensure_omnifm_stopped() {
     fi
   done
 
-  # The systemd services write no PID files (#524).
+  # The systemd services write no PID files (#524). Restart=always units sit
+  # in activating between two starts, the oneshot backup is activating for as
+  # long as it runs: every state but inactive/failed still uses the database.
   command -v systemctl >/dev/null 2>&1 || return 0
   local unit
   for unit in "$UNIT_PREFIX-backend" "$UNIT_PREFIX-bot" "$UNIT_PREFIX-frontend"; do
-    if systemctl is-active --quiet "$unit.service" 2>/dev/null; then
-      fatal "systemd unit $unit is active. Stop OmniFM first with ./stop.sh before restoring MongoDB."
+    if unit_busy "$unit"; then
+      fatal "systemd unit $unit is $UNIT_STATE. Stop OmniFM first with ./stop.sh before restoring MongoDB."
     fi
   done
-  if systemctl is-active --quiet "$UNIT_PREFIX-backup.service" 2>/dev/null; then
+  if unit_busy "$UNIT_PREFIX-backup"; then
     fatal "The nightly backup ($UNIT_PREFIX-backup) is running. Restore once it has finished (systemctl status $UNIT_PREFIX-backup)."
   fi
+}
+
+unit_busy() {
+  UNIT_STATE="$(systemctl is-active "$1.service" 2>/dev/null || true)"
+  case "$UNIT_STATE" in
+    active|activating|deactivating|reloading|refreshing) return 0 ;;
+  esac
+  return 1
 }
 
 # Backups and restores of this database exclude each other through one lock
 # file (#524); the timer may fire during a restore, its backup then waits.
 # flock comes with util-linux on every systemd server. Without it (macOS, Git
 # Bash) there is no omnifm-backup.timer either: warn and go on.
-acquire_backup_lock() { # flock options: -n (fail at once) or -w <seconds>
+acquire_backup_lock() { # restore: fail at once; create: wait
+  local lock="$BACKUP_DIR/.backup.lock"
   if ! command -v flock >/dev/null 2>&1; then
     echo "[WARN] flock is not installed; backups and restores are not locked against each other." >&2
     return 0
   fi
-  exec 9> "$BACKUP_DIR/.backup.lock"
-  flock "$@" 9     || fatal "Another MongoDB backup or restore is running ($BACKUP_DIR/.backup.lock). Try again once it has finished."
+  # Readable for everyone: a backup run once as root must not lock the
+  # service user out (umask 077 would create the file 600). flock works on a
+  # read-only descriptor.
+  : >> "$lock" 2>/dev/null || true
+  chmod 644 "$lock" 2>/dev/null || true
+  exec 9< "$lock" || fatal "Cannot open the backup lock file $lock (owner: another user?)."
+  flock -n 9 && return 0
+  [[ "$1" == "create" ]] \
+    || fatal "Another MongoDB backup or restore is running ($lock). Try again once it has finished."
+  echo "[INFO] Waiting up to $((LOCK_WAIT_SECONDS / 60)) minutes for a running MongoDB backup or restore ..."
+  flock -w "$LOCK_WAIT_SECONDS" 9 \
+    || fatal "A MongoDB backup or restore still holds $lock after $((LOCK_WAIT_SECONDS / 60)) minutes."
 }
 
 restore_backup() {
   local archive="${2:-}" force="${3:-}"
   [[ -n "$archive" && "$force" == "--force" ]] \
     || fatal "Usage: $0 restore <mongodb-archive.gz> --force"
-  ensure_omnifm_stopped
+  # Lock first: no backup can start between the checks and mongorestore.
   load_config
-  acquire_backup_lock -n
+  acquire_backup_lock restore
+  ensure_omnifm_stopped
   require_backup_tools
   require_restore_tools
   verify_backup "$archive"
@@ -210,7 +232,7 @@ restore_backup() {
 case "$MODE" in
   create|backup)
     mkdir -p "$BACKUP_DIR"
-    acquire_backup_lock -w "$LOCK_WAIT_SECONDS"
+    acquire_backup_lock create
     create_backup
     ;;
   verify)

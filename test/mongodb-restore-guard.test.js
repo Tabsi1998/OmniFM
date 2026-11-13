@@ -25,8 +25,10 @@ async function writeExecutable(filePath, contents) {
 }
 
 // The real backup-mongodb.sh with stand-ins for python3, the MongoDB tools,
-// systemctl (OMNIFM_FAKE_ACTIVE_UNITS lists the active units) and flock
-// (OMNIFM_FAKE_FLOCK_BUSY=1 means another process holds the lock).
+// systemctl and flock. OMNIFM_FAKE_UNIT_STATES lists unit=state pairs; the
+// stub prints the state and exits like systemctl is-active (0 only for active
+// and reloading, else 3). OMNIFM_FAKE_FLOCK_BUSY=1: the lock stays taken;
+// =briefly: only the non-blocking attempt fails.
 async function sandbox(t, { fakeFlock = true } = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "omnifm-restore-guard-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
@@ -50,14 +52,19 @@ printf 'fake' | gzip -c > "$archive"
     "#!/usr/bin/env bash\nprintf 'mongorestore %s\\n' \"$*\" >> \"$OMNIFM_FAKE_TRACE\"\n");
   await writeExecutable(path.join(bin, "systemctl"), `#!/usr/bin/env bash
 [ "$1" = "is-active" ] || exit 3
-for unit in $OMNIFM_FAKE_ACTIVE_UNITS; do
-  [ "$unit" = "\${!#}" ] || [ "$unit.service" = "\${!#}" ] && exit 0
+state=inactive
+for pair in $OMNIFM_FAKE_UNIT_STATES; do
+  [ "\${pair%%=*}.service" = "\${!#}" ] && state="\${pair#*=}"
 done
-exit 3
+[ "$2" = "--quiet" ] || echo "$state"
+case "$state" in active|reloading) exit 0 ;; *) exit 3 ;; esac
 `);
   if (fakeFlock) {
     await writeExecutable(path.join(bin, "flock"),
-      "#!/usr/bin/env bash\nprintf 'flock %s\\n' \"$*\" >> \"$OMNIFM_FAKE_TRACE\"\n[ \"${OMNIFM_FAKE_FLOCK_BUSY:-}\" != 1 ]\n");
+      `#!/usr/bin/env bash
+printf 'flock %s\\n' "$*" >> "$OMNIFM_FAKE_TRACE"
+case "\${OMNIFM_FAKE_FLOCK_BUSY:-}:$1" in 1:*|briefly:-n) exit 1 ;; esac
+`);
   }
   const archive = path.join(root, "old.archive.gz");
   execFileSync(resolveBash(), ["-c", `printf old | gzip -c > "${archive.replaceAll("\\", "/")}"`]);
@@ -89,19 +96,23 @@ test("restore runs when every OmniFM process is stopped and takes the backup loc
   assert.match(await fs.readFile(box.trace, "utf8"), /^flock -n \d+$/m);
 });
 
-for (const unit of ["omnifm-backend", "omnifm-bot", "omnifm-frontend"]) {
-  test(`restore stops while the systemd unit ${unit} is active`, async (t) => {
+// Restart=always units sit in activating between two starts and in
+// deactivating while they shut down; both still touch the database.
+for (const [unit, state] of [["omnifm-backend", "active"], ["omnifm-bot", "active"], ["omnifm-frontend", "active"],
+  ["omnifm-bot", "activating"], ["omnifm-backend", "deactivating"]]) {
+  test(`restore stops while the systemd unit ${unit} is ${state}`, async (t) => {
     const box = await sandbox(t);
-    const result = await restore(box, { OMNIFM_FAKE_ACTIVE_UNITS: unit });
+    const result = await restore(box, { OMNIFM_FAKE_UNIT_STATES: `${unit}=${state}` });
     assert.equal(result.code, 1);
     assert.match(result.stderr, new RegExp(`${unit}.*\\./stop\\.sh`));
     assert.equal(await restored(box.trace), false);
   });
 }
 
+// omnifm-backup.service is Type=oneshot: activating for as long as it runs.
 test("restore stops while the nightly backup service is running", async (t) => {
   const box = await sandbox(t);
-  const result = await restore(box, { OMNIFM_FAKE_ACTIVE_UNITS: "omnifm-backup" });
+  const result = await restore(box, { OMNIFM_FAKE_UNIT_STATES: "omnifm-backup=activating" });
   assert.equal(result.code, 1);
   assert.match(result.stderr, /omnifm-backup.*finished/);
   assert.equal(await restored(box.trace), false);
@@ -110,7 +121,7 @@ test("restore stops while the nightly backup service is running", async (t) => {
 test("a staging checkout checks its own units", async (t) => {
   const box = await sandbox(t);
   await fs.writeFile(path.join(box.root, "instance.env"), "OMNIFM_INSTANCE=staging\n");
-  const result = await restore(box, { OMNIFM_FAKE_ACTIVE_UNITS: "omnifm-staging-bot" });
+  const result = await restore(box, { OMNIFM_FAKE_UNIT_STATES: "omnifm-staging-bot=active omnifm-bot=inactive" });
   assert.equal(result.code, 1);
   assert.match(result.stderr, /omnifm-staging-bot/);
 });
@@ -132,14 +143,34 @@ test("restore stops while another backup or restore holds the lock", async (t) =
   assert.equal(await restored(box.trace), false);
 });
 
-test("create waits for the lock instead of failing at once", async (t) => {
-  const box = await sandbox(t);
-  const result = await execFile(resolveBash(), ["scripts/backup-mongodb.sh", "create"], {
+async function create(box, env = {}) {
+  return execFile(resolveBash(), ["scripts/backup-mongodb.sh", "create"], {
     cwd: box.root,
-    env: { ...process.env, PATH: `${box.bin}${path.delimiter}${process.env.PATH || ""}`, OMNIFM_FAKE_TRACE: box.trace },
+    env: { ...process.env, PATH: `${box.bin}${path.delimiter}${process.env.PATH || ""}`, OMNIFM_FAKE_TRACE: box.trace, ...env },
   });
+}
+
+test("create waits for a running backup or restore instead of failing at once", async (t) => {
+  const box = await sandbox(t);
+  const result = await create(box, { OMNIFM_FAKE_FLOCK_BUSY: "briefly" });
+  assert.match(result.stdout, /Waiting up to 30 minutes/);
   assert.match(result.stdout, /MongoDB backup created/);
-  assert.match(await fs.readFile(box.trace, "utf8"), /^flock -w \d+ \d+$/m);
+  assert.match(await fs.readFile(box.trace, "utf8"), /^flock -n \d+\nflock -w 1800 \d+$/m);
+});
+
+test("create takes a free lock without waiting", async (t) => {
+  const box = await sandbox(t);
+  const result = await create(box);
+  assert.doesNotMatch(result.stdout, /Waiting/);
+  assert.equal((await fs.readFile(box.trace, "utf8")).trim(), "flock -n 9");
+});
+
+// One run as root must not lock the service user out of the next backup.
+test("the lock file stays readable for other users", { skip: process.platform === "win32" && "no POSIX modes" }, async (t) => {
+  const box = await sandbox(t);
+  await create(box);
+  const { mode } = await fs.stat(path.join(box.root, ".update-backups", "mongodb", ".backup.lock"));
+  assert.equal(mode & 0o777, 0o644);
 });
 
 const realFlock = (() => {
