@@ -178,3 +178,31 @@ test("/api/health counts the bots from the health document, not from this proces
   assert.deepEqual(await readHealthBotCounts([], fakeDb(null)), {});
   assert.deepEqual(await readHealthBotCounts([], null), {});
 });
+
+test("/api/health reads the health document at most every 10 seconds (#532)", async () => {
+  const { readHealthBotCounts } = await import("../src/api/routes/public-routes.js");
+  const now = Date.now();
+  let reads = 0;
+  const doc = { at: new Date(now).toISOString(), nodes: [{ status: "online" }] };
+  const db = { collection: () => ({ findOne: async () => { reads += 1; return doc; } }) };
+
+  assert.deepEqual(await readHealthBotCounts([], db, { now }), { bots: 1, readyBots: 1 });
+  assert.deepEqual(await readHealthBotCounts([], db, { now: now + 9_000 }), { bots: 1, readyBots: 1 });
+  assert.equal(reads, 1);
+  await readHealthBotCounts([], db, { now: now + 10_000 });
+  assert.equal(reads, 2);
+});
+
+test("/api/health leaves the bot counts out when MongoDB does not answer in time (#532)", async () => {
+  const { readHealthBotCounts } = await import("../src/api/routes/public-routes.js");
+  let reads = 0;
+  const slow = { collection: () => ({ findOne: () => { reads += 1; return new Promise(() => {}); } }) };
+  const ownBot = { client: { isReady: () => true } };
+  const started = Date.now();
+
+  assert.deepEqual(await readHealthBotCounts([ownBot], slow, { timeoutMs: 20 }), {});
+  assert.ok(Date.now() - started < 1_000);
+  // A timeout is not cached: the next call asks again.
+  assert.deepEqual(await readHealthBotCounts([], slow, { timeoutMs: 20 }), {});
+  assert.equal(reads, 2);
+});
