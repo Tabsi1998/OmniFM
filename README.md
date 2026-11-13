@@ -176,6 +176,12 @@ bash ./scripts/backup-mongodb.sh restore .update-backups/mongodb/<backup>.archiv
 ./start.sh
 ```
 
+Der Restore bricht ab, solange ein OmniFM-Prozess läuft (PID-Dateien in `run/` und die systemd-Dienste
+`omnifm-backend`, `omnifm-bot`, `omnifm-frontend`), das nächtliche Backup (`omnifm-backup.service`)
+gerade sichert oder ein anderes Backup bzw. ein anderer Restore die Sperre
+`.update-backups/mongodb/.backup.lock` hält. `./stop.sh` stoppt die Dienste; der Backup-Timer darf
+aktiv bleiben: feuert er während des Restores, wartet sein Backup bis zu 30 Minuten auf die Sperre.
+
 ### Discord-Bot einrichten (100 % über die Owner-Konsole)
 
 1. `./start.sh` starten → Website + Owner-Konsole laufen.

@@ -36,6 +36,7 @@ test("MongoDB backup keeps credentials private and restore creates a safety snap
   await fs.mkdir(backendDir, { recursive: true });
   await fs.mkdir(binDir, { recursive: true });
   await fs.copyFile(path.join(repoRoot, "scripts", "backup-mongodb.sh"), scriptPath);
+  await fs.copyFile(path.join(repoRoot, "scripts", "instance-env.sh"), path.join(scriptsDir, "instance-env.sh"));
   await fs.writeFile(
     path.join(backendDir, ".env"),
     `MONGO_URL=mongodb://owner:${secret}@127.0.0.1:27017/?authSource=admin\nDB_NAME=omnifm_test\n`,

@@ -11,6 +11,13 @@ ENV_FILE="${OMNIFM_BACKEND_ENV:-$APP_DIR/backend/.env}"
 BACKUP_DIR="${OMNIFM_MONGO_BACKUP_DIR:-$APP_DIR/.update-backups/mongodb}"
 MODE="${1:-create}"
 TOOLS_CONFIG=""
+# Units of this checkout: omnifm-* in production, omnifm-staging-* on staging.
+# shellcheck disable=SC2034  # read by instance-env.sh
+ROOT="$APP_DIR"
+# shellcheck source=scripts/instance-env.sh
+. "$APP_DIR/scripts/instance-env.sh"
+# A backup waits this long for a running backup or restore (seconds).
+LOCK_WAIT_SECONDS=1800
 
 fatal() {
   echo "[ERROR] $*" >&2
@@ -149,14 +156,62 @@ ensure_omnifm_stopped() {
       fatal "Stop OmniFM first with ./stop.sh before restoring MongoDB."
     fi
   done
+
+  # The systemd services write no PID files (#524). Restart=always units sit
+  # in activating between two starts, the oneshot backup is activating for as
+  # long as it runs: every state but inactive/failed still uses the database.
+  command -v systemctl >/dev/null 2>&1 || return 0
+  local unit
+  for unit in "$UNIT_PREFIX-backend" "$UNIT_PREFIX-bot" "$UNIT_PREFIX-frontend"; do
+    if unit_busy "$unit"; then
+      fatal "systemd unit $unit is $UNIT_STATE. Stop OmniFM first with ./stop.sh before restoring MongoDB."
+    fi
+  done
+  if unit_busy "$UNIT_PREFIX-backup"; then
+    fatal "The nightly backup ($UNIT_PREFIX-backup) is running. Restore once it has finished (systemctl status $UNIT_PREFIX-backup)."
+  fi
+}
+
+unit_busy() {
+  UNIT_STATE="$(systemctl is-active "$1.service" 2>/dev/null || true)"
+  case "$UNIT_STATE" in
+    active|activating|deactivating|reloading|refreshing) return 0 ;;
+  esac
+  return 1
+}
+
+# Backups and restores of this database exclude each other through one lock
+# file (#524); the timer may fire during a restore, its backup then waits.
+# flock comes with util-linux on every systemd server. Without it (macOS, Git
+# Bash) there is no omnifm-backup.timer either: warn and go on.
+acquire_backup_lock() { # restore: fail at once; create: wait
+  local lock="$BACKUP_DIR/.backup.lock"
+  if ! command -v flock >/dev/null 2>&1; then
+    echo "[WARN] flock is not installed; backups and restores are not locked against each other." >&2
+    return 0
+  fi
+  # Readable for everyone: a backup run once as root must not lock the
+  # service user out (umask 077 would create the file 600). flock works on a
+  # read-only descriptor.
+  : >> "$lock" 2>/dev/null || true
+  chmod 644 "$lock" 2>/dev/null || true
+  exec 9< "$lock" || fatal "Cannot open the backup lock file $lock (owner: another user?)."
+  flock -n 9 && return 0
+  [[ "$1" == "create" ]] \
+    || fatal "Another MongoDB backup or restore is running ($lock). Try again once it has finished."
+  echo "[INFO] Waiting up to $((LOCK_WAIT_SECONDS / 60)) minutes for a running MongoDB backup or restore ..."
+  flock -w "$LOCK_WAIT_SECONDS" 9 \
+    || fatal "A MongoDB backup or restore still holds $lock after $((LOCK_WAIT_SECONDS / 60)) minutes."
 }
 
 restore_backup() {
   local archive="${2:-}" force="${3:-}"
   [[ -n "$archive" && "$force" == "--force" ]] \
     || fatal "Usage: $0 restore <mongodb-archive.gz> --force"
-  ensure_omnifm_stopped
+  # Lock first: no backup can start between the checks and mongorestore.
   load_config
+  acquire_backup_lock restore
+  ensure_omnifm_stopped
   require_backup_tools
   require_restore_tools
   verify_backup "$archive"
@@ -176,6 +231,8 @@ restore_backup() {
 
 case "$MODE" in
   create|backup)
+    mkdir -p "$BACKUP_DIR"
+    acquire_backup_lock create
     create_backup
     ;;
   verify)
@@ -196,8 +253,11 @@ Usage:
   bash ./scripts/backup-mongodb.sh verify <mongodb-archive.gz>
   bash ./scripts/backup-mongodb.sh restore <mongodb-archive.gz> --force
 
-Restore requires stopped OmniFM processes, verifies the selected archive and
-creates a second safety backup of the current database before replacing data.
+Restore requires stopped OmniFM processes (PID files and the systemd units),
+no running nightly backup and no other backup or restore (lock file
+.backup.lock in the backup directory; a backup waits up to 30 minutes for it).
+It verifies the selected archive and creates a second safety backup of the
+current database before replacing data.
 This script deletes no backup; the nightly omnifm-backup.timer thins them out
 (scripts/rotate-backups.mjs: 14 days, 8 weeks, 6 months).
 EOF
