@@ -449,13 +449,15 @@ function startWebServer(runtimes, { forwardRuntimeTo = "" } = {}) {
       return;
     }
 
-    // Dashboard SPA: /dashboard und /dashboard/* → dashboard.html
-    if (normalizedPathname === "/dashboard" || normalizedPathname.startsWith("/dashboard/")) {
-      const legacyDashboardFile = path.join(webDir, "dashboard.html");
-      const dashboardFile = fs.existsSync(legacyDashboardFile)
-        ? legacyDashboardFile
-        : path.join(webDir, "index.html");
-      sendStaticFile(res, dashboardFile, { headOnly: req.method === "HEAD" });
+    // The pages behind a login (#528), like serve.json: the app as noindex.html
+    // (the build writes it), else the old dashboard.html or index.html, always
+    // with X-Robots-Tag so no search engine keeps them.
+    const isDashboard = normalizedPathname === "/dashboard" || normalizedPathname.startsWith("/dashboard/");
+    if (isDashboard || normalizedPathname === "/admin" || normalizedPathname === "/owner") {
+      const candidates = ["noindex.html", ...(isDashboard ? ["dashboard.html"] : []), "index.html"];
+      const pageFile = candidates.map((file) => path.join(webDir, file)).find((file) => fs.existsSync(file)) || path.join(webDir, "index.html");
+      res.setHeader("X-Robots-Tag", "noindex");
+      sendStaticFile(res, pageFile, { headOnly: req.method === "HEAD" });
       return;
     }
 

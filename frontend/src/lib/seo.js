@@ -22,6 +22,10 @@ const PAGE_TYPES = {
   status: 'website',
 };
 
+// Behind a login: without one they only show the sign-in, so no search engine
+// shall keep them, and they stay out of the sitemap (#528).
+export const NOINDEX_PAGES = Object.freeze(['dashboard', 'dashboard-classic', 'dashboard-studio', 'admin']);
+
 function absoluteUrl(pathname = '/') {
   const path = String(pathname || '/').startsWith('/') ? pathname : `/${pathname}`;
   return `${SITE_ORIGIN}${path}`;
@@ -62,10 +66,13 @@ function upsertJsonLd(id, payload) {
   tag.textContent = JSON.stringify(payload);
 }
 
-/** The address of a page in a language: German and English keep theirs, every other language adds ?lang=. */
+/**
+ * The address of a page in a language: always with ?lang=, German and English
+ * too. The bare address shows the browser's language (i18n.js), so it is only
+ * the x-default, never one language's address (#529).
+ */
 function canonicalUrlFor(pageId, language) {
-  const path = getCanonicalPagePath(pageId, language);
-  return absoluteUrl(language === 'de' || language === 'en' ? path : `${path}?lang=${language}`);
+  return absoluteUrl(`${getCanonicalPagePath(pageId, language)}?lang=${language}`);
 }
 
 export function getPageSeo(page, locale = 'en') {
@@ -84,16 +91,16 @@ export function getPageSeo(page, locale = 'en') {
     canonicalUrl,
     image: DEFAULT_IMAGE,
     type: PAGE_TYPES[pageId] || 'website',
-    robots: 'index,follow',
+    robots: NOINDEX_PAGES.includes(pageId) ? 'noindex,follow' : 'index,follow',
   };
 }
 
-/** hreflang -> address of the same page in every language, plus x-default (English). */
+/** hreflang -> address of the same page in every language, plus x-default (the bare address, language by browser). */
 export function getLanguageAlternates(page) {
   const pageId = normalizePageId(page, 'home');
   return [
     ...WEBSITE_LANGUAGES.map((entry) => ({ hreflang: entry.hreflang, href: canonicalUrlFor(pageId, entry.code) })),
-    { hreflang: 'x-default', href: canonicalUrlFor(pageId, 'en') },
+    { hreflang: 'x-default', href: absoluteUrl(getCanonicalPagePath(pageId, 'en')) },
   ];
 }
 
@@ -183,17 +190,33 @@ export function buildStructuredData(seo) {
   };
 }
 
+/** Whether the address names one of the site's languages with ?lang= (the same rule as i18n.js). */
+function hasLanguageParam(href) {
+  try {
+    return Boolean(normalizeLanguage(new URL(String(href), SITE_ORIGIN).searchParams.get('lang'), ''));
+  } catch {
+    return false;
+  }
+}
+
 export function applySeoMetadata({ locale = 'en', url = null } = {}) {
   if (typeof document === 'undefined') return null;
-  const page = resolvePageFromUrl(url || window.location.href);
+  const href = url || window.location.href;
+  const page = resolvePageFromUrl(href);
+  const alternates = getLanguageAlternates(page);
   // An address the site does not have: no search engine shall keep it (#487).
-  const seo = page === NOT_FOUND_PAGE ? { ...getPageSeo('home', locale), robots: 'noindex,follow' } : getPageSeo(page, locale);
+  let seo = page === NOT_FOUND_PAGE ? { ...getPageSeo('home', locale), robots: 'noindex,follow' } : getPageSeo(page, locale);
+  // Without ?lang= the address shows the browser's language (i18n.js): it is
+  // the page's x-default and its own canonical, not one language's (#529).
+  if (page !== NOT_FOUND_PAGE && !hasLanguageParam(href)) {
+    seo = { ...seo, canonicalUrl: alternates.find((entry) => entry.hreflang === 'x-default').href };
+  }
   document.documentElement.lang = seo.language;
   document.title = seo.title;
 
   upsertLink('canonical', seo.canonicalUrl);
   // Every language of this page, so search engines find each one (#306).
-  replaceAlternates(getLanguageAlternates(page));
+  replaceAlternates(alternates);
   upsertLink('manifest', '/manifest.json');
   upsertMeta('meta[name="description"]', { name: 'description', content: seo.description });
   upsertMeta('meta[name="robots"]', { name: 'robots', content: seo.robots });

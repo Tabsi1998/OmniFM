@@ -14,43 +14,43 @@
     },
     {
       "source": "/dashboard",
-      "destination": "/index.html"
+      "destination": "/noindex.html"
     },
     {
       "source": "/dashboard/",
-      "destination": "/index.html"
+      "destination": "/noindex.html"
     },
     {
       "source": "/dashboard/classic",
-      "destination": "/index.html"
+      "destination": "/noindex.html"
     },
     {
       "source": "/dashboard/classic/",
-      "destination": "/index.html"
+      "destination": "/noindex.html"
     },
     {
       "source": "/dashboard/studio",
-      "destination": "/index.html"
+      "destination": "/noindex.html"
     },
     {
       "source": "/dashboard/studio/",
-      "destination": "/index.html"
+      "destination": "/noindex.html"
     },
     {
       "source": "/admin",
-      "destination": "/index.html"
+      "destination": "/noindex.html"
     },
     {
       "source": "/admin/",
-      "destination": "/index.html"
+      "destination": "/noindex.html"
     },
     {
       "source": "/owner",
-      "destination": "/index.html"
+      "destination": "/noindex.html"
     },
     {
       "source": "/owner/",
-      "destination": "/index.html"
+      "destination": "/noindex.html"
     },
     {
       "source": "/brand",
@@ -319,6 +319,15 @@
         {
           "key": "Cache-Control",
           "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "noindex.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
         }
       ]
     },

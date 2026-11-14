@@ -422,12 +422,15 @@ async function inspectSeo(baseUrl) {
       name: "sitemap.xml",
       path: "/sitemap.xml",
       assertions: [
-        { label: "home loc", regex: /<loc>https:\/\/omnifm\.xyz\/<\/loc>/i },
-        { label: "dashboard loc", regex: /<loc>https:\/\/omnifm\.xyz\/dashboard<\/loc>/i },
-        { label: "stations loc", regex: /<loc>https:\/\/omnifm\.xyz\/stations<\/loc>/i },
-        { label: "premium loc", regex: /<loc>https:\/\/omnifm\.xyz\/premium<\/loc>/i },
-        { label: "faq loc", regex: /<loc>https:\/\/omnifm\.xyz\/faq<\/loc>/i },
-        { label: "privacy loc", regex: /<loc>https:\/\/omnifm\.xyz\/datenschutz<\/loc>/i },
+        // The live site may still serve the sitemap from before #529 (without
+        // ?lang=) until the next deploy; both shapes pass. The exact content is
+        // checked against the repo in test/sitemap.test.js.
+        { label: "home loc", regex: /<loc>https:\/\/omnifm\.xyz\/(?:\?lang=de)?<\/loc>/i },
+        { label: "start loc", regex: /<loc>https:\/\/omnifm\.xyz\/start(?:\?lang=de)?<\/loc>/i },
+        { label: "stations loc", regex: /<loc>https:\/\/omnifm\.xyz\/stations(?:\?lang=de)?<\/loc>/i },
+        { label: "premium loc", regex: /<loc>https:\/\/omnifm\.xyz\/premium(?:\?lang=de)?<\/loc>/i },
+        { label: "faq loc", regex: /<loc>https:\/\/omnifm\.xyz\/faq(?:\?lang=de)?<\/loc>/i },
+        { label: "privacy loc", regex: /<loc>https:\/\/omnifm\.xyz\/datenschutz(?:\?lang=de)?<\/loc>/i },
       ],
     },
     {
@@ -449,7 +452,6 @@ async function inspectSeo(baseUrl) {
       name: "home meta",
       path: "/",
       assertions: [
-        { label: "canonical", regex: /<link[^>]+rel=["']canonical["'][^>]+href=["']https:\/\/omnifm\.xyz\//i },
         { label: "og title", regex: /<meta[^>]+property=["']og:title["']/i },
         { label: "twitter card", regex: /<meta[^>]+name=["']twitter:card["']/i },
         { label: "json ld", regex: /application\/ld\+json/i },

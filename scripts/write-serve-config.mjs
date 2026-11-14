@@ -8,7 +8,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ACTIVITY_FRAME_ANCESTORS, buildContentSecurityPolicy, buildWebsiteSecurityHeaders } from "../src/config/security-headers.js";
-import { WEBSITE_PAGE_PATHS } from "../frontend/src/lib/pageRouting.js";
+import { WEBSITE_PAGE_PATHS, resolvePageFromUrl } from "../frontend/src/lib/pageRouting.js";
+import { NOINDEX_PAGES } from "../frontend/src/lib/seo.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const SERVE_CONFIG_PATH = path.join(ROOT, "frontend", "serve.json");
@@ -33,9 +34,11 @@ export function buildServeConfig() {
       // list (#487). Any other answers 404 with build/404.html, which shows the
       // not-found page and keeps search engines off, instead of a copy of the
       // start page under every address.
+      // The pages behind a login get the same app as noindex.html, so the
+      // X-Robots-Tag rule below reaches them (#528).
       ...WEBSITE_PAGE_PATHS.filter((page) => page !== "/")
         .flatMap((page) => [page, `${page}/`])
-        .map((source) => ({ source, destination: "/index.html" })),
+        .map((source) => ({ source, destination: NOINDEX_PAGES.includes(resolvePageFromUrl(source)) ? "/noindex.html" : "/index.html" })),
     ],
     headers: [
       {
@@ -61,6 +64,11 @@ export function buildServeConfig() {
         // Vite puts a content hash into every file name below assets/.
         source: "assets/**",
         headers: toHeaderList({ "Cache-Control": "public, max-age=31536000, immutable" }),
+      },
+      {
+        // The dashboard and /admin: no search engine shall keep them (#528).
+        source: "noindex.html",
+        headers: toHeaderList({ "X-Robots-Tag": "noindex" }),
       },
       {
         source: "favicon.ico",

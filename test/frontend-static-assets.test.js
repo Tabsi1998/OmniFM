@@ -56,6 +56,17 @@ test("Vite entry document references the React mount and module entry", () => {
   );
 });
 
+test("pages behind a login are noindex, public pages stay indexable (#528)", () => {
+  for (const page of ["dashboard", "dashboard-classic", "dashboard-studio", "admin"]) {
+    for (const language of ["de", "en", "fr"]) {
+      assert.equal(getPageSeo(page, language).robots, "noindex,follow", `${page} (${language})`);
+    }
+  }
+  for (const page of ["home", "stations", "premium", "faq", "start", "imprint", "privacy", "terms", "charts", "status"]) {
+    assert.equal(getPageSeo(page, "en").robots, "index,follow", page);
+  }
+});
+
 test("React SEO assets and base metadata are present", () => {
   const publicDir = path.join(repoRoot, "frontend", "public");
   const indexHtml = fs.readFileSync(path.join(repoRoot, "frontend", "index.html"), "utf8");
@@ -63,7 +74,9 @@ test("React SEO assets and base metadata are present", () => {
   const sitemapXml = fs.readFileSync(path.join(publicDir, "sitemap.xml"), "utf8");
   const manifest = JSON.parse(fs.readFileSync(path.join(publicDir, "manifest.json"), "utf8"));
 
-  assert.match(indexHtml, /<link rel="canonical" href="https:\/\/omnifm\.xyz\/"/);
+  // No static canonical or og:url: the bare address is only the x-default,
+  // seo.js sets the page's own address (#529). 404.html and noindex.html are copies.
+  assert.doesNotMatch(indexHtml, /rel="canonical"|property="og:url"/);
   assert.match(indexHtml, /<meta name="google-site-verification" content="2ZCoKiPvrZJ_fKLyyE4SDbATwbL6yDX-iwI82ghmpSM" \/>/);
   assert.doesNotMatch(indexHtml, /googletagmanager\.com\/gtag\/js/i, "analytics must load only after explicit consent");
   assert.doesNotMatch(indexHtml, /gtag\(['"]config['"]/i, "the static document must not initialize tracking");
@@ -75,15 +88,15 @@ test("React SEO assets and base metadata are present", () => {
 
   assert.match(robotsTxt, /User-agent: \*/);
   assert.match(robotsTxt, /Sitemap: https:\/\/omnifm\.xyz\/sitemap\.xml/);
-  assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/<\/loc>/);
-  assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/dashboard<\/loc>/);
-  assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/stations<\/loc>/);
-  assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/premium<\/loc>/);
-  assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/faq<\/loc>/);
-  assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/start<\/loc>/);
-  assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/impressum<\/loc>/);
-  assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/datenschutz<\/loc>/);
-  assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/nutzungsbedingungen<\/loc>/);
+  assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/\?lang=de<\/loc>/);
+  assert.doesNotMatch(sitemapXml, /omnifm\.xyz\/(dashboard|admin)/);
+  assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/stations\?lang=de<\/loc>/);
+  assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/premium\?lang=de<\/loc>/);
+  assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/faq\?lang=de<\/loc>/);
+  assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/start\?lang=de<\/loc>/);
+  assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/impressum\?lang=de<\/loc>/);
+  assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/datenschutz\?lang=de<\/loc>/);
+  assert.match(sitemapXml, /<loc>https:\/\/omnifm\.xyz\/nutzungsbedingungen\?lang=de<\/loc>/);
   assert.equal(manifest.name, "OmniFM");
   // The installed app opens the dashboard (#305); the id keeps an earlier install the same app.
   assert.equal(manifest.start_url, "/dashboard");
@@ -103,29 +116,29 @@ test("React SEO assets and base metadata are present", () => {
 
 test("SEO helper returns route-specific canonical metadata and structured data", () => {
   const homeSeo = getPageSeo("home", "en");
-  assert.equal(homeSeo.canonicalUrl, "https://omnifm.xyz/");
+  assert.equal(homeSeo.canonicalUrl, "https://omnifm.xyz/?lang=en");
   assert.match(homeSeo.title, /24\/7 Radio/);
 
   const imprintSeo = getPageSeo("imprint", "de");
-  assert.equal(imprintSeo.canonicalUrl, "https://omnifm.xyz/impressum");
+  assert.equal(imprintSeo.canonicalUrl, "https://omnifm.xyz/impressum?lang=de");
   assert.match(imprintSeo.description, /Pflichtangaben/);
 
   const privacySeo = getPageSeo("privacy", "en");
-  assert.equal(privacySeo.canonicalUrl, "https://omnifm.xyz/privacy");
+  assert.equal(privacySeo.canonicalUrl, "https://omnifm.xyz/privacy?lang=en");
   assert.match(privacySeo.title, /Privacy policy/);
 
   const stationsSeo = getPageSeo("stations", "de");
-  assert.equal(stationsSeo.canonicalUrl, "https://omnifm.xyz/stations");
+  assert.equal(stationsSeo.canonicalUrl, "https://omnifm.xyz/stations?lang=de");
   assert.match(stationsSeo.title, /Stationen/);
   assert.match(stationsSeo.description, /Discord-Radio/);
 
   const premiumSeo = getPageSeo("premium", "en");
-  assert.equal(premiumSeo.canonicalUrl, "https://omnifm.xyz/premium");
+  assert.equal(premiumSeo.canonicalUrl, "https://omnifm.xyz/premium?lang=en");
   assert.match(premiumSeo.title, /Free, Pro and Ultimate/);
   assert.match(premiumSeo.description, /audio quality/i);
 
   const faqSeo = getPageSeo("faq", "de");
-  assert.equal(faqSeo.canonicalUrl, "https://omnifm.xyz/faq");
+  assert.equal(faqSeo.canonicalUrl, "https://omnifm.xyz/faq?lang=de");
   assert.match(faqSeo.title, /FAQ/);
 
   const structuredData = buildStructuredData(faqSeo);

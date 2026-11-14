@@ -39,7 +39,7 @@ test("only the site's pages get index.html; any other address stays a 404 (#487)
   const { WEBSITE_PAGE_PATHS } = await import("../frontend/src/lib/pageRouting.js");
   assert.deepEqual(config.rewrites[0], { source: "/activity", destination: "/activity/index.html" });
   const pages = config.rewrites.slice(1);
-  assert.ok(pages.every((rule) => rule.destination === "/index.html" && !rule.source.includes(":")), "named pages only, no pattern");
+  assert.ok(pages.every((rule) => ["/index.html", "/noindex.html"].includes(rule.destination) && !rule.source.includes(":")), "named pages only, no pattern");
   for (const page of ["/sender", "/preise", "/impressum", "/dashboard", "/admin", "/status", "/charts", "/start"]) {
     assert.ok(pages.some((rule) => rule.source === page) && pages.some((rule) => rule.source === `${page}/`), page);
   }
@@ -80,4 +80,17 @@ test("only the Discord Activity may be framed, and only by Discord (#308)", () =
   assert.equal(activity["Content-Security-Policy"].replace(/frame-ancestors [^;]*/, "frame-ancestors 'none'"), buildContentSecurityPolicy());
   // The rule for the site comes before the Activity's, the rule for everything first.
   assert.deepEqual(config.headers.slice(0, 3).map((rule) => rule.source), ["**", "!activity/**", "activity/**"]);
+});
+
+test("the dashboard and /admin are sent as noindex.html with X-Robots-Tag: noindex (#528)", () => {
+  const config = buildServeConfig();
+  const destination = (source) => config.rewrites.find((rule) => rule.source === source)?.destination;
+  for (const source of ["/dashboard", "/dashboard/", "/dashboard/classic", "/dashboard/studio/", "/admin", "/admin/", "/owner"]) {
+    assert.equal(destination(source), "/noindex.html", source);
+  }
+  for (const source of ["/stations", "/premium/", "/impressum", "/start"]) {
+    assert.equal(destination(source), "/index.html", source);
+  }
+  // serve picks header rules by the file it sends, so the rule names the file.
+  assert.equal(headersFor(config, "noindex.html")["X-Robots-Tag"], "noindex");
 });

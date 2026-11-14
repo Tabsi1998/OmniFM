@@ -28,6 +28,9 @@ function pagesReaching(id, getModuleInfo, path = new Set()) {
 // #487: an address the site does not have gets build/404.html, which `serve`
 // answers with status 404. The app shows its not-found page there; the
 // robots tag keeps search engines from keeping the address.
+// #528: the pages behind a login (dashboard, admin) get build/noindex.html,
+// the same app with that robots tag; serve.json adds X-Robots-Tag to it, as
+// serve picks header rules by the file it sends, not by the address.
 let buildOutDir = '';
 const notFoundPage = {
   name: 'omnifm:not-found-page',
@@ -41,7 +44,9 @@ const notFoundPage = {
     const html = fs.readFileSync(index, 'utf8');
     const robots = /<meta name="robots" content="[^"]*" \/>/;
     const noindex = '<meta name="robots" content="noindex,follow" />';
-    fs.writeFileSync(path.join(buildOutDir, '404.html'), robots.test(html) ? html.replace(robots, noindex) : html.replace('<head>', `<head>\n    ${noindex}`));
+    const noindexHtml = robots.test(html) ? html.replace(robots, noindex) : html.replace('<head>', `<head>\n    ${noindex}`);
+    fs.writeFileSync(path.join(buildOutDir, '404.html'), noindexHtml);
+    fs.writeFileSync(path.join(buildOutDir, 'noindex.html'), noindexHtml);
   },
 };
 
