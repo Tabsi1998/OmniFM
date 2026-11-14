@@ -70,7 +70,7 @@ import {
   systemSetting,
   workersResponse,
 } from "../../lib/owner-monitoring.js";
-import { isAllowedOperatorWebhookUrl } from "../../services/operator-webhook.js";
+import { isAllowedOperatorWebhookUrl, sendOperatorTestAlert } from "../../services/operator-webhook.js";
 import nodemailer from "nodemailer";
 import { reloadPremiumStore } from "../../premium-store.js";
 import { SERVER_DATA_RETENTION_DAYS, listGuildDepartures } from "../../guild-departures-store.js";
@@ -269,23 +269,12 @@ export function createAdminRoutesHandler(deps) {
         results.operatorAlerts = { ok: true, message: "Webhook-URL ist gesetzt." };
       } else {
         const mention = String(systemSetting(raw, "operatorAlerts", "mention", "OPERATOR_WEBHOOK_MENTION") || "").trim();
-        try {
-          const response = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            redirect: "manual",
-            signal: AbortSignal.timeout(10_000),
-            body: JSON.stringify({
-              username: "OmniFM Operator",
-              content: mention || null,
-              embeds: [{ title: "🧪 Testalarm", description: "So sehen Betreiber-Alarme von OmniFM aus. Die Einrichtung stimmt.", color: 0x00f0ff }],
-            }),
-          });
-          results.operatorAlerts = response.status < 300
-            ? { ok: true, message: "Testalarm gesendet, schau in den Discord-Kanal." }
-            : { ok: false, message: `Discord antwortet mit HTTP ${response.status}.` };
-        } catch (err) {
-          results.operatorAlerts = { ok: false, message: clipMessage(err) };
+        // Same payload and safeFetch path as a real alert (#555); never throws.
+        const sent = await sendOperatorTestAlert(url, mention);
+        if (sent.ok) {
+          results.operatorAlerts = { ok: true, message: "Testalarm gesendet, schau in den Discord-Kanal." };
+        } else {
+          results.operatorAlerts = { ok: false, message: sent.status ? `Discord antwortet mit HTTP ${sent.status}.` : clipMessage(sent.error) };
         }
       }
     }
