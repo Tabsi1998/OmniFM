@@ -244,6 +244,8 @@ jobs:
       DB_NAME: omnifm_ci_fastapi
       API_ADMIN_TOKEN: ci-owner-token
       SEED_DEMO_DATA: 0
+      # The local test sender of backend/tests (#542), for FastAPI and pytest.
+      OMNIFM_TEST_STREAM_ORIGIN: http://127.0.0.1:18008
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7

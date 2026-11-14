@@ -1,5 +1,8 @@
 import os
+import threading
 from datetime import datetime, timedelta, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlparse
 
 import pytest
 import requests
@@ -49,6 +52,57 @@ def contract_db():
     client = MongoClient(url, serverSelectionTimeoutMS=4000)
     yield client[name]
     client.close()
+
+
+# #542: a local test sender instead of a radio station on the internet. The
+# test harness (scripts/local_check.py) names its origin in
+# OMNIFM_TEST_STREAM_ORIGIN for the API under test and for this suite; the
+# API lets exactly that loopback origin through its private-host check.
+# MPEG-1 Layer III, 128 kbit/s, 44.1 kHz: 417 bytes per frame, 24 frames.
+TEST_STREAM_BODY = (bytes([0xFF, 0xFB, 0x90, 0x00]) + bytes(413)) * 24
+
+
+class _TestStreamHandler(BaseHTTPRequestHandler):
+    def do_GET(self):  # noqa: N802 - the name http.server calls
+        self.send_response(200)
+        self.send_header("Content-Type", "audio/mpeg")
+        self.send_header("icy-name", "OmniFM Test Stream")
+        self.send_header("icy-br", "128")
+        self.send_header("Content-Length", str(len(TEST_STREAM_BODY)))
+        self.end_headers()
+        try:
+            self.wfile.write(TEST_STREAM_BODY)
+        except OSError:
+            pass  # the probe stops reading once it has seen enough frames
+
+    def log_message(self, *args):
+        pass
+
+
+class _TestStreamServer(ThreadingHTTPServer):
+    # On Windows SO_REUSEADDR lets a second process bind the same port; a
+    # taken port must fail here instead of serving the other process's answers.
+    allow_reuse_address = False
+    allow_reuse_port = False
+    daemon_threads = True
+
+
+@pytest.fixture(scope="session")
+def test_stream_url():
+    """The URL of the local test sender; skips when the harness named none."""
+    origin = os.environ.get("OMNIFM_TEST_STREAM_ORIGIN", "").strip()
+    if not origin:
+        pytest.skip("OMNIFM_TEST_STREAM_ORIGIN is not set: no local test sender (scripts/local_check.py sets it)")
+    parsed = urlparse(origin)
+    try:
+        server = _TestStreamServer((parsed.hostname, parsed.port), _TestStreamHandler)
+    except OSError as error:
+        pytest.fail(f"the local test sender cannot listen on {origin}: {error}")
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield f"{origin.rstrip('/')}/test.mp3"
+    server.shutdown()
+    server.server_close()
 
 
 def _clear_runtime(db):

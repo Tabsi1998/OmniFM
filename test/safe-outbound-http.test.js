@@ -252,3 +252,60 @@ test("safe fetch hands the lenient parser to every redirect hop and keeps it off
   assert.deepEqual(await run({ lenientHttpParser: true }), [true, true]);
   assert.deepEqual(await run({}), [false, false]);
 });
+
+test("only the test harness's local test sender passes, exactly that origin (#542)", async (t) => {
+  const previous = process.env.OMNIFM_TEST_STREAM_ORIGIN;
+  t.after(() => {
+    if (previous === undefined) delete process.env.OMNIFM_TEST_STREAM_ORIGIN;
+    else process.env.OMNIFM_TEST_STREAM_ORIGIN = previous;
+  });
+
+  delete process.env.OMNIFM_TEST_STREAM_ORIGIN;
+  assert.equal(validateOutboundUrl("http://127.0.0.1:18008/test.mp3").ok, false, "unset: blocked as always");
+
+  process.env.OMNIFM_TEST_STREAM_ORIGIN = "http://127.0.0.1:18008";
+  assert.equal(validateOutboundUrl("http://127.0.0.1:18008/test.mp3").ok, true);
+  assert.equal((await validateOutboundUrlWithDns("http://127.0.0.1:18008/test.mp3")).ok, true);
+  const others = ["http://127.0.0.1/x", "http://127.0.0.1:18009/x", "https://127.0.0.1:18008/x", "http://localhost:18008/x", "http://10.0.0.1:18008/x"];
+  for (const url of others) assert.equal(validateOutboundUrl(url).ok, false, url);
+  const checked = await Promise.all(others.map((url) => validateOutboundUrlWithDns(url)));
+  checked.forEach((result, index) => assert.equal(result.ok, false, others[index]));
+
+  // Only a loopback origin with a port can be named at all.
+  for (const origin of ["http://10.0.0.1:18008", "http://127.0.0.1", "not a url"]) {
+    process.env.OMNIFM_TEST_STREAM_ORIGIN = origin;
+    assert.equal(validateOutboundUrl("http://10.0.0.1:18008/x").ok, false, origin);
+    assert.equal(validateOutboundUrl("http://127.0.0.1/x").ok, false, origin);
+  }
+});
+
+test("the owner's stream test plays the local test sender of the contract suite (#542)", async (t) => {
+  const http = await import("node:http");
+  const { once } = await import("node:events");
+  const { testStationStream } = await import("../src/lib/owner-stations.js");
+  const { mp3Frames } = await import("./support/stream-probe-server.mjs");
+  // What backend/tests/conftest.py serves: MP3 frames with an icy-name.
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, { "Content-Type": "audio/mpeg", "icy-name": "OmniFM Test Stream", "icy-br": "128" });
+    res.end(mp3Frames(24));
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const previous = process.env.OMNIFM_TEST_STREAM_ORIGIN;
+  t.after(() => {
+    server.close();
+    if (previous === undefined) delete process.env.OMNIFM_TEST_STREAM_ORIGIN;
+    else process.env.OMNIFM_TEST_STREAM_ORIGIN = previous;
+  });
+  const origin = `http://127.0.0.1:${/** @type {import("node:net").AddressInfo} */ (server.address()).port}`;
+
+  delete process.env.OMNIFM_TEST_STREAM_ORIGIN;
+  await assert.rejects(testStationStream(`${origin}/test.mp3`), (error) => error?.status === 400);
+
+  process.env.OMNIFM_TEST_STREAM_ORIGIN = origin;
+  const result = await testStationStream(`${origin}/test.mp3`);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.isAudioStream, true);
+  assert.equal(result.format, "mp3");
+  assert.equal(result.icyName, "OmniFM Test Stream");
+});

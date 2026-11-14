@@ -92,6 +92,9 @@ NODE_OWNER_CONTRACT_PORT = 18005
 # #290: the commander's Node API and the public Node entry in front of it.
 NODE_RUNTIME_PORT = 18006
 NODE_PUBLIC_PORT = 18007
+# The local test sender of backend/tests (#542): the contract suite serves MP3
+# frames here, and the API under test lets exactly this origin through.
+TEST_STREAM_PORT = 18008
 # #294: the website under test, like production: serve, Node API, one address.
 # 18051-18053: the other runners on this machine use 18009-18015, 18021-18024,
 # 18031, 18042-18044 and 18121-18144, and may run at the same time.
@@ -114,7 +117,7 @@ ENV_PROVIDED = {
     # preflight), node --test, and the backend contract test runner.
     "BOT_PROCESS_INDEX", "BOT_PROCESS_ROLE", "DRY_RUN", "NODE_TEST_CONTEXT",
     "OMNIFM_RUN_BACKEND_CONTRACT_TESTS", "OMNIFM_TEST_BASE_URL", "REACT_APP_BACKEND_URL",
-    "OMNIFM_TEST_ADMIN_TOKEN",
+    "OMNIFM_TEST_ADMIN_TOKEN", "OMNIFM_TEST_STREAM_ORIGIN",
 }
 
 ALLOWED_LICENCES = {
@@ -1272,7 +1275,8 @@ def expect(condition: object, message: str) -> None:
 def contract_database(context: Context, url: str, database: str) -> tuple:
     """An empty contract database and two helpers that read and write it with pymongo."""
     exe = venv_python()
-    env = {"MONGO_URL": url, "DB_NAME": database, "API_ADMIN_TOKEN": API_TOKEN, "SEED_DEMO_DATA": "0"}
+    env = {"MONGO_URL": url, "DB_NAME": database, "API_ADMIN_TOKEN": API_TOKEN, "SEED_DEMO_DATA": "0",
+           "OMNIFM_TEST_STREAM_ORIGIN": f"http://127.0.0.1:{TEST_STREAM_PORT}"}
     prelude = f"import json;from pymongo import MongoClient;d=MongoClient({url!r})[{database!r}];"
 
     def in_mongo(expression: str) -> object:
@@ -1321,6 +1325,8 @@ def fastapi_contract_suite(context: Context) -> str:
     env = context.cache.get("fastapi:env")
     if not env or not port_open(API_PORT):
         raise StepSkipped("the live FastAPI of backend/contract is not running")
+    if port_open(TEST_STREAM_PORT):
+        raise StepSkipped(f"port {TEST_STREAM_PORT} (the local test sender) is taken; stop what uses it and run again")
     base = f"http://127.0.0.1:{API_PORT}"
     completed = context.run(
         venv_python(), "-m", "pytest", BACKEND / "tests", "-q", "-p", "no:cacheprovider", "-rfE",
@@ -1350,11 +1356,14 @@ def node_contract_suite(context: Context) -> str:
         raise StepSkipped("the FastAPI environment of backend/contract is missing")
     if port_open(NODE_CONTRACT_PORT):
         raise StepSkipped(f"port {NODE_CONTRACT_PORT} is taken; stop what uses it and run again")
+    if port_open(TEST_STREAM_PORT):
+        raise StepSkipped(f"port {TEST_STREAM_PORT} (the local test sender) is taken; stop what uses it and run again")
     node = node_of(context, NODE_MAJOR)
     scratch = Path(tempfile.mkdtemp(prefix="omnifm-node-contract-"))
     base = f"http://127.0.0.1:{NODE_CONTRACT_PORT}"
     node_env = dict(node_path_env(context, node), **{
         "MONGO_URL": env["MONGO_URL"], "DB_NAME": env["DB_NAME"], "API_ADMIN_TOKEN": env["API_ADMIN_TOKEN"],
+        "OMNIFM_TEST_STREAM_ORIGIN": env["OMNIFM_TEST_STREAM_ORIGIN"],
         "WEB_SERVER_ENABLED": "1", "WEB_BIND": "127.0.0.1", "WEB_INTERNAL_PORT": str(NODE_CONTRACT_PORT),
         "PUBLIC_WEB_URL": base, "OMNIFM_RUNTIME_DATA_DIR": str(scratch), "LOGS_DIR": str(scratch / "logs"),
         # The suite fires hundreds of requests from one address; the limiter

@@ -126,8 +126,9 @@ class TestStationValidation:
 
 # --- stream test ---
 class TestStreamTest:
-    def test_valid_audio_stream(self, client):
-        r = client.post(f"{BASE_URL}/api/admin/stations/test", json={"url": TEST_URL}, timeout=40)
+    def test_valid_audio_stream(self, client, test_stream_url):
+        # The local test sender, not a station on the internet (#542).
+        r = client.post(f"{BASE_URL}/api/admin/stations/test", json={"url": test_stream_url}, timeout=40)
         assert r.status_code == 200, r.text[:300]
         d = r.json()
         assert d["ok"] is True, d

@@ -75,6 +75,21 @@ def is_private_or_local_host(hostname_input):
     )
 
 
+def is_test_stream_origin(parsed):
+    """Test only (#542): the contract suite's local test sender, like Node's
+    safe-outbound-http. OMNIFM_TEST_STREAM_ORIGIN names one loopback origin
+    with a port; exactly that origin passes. Unset, as in production, nothing changes."""
+    allowed = urlparse(str(os.environ.get("OMNIFM_TEST_STREAM_ORIGIN") or "").strip())
+    try:
+        allowed_port, port = allowed.port, parsed.port
+    except ValueError:
+        return False
+    return (
+        allowed.scheme == "http" and allowed.hostname == "127.0.0.1" and bool(allowed_port)
+        and parsed.scheme == allowed.scheme and parsed.hostname == allowed.hostname and port == allowed_port
+    )
+
+
 def validate_custom_station_url(raw_url):
     value = str(raw_url or "").strip()
     parsed = urlparse(value)
@@ -82,6 +97,8 @@ def validate_custom_station_url(raw_url):
         return {"ok": False, "error": "URL-Format ungültig."}
     if parsed.username or parsed.password:
         return {"ok": False, "error": "URLs mit Benutzername/Passwort sind nicht erlaubt."}
+    if is_test_stream_origin(parsed):
+        return {"ok": True, "url": value}
     if core.is_private_or_local_host(parsed.hostname):
         return {"ok": False, "error": "Lokale/private Hosts sind nicht erlaubt."}
 

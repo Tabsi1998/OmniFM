@@ -70,6 +70,23 @@ function createSafeOutboundError(code, message, cause = null) {
   return new SafeOutboundError(code, message, cause);
 }
 
+/**
+ * Test only (#542): the contract suite's local test sender. The test harness
+ * sets OMNIFM_TEST_STREAM_ORIGIN to one loopback origin with a port
+ * (http://127.0.0.1:18008); exactly that origin passes, nothing else on the
+ * machine. Unset, as in production, nothing changes.
+ */
+function isTestStreamOrigin(parsedUrl) {
+  const allowed = String(process.env.OMNIFM_TEST_STREAM_ORIGIN || "").trim();
+  if (!allowed) return false;
+  try {
+    const origin = new URL(allowed);
+    return origin.hostname === "127.0.0.1" && Boolean(origin.port) && parsedUrl.origin === origin.origin;
+  } catch {
+    return false;
+  }
+}
+
 function validateOutboundUrl(rawUrl, {
   allowedProtocols = DEFAULT_ALLOWED_PROTOCOLS,
   requireHttps = false,
@@ -108,7 +125,7 @@ function validateOutboundUrl(rawUrl, {
   }
   const address = normalizeOutboundIpAddress(hostname);
   if (address) {
-    if (!isPublicOutboundAddress(address)) {
+    if (!isPublicOutboundAddress(address) && !isTestStreamOrigin(parsed)) {
       return { ok: false, error: "Lokale/private Hosts sind nicht erlaubt.", code: "OUTBOUND_ADDRESS_NOT_ALLOWED" };
     }
   } else {
@@ -197,7 +214,8 @@ async function resolveSafeOutboundTarget(rawUrl, options = {}) {
     ? [{ address: literalAddress, family: net.isIP(literalAddress) }]
     : await resolveHostnameForOutboundRequest(hostname, options);
 
-  if (!addresses.length || addresses.some((entry) => !isPublicOutboundAddress(entry.address))) {
+  const publicOnly = addresses.length && addresses.every((entry) => isPublicOutboundAddress(entry.address));
+  if (!publicOnly && !isTestStreamOrigin(validation.parsedUrl)) {
     throw createSafeOutboundError("OUTBOUND_ADDRESS_NOT_ALLOWED", "Lokale/private Hosts sind nicht erlaubt.");
   }
 
