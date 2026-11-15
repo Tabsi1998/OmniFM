@@ -29,6 +29,10 @@ test("outbound URL policy rejects private, local, and credential-bearing targets
     "http://[fe80::1]/",
     "http://[fd00::1]/",
     "http://[::ffff:127.0.0.1]/",
+    // IPv4-compatible IPv6 (::/96): ipaddr.js calls these unicast.
+    "http://[::7f00:1]/",
+    "http://[::a00:1]/",
+    "http://[::808:808]/",
     "http://2130706433/",
     "http://0x7f000001/",
     "http://0177.0.0.1/",
@@ -43,6 +47,8 @@ test("outbound URL policy rejects private, local, and credential-bearing targets
   assert.equal(isPublicOutboundAddress("1.1.1.1"), true);
   assert.equal(isPublicOutboundAddress("127.0.0.1"), false);
   assert.equal(isPublicOutboundAddress("::ffff:127.0.0.1"), false);
+  assert.equal(isPublicOutboundAddress("::7f00:1"), false, "a DNS answer in ::/96 counts as private too");
+  assert.equal(isPublicOutboundAddress("2606:4700::1111"), true, "an ordinary public IPv6 address stays allowed");
 });
 
 test("outbound DNS validation rejects mixed public and private answers", async () => {

@@ -50,7 +50,12 @@ function normalizeOutboundIpAddress(rawValue) {
 function isPublicOutboundAddress(rawValue) {
   const normalized = normalizeOutboundIpAddress(rawValue);
   if (!normalized) return false;
-  return ipaddr.parse(normalized).range() === "unicast";
+  const parsed = ipaddr.parse(normalized);
+  // IPv4-compatible IPv6 (::/96, deprecated): ipaddr.js calls ::7f00:1
+  // unicast, but some stacks route it to 127.0.0.1. No public host uses it.
+  const ipv6 = /** @type {any} */ (parsed);
+  if (parsed.kind() === "ipv6" && ipv6.parts.slice(0, 6).every((part) => part === 0)) return false;
+  return parsed.range() === "unicast";
 }
 
 function normalizeHostname(rawValue) {
