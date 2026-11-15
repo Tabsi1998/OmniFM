@@ -7,13 +7,24 @@
 // limit, real audio detection). The answer is a result code and a few
 // harmless facts; the dashboard words it in the reader's language. No
 // address, resolved IP, query string or raw error text goes back.
-import { requestPinnedTarget, safeFetch, validateOutboundUrl } from "./safe-outbound-http.js";
+//
+// On top of the player's policy the test refuses ports of services that are
+// no stream and the machine's own addresses, on every hop: an admin could
+// otherwise use it to see whether something answers there (a blind GET with
+// the status code as the answer).
+import os from "node:os";
+import ipaddr from "ipaddr.js";
+import { parseEnvInt } from "./helpers.js";
+import { SafeOutboundError, normalizeOutboundIpAddress, requestPinnedTarget, safeFetch, validateOutboundUrl } from "./safe-outbound-http.js";
 import { probeStreamAudio } from "./stream-audio-probe.js";
 
 const STREAM_TEST_MAX_REDIRECTS = 3;
 const STREAM_TEST_TIMEOUT_MS = 8_000;
 const REDIRECT_STATUS_CODES = new Set([301, 302, 303, 307, 308]);
-const PRIVATE_TARGET_CODES = new Set(["OUTBOUND_ADDRESS_NOT_ALLOWED", "OUTBOUND_HOST_NOT_ALLOWED"]);
+// A blocked port or host answers like a private address: no answer of its own.
+const PRIVATE_TARGET_CODES = new Set(["OUTBOUND_ADDRESS_NOT_ALLOWED", "OUTBOUND_HOST_NOT_ALLOWED", "STREAM_TEST_PORT_BLOCKED", "STREAM_TEST_HOST_BLOCKED"]);
+// SSH, Telnet, mail, SMB, Docker, databases, search and caches.
+const SERVICE_PORTS = [22, 23, 25, 110, 143, 445, 2375, 2376, 3306, 5432, 6379, 9200, 9300, 11211, 27017, 27018];
 const DNS_CODES = new Set(["OUTBOUND_DNS_LOOKUP_FAILED", "OUTBOUND_DNS_EMPTY"]);
 const REDIRECT_TARGET_CODES = new Set([
   "OUTBOUND_URL_INVALID", "OUTBOUND_URL_TOO_LONG", "OUTBOUND_PROTOCOL_NOT_ALLOWED",
@@ -52,6 +63,56 @@ function classify(probe, failure, redirects) {
   }
 }
 
+function parsePorts(raw) {
+  return String(raw || "").split(",")
+    .map((value) => Number.parseInt(value.trim(), 10))
+    .filter((port) => Number.isInteger(port) && port > 0 && port < 65_536);
+}
+
+/**
+ * What a stream test never connects to. CUSTOM_STATION_TEST_BLOCKED_PORTS
+ * replaces the port list (default: SERVICE_PORTS and OmniFM's own API ports
+ * but 80 and 443); CUSTOM_STATION_TEST_BLOCKED_HOSTS adds host names (their
+ * subdomains too), IP addresses and CIDR ranges. The machine's own interface
+ * addresses are always blocked.
+ * @returns {{ ports: Set<number>, hosts: string[], ownAddresses: string[] }}
+ */
+function streamTestBlocklist(env = process.env, interfaces = os.networkInterfaces()) {
+  const ownPorts = parsePorts([env.WEB_PORT || "8081", env.WEB_INTERNAL_PORT || "8080", env.OMNIFM_NODE_API_PORT || "8002", "8001"].join(","))
+    .filter((port) => port !== 80 && port !== 443);
+  const configured = String(env.CUSTOM_STATION_TEST_BLOCKED_PORTS || "").trim();
+  return {
+    ports: new Set(configured ? parsePorts(configured) : [...SERVICE_PORTS, ...ownPorts]),
+    hosts: String(env.CUSTOM_STATION_TEST_BLOCKED_HOSTS || "").split(",").map((entry) => entry.trim().toLowerCase().replace(/\.$/, "")).filter(Boolean),
+    ownAddresses: Object.values(interfaces || {}).flat().map((entry) => normalizeOutboundIpAddress(entry?.address)).filter(Boolean),
+  };
+}
+
+function inRange(address, cidr) {
+  try {
+    const [range, bits] = ipaddr.parseCIDR(cidr);
+    const parsed = ipaddr.parse(address);
+    return parsed.kind() === range.kind() && parsed.match(range, bits);
+  } catch {
+    return false;
+  }
+}
+
+/** The error code when this hop (its pinned address included) is off limits, else null. */
+function blockedHop(target, blocklist) {
+  const port = Number(target.url.port) || (target.url.protocol === "https:" ? 443 : 80);
+  if (blocklist.ports.has(port)) return "STREAM_TEST_PORT_BLOCKED";
+  const address = normalizeOutboundIpAddress(target.address);
+  const hostname = String(target.hostname || "").toLowerCase();
+  if (address && blocklist.ownAddresses.includes(address)) return "STREAM_TEST_HOST_BLOCKED";
+  const hit = blocklist.hosts.some((entry) => {
+    if (entry.includes("/")) return Boolean(address) && inRange(address, entry);
+    const ip = normalizeOutboundIpAddress(entry);
+    return ip ? ip === address : hostname === entry || hostname.endsWith(`.${entry}`);
+  });
+  return hit ? "STREAM_TEST_HOST_BLOCKED" : null;
+}
+
 /** "128" or "128,128" from icy-br; anything else is not shown. */
 function bitrateKbps(raw) {
   const value = Number.parseInt(String(raw || "").split(",")[0], 10);
@@ -67,7 +128,8 @@ function formatFor(result, format) {
 
 /**
  * @param {string} rawUrl
- * @param {{ timeoutMs?: number, requestImpl?: Function, lookupFn?: Function }} [options]
+ * @param {{ timeoutMs?: number, requestImpl?: Function, lookupFn?: Function,
+ *   blocklist?: ReturnType<typeof streamTestBlocklist> }} [options]
  *   requestImpl and lookupFn reach safeFetch unchanged (tests: no network).
  * @returns {Promise<{ ok: boolean, result: StreamTestResult, httpStatus: number | null,
  *   format: string | null, bitrateKbps: number | null, redirects: number, responseTimeMs: number,
@@ -75,7 +137,9 @@ function formatFor(result, format) {
  *   host and detail are for the server's log only (the host without path or
  *   query, the error code); the route does not send them.
  */
-async function testCustomStationStream(rawUrl, { timeoutMs = STREAM_TEST_TIMEOUT_MS, requestImpl = requestPinnedTarget, lookupFn } = {}) {
+async function testCustomStationStream(rawUrl, {
+  timeoutMs = STREAM_TEST_TIMEOUT_MS, requestImpl = requestPinnedTarget, lookupFn, blocklist = streamTestBlocklist(),
+} = {}) {
   const answer = (result, extra = {}) => ({
     ok: result === "playable", result, httpStatus: null, format: null, bitrateKbps: null, redirects: 0, responseTimeMs: 0, host: null, detail: null, ...extra,
   });
@@ -87,14 +151,17 @@ async function testCustomStationStream(rawUrl, { timeoutMs = STREAM_TEST_TIMEOUT
   let redirects = 0;
   /** @type {any} */
   let failure = null;
-  const countRedirects = async (target, options) => {
+  // Every hop, the first one and each redirect, after safeFetch pinned its address.
+  const guardedRequest = async (target, options) => {
+    const blocked = blockedHop(target, blocklist);
+    if (blocked) throw new SafeOutboundError(blocked, "Ziel ist für den Stream-Test gesperrt.");
     const incoming = await requestImpl(target, options);
     if (REDIRECT_STATUS_CODES.has(Number(incoming?.statusCode))) redirects += 1;
     return incoming;
   };
   const fetchImpl = async (url, options) => {
     try {
-      return await safeFetch(url, { ...options, maxRedirects: STREAM_TEST_MAX_REDIRECTS, requestImpl: countRedirects, ...(lookupFn ? { lookupFn } : {}) });
+      return await safeFetch(url, { ...options, maxRedirects: STREAM_TEST_MAX_REDIRECTS, requestImpl: guardedRequest, ...(lookupFn ? { lookupFn } : {}) });
     } catch (error) {
       failure = error;
       throw error;
@@ -117,7 +184,11 @@ async function testCustomStationStream(rawUrl, { timeoutMs = STREAM_TEST_TIMEOUT
  * At most `max` tests per `windowMs` for every key given (the user and the
  * server alike). Returns 0 when the test may run, else the seconds to wait.
  */
-function createStreamTestLimiter({ max = 6, windowMs = 60_000, now = Date.now } = {}) {
+function createStreamTestLimiter({
+  max = parseEnvInt("CUSTOM_STATION_TEST_RATE_MAX", 6, 1, 1_000),
+  windowMs = parseEnvInt("CUSTOM_STATION_TEST_RATE_WINDOW_MS", 60_000, 1_000, 60 * 60_000),
+  now = Date.now,
+} = {}) {
   /** @type {Map<string, number[]>} */
   const hits = new Map();
   return function takeStreamTest(keys) {
@@ -138,5 +209,6 @@ function createStreamTestLimiter({ max = 6, windowMs = 60_000, now = Date.now } 
 export {
   STREAM_TEST_MAX_REDIRECTS,
   createStreamTestLimiter,
+  streamTestBlocklist,
   testCustomStationStream,
 };

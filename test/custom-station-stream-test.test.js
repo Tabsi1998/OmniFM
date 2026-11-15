@@ -3,7 +3,7 @@ import { once } from "node:events";
 import http from "node:http";
 import test from "node:test";
 
-import { createStreamTestLimiter, testCustomStationStream } from "../src/lib/custom-station-stream-test.js";
+import { createStreamTestLimiter, streamTestBlocklist, testCustomStationStream } from "../src/lib/custom-station-stream-test.js";
 import { requestPinnedTarget } from "../src/lib/safe-outbound-http.js";
 import { HTML_PAGE, mp3Frames } from "./support/stream-probe-server.mjs";
 
@@ -206,4 +206,89 @@ test("the limiter allows a few tests a minute per key and then names the wait (#
   assert.equal(take(["user:1", "server:C"]), 30);
   now += 30_001;
   assert.equal(take(["user:1", "server:A"]), 0, "a minute later it works again");
+});
+
+test("ports of services that are no stream are refused on every hop, like a private address (#537 review)", async () => {
+  await withServer((req, res) => {
+    if (req.url === "/to-redis") {
+      res.writeHead(302, { Location: "https://radio.example:6379/" });
+      res.end();
+      return;
+    }
+    res.writeHead(200, { "Content-Type": "audio/mpeg" });
+    res.end(mp3Frames(8));
+  }, async (run, requests) => {
+    for (const url of ["https://radio.example:22/", "http://radio.example:3306/", "http://radio.example:27017/", "http://radio.example:2375/containers/json"]) {
+      // eslint-disable-next-line no-await-in-loop -- one URL after the other
+      const answer = await run(url);
+      assert.deepEqual([answer.result, answer.detail], ["private_target", "STREAM_TEST_PORT_BLOCKED"], url);
+    }
+    // OmniFM's own API port, from the settings.
+    const ownPort = await run("https://radio.example:9443/api/admin", { blocklist: streamTestBlocklist({ WEB_PORT: "9443" }, {}) });
+    assert.deepEqual([ownPort.result, ownPort.detail], ["private_target", "STREAM_TEST_PORT_BLOCKED"]);
+    assert.deepEqual(requests, [], "nothing was asked on a blocked port");
+
+    // The first hop is fine, the redirect goes to Redis: refused before connecting.
+    const redirected = await run("https://radio.example/to-redis");
+    assert.deepEqual([redirected.result, redirected.detail, redirected.redirects], ["private_target", "STREAM_TEST_PORT_BLOCKED", 1]);
+    assert.deepEqual(requests, ["radio.example/to-redis"]);
+
+    // An Icecast port stays allowed.
+    assert.equal((await run("http://radio.example:8000/live")).result, "playable");
+  });
+});
+
+test("blocked hosts, IPs, ranges and the machine's own addresses are refused on every hop (#537 review)", async () => {
+  const blocklist = streamTestBlocklist(
+    { CUSTOM_STATION_TEST_BLOCKED_HOSTS: "Own.example., 45.33.32.0/24, 151.101.1.1, 2a00:1450::/32, not a cidr/99" },
+    { eth0: [{ address: "185.199.108.153" }, { address: "fe80::1" }], lo: [{ address: "127.0.0.1" }] },
+  );
+  await withServer((req, res) => {
+    if (req.url === "/to-cdn") {
+      res.writeHead(302, { Location: "https://cdn.example/live" });
+      res.end();
+      return;
+    }
+    res.writeHead(200, { "Content-Type": "audio/mpeg" });
+    res.end(mp3Frames(8));
+  }, async (run, requests) => {
+    const check = async (url) => {
+      const answer = await run(url, { blocklist });
+      return answer.result === "private_target" ? answer.detail : answer.result;
+    };
+    assert.equal(await check("https://own.example/live"), "STREAM_TEST_HOST_BLOCKED", "the host itself");
+    assert.equal(await check("https://api.own.example/live"), "STREAM_TEST_HOST_BLOCKED", "and its subdomains");
+    assert.equal(await check("https://ranged.example/live"), "STREAM_TEST_HOST_BLOCKED", "a DNS answer inside the range");
+    assert.equal(await check("https://self.example/live"), "STREAM_TEST_HOST_BLOCKED", "the machine's own public address");
+    assert.equal(await check("https://v6.example/live"), "STREAM_TEST_HOST_BLOCKED", "an IPv6 range");
+    assert.deepEqual(requests, []);
+    assert.equal(await check("https://radio.example/to-cdn"), "STREAM_TEST_HOST_BLOCKED", "a redirect to a blocked address");
+    assert.deepEqual(requests, ["radio.example/to-cdn"]);
+    assert.equal(await check("https://notown.example/live"), "playable", "a name that only ends the same way");
+  }, { dns: { "ranged.example": "45.33.32.156", "cdn.example": "151.101.1.1", "self.example": "185.199.108.153", "v6.example": "2a00:1450:4001::1" } });
+});
+
+test("the blocked ports and the rate limit come from the settings (#537 review)", () => {
+  const defaults = streamTestBlocklist({}, {});
+  for (const port of [22, 23, 25, 110, 143, 445, 2375, 2376, 3306, 5432, 6379, 9200, 9300, 11211, 27017, 27018, 8081, 8080, 8002, 8001]) {
+    assert.equal(defaults.ports.has(port), true, String(port));
+  }
+  assert.equal(defaults.ports.has(8000), false, "Icecast's port stays open");
+  const onWebPorts = streamTestBlocklist({ WEB_PORT: "443", WEB_INTERNAL_PORT: "80" }, {});
+  assert.deepEqual([onWebPorts.ports.has(443), onWebPorts.ports.has(80)], [false, false], "80 and 443 are never blocked by the own ports");
+  assert.deepEqual([...streamTestBlocklist({ CUSTOM_STATION_TEST_BLOCKED_PORTS: "8000, x, 99999,22" }, {}).ports], [8000, 22], "the setting replaces the list");
+
+  const saved = { max: process.env.CUSTOM_STATION_TEST_RATE_MAX, window: process.env.CUSTOM_STATION_TEST_RATE_WINDOW_MS };
+  try {
+    process.env.CUSTOM_STATION_TEST_RATE_MAX = "2";
+    process.env.CUSTOM_STATION_TEST_RATE_WINDOW_MS = "10000";
+    const now = 5_000_000;
+    const take = createStreamTestLimiter({ now: () => now });
+    assert.deepEqual([take(["user:1"]), take(["user:1"]), take(["user:1"])], [0, 0, 10]);
+  } finally {
+    for (const [name, value] of [["CUSTOM_STATION_TEST_RATE_MAX", saved.max], ["CUSTOM_STATION_TEST_RATE_WINDOW_MS", saved.window]]) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
 });
