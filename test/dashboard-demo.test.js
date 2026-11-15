@@ -145,6 +145,9 @@ test("the preview keeps nothing: every change gets a plain answer, and nothing i
   // Previews show something and keep nothing.
   const { preview } = await answer(request, `/api/dashboard/panel-design/preview?serverId=${guild}`, { method: "POST", body: JSON.stringify({ design: { showRecent: false } }) });
   assert.deepEqual(preview, buildDemoPanel("de", { showRecent: false }));
+  // "Test stream" (#537) shows an example result instead of an error.
+  const streamTest = await answer(request, `/api/dashboard/custom-stations/test?serverId=${guild}`, { method: "POST", body: JSON.stringify({ url: "https://radio.example/live" }) });
+  assert.deepEqual([streamTest.ok, streamTest.result, streamTest.format, streamTest.bitrateKbps], [true, "playable", "mp3", 128]);
   await Promise.all(["/api/auth/session", `/api/dashboard/license?serverId=${guild}`, `/api/dashboard/stats/detail?serverId=${guild}`, `/api/dashboard/playback?serverId=${guild}`].map((route) => answer(request, route)));
   assert.deepEqual(asked, []);
 });
