@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import os from "node:os";
 import path from "node:path";
 import { mkdtemp, rm } from "node:fs/promises";
+import { Readable } from "node:stream";
 
 // The dashboard route for a server's own stations (#541): an edit keeps the
 // key, the logo and what the form did not send; it needs the same rights as
 // every other change, and a refused URL leaves the station as it was.
+// "Stream testen" (#537) shares those rights and is limited per user and server.
 const tempDir = await mkdtemp(path.join(os.tmpdir(), "omnifm-custom-route-"));
 process.env.OMNIFM_CUSTOM_STATIONS_FILE = path.join(tempDir, "custom-stations.json");
 const store = await import("../src/custom-stations.js");
@@ -14,20 +16,22 @@ const { createDashboardCustomStationsRouteHandler } = await import("../src/api/r
 const { mapDashboardCustomStation } = await import("../src/api/helpers/license.js");
 const { clipText } = await import("../src/lib/helpers.js");
 const { languagePick, translateCustomStationErrorMessage } = await import("../src/lib/language.js");
+const { testCustomStationStream } = await import("../src/lib/custom-station-stream-test.js");
 
 test.after(() => rm(tempDir, { recursive: true, force: true }));
 
 const GUILD = "123456789012345678";
 const OTHER_GUILD = "223456789012345678";
 
-function route({ capabilities = ["dashboard_basic", "custom_station_urls"], signedIn = true } = {}) {
+function route({ capabilities = ["dashboard_basic", "custom_station_urls"], signedIn = true, streamTest } = {}) {
   const answers = [];
+  const headers = {};
   const handle = createDashboardCustomStationsRouteHandler({
     addCustomStation: store.addGuildStation,
     clipText,
     getCustomStations: store.getGuildStations,
     getDashboardRequestTranslator: () => ({ language: "de" }),
-    getDashboardSession: () => ({ session: signedIn ? { user: { id: "111111111111111111" } } : null }),
+    getDashboardSession: (req) => ({ session: signedIn ? { user: { id: req.userId || "111111111111111111" } } : null }),
     languagePick,
     mapDashboardCustomStation,
     methodNotAllowed: (_res, methods) => answers.push({ status: 405, body: { methods } }),
@@ -38,18 +42,19 @@ function route({ capabilities = ["dashboard_basic", "custom_station_urls"], sign
     serverHasCapability: (_guildId, capability) => capabilities.includes(capability),
     translateCustomStationErrorMessage,
     updateCustomStation: store.updateGuildStation,
+    testCustomStationStream: streamTest,
   });
-  const send = async (method, body = null, { serverId = GUILD, query = "" } = {}) => {
+  const send = async (method, body = null, { serverId = GUILD, pathname = "/api/dashboard/custom-stations", userId } = {}) => {
     const handled = await handle({
-      req: { method },
-      res: {},
-      requestUrl: new URL(`https://omnifm.test/api/dashboard/custom-stations?serverId=${serverId}${query}`),
+      req: { method, userId },
+      res: { setHeader: (name, value) => { headers[name] = value; } },
+      requestUrl: new URL(`https://omnifm.test${pathname}?serverId=${serverId}`),
       readJsonBody: async () => body,
     });
     assert.equal(handled, true);
     return answers.at(-1);
   };
-  return { send };
+  return { send, headers };
 }
 
 test("an edit keeps the key, the logo, genre, folder and tags; only name and URL change (#541)", async () => {
@@ -108,4 +113,58 @@ test("only a signed-in admin of an Ultimate server may edit (#541)", async () =>
   assert.match(pro.body.error, /Ultimate/);
   assert.equal((await route({ capabilities: [] }).send("PUT", edit)).status, 403);
   assert.equal(store.getGuildStations(GUILD).nightwave.name, "Nightwave FM");
+});
+
+const TEST_PATH = "/api/dashboard/custom-stations/test";
+const PLAYABLE = { ok: true, result: "playable", httpStatus: 200, format: "mp3", bitrateKbps: 128, redirects: 0, responseTimeMs: 12, host: "radio.example", detail: "ok" };
+
+test("stream test: the same rights as the station routes, and nothing is fetched without them (#537)", async () => {
+  let calls = 0;
+  const streamTest = async () => { calls += 1; return PLAYABLE; };
+  const body = { url: "https://radio.example/live" };
+  assert.equal((await route({ signedIn: false, streamTest }).send("POST", body, { pathname: TEST_PATH })).status, 401);
+  assert.equal((await route({ streamTest }).send("POST", body, { pathname: TEST_PATH, serverId: OTHER_GUILD })).status, 403);
+  assert.equal((await route({ capabilities: ["dashboard_basic"], streamTest }).send("POST", body, { pathname: TEST_PATH })).status, 403);
+  assert.equal((await route({ streamTest }).send("GET", null, { pathname: TEST_PATH })).status, 405);
+  assert.equal(calls, 0);
+
+  const allowed = await route({ streamTest }).send("POST", body, { pathname: TEST_PATH });
+  assert.equal(allowed.status, 200);
+  assert.deepEqual(allowed.body, { ok: true, result: "playable", httpStatus: 200, format: "mp3", bitrateKbps: 128, redirects: 0, responseTimeMs: 12 }, "host and detail stay in the log");
+  assert.equal(calls, 1);
+});
+
+test("stream test: six a minute per user and per server, then 429 with Retry-After (#537)", async () => {
+  let calls = 0;
+  const { send, headers } = route({ streamTest: async () => { calls += 1; return PLAYABLE; } });
+  for (let index = 0; index < 6; index += 1) {
+    // eslint-disable-next-line no-await-in-loop -- one test after the other, like a person clicks
+    assert.equal((await send("POST", { url: "https://radio.example/live" }, { pathname: TEST_PATH })).status, 200);
+  }
+  const limited = await send("POST", { url: "https://radio.example/live" }, { pathname: TEST_PATH });
+  assert.equal(limited.status, 429);
+  assert.match(limited.body.error, /Zu viele Stream-Tests/);
+  assert.ok(Number(headers["Retry-After"]) >= 1 && Number(headers["Retry-After"]) <= 60);
+  // Another admin of the same server shares the server's budget.
+  assert.equal((await send("POST", { url: "https://radio.example/live" }, { pathname: TEST_PATH, userId: "222222222222222222" })).status, 429);
+  assert.equal(calls, 6, "a refused test fetches nothing");
+});
+
+test("stream test: a redirect into the private network comes back as private_target, nothing more (#537)", async () => {
+  const requested = [];
+  const streamTest = (url) => testCustomStationStream(url, {
+    lookupFn: async () => [{ address: "93.184.216.34", family: 4 }],
+    requestImpl: async (target) => {
+      requested.push(target.url.href);
+      const incoming = Readable.from([]);
+      Object.assign(incoming, { statusCode: 302, statusMessage: "Found", headers: { location: "http://169.254.169.254/latest/meta-data?token=abc" } });
+      return incoming;
+    },
+  });
+  const answer = await route({ streamTest }).send("POST", { url: "https://radio.example/live?key=s3cret" }, { pathname: TEST_PATH });
+  assert.equal(answer.status, 200);
+  assert.deepEqual([answer.body.ok, answer.body.result, answer.body.redirects], [false, "private_target", 1]);
+  assert.deepEqual(requested, ["https://radio.example/live?key=s3cret"], "the metadata address is never asked");
+  const sent = JSON.stringify(answer.body);
+  for (const secret of ["169.254", "s3cret", "token", "radio.example"]) assert.equal(sent.includes(secret), false, secret);
 });

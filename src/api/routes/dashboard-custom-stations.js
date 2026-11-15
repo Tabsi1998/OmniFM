@@ -1,3 +1,11 @@
+import { log } from "../../lib/logging.js";
+import { createStreamTestLimiter, testCustomStationStream } from "../../lib/custom-station-stream-test.js";
+
+const CUSTOM_STATIONS_PATH = "/api/dashboard/custom-stations";
+// "Stream testen" (#537): same rights as the station routes, a few tests a
+// minute per user and per server.
+const STREAM_TEST_PATH = "/api/dashboard/custom-stations/test";
+
 function sortCustomStations(stations) {
   return stations.sort((a, b) => {
     const folderCompare = String(a.folder || "").localeCompare(String(b.folder || ""));
@@ -24,11 +32,14 @@ export function createDashboardCustomStationsRouteHandler(deps) {
     translateCustomStationErrorMessage,
     updateCustomStation,
   } = deps;
+  const runStreamTest = deps.testCustomStationStream || testCustomStationStream;
+  const takeStreamTest = createStreamTestLimiter();
 
   return async function handleDashboardCustomStationsRoute(context) {
     const { req, res, requestUrl, readJsonBody } = context;
 
-    if (requestUrl.pathname !== "/api/dashboard/custom-stations") {
+    const isStreamTest = requestUrl.pathname === STREAM_TEST_PATH;
+    if (requestUrl.pathname !== CUSTOM_STATIONS_PATH && !isStreamTest) {
       return false;
     }
 
@@ -56,6 +67,37 @@ export function createDashboardCustomStationsRouteHandler(deps) {
         "Custom-Stationen sind nur für Ultimate verfügbar.",
         "Custom stations are only available for Ultimate."
       );
+      return true;
+    }
+
+    if (isStreamTest) {
+      if (req.method !== "POST") {
+        methodNotAllowed(res, ["POST"]);
+        return true;
+      }
+      const waitSeconds = takeStreamTest([`user:${session.user?.id || ""}`, `server:${guildInfo.id}`]);
+      if (waitSeconds) {
+        res.setHeader?.("Retry-After", String(waitSeconds));
+        sendLocalizedError(
+          res,
+          429,
+          language,
+          "Zu viele Stream-Tests. Warte kurz und versuch es dann noch einmal.",
+          "Too many stream tests. Wait a moment and try again."
+        );
+        return true;
+      }
+      let body;
+      try {
+        body = await readJsonBody();
+      } catch (err) {
+        sendJson(res, 400, { error: err?.message || languagePick(language, "Ungültige Anfrage.", "Invalid request.") });
+        return true;
+      }
+      const { host, detail, ...answer } = await runStreamTest(clipText(body?.url || "", 500).trim());
+      // What happened, without path or query (signed parameters stay out of the log).
+      log("INFO", `[custom-station-test] ${guildInfo.id} ${host || "-"}: ${answer.result} (HTTP ${answer.httpStatus ?? "-"}, ${answer.redirects} Weiterleitungen, ${answer.format || "-"}, ${detail || "-"})`);
+      sendJson(res, 200, answer);
       return true;
     }
 
