@@ -71,18 +71,17 @@ function parsePorts(raw) {
 
 /**
  * What a stream test never connects to. CUSTOM_STATION_TEST_BLOCKED_PORTS
- * replaces the port list (default: SERVICE_PORTS and OmniFM's own API ports
- * but 80 and 443); CUSTOM_STATION_TEST_BLOCKED_HOSTS adds host names (their
+ * replaces the port list (default: SERVICE_PORTS; OmniFM's own API ports
+ * stay open, 8000 and 8080 are common Icecast ports, and the own host is
+ * covered below); CUSTOM_STATION_TEST_BLOCKED_HOSTS adds host names (their
  * subdomains too), IP addresses and CIDR ranges. The machine's own interface
  * addresses are always blocked.
  * @returns {{ ports: Set<number>, hosts: string[], ownAddresses: string[] }}
  */
 function streamTestBlocklist(env = process.env, interfaces = os.networkInterfaces()) {
-  const ownPorts = parsePorts([env.WEB_PORT || "8081", env.WEB_INTERNAL_PORT || "8080", env.OMNIFM_NODE_API_PORT || "8002", "8001"].join(","))
-    .filter((port) => port !== 80 && port !== 443);
   const configured = String(env.CUSTOM_STATION_TEST_BLOCKED_PORTS || "").trim();
   return {
-    ports: new Set(configured ? parsePorts(configured) : [...SERVICE_PORTS, ...ownPorts]),
+    ports: new Set(configured ? parsePorts(configured) : SERVICE_PORTS),
     hosts: String(env.CUSTOM_STATION_TEST_BLOCKED_HOSTS || "").split(",").map((entry) => entry.trim().toLowerCase().replace(/\.$/, "")).filter(Boolean),
     ownAddresses: Object.values(interfaces || {}).flat().map((entry) => normalizeOutboundIpAddress(entry?.address)).filter(Boolean),
   };

@@ -223,9 +223,9 @@ test("ports of services that are no stream are refused on every hop, like a priv
       const answer = await run(url);
       assert.deepEqual([answer.result, answer.detail], ["private_target", "STREAM_TEST_PORT_BLOCKED"], url);
     }
-    // OmniFM's own API port, from the settings.
-    const ownPort = await run("https://radio.example:9443/api/admin", { blocklist: streamTestBlocklist({ WEB_PORT: "9443" }, {}) });
-    assert.deepEqual([ownPort.result, ownPort.detail], ["private_target", "STREAM_TEST_PORT_BLOCKED"]);
+    // A port from the setting.
+    const configured = await run("https://radio.example:9443/live", { blocklist: streamTestBlocklist({ CUSTOM_STATION_TEST_BLOCKED_PORTS: "9443" }, {}) });
+    assert.deepEqual([configured.result, configured.detail], ["private_target", "STREAM_TEST_PORT_BLOCKED"]);
     assert.deepEqual(requests, [], "nothing was asked on a blocked port");
 
     // The first hop is fine, the redirect goes to Redis: refused before connecting.
@@ -233,8 +233,13 @@ test("ports of services that are no stream are refused on every hop, like a priv
     assert.deepEqual([redirected.result, redirected.detail, redirected.redirects], ["private_target", "STREAM_TEST_PORT_BLOCKED", 1]);
     assert.deepEqual(requests, ["radio.example/to-redis"]);
 
-    // An Icecast port stays allowed.
-    assert.equal((await run("http://radio.example:8000/live")).result, "playable");
+    // The usual Icecast ports stay allowed, OmniFM's own API port too: the
+    // own host is blocked by its addresses, not by port.
+    const ownApiPort = { blocklist: streamTestBlocklist({ WEB_INTERNAL_PORT: "8080", WEB_PORT: "8081" }, {}) };
+    for (const url of ["http://radio.example:8000/live", "http://radio.example:8080/live", "http://radio.example:8081/live"]) {
+      // eslint-disable-next-line no-await-in-loop -- one URL after the other
+      assert.equal((await run(url, ownApiPort)).result, "playable", url);
+    }
   });
 });
 
@@ -269,13 +274,8 @@ test("blocked hosts, IPs, ranges and the machine's own addresses are refused on 
 });
 
 test("the blocked ports and the rate limit come from the settings (#537 review)", () => {
-  const defaults = streamTestBlocklist({}, {});
-  for (const port of [22, 23, 25, 110, 143, 445, 2375, 2376, 3306, 5432, 6379, 9200, 9300, 11211, 27017, 27018, 8081, 8080, 8002, 8001]) {
-    assert.equal(defaults.ports.has(port), true, String(port));
-  }
-  assert.equal(defaults.ports.has(8000), false, "Icecast's port stays open");
-  const onWebPorts = streamTestBlocklist({ WEB_PORT: "443", WEB_INTERNAL_PORT: "80" }, {});
-  assert.deepEqual([onWebPorts.ports.has(443), onWebPorts.ports.has(80)], [false, false], "80 and 443 are never blocked by the own ports");
+  const defaults = streamTestBlocklist({ WEB_PORT: "8081", WEB_INTERNAL_PORT: "8080", OMNIFM_NODE_API_PORT: "8002" }, {});
+  assert.deepEqual([...defaults.ports].sort((a, b) => a - b), [22, 23, 25, 110, 143, 445, 2375, 2376, 3306, 5432, 6379, 9200, 9300, 11211, 27017, 27018], "only the service ports");
   assert.deepEqual([...streamTestBlocklist({ CUSTOM_STATION_TEST_BLOCKED_PORTS: "8000, x, 99999,22" }, {}).ports], [8000, 22], "the setting replaces the list");
 
   const saved = { max: process.env.CUSTOM_STATION_TEST_RATE_MAX, window: process.env.CUSTOM_STATION_TEST_RATE_WINDOW_MS };
