@@ -1,6 +1,6 @@
 // OmniFM: the window on the premium page: redeem a code, start the trial.
 // Split out of frontend/src/components/Premium.js (#296).
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { buildApiUrl } from '../lib/api.js';
@@ -49,7 +49,9 @@ export function CheckoutModal(props) {
     color: '#fff',
     padding: '12px 14px',
     fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 13,
+    // 16px or more: iOS Safari zooms in on a focused field below that, and
+    // the window puts the focus in the e-mail field when it opens (#530).
+    fontSize: 16,
     outline: 'none',
     transition: 'border-color 0.2s',
   };
@@ -72,11 +74,21 @@ export function CheckoutModal(props) {
     return () => opener?.focus?.();
   }, []);
 
+  // While a code or the free month is being sent, the window stays open:
+  // closing it would lose the answer, and a second try would then read
+  // "already used" (#530).
+  const busy = loading || trialLoading;
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+  const requestClose = useCallback(() => {
+    if (!busyRef.current) onClose();
+  }, [onClose]);
+
   // Escape closes; Tab and Shift+Tab go round inside the window (#530).
   useEffect(() => {
     const onKey = (event) => {
       if (event.key === 'Escape') {
-        onClose();
+        requestClose();
         return;
       }
       if (event.key !== 'Tab' || !dialog.current) return;
@@ -100,7 +112,7 @@ export function CheckoutModal(props) {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
     };
-  }, [onClose]);
+  }, [requestClose]);
 
   const handleRedeem = async () => {
     const trimmedEmail = email.trim();
@@ -184,7 +196,7 @@ export function CheckoutModal(props) {
     <div
       data-testid="checkout-modal-overlay"
       role="presentation"
-      onClick={onClose}
+      onClick={requestClose}
       style={{
         position: 'fixed',
         inset: 0,
@@ -218,7 +230,7 @@ export function CheckoutModal(props) {
       >
         <button
           data-testid="checkout-modal-close"
-          onClick={onClose}
+          onClick={requestClose}
           aria-label={t('Schließen', 'Close')}
           style={{
             position: 'absolute',
@@ -389,7 +401,7 @@ export function CheckoutModal(props) {
 
         <button
           data-testid="checkout-cancel-btn"
-          onClick={onClose}
+          onClick={requestClose}
           style={{
             display: 'block',
             width: '100%',

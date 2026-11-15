@@ -83,6 +83,27 @@ describe('the code and trial window', () => {
     expect(document.activeElement).toBe(opener);
   });
 
+  it('stays open while a code is being sent, so its answer is not lost', async () => {
+    const { dialog } = await openFrom('buy-btn-pro');
+    let answer;
+    vi.stubGlobal('fetch', vi.fn(() => new Promise((resolve) => { answer = resolve; })));
+    fireEvent.change(screen.getByTestId('checkout-email-input'), { target: { value: 'kunde@example.com' } });
+    fireEvent.change(screen.getByTestId('checkout-coupon-input'), { target: { value: 'CODE-1234' } });
+    fireEvent.click(screen.getByTestId('checkout-pay-btn-pro'));
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
+
+    fireEvent.keyDown(document.activeElement, { key: 'Escape' });
+    fireEvent.click(screen.getByTestId('checkout-cancel-btn'));
+    fireEvent.click(screen.getByTestId('checkout-modal-close'));
+    fireEvent.click(screen.getByTestId('checkout-modal-overlay'));
+    expect(screen.getByRole('dialog')).toBe(dialog);
+
+    answer({ ok: false, status: 400, json: async () => ({ error: 'Code ungültig' }) });
+    await waitFor(() => expect(screen.getByTestId('checkout-pay-btn-pro').disabled).toBe(false));
+    fireEvent.keyDown(document.activeElement, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('reads out what went wrong', async () => {
     const { dialog } = await openFrom('buy-btn-pro');
     fireEvent.click(screen.getByTestId('checkout-pay-btn-pro'));
