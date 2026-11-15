@@ -381,3 +381,33 @@ test("a tiny finished file sent as audio is not a station", async () => {
     );
   });
 });
+
+test("icy-metaint 1 in small pieces neither keeps the process busy nor hides the audio (#537)", async () => {
+  // One audio byte, one empty metadata block, and so on, read in pieces of
+  // 4 bytes (a server can send it that way). Judging every piece on its own
+  // was a pass over everything read so far, eight thousand times: seconds
+  // of CPU on the commander for one test.
+  let pieces = 0;
+  const piecewise = async () => new Response(new ReadableStream({
+    pull(controller) {
+      pieces += 1;
+      controller.enqueue(new Uint8Array(4));
+    },
+  }), { status: 200, headers: { "Content-Type": "application/octet-stream", "icy-metaint": "1" } });
+  const cpuBefore = process.cpuUsage();
+  const probe = await probeStreamAudio(URL_UNDER_TEST, { fetchImpl: piecewise, timeoutMs: 5000 });
+  const cpu = process.cpuUsage(cpuBefore);
+  assert.deepEqual([probe.playableAudio, probe.reasonCode, probe.timedOut, probe.bytesRead], [false, "unknown_format", false, 32 * 1024]);
+  assert.ok(pieces >= 8192, `${pieces} pieces`);
+  assert.ok(cpu.user + cpu.system < 1_000_000, `CPU ${Math.round((cpu.user + cpu.system) / 1000)} ms`);
+
+  // The same metaint with real frames: the metadata still comes out.
+  const frames = withIcyMetadata(mp3Frames(8), 1, "");
+  await withStreamServer((req, res) => {
+    res.writeHead(200, { "Content-Type": "audio/mpeg", "icy-metaint": "1" });
+    res.end(frames);
+  }, async (fetchImpl) => {
+    const probe = await probeStreamAudio(URL_UNDER_TEST, { fetchImpl });
+    assert.deepEqual([probe.playableAudio, probe.format], [true, "mp3"]);
+  });
+});
