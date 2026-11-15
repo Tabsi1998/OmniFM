@@ -15,6 +15,7 @@
 import os from "node:os";
 import ipaddr from "ipaddr.js";
 import { parseEnvInt } from "./helpers.js";
+import { log } from "./logging.js";
 import { SafeOutboundError, normalizeOutboundIpAddress, requestPinnedTarget, safeFetch, validateOutboundUrl } from "./safe-outbound-http.js";
 import { probeStreamAudio } from "./stream-audio-probe.js";
 
@@ -63,10 +64,31 @@ function classify(probe, failure, redirects) {
   }
 }
 
-function parsePorts(raw) {
-  return String(raw || "").split(",")
-    .map((value) => Number.parseInt(value.trim(), 10))
-    .filter((port) => Number.isInteger(port) && port > 0 && port < 65_536);
+const warned = new Set();
+/** A mistake in the settings goes to the log once, not with every test. */
+function warnOnce(message) {
+  if (warned.has(message)) return;
+  warned.add(message);
+  log("WARN", message);
+}
+
+// Entries are separated by commas, spaces or both.
+const splitList = (raw) => String(raw || "").split(/[\s,]+/).filter(Boolean);
+const HOST_NAME = /^[a-z0-9_-]+(\.[a-z0-9_-]+)*$/;
+const validPort = (entry) => /^\d{1,5}$/.test(entry) && Number(entry) >= 1 && Number(entry) <= 65_535;
+
+function validHost(entry) {
+  if (entry.includes("/")) {
+    try {
+      ipaddr.parseCIDR(entry);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  if (normalizeOutboundIpAddress(entry)) return true;
+  // Digits and dots that are no address are a mistyped IP, not a name.
+  return !/^[\d.]+$/.test(entry) && HOST_NAME.test(entry);
 }
 
 /**
@@ -75,14 +97,23 @@ function parsePorts(raw) {
  * stay open, 8000 and 8080 are common Icecast ports, and the own host is
  * covered below); CUSTOM_STATION_TEST_BLOCKED_HOSTS adds host names (their
  * subdomains too), IP addresses and CIDR ranges. The machine's own interface
- * addresses are always blocked.
+ * addresses are always blocked. A broken entry is left out with a warning;
+ * a port list without one valid port falls back to the default, so a typo
+ * never opens everything.
  * @returns {{ ports: Set<number>, hosts: string[], ownAddresses: string[] }}
  */
-function streamTestBlocklist(env = process.env, interfaces = os.networkInterfaces()) {
-  const configured = String(env.CUSTOM_STATION_TEST_BLOCKED_PORTS || "").trim();
+function streamTestBlocklist(env = process.env, interfaces = os.networkInterfaces(), warn = warnOnce) {
+  const portEntries = splitList(env.CUSTOM_STATION_TEST_BLOCKED_PORTS);
+  const ports = portEntries.filter(validPort).map(Number);
+  const badPorts = portEntries.filter((entry) => !validPort(entry));
+  if (badPorts.length) warn(`[custom-station-test] CUSTOM_STATION_TEST_BLOCKED_PORTS: ungültige Einträge ignoriert: ${badPorts.join(", ")}`);
+  if (portEntries.length && !ports.length) warn("[custom-station-test] CUSTOM_STATION_TEST_BLOCKED_PORTS enthält keinen gültigen Port, es gilt die Standardliste.");
+  const hostEntries = splitList(env.CUSTOM_STATION_TEST_BLOCKED_HOSTS).map((entry) => entry.toLowerCase().replace(/\.$/, ""));
+  const badHosts = hostEntries.filter((entry) => !validHost(entry));
+  if (badHosts.length) warn(`[custom-station-test] CUSTOM_STATION_TEST_BLOCKED_HOSTS: ungültige Einträge ignoriert: ${badHosts.join(", ")}`);
   return {
-    ports: new Set(configured ? parsePorts(configured) : SERVICE_PORTS),
-    hosts: String(env.CUSTOM_STATION_TEST_BLOCKED_HOSTS || "").split(",").map((entry) => entry.trim().toLowerCase().replace(/\.$/, "")).filter(Boolean),
+    ports: new Set(ports.length ? ports : SERVICE_PORTS),
+    hosts: hostEntries.filter(validHost),
     ownAddresses: Object.values(interfaces || {}).flat().map((entry) => normalizeOutboundIpAddress(entry?.address)).filter(Boolean),
   };
 }

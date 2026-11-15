@@ -1,5 +1,5 @@
 import { log } from "../../lib/logging.js";
-import { createStreamTestLimiter, testCustomStationStream } from "../../lib/custom-station-stream-test.js";
+import { createStreamTestLimiter, streamTestBlocklist, testCustomStationStream } from "../../lib/custom-station-stream-test.js";
 
 const CUSTOM_STATIONS_PATH = "/api/dashboard/custom-stations";
 // "Stream testen" (#537): same rights as the station routes, a few tests a
@@ -34,6 +34,9 @@ export function createDashboardCustomStationsRouteHandler(deps) {
   } = deps;
   const runStreamTest = deps.testCustomStationStream || testCustomStationStream;
   const takeStreamTest = createStreamTestLimiter();
+  // Read the block lists once now: a mistake in them shows in the log at
+  // start, not only with the first test.
+  streamTestBlocklist();
 
   return async function handleDashboardCustomStationsRoute(context) {
     const { req, res, requestUrl, readJsonBody } = context;

@@ -4,6 +4,7 @@ import http from "node:http";
 import test from "node:test";
 
 import { createStreamTestLimiter, streamTestBlocklist, testCustomStationStream } from "../src/lib/custom-station-stream-test.js";
+import { getRecentLogsSince } from "../src/lib/logging.js";
 import { requestPinnedTarget } from "../src/lib/safe-outbound-http.js";
 import { HTML_PAGE, mp3Frames } from "./support/stream-probe-server.mjs";
 
@@ -276,7 +277,7 @@ test("blocked hosts, IPs, ranges and the machine's own addresses are refused on 
 test("the blocked ports and the rate limit come from the settings (#537 review)", () => {
   const defaults = streamTestBlocklist({ WEB_PORT: "8081", WEB_INTERNAL_PORT: "8080", OMNIFM_NODE_API_PORT: "8002" }, {});
   assert.deepEqual([...defaults.ports].sort((a, b) => a - b), [22, 23, 25, 110, 143, 445, 2375, 2376, 3306, 5432, 6379, 9200, 9300, 11211, 27017, 27018], "only the service ports");
-  assert.deepEqual([...streamTestBlocklist({ CUSTOM_STATION_TEST_BLOCKED_PORTS: "8000, x, 99999,22" }, {}).ports], [8000, 22], "the setting replaces the list");
+  assert.deepEqual([...streamTestBlocklist({ CUSTOM_STATION_TEST_BLOCKED_PORTS: "8000,22" }, {}).ports], [8000, 22], "the setting replaces the list");
 
   const saved = { max: process.env.CUSTOM_STATION_TEST_RATE_MAX, window: process.env.CUSTOM_STATION_TEST_RATE_WINDOW_MS };
   try {
@@ -291,4 +292,49 @@ test("the blocked ports and the rate limit come from the settings (#537 review)"
       else process.env[name] = value;
     }
   }
+});
+
+const SERVICE_PORTS = [22, 23, 25, 110, 143, 445, 2375, 2376, 3306, 5432, 6379, 9200, 9300, 11211, 27017, 27018];
+const sortedPorts = (blocklist) => [...blocklist.ports].sort((a, b) => a - b);
+
+test("a typo in the blocked ports never opens them: bad entries are skipped with a warning (#537 review)", () => {
+  const warnings = [];
+  const warn = (message) => warnings.push(message);
+  // Commas, spaces or both.
+  const mixed = streamTestBlocklist({ CUSTOM_STATION_TEST_BLOCKED_PORTS: "22 3306,  6379 ,x 99999 -1 8o80 0" }, {}, warn);
+  assert.deepEqual(sortedPorts(mixed), [22, 3306, 6379]);
+  assert.deepEqual(warnings, ["[custom-station-test] CUSTOM_STATION_TEST_BLOCKED_PORTS: ungültige Einträge ignoriert: x, 99999, -1, 8o80, 0"]);
+
+  // Nothing valid left: the default list, not an empty one.
+  warnings.length = 0;
+  const broken = streamTestBlocklist({ CUSTOM_STATION_TEST_BLOCKED_PORTS: "x; y" }, {}, warn);
+  assert.deepEqual(sortedPorts(broken), SERVICE_PORTS);
+  assert.equal(warnings.length, 2);
+  assert.match(warnings[1], /keinen gültigen Port, es gilt die Standardliste/);
+
+  // Unset or blank: the default, without a warning.
+  warnings.length = 0;
+  assert.deepEqual(sortedPorts(streamTestBlocklist({ CUSTOM_STATION_TEST_BLOCKED_PORTS: "  " }, {}, warn)), SERVICE_PORTS);
+  assert.deepEqual(sortedPorts(streamTestBlocklist({}, {}, warn)), SERVICE_PORTS);
+  assert.deepEqual(warnings, []);
+});
+
+test("bad blocked hosts are skipped with a warning, the rest still counts (#537 review)", () => {
+  const warnings = [];
+  const blocklist = streamTestBlocklist(
+    { CUSTOM_STATION_TEST_BLOCKED_HOSTS: "Own.example. 203.0.113.10/33, 999.1.1.1 bad_host! 45.33.32.0/24 2a00:1450::/32 fe80::zz 151.101.1.1" },
+    {},
+    (message) => warnings.push(message),
+  );
+  assert.deepEqual(blocklist.hosts, ["own.example", "45.33.32.0/24", "2a00:1450::/32", "151.101.1.1"]);
+  assert.deepEqual(warnings, ["[custom-station-test] CUSTOM_STATION_TEST_BLOCKED_HOSTS: ungültige Einträge ignoriert: 203.0.113.10/33, 999.1.1.1, bad_host!, fe80::zz"]);
+});
+
+test("a settings warning reaches the log once, not with every test (#537 review)", () => {
+  const before = getRecentLogsSince(0).at(-1)?.seq || 0;
+  const env = { CUSTOM_STATION_TEST_BLOCKED_PORTS: "22 once-only-typo" };
+  streamTestBlocklist(env, {});
+  streamTestBlocklist(env, {});
+  const logged = getRecentLogsSince(before).filter((entry) => entry.message.includes("once-only-typo"));
+  assert.deepEqual(logged.map((entry) => [entry.level, entry.source]), [["WARN", "custom-station-test"]]);
 });
