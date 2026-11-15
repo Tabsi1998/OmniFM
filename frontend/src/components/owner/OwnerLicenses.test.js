@@ -179,6 +179,16 @@ describe('license manager: edit, extend, expire', () => {
     expect(screen.getByTestId(`license-row-${KEY}`).textContent).toContain('neu@example.com');
   });
 
+  it('leaves the expiry alone when only another field changed', async () => {
+    await openEdit();
+    type('license-input-note', 'Nur die Notiz');
+    await click('license-save-edit');
+
+    await waitFor(() => expect(api.writes).toHaveLength(1));
+    // The date field shows only the day; sending it back would move the end to midnight.
+    expect(api.writes[0].body).toEqual({ email: 'kunde@example.com', tier: 'pro', seats: 2, note: 'Nur die Notiz' });
+  });
+
   it.each([
     ['license-extend-1m', { extendMonths: 1 }, '+1 Monat'],
     ['license-extend-3m', { extendMonths: 3 }, '+3 Monate'],

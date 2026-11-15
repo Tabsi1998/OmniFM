@@ -101,7 +101,7 @@ export default function OwnerLicenses({
           ) : (
             <>
               <div style={{ marginTop: 16, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <button className="oa-btn primary" style={{ height: 40 }} disabled={licBusy} onClick={() => patchLicense({ email: licForm.email, tier: licForm.tier, seats: Number(licForm.seats) || 1, note: licForm.note, expiresAt: licForm.expiresAt || undefined }, 'Änderungen gespeichert.')} data-testid="license-save-edit"><Save size={15} /> Speichern</button>
+                <button className="oa-btn primary" style={{ height: 40 }} disabled={licBusy} onClick={() => patchLicense({ email: licForm.email, tier: licForm.tier, seats: Number(licForm.seats) || 1, note: licForm.note, expiresAt: licForm.expiresAt && licForm.expiresAt !== licForm._expiryDayShown ? licForm.expiresAt : undefined }, 'Änderungen gespeichert.')} data-testid="license-save-edit"><Save size={15} /> Speichern</button>
               </div>
 
               <div style={{ marginTop: 18 }}>
