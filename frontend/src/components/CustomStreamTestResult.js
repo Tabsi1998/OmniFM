@@ -27,7 +27,7 @@ export function describeStreamTest(test, t) {
     case 'invalid_url':
       return { tone: 'bad', title: t('Das ist keine gültige Stream-URL.', 'That is not a valid stream URL.'), hint: t('Sie beginnt mit http:// oder https:// und enthält weder Benutzernamen noch Passwort.', 'It starts with http:// or https:// and holds no user name or password.') };
     case 'private_target':
-      return { tone: 'bad', title: t('Die Adresse führt in ein privates oder lokales Netz.', 'The address leads into a private or local network.'), hint: t('OmniFM spielt nur Streams, die aus dem Internet erreichbar sind, auch nach einer Weiterleitung.', 'OmniFM only plays streams that can be reached from the internet, after a redirect too.') };
+      return { tone: 'bad', title: t('Diese Adresse darf OmniFM nicht abrufen.', 'OmniFM may not open this address.'), hint: t('Sie führt, direkt oder nach einer Weiterleitung, in ein privates Netz oder auf einen gesperrten Port. OmniFM testet nur öffentliche Streams.', 'Directly or after a redirect, it leads into a private network or to a blocked port. OmniFM only tests public streams.') };
     case 'dns_failed':
       return { tone: 'bad', title: t('Der Servername wurde nicht gefunden.', 'The server name was not found.'), hint: t('Prüf die Schreibweise der Adresse.', 'Check how the address is spelled.') };
     case 'too_many_redirects':
