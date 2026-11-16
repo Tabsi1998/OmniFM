@@ -12,6 +12,8 @@ import { safeFetch } from "./safe-outbound-http.js";
 const PROBE_MAX_BYTES = 32 * 1024;
 const PROBE_TIMEOUT_MS = 8_000;
 const TEXT_SAMPLE_BYTES = 512;
+// The body is judged again after this many new bytes, not after every piece.
+const JUDGE_STEP_BYTES = 512;
 // Unknown binary data sent as audio counts only with this much of it.
 const UNKNOWN_AUDIO_MIN_BYTES = 4 * 1024;
 /** @typedef {{ format: string | null, kind: "audio" | "text" | "playlist" | "unknown" }} AudioVerdict */
@@ -254,19 +256,33 @@ async function probeStreamAudio(url, {
       // who they are (icy-name, #325); what they mix into the audio for it
       // is taken out again.
       const metaint = Number.parseInt(String(response.headers?.get?.("icy-metaint") || ""), 10) || 0;
-      let raw = Buffer.alloc(0);
-      let bytes = raw;
+      const chunks = [];
+      let read = 0;
+      let judged = 0;
+      let bytes = Buffer.alloc(0);
       let verdict = undecided();
-      while (reader && !verdict.format && raw.length < maxBytes) {
+      // Judging is a pass over everything read so far (and its ICY blocks):
+      // only after every JUDGE_STEP_BYTES new bytes and at the end, so a body
+      // sent in tiny pieces cannot keep the process busy (#537).
+      const collect = () => {
+        judged = read;
+        const raw = Buffer.concat(chunks, read);
+        bytes = metaint > 0 ? stripIcyMetadata(raw, metaint) : raw;
+      };
+      while (reader && !verdict.format && read < maxBytes) {
         // eslint-disable-next-line no-await-in-loop -- the body arrives chunk by chunk
         const next = await Promise.race([reader.read().catch(() => null), aborted]);
         if (!next || next.done) break;
-        raw = Buffer.concat([raw, next.value]).subarray(0, maxBytes);
-        bytes = metaint > 0 ? stripIcyMetadata(raw, metaint) : raw;
+        const piece = next.value.subarray(0, maxBytes - read);
+        chunks.push(piece);
+        read += piece.length;
+        if (read - judged < JUDGE_STEP_BYTES && read < maxBytes) continue;
+        collect();
         verdict = detectAudioFormat(bytes);
       }
-      if (!verdict.format) verdict = detectAudioFormat(bytes, { final: true, full: raw.length >= maxBytes });
-      probe.bytesRead = raw.length;
+      if (judged < read) collect();
+      if (!verdict.format) verdict = detectAudioFormat(bytes, { final: true, full: read >= maxBytes });
+      probe.bytesRead = read;
       probe.format = verdict.format;
       if (verdict.kind === "audio") {
         probe.reasonCode = "ok";

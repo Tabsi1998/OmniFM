@@ -428,6 +428,8 @@ export function createDemoApi({ panels = {}, now = () => Date.now(), language = 
       };
     }
     if (method === 'POST' && route === '/api/dashboard/settings/digest-preview') return { success: true, serverId: guildId, preview: null };
+    // "Test stream" (#537): an example of what a working station looks like.
+    if (method === 'POST' && route === '/api/dashboard/custom-stations/test') return { ok: true, result: 'playable', httpStatus: 200, format: 'mp3', bitrateKbps: 128, redirects: 0, responseTimeMs: 180 };
     if (method !== 'GET' || !guild) throw refuse(t, method);
 
     const entitlement = demoEntitlement(guild.plan);
