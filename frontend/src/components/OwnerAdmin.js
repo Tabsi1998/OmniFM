@@ -172,6 +172,7 @@ export default function OwnerAdmin() {
   const openNewLicense = () => { setLicMsg(null); setLicForm({ _isNew: true, email: '', tier: 'pro', months: 1, seats: 1, note: '', serverId: '' }); };
   const openEditLicense = (l, keepMsg = false) => {
     if (!keepMsg) setLicMsg(null);
+    const expiryDay = l.expiresAt ? String(l.expiresAt).slice(0, 10) : '';
     setLicForm({
       _isNew: false,
       licenseKey: l.licenseKey || l.id,
@@ -179,7 +180,9 @@ export default function OwnerAdmin() {
       tier: l.plan === 'ultimate' ? 'ultimate' : 'pro',
       seats: l.seats || 1,
       note: l.note || '',
-      expiresAt: l.expiresAt ? String(l.expiresAt).slice(0, 10) : '',
+      expiresAt: expiryDay,
+      // The day the form opened with: only a changed day is sent (#531).
+      _expiryDayShown: expiryDay,
       linkedServerIds: l.linkedServerIds || [],
       linkedServers: l.linkedServers || [],
       newGuild: '',

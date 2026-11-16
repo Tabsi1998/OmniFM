@@ -1,9 +1,12 @@
 // OmniFM: the window on the premium page: redeem a code, start the trial.
 // Split out of frontend/src/components/Premium.js (#296).
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { buildApiUrl } from '../lib/api.js';
+
+// What Tab can reach inside the window (#530).
+const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
 
 // Nothing is bought on the website any more (#321): Premium comes to Discord.
 // Here a free code is redeemed, and Pro can be tried for a month.
@@ -27,6 +30,12 @@ export function CheckoutModal(props) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [noticeColor, setNoticeColor] = useState('#ff6b00');
+  const dialog = useRef(null);
+  const emailField = useRef(null);
+  const titleId = useId();
+  const emailId = useId();
+  const emailHintId = useId();
+  const couponId = useId();
 
   const Icon = meta.icon;
   const trialEnabled = planId === 'pro' && trialConfig?.enabled !== false;
@@ -40,7 +49,9 @@ export function CheckoutModal(props) {
     color: '#fff',
     padding: '12px 14px',
     fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 13,
+    // 16px or more: iOS Safari zooms in on a focused field below that, and
+    // the window puts the focus in the e-mail field when it opens (#530).
+    fontSize: 16,
     outline: 'none',
     transition: 'border-color 0.2s',
   };
@@ -55,17 +66,53 @@ export function CheckoutModal(props) {
     fontFamily: "'Syne', sans-serif",
   };
 
+  // The window takes the focus and gives it back to the button that opened
+  // it, however it closes (#530).
   useEffect(() => {
-    const onEscape = (event) => {
-      if (event.key === 'Escape') onClose();
+    const opener = document.activeElement;
+    emailField.current?.focus();
+    return () => opener?.focus?.();
+  }, []);
+
+  // While a code or the free month is being sent, the window stays open:
+  // closing it would lose the answer, and a second try would then read
+  // "already used" (#530).
+  const busy = loading || trialLoading;
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+  const requestClose = useCallback(() => {
+    if (!busyRef.current) onClose();
+  }, [onClose]);
+
+  // Escape closes; Tab and Shift+Tab go round inside the window (#530).
+  useEffect(() => {
+    const onKey = (event) => {
+      if (event.key === 'Escape') {
+        requestClose();
+        return;
+      }
+      if (event.key !== 'Tab' || !dialog.current) return;
+      const items = [...dialog.current.querySelectorAll(FOCUSABLE)];
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const current = document.activeElement;
+      const outside = !dialog.current.contains(current);
+      if (event.shiftKey && (outside || current === first)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (outside || current === last)) {
+        event.preventDefault();
+        first.focus();
+      }
     };
-    document.addEventListener('keydown', onEscape);
+    document.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
     return () => {
-      document.removeEventListener('keydown', onEscape);
+      document.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
     };
-  }, [onClose]);
+  }, [requestClose]);
 
   const handleRedeem = async () => {
     const trimmedEmail = email.trim();
@@ -148,7 +195,8 @@ export function CheckoutModal(props) {
   return createPortal((
     <div
       data-testid="checkout-modal-overlay"
-      onClick={onClose}
+      role="presentation"
+      onClick={requestClose}
       style={{
         position: 'fixed',
         inset: 0,
@@ -163,6 +211,10 @@ export function CheckoutModal(props) {
       }}
     >
       <div
+        ref={dialog}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         data-testid={`checkout-modal-${planId}`}
         onClick={(event) => event.stopPropagation()}
         style={{
@@ -178,7 +230,7 @@ export function CheckoutModal(props) {
       >
         <button
           data-testid="checkout-modal-close"
-          onClick={onClose}
+          onClick={requestClose}
           aria-label={t('Schließen', 'Close')}
           style={{
             position: 'absolute',
@@ -208,7 +260,7 @@ export function CheckoutModal(props) {
           }}>
             <Icon size={26} color={meta.color} />
           </div>
-          <h3 style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 22, color: '#fff', margin: 0 }}>
+          <h3 id={titleId} style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 22, color: '#fff', margin: 0 }}>
             {copy.premium.redeemTitle({ name: tier.name })}
           </h3>
         </div>
@@ -226,10 +278,14 @@ export function CheckoutModal(props) {
         </div>
 
         <div style={{ marginBottom: 18 }}>
-          <label style={labelStyle}>{copy.premium.emailLabel}</label>
+          <label htmlFor={emailId} style={labelStyle}>{copy.premium.emailLabel}</label>
           <input
+            ref={emailField}
+            id={emailId}
+            aria-describedby={emailHintId}
             data-testid="checkout-email-input"
             type="email"
+            autoComplete="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder={copy.premium.emailPlaceholder}
@@ -237,14 +293,15 @@ export function CheckoutModal(props) {
             onFocus={(event) => { event.target.style.borderColor = `${meta.color}60`; }}
             onBlur={(event) => { event.target.style.borderColor = 'rgba(255,255,255,0.12)'; }}
           />
-          <p style={{ margin: '4px 0 0', fontSize: 11, color: '#8e8e97' }}>
+          <p id={emailHintId} style={{ margin: '4px 0 0', fontSize: 11, color: '#8e8e97' }}>
             {copy.premium.emailHint}
           </p>
         </div>
 
         <div style={{ marginBottom: 18 }}>
-          <label style={labelStyle}>{copy.premium.couponLabel}</label>
+          <label htmlFor={couponId} style={labelStyle}>{copy.premium.couponLabel}</label>
           <input
+            id={couponId}
             data-testid="checkout-coupon-input"
             value={coupon}
             onChange={(event) => setCoupon(event.target.value)}
@@ -271,16 +328,19 @@ export function CheckoutModal(props) {
           </p>
         </div>
 
-        {notice && (
-          <p style={{ margin: '0 0 12px', fontSize: 12, color: noticeColor, textAlign: 'center' }}>
-            {notice}
-          </p>
-        )}
-        {error && (
-          <p data-testid="checkout-error-msg" style={{ margin: '0 0 12px', fontSize: 12, color: '#ff2a5f', textAlign: 'center' }}>
-            {error}
-          </p>
-        )}
+        {/* Read out when it appears: the code worked, or what went wrong (#530). */}
+        <div role="status" data-testid="checkout-status">
+          {notice && (
+            <p style={{ margin: '0 0 12px', fontSize: 12, color: noticeColor, textAlign: 'center' }}>
+              {notice}
+            </p>
+          )}
+          {error && (
+            <p data-testid="checkout-error-msg" style={{ margin: '0 0 12px', fontSize: 12, color: '#ff2a5f', textAlign: 'center' }}>
+              {error}
+            </p>
+          )}
+        </div>
 
         <button
           data-testid={`checkout-pay-btn-${planId}`}
@@ -341,7 +401,7 @@ export function CheckoutModal(props) {
 
         <button
           data-testid="checkout-cancel-btn"
-          onClick={onClose}
+          onClick={requestClose}
           style={{
             display: 'block',
             width: '100%',
