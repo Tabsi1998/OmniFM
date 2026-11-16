@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Radio, LayoutDashboard, ListMusic, ShieldCheck, BarChart3, CreditCard, LogOut,
-  Plus, Trash2, Check, Crown, Zap, Music2, Users, Clock, Lock, Server,
+  Check, Crown, Zap, Music2, Users, Clock, Lock, Server,
   ChevronRight, RefreshCw, AlertTriangle,
   CalendarDays, Settings, MessageSquareWarning,
 } from 'lucide-react';
@@ -15,6 +15,7 @@ import { isDashboardDemo, isDashboardTour } from '../lib/dashboardDemoMode.js';
 import { watchDashboardLive } from '../lib/dashboardLive.js';
 import { buildPageHref } from '../lib/pageRouting.js';
 import { useI18n } from '../i18n.js';
+import DashboardCustomStations from './DashboardCustomStations.js';
 import DashboardEvents from './DashboardEvents.js';
 import DashboardSettings from './DashboardSettings.js';
 import GuildLiveView from './GuildLiveView.js';
@@ -256,7 +257,6 @@ export default function GuildDashboard() {
   const [section, setSection] = useState('overview');
   const [store, setStore] = useState({});
   const [perms, setPerms] = useState({});
-  const [newStation, setNewStation] = useState({ name: '', url: '' });
   const [eventForm, setEventForm] = useState(() => emptyEventForm());
   const [editingEventId, setEditingEventId] = useState('');
   const [msg, setMsg] = useState(null);
@@ -438,28 +438,11 @@ export default function GuildDashboard() {
     },
   }), [gdata.custom, gdata.stations, gdata.textChannels, gdata.voiceChannels]);
 
-  const addCustom = async () => {
-    const name = newStation.name.trim();
-    const url = newStation.url.trim();
-    if (!name || !url) { setMsg({ ok: false, text: t('Name und URL sind erforderlich.', 'Name and URL are required.') }); return; }
-    const slug = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 55) || 'station';
-    try {
-      const payload = await apiRequest(`/api/dashboard/custom-stations?serverId=${encodeURIComponent(guildId)}`, {
-        method: 'POST', body: JSON.stringify({ key: `${slug}-${Date.now().toString(36)}`, name, url }),
-      });
-      setStore((current) => ({ ...current, [guildId]: { ...gdata, custom: [...gdata.custom, payload.station] } }));
-      setNewStation({ name: '', url: '' });
-      setMsg({ ok: true, text: t('Sender wurde gespeichert.', 'Station saved.') });
-    } catch (error) { setMsg({ ok: false, text: error.message }); }
-  };
-
-  const removeCustom = async (key) => {
-    try {
-      await apiRequest(`/api/dashboard/custom-stations?serverId=${encodeURIComponent(guildId)}&key=${encodeURIComponent(key)}`, { method: 'DELETE' });
-      setStore((current) => ({ ...current, [guildId]: { ...gdata, custom: gdata.custom.filter((item) => item.key !== key) } }));
-      setMsg({ ok: true, text: t('Sender wurde entfernt.', 'Station removed.') });
-    } catch (error) { setMsg({ ok: false, text: error.message }); }
-  };
+  // The own stations' list after an add, an edit or a removal (#541).
+  const updateCustom = (change) => setStore((current) => {
+    const data = current[guildId] || EMPTY_DATA;
+    return { ...current, [guildId]: { ...data, custom: change(data.custom || []) } };
+  });
 
   const togglePerm = (command, roleId) => setPerms((current) => ({ ...current, [`${command}:${roleId}`]: !current[`${command}:${roleId}`] }));
   const savePerms = async () => {
@@ -662,8 +645,7 @@ export default function GuildDashboard() {
           <div className="oa-grid cols-3" data-testid="guild-preset-stations">{gdata.stations.map((station) => <div key={station.key} className="oa-card hoverable"><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 38, height: 38, borderRadius: 10, background: '#1c2235', display: 'grid', placeItems: 'center' }}><Music2 size={17} color="#94a3b8" /></div><div><div style={{ fontWeight: 700 }}>{station.name}</div><div className="oa-mono" style={{ fontSize: 11, color: '#8190a8' }}>{station.genre || 'Radio'}</div></div></div></div>)}</div>
           <div className="oa-section-title" style={{ marginTop: 28 }}><ListMusic size={15} /> {t('Eigene Sender', 'Custom stations')} ({gdata.custom.length}/{tm.customLimit || 0})</div>
           {tier !== 'ultimate' ? <PlanLock plan="ultimate" title={t('Eigene Sender', 'Your own stations')} t={t} locale={locale} testId="guild-custom-locked" /> : <>
-            <div className="oa-card" style={{ marginBottom: 16 }} data-testid="guild-custom-form"><div className="oa-grid cols-2" style={{ gap: 12 }}><div><label className="oa-stat-label">Name</label><input className="oa-input" aria-label="Name" style={{ marginTop: 6 }} value={newStation.name} onChange={(event) => setNewStation({ ...newStation, name: event.target.value })} /></div><div><label className="oa-stat-label">Stream-URL</label><input className="oa-input" aria-label="Stream-URL" style={{ marginTop: 6 }} value={newStation.url} placeholder="https://…/stream.mp3" onChange={(event) => setNewStation({ ...newStation, url: event.target.value })} /></div></div><button className="oa-btn primary" style={{ marginTop: 14 }} onClick={addCustom}><Plus size={16} /> {t('Hinzufügen', 'Add')}</button></div>
-            <div className="oa-table-wrap"><table className="oa-table"><thead><tr><th>Name</th><th>Stream-URL</th><th /></tr></thead><tbody>{!gdata.custom.length && <tr><td colSpan={3} style={{ textAlign: 'center', color: '#8190a8', padding: 22 }}>{t('Noch keine eigenen Sender', 'No custom stations yet')}</td></tr>}{gdata.custom.map((station) => <tr key={station.key}><td style={{ fontWeight: 600 }}>{station.name}</td><td className="oa-mono" style={{ fontSize: 12, color: '#94a3b8' }}>{station.url}</td><td style={{ textAlign: 'right' }}><button className="oa-btn ghost" style={{ color: '#ff8fab' }} onClick={() => removeCustom(station.key)} aria-label={t('Sender entfernen', 'Remove station')} title={t('Sender entfernen', 'Remove station')}><Trash2 size={14} /></button></td></tr>)}</tbody></table></div>
+            <DashboardCustomStations key={guildId} t={t} guildId={guildId} stations={gdata.custom} apiRequest={apiRequest} onStationsChange={updateCustom} setMsg={setMsg} />
           </>}
         </>}
 
