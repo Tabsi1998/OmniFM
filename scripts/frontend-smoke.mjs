@@ -204,6 +204,43 @@ try {
     }
   }
 
+  // #530: the window for a code and the free month passes axe while open,
+  // Tab stays inside it, and Escape gives the focus back to its button.
+  {
+    const context = await browser.newContext({ locale: "de-DE", serviceWorkers: "block" });
+    const tab = await context.newPage();
+    const opener = '[data-testid="buy-btn-pro"]';
+    try {
+      await tab.goto(`${base}/preise`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+      await tab.click(opener, { timeout: 20_000 });
+      await tab.waitForSelector('[role="dialog"][aria-modal="true"]', { state: "visible", timeout: 5_000 });
+      const errors = (await accessibilityFindings(tab)).map((line) => `Barrierefreiheit: ${line}`);
+      // In the page: globalThis is its window.
+      const focusInside = () => tab.evaluate(() => Boolean(globalThis.document.activeElement?.closest('[role="dialog"]')));
+      if (!(await focusInside())) errors.push("der Fokus startet nicht im Fenster");
+      // More presses than the window has controls, forwards and backwards.
+      for (const key of ["Tab", "Shift+Tab"]) {
+        for (let press = 0; press < 8; press += 1) {
+          // eslint-disable-next-line no-await-in-loop -- one key after the other, like a person types
+          await tab.keyboard.press(key);
+        }
+        // eslint-disable-next-line no-await-in-loop
+        if (!(await focusInside())) errors.push(`${key} verlässt das Fenster`);
+      }
+      await tab.keyboard.press("Escape");
+      await tab.waitForSelector('[role="dialog"]', { state: "detached", timeout: 5_000 });
+      if (!(await tab.evaluate((wanted) => globalThis.document.activeElement?.matches(wanted), opener))) {
+        errors.push("Escape gibt den Fokus nicht an den Knopf zurück");
+      }
+      if (errors.length) problems.push(`Code-Fenster (/preise): ${errors.join(" | ")}`);
+      else console.log("ok  Code-Fenster (/preise): axe ohne Befund, Fokus bleibt drin und kommt zurück");
+    } catch (error) {
+      problems.push(`Code-Fenster (/preise): ${String(error.message).split("\n")[0]}`);
+    } finally {
+      await context.close();
+    }
+  }
+
   // #501: the sections below the first screen draw only when they come near
   // and grow when their data comes; /preise and /#faq still land on them.
   for (const [where, selector] of [["/preise", '[data-testid="premium-section"]'], ["/#faq", "#faq"]]) {
