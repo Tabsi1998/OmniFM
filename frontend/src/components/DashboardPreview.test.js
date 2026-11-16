@@ -39,6 +39,8 @@ function onPhone() {
 }
 
 const renderPreview = () => render(<I18nProvider><DashboardPreview /></I18nProvider>);
+// jsdom 31 keeps 6 decimals of a CSS number (scale(0.954667)), jsdom 30 all of them: compare the number.
+const scaleOf = (element) => Number(/^scale\(([^)]+)\)$/.exec(element.style.transform)?.[1]);
 
 describe('the dashboard preview on the start page', () => {
   it('labels every step with the plan the plan file names', () => {
@@ -65,7 +67,7 @@ describe('the dashboard preview on the start page', () => {
     expect(screen.getByTestId('dashboard-tour').getAttribute('aria-label')).toBe('Rundgang durch das Dashboard mit Beispieldaten');
     // 1280 × 800 drawn at 1100 px: 688 px high, no guessing.
     expect(screen.getByTestId('tour-frame').style.height).toBe('688px');
-    expect(tourScreen.style.transform).toBe(`scale(${1100 / 1280})`);
+    expect(scaleOf(tourScreen)).toBeCloseTo(1100 / 1280, 5);
     expect(screen.getByTestId('dashboard-preview-try').getAttribute('href')).toBe('/dashboard?demo=1&lang=de');
     expect(serverAsked).not.toHaveBeenCalled();
   });
@@ -85,7 +87,7 @@ describe('the dashboard preview on the start page', () => {
     const tourScreen = screen.getByTestId('tour-screen');
     // Drawn 375 px wide like a small phone, shown at 358 px.
     expect(tourScreen.style.width).toBe('375px');
-    expect(tourScreen.style.transform).toBe(`scale(${358 / 375})`);
+    expect(scaleOf(tourScreen)).toBeCloseTo(358 / 375, 5);
     expect(screen.getByTestId('tour-frame').style.height).toBe(`${Math.round(640 * (358 / 375))}px`);
     // The seven steps are one row to swipe, not seven rows.
     expect(screen.getByTestId('tour-steps').style.flexWrap).toBe('nowrap');
