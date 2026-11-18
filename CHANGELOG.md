@@ -6,6 +6,65 @@ folgt [SemVer](https://semver.org/lang/de/): Die erste Zahl steigt bei
 Funktionen, die dritte bei reinen Fehlerbehebungen. Wie ein Release entsteht,
 steht in `scripts/release.mjs`.
 
+## 3.21.0 – 2026-11-18
+
+Eigene Sender lassen sich jetzt bearbeiten und vor dem Speichern testen.
+Dazu kommen ein barrierefreies Code-Fenster, ein Fix für die Ablaufdaten
+von Lizenzen, echte Bot-Zahlen in `/api/health` und eine Website, die in
+Suchmaschinen in allen neun Sprachen richtig erscheint.
+
+### Neu
+
+- **Stream testen:** Beim Anlegen und Bearbeiten eines eigenen Senders zeigt
+  „Stream testen“ vor dem Speichern, ob er spielt, mit Format und Bitrate.
+  Spielt er nicht, steht da der Grund, etwa „kein Audio“, „Zugriff
+  verweigert (403)“, „Zeitüberschreitung“ oder „Playlist statt Stream“.
+  Der Test geht über `safeFetch` und prüft jede Weiterleitung neu. Er
+  sperrt Dienst-Ports wie SSH, MongoDB und Redis sowie die eigenen Adressen
+  und erlaubt höchstens 6 Tests pro Minute (`CUSTOM_STATION_TEST_*`).
+  Läuft der Server hinter NAT, gehört die eigene öffentliche IP in
+  `CUSTOM_STATION_TEST_BLOCKED_HOSTS`. (#577)
+- **Eigene Sender bearbeiten:** Name und URL lassen sich ändern, ohne den
+  Sender zu löschen. Logo, Favoriten, Ordner, Tags und Events bleiben
+  erhalten. (#576)
+
+### Verbessert
+
+- **Sicherheit bei Abrufen:** IPv4-kompatible IPv6-Adressen (`::/96`) gelten
+  überall als privat. Die Audio-Prüfung bewertet einen Stream nur noch alle
+  512 Bytes, ein bösartiger Sender kann den Bot damit nicht mehr auslasten.
+  (#577)
+
+### Behoben
+
+- **Code- und Probemonat-Fenster** auf der Preisseite: Es ist jetzt ein echter
+  Dialog und lässt sich mit Tastatur und Screenreader bedienen. Es bleibt
+  offen, solange eine Anfrage läuft, und zoomt auf dem iPhone nicht mehr
+  hinein. (#574)
+- **Ablaufdatum von Lizenzen:** Wer in der Owner-Konsole nur die Notiz oder
+  die E-Mail einer Lizenz geändert hat, hat dabei unbemerkt ihr Ende auf
+  00:00 UTC dieses Tages gesetzt. Die Lizenz lief dadurch bis zu einem Tag
+  zu früh ab. (#575)
+- **`/api/health` am öffentlichen Eingang** meldet die echten Bot-Zahlen statt
+  0. Ein externer Wächter schlägt deshalb keinen Fehlalarm mehr. (#569)
+- **Suchmaschinen:** Dashboard, `/admin` und `/owner` stehen auf `noindex`.
+  Die Sitemap führt jede Seite in allen neun Sprachen mit eigener Adresse.
+  (#571)
+- **Testalarm in der Owner-Konsole** läuft jetzt über denselben geschützten
+  Weg wie echte Alarme. (#568)
+
+### Intern
+
+- Tests für die Lizenzverwaltung der Owner-Konsole, 22 Abläufe. (#575)
+- Die Stream-Vertragstests laufen gegen einen lokalen Test-Sender statt
+  gegen das Internet. (#570)
+- Paket-Updates, darunter `mongodb` 7.9, `nodemailer` 10.5, `vite` 8.3.8,
+  `jsdom` 31, `fastapi` 0.162.5 und `pymongo` 4.20. Ein Website-Test ist an
+  jsdom 31 angepasst. (#578, #579, #580, #581, #583)
+- Für die picomatch-Lücke gibt es noch keinen Fix. Sie betrifft nur das
+  Bauen und Testen der Website und steht vorerst in der Baseline des
+  Prüflaufs. (#585)
+
 ## 3.20.0 – 2026-11-13
 
 Die Sender laufen verlässlicher, und OmniFM sagt dem Betreiber Bescheid,
