@@ -11,9 +11,16 @@
   "node-contract-suite": [],
   "npm-audit": [
     "frontend: @discord/embedded-app-sdk (high)",
+    "frontend: @vitejs/plugin-react (high)",
+    "frontend: fdir (high)",
+    "frontend: picomatch (high)",
+    "frontend: tinyglobby (high)",
+    "frontend: vite (high)",
+    "frontend: vitest (high)",
     "frontend: zod (high)"
   ],
   "osv": [
+    "frontend/package-lock.json: picomatch 4.0.7 GHSA-fc5q-39xc-vjpf",
     "frontend/package-lock.json: zod 3.25.76 GHSA-mrhx-c7xc-m3w5"
   ],
   "semgrep": [
