@@ -90,6 +90,11 @@ describe('OmniFM Radio in the owner cockpit', () => {
     expect(consoleErrors.some((line) => line.includes('same key'))).toBe(false);
   });
 
+  it('says when the stored state cannot be read', async () => {
+    setup({ ...OFFLINE, readable: false });
+    expect((await screen.findByTestId('radio-live-state')).textContent).toContain('Zustand nicht lesbar (Datenbank)');
+  });
+
   it('says so when the live detection does not run', async () => {
     setup({});
     expect((await screen.findByTestId('radio-live-state')).textContent).toContain('läuft nicht');

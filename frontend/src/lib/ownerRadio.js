@@ -40,6 +40,7 @@ export function radioTime(iso) {
 /** The one line at the top: live with DJ and time, or the auto DJ. */
 export function radioStateText(data, now = Date.now()) {
   if (!data?.enabled) return 'Die Live-Erkennung läuft nicht: OmniFM Radio ist aus, oder der Bot startet gerade.';
+  if (data.readable === false) return 'Zustand nicht lesbar (Datenbank). Bis MongoDB antwortet, wird nichts erkannt oder gemeldet.';
   const current = data.current || {};
   if (current.isLive) {
     const since = current.startedAt ? ` · seit ${radioTime(current.startedAt)} (${radioShowDuration(now - Date.parse(current.startedAt))})` : '';

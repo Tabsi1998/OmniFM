@@ -95,6 +95,11 @@ export function createOmnifmRadioWebhookHandler({ getService, getSettings = defa
       title: state.songText || state.title,
       liveSince: state.liveSince,
     }, "webhook");
+    // The stored state was not readable, so nothing was taken: AzuraCast logs a failure.
+    if (service.tracker.snapshot().readable === false) {
+      sendJson(res, 503, { error: "Der Live-Zustand ist gerade nicht lesbar (Datenbank)." });
+      return true;
+    }
     sendJson(res, 200, { ok: true, isLive: state.isLive });
     return true;
   };

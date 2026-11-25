@@ -128,6 +128,19 @@ test("other methods and paths; an unknown caller learns nothing about the method
   assert.equal((await call({ path: "/api/radio/other" })).handled, false);
 });
 
+test("while the stored state cannot be read the webhook reports a failure", async () => {
+  const tracker = createOmnifmRadioLiveTracker({ store: { load: async () => { throw new Error("MongoDB weg"); }, save: async () => {} }, onEvent: () => {} });
+  const handler = createOmnifmRadioWebhookHandler({
+    getService: () => ({ tracker }),
+    getSettings: () => ({ enabled: true, station: "omnifm_radio", webhookSecret: SECRET }),
+    log: () => {},
+  });
+  const res = { writeHead(status) { this.status = status; }, setHeader() {}, end(payload) { this.body = payload ? JSON.parse(payload) : null; } };
+  const req = { method: "POST", headers: { authorization: basic("azuracast", SECRET) }, socket: { remoteAddress: "203.0.113.7" } };
+  await handler({ req, res, requestUrl: new URL("https://omnifm.xyz/api/radio/webhook"), readRawBody: async () => JSON.stringify(azuracast()) });
+  assert.equal(res.status, 503, "AzuraCast logs it as failed");
+});
+
 test("before the live detection runs the webhook says so", async () => {
   const { call } = setup({ service: null });
   assert.equal((await call({ authorization: basic("azuracast", SECRET) })).res.status, 503);
