@@ -8,6 +8,8 @@
 //   lastTestDmAt   the last DM of a test show, counted apart
 //   dmClosedUntil  Discord refused the DM (50007/403): left alone until then
 // plus the document "last-run" with the numbers of the last distribution.
+// /mydata (#285) shows a person's document and deletes it; an unsubscribe
+// stays as { _id, unsubscribed: true } so the opt-out is still honoured.
 // A DM is claimed before it is sent, in one conditional update, so neither
 // a restart nor two runs can send a person two. Without MongoDB (local
 // development) it stays in memory; a MongoDB that is configured but not
@@ -38,6 +40,8 @@ function personFrom(doc) {
     lastDmAt: msOf(doc.lastDmAt),
     lastTestDmAt: msOf(doc.lastTestDmAt),
     dmClosedUntil: msOf(doc.dmClosedUntil),
+    unsubscribedAt: msOf(doc.unsubscribedAt),
+    subscribedAt: msOf(doc.subscribedAt),
   };
 }
 
@@ -135,6 +139,27 @@ export function createOmnifmRadioDmStore({
     /** Discord does not deliver DMs to this person: no new try before `until`. */
     markDmsClosed(userId, { until }) {
       return update(userId, { dmClosedUntil: new Date(until) });
+    },
+
+    /**
+     * "Delete everything" in /mydata: the person's document goes. Who
+     * unsubscribed keeps only that, without any time, so no DM comes again.
+     * @returns {Promise<{ found: boolean, keptUnsubscribe: boolean }>}
+     */
+    async forget(userId) {
+      const id = userIdOf(userId);
+      if (!id) return { found: false, keptUnsubscribe: false };
+      const people = collection();
+      const person = people ? personFrom(await people.findOne({ _id: id })) : memory.get(id) || null;
+      if (!person) return { found: false, keptUnsubscribe: false };
+      if (person.unsubscribed) {
+        if (people) await people.replaceOne({ _id: id }, { unsubscribed: true });
+        else memory.set(id, { ...personFrom({}), unsubscribed: true });
+        return { found: true, keptUnsubscribe: true };
+      }
+      if (people) await people.deleteOne({ _id: id });
+      else memory.delete(id);
+      return { found: true, keptUnsubscribe: false };
     },
 
     async saveLastRun(run) {

@@ -97,7 +97,37 @@ for (const [name, make, options] of backends) {
     await store.saveLastRun(run);
     assert.deepEqual(await store.loadLastRun(), run);
   });
+
+  test(`${name}: /mydata: forgetting a person keeps only an unsubscribe`, options, async () => {
+    const store = await make();
+    const fan = nextUser();
+    const quitter = nextUser();
+    await store.claim(fan, { ...REAL, now: T0 });
+    await store.markDmsClosed(fan, { until: T0 + 30 * DAY });
+    await store.claim(quitter, { ...TEST, now: T0 });
+    await store.setSubscribed(quitter, false, { now: T0 + HOUR });
+    assert.equal((await store.get(quitter)).unsubscribedAt, T0 + HOUR, "the export can say since when");
+
+    assert.deepEqual(await store.forget(fan), { found: true, keptUnsubscribe: false });
+    assert.equal(await store.get(fan), null, "nothing left of someone who never unsubscribed");
+    assert.deepEqual(await store.forget(quitter), { found: true, keptUnsubscribe: true });
+    assert.deepEqual(await store.get(quitter), {
+      unsubscribed: true, subscribed: false, lastDmAt: null, lastTestDmAt: null, dmClosedUntil: null, unsubscribedAt: null, subscribedAt: null,
+    }, "only the opt-out stays, no times");
+    assert.equal(await store.claim(quitter, { ...REAL, now: T0 + 2 * DAY }), false, "and it is still honoured");
+    assert.deepEqual(await store.forget(nextUser()), { found: false, keptUnsubscribe: false });
+  });
 }
+
+test("MongoDB: the kept opt-out is the Discord ID and one flag, nothing else", { skip: !hasMongoConfig }, async () => {
+  const store = await mongoStore();
+  const user = nextUser();
+  await store.claim(user, { ...REAL, now: T0 });
+  await store.setSubscribed(user, false, { now: T0 });
+  await store.forget(user);
+  const { getDb } = await import("../src/lib/db.js");
+  assert.deepEqual(await getDb().collection(OMNIFM_RADIO_DM_COLLECTION).findOne({ _id: user }), { _id: user, unsubscribed: true });
+});
 
 test("MongoDB: ten claims at once for one person, exactly one wins", { skip: !hasMongoConfig }, async () => {
   const store = await mongoStore();
