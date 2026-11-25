@@ -417,12 +417,12 @@ export async function alertRadioLive(event, env = process.env, send = notifyOper
 
 /**
  * The emergency brake of the owner DMs (#594): Discord's spam signals or
- * five failures in a row stopped the run and switched the DMs off.
- * Switched off together with the show messages (OPERATOR_ALERT_RADIO_LIVE).
+ * too many failures stopped the run and switched the DMs off. Always
+ * sent, whatever the alert switches say; one per run (the key).
  * @param {{ reason: "discord" | "failures", run?: { startedAt?: string, sent?: number, failed?: number, remaining?: number, error?: string | null } }} info
  */
 export function buildRadioDmBrakeAlert({ reason, run = {} }) {
-  const why = reason === "discord" ? "Discord bremst (Rate-Limit oder Sperre)" : "fünf Fehler hintereinander";
+  const why = reason === "discord" ? "Discord bremst (Rate-Limit oder Sperre)" : "zu viele Fehler";
   return {
     key: `radio-dm-brake:${run.startedAt || "-"}`,
     embed: {
@@ -437,8 +437,7 @@ export function buildRadioDmBrakeAlert({ reason, run = {} }) {
   };
 }
 
-export async function alertRadioDmBrake(info, env = process.env, send = notifyOperator) {
-  if (!alertEnabled("RADIO_LIVE", env)) return false;
+export async function alertRadioDmBrake(info, _env = process.env, send = notifyOperator) {
   const { key, embed } = buildRadioDmBrakeAlert(info);
   return (await send(key, embed)) === true;
 }

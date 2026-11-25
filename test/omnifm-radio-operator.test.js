@@ -80,6 +80,6 @@ test("the DM emergency brake (#594) tells the operator why the DMs are off now",
 
   const sent = [];
   assert.equal(await alertRadioDmBrake({ reason: "discord", run }, {}, async (key, embed) => { sent.push(embed); return true; }), true);
-  assert.equal(await alertRadioDmBrake({ reason: "discord", run }, { OPERATOR_ALERT_RADIO_LIVE: "0" }, async () => true), false, "the radio switch also covers the brake");
-  assert.equal(sent.length, 1);
+  assert.equal(await alertRadioDmBrake({ reason: "discord", run }, { OPERATOR_ALERT_RADIO_LIVE: "0" }, async (key, embed) => { sent.push(embed); return true; }), true, "the brake ignores the show messages' switch");
+  assert.equal(sent.length, 2);
 });

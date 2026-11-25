@@ -15,7 +15,7 @@
 //     run that is otherwise healthy.
 //   - emergency brake: Discord's spam signals (40003, 40004, a rate limit)
 //     or five failures in a row stop the run, switch the mode to "off" and
-//     tell the operator (OPERATOR_ALERT_RADIO_LIVE).
+//     tell the operator, always (no alert switch).
 //   - "Abbestellen" in every DM, for good (src/bot/omnifm-radio-dm-message.js).
 //   - the mode in the owner console (owner_config.radioDm.mode), else
 //     OMNIFM_RADIO_DM_MODE, else "owners": owners | optin | off. It is read
