@@ -558,6 +558,15 @@ class RemoteWorkerHandle {
     return this.sendCommand("playJingle", { guildId }, { timeoutMs: 15_000 });
   }
 
+  // OmniFM Radio's live announcement (#593): the worker posts and edits it.
+  async postRadioAnnouncement(guildId, { channelId = "", roleId = "", show = {} } = {}) {
+    return this.sendCommand("radioAnnounce", { guildId, channelId, roleId, show }, { timeoutMs: 20_000 });
+  }
+
+  async endRadioAnnouncement(guildId, { channelId = "", messageId = "", show = {} } = {}) {
+    return this.sendCommand("radioAnnounceEnd", { guildId, channelId, messageId, show }, { timeoutMs: 20_000 });
+  }
+
   async setSleepTimerInGuild(guildId, minutes) {
     return this.sendCommand("setSleepTimer", { guildId, minutes }, { timeoutMs: 15_000 });
   }

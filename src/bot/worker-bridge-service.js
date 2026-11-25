@@ -116,6 +116,11 @@ class WorkerBridgeService {
       // The dashboard's button that plays the server's jingle now (#309).
       case "playJingle":
         return this.runtime.playJingleFromDashboard(guildId);
+      // OmniFM Radio's live announcement (#593), posted and edited by OmniFM 1.
+      case "radioAnnounce":
+        return this.runtime.postRadioAnnouncement(guildId, { channelId: payload.channelId, roleId: payload.roleId, show: payload.show });
+      case "radioAnnounceEnd":
+        return this.runtime.endRadioAnnouncement(guildId, { channelId: payload.channelId, messageId: payload.messageId, show: payload.show });
       case "setGuildProfile":
         return this.runtime.applyGuildBotProfile(guildId, payload.changes || {});
       case "setVolume": {
