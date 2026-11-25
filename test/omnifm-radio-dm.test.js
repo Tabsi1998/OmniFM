@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 
 // OmniFM Radio DMs (#594): when DJ Tabsi goes live, the owners of the
@@ -13,6 +13,7 @@ import {
 } from "../src/services/omnifm-radio-dm.js";
 import { createOmnifmRadioDmStore } from "../src/omnifm-radio-dm-store.js";
 
+const hasMongoConfig = Boolean(String(process.env.MONGO_URL || "").trim());
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
@@ -41,6 +42,14 @@ function clock(at = T0) {
   now.set = (ms) => { time.at = ms; };
   return now;
 }
+
+// The connection stays open for the tests after the MongoDB one: a closed
+// one counts as "MongoDB away", and then no DM goes out at all.
+after(async () => {
+  if (!hasMongoConfig) return;
+  const { close } = await import("../src/lib/db.js");
+  await close().catch(() => null);
+});
 
 const memoryStore = () => createOmnifmRadioDmStore({ getDatabase: () => null, mongoRequested: () => false });
 
@@ -338,9 +347,9 @@ test("the console's mode lives in owner_config; without it in memory, a missing 
   await assert.rejects(createRadioDmModeStore({ getDatabase: () => null, mongoRequested: () => true }).read(), /MongoDB/);
 });
 
-test("MongoDB: the mode is stored in owner_config.radioDm, the other sections stay", { skip: !String(process.env.MONGO_URL || "").trim() }, async () => {
+test("MongoDB: the mode is stored in owner_config.radioDm, the other sections stay", { skip: !hasMongoConfig }, async () => {
   const { createRadioDmModeStore } = await import("../src/services/omnifm-radio-dm.js");
-  const { connect, getDb, close } = await import("../src/lib/db.js");
+  const { connect, getDb } = await import("../src/lib/db.js");
   await connect();
   try {
     const ownerConfig = getDb().collection("owner_config");
@@ -352,7 +361,7 @@ test("MongoDB: the mode is stored in owner_config.radioDm, the other sections st
     assert.equal(doc.radioDm.mode, "optin");
     assert.equal(doc.company.providerName, "OmniFM");
   } finally {
-    await close().catch(() => null);
+    await getDb().collection("owner_config").deleteMany({});
   }
 });
 
