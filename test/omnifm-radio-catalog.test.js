@@ -46,6 +46,8 @@ const { buildDashboardFallbackStationPreview } = await import("../src/api/helper
 const { createDashboardStationsRouteHandler } = await import("../src/api/routes/dashboard-stations.js");
 const { buildPublicStationCatalog } = await import("../src/lib/public-stations.js");
 const { automaticFallbackKeysForGuild, resetDownStationKeysForTests } = await import("../src/bot/automatic-fallback.js");
+const { buildStationDocument } = await import("../src/lib/owner-stations.js");
+const { addGuildStation, updateGuildStation } = await import("../src/custom-stations.js");
 const { isOmnifmRadioKey } = await import("../src/services/omnifm-radio-station.js");
 
 setLicenseProvider(() => null);
@@ -180,7 +182,7 @@ test("the automatic fallback never picks OmniFM Radio, not even on a test server
   assert.deepEqual(keys, ["rockradio", "zenradio"], "the other Free stations of the catalog, in catalog order");
 });
 
-test("nobody can put a station of their own under the OmniFM Radio key", () => {
+test("nobody can put a station of their own under the OmniFM Radio key", async () => {
   assert.equal(isOmnifmRadioKey("omnifm-radio"), true);
   assert.equal(isOmnifmRadioKey("OmniFM_Radio"), true, "the catalog drops - and _, so these become the same key");
   assert.equal(isOmnifmRadioKey("groove"), false);
@@ -188,6 +190,20 @@ test("nobody can put a station of their own under the OmniFM Radio key", () => {
   const catalog = loadStations().stations;
   assert.equal(Object.values(catalog).some((station) => station.name === "Fake OmniFM"), false, "a catalog row with the key is ignored");
   assert.equal(Object.keys(catalog).length, 4);
+
+  for (const key of ["omnifm-radio", "omnifm_radio"]) {
+    // eslint-disable-next-line no-await-in-loop -- two keys, one after the other
+    await assert.rejects(
+      buildStationDocument({ key, name: "Fake", url: "https://radio.example.test/fake.mp3" }),
+      (error) => error.status === 400 && /OmniFM Radio/.test(error.message),
+      `owner editor refuses ${key}`
+    );
+  }
+
+  const added = await addGuildStation(TEST_GUILD, KEY, "Fake", "https://radio.example.test/fake.mp3");
+  assert.equal(added.error, "Station mit Key 'omnifm-radio' existiert bereits.");
+  const updated = await updateGuildStation(TEST_GUILD, KEY, "Fake", "https://radio.example.test/fake.mp3");
+  assert.equal(updated.error, "Station mit Key 'omnifm-radio' existiert bereits.");
 
   assert.equal(
     STATION_CATALOG_MIGRATIONS.some((migration) => [migration.key, ...(migration.keys || [])].some((key) => isOmnifmRadioKey(key))),
