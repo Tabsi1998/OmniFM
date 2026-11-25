@@ -62,6 +62,12 @@ test("without a DJ or a title the DM still reads well", () => {
   assert.equal(textOf(buildRadioDmMessage({ show: SHOW, language: "en", config: CONFIG })).includes("DJ Tabsi is live on OmniFM Radio"), true);
 });
 
+test("the other seven languages come from the tables", () => {
+  const payload = buildRadioDmMessage({ show: SHOW, language: "fr", config: CONFIG });
+  assert.match(textOf(payload), /DJ Tabsi est en direct sur OmniFM Radio/);
+  assert.deepEqual(buttonsOf(payload).map((button) => button.label), ["Écouter maintenant", "Se désabonner"]);
+});
+
 test("names and titles from AzuraCast cannot format the DM or mention anybody", () => {
   const show = { ...SHOW, streamerName: "**DJ** @everyone", title: "<@123456789012345678> `x` __y__" };
   const text = textOf(buildRadioDmMessage({ show, language: "de", config: CONFIG, guildName: "@here *Server*" }));
