@@ -12,14 +12,19 @@ import * as ui from "../discord/ui/index.js";
 /** The "Listen now" button; handled by the bot that posted the message. */
 export const RADIO_LISTEN_ID = "omnifm:radio:listen";
 
-// After "<" it stops a mention from rendering (the ping is off anyway).
+// After "<" it stops a mention from rendering (the ping is off anyway); in
+// "://" and before the dot of an invite host it stops a link and its embed.
 const ZERO_WIDTH = String.fromCharCode(0x200b);
 
-/** One line of AzuraCast text that renders as written: no markdown, no mention. */
+/** One line of AzuraCast text that renders as written: no markdown, no mention, no link. */
 function plain(value, max) {
-  const line = String(value ?? "").replace(/\s+/g, " ").trim();
-  const clipped = line.length > max ? `${line.slice(0, max - 1)}…` : line;
-  return escapeMarkdown(clipped, { maskedLink: true }).replace(/</g, `<${ZERO_WIDTH}`);
+  // Counted in characters as people see them (code points), so no emoji is cut in half.
+  const chars = [...String(value ?? "").replace(/\s+/g, " ").trim()];
+  const clipped = chars.length > max ? `${chars.slice(0, max - 1).join("")}…` : chars.join("");
+  return escapeMarkdown(clipped, { maskedLink: true })
+    .replace(/</g, `<${ZERO_WIDTH}`)
+    .replace(/:\/\//g, `:${ZERO_WIDTH}//`)
+    .replace(/\b(discord(?:app)?)\.(gg|com|me|io)\b/gi, `$1${ZERO_WIDTH}.$2`);
 }
 
 const unix = (iso) => {

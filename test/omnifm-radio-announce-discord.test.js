@@ -102,6 +102,21 @@ test("DJ name and title cannot format, mention or ping", () => {
   assert.deepEqual(payload.allowedMentions, { parse: [] });
 });
 
+test("links in the DJ name or title neither link nor embed, and an emoji is never cut in half", () => {
+  const t = botTranslator("de");
+  const linked = textOf(buildRadioLivePayload({
+    t,
+    show: { ...SHOW, streamerName: "DJ https://dj.example", title: "Jetzt auf http://evil.example/x und discord.gg/abc oder discord.com/invite/xyz" },
+  }));
+  assert.doesNotMatch(linked, /https?:\/\//, "no clickable URL");
+  assert.doesNotMatch(linked, /discord\.(gg|com)\//i, "no invite link");
+  assert.match(linked, /evil/, "the text itself stays readable");
+
+  const emoji = textOf(buildRadioLivePayload({ t, show: { ...SHOW, title: "🎧".repeat(250) } }));
+  assert.doesNotMatch(emoji, /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/, "no broken surrogate pair");
+  assert.ok(emoji.includes(`${"🎧".repeat(199)}…`), "200 characters as people count them");
+});
+
 test("the live and the ended message stay inside Discord's limits in all nine languages", () => {
   const worst = {
     ...SHOW,
