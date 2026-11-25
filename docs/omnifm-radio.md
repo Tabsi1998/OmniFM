@@ -15,9 +15,9 @@ OmniFM merkt innerhalb weniger Sekunden, wenn DJ Tabsi live geht oder aufhört. 
 - **Webhook:** AzuraCast meldet „DJ verbunden/getrennt“ an `POST /api/radio/webhook`. Den Endpunkt gibt es nur mit `OMNIFM_RADIO_WEBHOOK_SECRET` (mindestens 16 Zeichen, sonst bleibt er aus). Ohne Geheimnis antwortet er 404, mit falschem 401.
 - **Abfrage als Rückfall:** Alle `OMNIFM_RADIO_POLL_MS` (Standard 30 s, mindestens 5 s) fragt OmniFM die Now-Playing-API. Antwortet sie nicht, bleibt der Zustand, wie er ist.
 - **Kurze Aussetzer:** Bricht die Verbindung kürzer als `OMNIFM_RADIO_LIVE_GRACE_MS` (Standard 60 s) weg, läuft dieselbe Sendung weiter. Melden Webhook und Abfrage dieselbe Sendung, gibt es trotzdem nur einen Beginn. Eine Abfrage, die vor dem letzten Webhook gestartet ist, zählt nicht.
-- **Verpasste Lücke:** War OmniFM länger weg und meldet AzuraCast eine neue Sendung (`broadcast_start` deutlich nach dem letzten Live-Stand), endet die alte und die neue beginnt.
+- **Verpasste Lücke:** War OmniFM länger weg und meldet AzuraCast eine neue Sendung (`broadcast_start` deutlich nach dem letzten Live-Stand), endet die alte zum letzten Live-Stand und die neue beginnt. Ein `broadcast_start` in der Zukunft (Uhr von AzuraCast vorgestellt) zählt höchstens bis jetzt.
 - **Titel:** Der Song kurz vor dem Live-Gehen ist meist noch vom Auto-DJ. Als Titel zählt erst ein anderer Text nach dem Beginn, sonst bleibt er leer.
-- **Datenbank weg:** Solange der gespeicherte Zustand nicht lesbar ist, speichert und meldet OmniFM nichts. So bleibt der Verlauf ganz, und eine laufende Sendung wird nicht doppelt gemeldet.
+- **Datenbank weg:** Solange der gespeicherte Zustand nicht lesbar ist, speichert und meldet OmniFM nichts. So bleibt der Verlauf ganz, und eine laufende Sendung wird nicht doppelt gemeldet. Der Webhook antwortet dann 503, das Cockpit zeigt „Zustand nicht lesbar (Datenbank)“.
 - Webhook und Abfrage laufen im Commander (oder im Monolith). Der öffentliche Eingang leitet `/api/radio` dorthin weiter. Staging setzt `OMNIFM_RADIO_ENABLED=0` (`docs/staging.md`).
 
 ### Webhook in AzuraCast einrichten
