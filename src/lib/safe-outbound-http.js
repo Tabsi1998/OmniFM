@@ -105,13 +105,26 @@ function isTestStreamOrigin(parsedUrl) {
 // naming the internal address stays refused. OMNIFM_RADIO_ENABLED=0 turns it off.
 const RADIO_INTERNAL_ROUTE = Symbol("omnifm-radio-internal-route");
 
-function radioPathAllowed(pathname, config, baseHost) {
+// One plain file name after /listen/<station>/: no further segments, no
+// percent-encoding (an encoded "/" or ".." would be decoded later by the proxy).
+const RADIO_STREAM_FILE = /^[A-Za-z0-9._-]+$/;
+
+function radioPathAllowed(pathname, config, base) {
+  const basePath = base.pathname.replace(/\/+$/, "");
   const station = encodeURIComponent(config.station);
-  if (pathname === `/api/nowplaying/${station}`) return true;
-  if (pathname.startsWith(`/listen/${station}/`)) return true;
+  try {
+    if (pathname === new URL(config.nowPlayingUrl).pathname) return true;
+  } catch {
+    // no now-playing path: nothing to allow here
+  }
+  const listen = `${basePath}/listen/${station}/`;
+  if (pathname.startsWith(listen)) {
+    const file = pathname.slice(listen.length);
+    return RADIO_STREAM_FILE.test(file) && !/^\.+$/.test(file);
+  }
   try {
     const stream = new URL(config.streamUrl);
-    return normalizeHostname(stream.hostname) === baseHost && pathname === stream.pathname;
+    return normalizeHostname(stream.hostname) === normalizeHostname(base.hostname) && pathname === stream.pathname;
   } catch {
     return false;
   }
@@ -119,9 +132,14 @@ function radioPathAllowed(pathname, config, baseHost) {
 
 /** The internal address for a request the bot makes to its own radio, or null. */
 function radioInternalRoute(rawUrl, method, policyOptions = {}) {
+  if (!String(process.env.OMNIFM_RADIO_INTERNAL_URL || "").trim()) return null;
   if (method !== "GET" && method !== "HEAD") return null;
   if (policyOptions?.requireHttps) return null;
   const config = getOmnifmRadioConfig();
+  if (Array.isArray(policyOptions?.allowedProtocols)
+    && !normalizeAllowedProtocols(policyOptions.allowedProtocols).has(new URL(config.internalUrl || "http://invalid").protocol)) {
+    return null;
+  }
   if (!config.enabled || !config.internalUrl) return null;
   let parsed;
   let base;
@@ -134,7 +152,7 @@ function radioInternalRoute(rawUrl, method, policyOptions = {}) {
   if (parsed.username || parsed.password) return null;
   const baseHost = normalizeHostname(base.hostname);
   if (parsed.protocol !== base.protocol || parsed.port !== base.port || normalizeHostname(parsed.hostname) !== baseHost) return null;
-  if (!radioPathAllowed(parsed.pathname, config, baseHost)) return null;
+  if (!radioPathAllowed(parsed.pathname, config, base)) return null;
   // Built from parts: a path such as "//other.host/x" can never become a host.
   const hop = new URL(config.internalUrl);
   hop.pathname = parsed.pathname;

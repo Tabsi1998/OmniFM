@@ -204,6 +204,61 @@ test("the internal address takes no credentials, so config and safeFetch agree",
   assert.equal(getOmnifmRadioConfig({ OMNIFM_RADIO_INTERNAL_URL: "http://u:p@192.168.2.253:8080" }).internalUrl, "");
 });
 
+test("behind /listen/<station>/ only one plain file name is rerouted, nothing encoded, no deeper path", () => withEnv(INTERNAL, async () => {
+  const hostOf = async (url) => {
+    const seen = [];
+    await safeFetch(url, {
+      lookupFn: async () => [{ address: "87.247.213.69", family: 4 }],
+      requestImpl: async (target) => {
+        seen.push(target.url.hostname);
+        return incoming(200);
+      },
+    });
+    return seen[0];
+  };
+  assert.equal(await hostOf("https://radio.omnifm.xyz/listen/omnifm_radio/radio.mp3"), "192.168.2.253");
+  assert.equal(await hostOf("https://radio.omnifm.xyz/listen/omnifm_radio/radio_192.aac"), "192.168.2.253");
+  for (const url of [
+    "https://radio.omnifm.xyz/listen/omnifm_radio/..%2F..%2Fapi%2Fadmin",
+    "https://radio.omnifm.xyz/listen/omnifm_radio/x%2F..%2F..%2Fradio%2F8000%2Fadmin%2F",
+    "https://radio.omnifm.xyz/listen/omnifm_radio/..%5Cadmin",
+    "https://radio.omnifm.xyz/listen/omnifm_radio/admin/stats",
+    "https://radio.omnifm.xyz/listen/omnifm_radio/",
+    "https://radio.omnifm.xyz/api/nowplaying/omnifm_radio/",
+  ]) {
+    // eslint-disable-next-line no-await-in-loop -- one address after the other
+    assert.equal(await hostOf(url), "radio.omnifm.xyz", `${url} stays public`);
+  }
+}));
+
+test("a base URL with a path prefix keeps the now-playing poll on the internal address", () => withEnv({
+  ...INTERNAL,
+  OMNIFM_RADIO_BASE_URL: "https://radio.omnifm.xyz/azura",
+}, async () => {
+  const seen = [];
+  await safeFetch("https://radio.omnifm.xyz/azura/api/nowplaying/omnifm_radio", {
+    lookupFn: noLookup,
+    requestImpl: async (target) => {
+      seen.push(target.url.toString());
+      return incoming(200, { body: "{}" });
+    },
+  });
+  assert.deepEqual(seen, ["http://192.168.2.253:8080/azura/api/nowplaying/omnifm_radio"]);
+}));
+
+test("a caller that allows only https is never rerouted to the http internal address", () => withEnv(INTERNAL, async () => {
+  const seen = [];
+  await safeFetch("https://radio.omnifm.xyz/listen/omnifm_radio/radio.mp3", {
+    allowedProtocols: ["https:"],
+    lookupFn: async () => [{ address: "87.247.213.69", family: 4 }],
+    requestImpl: async (target) => {
+      seen.push(target.url.toString());
+      return incoming(200);
+    },
+  });
+  assert.deepEqual(seen, ["https://radio.omnifm.xyz/listen/omnifm_radio/radio.mp3"]);
+}));
+
 test("the poller says since when AzuraCast does not answer and when it works again", async () => {
   const observed = [];
   const tracker = { observe: async (observation) => { observed.push(observation); }, tick: async () => {} };
