@@ -30,7 +30,7 @@ const personalDataMethods = {
     const collected = await collectPersonalData(interaction.user?.id);
     if (!collected.ok) return buildPersonalDataProblemPayload({ t, error: collected.error, applicationId });
     const listening = { counting: Boolean(collected.data.listeningHours), hours: collected.data.listeningHours?.hours || 0 };
-    return buildPersonalDataPayload({ t, counts: countPersonalData(collected.data), applicationId, listening });
+    return buildPersonalDataPayload({ t, counts: countPersonalData(collected.data), applicationId, listening, radioDmOptOut: collected.data.radioDms?.unsubscribed === true });
   },
 
   /** /meine-daten: private, always allowed; it is the person's own data. */
@@ -67,7 +67,7 @@ const personalDataMethods = {
     if (action === "erase") {
       const collected = await collectPersonalData(userId);
       await interaction.update(asUpdate(collected.ok
-        ? buildErasePersonalDataConfirm({ t, counts: countPersonalData(collected.data) })
+        ? buildErasePersonalDataConfirm({ t, counts: countPersonalData(collected.data), radioDmOptOut: collected.data.radioDms?.unsubscribed === true })
         : buildPersonalDataProblemPayload({ t, error: collected.error, applicationId })));
       return true;
     }

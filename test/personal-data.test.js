@@ -74,6 +74,19 @@ test("mydata panel: the OmniFM Radio DMs are listed, and deleting says an unsubs
   assert.match(textOf(buildPersonalDataPayload({ t, counts })), /OmniFM-Radio-DMs/);
   assert.doesNotMatch(textOf(buildPersonalDataPayload({ t, counts: { ...counts, radioDms: 0 } })), /OmniFM-Radio-DMs/);
   assert.match(textOf(buildErasePersonalDataConfirm({ t, counts })), /bleibt nur diese Abmeldung gespeichert/);
+  assert.doesNotMatch(textOf(buildErasePersonalDataConfirm({ t, counts: { ...counts, radioDms: 0, savedSongs: 2 } })), /OmniFM Radio/, "no word about the DMs without DM data");
+});
+
+test("mydata panel: a bare unsubscribe is shown as stored, but there is nothing to delete (#594)", () => {
+  const t = botTranslator("de");
+  const counts = { savedSongs: 0, votes: 0, dashboardLogins: 0, ownerConsoleLogins: 0, pollsStarted: 0, eventsCreated: 0, dashboardChanges: 0, radioDms: 0 };
+  const payload = buildPersonalDataPayload({ t, counts, radioDmOptOut: true });
+  assert.match(textOf(payload), /OmniFM-Radio-DMs: \*\*Abmeldung gespeichert\*\*/);
+  const erase = payload.components.flatMap((component) => component.toJSON().components)
+    .filter((block) => block.type === 1).flatMap((row) => row.components)
+    .find((button) => button.custom_id === personalDataCustomId("erase"));
+  assert.equal(erase.disabled, true, "the opt-out is not deletable");
+  assert.match(textOf(buildErasePersonalDataConfirm({ t, counts: { ...counts, savedSongs: 1 }, radioDmOptOut: true })), /bleibt nur diese Abmeldung gespeichert/);
 });
 
 test("mydata counts the OmniFM Radio DMs only beyond a bare unsubscribe, which deleting keeps (#594)", async () => {
