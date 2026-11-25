@@ -42,3 +42,10 @@ condition = "AND"
 paths = ['''^test/(web-server-dashboard|start-config-migration)\.test\.js$''']
 regexTarget = "secret"
 regexes = ['''^9(23456789012345678|87654321098765432)$''']
+
+[[allowlists]]
+description = "The made-up webhook secret in the OmniFM Radio live tests (#592). It only checks that the setting is read and trimmed."
+condition = "AND"
+paths = ['''^test/omnifm-radio-live\.test\.js$''']
+regexTarget = "secret"
+regexes = ['''^\s*a-long-enough-secret-123\s*$''']
