@@ -77,6 +77,26 @@ test("names and titles from AzuraCast cannot format the DM or mention anybody", 
   assert.match(text, /\\`x\\`/);
 });
 
+test("the official DM carries no disguised or clickable foreign link, heading or list", () => {
+  const titles = {
+    masked: "[Jetzt gratis Nitro](https://evil.example/nitro)",
+    heading: "# Riesig",
+    bullet: "- Punkt",
+    numbered: "1. Punkt",
+    raw: "hör auch https://evil.example und http://other.example/x",
+  };
+  for (const [kind, title] of Object.entries(titles)) {
+    const payload = buildRadioDmMessage({ show: { ...SHOW, streamerName: "[DJ](https://evil.example)", title }, language: "de", config: CONFIG, guildName: "# https://evil.example" });
+    const shown = textOf(payload);
+    assert.doesNotMatch(shown, /https?:\/\//, `${kind}: no URL Discord would make clickable`);
+    assert.doesNotMatch(shown, /(^|[^\\])\[[^\]]*\]\(/, `${kind}: no masked link`);
+    const subtitle = shown.split("\n")[1];
+    assert.doesNotMatch(subtitle, /^(#{1,3} |- |\d+\. )/, `${kind}: the title line is no heading or list`);
+  }
+  const link = buttonsOf(buildRadioDmMessage({ show: SHOW, language: "de", config: CONFIG }))[0];
+  assert.equal(link.url, "https://radio.omnifm.xyz/public/omnifm_radio", "our own button keeps its link");
+});
+
 test("a test DM says it is a test", () => {
   assert.match(textOf(buildRadioDmMessage({ show: { ...SHOW, source: "test" }, language: "de", config: CONFIG })), /🧪/);
   assert.doesNotMatch(textOf(buildRadioDmMessage({ show: SHOW, language: "de", config: CONFIG })), /🧪/);

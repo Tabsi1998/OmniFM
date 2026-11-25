@@ -30,10 +30,19 @@ export function radioDmListenUrl(config) {
   return `${String(config?.baseUrl || "").replace(/\/+$/, "")}/public/${encodeURIComponent(String(config?.station || ""))}`;
 }
 
-/** One line, at most `max` characters, no formatting, no mention (an @ gets a zero-width space). */
+const ZERO_WIDTH_SPACE = "\u200b";
+const MARKDOWN = Object.freeze({ heading: true, maskedLink: true, bulletedList: true, numberedList: true });
+
+/**
+ * One line, at most `max` characters, as plain text: no formatting, no
+ * heading or list, no masked link, no clickable URL (the scheme is broken
+ * with a zero-width space) and no mention (an @ gets one too).
+ */
 function safe(value, max) {
   const line = String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
-  return escapeMarkdown(line).replace(/@/g, "@​");
+  return escapeMarkdown(line, MARKDOWN)
+    .replace(/([a-z][a-z0-9+.-]*):\/\//gi, `$1:${ZERO_WIDTH_SPACE}//`)
+    .replace(/@/g, `@${ZERO_WIDTH_SPACE}`);
 }
 
 function buttonRow(button) {
