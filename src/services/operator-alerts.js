@@ -415,6 +415,34 @@ export async function alertRadioLive(event, env = process.env, send = notifyOper
   return (await send(key, embed)) === true;
 }
 
+/**
+ * The emergency brake of the owner DMs (#594): Discord's spam signals or
+ * five failures in a row stopped the run and switched the DMs off.
+ * Switched off together with the show messages (OPERATOR_ALERT_RADIO_LIVE).
+ * @param {{ reason: "discord" | "failures", run?: { startedAt?: string, sent?: number, failed?: number, remaining?: number, error?: string | null } }} info
+ */
+export function buildRadioDmBrakeAlert({ reason, run = {} }) {
+  const why = reason === "discord" ? "Discord bremst (Rate-Limit oder Sperre)" : "fünf Fehler hintereinander";
+  return {
+    key: `radio-dm-brake:${run.startedAt || "-"}`,
+    embed: {
+      color: OPERATOR_COLORS.error,
+      title: `🛑 OmniFM-Radio-DMs gestoppt: ${why}`,
+      description: [
+        `${run.sent || 0} gesendet, ${run.failed || 0} fehlgeschlagen, ${run.remaining || 0} offen.`,
+        run.error ? `Zuletzt: ${plain(run.error, 200)}` : "",
+        "Der DM-Modus steht jetzt auf „Aus“. Wieder einschalten im Cockpit, Karte „DMs an Server-Besitzer“.",
+      ].filter(Boolean).join("\n"),
+    },
+  };
+}
+
+export async function alertRadioDmBrake(info, env = process.env, send = notifyOperator) {
+  if (!alertEnabled("RADIO_LIVE", env)) return false;
+  const { key, embed } = buildRadioDmBrakeAlert(info);
+  return (await send(key, embed)) === true;
+}
+
 // ---------------------------------------------------------------- commander
 
 /** Worker and disk watchers of the commander process. Returns a stop function. */

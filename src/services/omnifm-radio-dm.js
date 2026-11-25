@@ -11,7 +11,11 @@
 //   - one global queue, one DM every few seconds, one attempt each: the DMs
 //     go through their own REST client without retries that rejects a
 //     rate limit (src/services/omnifm-radio-dm-sender.js). Closed DMs
-//     (50007/403) leave the person alone for 30 days.
+//     (50007, 10013, 403) leave the person alone for 30 days, but only in a
+//     run that is otherwise healthy.
+//   - emergency brake: Discord's spam signals (40003, 40004, a rate limit)
+//     or five failures in a row stop the run, switch the mode to "off" and
+//     tell the operator (OPERATOR_ALERT_RADIO_LIVE).
 //   - "Abbestellen" in every DM, for good (src/bot/omnifm-radio-dm-message.js).
 //   - the mode in the owner console (owner_config.radioDm.mode), else
 //     OMNIFM_RADIO_DM_MODE, else "owners": owners | optin | off. It is read
@@ -23,7 +27,8 @@ import { getDb, isConnected, isMongoRequested } from "../lib/db.js";
 import { OWNER_CONFIG_ID } from "../lib/owner-config.js";
 import { sharedOmnifmRadioDmStore } from "../omnifm-radio-dm-store.js";
 import { buildRadioDmMessage } from "../bot/omnifm-radio-dm-message.js";
-import { createRadioDmSender, radioDmBody } from "./omnifm-radio-dm-sender.js";
+import { createRadioDmSender, isRadioDmRateLimit, radioDmBody } from "./omnifm-radio-dm-sender.js";
+import { alertRadioDmBrake } from "./operator-alerts.js";
 import { getOmnifmRadioConfig, isOmnifmRadioVisibleForGuild } from "./omnifm-radio-config.js";
 import { onOmnifmRadioLiveEvent } from "./omnifm-radio-live.js";
 
@@ -38,6 +43,10 @@ const DM_INTERVAL_MS = 5_000;
 const CLIENT_WAIT_MS = 2 * MINUTE;
 const CLIENT_POLL_MS = 1_000;
 const STOP_TIMEOUT_MS = 3_000;
+// Five failed DMs in a row look like a bot Discord no longer trusts.
+const FAILURE_STREAK_LIMIT = 5;
+// "Opening DMs too fast", "sending temporarily disabled".
+const SPAM_SIGNAL_CODES = new Set([40003, 40004]);
 const SNOWFLAKE = /^\d{17,22}$/;
 const iso = (ms) => new Date(ms).toISOString();
 const errorText = (error) => String(error?.message || error).slice(0, 200);
@@ -113,9 +122,15 @@ export function collectRadioDmRecipients({ guilds, config, test, resolveLanguage
   return [...recipients.values()];
 }
 
-/** Discord does not deliver DMs to this person (50007, or a 403). */
+/** Discord tells the bot to slow down: stop everything (40003, 40004, a rate limit). */
+export function isDiscordSpamSignal(error) {
+  return SPAM_SIGNAL_CODES.has(error?.code) || isRadioDmRateLimit(error);
+}
+
+/** Discord does not deliver DMs to this person (50007, an unknown user 10013, another 403). */
 export function isDmClosedError(error) {
-  return error?.code === 50007 || error?.status === 403;
+  if (isDiscordSpamSignal(error)) return false;
+  return error?.code === 50007 || error?.code === 10013 || error?.status === 403;
 }
 
 // ---------------------------------------------------------------- distribution
@@ -138,7 +153,7 @@ function abortableSleep(ms, signal) {
 }
 
 /**
- * @param {{ getRuntime: () => any, store?: any, modeStore?: { read: () => Promise<string>, write: (mode: string) => Promise<void> }, env?: Record<string, string | undefined>, getConfig?: () => any, createSender?: (runtime: any) => { send: (userId: string, body: any) => Promise<void>, stop?: () => void }, now?: () => number, sleep?: (ms: number, signal?: AbortSignal) => Promise<void>, intervalMs?: number, clientWaitMs?: number }} options
+ * @param {{ getRuntime: () => any, store?: any, modeStore?: { read: () => Promise<string>, write: (mode: string) => Promise<void> }, env?: Record<string, string | undefined>, getConfig?: () => any, createSender?: (runtime: any) => { send: (userId: string, body: any) => Promise<void>, stop?: () => void }, alert?: (info: any) => Promise<any>, now?: () => number, sleep?: (ms: number, signal?: AbortSignal) => Promise<void>, intervalMs?: number, clientWaitMs?: number }} options
  */
 export function createOmnifmRadioDmService({
   getRuntime,
@@ -148,6 +163,7 @@ export function createOmnifmRadioDmService({
   getConfig = () => getOmnifmRadioConfig(env),
   // The commander's own token, its own REST client: one attempt per DM.
   createSender = (runtime) => createRadioDmSender({ token: runtime.config?.token || runtime.client?.token }),
+  alert = (info) => alertRadioDmBrake(info, env),
   now = Date.now,
   sleep = abortableSleep,
   intervalMs = DM_INTERVAL_MS,
@@ -202,20 +218,33 @@ export function createOmnifmRadioDmService({
     }));
   }
 
+  /** One attempt; no retry, a second try is exactly what looks like spam. */
   async function sendOne(sender, recipient, body, run) {
     try {
       await sender.send(recipient.userId, body);
       run.sent += 1;
+      return { ok: true };
     } catch (error) {
-      // No retry: a second try is exactly what looks like spam.
       run.failed += 1;
-      if (isDmClosedError(error)) {
-        await store.markDmsClosed(recipient.userId, { until: now() + CLOSED_FOR_MS })
-          .catch((storeError) => log("WARN", `[OmniFM Radio] Geschlossene DMs nicht gespeichert: ${storeError?.message || storeError}`));
-      } else {
-        log("WARN", `[OmniFM Radio] DM an ${recipient.userId} fehlgeschlagen: ${error?.message || error}`);
-      }
+      log("WARN", `[OmniFM Radio] DM an ${recipient.userId} fehlgeschlagen: ${error?.code || error?.status || ""} ${error?.message || error}`);
+      return { ok: false, error, brake: isDiscordSpamSignal(error), closed: isDmClosedError(error) };
     }
+  }
+
+  /** Off at once and stored, and the operator hears why. */
+  async function pullTheBrake(run) {
+    offInMemory = true;
+    abortAll(run.stoppedBy);
+    try {
+      await modeStore.write("off");
+      offInMemory = false;
+    } catch (error) {
+      log("WARN", `[OmniFM Radio] DM-Not-Aus nur im Speicher, nicht gespeichert: ${error?.message || error}`);
+    }
+    log("WARN", `[OmniFM Radio] DMs automatisch ausgeschaltet (${run.stoppedBy}): ${run.error || "-"}`);
+    await Promise.resolve()
+      .then(() => alert({ reason: run.stoppedBy, run: { ...run, show: { ...run.show } } }))
+      .catch((error) => log("WARN", `[OmniFM Radio] Betreiber-Meldung zum DM-Not-Aus fehlgeschlagen: ${error?.message || error}`));
   }
 
   /** @returns {Promise<string | null>} why it stopped early, null when everyone was handled */
@@ -255,37 +284,65 @@ export function createOmnifmRadioDmService({
   async function distributeTo(job, run, { runtime, sender, recipients, quota, config }) {
     const { signal } = job.controller;
     let pause = false;
-    for (const recipient of recipients) {
-      // One after the other on purpose: one DM, a pause, the next.
-      // eslint-disable-next-line no-await-in-loop
-      if (pause) await sleep(intervalMs, signal);
-      pause = false;
-      if (signal.aborted) return job.reason;
-      // The kill switch counts before every DM.
-      // eslint-disable-next-line no-await-in-loop
-      run.mode = await currentMode();
-      if (run.mode === "off") return "off";
-      let body;
-      try {
-        body = buildBody(runtime, recipient, job.show, config);
-      } catch (error) {
-        run.error = errorText(error);
-        return "config";
+    let streak = 0;
+    let healthy = true;
+    // Closed DMs are marked once the run has shown it works; a failing streak proves nothing.
+    const closed = [];
+    const markClosed = async () => {
+      for (const entry of closed.splice(0)) {
+        // eslint-disable-next-line no-await-in-loop -- a few, one after the other
+        await store.markDmsClosed(entry.userId, { until: entry.until, now: now() })
+          .catch((error) => log("WARN", `[OmniFM Radio] Geschlossene DMs nicht gespeichert: ${error?.message || error}`));
       }
-      // eslint-disable-next-line no-await-in-loop
-      const claimed = await store.claim(recipient.userId, { quota, windowMs: QUOTAS[quota], now: now(), subscribedOnly: run.mode === "optin" });
-      // A stop during the claim: the slot stays used, but nothing is sent.
-      if (claimed && signal.aborted) return job.reason;
-      run.remaining -= 1;
-      if (!claimed) {
-        run.skipped += 1;
-        continue;
+    };
+    try {
+      for (const recipient of recipients) {
+        // One after the other on purpose: one DM, a pause, the next.
+        // eslint-disable-next-line no-await-in-loop
+        if (pause) await sleep(intervalMs, signal);
+        pause = false;
+        if (signal.aborted) return job.reason;
+        // The kill switch counts before every DM.
+        // eslint-disable-next-line no-await-in-loop
+        run.mode = await currentMode();
+        if (run.mode === "off") return "off";
+        let body;
+        try {
+          body = buildBody(runtime, recipient, job.show, config);
+        } catch (error) {
+          run.error = errorText(error);
+          return "config";
+        }
+        // eslint-disable-next-line no-await-in-loop
+        const claimed = await store.claim(recipient.userId, { quota, windowMs: QUOTAS[quota], now: now(), subscribedOnly: run.mode === "optin" });
+        // A stop during the claim: the slot stays used, but nothing is sent.
+        if (claimed && signal.aborted) return job.reason;
+        run.remaining -= 1;
+        if (!claimed) {
+          run.skipped += 1;
+          continue;
+        }
+        // eslint-disable-next-line no-await-in-loop
+        const outcome = await sendOne(sender, recipient, body, run);
+        pause = true;
+        if (outcome.ok) {
+          streak = 0;
+          // eslint-disable-next-line no-await-in-loop
+          await markClosed();
+          continue;
+        }
+        streak += 1;
+        if (outcome.closed) closed.push({ userId: recipient.userId, until: now() + CLOSED_FOR_MS });
+        if (outcome.brake || streak >= FAILURE_STREAK_LIMIT) {
+          healthy = false;
+          run.error = errorText(outcome.error);
+          return outcome.brake ? "discord" : "failures";
+        }
       }
-      // eslint-disable-next-line no-await-in-loop
-      await sendOne(sender, recipient, body, run);
-      pause = true;
+      return null;
+    } finally {
+      if (healthy) await markClosed();
     }
-    return null;
   }
 
   async function runJob(job) {
@@ -312,6 +369,7 @@ export function createOmnifmRadioDmService({
     active = job;
     try {
       run.stoppedBy = await distribute(job, run);
+      if (run.stoppedBy === "discord" || run.stoppedBy === "failures") await pullTheBrake(run);
     } catch (error) {
       log("WARN", `[OmniFM Radio] DM-Verteilung abgebrochen: ${error?.message || error}`);
       run.stoppedBy = "error";

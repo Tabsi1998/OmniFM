@@ -96,7 +96,7 @@ function setup({ config = CONFIG, env = {}, consoleMode = "", store = memoryStor
     },
     async write(mode) { this.value = mode; },
   };
-  const context = { sleeps, modeStore, runtime, store, now };
+  const context = { sleeps, modeStore, runtime, store, now, alerts: [] };
   context.service = createOmnifmRadioDmService({
     getRuntime: () => runtime,
     store,
@@ -104,6 +104,7 @@ function setup({ config = CONFIG, env = {}, consoleMode = "", store = memoryStor
     env,
     getConfig: () => config,
     createSender: (commander) => commander.sender,
+    alert: async (info) => { context.alerts.push(info); },
     now,
     intervalMs: 5_000,
     sleep: async (ms, signal) => {
@@ -441,4 +442,71 @@ test("a stop that comes while a person is being claimed sends that person nothin
   const run = await distribute(context);
   assert.equal(run.stoppedBy, "end");
   assert.deepEqual(context.runtime.fetched, [], "claimed, but not sent");
+});
+
+// ---------------------------------------------------------------- emergency brake
+
+const apiError = (code, status, message = "Discord") => Object.assign(new Error(message), { code, status });
+const owners = (count) => Array.from({ length: count }, (_, index) => ({
+  id: String(600000000000000001n + BigInt(index)),
+  ownerId: String(700000000000000001n + BigInt(index)),
+  name: `Server ${index + 1}`,
+}));
+
+test("Discord's spam signals stop the run at once, switch the DMs off and tell the operator", async () => {
+  const { RateLimitError } = await import("@discordjs/rest");
+  const limited = new RateLimitError({ timeToReset: 5000, limit: 1, method: "POST", hash: "h", url: "u", route: "/users/@me/channels", majorParameter: "1", global: false, retryAfter: 5000, sublimitTimeout: 0, scope: "user" });
+  const signals = {
+    "40003 (opening DMs too fast)": apiError(40003, 403, "You are opening direct messages too fast."),
+    "40004 (sending disabled)": apiError(40004, 403, "Send messages has been temporarily disabled."),
+    "a 429": apiError(0, 429, "Too Many Requests"),
+    "a rate limit of the REST client": limited,
+  };
+  for (const [name, error] of Object.entries(signals)) {
+    const context = setup({ config: PUBLIC, runtime: fakeRuntime({ fail: { [A]: error } }) });
+    // eslint-disable-next-line no-await-in-loop -- one signal after the other
+    const run = await distribute(context);
+    assert.equal(run.stoppedBy, "discord", name);
+    assert.deepEqual(context.runtime.fetched, [A], `${name}: nobody after that`);
+    assert.equal(context.modeStore.value, "off", `${name}: the DMs are switched off`);
+    assert.equal(context.alerts.length, 1, `${name}: the operator hears it`);
+    assert.equal(context.alerts[0].reason, "discord");
+    // eslint-disable-next-line no-await-in-loop
+    assert.equal((await context.store.get(A)).dmClosedUntil, null, `${name}: no "DMs closed" from a brake`);
+  }
+});
+
+test("five failures in a row stop the run; a streak of closed DMs marks nobody", async () => {
+  const guilds = owners(7);
+  const fail = Object.fromEntries(guilds.map((guild) => [guild.ownerId, apiError(50007, 403, "Cannot send messages to this user")]));
+  const context = setup({ config: { ...PUBLIC, testGuildIds: [] }, runtime: fakeRuntime({ guilds, fail }) });
+  const run = await distribute(context);
+  assert.equal(run.stoppedBy, "failures");
+  assert.equal(context.runtime.fetched.length, 5);
+  assert.deepEqual({ failed: run.failed, remaining: run.remaining }, { failed: 5, remaining: 2 });
+  assert.equal(context.modeStore.value, "off");
+  assert.equal(context.alerts[0].reason, "failures");
+  const marked = await Promise.all(guilds.map((guild) => context.store.get(guild.ownerId)));
+  assert.deepEqual(marked.map((person) => person?.dmClosedUntil ?? null), guilds.map(() => null), "a broken run is no proof that DMs are closed");
+});
+
+test("single closed DMs (50007, also 10013) in a healthy run are remembered; a success breaks the streak", async () => {
+  const guilds = owners(7);
+  const [first, second, third] = guilds.map((guild) => guild.ownerId);
+  const fail = {
+    [first]: apiError(50007, 403),
+    [second]: apiError(10013, 404, "Unknown User"),
+  };
+  // Four failures, a success, four failures: never five in a row.
+  for (const guild of guilds.slice(2, 4)) fail[guild.ownerId] = apiError(0, 500);
+  for (const guild of guilds.slice(5)) fail[guild.ownerId] = apiError(0, 500);
+  const context = setup({ config: { ...PUBLIC, testGuildIds: [] }, runtime: fakeRuntime({ guilds, fail }) });
+  const run = await distribute(context);
+  assert.equal(run.stoppedBy, null);
+  assert.deepEqual({ sent: run.sent, failed: run.failed }, { sent: 1, failed: 6 });
+  assert.ok((await context.store.get(first)).dmClosedUntil > T0, "50007 is remembered");
+  assert.ok((await context.store.get(second)).dmClosedUntil > T0, "10013 too");
+  assert.equal((await context.store.get(third)).dmClosedUntil, null);
+  assert.equal(context.alerts.length, 0);
+  assert.equal(context.modeStore.value, "", "a healthy run leaves the mode alone");
 });
