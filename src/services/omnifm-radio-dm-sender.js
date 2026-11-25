@@ -35,7 +35,7 @@ export function isRadioDmRateLimit(error) {
 /** How long the client's own lock lasts, or null. Under such a lock nothing reached Discord. */
 export function radioDmWaitMs(error) {
   if (Number.isFinite(error?.radioDmWaitMs)) return Math.max(0, error.radioDmWaitMs);
-  if (error instanceof RateLimitError && error.radioDmTooManyRequests !== true) return Math.max(0, Number(error.timeToReset) || 0);
+  if (error instanceof RateLimitError && /** @type {any} */ (error).radioDmTooManyRequests !== true) return Math.max(0, Number(error.timeToReset) || 0);
   return null;
 }
 
@@ -65,8 +65,13 @@ export function createRadioDmSender({ token, rest = createRadioDmRest(token) }) 
   }
 
   return {
-    /** @param {{ signal?: AbortSignal }} [options] */
-    async send(userId, body, { signal } = {}) {
+    /**
+     * @param {string} userId
+     * @param {any} body
+     * @param {{ signal?: AbortSignal }} [options]
+     */
+    async send(userId, body, options = {}) {
+      const { signal } = options;
       const channel = await post(Routes.userChannels(), { body: { recipient_id: userId }, signal });
       if (!channel?.id) throw new Error("Discord hat keinen DM-Kanal zurückgegeben.");
       await post(Routes.channelMessages(channel.id), { body, signal });
