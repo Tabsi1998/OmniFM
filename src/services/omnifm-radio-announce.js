@@ -125,10 +125,10 @@ export function createOmnifmRadioAnnouncer({
     const settings = normalizeRadioAnnounceSettings((await loadSettings(guildId))?.[RADIO_ANNOUNCE_SETTINGS_KEY]);
     if (!settings.enabled) return "off";
     const test = show.source === "test";
-    if (!test) {
-      const last = await store.lastPostedAt(guildId);
-      if (last !== null && now() - last < ANNOUNCE_LIMIT_MS) return "limit";
-    }
+    // Asked for test shows too: with MongoDB away this throws, so nothing goes
+    // out that could not be edited later (and an "off" that could not be read stays off).
+    const last = await store.lastPostedAt(guildId);
+    if (!test && last !== null && now() - last < ANNOUNCE_LIMIT_MS) return "limit";
     await pace();
     // The show may have ended while this one waited for its turn.
     if (activeShowId !== showId || stopped) return "ended";

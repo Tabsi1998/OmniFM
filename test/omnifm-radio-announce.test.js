@@ -192,6 +192,17 @@ test("a server whose settings cannot be read is skipped, the others still get th
   assert.deepEqual(bot.posts.map((post) => post.guildId), [OTHER_GUILD]);
 });
 
+test("with MongoDB away nothing goes out, not even a test show (its \"off\" could not be read)", async () => {
+  const away = createOmnifmRadioAnnounceStore({ getDatabase: () => null, mongoRequested: () => true });
+  for (const source of ["webhook", "test"]) {
+    const { bot, announcer } = setup({ store: away });
+    announcer.handle({ type: "start", show: show(START, { source }) });
+    // eslint-disable-next-line no-await-in-loop -- one show after the other
+    await announcer.idle();
+    assert.equal(bot.posts.length, 0, source);
+  }
+});
+
 test("OmniFM 1 posts once it is ready; without it on the server nothing goes out", async () => {
   const bot = fakeBot({ guilds: [OTHER_GUILD] });
   let calls = 0;
