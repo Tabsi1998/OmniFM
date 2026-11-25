@@ -330,3 +330,39 @@ test("stop drops what is still waiting", async () => {
   await announcer.idle();
   assert.ok(bot.posts.length < 3, "nothing new after stop");
 });
+
+// ---------------------------------------------------------------- wiring
+
+test("the service listens to the live events and lets OmniFM 1 (worker slot 1) post; stop ends that", async () => {
+  const { emitOmnifmRadioLiveEvent } = await import("../src/services/omnifm-radio-live.js");
+  const { startOmnifmRadioAnnouncements, stopOmnifmRadioAnnouncements } = await import("../src/services/omnifm-radio-announce.js");
+  const first = fakeBot({ id: "bot-2", guilds: [TEST_GUILD] });
+  const second = fakeBot({ id: "bot-3", guilds: [TEST_GUILD] });
+  const workerManager = { getWorkerBySlot: (slot) => ({ 1: first, 2: second })[slot] || null };
+  const service = startOmnifmRadioAnnouncements({
+    getWorkerManager: () => workerManager,
+    store: createOmnifmRadioAnnounceStore({ getDatabase: () => null, mongoRequested: () => false }),
+    loadSettings: async () => ({}),
+    getConfig: () => radioConfig(),
+    sleep: async () => {},
+  });
+  emitOmnifmRadioLiveEvent({ type: "start", show: show() });
+  await service.announcer.idle();
+  assert.deepEqual([first.posts.length, second.posts.length], [1, 0]);
+
+  await stopOmnifmRadioAnnouncements();
+  emitOmnifmRadioLiveEvent({ type: "start", show: show(START + 3 * ANNOUNCE_LIMIT_MS) });
+  await service.announcer.idle();
+  assert.equal(first.posts.length, 1, "after stop nothing listens");
+});
+
+test("both entry points subscribe right below the live detection and stop on shutdown", async () => {
+  const fs = await import("node:fs");
+  for (const file of ["src/entrypoints/commander.js", "src/index.js"]) {
+    const lines = fs.readFileSync(new URL(`../${file}`, import.meta.url), "utf8").split(/\r?\n/);
+    const live = lines.findIndex((line) => line.startsWith("await startOmnifmRadioLiveService("));
+    assert.ok(live > 0, file);
+    assert.match(lines[live + 1], /^startOmnifmRadioAnnouncements\(\{ getWorkerManager: \(\) => workerManager \}\);/, file);
+    assert.ok(lines.some((line) => line.includes("stopOmnifmRadioAnnouncements()")), `${file}: stopped on shutdown`);
+  }
+});

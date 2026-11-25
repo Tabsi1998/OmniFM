@@ -244,13 +244,15 @@ let service = null;
  * Subscribes to the live events in the commander or the monolith.
  * `getWorkerManager` returns the process's worker manager; the entry points
  * create it after this call, so it may throw or return nothing at first.
- * @param {{ getWorkerManager: () => any }} options
+ * The other options reach createOmnifmRadioAnnouncer (tests).
+ * @param {{ getWorkerManager: () => any } & Record<string, any>} options
  */
-export function startOmnifmRadioAnnouncements({ getWorkerManager }) {
+export function startOmnifmRadioAnnouncements({ getWorkerManager, ...options }) {
   if (service) return service;
   const announcer = createOmnifmRadioAnnouncer({
     // OmniFM 1 is the first worker (slot 1), the bot every server has.
     getAnnouncer: () => getWorkerManager()?.getWorkerBySlot?.(1) || null,
+    ...options,
   });
   const unsubscribe = onOmnifmRadioLiveEvent((event) => announcer.handle(event));
   service = {
