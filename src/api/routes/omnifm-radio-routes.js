@@ -179,6 +179,8 @@ function consoleView(service, role) {
     webhookSecretTooShort: service.settings?.webhookSecretTooShort === true,
     pollMs: service.settings?.pollMs ?? null,
     graceMs: service.settings?.graceMs ?? null,
+    internal: Boolean(service.config?.internalUrl),
+    poll: typeof service.pollStatus === "function" ? service.pollStatus() : null,
     ...service.tracker.snapshot(),
   };
 }

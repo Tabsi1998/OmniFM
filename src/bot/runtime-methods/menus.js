@@ -16,6 +16,7 @@ import { PERSONAL_DATA_PREFIX } from "../personal-data-panel.js";
 import { YEAR_REVIEW_PREFIX } from "../year-review-panel.js";
 import { REPORT_PREFIX } from "../problem-report-messages.js";
 import { RADIO_DM_PREFIX, handleRadioDmComponent } from "../omnifm-radio-dm-message.js";
+import { RADIO_LISTEN_ID } from "../omnifm-radio-announce-messages.js";
 import { clipText } from "../../lib/helpers.js";
 import { getTier } from "../../core/entitlements.js";
 import { BRAND } from "../../config/plans.js";
@@ -629,6 +630,10 @@ const menuMethods = {
       // "Abbestellen" in the OmniFM Radio DM (#594); in a DM, without a server.
       if (customId.startsWith(RADIO_DM_PREFIX)) {
         return handleRadioDmComponent(interaction);
+      }
+      // "Listen now" under a live announcement of OmniFM Radio (#593).
+      if (customId === RADIO_LISTEN_ID && interaction.isButton?.()) {
+        return this.handleRadioListenButton(interaction);
       }
       return false;
     } catch (err) {

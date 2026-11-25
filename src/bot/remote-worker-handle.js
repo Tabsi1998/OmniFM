@@ -485,6 +485,8 @@ class RemoteWorkerHandle {
       return {
         ok: false,
         error: "Worker ist offline oder kein Heartbeat verfügbar.",
+        // Never queued: the worker certainly did nothing.
+        notStarted: true,
       };
     }
     try {
@@ -501,6 +503,8 @@ class RemoteWorkerHandle {
       return {
         ok: false,
         error: err?.message || String(err),
+        // Cancelled while still pending: the worker never ran it.
+        ...(err?.notStarted === true ? { notStarted: true } : {}),
       };
     }
   }
@@ -556,6 +560,20 @@ class RemoteWorkerHandle {
 
   async playJingleFromDashboard(guildId) {
     return this.sendCommand("playJingle", { guildId }, { timeoutMs: 15_000 });
+  }
+
+  // OmniFM Radio's live announcement (#593): the worker posts and edits it.
+  async postRadioAnnouncement(guildId, { channelId = "", roleId = "", show = {}, claim = null } = {}) {
+    return this.sendCommand("radioAnnounce", { guildId, channelId, roleId, show, claim }, { timeoutMs: 20_000 });
+  }
+
+  /** Answered from the worker's cache: no call to Discord. */
+  async checkRadioAnnouncement(guildId, { channelId = "" } = {}) {
+    return this.sendCommand("radioAnnounceCheck", { guildId, channelId }, { timeoutMs: 10_000 });
+  }
+
+  async endRadioAnnouncement(guildId, { channelId = "", messageId = "", show = {} } = {}) {
+    return this.sendCommand("radioAnnounceEnd", { guildId, channelId, messageId, show }, { timeoutMs: 20_000 });
   }
 
   async setSleepTimerInGuild(guildId, minutes) {

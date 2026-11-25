@@ -3,7 +3,7 @@
 // (with the operator message) without sending anything.
 import { useCallback, useEffect, useState } from 'react';
 import { Radio } from 'lucide-react';
-import { radioDetectionText, radioShowDuration, radioShowLabel, radioSourceLabel, radioStateText, radioTime } from '../../lib/ownerRadio.js';
+import { radioDetectionText, radioPollProblemText, radioShowDuration, radioShowLabel, radioSourceLabel, radioStateText, radioTime } from '../../lib/ownerRadio.js';
 
 const SHOWN_SHOWS = 10;
 
@@ -58,6 +58,11 @@ export default function OwnerRadioLive({ apiGet, apiSend }) {
             {radioDetectionText(data)}
             {data.observedAt ? ` · zuletzt gemeldet ${radioTime(data.observedAt)} (${radioSourceLabel(data.observedBy)})` : ''}
           </div>
+          {radioPollProblemText(data) && (
+            <div role="alert" data-testid="radio-live-poll-problem" style={{ color: '#fbbf24', fontSize: 12, marginTop: 6, overflowWrap: 'anywhere' }}>
+              {radioPollProblemText(data)}
+            </div>
+          )}
           {data.canTest && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
               <button type="button" className="oa-btn ghost" disabled={busy || realLive} onClick={testShow} data-testid="radio-live-test" style={{ height: 30, padding: '0 12px', fontSize: 12 }}>

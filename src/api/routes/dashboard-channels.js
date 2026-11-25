@@ -41,7 +41,7 @@ export function createDashboardChannelsRouteHandler(deps) {
 
     const { guild } = resolveRuntimeForGuild(runtimes, guildInfo.id);
     if (!guild) {
-      sendJson(res, 200, { voiceChannels: [], textChannels: [] });
+      sendJson(res, 200, { voiceChannels: [], textChannels: [], announcementChannels: [] });
       return true;
     }
 
@@ -51,6 +51,8 @@ export function createDashboardChannelsRouteHandler(deps) {
 
     const voiceChannels = [];
     const textChannels = [];
+    // Only the radio announcement (#593) offers them; the other pickers keep text channels.
+    const announcementChannels = [];
     for (const [, channel] of guild.channels.cache) {
       const entry = {
         id: channel.id,
@@ -62,12 +64,15 @@ export function createDashboardChannelsRouteHandler(deps) {
         voiceChannels.push({ ...entry, type: channel.type === 13 ? "stage" : "voice" });
       } else if (channel.type === 0) {
         textChannels.push(entry);
+      } else if (channel.type === 5) {
+        announcementChannels.push(entry);
       }
     }
 
     voiceChannels.sort((a, b) => a.position - b.position);
     textChannels.sort((a, b) => a.position - b.position);
-    sendJson(res, 200, { voiceChannels, textChannels });
+    announcementChannels.sort((a, b) => a.position - b.position);
+    sendJson(res, 200, { voiceChannels, textChannels, announcementChannels });
     return true;
   };
 }

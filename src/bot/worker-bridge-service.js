@@ -13,6 +13,10 @@ const REMOTE_WORKER_COMMAND_FALLBACK_POLL_MS = Math.max(
   Number.parseInt(String(process.env.REMOTE_WORKER_COMMAND_FALLBACK_POLL_MS || "5000"), 10) || 5_000
 );
 const REMOTE_WORKER_MAX_COMMANDS_PER_TICK = 25;
+// OmniFM Radio's announcement (#593) changes no playback: no snapshot write per
+// server. "Listen now" publishes its own after it starts playing.
+const COMMANDS_WITHOUT_SNAPSHOT = new Set(["radioAnnounceCheck", "radioAnnounce", "radioAnnounceEnd"]);
+const changesPlayback = (command) => !COMMANDS_WITHOUT_SNAPSHOT.has(String(command?.type || "").trim());
 let lastCpuUsage = process.cpuUsage();
 let lastCpuSampleAt = Date.now();
 
@@ -73,6 +77,8 @@ class WorkerBridgeService {
     this.commandLoopInFlight = false;
     this.tickRequested = false;
     this.stopDoorbell = null;
+    // "Listen now" (#593) tells the commander right away that this worker plays.
+    runtime.publishWorkerSnapshot = () => this.publishSnapshot();
   }
 
   async publishSnapshot() {
@@ -116,6 +122,13 @@ class WorkerBridgeService {
       // The dashboard's button that plays the server's jingle now (#309).
       case "playJingle":
         return this.runtime.playJingleFromDashboard(guildId);
+      // OmniFM Radio's live announcement (#593), posted and edited by OmniFM 1.
+      case "radioAnnounce":
+        return this.runtime.postRadioAnnouncement(guildId, { channelId: payload.channelId, roleId: payload.roleId, show: payload.show, claim: payload.claim });
+      case "radioAnnounceCheck":
+        return this.runtime.checkRadioAnnouncement(guildId, { channelId: payload.channelId });
+      case "radioAnnounceEnd":
+        return this.runtime.endRadioAnnouncement(guildId, { channelId: payload.channelId, messageId: payload.messageId, show: payload.show });
       case "setGuildProfile":
         return this.runtime.applyGuildBotProfile(guildId, payload.changes || {});
       case "setVolume": {
@@ -153,9 +166,11 @@ class WorkerBridgeService {
   async runClaimedCommand(command) {
     try {
       const result = await this.executeCommand(command);
-      await this.publishSnapshot().catch((err) => {
-        log("WARN", `[${this.runtime.config.name}] Worker-Bridge Snapshot nach Command fehlgeschlagen: ${err?.message || err}`);
-      });
+      if (changesPlayback(command)) {
+        await this.publishSnapshot().catch((err) => {
+          log("WARN", `[${this.runtime.config.name}] Worker-Bridge Snapshot nach Command fehlgeschlagen: ${err?.message || err}`);
+        });
+      }
       await this.bridge.completeWorkerCommand(command.commandId, result || { ok: true });
     } catch (err) {
       await this.bridge.failWorkerCommand(command.commandId, err).catch(() => null);
@@ -176,7 +191,7 @@ class WorkerBridgeService {
     }
     this.commandLoopInFlight = true;
     try {
-      let claimedAny = false;
+      let snapshotDue = false;
       do {
         this.tickRequested = false;
         const claimed = [];
@@ -193,7 +208,7 @@ class WorkerBridgeService {
           if (this.tickRequested) continue;
           break;
         }
-        claimedAny = true;
+        if (claimed.some(changesPlayback)) snapshotDue = true;
 
         const byGuild = new Map();
         for (const command of claimed) {
@@ -210,7 +225,7 @@ class WorkerBridgeService {
         }));
         if (claimed.length >= REMOTE_WORKER_MAX_COMMANDS_PER_TICK) this.tickRequested = true;
       } while (this.tickRequested);
-      if (claimedAny) await this.publishSnapshot().catch(() => null);
+      if (snapshotDue) await this.publishSnapshot().catch(() => null);
     } finally {
       this.commandLoopInFlight = false;
     }

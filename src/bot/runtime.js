@@ -59,6 +59,7 @@ import { reportMethods } from "./runtime-methods/reports.js";
 import { easterEggMethods } from "./runtime-methods/easter-eggs.js";
 import { jingleMethods } from "./runtime-methods/jingles.js";
 import { listeningHourMethods } from "./runtime-methods/listening-hours.js";
+import { radioAnnounceMethods } from "./runtime-methods/radio-announce.js";
 import { startStationSuggestionService } from "../services/station-suggestions.js";
 import { startProblemReportService } from "../services/problem-reports.js";
 import { startLinkedRolesService } from "../services/linked-roles.js";
@@ -67,7 +68,7 @@ import { startLinkedRolesService } from "../services/linked-roles.js";
 // BotRuntime.prototype at the end of this file. TypeScript sees them
 // through this base class, which is empty at runtime (#298).
 /**
- * @typedef {typeof guildSettingsMethods & typeof commandSyncMethods & typeof runtimeDelegateMethods & typeof playbackControlMethods & typeof nowPlayingStatsMethods & typeof nowPlayingEmbedMethods & typeof nowPlayingControlMethods & typeof nowPlayingMethods & typeof menuMethods & typeof permissionMethods & typeof statusMethods & typeof voiceMethods & typeof onboardingMethods & typeof favoriteMethods & typeof formMethods & typeof shareMethods & typeof savedSongMethods & typeof personalDataMethods & typeof sleepMethods & typeof pollMethods & typeof botProfileMethods & typeof liveViewMethods & typeof yearReviewMethods & typeof suggestionMethods & typeof reportMethods & typeof easterEggMethods & typeof jingleMethods & typeof listeningHourMethods} RuntimeMixins
+ * @typedef {typeof guildSettingsMethods & typeof commandSyncMethods & typeof runtimeDelegateMethods & typeof playbackControlMethods & typeof nowPlayingStatsMethods & typeof nowPlayingEmbedMethods & typeof nowPlayingControlMethods & typeof nowPlayingMethods & typeof menuMethods & typeof permissionMethods & typeof statusMethods & typeof voiceMethods & typeof onboardingMethods & typeof favoriteMethods & typeof formMethods & typeof shareMethods & typeof savedSongMethods & typeof personalDataMethods & typeof sleepMethods & typeof pollMethods & typeof botProfileMethods & typeof liveViewMethods & typeof yearReviewMethods & typeof suggestionMethods & typeof reportMethods & typeof easterEggMethods & typeof jingleMethods & typeof listeningHourMethods & typeof radioAnnounceMethods} RuntimeMixins
  */
 /** @type {new () => RuntimeMixins} */
 const RuntimeMixinBase = /** @type {any} */ (class {});
@@ -629,6 +630,7 @@ Object.assign(
   easterEggMethods,
   jingleMethods,
   listeningHourMethods,
+  radioAnnounceMethods,
 );
 
 export { BotRuntime };

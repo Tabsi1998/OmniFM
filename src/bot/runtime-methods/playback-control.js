@@ -22,6 +22,12 @@ const playbackControlMethods = {
       try {
         const guild = this.client.guilds.cache.get(guildId);
         if (!guild) return { ok: false, error: "Worker ist nicht auf diesem Server." };
+        // "Listen now" (#593): checked inside the lock, so no other play in
+        // between can make this bot leave the listeners it already has.
+        if (options?.onlyWhenIdle && state.currentStationKey) {
+          const busyIn = String(state.connection?.joinConfig?.channelId || state.lastChannelId || "").trim();
+          if (busyIn) return { ok: false, busy: true, channelId: busyIn, stationKey: state.currentStationKey };
+        }
 
         if (typeof this.refreshVoiceGuardSettings === "function") {
           await this.refreshVoiceGuardSettings(guildId).catch(() => null);

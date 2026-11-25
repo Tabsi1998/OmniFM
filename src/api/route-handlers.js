@@ -572,6 +572,7 @@ export const handleDashboardSettingsRoute = createDashboardSettingsRouteHandler(
   normalizeWeeklyDigestConfig,
   resolveDashboardFailoverChain,
   resolveDashboardGuildForSession,
+  resolveRuntimeForGuild,
   sendJson,
   sendLocalizedError,
   serverHasCapability,
