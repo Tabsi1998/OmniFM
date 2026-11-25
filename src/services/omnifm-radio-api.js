@@ -1,7 +1,7 @@
 // ============================================================
 // OmniFM Radio (#572): Abfrage der AzuraCast-API.
-// Liefert einen einheitlichen Zustand fuer Katalog, Live-Erkennung und
-// Anzeigen. Faellt die API aus, kommt { ok: false } zurueck, nie ein Fehler.
+// Liefert einen einheitlichen Zustand für Katalog, Live-Erkennung und
+// Anzeigen. Fällt die API aus, kommt { ok: false } zurück, nie ein Fehler.
 // ============================================================
 
 import { safeFetch } from "../lib/safe-outbound-http.js";
@@ -55,7 +55,7 @@ export function normalizeAzuracastNowPlaying(payload, { now = Date.now() } = {})
 
 async function readJson(response) {
   const body = await response.text();
-  if (body.length > MAX_BODY_BYTES) throw new Error("AzuraCast-Antwort zu gross");
+  if (body.length > MAX_BODY_BYTES) throw new Error("AzuraCast-Antwort zu groß");
   return JSON.parse(body);
 }
 
