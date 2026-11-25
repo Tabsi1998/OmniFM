@@ -54,9 +54,11 @@ Geht DJ Tabsi live, bekommt der Besitzer jedes Servers mit OmniFM, auf dem OmniF
 
 - Nur beim Beginn einer Sendung, nie beim Ende. Wer mehrere Server besitzt, bekommt eine DM.
 - Höchstens **eine DM pro Person in 12 Stunden**, gespeichert, also auch über einen Neustart. Vor dem Senden wird der Platz belegt; scheitert das Senden, gibt es trotzdem keine zweite.
-- **Langsam:** eine Warteschlange für alle, eine DM alle 5 Sekunden. Kein neuer Versuch bei Fehlern. Lehnt Discord ab (50007 oder 403, DMs geschlossen), lässt OmniFM die Person 30 Tage in Ruhe.
+- **Langsam:** eine Warteschlange für alle, eine DM alle 5 Sekunden. Gesendet wird über einen eigenen REST-Client mit dem Commander-Token, ohne Wiederholung (eine Anfrage, die in die Zeitüberschreitung läuft, könnte sonst doppelt ankommen) und ohne Warten auf ein Rate-Limit (das ginge am Not-Aus vorbei). Lehnt Discord ab (50007, 10013 oder 403, DMs geschlossen), lässt OmniFM die Person 30 Tage in Ruhe, aber nur, wenn die Verteilung sonst läuft.
+- **Not-Bremse:** Meldet Discord 40003, 40004 oder ein Rate-Limit, oder schlagen fünf DMs hintereinander fehl, stoppt die Verteilung, der Modus springt auf `off` und der Betreiber-Webhook meldet es (Schalter „OmniFM Radio“, `OPERATOR_ALERT_RADIO_LIVE`). Wieder einschalten nur von Hand.
+- Jede DM wird vor dem Belegen gebaut. Ist eine Einstellung kaputt (etwa `OMNIFM_RADIO_BASE_URL` ohne `https://`), stoppt die Verteilung mit „Einstellung fehlerhaft“, und niemandem werden die 12 Stunden angerechnet.
 - **„Abbestellen“** gilt dauerhaft, auch nach Neustarts. Die DM zeigt danach „Wieder abonnieren“.
-- **/meine-daten** zeigt den Zustand (abbestellt, letzte DM, DMs geschlossen bis) und schickt ihn in der Datei mit. „Alles löschen“ löscht ihn; wer abbestellt hat, behält nur `{ _id, unsubscribed: true }` ohne Zeiten, damit die Abmeldung weiter gilt. Steht so auch in der Datenschutzerklärung.
+- **/meine-daten** zeigt den Zustand (abbestellt, letzte DM, DMs geschlossen bis) und schickt ihn in der Datei mit. „Alles löschen“ löscht ihn; wer abbestellt hat, behält nur `{ _id, unsubscribed: true }` ohne Zeiten, damit die Abmeldung weiter gilt. Wer weder abbestellt noch wieder abonniert hat, verliert den Eintrag 30 Tage nach der letzten DM von selbst (TTL-Index auf `expiresAt`). Steht so auch in der Datenschutzerklärung.
 - Endet die Sendung, während noch DMs ausstehen, gehen die restlichen nicht mehr raus.
 - **Test-Sendung:** DMs nur an die Besitzer der Server aus `OMNIFM_RADIO_TEST_GUILD_IDS`, mit dem Hinweis „🧪 Test-Sendung“. Eigene Grenze von einer DM in 10 Minuten, die 12 Stunden bleiben unberührt.
 
@@ -64,6 +66,6 @@ Geht DJ Tabsi live, bekommt der Besitzer jedes Servers mit OmniFM, auf dem OmniF
 
 - `owners`: alle Besitzer wie oben (Standard).
 - `optin`: nur wer nach dem Abbestellen „Wieder abonnieren“ gedrückt hat. Einen anderen Weg zum Anmelden gibt es vorerst bewusst nicht.
-- `off`: keine DMs. Der Modus wird vor **jeder einzelnen** DM gelesen, „Aus“ stoppt also auch eine laufende Verteilung sofort. Ein unbekannter Wert und eine Datenbank, die nicht antwortet, zählen wie `off`.
+- `off`: keine DMs. Der Modus wird vor **jeder einzelnen** DM gelesen, „Aus“ stoppt also auch eine laufende Verteilung sofort, noch bevor es gespeichert ist; antwortet die Datenbank nicht, bleibt „Aus“ im Speicher, bis das Speichern klappt. Ein unbekannter Wert und eine Datenbank, die nicht antwortet, zählen wie `off`.
 
 Die Karte zeigt außerdem die letzte Verteilung: gesendet, übersprungen, fehlgeschlagen, offen und warum sie gestoppt hat. Gesendet wird von OmniFM 1 (dem Commander, im Monolith ebenso), die Worker schicken nie DMs.
