@@ -10,13 +10,16 @@
 // Discord does not throttle. When the show ends, the same messages are
 // edited to "show over"; where they are is kept in MongoDB
 // (src/omnifm-radio-announce-store.js), so that works after a restart too.
+// An end that was missed (database away, bot not ready, restart) is caught
+// up at start and every five minutes: whatever still says "live" but is
+// not the show on air now is edited.
 // Nobody is switched: the "Listen now" button only acts for whoever presses
 // it (src/bot/runtime-methods/radio-announce.js).
 import { log } from "../lib/logging.js";
 import { loadRadioAnnounceSettings, normalizeRadioAnnounceSettings } from "../lib/omnifm-radio-announce-settings.js";
 import { createOmnifmRadioAnnounceStore } from "../omnifm-radio-announce-store.js";
 import { getOmnifmRadioConfig, isOmnifmRadioVisibleForGuild } from "./omnifm-radio-config.js";
-import { onOmnifmRadioLiveEvent } from "./omnifm-radio-live.js";
+import { getOmnifmRadioLiveService, onOmnifmRadioLiveEvent } from "./omnifm-radio-live.js";
 
 export const ANNOUNCE_LIMIT_MS = 2 * 60 * 60 * 1000;
 const SEND_INTERVAL_MS = 1_500;
@@ -25,6 +28,7 @@ const READY_TIMEOUT_MS = 2 * 60 * 1000;
 const READY_POLL_MS = 2_000;
 const STOP_TIMEOUT_MS = 3_000;
 // How long a claim without message id waits for the worker to report one.
+const CATCH_UP_MS = 5 * 60 * 1000;
 const PENDING_ID_GRACE_MS = 10 * 60 * 1000;
 const TAG = "[OmniFM Radio] Ankündigung";
 
@@ -45,19 +49,23 @@ function messageShow(show) {
   };
 }
 
+/** The live detection's state in this process, or null where it does not run. */
+const liveDetectionState = () => getOmnifmRadioLiveService()?.tracker?.snapshot?.() || null;
+
 const defaultSleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms).unref?.(); });
 
 /**
  * The announcements of one process. `handle` takes the live events; one
  * queue runs everything, so the end of a show always comes after the posts
  * that were already on their way.
- * @param {{ getAnnouncer: () => any, store?: ReturnType<typeof createOmnifmRadioAnnounceStore>, loadSettings?: (guildId: string) => Promise<any>, getConfig?: typeof getOmnifmRadioConfig, now?: () => number, intervalMs?: number, sleep?: (ms: number) => Promise<void>, readyTimeoutMs?: number }} options
+ * @param {{ getAnnouncer: () => any, store?: ReturnType<typeof createOmnifmRadioAnnounceStore>, loadSettings?: (guildId: string) => Promise<any>, getConfig?: typeof getOmnifmRadioConfig, getLiveState?: () => any, now?: () => number, intervalMs?: number, sleep?: (ms: number) => Promise<void>, readyTimeoutMs?: number }} options
  */
 export function createOmnifmRadioAnnouncer({
   getAnnouncer,
   store = createOmnifmRadioAnnounceStore(),
   loadSettings = loadRadioAnnounceSettings,
   getConfig = getOmnifmRadioConfig,
+  getLiveState = liveDetectionState,
   now = Date.now,
   intervalMs = SEND_INTERVAL_MS,
   sleep = defaultSleep,
@@ -68,6 +76,9 @@ export function createOmnifmRadioAnnouncer({
   let stopped = false;
   let activeShowId = null;
   let lastCallAt = Number.NEGATIVE_INFINITY;
+  // Announcements with an edit waiting in the queue: queued once only.
+  const editing = new Set();
+  let catchUpQueued = false;
 
   async function run() {
     while (jobs.length && !stopped) {
@@ -215,7 +226,36 @@ export function createOmnifmRadioAnnouncer({
       log("WARN", `${TAG}: OmniFM 1 ist nicht bereit, ${entries.length} Ankündigung(en) bleiben auf „live“.`);
       return;
     }
-    for (const entry of entries) jobs.push(() => editOne(bot, entry, show));
+    for (const entry of entries) queueEdit(bot, entry, show);
+  }
+
+  function queueEdit(bot, entry, show) {
+    const key = `${entry.showId}|${entry.guildId}`;
+    if (editing.has(key)) return;
+    editing.add(key);
+    jobs.push(() => editOne(bot, entry, show).finally(() => editing.delete(key)));
+  }
+
+  /** Edits what still says "live" but is not the show on air (a missed end). */
+  async function catchUpEnds() {
+    catchUpQueued = false;
+    let liveId = null;
+    let history = [];
+    if (getConfig().enabled) {
+      const live = getLiveState();
+      // Without a readable live state nothing is decided: it may still be on air.
+      if (!live?.readable) return;
+      liveId = live.current?.isLive ? radioShowId(live.current) : null;
+      history = [...(live.shows || []), ...(live.testShows || [])];
+    }
+    const entries = (await store.listOpen()).filter((entry) => entry.showId !== liveId && entry.showId !== activeShowId);
+    if (!entries.length) return;
+    const bot = await readyAnnouncer();
+    if (!bot) return;
+    for (const entry of entries) {
+      const past = history.find((show) => radioShowId(show) === entry.showId);
+      queueEdit(bot, entry, { ...entry.show, endedAt: past?.endedAt || null, durationMs: past?.durationMs || 0 });
+    }
   }
 
   return {
@@ -235,6 +275,12 @@ export function createOmnifmRadioAnnouncer({
         if (activeShowId === showId) activeShowId = null;
         enqueue(() => planEdits(show, showId));
       }
+    },
+    /** Queues the catch-up of missed ends (at start and every few minutes). */
+    catchUp() {
+      if (stopped || catchUpQueued) return;
+      catchUpQueued = true;
+      enqueue(catchUpEnds);
     },
     /** Resolves once the queue is empty (for tests and the shutdown). */
     async idle() {
@@ -271,9 +317,13 @@ export function startOmnifmRadioAnnouncements({ getWorkerManager, ...options }) 
     ...options,
   });
   const unsubscribe = onOmnifmRadioLiveEvent((event) => announcer.handle(event));
+  announcer.catchUp();
+  const catchUpTimer = setInterval(() => announcer.catchUp(), CATCH_UP_MS);
+  catchUpTimer.unref?.();
   service = {
     announcer,
     async stop() {
+      clearInterval(catchUpTimer);
       unsubscribe();
       await announcer.stop();
     },

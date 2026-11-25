@@ -462,6 +462,116 @@ test("stop drops what is still waiting", async () => {
   assert.ok(bot.posts.length < 3, "nothing new after stop");
 });
 
+// ---------------------------------------------------------------- catching up on missed ends
+
+/** An announcement of `live` on the test server, as a commander before a restart left it. */
+async function postedBefore(store, live, { messageId = "81", at = Date.parse(live.startedAt) } = {}) {
+  const key = { showId: radioShowId(live), guildId: TEST_GUILD };
+  await store.claim({ ...key, botId: "bot-2", test: false, show: live, at: new Date(at) });
+  if (messageId) await store.setMessage(key, { channelId: "1", messageId, at: new Date(at) });
+  return key;
+}
+
+const liveState = ({ current = { isLive: false }, shows = [], readable = true } = {}) => () => ({ readable, current, shows, testShows: [] });
+
+test("after a restart the commander edits what an end it missed left on \"live\"", async () => {
+  const { startOmnifmRadioAnnouncements, stopOmnifmRadioAnnouncements } = await import("../src/services/omnifm-radio-announce.js");
+  const store = createOmnifmRadioAnnounceStore({ getDatabase: () => null, mongoRequested: () => false });
+  const live = show();
+  await postedBefore(store, live);
+  const bot = fakeBot({ guilds: [TEST_GUILD] });
+  const service = startOmnifmRadioAnnouncements({
+    getWorkerManager: () => ({ getWorkerBySlot: () => bot }),
+    store,
+    getLiveState: liveState({ shows: [ended(live, START + 72 * MINUTE)] }),
+    getConfig: () => radioConfig(),
+    sleep: async () => {},
+  });
+  try {
+    await service.announcer.idle();
+    assert.deepEqual(bot.edits.map((edit) => [edit.guildId, edit.messageId]), [[TEST_GUILD, "81"]]);
+    assert.equal(bot.edits[0].show.endedAt, new Date(START + 72 * MINUTE).toISOString(), "the end time from the history");
+    assert.deepEqual(await store.listOpen(), []);
+  } finally {
+    await stopOmnifmRadioAnnouncements();
+  }
+});
+
+test("catching up never touches the show that is still live, and decides nothing without a readable state", async () => {
+  const store = createOmnifmRadioAnnounceStore({ getDatabase: () => null, mongoRequested: () => false });
+  const live = show();
+  await postedBefore(store, live);
+  const running = setup({ store });
+  const announcer = createOmnifmRadioAnnouncer({
+    getAnnouncer: () => running.bot,
+    store,
+    getLiveState: liveState({ current: { isLive: true, startedAt: live.startedAt, source: "webhook" } }),
+    getConfig: () => radioConfig(),
+    sleep: async () => {},
+  });
+  announcer.catchUp();
+  await announcer.idle();
+  assert.equal(running.bot.edits.length, 0, "the running show keeps its message");
+
+  const blind = createOmnifmRadioAnnouncer({
+    getAnnouncer: () => running.bot,
+    store,
+    getLiveState: liveState({ readable: false }),
+    getConfig: () => radioConfig(),
+    sleep: async () => {},
+  });
+  blind.catchUp();
+  await blind.idle();
+  assert.equal(running.bot.edits.length, 0, "the database was away: nothing decided");
+});
+
+test("an end whose edits failed is caught up on the next round, without a double edit", async () => {
+  const store = createOmnifmRadioAnnounceStore({ getDatabase: () => null, mongoRequested: () => false });
+  const live = show();
+  await postedBefore(store, live);
+  let failures = 1;
+  const flaky = { ...store, listForShow: async (showId) => { if (failures-- > 0) throw new Error("timeout"); return store.listForShow(showId); } };
+  const bot = fakeBot({ guilds: [TEST_GUILD] });
+  const announcer = createOmnifmRadioAnnouncer({
+    getAnnouncer: () => bot,
+    store: flaky,
+    getLiveState: liveState({ shows: [ended(live, START + 10 * MINUTE)] }),
+    getConfig: () => radioConfig(),
+    sleep: async () => {},
+  });
+  announcer.handle({ type: "end", show: ended(live, START + 10 * MINUTE) });
+  await announcer.idle();
+  assert.equal(bot.edits.length, 0, "the end could not read its messages");
+  announcer.catchUp();
+  announcer.catchUp();
+  await announcer.idle();
+  assert.equal(bot.edits.length, 1, "caught up once");
+});
+
+test("a claim still waiting for its message id is left for a while, then closed", async () => {
+  const now = clock(START + 60 * MINUTE);
+  const store = createOmnifmRadioAnnounceStore({ getDatabase: () => null, mongoRequested: () => false });
+  const live = show();
+  await postedBefore(store, live, { messageId: null, at: now() - MINUTE });
+  const bot = fakeBot({ guilds: [TEST_GUILD] });
+  const announcer = createOmnifmRadioAnnouncer({
+    getAnnouncer: () => bot,
+    store,
+    getLiveState: liveState({ shows: [ended(live, START + 30 * MINUTE)] }),
+    getConfig: () => radioConfig(),
+    now,
+    sleep: async (ms) => { now.advance(ms); },
+  });
+  announcer.catchUp();
+  await announcer.idle();
+  assert.equal((await store.listOpen()).length, 1, "the worker may still report the id");
+  now.advance(15 * MINUTE);
+  announcer.catchUp();
+  await announcer.idle();
+  assert.deepEqual(await store.listOpen(), [], "closed after the wait, nothing to edit");
+  assert.equal(bot.edits.length, 0);
+});
+
 // ---------------------------------------------------------------- wiring
 
 test("the service listens to the live events and lets OmniFM 1 (worker slot 1) post; stop ends that", async () => {
