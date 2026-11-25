@@ -39,7 +39,7 @@ fs.writeFileSync(path.join(dataDir, "stations.json"), JSON.stringify({
   },
 }));
 
-const { loadStations, filterStationsByTier, STATION_CATALOG_MIGRATIONS } = await import("../src/stations-store.js");
+const { loadStations, filterStationsByTier, buildScopedStationsData, STATION_CATALOG_MIGRATIONS } = await import("../src/stations-store.js");
 const { setLicenseProvider } = await import("../src/core/entitlements.js");
 const { resolveStationForGuild, normalizeStationReference } = await import("../src/bot/runtime-events.js");
 const { buildStationCatalog, buildRuntimeStationsBrowserPayload } = await import("../src/bot/runtime-panels.js");
@@ -181,6 +181,17 @@ test("OMNIFM_RADIO_ENABLED=0 hides OmniFM Radio everywhere, even when public", (
   assert.equal(resolveStationForGuild(runtimeStub, TEST_GUILD, KEY, "en").ok, false);
   assert.equal(buildPublicStationCatalog(loadStations()).stations.some((station) => station.key === KEY), false);
 }));
+
+test("OmniFM Radio is never the default station of a server", () => {
+  const catalog = loadStations();
+  // A Free test server whose catalog default is a Pro station: the first free catalog station, not OmniFM Radio.
+  const scoped = buildScopedStationsData({ ...catalog, defaultStationKey: "jazzpro" }, freeStationsOf(TEST_GUILD));
+  assert.equal(Object.keys(scoped.stations)[0], KEY);
+  assert.equal(scoped.defaultStationKey, "groove");
+  assert.equal(buildStationCatalog(TEST_GUILD).stationsData.defaultStationKey, "groove");
+  assert.equal(buildScopedStationsData({ ...catalog, defaultStationKey: KEY }, freeStationsOf(TEST_GUILD)).defaultStationKey, "groove", "not even when named");
+  assert.equal(buildScopedStationsData({}, { [KEY]: freeStationsOf(TEST_GUILD)[KEY] }).defaultStationKey, null, "no other station: no default");
+});
 
 test("the automatic fallback never picks OmniFM Radio, not even on a test server", async () => {
   resetDownStationKeysForTests();

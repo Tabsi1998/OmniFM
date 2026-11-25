@@ -461,8 +461,10 @@ export function normalizeKey(rawKey) { return sanitizeKey(rawKey); }
 export function buildScopedStationsData(source, scopedStations = null) {
   const sourceData = source && typeof source === "object" ? source : emptyStationsData();
   const stations = cloneStationMap(scopedStations ?? sourceData.stations);
-  const stationKeys = Object.keys(stations);
-  const defaultStationKey = stations[sourceData.defaultStationKey] ? sourceData.defaultStationKey : (stationKeys[0] || null);
+  // #591: OmniFM Radio is never the default station; a server picks it on purpose.
+  const omnifmRadio = getOmnifmRadioConfig();
+  const stationKeys = Object.keys(stations).filter((key) => !isOmnifmRadioKey(key, omnifmRadio));
+  const defaultStationKey = stationKeys.includes(sourceData.defaultStationKey) ? sourceData.defaultStationKey : (stationKeys[0] || null);
   const qualityPreset = String(sourceData.qualityPreset || "custom").toLowerCase();
   const fallbackKeys = Array.isArray(sourceData.fallbackKeys)
     ? sourceData.fallbackKeys.filter((key, idx, arr) => stations[key] && arr.indexOf(key) === idx)
