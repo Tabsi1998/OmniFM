@@ -1,7 +1,7 @@
 // ============================================================
 // OmniFM Radio (#572): gemeinsame Einstellungen des eigenen Senders.
 // AzuraCast sendet, OmniFM spielt den Stream wie jeden Katalog-Sender.
-// Eine Quelle fuer Katalog (#591), Live-Erkennung (#592) und Meldungen.
+// Eine Quelle für Katalog (#591), Live-Erkennung (#592) und Meldungen.
 //
 // Konfiguration in .env (alle optional):
 //   OMNIFM_RADIO_ENABLED=1            0 schaltet den Sender ganz ab
@@ -9,7 +9,7 @@
 //   OMNIFM_RADIO_STATION=omnifm_radio  Kurzname der AzuraCast-Station
 //   OMNIFM_RADIO_STREAM_URL=           Standard: <BASE>/listen/<STATION>/radio.mp3
 //   OMNIFM_RADIO_STATION_KEY=omnifm-radio  Key im OmniFM-Katalog
-//   OMNIFM_RADIO_PUBLIC=0              1 = fuer alle Server sichtbar
+//   OMNIFM_RADIO_PUBLIC=0              1 = für alle Server sichtbar
 //   OMNIFM_RADIO_TEST_GUILD_IDS=       Server-IDs (Komma), die ihn vorher sehen
 // ============================================================
 
@@ -53,9 +53,9 @@ export function getOmnifmRadioConfig(env = process.env) {
   });
 }
 
-// Solange die Musikrechte (AKM/LSG) nicht geklaert sind, sehen den Sender
-// nur die Test-Server. Ohne guildId (z. B. oeffentliche Website) nur, wenn er
-// oeffentlich ist.
+// Solange die Musikrechte (AKM/LSG) nicht geklärt sind, sehen den Sender
+// nur die Test-Server. Ohne guildId (z. B. öffentliche Website) nur, wenn er
+// öffentlich ist.
 export function isOmnifmRadioVisibleForGuild(guildId, config = getOmnifmRadioConfig()) {
   if (!config.enabled) return false;
   if (config.isPublic) return true;
