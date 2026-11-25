@@ -159,7 +159,8 @@ async function handleDmRoute({ req, res, identity, dmService, readJsonBody, audi
     await dmService.setMode(mode);
   } catch (error) {
     audit({ actor, action: "radio.dm.mode", status: "failed", target: mode, summary: String(error?.message || error).slice(0, 200) });
-    sendJson(res, 503, { error: "Nicht gespeichert, die Datenbank antwortet nicht." });
+    // "Off" works at once in memory even when it cannot be stored.
+    sendJson(res, 503, { error: mode === "off" ? "„Aus“ gilt sofort, ist aber nicht gespeichert: die Datenbank antwortet nicht." : "Nicht gespeichert, die Datenbank antwortet nicht." });
     return;
   }
   audit({ actor, action: "radio.dm.mode", status: "success", target: mode, summary: `DMs an Server-Besitzer: ${mode}` });

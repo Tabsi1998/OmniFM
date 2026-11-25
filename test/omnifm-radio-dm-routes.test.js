@@ -79,3 +79,13 @@ test("without the DM service (OmniFM Radio off) the console says so", async () =
   assert.equal((await call("POST", { mode: "off" })).res.status, 503);
   assert.equal((await call("DELETE")).res.status, 405);
 });
+
+test("off that cannot be stored still counts, and the console says so", async () => {
+  const { call, modeStore } = setup();
+  modeStore.write = async () => { throw new Error("MongoDB ist nicht verbunden."); };
+  const off = await call("POST", { mode: "off" });
+  assert.equal(off.res.status, 503);
+  assert.match(off.res.body.error, /gilt sofort/);
+  const read = await call("GET");
+  assert.deepEqual({ mode: read.res.body.mode, modeSource: read.res.body.modeSource }, { mode: "off", modeSource: "memory" });
+});

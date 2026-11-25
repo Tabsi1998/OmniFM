@@ -158,8 +158,10 @@ export function createOmnifmRadioDmService({
   let active = null;
   let lastRun = null;
   let stopped = false;
+  // "Off" from the console that the database did not take yet: off until a write works.
+  let offInMemory = false;
 
-  const currentMode = async () => resolveRadioDmMode(await modeStore.read(), env.OMNIFM_RADIO_DM_MODE).mode;
+  const currentMode = async () => (offInMemory ? "off" : resolveRadioDmMode(await modeStore.read(), env.OMNIFM_RADIO_DM_MODE).mode);
 
   function abortAll(reason) {
     for (const job of jobs) {
@@ -272,6 +274,8 @@ export function createOmnifmRadioDmService({
       }
       // eslint-disable-next-line no-await-in-loop
       const claimed = await store.claim(recipient.userId, { quota, windowMs: QUOTAS[quota], now: now(), subscribedOnly: run.mode === "optin" });
+      // A stop during the claim: the slot stays used, but nothing is sent.
+      if (claimed && signal.aborted) return job.reason;
       run.remaining -= 1;
       if (!claimed) {
         run.skipped += 1;
@@ -336,12 +340,19 @@ export function createOmnifmRadioDmService({
       chain = chain.then(() => runJob(job));
     },
 
-    /** Stores the console's mode; "off" also stops what runs, at once. */
+    /**
+     * Stores the console's mode. "Off" stops what runs first, then is
+     * stored; a write that fails keeps it off in memory until one works.
+     */
     async setMode(mode) {
       const value = parseMode(mode);
       if (!RADIO_DM_MODES.includes(value)) throw new Error(`Unbekannter Modus: ${String(mode).slice(0, 20)}`);
+      if (value === "off") {
+        offInMemory = true;
+        abortAll("off");
+      }
       await modeStore.write(value);
-      if (value === "off") abortAll("off");
+      offInMemory = false;
       return value;
     },
 
@@ -354,6 +365,7 @@ export function createOmnifmRadioDmService({
       } catch (error) {
         modeError = String(error?.message || error);
       }
+      if (offInMemory) resolved = { mode: "off", source: "memory" };
       const run = lastRun || await store.loadLastRun().catch(() => null);
       return {
         mode: resolved.mode,

@@ -398,3 +398,47 @@ test("a DM that cannot be built stops the run before anybody is claimed", async 
   assert.equal(await context.store.get(A), null, "nobody's 12 hours are used up");
   assert.equal(await context.store.get(B), null);
 });
+
+test("the kill switch acts before it is stored, and stays off in memory while the database does not take it", async () => {
+  let rejected = null;
+  const context = setup({
+    config: PUBLIC,
+    onSleep: async (current) => {
+      current.modeStore.write = async () => { throw new Error("MongoDB ist nicht verbunden."); };
+      rejected = await current.service.setMode("off").then(() => null, (error) => error);
+    },
+  });
+  const run = await distribute(context);
+  assert.ok(rejected, "the console hears that it is not stored");
+  assert.equal(run.stoppedBy, "off", "but the DMs stopped anyway");
+  assert.deepEqual(recipientsOf(context.runtime), [A]);
+  const status = await context.service.status();
+  assert.deepEqual({ mode: status.mode, modeSource: status.modeSource }, { mode: "off", modeSource: "memory" });
+
+  context.now.advance(13 * 60 * MINUTE);
+  assert.equal((await distribute(context, start({ ...SHOW, startedAt: "2026-11-26T09:00:00.000Z" }))).stoppedBy, "off", "the stored mode says owners, memory says off");
+  await assert.rejects(context.service.setMode("owners"), /MongoDB/);
+  assert.equal((await context.service.status()).mode, "off", "still off until a write works");
+  context.modeStore.write = async function write(mode) { this.value = mode; };
+  await context.service.setMode("owners");
+  assert.equal((await context.service.status()).modeSource, "console");
+});
+
+test("a stop that comes while a person is being claimed sends that person nothing", async () => {
+  const base = memoryStore();
+  let service = null;
+  const store = {
+    ...base,
+    get: base.get,
+    async claim(...args) {
+      const claimed = await base.claim(...args);
+      service.handleEvent(end());
+      return claimed;
+    },
+  };
+  const context = setup({ store });
+  service = context.service;
+  const run = await distribute(context);
+  assert.equal(run.stoppedBy, "end");
+  assert.deepEqual(context.runtime.fetched, [], "claimed, but not sent");
+});
