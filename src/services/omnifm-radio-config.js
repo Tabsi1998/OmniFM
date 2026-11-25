@@ -59,7 +59,8 @@ function internalOrigin(value) {
   if (!raw) return "";
   try {
     const url = new URL(raw);
-    return url.protocol === "http:" || url.protocol === "https:" ? url.origin : "";
+    if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password) return "";
+    return url.origin;
   } catch {
     return "";
   }

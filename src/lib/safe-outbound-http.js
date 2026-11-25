@@ -4,6 +4,7 @@ import net from "node:net";
 import { lookup as dnsLookup } from "node:dns/promises";
 import { Readable } from "node:stream";
 import ipaddr from "ipaddr.js";
+import { getOmnifmRadioConfig } from "../services/omnifm-radio-config.js";
 
 const DEFAULT_ALLOWED_PROTOCOLS = Object.freeze(["http:", "https:"]);
 const DEFAULT_MAX_URL_LENGTH = 2_048;
@@ -94,52 +95,57 @@ function isTestStreamOrigin(parsedUrl) {
 
 // #599: the server may not reach its own public address (no hairpin NAT).
 // OMNIFM_RADIO_INTERNAL_URL names where it reaches AzuraCast in its own
-// network instead (e.g. http://192.168.2.253:8080). A request to the public
-// radio host (host of OMNIFM_RADIO_BASE_URL, default radio.omnifm.xyz) goes
-// there, path and query kept, like split DNS. Only such a rerouted request may
-// reach that one private origin: the mark is a symbol no caller can pass, so
-// a custom station or a webhook naming the internal address stays refused.
+// network instead (e.g. http://192.168.2.253:8080). Only what the bot itself
+// needs from the public radio host goes there: GET/HEAD on the station's
+// now-playing API and its /listen/<station>/ streams (plus the path of
+// OMNIFM_RADIO_STREAM_URL on that host), with the same scheme and port and no
+// credentials. Everything else on that host is asked publicly as before.
+// Only a rerouted request may reach that one private origin: the mark is a
+// symbol no caller can pass, so a custom station, a stream test or a webhook
+// naming the internal address stays refused. OMNIFM_RADIO_ENABLED=0 turns it off.
 const RADIO_INTERNAL_ROUTE = Symbol("omnifm-radio-internal-route");
 
-function radioInternalOrigin() {
-  const raw = String(process.env.OMNIFM_RADIO_INTERNAL_URL || "").trim();
-  if (!raw) return null;
+function radioPathAllowed(pathname, config, baseHost) {
+  const station = encodeURIComponent(config.station);
+  if (pathname === `/api/nowplaying/${station}`) return true;
+  if (pathname.startsWith(`/listen/${station}/`)) return true;
   try {
-    const url = new URL(raw);
-    if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password) return null;
-    return url;
+    const stream = new URL(config.streamUrl);
+    return normalizeHostname(stream.hostname) === baseHost && pathname === stream.pathname;
   } catch {
-    return null;
+    return false;
   }
 }
 
-function radioPublicHostname() {
-  try {
-    return normalizeHostname(new URL(String(process.env.OMNIFM_RADIO_BASE_URL || "").trim() || "https://radio.omnifm.xyz").hostname);
-  } catch {
-    return "";
-  }
-}
-
-/** The internal address for a request to the public radio host, or null. */
-function radioInternalRoute(rawUrl) {
-  const internal = radioInternalOrigin();
-  if (!internal) return null;
+/** The internal address for a request the bot makes to its own radio, or null. */
+function radioInternalRoute(rawUrl, method, policyOptions = {}) {
+  if (method !== "GET" && method !== "HEAD") return null;
+  if (policyOptions?.requireHttps) return null;
+  const config = getOmnifmRadioConfig();
+  if (!config.enabled || !config.internalUrl) return null;
   let parsed;
+  let base;
   try {
     parsed = new URL(String(rawUrl || "").trim());
+    base = new URL(config.baseUrl);
   } catch {
     return null;
   }
-  const publicHost = radioPublicHostname();
-  if (!publicHost || normalizeHostname(parsed.hostname) !== publicHost) return null;
-  return new URL(`${parsed.pathname}${parsed.search}`, internal.origin).toString();
+  if (parsed.username || parsed.password) return null;
+  const baseHost = normalizeHostname(base.hostname);
+  if (parsed.protocol !== base.protocol || parsed.port !== base.port || normalizeHostname(parsed.hostname) !== baseHost) return null;
+  if (!radioPathAllowed(parsed.pathname, config, baseHost)) return null;
+  // Built from parts: a path such as "//other.host/x" can never become a host.
+  const hop = new URL(config.internalUrl);
+  hop.pathname = parsed.pathname;
+  hop.search = parsed.search;
+  return hop.toString();
 }
 
 function isRadioInternalRequest(parsedUrl, options) {
   if (options?.[RADIO_INTERNAL_ROUTE] !== true) return false;
-  const internal = radioInternalOrigin();
-  return Boolean(internal) && parsedUrl.origin === internal.origin;
+  const internal = getOmnifmRadioConfig().internalUrl;
+  return Boolean(internal) && parsedUrl.origin === internal;
 }
 
 function validateOutboundUrl(rawUrl, {
@@ -466,7 +472,7 @@ async function safeFetch(rawUrl, {
 
   for (let redirectCount = 0; ; redirectCount += 1) {
     // #599: the public radio host is reached over the own network when configured.
-    const internalUrl = radioInternalRoute(currentUrl);
+    const internalUrl = radioInternalRoute(currentUrl, normalizedMethod, policyOptions);
     const hopUrl = internalUrl || currentUrl;
     const hopPolicy = internalUrl ? { ...policyOptions, [RADIO_INTERNAL_ROUTE]: true } : policyOptions;
     // eslint-disable-next-line no-await-in-loop -- each redirect hop depends on the one before
@@ -508,8 +514,10 @@ async function safeFetch(rawUrl, {
     }
 
     try {
-      const nextUrl = new URL(location, target.url);
-      if (nextUrl.origin !== target.url.origin) {
+      // #599: a rerouted hop answers for the public address, so its redirects count from there.
+      const base = internalUrl ? new URL(currentUrl) : target.url;
+      const nextUrl = new URL(location, base);
+      if (nextUrl.origin !== base.origin) {
         requestHeaders = stripSensitiveRedirectHeaders(requestHeaders);
       }
       currentUrl = nextUrl.toString();

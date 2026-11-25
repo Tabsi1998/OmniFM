@@ -118,6 +118,92 @@ test("other hosts are never rerouted, even with the internal address set", () =>
   assert.equal(seen[0].url.toString(), "https://stream.laut.fm/drill");
 }));
 
+test("only the bot's own radio paths are rerouted, by GET, with the same scheme and port and no credentials", () => withEnv(INTERNAL, async () => {
+  const route = async (url, options = {}) => {
+    const seen = [];
+    await safeFetch(url, {
+      lookupFn: async () => [{ address: "87.247.213.69", family: 4 }],
+      requestImpl: async (target) => {
+        seen.push(target.url.toString());
+        return incoming(200);
+      },
+      ...options,
+    }).catch((error) => seen.push(`error:${error.code}`));
+    return seen[0];
+  };
+  assert.equal(await route("https://radio.omnifm.xyz/api/admin/settings"), "https://radio.omnifm.xyz/api/admin/settings", "other AzuraCast paths stay public");
+  assert.equal(await route("https://radio.omnifm.xyz/api/nowplaying/other_station"), "https://radio.omnifm.xyz/api/nowplaying/other_station");
+  assert.equal(await route("https://radio.omnifm.xyz/listen/omnifm_radio/../../api/admin"), "https://radio.omnifm.xyz/api/admin", "dot segments are resolved before the path check");
+  assert.equal(await route("https://radio.omnifm.xyz/listen/omnifm_radio/radio.mp3", { method: "POST" }), "https://radio.omnifm.xyz/listen/omnifm_radio/radio.mp3", "a POST (webhook) is never rerouted");
+  assert.equal(await route("https://radio.omnifm.xyz/listen/omnifm_radio/radio.mp3", { requireHttps: true }), "https://radio.omnifm.xyz/listen/omnifm_radio/radio.mp3", "callers that need https stay on https");
+  assert.equal(await route("http://radio.omnifm.xyz/listen/omnifm_radio/radio.mp3"), "http://radio.omnifm.xyz/listen/omnifm_radio/radio.mp3", "another scheme is not the configured host");
+  assert.equal(await route("https://radio.omnifm.xyz:8443/listen/omnifm_radio/radio.mp3"), "https://radio.omnifm.xyz:8443/listen/omnifm_radio/radio.mp3", "another port is not the configured host");
+  assert.equal(await route("https://u:p@radio.omnifm.xyz/listen/omnifm_radio/radio.mp3"), "error:OUTBOUND_CREDENTIALS_NOT_ALLOWED");
+  assert.equal(await route("https://radio.omnifm.xyz.evil.example/listen/omnifm_radio/radio.mp3"), "https://radio.omnifm.xyz.evil.example/listen/omnifm_radio/radio.mp3");
+}));
+
+test("a path like //other.host or a backslash never turns into another host", () => withEnv(INTERNAL, async () => {
+  const urls = [
+    "https://radio.omnifm.xyz//evil.example/x",
+    "https://radio.omnifm.xyz/\\evil.example/x",
+    "https://radio.omnifm.xyz/listen/omnifm_radio//evil.example/x",
+  ];
+  for (const url of urls) {
+    const seen = [];
+    // eslint-disable-next-line no-await-in-loop -- one address after the other
+    await safeFetch(url, {
+      lookupFn: async () => [{ address: "87.247.213.69", family: 4 }],
+      requestImpl: async (target) => {
+        seen.push(target);
+        return incoming(200);
+      },
+    });
+    const host = seen[0].url.hostname;
+    assert.ok(host === "radio.omnifm.xyz" || host === "192.168.2.253", `${url} went to ${host}`);
+  }
+}));
+
+test("OMNIFM_RADIO_ENABLED=0 turns the rerouting off", () => withEnv({ ...INTERNAL, OMNIFM_RADIO_ENABLED: "0" }, async () => {
+  const seen = [];
+  await safeFetch("https://radio.omnifm.xyz/api/nowplaying/omnifm_radio", {
+    lookupFn: async () => [{ address: "87.247.213.69", family: 4 }],
+    requestImpl: async (target) => {
+      seen.push(target.url.toString());
+      return incoming(200);
+    },
+  });
+  assert.deepEqual(seen, ["https://radio.omnifm.xyz/api/nowplaying/omnifm_radio"]);
+}));
+
+test("a relative redirect of the internal AzuraCast counts from the public address and is rerouted again", () => withEnv(INTERNAL, async () => {
+  const urls = [];
+  await safeFetch("https://radio.omnifm.xyz/listen/omnifm_radio/radio.mp3", {
+    lookupFn: noLookup,
+    requestImpl: async (target) => {
+      urls.push(target.url.toString());
+      return urls.length === 1 ? incoming(302, { headers: { location: "/listen/omnifm_radio/radio.aac" } }) : incoming(200);
+    },
+  });
+  assert.deepEqual(urls, [
+    "http://192.168.2.253:8080/listen/omnifm_radio/radio.mp3",
+    "http://192.168.2.253:8080/listen/omnifm_radio/radio.aac",
+  ]);
+}));
+
+test("a foreign host cannot redirect straight to the internal address", () => withEnv(INTERNAL, async () => {
+  await assert.rejects(
+    safeFetch("https://stream.example.org/live", {
+      lookupFn: async () => [{ address: "1.1.1.1", family: 4 }],
+      requestImpl: async () => incoming(302, { headers: { location: "http://192.168.2.253:8080/api/nowplaying/omnifm_radio" } }),
+    }),
+    (error) => error.code === "OUTBOUND_ADDRESS_NOT_ALLOWED",
+  );
+}));
+
+test("the internal address takes no credentials, so config and safeFetch agree", () => {
+  assert.equal(getOmnifmRadioConfig({ OMNIFM_RADIO_INTERNAL_URL: "http://u:p@192.168.2.253:8080" }).internalUrl, "");
+});
+
 test("the poller says since when AzuraCast does not answer and when it works again", async () => {
   const observed = [];
   const tracker = { observe: async (observation) => { observed.push(observation); }, tick: async () => {} };

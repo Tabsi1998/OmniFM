@@ -390,7 +390,10 @@ export function createOmnifmRadioPoller({
     const reason = String(result?.reason || "error").slice(0, 80);
     if (!status.failingSince) {
       status.failingSince = new Date(at).toISOString();
-      log("WARN", `[OmniFM Radio] Abfrage von AzuraCast fehlgeschlagen (${reason}). Erreicht der Server radio.omnifm.xyz? Sonst OMNIFM_RADIO_INTERNAL_URL setzen.`);
+      const hint = getOmnifmRadioConfig().internalUrl
+        ? "Ist OMNIFM_RADIO_INTERNAL_URL richtig?"
+        : "Erreicht der Server die öffentliche Radio-Adresse? Sonst OMNIFM_RADIO_INTERNAL_URL setzen.";
+      log("WARN", `[OmniFM Radio] Abfrage von AzuraCast fehlgeschlagen (${reason}). ${hint}`);
     }
     status.lastError = reason;
   }
