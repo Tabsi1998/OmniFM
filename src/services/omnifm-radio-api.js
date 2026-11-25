@@ -54,9 +54,7 @@ export function normalizeAzuracastNowPlaying(payload, { now = Date.now() } = {})
 }
 
 function tooLarge() {
-  const error = new Error("AzuraCast-Antwort zu groß");
-  error.code = "too_large";
-  return error;
+  return Object.assign(new Error("AzuraCast-Antwort zu groß"), { code: "too_large" });
 }
 
 // Reads at most MAX_BODY_BYTES: a longer answer is cut off, not read to the end.
