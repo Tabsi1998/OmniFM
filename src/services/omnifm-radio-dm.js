@@ -45,7 +45,7 @@ const parseMode = (value) => String(value ?? "").trim().toLowerCase();
 /**
  * The mode that applies: the console's, else the environment's, else
  * "owners". A value that is set but unknown is "off": a typo never sends.
- * @returns {{ mode: "owners" | "optin" | "off", source: "console" | "env" | "default" }}
+ * @returns {{ mode: string, source: string }} mode owners | optin | off, source console | env | default
  */
 export function resolveRadioDmMode(consoleMode, envMode) {
   for (const [value, source] of [[consoleMode, "console"], [envMode, "env"]]) {
@@ -119,13 +119,13 @@ export function isDmClosedError(error) {
 function abortableSleep(ms, signal) {
   return new Promise((resolve) => {
     if (signal?.aborted) {
-      resolve();
+      resolve(undefined);
       return;
     }
     const done = () => {
       clearTimeout(timer);
       signal?.removeEventListener("abort", done);
-      resolve();
+      resolve(undefined);
     };
     const timer = setTimeout(done, ms);
     timer.unref?.();
