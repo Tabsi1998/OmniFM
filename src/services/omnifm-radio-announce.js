@@ -92,10 +92,19 @@ export function createOmnifmRadioAnnouncer({
     }
   }
 
+  function kick() {
+    if (running || stopped || !jobs.length) return;
+    running = run().finally(() => {
+      running = null;
+      // A job queued after the loop's last look but before this point.
+      kick();
+    });
+  }
+
   function enqueue(job) {
     if (stopped) return;
     jobs.push(job);
-    running ||= run().finally(() => { running = null; });
+    kick();
   }
 
   /** Waits until the last call to Discord is `intervalMs` ago. */

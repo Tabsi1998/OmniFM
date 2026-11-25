@@ -462,6 +462,35 @@ test("stop drops what is still waiting", async () => {
   assert.ok(bot.posts.length < 3, "nothing new after stop");
 });
 
+test("an event that arrives just as the queue runs dry is not stranded", async () => {
+  const hop = (count, then) => (count === 0 ? then() : queueMicrotask(() => hop(count - 1, then)));
+  for (let hops = 0; hops <= 12; hops += 1) {
+    const store = createOmnifmRadioAnnounceStore({ getDatabase: () => null, mongoRequested: () => false });
+    const live = show();
+    // eslint-disable-next-line no-await-in-loop -- one round after the other
+    await store.claim({ showId: radioShowId(live), guildId: TEST_GUILD, botId: "bot-2", show: live, at: new Date(START) });
+    // eslint-disable-next-line no-await-in-loop
+    await store.setMessage({ showId: radioShowId(live), guildId: TEST_GUILD }, { channelId: "1", messageId: "2", at: new Date(START) });
+    const bot = fakeBot({ guilds: [TEST_GUILD] });
+    let announcer;
+    // The next show starts a few microtasks after the last job (the edit) finished.
+    const watched = {
+      ...store,
+      async markEnded(key, at) {
+        await store.markEnded(key, at);
+        hop(hops, () => announcer.handle({ type: "start", show: show(START + MINUTE, { source: "test" }) }));
+      },
+    };
+    ({ announcer } = setup({ bot, store: watched }));
+    announcer.handle({ type: "end", show: ended(live, START + MINUTE) });
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((resolve) => { setImmediate(resolve); });
+    // eslint-disable-next-line no-await-in-loop
+    await announcer.idle();
+    assert.equal(bot.posts.length, 1, `start ${hops} microtasks after the last job`);
+  }
+});
+
 // ---------------------------------------------------------------- catching up on missed ends
 
 /** An announcement of `live` on the test server, as a commander before a restart left it. */
