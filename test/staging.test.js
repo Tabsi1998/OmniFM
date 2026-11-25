@@ -83,6 +83,7 @@ test("setup writes a separate instance: own units, ports, database and owner tok
   assert.equal(backend.MONGO_URL, "mongodb://127.0.0.1:27017");
   assert.match(backend.API_ADMIN_TOKEN, /^[0-9a-f]{48}$/);
   assert.equal(backend.OMNIFM_NODE_API_PORT, "8102");
+  assert.equal(backend.OMNIFM_RADIO_ENABLED, "0", "staging does not poll or announce the production radio (#592)");
   assert.equal(backend.PUBLIC_WEB_URL, "https://staging.example.test");
   assert.equal(backend.OPERATOR_WEBHOOK_URL, undefined, "staging never alerts into the production channel");
   assert.equal((await fs.readFile(path.join(dir, "frontend", ".env"), "utf8")).trim(), "REACT_APP_BACKEND_URL=");

@@ -92,6 +92,8 @@ DEFAULT_LANGUAGE=de
 SEED_DEMO_DATA=0
 OMNIFM_DASHBOARD_BACKEND=node
 OMNIFM_NODE_API_PORT=$STAGING_NODE_API_PORT
+# OmniFM Radio (#592): staging does not poll the production station or announce its shows.
+OMNIFM_RADIO_ENABLED=0
 EOF
   printf 'REACT_APP_BACKEND_URL=%s\n' "$backend_url" > "$STAGING_DIR/frontend/.env"
 

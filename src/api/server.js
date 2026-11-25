@@ -52,6 +52,8 @@ import {
   handleDashboardStatsRoute,
   handleDashboardTelemetryRoute,
   handleDiscordBotListRoutes,
+  handleOmnifmRadioWebhook,
+  handleOwnerRadioRoutes,
   handleOwnerStatusRoutes,
   handlePremiumBillingRoutes,
   handlePremiumOffersRoutes,
@@ -309,6 +311,12 @@ function startWebServer(runtimes, { forwardRuntimeTo = "" } = {}) {
       return;
     }
     if (await handleOwnerStatusRoutes({ req, res, requestUrl, readJsonBody })) {
+      return;
+    }
+    if (await handleOwnerRadioRoutes({ req, res, requestUrl, readJsonBody })) {
+      return;
+    }
+    if (await handleOmnifmRadioWebhook({ req, res, requestUrl, readRawBody })) {
       return;
     }
 

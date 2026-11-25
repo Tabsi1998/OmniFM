@@ -17,6 +17,7 @@ export const OPERATOR_ALERT_SWITCHES = Object.freeze([
   ["backupFailed", "BACKUP_FAILED"],
   ["updates", "UPDATES"],
   ["stationOutages", "STATIONS"],
+  ["radioLive", "RADIO_LIVE"],
 ]);
 
 function isSet(value) {

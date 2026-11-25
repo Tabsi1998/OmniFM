@@ -14,7 +14,8 @@ import http from "node:http";
 import net from "node:net";
 
 // /api/activity: the Discord Activity checks who is in which voice channel (#308).
-export const RUNTIME_PREFIXES = Object.freeze(["/api/auth", "/api/dashboard", "/api/share", "/api/station-logos", "/api/owner", "/api/activity"]);
+// /api/radio: the AzuraCast webhook reaches the live detection in the commander (#592).
+export const RUNTIME_PREFIXES = Object.freeze(["/api/auth", "/api/dashboard", "/api/share", "/api/station-logos", "/api/owner", "/api/activity", "/api/radio"]);
 export const RUNTIME_UNAVAILABLE = "Das Dashboard startet gerade neu. Bitte in ein paar Sekunden erneut versuchen.";
 
 // Hop-by-hop headers stay on each connection. Length and encoding are kept:

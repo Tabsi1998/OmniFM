@@ -28,6 +28,7 @@ import { WorkerManager } from "./bot/worker-manager.js";
 import { startWebServer } from "./api/server.js";
 import { startRuntimeHealthReporter } from "./services/runtime-health-reporter.js";
 import { startStationHealthService, stopStationHealthService } from "./services/station-health.js";
+import { startOmnifmRadioLiveService, stopOmnifmRadioLiveService } from "./services/omnifm-radio-live.js";
 import { initScheduledEventsStore, stopScheduledEventsStore } from "./scheduled-events-store.js";
 import { initCustomStationsStore, stopCustomStationsStore } from "./custom-stations.js";
 import { initCommandPermissionsStore, stopCommandPermissionsStore } from "./command-permissions-store.js";
@@ -138,6 +139,8 @@ await initCustomStationsStore();
 await initCommandPermissionsStore();
 await initScheduledEventsStore();
 startStationHealthService(loadStations);
+// OmniFM Radio (#592): live detection by webhook and poll.
+await startOmnifmRadioLiveService().catch((err) => logError("[OmniFM Radio] Live-Erkennung nicht gestartet", err));
 await logRecentOperatorIncidentSummary({
   label: "Owner summary on startup",
 }).catch(() => null);
@@ -611,6 +614,8 @@ async function shutdown(signal) {
   shuttingDown = true;
   log("INFO", `Shutdown via ${signal}...`);
   stopStationHealthService();
+  // Stops alongside the rest, at most 3 s: the bot state below never waits for it.
+  const radioStopped = stopOmnifmRadioLiveService();
 
   // Operator-Webhook: Shutdown-Benachrichtigung (nur bei externem Signal, nicht bei uncaughtException)
   if (signal === "SIGINT" || signal === "SIGTERM") {
@@ -632,6 +637,7 @@ async function shutdown(signal) {
     await flushBotStateStore().catch(() => null);
   }
   await Promise.all([
+    radioStopped,
     stopScheduledEventsStore(),
     stopCustomStationsStore(),
     stopCommandPermissionsStore(),

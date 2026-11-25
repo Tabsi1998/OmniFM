@@ -362,6 +362,59 @@ export function createStationOutageAlerter({ env = process.env, send = notifyOpe
   };
 }
 
+// ---------------------------------------------------------------- OmniFM Radio (#592)
+
+/** "1 h 12 min", "5 min", "unter 1 min". */
+export function formatShowDuration(ms) {
+  const total = Math.round(Math.max(0, Number(ms) || 0) / MINUTE);
+  if (total < 1) return "unter 1 min";
+  const hours = Math.floor(total / 60);
+  const rest = total % 60;
+  if (!hours) return `${rest} min`;
+  return rest ? `${hours} h ${rest} min` : `${hours} h`;
+}
+
+/** "DJ Tabsi – Abendshow"; the DJ and title are what the DJ software sends. */
+function showLabel(show) {
+  return [plain(show?.streamerName, 100), plain(show?.title, 200)].filter(Boolean).join(" – ");
+}
+
+/**
+ * The message for one live event of src/services/omnifm-radio-live.js.
+ * @param {{ type: "start" | "end", show?: { streamerName?: string, title?: string, startedAt?: string, durationMs?: number, source?: string } }} event
+ */
+export function buildRadioLiveAlert({ type, show = {} }) {
+  const label = showLabel(show);
+  const isTest = show.source === "test";
+  const test = isTest ? "Test-Sendung aus der Owner-Konsole, gesendet wurde nichts." : "";
+  // The test shows first, so a push preview never looks like a real show.
+  const titled = (title) => (isTest ? `🧪 Test-Sendung: ${title}` : title).slice(0, 256);
+  if (type === "start") {
+    return {
+      key: `radio-live-start:${show.startedAt || "-"}`,
+      embed: {
+        color: OPERATOR_COLORS.error,
+        title: titled(label ? `🔴 Live gestartet: ${label}` : "🔴 Live gestartet"),
+        description: test || "OmniFM Radio sendet live.",
+      },
+    };
+  }
+  return {
+    key: `radio-live-end:${show.startedAt || "-"}`,
+    embed: {
+      color: OPERATOR_COLORS.info,
+      title: titled(`Sendung beendet nach ${formatShowDuration(show.durationMs)}`),
+      description: [label, test || "Der Auto-DJ ist wieder dran."].filter(Boolean).join("\n"),
+    },
+  };
+}
+
+export async function alertRadioLive(event, env = process.env, send = notifyOperator) {
+  if (!alertEnabled("RADIO_LIVE", env)) return false;
+  const { key, embed } = buildRadioLiveAlert(event);
+  return (await send(key, embed)) === true;
+}
+
 // ---------------------------------------------------------------- commander
 
 /** Worker and disk watchers of the commander process. Returns a stop function. */

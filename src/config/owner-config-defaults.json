@@ -115,7 +115,8 @@
       "diskSpace": true,
       "backupFailed": true,
       "updates": true,
-      "stationOutages": true
+      "stationOutages": true,
+      "radioLive": true
     },
     "audioRecognition": {
       "enabled": false,

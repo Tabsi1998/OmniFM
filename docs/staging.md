@@ -35,6 +35,8 @@ Website. Produktion merkt davon nichts.
    mit dem Staging-Token) → *Discord & Bots*: die Tokens der Test-Bots
    eintragen → speichern → `bash scripts/staging.sh deploy main` startet den
    Bot mit ihnen.
+5. **OmniFM Radio aus:** in `../omnifm-staging/backend/.env` `OMNIFM_RADIO_ENABLED=0` setzen. Sonst fragt
+   Staging den echten Sender ab und meldet „Live gestartet“ ein zweites Mal (#592).
 
 ## Einen Branch ausprobieren
 

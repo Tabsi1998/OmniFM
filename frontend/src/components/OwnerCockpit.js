@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { cockpitHeadline, historyCells, sortCockpitChecks, stateMeta } from '../lib/ownerCockpit.js';
+import OwnerRadioLive from './owner/OwnerRadioLive.js';
 
 // The owner cockpit (#355): does everything work? OmniFM checks every
 // 5 minutes on its own; this page shows the result, red first.
@@ -112,6 +113,7 @@ export default function OwnerCockpit({ apiGet, apiSend, onOpen }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
         {checks.map((entry) => <CheckTile key={entry.key} check={entry} busy={busy} onCheck={check} onOpen={onOpen} />)}
       </div>
+      <OwnerRadioLive apiGet={apiGet} apiSend={apiSend} />
     </div>
   );
 }
