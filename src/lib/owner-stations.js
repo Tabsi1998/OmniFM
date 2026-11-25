@@ -13,7 +13,7 @@ import { safeFetch, validateOutboundUrlWithDns } from "./safe-outbound-http.js";
 import { probeStreamAudio, stationOutageText, stationRecoveryText } from "./stream-audio-probe.js";
 import { parseIntLike } from "./owner-licenses.js";
 import { normalizeStationSeasons } from "./station-fields.js";
-import { isOmnifmRadioKey } from "../services/omnifm-radio-station.js";
+import { isOmnifmRadioKey, isOmnifmRadioUrl } from "../services/omnifm-radio-station.js";
 
 export const STATION_KEY = /^[a-z0-9][a-z0-9._-]{1,48}$/;
 export const VALID_STATION_TIERS = Object.freeze(["free", "pro", "ultimate"]);
@@ -131,6 +131,7 @@ export async function buildStationDocument(body = {}) {
   if (isOmnifmRadioKey(key)) throw new OwnerStationError(400, "Der Key gehört OmniFM Radio und ist reserviert.");
   if (!name) throw new OwnerStationError(400, "Name erforderlich.");
   if (!VALID_STATION_TIERS.includes(tier)) throw new OwnerStationError(400, "Tier muss free, pro oder ultimate sein.");
+  if (isOmnifmRadioUrl(url)) throw new OwnerStationError(400, "Die Adresse gehört zu OmniFM Radio; der Sender steht schon fest im Katalog.");
   const check = await validateStationUrl(url);
   if (!check.ok) throw new OwnerStationError(400, check.error || "Stream-URL ungültig.");
   const extra = stationCatalogFields({ ...body, genre });

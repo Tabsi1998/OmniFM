@@ -20,6 +20,24 @@ export function isOmnifmRadioKey(key, config = getOmnifmRadioConfig()) {
   return Boolean(compact) && compact === compactKey(config.stationKey);
 }
 
+function hostOf(url) {
+  try {
+    return new URL(String(url || "").trim()).hostname.toLowerCase().replace(/\.+$/, "");
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Whether a stream address points at the OmniFM Radio server (any path,
+ * port or query): only the fixed station may play it, never a custom
+ * station or another catalog row.
+ */
+export function isOmnifmRadioUrl(url, config = getOmnifmRadioConfig()) {
+  const host = hostOf(url);
+  return Boolean(host) && [config.streamUrl, config.baseUrl].some((own) => hostOf(own) === host);
+}
+
 export function buildOmnifmRadioStation(config = getOmnifmRadioConfig()) {
   const website = String(resolveWebsiteUrl() || "").replace(/\/+$/, "");
   const logo = normalizeHttpsUrl(`${website}/brand/omnifm-discord-avatar-192.png`);

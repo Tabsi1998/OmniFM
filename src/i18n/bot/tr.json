@@ -743,6 +743,7 @@
   "There is currently no active stream on this server for `bot:{worker}`.": "Bu sunucuda şu anda `bot:{worker}` için etkin bir yayın yok.",
   "There is no listening time for this year yet.": "Bu yıl için henüz dinleme süresi yok.",
   "These links work right away for your unlocked plan.": "Bu bağlantılar açılan planın için hemen çalışır.",
+  "This address belongs to OmniFM Radio and cannot be a custom station.": "Bu adres OmniFM Radio'ya ait ve özel istasyon olamaz.",
   "This bot is not ready right now. Please try again in a moment.": "Bu bot şu anda hazır değil. Lütfen birazdan yeniden dene.",
   "This bot only works in servers.": "Bu bot yalnızca sunucularda çalışır.",
   "This code cannot be redeemed directly as a free license.": "Bu kod doğrudan ücretsiz lisans olarak kullanılamaz.",

@@ -34,6 +34,8 @@ fs.writeFileSync(path.join(dataDir, "stations.json"), JSON.stringify({
     jazzpro: { name: "Jazz Pro", url: "https://radio.example.test/jazz.mp3", tier: "pro", genre: "Jazz" },
     // A catalog row must never stand in for OmniFM Radio.
     "omnifm-radio": { name: "Fake OmniFM", url: "https://fake.example.test/stream.mp3", tier: "free", genre: "Pop" },
+    // Nor a row under another key that plays the OmniFM Radio server.
+    sneakyradio: { name: "Sneaky Radio", url: "https://RADIO.omnifm.xyz/listen/omnifm_radio/radio.aac?x=1", tier: "free", genre: "Pop" },
   },
 }));
 
@@ -47,8 +49,9 @@ const { createDashboardStationsRouteHandler } = await import("../src/api/routes/
 const { buildPublicStationCatalog } = await import("../src/lib/public-stations.js");
 const { automaticFallbackKeysForGuild, resetDownStationKeysForTests } = await import("../src/bot/automatic-fallback.js");
 const { buildStationDocument } = await import("../src/lib/owner-stations.js");
-const { addGuildStation, updateGuildStation } = await import("../src/custom-stations.js");
-const { isOmnifmRadioKey } = await import("../src/services/omnifm-radio-station.js");
+const { addGuildStation, updateGuildStation, validateCustomStationUrl } = await import("../src/custom-stations.js");
+const { translateCustomStationErrorMessage } = await import("../src/lib/language.js");
+const { isOmnifmRadioKey, isOmnifmRadioUrl } = await import("../src/services/omnifm-radio-station.js");
 const { fetchStationSnapshot } = await import("../src/services/omnifm-radio-now-playing.js");
 const { setOmnifmRadioFetchForTests, clearOmnifmRadioApiCache } = await import("../src/services/omnifm-radio-api.js");
 const { setNowPlayingFetchImplementationForTests, clearNowPlayingSnapshotCache } = await import("../src/services/now-playing.js");
@@ -213,6 +216,42 @@ test("nobody can put a station of their own under the OmniFM Radio key", async (
     false,
     "no catalog migration touches the key"
   );
+});
+
+const RADIO_URL_ERROR = "Diese Adresse gehört zu OmniFM Radio und kann kein eigener Sender sein.";
+
+test("nobody can play the OmniFM Radio server under another key: custom station, editor, catalog", async () => {
+  const radioUrls = [
+    STREAM_URL,
+    "https://radio.omnifm.xyz/listen/omnifm_radio/radio.aac?bitrate=64",
+    "https://RADIO.OmniFM.XYZ/radio.mp3",
+    "http://radio.omnifm.xyz:8000/public/omnifm_radio",
+  ];
+  for (const url of radioUrls) {
+    assert.equal(isOmnifmRadioUrl(url), true, url);
+    assert.deepEqual(validateCustomStationUrl(url), { ok: false, error: RADIO_URL_ERROR }, `playing a stored custom station: ${url}`);
+    // eslint-disable-next-line no-await-in-loop -- one address after the other
+    assert.equal((await addGuildStation(TEST_GUILD, "mine", "Mine", url)).error, RADIO_URL_ERROR, `/addstation: ${url}`);
+    // eslint-disable-next-line no-await-in-loop -- one address after the other
+    await assert.rejects(
+      buildStationDocument({ key: "mine", name: "Mine", url }),
+      (error) => error.status === 400 && /OmniFM Radio/.test(error.message),
+      `owner editor: ${url}`
+    );
+  }
+  assert.equal(isOmnifmRadioUrl("https://omnifm.xyz/brand/omnifm-mark.svg"), false, "the website is another host");
+  assert.equal(isOmnifmRadioUrl("https://radio.example.test/groove.mp3"), false);
+  assert.equal(isOmnifmRadioUrl("not a url"), false);
+  assert.equal(validateCustomStationUrl("https://radio.example.test/groove.mp3").ok, true);
+
+  withEnv({ OMNIFM_RADIO_PUBLIC: "1" }, () => {
+    assert.equal(validateCustomStationUrl(STREAM_URL).ok, false, "also when public: then it is in the catalog anyway");
+  });
+
+  assert.equal(Object.values(loadStations().stations).some((station) => station.name === "Sneaky Radio"), false, "a catalog row with the address is ignored");
+
+  assert.equal(translateCustomStationErrorMessage(RADIO_URL_ERROR, "en"), "This address belongs to OmniFM Radio and cannot be a custom station.");
+  assert.notEqual(translateCustomStationErrorMessage(RADIO_URL_ERROR, "fr"), "This address belongs to OmniFM Radio and cannot be a custom station.");
 });
 
 const METAINT = 16;

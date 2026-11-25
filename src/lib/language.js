@@ -141,6 +141,14 @@ function translateCustomStationErrorMessage(message, language = "de") {
     );
   }
 
+  if (value === "Diese Adresse gehört zu OmniFM Radio und kann kein eigener Sender sein.") {
+    return languagePick(
+      language,
+      "Diese Adresse gehört zu OmniFM Radio und kann kein eigener Sender sein.",
+      "This address belongs to OmniFM Radio and cannot be a custom station."
+    );
+  }
+
   const duplicateKeyMatch = value.match(/^Station mit Key '([^']+)' existiert bereits\.$/);
   if (duplicateKeyMatch) {
     return languagePick(

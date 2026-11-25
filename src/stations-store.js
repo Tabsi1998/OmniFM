@@ -11,7 +11,7 @@ import { appRootDir, resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 import { normalizeStationCatalogFields } from "./lib/station-fields.js";
 import { CATALOG_549_MIGRATIONS, CATALOG_561_MIGRATIONS } from "./station-catalog-migrations.js";
 import { getOmnifmRadioConfig } from "./services/omnifm-radio-config.js";
-import { isOmnifmRadioKey, withOmnifmRadioStation } from "./services/omnifm-radio-station.js";
+import { isOmnifmRadioKey, isOmnifmRadioUrl, withOmnifmRadioStation } from "./services/omnifm-radio-station.js";
 
 /**
  * The tracked stations.json in the repository is the shipped seed and is never
@@ -219,8 +219,8 @@ function sanitizeStations(stationsInput) {
     const name = String(rawValue?.name || "").trim();
     const url = String(rawValue?.url || "").trim();
     if (!key || !name || !url) continue;
-    // #591: the key of OmniFM Radio is reserved; no stored row stands in for it.
-    if (isOmnifmRadioKey(key, omnifmRadio)) continue;
+    // #591: the key and the server of OmniFM Radio are reserved; no stored row stands in for it.
+    if (isOmnifmRadioKey(key, omnifmRadio) || isOmnifmRadioUrl(url, omnifmRadio)) continue;
     const tier = String(rawValue?.tier || "free").toLowerCase();
     out[key] = {
       name,

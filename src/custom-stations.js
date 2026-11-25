@@ -6,7 +6,7 @@ import { resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 import { getDb, isConnected } from "./lib/db.js";
 import { deleteGuildStationLogos, deleteStationLogo } from "./station-logos-store.js";
 import { resolveWebsiteUrl } from "./bot/runtime-links.js";
-import { isOmnifmRadioKey } from "./services/omnifm-radio-station.js";
+import { isOmnifmRadioKey, isOmnifmRadioUrl } from "./services/omnifm-radio-station.js";
 
 const DEFAULT_CUSTOM_FILE = resolveRuntimeDataPath("custom-stations.json");
 const CUSTOM_FILE = path.resolve(process.env.OMNIFM_CUSTOM_STATIONS_FILE || DEFAULT_CUSTOM_FILE);
@@ -317,15 +317,20 @@ function parseCustomStationReference(rawReference) {
   };
 }
 
+// #591: OmniFM Radio plays only as the fixed station, for the servers that may see it.
+const OMNIFM_RADIO_URL_ERROR = "Diese Adresse gehört zu OmniFM Radio und kann kein eigener Sender sein.";
+
 function validateCustomStationUrl(rawUrl) {
   const validation = validateOutboundUrl(rawUrl, {
     allowedProtocols: ["http:", "https:"],
   });
   if (!validation.ok) return validation;
+  if (isOmnifmRadioUrl(validation.url)) return { ok: false, error: OMNIFM_RADIO_URL_ERROR };
   return { ok: true, url: validation.url };
 }
 
 async function validateCustomStationUrlWithDns(rawUrl, options = {}) {
+  if (isOmnifmRadioUrl(rawUrl)) return { ok: false, error: OMNIFM_RADIO_URL_ERROR };
   return validateOutboundUrlWithDns(rawUrl, {
     ...options,
     allowedProtocols: ["http:", "https:"],

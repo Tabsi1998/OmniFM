@@ -743,6 +743,7 @@
   "There is currently no active stream on this server for `bot:{worker}`.": "Al momento non c'è nessuno stream attivo su questo server per `bot:{worker}`.",
   "There is no listening time for this year yet.": "Per quest'anno non c'è ancora tempo di ascolto.",
   "These links work right away for your unlocked plan.": "Questi link funzionano subito per il tuo piano sbloccato.",
+  "This address belongs to OmniFM Radio and cannot be a custom station.": "Questo indirizzo appartiene a OmniFM Radio e non può essere una stazione personalizzata.",
   "This bot is not ready right now. Please try again in a moment.": "Questo bot al momento non è pronto. Riprova tra poco.",
   "This bot only works in servers.": "Questo bot funziona solo nei server.",
   "This code cannot be redeemed directly as a free license.": "Questo codice non può essere riscattato direttamente come licenza gratuita.",
