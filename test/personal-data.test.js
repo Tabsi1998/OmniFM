@@ -78,7 +78,7 @@ test("mydata panel: the OmniFM Radio DMs are listed, and deleting says an unsubs
 
 test("mydata counts the OmniFM Radio DMs only beyond a bare unsubscribe, which deleting keeps (#594)", async () => {
   const { countPersonalData } = await import("../src/lib/personal-data.js");
-  const bare = { unsubscribed: true, subscribed: false, unsubscribedAt: null, subscribedAt: null, lastDmAt: null, lastTestDmAt: null, dmsClosedUntil: null, onDelete: "…" };
+  const bare = { unsubscribed: true, subscribed: false, unsubscribedAt: null, subscribedAt: null, lastDmAt: null, lastTestDmAt: null, dmsClosedUntil: null, updatedAt: null, deletedAutomaticallyAt: null, onDelete: "…" };
   assert.equal(countPersonalData({ radioDms: bare }).radioDms, 0);
   assert.equal(countPersonalData({ radioDms: { ...bare, lastDmAt: "2026-11-25T20:00:00.000Z" } }).radioDms, 1);
   assert.equal(countPersonalData({ radioDms: null }).radioDms, 0);
@@ -167,6 +167,8 @@ test("after 'delete everything' the Discord ID is in no collection", { skip: !ha
   assert.equal(collected.data.listeningHours.hours, 2);
   assert.equal(collected.data.radioDms.unsubscribed, false);
   assert.equal(typeof collected.data.radioDms.lastDmAt, "string");
+  assert.equal(typeof collected.data.radioDms.updatedAt, "string");
+  assert.equal(typeof collected.data.radioDms.deletedAutomaticallyAt, "string", "without a choice the file says when it goes by itself");
   assert.ok(!JSON.stringify(collected.data).includes("refresh"), "no Discord key in the file");
   assert.equal(collected.data.reports[0].text, "Mehr Jazz bitte");
   assert.deepEqual(
@@ -236,6 +238,8 @@ test("an unsubscribe from the OmniFM Radio DMs is in the file and is all that st
     lastDmAt: "2026-11-25T20:00:00.000Z",
     lastTestDmAt: null,
     dmsClosedUntil: null,
+    updatedAt: "2026-11-25T20:01:00.000Z",
+    deletedAutomaticallyAt: null,
   });
   assert.match(onDelete, /Abmeldung/, "the file says what deleting keeps");
   assert.equal(countPersonalData(collected.data).radioDms, 1);

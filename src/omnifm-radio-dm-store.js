@@ -7,6 +7,10 @@
 //   lastDmAt       the last DM of a real show (one in 12 hours)
 //   lastTestDmAt   the last DM of a test show, counted apart
 //   dmClosedUntil  Discord refused the DM (50007/403): left alone until then
+//   updatedAt      the last change
+//   expiresAt      for someone who neither unsubscribed nor subscribed: 30 days
+//                  after the last DM (or the end of closed DMs), then a TTL
+//                  index deletes the document; unset for a choice, which stays
 // plus the document "last-run" with the numbers of the last distribution.
 // /mydata (#285) shows a person's document and deletes it; an unsubscribe
 // stays as { _id, unsubscribed: true } so the opt-out is still honoured.
@@ -20,6 +24,7 @@ export const OMNIFM_RADIO_DM_COLLECTION = "omnifm_radio_dm";
 const LAST_RUN_ID = "last-run";
 const SNOWFLAKE = /^\d{17,22}$/;
 const QUOTA_FIELDS = Object.freeze({ real: "lastDmAt", test: "lastTestDmAt" });
+export const RADIO_DM_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const msOf = (value) => {
@@ -42,8 +47,16 @@ function personFrom(doc) {
     dmClosedUntil: msOf(doc.dmClosedUntil),
     unsubscribedAt: msOf(doc.unsubscribedAt),
     subscribedAt: msOf(doc.subscribedAt),
+    updatedAt: msOf(doc.updatedAt),
+    expiresAt: msOf(doc.expiresAt),
   };
 }
+
+/** A pipeline value: the expiry, or no field at all for someone who made a choice. */
+const expiryUnlessChosen = (expiresAt) => ({
+  $cond: [{ $or: [{ $eq: ["$subscribed", true] }, { $eq: ["$unsubscribed", true] }] }, "$$REMOVE", expiresAt],
+});
+const chosen = (person) => Boolean(person?.subscribed || person?.unsubscribed);
 
 /** The rule of a claim, for the memory store; MongoDB gets the same as a filter. */
 function mayClaim(person, field, { windowMs, now, subscribedOnly }) {
@@ -61,23 +74,28 @@ export function createOmnifmRadioDmStore({
   const memory = new Map();
   let memoryRun = null;
 
+  let indexed = false;
   /** The collection, null without MongoDB; throws while MongoDB is away. */
   const collection = () => {
     const db = getDatabase();
     if (!db && mongoRequested()) throw new Error("MongoDB ist nicht verbunden.");
-    return db ? db.collection(OMNIFM_RADIO_DM_COLLECTION) : null;
+    if (!db) return null;
+    const people = db.collection(OMNIFM_RADIO_DM_COLLECTION);
+    if (!indexed) {
+      indexed = true;
+      // The retention: MongoDB deletes a document once its expiresAt is past.
+      people.createIndex({ expiresAt: 1 }, { name: "omnifm_radio_dm_expiry", expireAfterSeconds: 0 }).catch(() => { indexed = false; });
+    }
+    return people;
   };
 
-  async function update(userId, fields) {
+  const memoryPerson = (id) => memory.get(id) || personFrom({});
+  const toMs = (fields) => Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, value instanceof Date ? value.getTime() : value]));
+
+  function validId(userId) {
     const id = userIdOf(userId);
     if (!id) throw new Error("Keine gültige Discord-ID.");
-    const people = collection();
-    if (!people) {
-      const person = memory.get(id) || personFrom({});
-      memory.set(id, { ...person, ...Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, value instanceof Date ? value.getTime() : value])) });
-      return;
-    }
-    await people.updateOne({ _id: id }, { $set: { ...fields, updatedAt: new Date() } }, { upsert: true });
+    return id;
   }
 
   return {
@@ -102,10 +120,11 @@ export function createOmnifmRadioDmStore({
       const field = QUOTA_FIELDS[quota];
       if (!id || !field || !Number.isFinite(windowMs) || windowMs <= 0 || !Number.isFinite(now)) return false;
       const people = collection();
+      const expiresAt = now + RADIO_DM_RETENTION_MS;
       if (!people) {
         const person = memory.get(id) || null;
         if (!mayClaim(person, field, { windowMs, now, subscribedOnly })) return false;
-        memory.set(id, { ...(person || personFrom({})), [field]: now });
+        memory.set(id, { ...memoryPerson(id), [field]: now, updatedAt: now, expiresAt: chosen(person) ? null : expiresAt });
         return true;
       }
       const at = new Date(now);
@@ -120,7 +139,8 @@ export function createOmnifmRadioDmStore({
       };
       try {
         // A person who does not match makes the upsert insert a second _id: that is the "no".
-        const result = await people.updateOne(filter, { $set: { [field]: at, updatedAt: at } }, { upsert: !subscribedOnly });
+        const update = [{ $set: { [field]: at, updatedAt: at, expiresAt: expiryUnlessChosen(new Date(expiresAt)) } }];
+        const result = await people.updateOne(filter, update, { upsert: !subscribedOnly });
         return result.matchedCount > 0 || result.upsertedCount > 0;
       } catch (error) {
         if (error?.code === 11000) return false;
@@ -128,17 +148,36 @@ export function createOmnifmRadioDmStore({
       }
     },
 
-    /** "Abbestellen" (false) or "Wieder abonnieren" (true). */
-    setSubscribed(userId, subscribed, { now = Date.now() } = {}) {
+    /** "Abbestellen" (false) or "Wieder abonnieren" (true): a choice, kept without expiry. */
+    async setSubscribed(userId, subscribed, { now = Date.now() } = {}) {
+      const id = validId(userId);
       const at = new Date(now);
-      return update(userId, subscribed
-        ? { unsubscribed: false, subscribed: true, subscribedAt: at }
-        : { unsubscribed: true, subscribed: false, unsubscribedAt: at });
+      const fields = subscribed
+        ? { unsubscribed: false, subscribed: true, subscribedAt: at, updatedAt: at }
+        : { unsubscribed: true, subscribed: false, unsubscribedAt: at, updatedAt: at };
+      const people = collection();
+      if (!people) {
+        memory.set(id, { ...memoryPerson(id), ...toMs(fields), expiresAt: null });
+        return;
+      }
+      await people.updateOne({ _id: id }, { $set: fields, $unset: { expiresAt: "" } }, { upsert: true });
     },
 
     /** Discord does not deliver DMs to this person: no new try before `until`. */
-    markDmsClosed(userId, { until }) {
-      return update(userId, { dmClosedUntil: new Date(until) });
+    async markDmsClosed(userId, { until, now = Date.now() }) {
+      const id = validId(userId);
+      const expiresAt = Math.max(until, now + RADIO_DM_RETENTION_MS);
+      const people = collection();
+      if (!people) {
+        const person = memoryPerson(id);
+        memory.set(id, { ...person, dmClosedUntil: until, updatedAt: now, expiresAt: chosen(person) ? null : expiresAt });
+        return;
+      }
+      await people.updateOne(
+        { _id: id },
+        [{ $set: { dmClosedUntil: new Date(until), updatedAt: new Date(now), expiresAt: expiryUnlessChosen(new Date(expiresAt)) } }],
+        { upsert: true },
+      );
     },
 
     /**

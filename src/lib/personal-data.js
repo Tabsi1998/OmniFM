@@ -62,6 +62,9 @@ function radioDmsFor(person) {
     lastDmAt: isoOrNull(person.lastDmAt),
     lastTestDmAt: isoOrNull(person.lastTestDmAt),
     dmsClosedUntil: isoOrNull(person.dmClosedUntil),
+    updatedAt: isoOrNull(person.updatedAt),
+    // Without a choice (abbestellt/abonniert) the entry goes by itself then.
+    deletedAutomaticallyAt: isoOrNull(person.expiresAt),
     onDelete: "Hast du die DMs von OmniFM Radio abbestellt, bleibt beim Löschen nur diese Abmeldung gespeichert (ohne Zeiten), damit du keine mehr bekommst. Alles andere wird gelöscht.",
   };
 }
@@ -69,7 +72,7 @@ function radioDmsFor(person) {
 /** Anything beyond a bare unsubscribe, which deleting keeps. */
 function radioDmsBeyondOptOut(state) {
   if (!state) return false;
-  return Boolean(state.subscribed || state.unsubscribedAt || state.subscribedAt || state.lastDmAt || state.lastTestDmAt || state.dmsClosedUntil);
+  return Boolean(state.subscribed || state.unsubscribedAt || state.subscribedAt || state.lastDmAt || state.lastTestDmAt || state.dmsClosedUntil || state.updatedAt);
 }
 
 function eventsCreatedBy(id) {

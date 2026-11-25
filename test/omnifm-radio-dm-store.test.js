@@ -112,12 +112,46 @@ for (const [name, make, options] of backends) {
     assert.equal(await store.get(fan), null, "nothing left of someone who never unsubscribed");
     assert.deepEqual(await store.forget(quitter), { found: true, keptUnsubscribe: true });
     assert.deepEqual(await store.get(quitter), {
-      unsubscribed: true, subscribed: false, lastDmAt: null, lastTestDmAt: null, dmClosedUntil: null, unsubscribedAt: null, subscribedAt: null,
+      unsubscribed: true, subscribed: false, lastDmAt: null, lastTestDmAt: null, dmClosedUntil: null, unsubscribedAt: null, subscribedAt: null, updatedAt: null, expiresAt: null,
     }, "only the opt-out stays, no times");
     assert.equal(await store.claim(quitter, { ...REAL, now: T0 + 2 * DAY }), false, "and it is still honoured");
     assert.deepEqual(await store.forget(nextUser()), { found: false, keptUnsubscribe: false });
   });
 }
+
+for (const [name, make, options] of backends) {
+  test(`${name}: who never chose keeps the times at most 30 days after the last DM`, options, async () => {
+    const store = await make();
+    const plain = nextUser();
+    assert.equal(await store.claim(plain, { ...REAL, now: T0 }), true);
+    assert.deepEqual({ updatedAt: (await store.get(plain)).updatedAt, expiresAt: (await store.get(plain)).expiresAt }, { updatedAt: T0, expiresAt: T0 + 30 * DAY });
+    await store.claim(plain, { ...TEST, now: T0 + DAY });
+    assert.equal((await store.get(plain)).expiresAt, T0 + 31 * DAY, "each DM moves it");
+    await store.markDmsClosed(plain, { until: T0 + 32 * DAY, now: T0 + 2 * DAY });
+    assert.equal((await store.get(plain)).expiresAt, T0 + 32 * DAY, "never before the closed time is over");
+
+    const fan = nextUser();
+    await store.setSubscribed(fan, true, { now: T0 });
+    await store.claim(fan, { ...REAL, now: T0 + HOUR });
+    await store.markDmsClosed(fan, { until: T0 + 30 * DAY, now: T0 + HOUR });
+    assert.equal((await store.get(fan)).expiresAt, null, "a subscription stays until the person changes it");
+
+    const quitter = nextUser();
+    await store.claim(quitter, { ...REAL, now: T0 });
+    await store.setSubscribed(quitter, false, { now: T0 + HOUR });
+    assert.deepEqual({ updatedAt: (await store.get(quitter)).updatedAt, expiresAt: (await store.get(quitter)).expiresAt }, { updatedAt: T0 + HOUR, expiresAt: null }, "an unsubscribe stays");
+  });
+}
+
+test("MongoDB: the times expire through a TTL index", { skip: !hasMongoConfig }, async () => {
+  const store = await mongoStore();
+  await store.claim(nextUser(), { ...REAL, now: T0 });
+  const { getDb } = await import("../src/lib/db.js");
+  const indexes = await getDb().collection(OMNIFM_RADIO_DM_COLLECTION).indexes();
+  const ttl = indexes.find((index) => index.key?.expiresAt === 1);
+  assert.ok(ttl, "an index on expiresAt");
+  assert.equal(ttl.expireAfterSeconds, 0);
+});
 
 test("MongoDB: the kept opt-out is the Discord ID and one flag, nothing else", { skip: !hasMongoConfig }, async () => {
   const store = await mongoStore();
