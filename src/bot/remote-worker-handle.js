@@ -563,6 +563,11 @@ class RemoteWorkerHandle {
     return this.sendCommand("radioAnnounce", { guildId, channelId, roleId, show, claim }, { timeoutMs: 20_000 });
   }
 
+  /** Answered from the worker's cache: no call to Discord. */
+  async checkRadioAnnouncement(guildId, { channelId = "" } = {}) {
+    return this.sendCommand("radioAnnounceCheck", { guildId, channelId }, { timeoutMs: 10_000 });
+  }
+
   async endRadioAnnouncement(guildId, { channelId = "", messageId = "", show = {} } = {}) {
     return this.sendCommand("radioAnnounceEnd", { guildId, channelId, messageId, show }, { timeoutMs: 20_000 });
   }

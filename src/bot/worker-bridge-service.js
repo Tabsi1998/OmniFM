@@ -121,6 +121,8 @@ class WorkerBridgeService {
       // OmniFM Radio's live announcement (#593), posted and edited by OmniFM 1.
       case "radioAnnounce":
         return this.runtime.postRadioAnnouncement(guildId, { channelId: payload.channelId, roleId: payload.roleId, show: payload.show, claim: payload.claim });
+      case "radioAnnounceCheck":
+        return this.runtime.checkRadioAnnouncement(guildId, { channelId: payload.channelId });
       case "radioAnnounceEnd":
         return this.runtime.endRadioAnnouncement(guildId, { channelId: payload.channelId, messageId: payload.messageId, show: payload.show });
       case "setGuildProfile":

@@ -381,6 +381,70 @@ test("a store write that fails after the message went out still holds the limit"
   assert.equal(bot.posts.length, 1, "no second message within two hours");
 });
 
+// ---------------------------------------------------------------- many servers
+
+test("the order of the servers is shuffled for each show", async () => {
+  const guilds = [TEST_GUILD, OTHER_GUILD, THIRD_GUILD];
+  const orderWith = async (random) => {
+    const bot = fakeBot({ guilds });
+    const announcer = createOmnifmRadioAnnouncer({
+      getAnnouncer: () => bot,
+      store: createOmnifmRadioAnnounceStore({ getDatabase: () => null, mongoRequested: () => false }),
+      loadSettings: async () => undefined,
+      getConfig: () => radioConfig({ isPublic: true }),
+      sleep: async () => {},
+      random,
+    });
+    announcer.handle({ type: "start", show: show() });
+    await announcer.idle();
+    return bot.posts.map((post) => post.guildId);
+  };
+  const first = await orderWith(() => 0);
+  const second = await orderWith(() => 0.99);
+  assert.deepEqual([...first].sort(), [...guilds].sort());
+  assert.deepEqual([...second].sort(), [...guilds].sort());
+  assert.notDeepEqual(first, second, "another show, another order");
+  assert.notDeepEqual(first, guilds, "not simply the order of the cache");
+});
+
+test("a server that fails the quick check costs no slot in the pacing", async () => {
+  const bot = fakeBot({ guilds: [TEST_GUILD, OTHER_GUILD, THIRD_GUILD] });
+  bot.checks = [];
+  bot.checkRadioAnnouncement = async (guildId) => {
+    bot.checks.push(guildId);
+    return guildId === OTHER_GUILD ? { ok: false, reason: "missing-permissions" } : { ok: true };
+  };
+  const { announcer, sleeps } = setup({ bot, isPublic: true });
+  announcer.handle({ type: "start", show: show() });
+  await announcer.idle();
+  assert.equal(bot.checks.length, 3);
+  assert.deepEqual(bot.posts.map((post) => post.guildId).sort(), [TEST_GUILD, THIRD_GUILD].sort());
+  assert.deepEqual(sleeps, [1500], "two messages, one pause");
+});
+
+test("OMNIFM_RADIO_ANNOUNCE=0 stops new announcements; ends are still edited", async () => {
+  assert.equal(getOmnifmRadioConfig({}).announce, true, "on by default");
+  assert.equal(getOmnifmRadioConfig({ OMNIFM_RADIO_ANNOUNCE: "off" }).announce, false);
+  const store = createOmnifmRadioAnnounceStore({ getDatabase: () => null, mongoRequested: () => false });
+  const earlier = show(START - 3 * ANNOUNCE_LIMIT_MS);
+  const key = { showId: radioShowId(earlier), guildId: TEST_GUILD };
+  await store.claim({ ...key, botId: "bot-2", show: earlier, at: new Date(START - 3 * ANNOUNCE_LIMIT_MS) });
+  await store.setMessage(key, { channelId: "1", messageId: "2", at: new Date(START - 3 * ANNOUNCE_LIMIT_MS) });
+  const bot = fakeBot({ guilds: [TEST_GUILD] });
+  const announcer = createOmnifmRadioAnnouncer({
+    getAnnouncer: () => bot,
+    store,
+    loadSettings: async () => undefined,
+    getConfig: () => getOmnifmRadioConfig({ OMNIFM_RADIO_TEST_GUILD_IDS: TEST_GUILD, OMNIFM_RADIO_ANNOUNCE: "0" }),
+    sleep: async () => {},
+  });
+  announcer.handle({ type: "start", show: show() });
+  announcer.handle({ type: "end", show: ended(earlier, START - 2 * ANNOUNCE_LIMIT_MS) });
+  await announcer.idle();
+  assert.equal(bot.posts.length, 0);
+  assert.equal(bot.edits.length, 1);
+});
+
 // ---------------------------------------------------------------- end
 
 test("the end edits the same message, once, also after a restart", async () => {

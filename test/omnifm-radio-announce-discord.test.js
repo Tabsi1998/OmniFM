@@ -252,6 +252,19 @@ test("no channel, a channel that is gone or missing rights: skipped, nothing sen
   assert.deepEqual(await elsewhere.postRadioAnnouncement(TEST_GUILD, { show: SHOW }), { ok: false, reason: "not-in-guild" });
 });
 
+test("the quick check answers from the cache, without a call to Discord", async () => {
+  const system = textChannel(SYSTEM);
+  const { runtime, guild } = fakeRuntime({ channels: [system] });
+  let fetched = 0;
+  guild.channels.fetch = async () => { fetched += 1; return null; };
+  assert.deepEqual(await runtime.checkRadioAnnouncement(TEST_GUILD, {}), { ok: true });
+  assert.deepEqual(await runtime.checkRadioAnnouncement(TEST_GUILD, { channelId: OTHER_TEXT }), { ok: false, reason: "no-channel" });
+  const { runtime: noRights } = fakeRuntime({ channels: [textChannel(SYSTEM, { perms: [PermissionFlagsBits.ViewChannel] })] });
+  assert.deepEqual(await noRights.checkRadioAnnouncement(TEST_GUILD, {}), { ok: false, reason: "missing-permissions" });
+  assert.equal(fetched, 0);
+  assert.equal(system.sent.length, 0);
+});
+
 test("the end edits the posted message in place", async () => {
   const system = textChannel(SYSTEM);
   const { runtime } = fakeRuntime({ channels: [system] });
@@ -363,19 +376,22 @@ test("split mode: the commander's post and edit reach OmniFM 1 through the worke
     config: { id: "bot-2" },
     postRadioAnnouncement: async (...args) => { calls.push(["post", ...args]); return { ok: true, channelId: SYSTEM, messageId: "91" }; },
     endRadioAnnouncement: async (...args) => { calls.push(["end", ...args]); return { ok: true }; },
+    checkRadioAnnouncement: async (...args) => { calls.push(["check", ...args]); return { ok: true }; },
   }, { bridge: {}, doorbell: { isDoorbellConnected: () => false, onDoorbell: () => () => {} } });
   const post = { channelId: "", roleId: ROLE, show: SHOW, claim: { showId: "live:x", guildId: TEST_GUILD } };
   assert.deepEqual(await service.executeCommand({ type: "radioAnnounce", payload: { guildId: TEST_GUILD, ...post } }), { ok: true, channelId: SYSTEM, messageId: "91" });
   const end = { channelId: SYSTEM, messageId: "91", show: SHOW };
   assert.deepEqual(await service.executeCommand({ type: "radioAnnounceEnd", payload: { guildId: TEST_GUILD, ...end } }), { ok: true });
-  assert.deepEqual(calls, [["post", TEST_GUILD, post], ["end", TEST_GUILD, end]]);
+  assert.deepEqual(await service.executeCommand({ type: "radioAnnounceCheck", payload: { guildId: TEST_GUILD, channelId: SYSTEM } }), { ok: true });
+  assert.deepEqual(calls, [["post", TEST_GUILD, post], ["end", TEST_GUILD, end], ["check", TEST_GUILD, { channelId: SYSTEM }]]);
 
   const handle = new RemoteWorkerHandle({ id: "bot-2", name: "OmniFM 1" });
   const sent = [];
   handle.sendCommand = async (type, payload) => { sent.push([type, payload]); return { ok: true }; };
   await handle.postRadioAnnouncement(TEST_GUILD, post);
   await handle.endRadioAnnouncement(TEST_GUILD, end);
-  assert.deepEqual(sent, [["radioAnnounce", { guildId: TEST_GUILD, ...post }], ["radioAnnounceEnd", { guildId: TEST_GUILD, ...end }]]);
+  await handle.checkRadioAnnouncement(TEST_GUILD, { channelId: SYSTEM });
+  assert.deepEqual(sent, [["radioAnnounce", { guildId: TEST_GUILD, ...post }], ["radioAnnounceEnd", { guildId: TEST_GUILD, ...end }], ["radioAnnounceCheck", { guildId: TEST_GUILD, channelId: SYSTEM }]]);
 });
 
 test("the button under the message reaches the Listen now handler", async () => {

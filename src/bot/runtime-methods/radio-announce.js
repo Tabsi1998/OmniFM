@@ -41,20 +41,38 @@ function streamingChannelId(state) {
   return String(state.connection?.joinConfig?.channelId || state.lastChannelId || "").trim();
 }
 
+/**
+ * The channel the announcement goes to (the chosen one, else the system
+ * channel) once this bot may write there, else the reason it may not.
+ * Without `fetch` only the cache is asked: no call to Discord.
+ */
+async function announceTarget(runtime, guildId, channelId, { fetch = false } = {}) {
+  const guild = runtime.client.guilds.cache.get(guildId);
+  if (!guild) return { reason: "not-in-guild" };
+  const me = guild.members?.me || (fetch ? await runtime.resolveBotMember(guild) : null);
+  if (!me) return { reason: "no-member" };
+  const channel = channelId
+    ? guild.channels.cache.get(channelId) || (fetch ? await guild.channels.fetch(channelId).catch(() => null) : null)
+    : guild.systemChannel;
+  if (!channel || (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)) {
+    return { reason: "no-channel" };
+  }
+  if (!canPost(channel, me)) return { reason: "missing-permissions" };
+  return { guild, channel };
+}
+
 const radioAnnounceMethods = {
+  /** Whether this bot could post on the server now, from its cache only (before the commander's pause). */
+  async checkRadioAnnouncement(guildId, { channelId = "" } = {}) {
+    const target = await announceTarget(this, guildId, channelId);
+    return target.reason ? { ok: false, reason: target.reason } : { ok: true };
+  },
+
   /** Posts the live message: the chosen channel, else the system channel. */
   async postRadioAnnouncement(guildId, { channelId = "", roleId = "", show = {}, claim = null } = {}) {
-    const guild = this.client.guilds.cache.get(guildId);
-    if (!guild) return { ok: false, reason: "not-in-guild" };
-    const me = await this.resolveBotMember(guild);
-    if (!me) return { ok: false, reason: "no-member" };
-    const channel = channelId
-      ? guild.channels.cache.get(channelId) || await guild.channels.fetch(channelId).catch(() => null)
-      : guild.systemChannel;
-    if (!channel || (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)) {
-      return { ok: false, reason: "no-channel" };
-    }
-    if (!canPost(channel, me)) return { ok: false, reason: "missing-permissions" };
+    const target = await announceTarget(this, guildId, channelId, { fetch: true });
+    if (target.reason) return { ok: false, reason: target.reason };
+    const { guild, channel } = target;
     // A role that was deleted is not mentioned.
     const role = roleId ? guild.roles.cache.get(roleId) : null;
     const payload = buildRadioLivePayload({

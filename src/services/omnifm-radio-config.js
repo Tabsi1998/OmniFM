@@ -11,6 +11,7 @@
 //   OMNIFM_RADIO_STATION_KEY=omnifm-radio  Key im OmniFM-Katalog
 //   OMNIFM_RADIO_PUBLIC=0              1 = für alle Server sichtbar
 //   OMNIFM_RADIO_TEST_GUILD_IDS=       Server-IDs (Komma), die ihn vorher sehen
+//   OMNIFM_RADIO_ANNOUNCE=1            0 = keine neuen Ankündigungen auf den Servern (#593)
 // ============================================================
 
 import { log } from "../lib/logging.js";
@@ -67,6 +68,7 @@ export function getOmnifmRadioConfig(env = process.env) {
     nowPlayingUrl: `${baseUrl}/api/nowplaying/${encodeURIComponent(station)}`,
     isPublic: flag(env.OMNIFM_RADIO_PUBLIC, false),
     testGuildIds: Object.freeze(parseIdList(env.OMNIFM_RADIO_TEST_GUILD_IDS)),
+    announce: flag(env.OMNIFM_RADIO_ANNOUNCE, true),
   });
 }
 

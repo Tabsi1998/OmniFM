@@ -58,7 +58,7 @@ const defaultSleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms).
  * The announcements of one process. `handle` takes the live events; one
  * queue runs everything, so the end of a show always comes after the posts
  * that were already on their way.
- * @param {{ getAnnouncer: () => any, store?: ReturnType<typeof createOmnifmRadioAnnounceStore>, loadSettings?: (guildId: string) => Promise<any>, getConfig?: typeof getOmnifmRadioConfig, getLiveState?: () => any, now?: () => number, intervalMs?: number, sleep?: (ms: number) => Promise<void>, readyTimeoutMs?: number }} options
+ * @param {{ getAnnouncer: () => any, store?: ReturnType<typeof createOmnifmRadioAnnounceStore>, loadSettings?: (guildId: string) => Promise<any>, getConfig?: typeof getOmnifmRadioConfig, getLiveState?: () => any, random?: () => number, now?: () => number, intervalMs?: number, sleep?: (ms: number) => Promise<void>, readyTimeoutMs?: number }} options
  */
 export function createOmnifmRadioAnnouncer({
   getAnnouncer,
@@ -66,6 +66,7 @@ export function createOmnifmRadioAnnouncer({
   loadSettings = loadRadioAnnounceSettings,
   getConfig = getOmnifmRadioConfig,
   getLiveState = liveDetectionState,
+  random = Math.random,
   now = Date.now,
   intervalMs = SEND_INTERVAL_MS,
   sleep = defaultSleep,
@@ -132,6 +133,16 @@ export function createOmnifmRadioAnnouncer({
     }
   }
 
+  /** Another order for each show: no server is always last. */
+  function shuffled(list) {
+    const copy = [...list];
+    for (let index = copy.length - 1; index > 0; index -= 1) {
+      const other = Math.floor(random() * (index + 1));
+      [copy[index], copy[other]] = [copy[other], copy[index]];
+    }
+    return copy;
+  }
+
   function targetGuilds(bot, show) {
     const config = getConfig();
     const ids = [...bot.client.guilds.cache.keys()].map(String);
@@ -151,6 +162,14 @@ export function createOmnifmRadioAnnouncer({
     // out that could not be edited later (and an "off" that could not be read stays off).
     const last = await store.lastPostedAt(guildId);
     if (!test && last !== null && now() - last < ANNOUNCE_LIMIT_MS) return "limit";
+    // From the bot's cache, no call to Discord: a server it cannot write to costs no slot.
+    if (typeof bot.checkRadioAnnouncement === "function") {
+      const check = await bot.checkRadioAnnouncement(guildId, { channelId: settings.channelId }).catch(() => null);
+      if (check && !check.ok && check.reason) {
+        log("DEBUG", `${TAG} ${guildId} übersprungen: ${check.reason}`);
+        return "skipped";
+      }
+    }
     await pace();
     // The show may have ended while this one waited for its turn.
     if (activeShowId !== showId || stopped) return "ended";
@@ -187,7 +206,14 @@ export function createOmnifmRadioAnnouncer({
       return;
     }
     if (activeShowId !== showId) return;
-    const guildIds = targetGuilds(bot, show);
+    if (!getConfig().announce) {
+      log("INFO", `${TAG}: abgeschaltet (OMNIFM_RADIO_ANNOUNCE=0), keine neue Ankündigung.`);
+      return;
+    }
+    const guildIds = shuffled(targetGuilds(bot, show));
+    if (guildIds.length) {
+      log("INFO", `${TAG} (${show.source}): ${guildIds.length} Server, höchstens etwa ${Math.ceil((guildIds.length * intervalMs) / 60_000)} min.`);
+    }
     const counts = {};
     let open = guildIds.length;
     const tally = (outcome) => {
