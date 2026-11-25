@@ -43,6 +43,7 @@ import SettingsTimeZone from './settings/SettingsTimeZone.js';
 import SettingsSeasons from './settings/SettingsSeasons.js';
 import { seasonEmoji } from '../../../src/lib/seasons.js';
 import SettingsVoiceGuard from './settings/SettingsVoiceGuard.js';
+import SettingsRadioAnnounce from './settings/SettingsRadioAnnounce.js';
 
 export default function DashboardSettings({
   apiRequest,
@@ -54,6 +55,8 @@ export default function DashboardSettings({
 }) {
   const [settings, setSettings] = useState(null);
   const [textChannels, setTextChannels] = useState([]);
+  // Announcement channels (type 5) only for the radio announcement (#593).
+  const [announcementChannels, setAnnouncementChannels] = useState([]);
   const [stations, setStations] = useState({ free: [], pro: [], ultimate: [], custom: [] });
   const [pendingFailoverStation, setPendingFailoverStation] = useState('');
   const [digestPreview, setDigestPreview] = useState(null);
@@ -102,6 +105,7 @@ export default function DashboardSettings({
     if (!selectedGuildId) {
       setSettings(null);
       setTextChannels([]);
+      setAnnouncementChannels([]);
       setStations({ free: [], pro: [], ultimate: [], custom: [] });
       setError('');
       setMessage('');
@@ -119,6 +123,7 @@ export default function DashboardSettings({
     setMessage('');
     setSettings(null);
     setTextChannels([]);
+    setAnnouncementChannels([]);
     setStations({ free: [], pro: [], ultimate: [], custom: [] });
     setPendingFailoverStation('');
     setDigestPreview(null);
@@ -139,6 +144,7 @@ export default function DashboardSettings({
       };
       setSettings(nextSettings);
       setTextChannels(channelsResult.textChannels || []);
+      setAnnouncementChannels(channelsResult.announcementChannels || []);
       setStations({
         free: stationsResult.free || [],
         pro: stationsResult.pro || [],
@@ -176,6 +182,11 @@ export default function DashboardSettings({
       if (settings?.serverTimeZone?.current) body.serverTimeZone = settings.serverTimeZone.current;
       if (settings?.seasonDecor) body.seasonDecor = { seasons: settings.seasonDecor.seasons || {}, parts: settings.seasonDecor.parts || {} };
       if (settings?.favorites) body.favorites = { stations: settings.favorites.stations || [] };
+      // Every plan, where the server sees OmniFM Radio (#593).
+      if (settings?.omnifmRadioAnnounce?.available) {
+        const { enabled, channelId, roleId } = settings.omnifmRadioAnnounce;
+        body.omnifmRadioAnnounce = { enabled: enabled !== false, channelId: channelId || '', roleId: roleId || '' };
+      }
       const result = await apiRequest(`/api/dashboard/settings?serverId=${encodeURIComponent(selectedGuildId)}`, {
         method: 'PUT',
         body: JSON.stringify(body),
@@ -240,6 +251,11 @@ export default function DashboardSettings({
   const setSeasonDecor = (value) => setSettings((current) => ({
     ...(current || {}),
     seasonDecor: { ...(current?.seasonDecor || {}), ...value },
+  }));
+  const radioAnnounce = settings?.omnifmRadioAnnounce?.available ? settings.omnifmRadioAnnounce : null;
+  const setRadioAnnounce = (patch) => setSettings((current) => ({
+    ...(current || {}),
+    omnifmRadioAnnounce: { ...(current?.omnifmRadioAnnounce || {}), ...patch },
   }));
   const configuredFailoverChain = getConfiguredFailoverChain(settings);
   const digestSummary = buildWeeklyDigestSummary(settings, t, formatDate);
@@ -507,6 +523,11 @@ export default function DashboardSettings({
       t={t}
       timeZone={settings.serverTimeZone?.current}
     />
+      )}
+
+      {/* Messages OmniFM posts in a channel: the radio announcement, then the digest. */}
+      {radioAnnounce && (
+    <SettingsRadioAnnounce radioAnnounce={radioAnnounce} setRadioAnnounce={setRadioAnnounce} t={t} textChannels={[...textChannels, ...announcementChannels]} />
       )}
 
     <SettingsWeeklyDigest

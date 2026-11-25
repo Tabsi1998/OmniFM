@@ -314,6 +314,13 @@ async function getWorkerCommand(commandId) {
   return db.collection(WORKER_COMMAND_COLLECTION).findOne({ commandId: normalizedCommandId });
 }
 
+/** A command that was cancelled while still pending: the worker never ran it. */
+function notStartedError(message) {
+  const error = /** @type {Error & { notStarted?: boolean }} */ (new Error(message));
+  error.notStarted = true;
+  return error;
+}
+
 async function waitForWorkerCommandResult(commandId, options = {}) {
   const normalizedCommandId = String(commandId || "").trim();
   if (!normalizedCommandId) {
@@ -344,7 +351,8 @@ async function waitForWorkerCommandResult(commandId, options = {}) {
       throw new Error(String(doc.error || "Worker-Command fehlgeschlagen."));
     }
     if (doc.status === "cancelled") {
-      throw new Error(String(doc.error || "Worker-Command abgebrochen."));
+      // Only a pending command is ever cancelled.
+      throw notStartedError(String(doc.error || "Worker-Command abgebrochen."));
     }
     // Polling stays the fallback; the worker's ring ends the wait early.
     // eslint-disable-next-line no-await-in-loop -- polls the command until the worker answers
@@ -373,7 +381,7 @@ async function waitForWorkerCommandResult(commandId, options = {}) {
     }
   }
 
-  throw new Error(timeoutError);
+  throw cancelled ? notStartedError(timeoutError) : new Error(timeoutError);
 }
 
 async function sendWorkerCommandAndWait(workerId, type, payload = {}, options = {}) {

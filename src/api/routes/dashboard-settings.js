@@ -25,6 +25,13 @@ import {
   seasonForServer,
 } from "../../lib/seasons.js";
 import { ownerSettings } from "../../lib/owner-settings-cache.js";
+import {
+  RADIO_ANNOUNCE_SETTINGS_KEY,
+  buildDashboardRadioAnnounceResponse,
+  normalizeRadioAnnounceSettings,
+  radioAnnounceRole,
+} from "../../lib/omnifm-radio-announce-settings.js";
+import { isOmnifmRadioVisibleForGuild } from "../../services/omnifm-radio-config.js";
 
 // The favourite bar (#276): the stored stations and how many the plan shows.
 export function buildDashboardFavoritesResponse(settings = {}, tier = "free") {
@@ -98,6 +105,7 @@ export function createDashboardSettingsRouteHandler(deps) {
     normalizeWeeklyDigestConfig,
     resolveDashboardFailoverChain,
     resolveDashboardGuildForSession,
+    resolveRuntimeForGuild,
     sendJson,
     sendLocalizedError,
     serverHasCapability,
@@ -129,6 +137,10 @@ export function createDashboardSettingsRouteHandler(deps) {
       sendLocalizedError(res, 403, language, "Kein Zugriff.", "No access.");
       return true;
     }
+    // OmniFM Radio's live announcement (#593): roles and system channel as the bots see the server.
+    const radioAnnounce = (stored) => buildDashboardRadioAnnounceResponse(guildInfo.id, stored, {
+      guild: resolveRuntimeForGuild(runtimes || [], guildInfo.id).guild,
+    });
 
     if (req.method === "GET") {
       const settings = await loadDashboardGuildSettings(guildInfo.id);
@@ -161,6 +173,7 @@ export function createDashboardSettingsRouteHandler(deps) {
         serverLanguage: buildDashboardLanguageResponse(guildInfo.id),
         serverTimeZone: buildDashboardTimeZoneResponse(settings),
         seasonDecor: buildDashboardSeasonDecorResponse(guildInfo.id, settings),
+        omnifmRadioAnnounce: radioAnnounce(settings),
       });
       return true;
     }
@@ -340,6 +353,29 @@ export function createDashboardSettingsRouteHandler(deps) {
           else updates.timeZone = zone;
         }
 
+        // Every plan sets where OmniFM Radio's live show is announced (#593).
+        // Hidden since the page was loaded: left out, the rest of the save goes through.
+        const radioInput = body?.[RADIO_ANNOUNCE_SETTINGS_KEY];
+        if (radioInput && typeof radioInput === "object" && isOmnifmRadioVisibleForGuild(guildInfo.id)) {
+          if (radioInput.enabled !== undefined && typeof radioInput.enabled !== "boolean") {
+            sendLocalizedError(res, 400, language, "Die Ankündigung ist entweder an oder aus.", "The announcement is either on or off.");
+            return true;
+          }
+          const radio = normalizeRadioAnnounceSettings(radioInput);
+          // Only a changed role is checked: one deleted in Discord stays stored until
+          // someone picks another (OmniFM 1 skips it when posting), and every other
+          // setting can still be saved. Where the bots' view has no roles, it is not refused.
+          const storedRole = normalizeRadioAnnounceSettings((await getCurrentSettings())[RADIO_ANNOUNCE_SETTINGS_KEY]).roleId;
+          const radioGuild = resolveRuntimeForGuild(runtimes || [], guildInfo.id).guild;
+          const rolesKnown = Boolean(radioGuild?.roles?.cache);
+          if (radio.roleId && radio.roleId !== storedRole
+            && (radio.roleId === guildInfo.id || (rolesKnown && !radioAnnounceRole(radioGuild, radio.roleId)))) {
+            sendLocalizedError(res, 400, language, "Diese Rolle kann OmniFM nicht erwähnen. Wähle eine andere.", "OmniFM cannot mention this role. Choose another one.");
+            return true;
+          }
+          updates[RADIO_ANNOUNCE_SETTINGS_KEY] = radio;
+        }
+
         // Every plan may switch the seasonal decoration (#425).
         if (body?.seasonDecor && typeof body.seasonDecor === "object") {
           updates.seasonDecor = normalizeSeasonSettings(body.seasonDecor);
@@ -468,6 +504,9 @@ export function createDashboardSettingsRouteHandler(deps) {
           serverLanguage: buildDashboardLanguageResponse(guildInfo.id),
           serverTimeZone: buildDashboardTimeZoneResponse(seasonSource),
           seasonDecor: buildDashboardSeasonDecorResponse(guildInfo.id, seasonSource),
+          omnifmRadioAnnounce: radioAnnounce({
+            [RADIO_ANNOUNCE_SETTINGS_KEY]: updates[RADIO_ANNOUNCE_SETTINGS_KEY] ?? savedSettings[RADIO_ANNOUNCE_SETTINGS_KEY],
+          }),
         });
       } catch (err) {
         logError("[DashboardSettings] Save failed", err, {
