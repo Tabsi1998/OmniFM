@@ -153,3 +153,11 @@ export function createOmnifmRadioDmStore({
     },
   };
 }
+
+let shared = null;
+
+/** The one store of this process: the distribution and the DM buttons see the same people. */
+export function sharedOmnifmRadioDmStore() {
+  shared ||= createOmnifmRadioDmStore();
+  return shared;
+}
