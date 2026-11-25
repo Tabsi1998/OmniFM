@@ -642,6 +642,7 @@
   "Starts": "Başlatmalar",
   "Starts without recovery: **{starts}**\nLast start: {last}": "Toparlanmasız başlatmalar: **{starts}**\nSon başlatma: {last}",
   "Station": "İstasyon",
+  "Station API": "İstasyon API'si",
   "Station `{key}` removed.": "`{key}` istasyonu kaldırıldı.",
   "Station `{key}` was not found.": "`{key}` istasyonu bulunamadı.",
   "Station `{station}` is not available in your plan.": "`{station}` istasyonu planında kullanılamıyor.",

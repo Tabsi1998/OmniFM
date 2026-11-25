@@ -642,6 +642,7 @@
   "Starts": "Inícios",
   "Starts without recovery: **{starts}**\nLast start: {last}": "Inícios sem recuperação: **{starts}**\nÚltimo início: {last}",
   "Station": "Estação",
+  "Station API": "API da estação",
   "Station `{key}` removed.": "Estação `{key}` removida.",
   "Station `{key}` was not found.": "Estação `{key}` não encontrada.",
   "Station `{station}` is not available in your plan.": "A estação `{station}` não está disponível no seu plano.",

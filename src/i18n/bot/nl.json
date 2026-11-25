@@ -642,6 +642,7 @@
   "Starts": "Starts",
   "Starts without recovery: **{starts}**\nLast start: {last}": "Starts zonder herstel: **{starts}**\nLaatste start: {last}",
   "Station": "Zender",
+  "Station API": "Zender-API",
   "Station `{key}` removed.": "Zender `{key}` verwijderd.",
   "Station `{key}` was not found.": "Zender `{key}` niet gevonden.",
   "Station `{station}` is not available in your plan.": "Zender `{station}` is niet beschikbaar in je abonnement.",

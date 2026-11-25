@@ -642,6 +642,7 @@
   "Starts": "Démarrages",
   "Starts without recovery: **{starts}**\nLast start: {last}": "Démarrages sans rétablissement : **{starts}**\nDernier démarrage : {last}",
   "Station": "Station",
+  "Station API": "API de la station",
   "Station `{key}` removed.": "Station `{key}` supprimée.",
   "Station `{key}` was not found.": "Station `{key}` introuvable.",
   "Station `{station}` is not available in your plan.": "La station `{station}` n'est pas disponible avec ton offre.",

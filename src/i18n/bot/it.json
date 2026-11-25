@@ -642,6 +642,7 @@
   "Starts": "Avvii",
   "Starts without recovery: **{starts}**\nLast start: {last}": "Avvii senza ripristino: **{starts}**\nUltimo avvio: {last}",
   "Station": "Stazione",
+  "Station API": "API della stazione",
   "Station `{key}` removed.": "Stazione `{key}` rimossa.",
   "Station `{key}` was not found.": "Stazione `{key}` non trovata.",
   "Station `{station}` is not available in your plan.": "La stazione `{station}` non è disponibile con il tuo piano.",

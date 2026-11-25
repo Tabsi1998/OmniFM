@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { botTranslator } from "../src/lib/bot-i18n.js";
+import { botText, botTranslator } from "../src/lib/bot-i18n.js";
 
 // OmniFM Radio as a fixed catalog station (#591): never stored, added for the
 // servers that may see it, first in their lists; the key is reserved.
@@ -55,6 +55,7 @@ const { isOmnifmRadioKey, isOmnifmRadioUrl } = await import("../src/services/omn
 const { fetchStationSnapshot } = await import("../src/services/omnifm-radio-now-playing.js");
 const { setOmnifmRadioFetchForTests, clearOmnifmRadioApiCache } = await import("../src/services/omnifm-radio-api.js");
 const { setNowPlayingFetchImplementationForTests, clearNowPlayingSnapshotCache } = await import("../src/services/now-playing.js");
+const { nowPlayingMethods } = await import("../src/bot/now-playing/now-playing-methods.js");
 
 setLicenseProvider(() => null);
 
@@ -319,4 +320,14 @@ test("now playing of OmniFM Radio comes from AzuraCast, from the stream's ICY ti
   assert.equal(apiCalls, 0, "other stations never ask AzuraCast");
   assert.equal(other.title, "ICY Song");
   clearOmnifmRadioApiCache();
+});
+
+test("the panel names the AzuraCast API as the song source, in every language", () => {
+  const label = (language) => nowPlayingMethods.buildNowPlayingSourceSummary(language, { metadataSource: "azuracast", metadataStatus: "ok" }, true).sourceLabel;
+  assert.equal(label("de"), "Sender-API");
+  assert.equal(label("en"), "Station API");
+  for (const language of ["fr", "es", "it", "pl", "tr", "pt", "nl"]) {
+    assert.notEqual(label(language), botText(language, "Unbekannt", "Unknown"), language);
+    assert.notEqual(label(language), "Station API", `${language} has its own word`);
+  }
 });

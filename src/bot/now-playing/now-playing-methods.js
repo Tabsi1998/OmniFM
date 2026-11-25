@@ -313,6 +313,10 @@ const nowPlayingMethods = {
     } else if (metadataSource === "stream") {
       sourceLabel = t("Stream-Info", "Stream info");
       sourceDetail = sourceLabel;
+    } else if (metadataSource === "azuracast") {
+      // OmniFM Radio (#591): the title comes from the station's own AzuraCast API.
+      sourceLabel = t("Sender-API", "Station API");
+      sourceDetail = sourceLabel;
     }
 
     let metadataHint = null;
