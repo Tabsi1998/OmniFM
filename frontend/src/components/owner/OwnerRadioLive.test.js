@@ -50,6 +50,20 @@ describe('OmniFM Radio in the owner cockpit', () => {
     expect(screen.getByTestId('radio-live-shows').textContent).toContain('1 h 12 min');
   });
 
+  it('says when the poll of AzuraCast fails and what to set (#599)', async () => {
+    setup({ ...OFFLINE, webhook: false, internal: false, poll: { failingSince: '2026-11-25T01:12:00.000Z', lastError: 'OUTBOUND_TIMEOUT', lastOkAt: null } });
+    const problem = await screen.findByTestId('radio-live-poll-problem');
+    expect(problem.getAttribute('role')).toBe('alert');
+    expect(problem.textContent).toContain('OUTBOUND_TIMEOUT');
+    expect(problem.textContent).toContain('OMNIFM_RADIO_INTERNAL_URL');
+  });
+
+  it('stays quiet while the poll works', async () => {
+    setup({ ...OFFLINE, poll: { failingSince: null, lastError: null, lastOkAt: '2026-11-25T01:12:00.000Z' } });
+    await screen.findByTestId('radio-live');
+    expect(screen.queryByTestId('radio-live-poll-problem')).toBeNull();
+  });
+
   it('starts a test show and offers to end it', async () => {
     const { apiSend } = setup(OFFLINE, TEST_LIVE);
     await screen.findByTestId('radio-live');

@@ -4,6 +4,7 @@ import net from "node:net";
 import { lookup as dnsLookup } from "node:dns/promises";
 import { Readable } from "node:stream";
 import ipaddr from "ipaddr.js";
+import { getOmnifmRadioConfig } from "../services/omnifm-radio-config.js";
 
 const DEFAULT_ALLOWED_PROTOCOLS = Object.freeze(["http:", "https:"]);
 const DEFAULT_MAX_URL_LENGTH = 2_048;
@@ -92,10 +93,84 @@ function isTestStreamOrigin(parsedUrl) {
   }
 }
 
+// #599: the server may not reach its own public address (no hairpin NAT).
+// OMNIFM_RADIO_INTERNAL_URL names where it reaches AzuraCast in its own
+// network instead (e.g. http://192.168.2.253:8080). Only what the bot itself
+// needs from the public radio host goes there: GET/HEAD on the station's
+// now-playing API and its /listen/<station>/ streams (plus the path of
+// OMNIFM_RADIO_STREAM_URL on that host), with the same scheme and port and no
+// credentials. Everything else on that host is asked publicly as before.
+// Only a rerouted request may reach that one private origin: the mark is a
+// symbol no caller can pass, so a custom station, a stream test or a webhook
+// naming the internal address stays refused. OMNIFM_RADIO_ENABLED=0 turns it off.
+const RADIO_INTERNAL_ROUTE = Symbol("omnifm-radio-internal-route");
+
+// One plain file name after /listen/<station>/: no further segments, no
+// percent-encoding (an encoded "/" or ".." would be decoded later by the proxy).
+const RADIO_STREAM_FILE = /^[A-Za-z0-9._-]+$/;
+
+function radioPathAllowed(pathname, config, base) {
+  const basePath = base.pathname.replace(/\/+$/, "");
+  const station = encodeURIComponent(config.station);
+  try {
+    if (pathname === new URL(config.nowPlayingUrl).pathname) return true;
+  } catch {
+    // no now-playing path: nothing to allow here
+  }
+  const listen = `${basePath}/listen/${station}/`;
+  if (pathname.startsWith(listen)) {
+    const file = pathname.slice(listen.length);
+    return RADIO_STREAM_FILE.test(file) && !/^\.+$/.test(file);
+  }
+  try {
+    const stream = new URL(config.streamUrl);
+    return normalizeHostname(stream.hostname) === normalizeHostname(base.hostname) && pathname === stream.pathname;
+  } catch {
+    return false;
+  }
+}
+
+/** The internal address for a request the bot makes to its own radio, or null. */
+function radioInternalRoute(rawUrl, method, policyOptions = {}) {
+  if (!String(process.env.OMNIFM_RADIO_INTERNAL_URL || "").trim()) return null;
+  if (method !== "GET" && method !== "HEAD") return null;
+  if (policyOptions?.requireHttps) return null;
+  const config = getOmnifmRadioConfig();
+  if (Array.isArray(policyOptions?.allowedProtocols)
+    && !normalizeAllowedProtocols(policyOptions.allowedProtocols).has(new URL(config.internalUrl || "http://invalid").protocol)) {
+    return null;
+  }
+  if (!config.enabled || !config.internalUrl) return null;
+  let parsed;
+  let base;
+  try {
+    parsed = new URL(String(rawUrl || "").trim());
+    base = new URL(config.baseUrl);
+  } catch {
+    return null;
+  }
+  if (parsed.username || parsed.password) return null;
+  const baseHost = normalizeHostname(base.hostname);
+  if (parsed.protocol !== base.protocol || parsed.port !== base.port || normalizeHostname(parsed.hostname) !== baseHost) return null;
+  if (!radioPathAllowed(parsed.pathname, config, base)) return null;
+  // Built from parts: a path such as "//other.host/x" can never become a host.
+  const hop = new URL(config.internalUrl);
+  hop.pathname = parsed.pathname;
+  hop.search = parsed.search;
+  return hop.toString();
+}
+
+function isRadioInternalRequest(parsedUrl, options) {
+  if (options?.[RADIO_INTERNAL_ROUTE] !== true) return false;
+  const internal = getOmnifmRadioConfig().internalUrl;
+  return Boolean(internal) && parsedUrl.origin === internal;
+}
+
 function validateOutboundUrl(rawUrl, {
   allowedProtocols = DEFAULT_ALLOWED_PROTOCOLS,
   requireHttps = false,
   maxUrlLength = DEFAULT_MAX_URL_LENGTH,
+  [RADIO_INTERNAL_ROUTE]: radioInternal = false,
 } = {}) {
   const raw = String(rawUrl || "").trim();
   const maxLength = Math.max(1, Number.parseInt(String(maxUrlLength), 10) || DEFAULT_MAX_URL_LENGTH);
@@ -127,6 +202,10 @@ function validateOutboundUrl(rawUrl, {
   const hostname = normalizeHostname(parsed.hostname);
   if (!hostname) {
     return { ok: false, error: "URL-Host fehlt.", code: "OUTBOUND_HOST_INVALID" };
+  }
+  if (isRadioInternalRequest(parsed, { [RADIO_INTERNAL_ROUTE]: radioInternal })) {
+    parsed.hash = "";
+    return { ok: true, url: parsed.toString(), parsedUrl: parsed };
   }
   const address = normalizeOutboundIpAddress(hostname);
   if (address) {
@@ -220,7 +299,7 @@ async function resolveSafeOutboundTarget(rawUrl, options = {}) {
     : await resolveHostnameForOutboundRequest(hostname, options);
 
   const publicOnly = addresses.length && addresses.every((entry) => isPublicOutboundAddress(entry.address));
-  if (!publicOnly && !isTestStreamOrigin(validation.parsedUrl)) {
+  if (!publicOnly && !isTestStreamOrigin(validation.parsedUrl) && !isRadioInternalRequest(validation.parsedUrl, options)) {
     throw createSafeOutboundError("OUTBOUND_ADDRESS_NOT_ALLOWED", "Lokale/private Hosts sind nicht erlaubt.");
   }
 
@@ -410,8 +489,12 @@ async function safeFetch(rawUrl, {
   let requestHeaders = headers;
 
   for (let redirectCount = 0; ; redirectCount += 1) {
+    // #599: the public radio host is reached over the own network when configured.
+    const internalUrl = radioInternalRoute(currentUrl, normalizedMethod, policyOptions);
+    const hopUrl = internalUrl || currentUrl;
+    const hopPolicy = internalUrl ? { ...policyOptions, [RADIO_INTERNAL_ROUTE]: true } : policyOptions;
     // eslint-disable-next-line no-await-in-loop -- each redirect hop depends on the one before
-    const target = await resolveSafeOutboundTarget(currentUrl, policyOptions);
+    const target = await resolveSafeOutboundTarget(hopUrl, hopPolicy);
     let incoming;
     try {
       // eslint-disable-next-line no-await-in-loop -- each redirect hop depends on the one before
@@ -449,8 +532,10 @@ async function safeFetch(rawUrl, {
     }
 
     try {
-      const nextUrl = new URL(location, target.url);
-      if (nextUrl.origin !== target.url.origin) {
+      // #599: a rerouted hop answers for the public address, so its redirects count from there.
+      const base = internalUrl ? new URL(currentUrl) : target.url;
+      const nextUrl = new URL(location, base);
+      if (nextUrl.origin !== base.origin) {
         requestHeaders = stripSensitiveRedirectHeaders(requestHeaders);
       }
       currentUrl = nextUrl.toString();
