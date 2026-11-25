@@ -16,7 +16,8 @@ const STOP_LABELS = {
   shutdown: 'Bot neu gestartet',
   client: 'Bot nicht angemeldet',
   discord: 'Discord bremst, DMs ausgeschaltet',
-  failures: '5 Fehler in Folge, DMs ausgeschaltet',
+  failures: 'zu viele Fehler, DMs ausgeschaltet',
+  ratelimit: 'Rate-Limit zu lang',
   config: 'Einstellung fehlerhaft',
   error: 'Fehler',
 };
@@ -36,8 +37,8 @@ export function radioDmRunText(run) {
   if (run.remaining) parts.push(`${run.remaining} offen`);
   if (run.stoppedBy) {
     const label = STOP_LABELS[run.stoppedBy] || run.stoppedBy;
-    // The service's own words for "error" and "config"; the others say enough.
-    const detail = ['error', 'config'].includes(run.stoppedBy) && run.error ? ` (${run.error})` : '';
+    // The service's own words for these; the others say enough.
+    const detail = ['error', 'config', 'ratelimit'].includes(run.stoppedBy) && run.error ? ` (${run.error})` : '';
     parts.push(`gestoppt: ${label}${detail}`);
   }
   return `${run.test ? 'Test · ' : ''}${radioTime(run.startedAt)}: ${parts.join(' · ')}`;

@@ -90,7 +90,8 @@ describe('OmniFM Radio DMs in the owner cockpit', () => {
     expect(failed).toContain('gestoppt: Fehler (Unknown claim error)');
     expect(failed).not.toContain('Datenbank');
     expect(radioDmRunText({ ...LAST_RUN, stoppedBy: 'discord' })).toContain('Discord bremst, DMs ausgeschaltet');
-    expect(radioDmRunText({ ...LAST_RUN, stoppedBy: 'failures' })).toContain('5 Fehler in Folge, DMs ausgeschaltet');
+    expect(radioDmRunText({ ...LAST_RUN, stoppedBy: 'failures' })).toContain('zu viele Fehler, DMs ausgeschaltet');
+    expect(radioDmRunText({ ...LAST_RUN, stoppedBy: 'ratelimit', error: 'Rate-Limit: 120 s Wartezeit' })).toContain('gestoppt: Rate-Limit zu lang (Rate-Limit: 120 s Wartezeit)');
     expect(radioDmRunText({ ...LAST_RUN, stoppedBy: 'config', error: 'Invalid URL' })).toContain('Einstellung fehlerhaft (Invalid URL)');
     expect(radioDmSourceLabel('memory')).toContain('nur im Speicher');
   });
