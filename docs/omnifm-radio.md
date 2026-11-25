@@ -45,3 +45,15 @@ AzuraCast schickt den ganzen Now-Playing-Stand als JSON, ohne Feld für den Ausl
 - Das Cockpit zeigt in der Karte „OmniFM Radio · Live-Erkennung“ den Zustand, wie erkannt wird und die letzten Sendungen.
 - **Test-Sendung** (nur Rolle Owner): Der Knopf spielt Beginn und Ende durch (Quelle „Test“), gesendet wird nichts. Die Betreiber-Meldung beginnt dann mit „🧪 Test-Sendung:“. Nach 10 Minuten endet ein Test von selbst. Tests stehen nicht im Verlauf der Sendungen. Während einer echten Sendung geht kein Test; geht DJ Tabsi während eines Tests live, endet der Test und die echte Sendung beginnt.
 - Für weitere Meldungen (#593, #594, #595): `onOmnifmRadioLiveEvent(({ type, show }) => …)` aus `src/services/omnifm-radio-live.js`. `type` ist `start` oder `end`, `show.source` ist `webhook`, `poll` oder `test`; im Zustand steht es unter `current.source`. Eine Test-Sendung bitte überspringen.
+
+## Ankündigung auf jedem Server (#593)
+
+Geht eine Sendung live, schreibt **OmniFM 1** (der erste Worker, Slot 1) auf jedem Server, auf dem er ist und der OmniFM Radio sieht, eine Nachricht: „🔴 DJ Tabsi ist live auf OmniFM Radio“, dazu der Titel und der Knopf **„Jetzt hören“**. Endet die Sendung, wird dieselbe Nachricht zu „Sendung vorbei – danke fürs Zuhören“, ohne Knopf. Eine zweite Nachricht gibt es nicht.
+
+- **Wer:** Mit `OMNIFM_RADIO_PUBLIC=0` nur die Test-Server. Eine Test-Sendung aus dem Cockpit geht immer nur an `OMNIFM_RADIO_TEST_GUILD_IDS`, auch wenn der Sender öffentlich ist. Ist OmniFM 1 nicht auf einem Server, bekommt der nichts.
+- **Einstellung je Server:** Dashboard → Einstellungen → „Live-Sendungen von OmniFM Radio ankündigen“ (jeder Plan, nur wo der Sender sichtbar ist). Standard ist der Systemkanal, dazu optional eine Rolle oder „aus“. Gespeichert in `guild_settings.omnifmRadioAnnounce`.
+- **Erwähnung:** Gepingt wird nur die gewählte Rolle (`allowed_mentions`), nie @everyone. DJ-Name und Titel werden maskiert. Die Rolle muss in Discord erwähnbar sein.
+- **Grenzen:** Höchstens eine Ankündigung je Server in 2 Stunden (Test-Sendungen zählen nicht). Die Nachrichten gehen nacheinander raus, eine alle 1,5 s. Endet die Sendung, bevor alle draußen sind, kommt danach keine „live“-Nachricht mehr.
+- **Übersprungen:** Ohne Kanal, ohne die Rechte Kanal ansehen, Nachrichten senden und Links einbetten oder bei „aus“ bleibt der Server still. Im Log steht je Sendung eine Zeile mit den Zahlen (`posted`, `off`, `limit`, `skipped` …).
+- **„Jetzt hören“:** OmniFM 1 kommt in den Sprachkanal der Person und spielt OmniFM Radio, mit denselben Regeln wie `/play` (Rollenrechte, Plan, Sichtbarkeit). Ohne Sprachkanal kommt ein kurzer Hinweis. Spielt OmniFM 1 schon woanders auf dem Server oder ist ein anderer OmniFM-Bot im Kanal, wird niemand umgeschaltet; der Hinweis nennt `/play`.
+- **Technik:** Der Commander (oder der Monolith) hört auf `onOmnifmRadioLiveEvent` (`src/services/omnifm-radio-announce.js`). OmniFM 1 schreibt und bearbeitet über die Worker-Bridge (`radioAnnounce`, `radioAnnounceEnd`). Wo die Nachrichten stehen, liegt in MongoDB (`omnifm_radio_announcements`, eine Woche lang). So klappt das Bearbeiten auch nach einem Neustart.
