@@ -385,13 +385,16 @@ function showLabel(show) {
  */
 export function buildRadioLiveAlert({ type, show = {} }) {
   const label = showLabel(show);
-  const test = show.source === "test" ? "Test-Sendung aus der Owner-Konsole, gesendet wurde nichts." : "";
+  const isTest = show.source === "test";
+  const test = isTest ? "Test-Sendung aus der Owner-Konsole, gesendet wurde nichts." : "";
+  // The test shows first, so a push preview never looks like a real show.
+  const titled = (title) => (isTest ? `🧪 Test-Sendung: ${title}` : title).slice(0, 256);
   if (type === "start") {
     return {
       key: `radio-live-start:${show.startedAt || "-"}`,
       embed: {
         color: OPERATOR_COLORS.error,
-        title: (label ? `🔴 Live gestartet: ${label}` : "🔴 Live gestartet").slice(0, 256),
+        title: titled(label ? `🔴 Live gestartet: ${label}` : "🔴 Live gestartet"),
         description: test || "OmniFM Radio sendet live.",
       },
     };
@@ -400,7 +403,7 @@ export function buildRadioLiveAlert({ type, show = {} }) {
     key: `radio-live-end:${show.startedAt || "-"}`,
     embed: {
       color: OPERATOR_COLORS.info,
-      title: `Sendung beendet nach ${formatShowDuration(show.durationMs)}`,
+      title: titled(`Sendung beendet nach ${formatShowDuration(show.durationMs)}`),
       description: [label, test || "Der Auto-DJ ist wieder dran."].filter(Boolean).join("\n"),
     },
   };

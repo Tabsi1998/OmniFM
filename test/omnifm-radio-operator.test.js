@@ -37,9 +37,14 @@ test("the end message says how long the show was", () => {
   assert.notEqual(key, buildRadioLiveAlert(start).key, "start and end never swallow each other");
 });
 
-test("a test show says so in the message", () => {
+test("a test show says so first, also in a push preview", () => {
   const { embed } = buildRadioLiveAlert({ type: "start", show: { ...start.show, source: "test" } });
+  assert.ok(embed.title.startsWith("🧪 Test-Sendung: "), embed.title);
+  assert.equal(embed.title, "🧪 Test-Sendung: 🔴 Live gestartet: DJ Tabsi – Abendshow");
   assert.match(embed.description, /Test-Sendung/);
+  const ended = buildRadioLiveAlert({ type: "end", show: { ...end.show, source: "test" } });
+  assert.equal(ended.embed.title, "🧪 Test-Sendung: Sendung beendet nach 1 h 12 min");
+  assert.doesNotMatch(buildRadioLiveAlert(start).embed.title, /Test/);
   assert.doesNotMatch(buildRadioLiveAlert(start).embed.description || "", /Test-Sendung/);
 });
 
