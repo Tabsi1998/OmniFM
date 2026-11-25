@@ -12,9 +12,8 @@
 // (src/omnifm-radio-announce-store.js), so that works after a restart too.
 // Nobody is switched: the "Listen now" button only acts for whoever presses
 // it (src/bot/runtime-methods/radio-announce.js).
-import { loadGuildSettings } from "../lib/guild-settings.js";
 import { log } from "../lib/logging.js";
-import { normalizeRadioAnnounceSettings, RADIO_ANNOUNCE_SETTINGS_KEY } from "../lib/omnifm-radio-announce-settings.js";
+import { loadRadioAnnounceSettings, normalizeRadioAnnounceSettings } from "../lib/omnifm-radio-announce-settings.js";
 import { createOmnifmRadioAnnounceStore } from "../omnifm-radio-announce-store.js";
 import { getOmnifmRadioConfig, isOmnifmRadioVisibleForGuild } from "./omnifm-radio-config.js";
 import { onOmnifmRadioLiveEvent } from "./omnifm-radio-live.js";
@@ -55,7 +54,7 @@ const defaultSleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms).
 export function createOmnifmRadioAnnouncer({
   getAnnouncer,
   store = createOmnifmRadioAnnounceStore(),
-  loadSettings = loadGuildSettings,
+  loadSettings = loadRadioAnnounceSettings,
   getConfig = getOmnifmRadioConfig,
   now = Date.now,
   intervalMs = SEND_INTERVAL_MS,
@@ -122,7 +121,8 @@ export function createOmnifmRadioAnnouncer({
   /** Posts on one server; returns what happened, for the summary in the log. */
   async function postTo(bot, guildId, show, showId) {
     if (activeShowId !== showId) return "ended";
-    const settings = normalizeRadioAnnounceSettings((await loadSettings(guildId))?.[RADIO_ANNOUNCE_SETTINGS_KEY]);
+    // Throws when the setting cannot be read: then this server is skipped.
+    const settings = normalizeRadioAnnounceSettings(await loadSettings(guildId));
     if (!settings.enabled) return "off";
     const test = show.source === "test";
     // Asked for test shows too: with MongoDB away this throws, so nothing goes

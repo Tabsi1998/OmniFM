@@ -4,7 +4,8 @@
 // Stored in guild_settings under `omnifmRadioAnnounce`. On by default: the
 // message goes to the server's system channel, without a role mention.
 // "Off" is `enabled: false`. The dashboard sets it (every plan), the
-// commander reads it before OmniFM 1 posts.
+// commander reads it with loadRadioAnnounceSettings before OmniFM 1 posts.
+import { getDb, isConnected, isMongoRequested } from "./db.js";
 import { isOmnifmRadioVisibleForGuild } from "../services/omnifm-radio-config.js";
 
 export const RADIO_ANNOUNCE_SETTINGS_KEY = "omnifmRadioAnnounce";
@@ -18,10 +19,33 @@ const snowflake = (value) => {
 export function normalizeRadioAnnounceSettings(raw) {
   const input = raw && typeof raw === "object" ? raw : {};
   return {
-    enabled: input.enabled !== false,
+    // Only a real false switches it off; anything else is the default.
+    enabled: typeof input.enabled === "boolean" ? input.enabled : true,
     channelId: snowflake(input.channelId),
     roleId: snowflake(input.roleId),
   };
+}
+
+/**
+ * The server's setting, read strictly: unlike loadGuildSettings, a database
+ * that is away or fails throws, so a server that switched it off never gets
+ * a message because its "off" could not be read. Without MongoDB at all
+ * (local development) it is the default.
+ */
+export async function loadRadioAnnounceSettings(guildId, {
+  getDatabase = () => (isConnected() ? getDb() : null),
+  mongoRequested = isMongoRequested,
+} = {}) {
+  const db = getDatabase();
+  if (!db) {
+    if (mongoRequested()) throw new Error("MongoDB ist nicht verbunden.");
+    return normalizeRadioAnnounceSettings(undefined);
+  }
+  const doc = await db.collection("guild_settings").findOne(
+    { guildId: String(guildId || "") },
+    { projection: { [RADIO_ANNOUNCE_SETTINGS_KEY]: 1 } },
+  );
+  return normalizeRadioAnnounceSettings(doc?.[RADIO_ANNOUNCE_SETTINGS_KEY]);
 }
 
 /**

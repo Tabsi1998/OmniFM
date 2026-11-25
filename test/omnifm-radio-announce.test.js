@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // on every server that can see the station, at most once in two hours, and
 // edits the same message when the show ends.
 import { getOmnifmRadioConfig } from "../src/services/omnifm-radio-config.js";
-import { normalizeRadioAnnounceSettings } from "../src/lib/omnifm-radio-announce-settings.js";
+import { loadRadioAnnounceSettings, normalizeRadioAnnounceSettings } from "../src/lib/omnifm-radio-announce-settings.js";
 import { createOmnifmRadioAnnounceStore } from "../src/omnifm-radio-announce-store.js";
 import {
   ANNOUNCE_LIMIT_MS,
@@ -61,7 +61,7 @@ function setup({ bot = fakeBot(), store = createOmnifmRadioAnnounceStore({ getDa
   const announcer = createOmnifmRadioAnnouncer({
     getAnnouncer: getAnnouncer || (() => bot),
     store,
-    loadSettings: async (guildId) => settings[guildId] || {},
+    loadSettings: async (guildId) => settings[guildId]?.omnifmRadioAnnounce,
     getConfig: () => radioConfig({ isPublic }),
     now,
     intervalMs: 1500,
@@ -90,6 +90,44 @@ test("the server's setting: on by default, the system channel, no role", () => {
     { enabled: true, channelId: "123456789012345678", roleId: "223456789012345678" },
   );
   assert.deepEqual(normalizeRadioAnnounceSettings({ channelId: "#general", roleId: "@everyone" }), { enabled: true, channelId: "", roleId: "" }, "only Discord ids");
+  for (const notABoolean of ["false", 0, "no", null]) {
+    assert.equal(normalizeRadioAnnounceSettings({ enabled: notABoolean }).enabled, true, `only a real false switches it off (${JSON.stringify(notABoolean)})`);
+  }
+});
+
+test("the setting is read strictly: a database that is away or fails is an error, never \"on\"", async () => {
+  await assert.rejects(loadRadioAnnounceSettings(TEST_GUILD, { getDatabase: () => null, mongoRequested: () => true }), /MongoDB/);
+  const failing = { collection: () => ({ findOne: async () => { throw new Error("connection reset"); } }) };
+  await assert.rejects(loadRadioAnnounceSettings(TEST_GUILD, { getDatabase: () => failing }), /connection reset/);
+  assert.deepEqual(await loadRadioAnnounceSettings(TEST_GUILD, { getDatabase: () => null, mongoRequested: () => false }), { enabled: true, channelId: "", roleId: "" }, "without MongoDB (development): the default");
+});
+
+test("a server that switched it off stays off when its setting cannot be read", async () => {
+  const failing = { collection: () => ({ findOne: async () => { throw new Error("connection reset"); } }) };
+  const bot = fakeBot();
+  const strict = createOmnifmRadioAnnouncer({
+    getAnnouncer: () => bot,
+    store: createOmnifmRadioAnnounceStore({ getDatabase: () => null, mongoRequested: () => false }),
+    loadSettings: (guildId) => loadRadioAnnounceSettings(guildId, { getDatabase: () => failing }),
+    getConfig: () => radioConfig({ isPublic: true }),
+    sleep: async () => {},
+  });
+  strict.handle({ type: "start", show: show() });
+  await strict.idle();
+  assert.equal(bot.posts.length, 0);
+});
+
+test("the stored \"off\" is read from guild_settings in MongoDB", { skip: !hasMongoConfig }, async () => {
+  const { connect, getDb } = await import("../src/lib/db.js");
+  await connect();
+  const guildId = String(300000000000000000n + BigInt(Math.floor(Math.random() * 1e15)));
+  await getDb().collection("guild_settings").insertOne({ guildId, omnifmRadioAnnounce: { enabled: false, channelId: "", roleId: "" } });
+  try {
+    assert.equal((await loadRadioAnnounceSettings(guildId)).enabled, false);
+    assert.equal((await loadRadioAnnounceSettings("400000000000000000")).enabled, true, "nothing stored: on");
+  } finally {
+    await getDb().collection("guild_settings").deleteMany({ guildId });
+  }
 });
 
 // ---------------------------------------------------------------- store
@@ -319,7 +357,7 @@ test("a show that ends during the pause between two messages posts no further on
   announcer = createOmnifmRadioAnnouncer({
     getAnnouncer: () => bot,
     store: createOmnifmRadioAnnounceStore({ getDatabase: () => null, mongoRequested: () => false }),
-    loadSettings: async () => ({}),
+    loadSettings: async () => undefined,
     getConfig: () => radioConfig({ isPublic: true }),
     now,
     intervalMs: 1500,
@@ -353,7 +391,7 @@ test("the service listens to the live events and lets OmniFM 1 (worker slot 1) p
   const service = startOmnifmRadioAnnouncements({
     getWorkerManager: () => workerManager,
     store: createOmnifmRadioAnnounceStore({ getDatabase: () => null, mongoRequested: () => false }),
-    loadSettings: async () => ({}),
+    loadSettings: async () => undefined,
     getConfig: () => radioConfig(),
     sleep: async () => {},
   });
