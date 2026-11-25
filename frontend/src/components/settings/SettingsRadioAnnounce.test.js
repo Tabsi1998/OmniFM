@@ -10,6 +10,7 @@ const SERVER = '123456789012345678';
 const SYSTEM = '223456789012345678';
 const NEWS = '323456789012345678';
 const ROLE = '423456789012345678';
+const ANNOUNCEMENTS = '523456789012345678';
 const t = translatorFor('de');
 
 function api({ radio }) {
@@ -18,7 +19,7 @@ function api({ radio }) {
     const route = String(url).split('?')[0];
     requests.push({ route, method: options.method || 'GET', body: options.body ? JSON.parse(options.body) : null });
     if (route === '/api/dashboard/settings') return { omnifmRadioAnnounce: radio };
-    if (route === '/api/dashboard/channels') return { textChannels: [{ id: SYSTEM, name: 'allgemein' }, { id: NEWS, name: 'radio-news' }], voiceChannels: [] };
+    if (route === '/api/dashboard/channels') return { textChannels: [{ id: SYSTEM, name: 'allgemein' }, { id: NEWS, name: 'radio-news' }], announcementChannels: [{ id: ANNOUNCEMENTS, name: 'neuigkeiten' }], voiceChannels: [] };
     if (route === '/api/dashboard/stations') return { free: [], pro: [], ultimate: [], custom: [] };
     return {};
   };
@@ -50,6 +51,7 @@ describe('the radio announcement card', () => {
     const channel = await screen.findByTestId('radio-announce-channel');
     expect(channel.value).toBe('');
     expect(channel.options[0].textContent).toBe('Systemkanal (#allgemein)');
+    expect([...channel.options].map((option) => option.value)).toEqual(['', SYSTEM, NEWS, ANNOUNCEMENTS]);
     const role = screen.getByTestId('radio-announce-role');
     expect([...role.options].map((option) => option.textContent)).toEqual(['Keine Rolle', '@Radio-Fans']);
 

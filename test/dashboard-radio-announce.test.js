@@ -34,10 +34,17 @@ const ROLE_LOW = "423456789012345678";
 const ROLE_HIGH = "523456789012345678";
 const BOT_ROLE = "623456789012345678";
 
+const NEWS = "723456789012345679";
+
 function guildOf(id) {
+  const channels = new Map([
+    [SYSTEM, { id: SYSTEM, name: "allgemein", type: 0, position: 0 }],
+    [NEWS, { id: NEWS, name: "radio-news", type: 5, position: 1 }],
+  ]);
   return {
     id,
     name: "Club",
+    channels: { cache: channels, fetch: async () => channels },
     systemChannel: { id: SYSTEM, name: "allgemein" },
     roles: {
       cache: new Map([
@@ -134,9 +141,23 @@ test("a Free server sets channel, role or off; a server without OmniFM Radio can
 
   const hidden = await call("GET", `/api/dashboard/settings?serverId=${HIDDEN}`);
   assert.deepEqual(hidden.payload.omnifmRadioAnnounce, { available: false });
-  const refused = await call("PUT", `/api/dashboard/settings?serverId=${HIDDEN}`, { omnifmRadioAnnounce: { enabled: true } });
-  assert.equal(refused.status, 403);
-  assert.match(refused.payload.error, /OmniFM Radio/);
+  // Hidden between GET and PUT: the rest of the save goes through, the radio part is left out.
+  const hiddenSave = await call("PUT", `/api/dashboard/settings?serverId=${HIDDEN}`, { omnifmRadioAnnounce: { enabled: false }, serverTimeZone: "Europe/Berlin" });
+  assert.notEqual(hiddenSave.status, 403);
+  assert.notEqual(hiddenSave.status, 400);
+
+  // Only a role that can be mentioned, only a real boolean.
+  for (const roleId of [VISIBLE, BOT_ROLE, "823456789012345678"]) {
+    // eslint-disable-next-line no-await-in-loop -- one after the other
+    const bad = await call("PUT", `/api/dashboard/settings?serverId=${VISIBLE}`, { omnifmRadioAnnounce: { enabled: true, roleId } });
+    assert.equal(bad.status, 400, roleId);
+  }
+  assert.equal((await call("PUT", `/api/dashboard/settings?serverId=${VISIBLE}`, { omnifmRadioAnnounce: { enabled: "false" } })).status, 400);
+
+  // Announcement channels (type 5) are offered for this card, the other pickers keep text channels only.
+  const channels = await call("GET", `/api/dashboard/channels?serverId=${VISIBLE}`);
+  assert.deepEqual(channels.payload.textChannels.map((channel) => channel.id), [SYSTEM]);
+  assert.deepEqual(channels.payload.announcementChannels.map((channel) => channel.id), [NEWS]);
 
   if (!mongo) return;
   const saved = await call("PUT", `/api/dashboard/settings?serverId=${VISIBLE}`, { omnifmRadioAnnounce: { enabled: true, channelId: SYSTEM, roleId: ROLE_LOW } });
@@ -147,6 +168,9 @@ test("a Free server sets channel, role or off; a server without OmniFM Radio can
   assert.equal(off.payload.omnifmRadioAnnounce.channelId, "", "only Discord ids are kept");
   const again = await call("GET", `/api/dashboard/settings?serverId=${VISIBLE}`);
   assert.equal(again.payload.omnifmRadioAnnounce.enabled, false);
+  const hiddenStored = await mongo.collection("guild_settings").findOne({ guildId: HIDDEN });
+  assert.equal(hiddenStored?.timeZone, "Europe/Berlin", "the rest was saved");
+  assert.equal(hiddenStored?.omnifmRadioAnnounce, undefined, "the radio part was left out");
   const stored = await mongo.collection("guild_settings").findOne({ guildId: VISIBLE });
   assert.deepEqual(stored.omnifmRadioAnnounce, { enabled: false, channelId: "", roleId: "" }, "what the commander reads");
 });

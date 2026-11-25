@@ -55,6 +55,8 @@ export default function DashboardSettings({
 }) {
   const [settings, setSettings] = useState(null);
   const [textChannels, setTextChannels] = useState([]);
+  // Announcement channels (type 5) only for the radio announcement (#593).
+  const [announcementChannels, setAnnouncementChannels] = useState([]);
   const [stations, setStations] = useState({ free: [], pro: [], ultimate: [], custom: [] });
   const [pendingFailoverStation, setPendingFailoverStation] = useState('');
   const [digestPreview, setDigestPreview] = useState(null);
@@ -103,6 +105,7 @@ export default function DashboardSettings({
     if (!selectedGuildId) {
       setSettings(null);
       setTextChannels([]);
+      setAnnouncementChannels([]);
       setStations({ free: [], pro: [], ultimate: [], custom: [] });
       setError('');
       setMessage('');
@@ -120,6 +123,7 @@ export default function DashboardSettings({
     setMessage('');
     setSettings(null);
     setTextChannels([]);
+    setAnnouncementChannels([]);
     setStations({ free: [], pro: [], ultimate: [], custom: [] });
     setPendingFailoverStation('');
     setDigestPreview(null);
@@ -140,6 +144,7 @@ export default function DashboardSettings({
       };
       setSettings(nextSettings);
       setTextChannels(channelsResult.textChannels || []);
+      setAnnouncementChannels(channelsResult.announcementChannels || []);
       setStations({
         free: stationsResult.free || [],
         pro: stationsResult.pro || [],
@@ -522,7 +527,7 @@ export default function DashboardSettings({
 
       {/* Messages OmniFM posts in a channel: the radio announcement, then the digest. */}
       {radioAnnounce && (
-    <SettingsRadioAnnounce radioAnnounce={radioAnnounce} setRadioAnnounce={setRadioAnnounce} t={t} textChannels={textChannels} />
+    <SettingsRadioAnnounce radioAnnounce={radioAnnounce} setRadioAnnounce={setRadioAnnounce} t={t} textChannels={[...textChannels, ...announcementChannels]} />
       )}
 
     <SettingsWeeklyDigest

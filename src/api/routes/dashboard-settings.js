@@ -29,6 +29,7 @@ import {
   RADIO_ANNOUNCE_SETTINGS_KEY,
   buildDashboardRadioAnnounceResponse,
   normalizeRadioAnnounceSettings,
+  radioAnnounceRole,
 } from "../../lib/omnifm-radio-announce-settings.js";
 import { isOmnifmRadioVisibleForGuild } from "../../services/omnifm-radio-config.js";
 
@@ -353,12 +354,20 @@ export function createDashboardSettingsRouteHandler(deps) {
         }
 
         // Every plan sets where OmniFM Radio's live show is announced (#593).
-        if (body?.[RADIO_ANNOUNCE_SETTINGS_KEY] && typeof body[RADIO_ANNOUNCE_SETTINGS_KEY] === "object") {
-          if (!isOmnifmRadioVisibleForGuild(guildInfo.id)) {
-            sendLocalizedError(res, 403, language, "OmniFM Radio gibt es auf diesem Server noch nicht.", "OmniFM Radio is not available on this server yet.");
+        // Hidden since the page was loaded: left out, the rest of the save goes through.
+        const radioInput = body?.[RADIO_ANNOUNCE_SETTINGS_KEY];
+        if (radioInput && typeof radioInput === "object" && isOmnifmRadioVisibleForGuild(guildInfo.id)) {
+          if (radioInput.enabled !== undefined && typeof radioInput.enabled !== "boolean") {
+            sendLocalizedError(res, 400, language, "Die Ankündigung ist entweder an oder aus.", "The announcement is either on or off.");
             return true;
           }
-          updates[RADIO_ANNOUNCE_SETTINGS_KEY] = normalizeRadioAnnounceSettings(body[RADIO_ANNOUNCE_SETTINGS_KEY]);
+          const radio = normalizeRadioAnnounceSettings(radioInput);
+          const radioGuild = resolveRuntimeForGuild(runtimes || [], guildInfo.id).guild;
+          if (radio.roleId && (radio.roleId === guildInfo.id || (radioGuild && !radioAnnounceRole(radioGuild, radio.roleId)))) {
+            sendLocalizedError(res, 400, language, "Diese Rolle kann OmniFM nicht erwähnen. Wähle eine andere.", "OmniFM cannot mention this role. Choose another one.");
+            return true;
+          }
+          updates[RADIO_ANNOUNCE_SETTINGS_KEY] = radio;
         }
 
         // Every plan may switch the seasonal decoration (#425).
