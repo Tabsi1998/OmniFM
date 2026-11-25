@@ -8,7 +8,9 @@
 //     servers. One person with several servers gets one DM.
 //   - one DM per person in 12 hours, stored (src/omnifm-radio-dm-store.js);
 //     test DMs have their own 10 minutes and use none of the 12 hours.
-//   - one global queue, one DM every few seconds, no retry. Closed DMs
+//   - one global queue, one DM every few seconds, one attempt each: the DMs
+//     go through their own REST client without retries that rejects a
+//     rate limit (src/services/omnifm-radio-dm-sender.js). Closed DMs
 //     (50007/403) leave the person alone for 30 days.
 //   - "Abbestellen" in every DM, for good (src/bot/omnifm-radio-dm-message.js).
 //   - the mode in the owner console (owner_config.radioDm.mode), else
@@ -21,6 +23,7 @@ import { getDb, isConnected, isMongoRequested } from "../lib/db.js";
 import { OWNER_CONFIG_ID } from "../lib/owner-config.js";
 import { sharedOmnifmRadioDmStore } from "../omnifm-radio-dm-store.js";
 import { buildRadioDmMessage } from "../bot/omnifm-radio-dm-message.js";
+import { createRadioDmSender, radioDmBody } from "./omnifm-radio-dm-sender.js";
 import { getOmnifmRadioConfig, isOmnifmRadioVisibleForGuild } from "./omnifm-radio-config.js";
 import { onOmnifmRadioLiveEvent } from "./omnifm-radio-live.js";
 
@@ -134,7 +137,7 @@ function abortableSleep(ms, signal) {
 }
 
 /**
- * @param {{ getRuntime: () => any, store?: any, modeStore?: { read: () => Promise<string>, write: (mode: string) => Promise<void> }, env?: Record<string, string | undefined>, getConfig?: () => any, now?: () => number, sleep?: (ms: number, signal?: AbortSignal) => Promise<void>, intervalMs?: number, clientWaitMs?: number }} options
+ * @param {{ getRuntime: () => any, store?: any, modeStore?: { read: () => Promise<string>, write: (mode: string) => Promise<void> }, env?: Record<string, string | undefined>, getConfig?: () => any, createSender?: (runtime: any) => { send: (userId: string, body: any) => Promise<void>, stop?: () => void }, now?: () => number, sleep?: (ms: number, signal?: AbortSignal) => Promise<void>, intervalMs?: number, clientWaitMs?: number }} options
  */
 export function createOmnifmRadioDmService({
   getRuntime,
@@ -142,6 +145,8 @@ export function createOmnifmRadioDmService({
   modeStore = createRadioDmModeStore(),
   env = process.env,
   getConfig = () => getOmnifmRadioConfig(env),
+  // The commander's own token, its own REST client: one attempt per DM.
+  createSender = (runtime) => createRadioDmSender({ token: runtime.config?.token || runtime.client?.token }),
   now = Date.now,
   sleep = abortableSleep,
   intervalMs = DM_INTERVAL_MS,
@@ -183,16 +188,15 @@ export function createOmnifmRadioDmService({
     }
   }
 
-  async function sendOne(runtime, recipient, show, run) {
+  async function sendOne(runtime, sender, recipient, show, run) {
     try {
-      const user = await runtime.client.users.fetch(recipient.userId);
-      await user.send(buildRadioDmMessage({
+      await sender.send(recipient.userId, radioDmBody(buildRadioDmMessage({
         show,
         language: recipient.language,
         config: getConfig(),
         guildName: recipient.guildName,
         applicationId: runtime.getApplicationId?.() || runtime.client.application?.id || null,
-      }));
+      })));
       run.sent += 1;
     } catch (error) {
       // No retry: a second try is exactly what looks like spam.
@@ -224,6 +228,16 @@ export function createOmnifmRadioDmService({
     run.total = recipients.length;
     run.remaining = recipients.length;
     const quota = run.test ? "test" : "real";
+    const sender = createSender(runtime);
+    try {
+      return await distributeTo(job, run, { runtime, sender, recipients, quota });
+    } finally {
+      sender.stop?.();
+    }
+  }
+
+  async function distributeTo(job, run, { runtime, sender, recipients, quota }) {
+    const { signal } = job.controller;
     let pause = false;
     for (const recipient of recipients) {
       // One after the other on purpose: one DM, a pause, the next.
@@ -243,7 +257,7 @@ export function createOmnifmRadioDmService({
         continue;
       }
       // eslint-disable-next-line no-await-in-loop
-      await sendOne(runtime, recipient, job.show, run);
+      await sendOne(runtime, sender, recipient, job.show, run);
       pause = true;
     }
     return null;

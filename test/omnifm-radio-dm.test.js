@@ -53,31 +53,33 @@ after(async () => {
 
 const memoryStore = () => createOmnifmRadioDmStore({ getDatabase: () => null, mongoRequested: () => false });
 
-function fakeRuntime({ guilds = GUILDS, fail = {}, ready = true } = {}) {
+// The commander, without client.users: DMs go through the DM sender only (one attempt each).
+function fakeRuntime({ guilds = GUILDS, fail = {}, ready = true, bots = [] } = {}) {
   const sent = [];
   const fetched = [];
   const runtime = {
     sent,
     fetched,
+    fail,
     ready,
     resolveGuildLanguage: (guildId) => LANGUAGES[guildId] || "de",
     getApplicationId: () => BOT,
+    config: { token: "commander-token" },
     client: {
       isReady: () => runtime.ready,
       user: { id: BOT },
       guilds: { cache: new Map(guilds.map((guild) => [guild.id, guild])) },
-      users: {
-        fetch: async (id) => {
-          fetched.push(id);
-          return {
-            id,
-            send: async (payload) => {
-              if (fail[id]) throw fail[id];
-              sent.push({ id, payload });
-            },
-          };
-        },
+      users: { cache: new Map(bots.map((id) => [id, { id, bot: true }])) },
+    },
+    sender: {
+      stopped: 0,
+      async send(id, body) {
+        fetched.push(id);
+        const failure = typeof fail[id] === "function" ? fail[id]() : fail[id];
+        if (failure) throw failure;
+        sent.push({ id, payload: body });
       },
+      stop() { this.stopped += 1; },
     },
   };
   return runtime;
@@ -101,6 +103,7 @@ function setup({ config = CONFIG, env = {}, consoleMode = "", store = memoryStor
     modeStore,
     env,
     getConfig: () => config,
+    createSender: (commander) => commander.sender,
     now,
     intervalMs: 5_000,
     sleep: async (ms, signal) => {
@@ -114,7 +117,7 @@ function setup({ config = CONFIG, env = {}, consoleMode = "", store = memoryStor
 }
 
 const recipientsOf = (runtime) => runtime.sent.map((entry) => entry.id);
-const textOf = (payload) => JSON.stringify(payload.components.map((component) => component.toJSON()));
+const textOf = (payload) => JSON.stringify(payload.components);
 
 async function distribute(context, event = start()) {
   context.service.handleEvent(event);
@@ -163,6 +166,7 @@ test("a show start DMs each owner once, a few seconds apart, in the server's lan
   assert.match(textOf(context.runtime.sent[0].payload), /DJ Tabsi ist live auf OmniFM Radio/);
   assert.match(textOf(context.runtime.sent[1].payload), /DJ Tabsi is live on OmniFM Radio/);
   assert.deepEqual(context.sleeps, [5_000], "one pause between two DMs");
+  assert.equal(context.runtime.sender.stopped, 1, "the run's own REST client is closed after it");
   assert.deepEqual(
     { total: run.total, sent: run.sent, skipped: run.skipped, failed: run.failed, remaining: run.remaining, stoppedBy: run.stoppedBy, mode: run.mode },
     { total: 2, sent: 2, skipped: 0, failed: 0, remaining: 0, stoppedBy: null, mode: "owners" },
