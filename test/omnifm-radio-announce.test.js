@@ -179,6 +179,19 @@ test("a server OmniFM 1 cannot write to is skipped and keeps its next announceme
   assert.equal(bot.edits.length, 0, "there was nothing to edit");
 });
 
+test("a server whose settings cannot be read is skipped, the others still get the message", async () => {
+  const { bot, announcer } = setup({ isPublic: true });
+  const failing = announcer;
+  bot.postRadioAnnouncement = async (guildId, options) => {
+    if (guildId === TEST_GUILD) throw new Error("bridge timeout");
+    bot.posts.push({ guildId, ...options });
+    return { ok: true, channelId: "1", messageId: "2" };
+  };
+  failing.handle({ type: "start", show: show() });
+  await failing.idle();
+  assert.deepEqual(bot.posts.map((post) => post.guildId), [OTHER_GUILD]);
+});
+
 test("OmniFM 1 posts once it is ready; without it on the server nothing goes out", async () => {
   const bot = fakeBot({ guilds: [OTHER_GUILD] });
   let calls = 0;

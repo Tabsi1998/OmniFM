@@ -97,10 +97,11 @@ export function createOmnifmRadioAnnouncer({
   async function readyAnnouncer() {
     const deadline = now() + readyTimeoutMs;
     for (;;) {
-      let bot = null;
+      let bot;
       try {
         bot = getAnnouncer() || null;
       } catch {
+        // Not created yet (the entry point still starts up).
         bot = null;
       }
       if (bot?.client?.isReady?.()) return bot;
@@ -118,23 +119,24 @@ export function createOmnifmRadioAnnouncer({
     return ids.filter((id) => isOmnifmRadioVisibleForGuild(id, config));
   }
 
-  async function postTo(bot, guildId, show, showId, tally) {
-    if (activeShowId !== showId) return tally("ended");
+  /** Posts on one server; returns what happened, for the summary in the log. */
+  async function postTo(bot, guildId, show, showId) {
+    if (activeShowId !== showId) return "ended";
     const settings = normalizeRadioAnnounceSettings((await loadSettings(guildId))?.[RADIO_ANNOUNCE_SETTINGS_KEY]);
-    if (!settings.enabled) return tally("off");
+    if (!settings.enabled) return "off";
     const test = show.source === "test";
     if (!test) {
       const last = await store.lastPostedAt(guildId);
-      if (last !== null && now() - last < ANNOUNCE_LIMIT_MS) return tally("limit");
+      if (last !== null && now() - last < ANNOUNCE_LIMIT_MS) return "limit";
     }
     await pace();
     // The show may have ended while this one waited for its turn.
-    if (activeShowId !== showId || stopped) return tally("ended");
-    if (!bot.client.guilds.cache.has(guildId)) return tally("gone");
+    if (activeShowId !== showId || stopped) return "ended";
+    if (!bot.client.guilds.cache.has(guildId)) return "gone";
     const result = await bot.postRadioAnnouncement(guildId, { channelId: settings.channelId, roleId: settings.roleId, show: messageShow(show) });
     if (!result?.ok) {
       log("DEBUG", `${TAG} ${guildId} übersprungen: ${result?.reason || result?.error || "unbekannt"}`);
-      return tally("skipped");
+      return "skipped";
     }
     await store.record({
       showId,
@@ -145,7 +147,7 @@ export function createOmnifmRadioAnnouncer({
       test,
       postedAt: new Date(now()),
     });
-    return tally("posted");
+    return "posted";
   }
 
   async function planPosts(show, showId) {
@@ -164,7 +166,19 @@ export function createOmnifmRadioAnnouncer({
       if (open === 0) log("INFO", `${TAG} (${show.source}): ${Object.entries(counts).map(([key, value]) => `${key} ${value}`).join(", ")}`);
     };
     // Straight into the queue: this job runs inside it.
-    for (const guildId of guildIds) jobs.push(() => postTo(bot, guildId, show, showId, tally));
+    for (const guildId of guildIds) {
+      jobs.push(async () => {
+        let outcome;
+        try {
+          outcome = await postTo(bot, guildId, show, showId);
+        } catch (error) {
+          // A bridge timeout or the database away: this server is skipped, the others go on.
+          log("WARN", `${TAG} ${guildId}: ${error?.message || error}`);
+          outcome = "failed";
+        }
+        tally(outcome);
+      });
+    }
   }
 
   async function editOne(bot, entry, show) {
@@ -189,7 +203,10 @@ export function createOmnifmRadioAnnouncer({
   }
 
   return {
-    /** A live event: `start` announces, `end` edits the announcements of that show. */
+    /**
+     * A live event: `start` announces, `end` edits the announcements of that show.
+     * @param {{ type?: string, show?: any }} [event]
+     */
     handle({ type, show } = {}) {
       if (stopped || !show?.startedAt) return;
       const showId = radioShowId(show);
