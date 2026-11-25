@@ -4,7 +4,7 @@
 // Eine Quelle für Katalog (#591), Live-Erkennung (#592) und Meldungen.
 //
 // Konfiguration in .env (alle optional):
-//   OMNIFM_RADIO_ENABLED=1            0 schaltet den Sender ganz ab
+//   OMNIFM_RADIO_ENABLED=1            0 schaltet den Sender ganz ab (auch true/false, yes/no, on/off)
 //   OMNIFM_RADIO_BASE_URL=https://radio.omnifm.xyz
 //   OMNIFM_RADIO_STATION=omnifm_radio  Kurzname der AzuraCast-Station
 //   OMNIFM_RADIO_STREAM_URL=           Standard: <BASE>/listen/<STATION>/radio.mp3
@@ -13,14 +13,31 @@
 //   OMNIFM_RADIO_TEST_GUILD_IDS=       Server-IDs (Komma), die ihn vorher sehen
 // ============================================================
 
+import { log } from "../lib/logging.js";
+
 const DEFAULT_BASE_URL = "https://radio.omnifm.xyz";
 const DEFAULT_STATION = "omnifm_radio";
 const DEFAULT_STATION_KEY = "omnifm-radio";
+// Kleinbuchstaben, Ziffern und "-": kein "custom:", kein "_" (#591).
+const STATION_KEY_PATTERN = /^[a-z0-9][a-z0-9-]{0,48}$/;
+const warnedStationKeys = new Set();
 
 function flag(value, fallback) {
-  const raw = String(value ?? "").trim();
+  const raw = String(value ?? "").trim().toLowerCase();
   if (!raw) return fallback;
-  return raw === "1" || raw.toLowerCase() === "true";
+  return ["1", "true", "yes", "on"].includes(raw);
+}
+
+function stationKeyFrom(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) return DEFAULT_STATION_KEY;
+  if (STATION_KEY_PATTERN.test(raw)) return raw;
+  // Die Einstellungen werden oft gelesen: die Warnung kommt nur einmal je Wert.
+  if (!warnedStationKeys.has(raw)) {
+    warnedStationKeys.add(raw);
+    log("WARN", `OMNIFM_RADIO_STATION_KEY "${raw.slice(0, 60)}" ist ungültig (a-z, 0-9, -); OmniFM nimmt "${DEFAULT_STATION_KEY}".`);
+  }
+  return DEFAULT_STATION_KEY;
 }
 
 function trimSlash(value) {
@@ -46,7 +63,7 @@ export function getOmnifmRadioConfig(env = process.env) {
     baseUrl,
     station,
     streamUrl,
-    stationKey: String(env.OMNIFM_RADIO_STATION_KEY || "").trim().toLowerCase() || DEFAULT_STATION_KEY,
+    stationKey: stationKeyFrom(env.OMNIFM_RADIO_STATION_KEY),
     nowPlayingUrl: `${baseUrl}/api/nowplaying/${encodeURIComponent(station)}`,
     isPublic: flag(env.OMNIFM_RADIO_PUBLIC, false),
     testGuildIds: Object.freeze(parseIdList(env.OMNIFM_RADIO_TEST_GUILD_IDS)),
