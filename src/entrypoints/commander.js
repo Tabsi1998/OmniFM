@@ -121,8 +121,9 @@ installProcessHandlers({
       stopOperatorAlerts();
       stopRuntimeHealthReporter();
       stopStationHealthService();
-      await stopOmnifmRadioLiveService();
+      // At most 3 s, alongside the stores: the radio never holds the bot state back.
       await Promise.all([
+        stopOmnifmRadioLiveService(),
         stopScheduledEventsStore(),
         stopCustomStationsStore(),
         stopCommandPermissionsStore(),

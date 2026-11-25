@@ -340,8 +340,20 @@ test("the store keeps the state in MongoDB, one document", async () => {
   assert.deepEqual(loaded.shows, [{ title: "A" }]);
 });
 
+test("a MongoDB that is configured but not connected is an error, never an empty state", async () => {
+  const store = createOmnifmRadioLiveStore({ getDatabase: () => null, mongoRequested: () => true });
+  await assert.rejects(store.load(), /MongoDB/);
+  await assert.rejects(store.save({ current: {}, shows: [] }), /MongoDB/);
+
+  const events = [];
+  const tracker = createOmnifmRadioLiveTracker({ store, onEvent: (event) => events.push(event) });
+  await tracker.observe(LIVE, "webhook");
+  assert.equal(tracker.snapshot().readable, false, "the load gate holds");
+  assert.deepEqual(events, []);
+});
+
 test("without MongoDB the store keeps the state in memory", async () => {
-  const store = createOmnifmRadioLiveStore({ getDatabase: () => null });
+  const store = createOmnifmRadioLiveStore({ getDatabase: () => null, mongoRequested: () => false });
   await store.save({ current: { isLive: false }, shows: [] });
   assert.deepEqual(await store.load(), { current: { isLive: false }, shows: [], testShows: [], track: null });
 });
@@ -382,4 +394,16 @@ test("the service runs only when OmniFM Radio is on, and stops cleanly", async (
     stopOmnifmRadioLiveService();
   }
   assert.equal(getOmnifmRadioLiveService(), null);
+});
+
+test("stopping never waits long for a hanging poll", async () => {
+  const { startOmnifmRadioLiveService, stopOmnifmRadioLiveService } = await import("../src/services/omnifm-radio-live.js");
+  await startOmnifmRadioLiveService({
+    env: { OPERATOR_ALERT_RADIO_LIVE: "0" },
+    store: memoryStore(),
+    fetchNowPlaying: () => new Promise(() => {}),
+  });
+  const started = Date.now();
+  await stopOmnifmRadioLiveService({ timeoutMs: 50 });
+  assert.ok(Date.now() - started < 1000, "the bot state is saved without waiting for the radio");
 });

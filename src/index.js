@@ -614,7 +614,8 @@ async function shutdown(signal) {
   shuttingDown = true;
   log("INFO", `Shutdown via ${signal}...`);
   stopStationHealthService();
-  await stopOmnifmRadioLiveService();
+  // Stops alongside the rest, at most 3 s: the bot state below never waits for it.
+  const radioStopped = stopOmnifmRadioLiveService();
 
   // Operator-Webhook: Shutdown-Benachrichtigung (nur bei externem Signal, nicht bei uncaughtException)
   if (signal === "SIGINT" || signal === "SIGTERM") {
@@ -636,6 +637,7 @@ async function shutdown(signal) {
     await flushBotStateStore().catch(() => null);
   }
   await Promise.all([
+    radioStopped,
     stopScheduledEventsStore(),
     stopCustomStationsStore(),
     stopCommandPermissionsStore(),

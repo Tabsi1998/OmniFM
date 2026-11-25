@@ -22,6 +22,9 @@ const MAX_SHOWS = 50;
 const MAX_TEST_SHOWS = 5;
 const TEST_SHOW_MAX_MS = 10 * 60 * 1000;
 const STORE_TIMEOUT_MS = 5_000;
+// The last live sighting is kept exact in memory and stored at most this often.
+const LAST_LIVE_SAVE_MS = 5 * 60 * 1000;
+const STOP_TIMEOUT_MS = 3_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SOURCES = new Set(["webhook", "poll", "test"]);
 
@@ -101,12 +104,14 @@ function normalizeShows(raw, max) {
 }
 
 // What the state machine needs besides the state: when the show was last
-// seen live (a gap the bot missed) and the song text from just before it
-// went live (that one is the auto DJ's, not the show's title).
+// seen live and AzuraCast's start of the current connection (a gap the bot
+// missed), and the song text from just before it went live (that one is the
+// auto DJ's, not the show's title).
 function normalizeTrack(raw) {
   const data = raw && typeof raw === "object" ? raw : {};
   return {
     lastLiveAt: isoOrNull(data.lastLiveAt),
+    broadcastStart: isoOrNull(data.broadcastStart),
     titleRef: typeof data.titleRef === "string" ? text(data.titleRef, 300) : null,
   };
 }
@@ -147,6 +152,7 @@ export function createOmnifmRadioLiveTracker({
   let lastWebhookAt = Number.NEGATIVE_INFINITY;
   let observed = { at: null, source: null };
   let loaded = false;
+  let savedLastLiveAtMs = Number.NEGATIVE_INFINITY;
   let queue = Promise.resolve();
 
   const serial = (task) => {
@@ -163,6 +169,7 @@ export function createOmnifmRadioLiveTracker({
       shows = normalizeShows(stored?.shows, MAX_SHOWS);
       testShows = normalizeShows(stored?.testShows, MAX_TEST_SHOWS);
       track = normalizeTrack(stored?.track);
+      savedLastLiveAtMs = track.lastLiveAt ? Date.parse(track.lastLiveAt) : Number.NEGATIVE_INFINITY;
       loaded = true;
     } catch (error) {
       log("WARN", `[OmniFM Radio] Live-Zustand nicht lesbar, neuer Versuch beim nächsten Takt: ${error?.message || error}`);
@@ -173,6 +180,7 @@ export function createOmnifmRadioLiveTracker({
   async function commit(events) {
     try {
       await withTimeout(() => store.save({ current, shows, testShows, track }), storeTimeoutMs, "Live-Zustand speichern");
+      if (track.lastLiveAt) savedLastLiveAtMs = Date.parse(track.lastLiveAt);
     } catch (error) {
       // The state in memory stays right; the next change stores it again.
       log("WARN", `[OmniFM Radio] Live-Zustand nicht gespeichert: ${error?.message || error}`);
@@ -201,7 +209,7 @@ export function createOmnifmRadioLiveTracker({
     const startedAt = sinceMs <= at && at - sinceMs < DAY_MS ? since : iso(at);
     const songText = text(title, 300);
     // Without a text from before going live the first live text is suspect too.
-    track = { lastLiveAt: iso(at), titleRef: source === "test" ? null : preLiveText ?? songText };
+    track = { lastLiveAt: iso(at), broadcastStart: since, titleRef: source === "test" ? null : preLiveText ?? songText };
     current = {
       isLive: true,
       streamerName: text(streamerName, 100),
@@ -242,13 +250,18 @@ export function createOmnifmRadioLiveTracker({
     return at - droppedAt >= graceMs ? finish(droppedAt) : null;
   }
 
-  /** AzuraCast reports a broadcast that began after a gap the bot did not see. */
-  function newBroadcastStart(liveSince) {
+  /**
+   * AzuraCast reports a broadcast that began after a gap the bot did not
+   * see: the old show ends when it was last seen live, else null.
+   */
+  function missedGapEnd(liveSince, at) {
     if (!current.isLive || current.source === "test" || current.offlineSince) return null;
     const since = isoOrNull(liveSince);
-    if (!since) return null;
-    const lastSeen = Date.parse(track.lastLiveAt || current.startedAt);
-    return Date.parse(since) - lastSeen > missedGapMs ? Date.parse(since) : null;
+    if (!since || since === track.broadcastStart) return null;
+    // An AzuraCast clock ahead of ours must not open a gap: never later than now.
+    const sinceMs = Math.min(Date.parse(since), at);
+    const lastSeenMs = Date.parse(track.lastLiveAt || current.startedAt);
+    return sinceMs - lastSeenMs > missedGapMs ? lastSeenMs : null;
   }
 
   return {
@@ -277,7 +290,7 @@ export function createOmnifmRadioLiveTracker({
       if (observation.isLive === true) {
         // A real show beats the console's test show.
         if (current.isLive && current.source === "test") events.push(finish(at));
-        const gapEnd = newBroadcastStart(observation.liveSince);
+        const gapEnd = missedGapEnd(observation.liveSince, at);
         if (gapEnd !== null) events.push(finish(gapEnd));
         if (!current.isLive) {
           events.push(begin(observation, source, at));
@@ -290,10 +303,11 @@ export function createOmnifmRadioLiveTracker({
           };
           changed = Object.keys(next).some((key) => next[key] !== current[key]);
           current = next;
-          if (track.lastLiveAt !== iso(at)) {
-            track = { ...track, lastLiveAt: iso(at) };
-            changed = true;
-          }
+          const broadcastStart = isoOrNull(observation.liveSince) || track.broadcastStart;
+          // A new connection (a reconnect within the grace time) is stored at
+          // once, the last sighting every few minutes.
+          if (broadcastStart !== track.broadcastStart || at - savedLastLiveAtMs >= LAST_LIVE_SAVE_MS) changed = true;
+          track = { ...track, lastLiveAt: iso(at), broadcastStart };
         }
       } else {
         preLiveText = songText;
@@ -453,6 +467,17 @@ export async function startOmnifmRadioLiveService({ env = process.env, store, fe
   return started;
 }
 
-export async function stopOmnifmRadioLiveService() {
-  await service?.stop();
+/** Stops the live detection, waiting at most `timeoutMs`: the bot's own state comes first. */
+export async function stopOmnifmRadioLiveService({ timeoutMs = STOP_TIMEOUT_MS } = {}) {
+  const running = service;
+  if (!running) return;
+  let timer;
+  const waited = new Promise((resolve) => { timer = setTimeout(resolve, timeoutMs); });
+  try {
+    await Promise.race([running.stop(), waited]);
+  } catch (error) {
+    log("WARN", `[OmniFM Radio] Live-Erkennung nicht sauber gestoppt: ${error?.message || error}`);
+  } finally {
+    clearTimeout(timer);
+  }
 }

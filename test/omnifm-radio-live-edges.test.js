@@ -126,7 +126,7 @@ test("a new broadcast after a gap the bot missed ends the old show and starts th
   await tracker.observe(live("DJ B", { liveSince: at(150 * MINUTE) }), "poll");
   assert.deepEqual(types(events), ["end", "start"]);
   assert.equal(events[0].show.streamerName, "DJ A");
-  assert.equal(events[0].show.endedAt, at(150 * MINUTE));
+  assert.equal(events[0].show.endedAt, at(30 * MINUTE), "A ends when it was last seen live");
   assert.equal(events[1].show.streamerName, "DJ B");
   assert.equal(tracker.snapshot().current.startedAt, at(150 * MINUTE));
 });
@@ -240,4 +240,64 @@ test("stopping the poller waits for the poll that is running", async () => {
   await stopping;
   assert.equal(stopped, true);
   assert.equal(tracker.snapshot().current.isLive, true, "the last answer was still applied");
+});
+
+// ---------------------------------------------------------------- re-review
+
+test("an AzuraCast clock two minutes ahead never makes fake shows", async () => {
+  const { tracker, events, now } = setup();
+  // Connected at 20:00 by our clock; AzuraCast's clock says 20:02.
+  const poller = createOmnifmRadioPoller({
+    tracker,
+    fetchNowPlaying: async () => ({ ok: true, isLive: true, streamerName: "DJ A", songText: "", liveSince: at(2 * MINUTE) }),
+    intervalMs: 30 * SECOND,
+    now,
+  });
+  for (let round = 0; round < 6; round += 1) {
+    // eslint-disable-next-line no-await-in-loop -- one poll after the other
+    await poller.pollOnce();
+    now.advance(30 * SECOND);
+  }
+  assert.deepEqual(types(events), ["start"]);
+  assert.equal(tracker.snapshot().current.startedAt, at(0), "a start in the future is not taken");
+
+  // Stored before the connection start was known: the future value alone must not open a gap.
+  const restarted = setup({
+    store: memoryStore({ current: { isLive: true, streamerName: "DJ A", startedAt: at(0), source: "poll" }, shows: [], track: { lastLiveAt: at(0) } }),
+    now: clock(START + 30 * SECOND),
+  });
+  await restarted.tracker.observe(live("DJ A", { liveSince: at(2 * MINUTE) }), "poll");
+  assert.deepEqual(restarted.events, []);
+});
+
+test("a live hour stores the state only every few minutes", async () => {
+  const store = memoryStore();
+  const { tracker, now } = setup({ store });
+  await tracker.observe(OFFLINE, "poll");
+  const before = store.saves;
+  for (let round = 0; round < 120; round += 1) {
+    // eslint-disable-next-line no-await-in-loop -- one poll after the other
+    await tracker.observe(live("DJ A", { liveSince: at(0) }), "poll");
+    now.advance(30 * SECOND);
+  }
+  assert.ok(store.saves - before <= 15, `${store.saves - before} saves in an hour`);
+  assert.equal(tracker.snapshot().current.isLive, true);
+});
+
+test("a reconnect no poll saw, then a restart, stays one show", async () => {
+  const store = memoryStore();
+  const first = setup({ store });
+  await first.tracker.observe(live("DJ A", { liveSince: at(0) }), "poll");
+  first.now.advance(2 * MINUTE);
+  await first.tracker.observe(live("DJ A", { liveSince: at(0) }), "poll");
+  // A 20 s drop between two polls: AzuraCast now reports a new broadcast start.
+  first.now.advance(30 * SECOND);
+  await first.tracker.observe(live("DJ A", { liveSince: at(2 * MINUTE + 10 * SECOND) }), "poll");
+  first.now.advance(30 * SECOND);
+  await first.tracker.observe(live("DJ A", { liveSince: at(2 * MINUTE + 10 * SECOND) }), "poll");
+
+  const again = setup({ store, now: clock(START + 6 * MINUTE) });
+  await again.tracker.observe(live("DJ A", { liveSince: at(2 * MINUTE + 10 * SECOND) }), "poll");
+  assert.deepEqual(types(first.events), ["start"]);
+  assert.deepEqual(again.events, [], "no second start after the restart");
 });
