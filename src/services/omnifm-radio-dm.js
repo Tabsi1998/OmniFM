@@ -21,7 +21,7 @@ import { getDb, isConnected, isMongoRequested } from "../lib/db.js";
 import { OWNER_CONFIG_ID } from "../lib/owner-config.js";
 import { sharedOmnifmRadioDmStore } from "../omnifm-radio-dm-store.js";
 import { buildRadioDmMessage } from "../bot/omnifm-radio-dm-message.js";
-import { getOmnifmRadioConfig } from "./omnifm-radio-config.js";
+import { getOmnifmRadioConfig, isOmnifmRadioVisibleForGuild } from "./omnifm-radio-config.js";
 import { onOmnifmRadioLiveEvent } from "./omnifm-radio-live.js";
 
 export const RADIO_DM_MODES = Object.freeze(["owners", "optin", "off"]);
@@ -102,7 +102,7 @@ export function collectRadioDmRecipients({ guilds, config, test, resolveLanguage
     const guildId = String(guild?.id || "");
     const ownerId = String(guild?.ownerId || "");
     if (!SNOWFLAKE.test(guildId) || !SNOWFLAKE.test(ownerId) || ownerId === selfId || recipients.has(ownerId)) continue;
-    const visible = test ? config.testGuildIds.includes(guildId) : config.isPublic || config.testGuildIds.includes(guildId);
+    const visible = test ? config.testGuildIds.includes(guildId) : isOmnifmRadioVisibleForGuild(guildId, config);
     if (!visible) continue;
     recipients.set(ownerId, { userId: ownerId, guildId, guildName: String(guild?.name || ""), language: resolveLanguage(guildId) || "de" });
   }
