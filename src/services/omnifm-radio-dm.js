@@ -40,6 +40,7 @@ const CLIENT_POLL_MS = 1_000;
 const STOP_TIMEOUT_MS = 3_000;
 const SNOWFLAKE = /^\d{17,22}$/;
 const iso = (ms) => new Date(ms).toISOString();
+const errorText = (error) => String(error?.message || error).slice(0, 200);
 
 // ---------------------------------------------------------------- mode
 
@@ -188,15 +189,20 @@ export function createOmnifmRadioDmService({
     }
   }
 
-  async function sendOne(runtime, sender, recipient, show, run) {
+  /** The JSON body of one DM; throws when the settings make no valid message (a base URL without https://). */
+  function buildBody(runtime, recipient, show, config) {
+    return radioDmBody(buildRadioDmMessage({
+      show,
+      language: recipient.language,
+      config,
+      guildName: recipient.guildName,
+      applicationId: runtime.getApplicationId?.() || runtime.client.application?.id || null,
+    }));
+  }
+
+  async function sendOne(sender, recipient, body, run) {
     try {
-      await sender.send(recipient.userId, radioDmBody(buildRadioDmMessage({
-        show,
-        language: recipient.language,
-        config: getConfig(),
-        guildName: recipient.guildName,
-        applicationId: runtime.getApplicationId?.() || runtime.client.application?.id || null,
-      })));
+      await sender.send(recipient.userId, body);
       run.sent += 1;
     } catch (error) {
       // No retry: a second try is exactly what looks like spam.
@@ -218,25 +224,33 @@ export function createOmnifmRadioDmService({
     const runtime = await waitForRuntime(signal);
     if (signal.aborted) return job.reason;
     if (!runtime) return "client";
+    const config = getConfig();
     const recipients = collectRadioDmRecipients({
       guilds: runtime.client.guilds.cache.values(),
-      config: getConfig(),
+      config,
       test: run.test,
       resolveLanguage: (guildId) => runtime.resolveGuildLanguage?.(guildId),
       selfId: String(runtime.client.user?.id || ""),
     });
     run.total = recipients.length;
     run.remaining = recipients.length;
+    // Every language once before anybody is claimed: broken settings use up nobody's 12 hours.
+    try {
+      for (const language of new Set(recipients.map((recipient) => recipient.language))) buildBody(runtime, { language, guildName: "" }, job.show, config);
+    } catch (error) {
+      run.error = errorText(error);
+      return "config";
+    }
     const quota = run.test ? "test" : "real";
     const sender = createSender(runtime);
     try {
-      return await distributeTo(job, run, { runtime, sender, recipients, quota });
+      return await distributeTo(job, run, { runtime, sender, recipients, quota, config });
     } finally {
       sender.stop?.();
     }
   }
 
-  async function distributeTo(job, run, { runtime, sender, recipients, quota }) {
+  async function distributeTo(job, run, { runtime, sender, recipients, quota, config }) {
     const { signal } = job.controller;
     let pause = false;
     for (const recipient of recipients) {
@@ -249,6 +263,13 @@ export function createOmnifmRadioDmService({
       // eslint-disable-next-line no-await-in-loop
       run.mode = await currentMode();
       if (run.mode === "off") return "off";
+      let body;
+      try {
+        body = buildBody(runtime, recipient, job.show, config);
+      } catch (error) {
+        run.error = errorText(error);
+        return "config";
+      }
       // eslint-disable-next-line no-await-in-loop
       const claimed = await store.claim(recipient.userId, { quota, windowMs: QUOTAS[quota], now: now(), subscribedOnly: run.mode === "optin" });
       run.remaining -= 1;
@@ -257,7 +278,7 @@ export function createOmnifmRadioDmService({
         continue;
       }
       // eslint-disable-next-line no-await-in-loop
-      await sendOne(runtime, sender, recipient, job.show, run);
+      await sendOne(sender, recipient, body, run);
       pause = true;
     }
     return null;
@@ -281,6 +302,7 @@ export function createOmnifmRadioDmService({
       failed: 0,
       remaining: 0,
       stoppedBy: null,
+      error: null,
     };
     lastRun = run;
     active = job;
@@ -289,6 +311,7 @@ export function createOmnifmRadioDmService({
     } catch (error) {
       log("WARN", `[OmniFM Radio] DM-Verteilung abgebrochen: ${error?.message || error}`);
       run.stoppedBy = "error";
+      run.error = errorText(error);
     } finally {
       run.finishedAt = iso(now());
       active = null;

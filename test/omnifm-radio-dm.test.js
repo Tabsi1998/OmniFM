@@ -385,3 +385,16 @@ test("started next to the live detection: a live start reaches it, a shutdown st
   await service.idle();
   assert.equal((await service.status()).running, false, "no listener left");
 });
+
+test("a DM that cannot be built stops the run before anybody is claimed", async () => {
+  const { getOmnifmRadioConfig } = await import("../src/services/omnifm-radio-config.js");
+  // OMNIFM_RADIO_BASE_URL without https://: the "Jetzt hören" link is no URL Discord takes.
+  const config = getOmnifmRadioConfig({ OMNIFM_RADIO_BASE_URL: "radio.omnifm.xyz", OMNIFM_RADIO_TEST_GUILD_IDS: `${G1},${G2}` });
+  const context = setup({ config });
+  const run = await distribute(context);
+  assert.equal(run.stoppedBy, "config");
+  assert.match(run.error, /URL/i, "the console can say what is wrong");
+  assert.deepEqual(context.runtime.fetched, []);
+  assert.equal(await context.store.get(A), null, "nobody's 12 hours are used up");
+  assert.equal(await context.store.get(B), null);
+});
