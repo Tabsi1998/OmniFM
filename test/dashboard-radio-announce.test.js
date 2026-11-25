@@ -11,13 +11,15 @@ import path from "node:path";
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "omnifm-dashboard-radio-"));
 const VISIBLE = String(100000000000000000n + BigInt(Math.floor(Math.random() * 1e15)));
 const HIDDEN = String(BigInt(VISIBLE) + 1n);
+// Visible, but the bot's view of it has no roles (like a worker's summary).
+const ROLELESS = String(BigInt(VISIBLE) + 2n);
 const env = {
   OMNIFM_RUNTIME_DATA_DIR: dataDir,
   WEB_INTERNAL_PORT: "0",
   WEB_PORT: "0",
   WEB_BIND: "127.0.0.1",
   API_RATE_LIMIT_MAX: "500",
-  OMNIFM_RADIO_TEST_GUILD_IDS: VISIBLE,
+  OMNIFM_RADIO_TEST_GUILD_IDS: `${VISIBLE},${ROLELESS}`,
   OMNIFM_RADIO_PUBLIC: "0",
 };
 const previousEnv = Object.fromEntries(Object.keys(env).map((key) => [key, process.env[key]]));
@@ -79,7 +81,7 @@ function createRuntimes() {
   return [{
     role: "commander",
     config: { id: "bot-radio-commander", index: 1, name: "OmniFM DJ", requiredTier: "free" },
-    client: { isReady: () => true, guilds: { cache: new Map([[VISIBLE, guildOf(VISIBLE)], [HIDDEN, guildOf(HIDDEN)]]) } },
+    client: { isReady: () => true, guilds: { cache: new Map([[VISIBLE, guildOf(VISIBLE)], [HIDDEN, guildOf(HIDDEN)], [ROLELESS, { id: ROLELESS, name: "Ohne Rollen" }]]) } },
     getPublicStatus: () => status,
     getDashboardStatus: () => ({ ...status, guildDetails: [] }),
     workerManager: { refreshRemoteStates: async () => null, getStreamingWorkers: () => [] },
@@ -100,7 +102,7 @@ test("a Free server sets channel, role or off; a server without OmniFM Radio can
   const nowTs = Math.floor(Date.now() / 1000);
   setDashboardAuthSession(token, {
     user: { id: "723456789012345678", username: "Vereinsadmin" },
-    guilds: [{ id: VISIBLE, name: "Club", permissions: "32", owner: true }, { id: HIDDEN, name: "Andere", permissions: "32", owner: true }],
+    guilds: [{ id: VISIBLE, name: "Club", permissions: "32", owner: true }, { id: HIDDEN, name: "Andere", permissions: "32", owner: true }, { id: ROLELESS, name: "Ohne Rollen", permissions: "32", owner: true }],
     createdAt: nowTs,
     expiresAt: nowTs + 3600,
   });
@@ -110,7 +112,7 @@ test("a Free server sets channel, role or off; a server without OmniFM Radio can
   t.after(async () => {
     await new Promise((resolve) => server.close(resolve));
     deleteDashboardAuthSession(token);
-    if (mongo) await mongo.collection("guild_settings").deleteMany({ guildId: { $in: [VISIBLE, HIDDEN] } }).catch(() => null);
+    if (mongo) await mongo.collection("guild_settings").deleteMany({ guildId: { $in: [VISIBLE, HIDDEN, ROLELESS] } }).catch(() => null);
     const { close } = await import("../src/lib/db.js");
     await close().catch(() => null);
     for (const [key, value] of Object.entries(previousEnv)) {
@@ -154,6 +156,10 @@ test("a Free server sets channel, role or off; a server without OmniFM Radio can
   }
   assert.equal((await call("PUT", `/api/dashboard/settings?serverId=${VISIBLE}`, { omnifmRadioAnnounce: { enabled: "false" } })).status, 400);
 
+  // Where the bots' view has no roles, a role cannot be checked here: it is not refused (OmniFM 1 checks when posting).
+  const unchecked = await call("PUT", `/api/dashboard/settings?serverId=${ROLELESS}`, { omnifmRadioAnnounce: { enabled: true, roleId: ROLE_LOW } });
+  assert.notEqual(unchecked.status, 400, JSON.stringify(unchecked.payload));
+
   // Announcement channels (type 5) are offered for this card, the other pickers keep text channels only.
   const channels = await call("GET", `/api/dashboard/channels?serverId=${VISIBLE}`);
   assert.deepEqual(channels.payload.textChannels.map((channel) => channel.id), [SYSTEM]);
@@ -171,6 +177,17 @@ test("a Free server sets channel, role or off; a server without OmniFM Radio can
   const hiddenStored = await mongo.collection("guild_settings").findOne({ guildId: HIDDEN });
   assert.equal(hiddenStored?.timeZone, "Europe/Berlin", "the rest was saved");
   assert.equal(hiddenStored?.omnifmRadioAnnounce, undefined, "the radio part was left out");
+  // A role deleted in Discord stays stored; saving anything else must still work.
+  const DELETED_ROLE = "923456789012345678";
+  await mongo.collection("guild_settings").updateOne({ guildId: VISIBLE }, { $set: { omnifmRadioAnnounce: { enabled: true, channelId: "", roleId: DELETED_ROLE } } });
+  const keep = await call("PUT", `/api/dashboard/settings?serverId=${VISIBLE}`, { omnifmRadioAnnounce: { enabled: true, channelId: "", roleId: DELETED_ROLE }, serverTimeZone: "Europe/Berlin" });
+  assert.equal(keep.status, 200, JSON.stringify(keep.payload));
+  assert.equal(keep.payload.serverTimeZone.current, "Europe/Berlin");
+  assert.equal(keep.payload.omnifmRadioAnnounce.roleId, DELETED_ROLE, "kept until someone picks another");
+  const toEveryone = await call("PUT", `/api/dashboard/settings?serverId=${VISIBLE}`, { omnifmRadioAnnounce: { enabled: true, roleId: VISIBLE } });
+  assert.equal(toEveryone.status, 400, "changing it to @everyone is refused");
+  await mongo.collection("guild_settings").updateOne({ guildId: VISIBLE }, { $set: { omnifmRadioAnnounce: { enabled: false, channelId: "", roleId: "" } } });
+
   const stored = await mongo.collection("guild_settings").findOne({ guildId: VISIBLE });
   assert.deepEqual(stored.omnifmRadioAnnounce, { enabled: false, channelId: "", roleId: "" }, "what the commander reads");
 });

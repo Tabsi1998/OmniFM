@@ -362,8 +362,14 @@ export function createDashboardSettingsRouteHandler(deps) {
             return true;
           }
           const radio = normalizeRadioAnnounceSettings(radioInput);
+          // Only a changed role is checked: one deleted in Discord stays stored until
+          // someone picks another (OmniFM 1 skips it when posting), and every other
+          // setting can still be saved. Where the bots' view has no roles, it is not refused.
+          const storedRole = normalizeRadioAnnounceSettings((await getCurrentSettings())[RADIO_ANNOUNCE_SETTINGS_KEY]).roleId;
           const radioGuild = resolveRuntimeForGuild(runtimes || [], guildInfo.id).guild;
-          if (radio.roleId && (radio.roleId === guildInfo.id || (radioGuild && !radioAnnounceRole(radioGuild, radio.roleId)))) {
+          const rolesKnown = Boolean(radioGuild?.roles?.cache);
+          if (radio.roleId && radio.roleId !== storedRole
+            && (radio.roleId === guildInfo.id || (rolesKnown && !radioAnnounceRole(radioGuild, radio.roleId)))) {
             sendLocalizedError(res, 400, language, "Diese Rolle kann OmniFM nicht erwähnen. Wähle eine andere.", "OmniFM cannot mention this role. Choose another one.");
             return true;
           }
