@@ -26,6 +26,12 @@ export function normalizeRadioAnnounceSettings(raw) {
   };
 }
 
+/** A role the announcement may mention: on the server, not @everyone, not a bot's own role. */
+export function radioAnnounceRole(guild, roleId) {
+  const role = roleId ? guild?.roles?.cache?.get?.(roleId) : null;
+  return role && role.id !== guild.id && !role.managed ? role : null;
+}
+
 /**
  * The server's setting, read strictly: unlike loadGuildSettings, a database
  * that is away or fails throws, so a server that switched it off never gets

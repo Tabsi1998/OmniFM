@@ -222,6 +222,17 @@ test("the chosen channel and role; a role that is gone is not mentioned", async 
 
   await runtime.postRadioAnnouncement(TEST_GUILD, { channelId: OTHER_TEXT, roleId: "999999999999999999", show: SHOW });
   assert.deepEqual(chosen.sent[1].allowedMentions, { parse: [] });
+
+  // @everyone (the role with the server's id) and bot roles are never mentioned, whatever is stored.
+  const { runtime: guarded, guild } = fakeRuntime({ channels: [chosen], roles: [] });
+  guild.roles.cache.set(TEST_GUILD, { id: TEST_GUILD, name: "@everyone" });
+  guild.roles.cache.set(ROLE, { id: ROLE, name: "OmniFM", managed: true });
+  for (const roleId of [TEST_GUILD, ROLE]) {
+    // eslint-disable-next-line no-await-in-loop -- one after the other
+    await guarded.postRadioAnnouncement(TEST_GUILD, { channelId: OTHER_TEXT, roleId, show: SHOW });
+    assert.deepEqual(chosen.sent.at(-1).allowedMentions, { parse: [] }, roleId);
+    assert.doesNotMatch(textOf(chosen.sent.at(-1)), /<@&/);
+  }
 });
 
 test("no channel, a channel that is gone or missing rights: skipped, nothing sent", async () => {

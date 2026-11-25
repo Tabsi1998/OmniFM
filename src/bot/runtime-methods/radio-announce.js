@@ -11,6 +11,7 @@ import { botTranslator } from "../../lib/bot-i18n.js";
 import { log } from "../../lib/logging.js";
 import { getOmnifmRadioConfig } from "../../services/omnifm-radio-config.js";
 import { createOmnifmRadioAnnounceStore } from "../../omnifm-radio-announce-store.js";
+import { radioAnnounceRole } from "../../lib/omnifm-radio-announce-settings.js";
 import { buildRadioEndedPayload, buildRadioLivePayload } from "../omnifm-radio-announce-messages.js";
 import { buildStationCatalog } from "../runtime-panels.js";
 
@@ -73,8 +74,8 @@ const radioAnnounceMethods = {
     const target = await announceTarget(this, guildId, channelId, { fetch: true });
     if (target.reason) return { ok: false, reason: target.reason };
     const { guild, channel } = target;
-    // A role that was deleted is not mentioned.
-    const role = roleId ? guild.roles.cache.get(roleId) : null;
+    // A deleted role, @everyone or a bot role is never mentioned, whatever is stored.
+    const role = radioAnnounceRole(guild, roleId);
     const payload = buildRadioLivePayload({
       t: botTranslator(this.resolveGuildLanguage(guildId)),
       show,
