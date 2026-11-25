@@ -123,9 +123,10 @@ function subscriptionChangedMessage({ subscribed, language, applicationId }) {
 }
 
 /**
- * "Abbestellen" and "Wieder abonnieren" in the DM: stored for the person
- * who clicks, then the DM itself shows the new state. Not stored: the DM
- * stays and only the person hears that it did not work.
+ * "Abbestellen" and "Wieder abonnieren" in the DM: Discord is answered at
+ * once (deferUpdate, the database may take longer than its 3 seconds), the
+ * choice is stored for the person who clicks, then the DM itself shows the
+ * new state. Not stored: the DM stays and only the person hears it failed.
  * @returns {Promise<boolean>} false when the button is not one of the DM's
  */
 export async function handleRadioDmComponent(interaction, { store = sharedOmnifmRadioDmStore(), now = Date.now } = {}) {
@@ -133,13 +134,14 @@ export async function handleRadioDmComponent(interaction, { store = sharedOmnifm
   if (!parsed || !interaction.isButton?.()) return false;
   const { language } = parsed;
   const subscribed = parsed.action === "resub";
+  await interaction.deferUpdate();
   try {
     await store.setSubscribed(interaction.user?.id, subscribed, { now: now() });
   } catch (error) {
     log("WARN", `[OmniFM Radio] DM-${subscribed ? "Abo" : "Abmeldung"} nicht gespeichert: ${error?.message || error}`);
-    await interaction.reply(buildNoticePayload({ t: botTranslator(language), language, code: "failed" }));
+    await interaction.followUp(buildNoticePayload({ t: botTranslator(language), language, code: "failed" }));
     return true;
   }
-  await interaction.update(subscriptionChangedMessage({ subscribed, language, applicationId: interaction.applicationId || null }));
+  await interaction.editReply(subscriptionChangedMessage({ subscribed, language, applicationId: interaction.applicationId || null }));
   return true;
 }

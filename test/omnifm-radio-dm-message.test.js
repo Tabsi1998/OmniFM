@@ -121,24 +121,41 @@ test("the button ids carry the action and the language, nothing else", () => {
 });
 
 function click(customId, { userId = USER } = {}) {
-  const calls = { update: [], reply: [] };
+  const calls = { order: [], editReply: [], followUp: [], update: [], reply: [] };
   return {
     calls,
     customId,
     user: { id: userId },
     guildId: null,
     isButton: () => true,
+    deferUpdate: async () => { calls.order.push("deferUpdate"); },
+    editReply: async (payload) => { calls.order.push("editReply"); calls.editReply.push(payload); },
+    followUp: async (payload) => { calls.order.push("followUp"); calls.followUp.push(payload); },
     update: async (payload) => { calls.update.push(payload); },
     reply: async (payload) => { calls.reply.push(payload); },
   };
 }
 
+/** A store that notes when it is written, so the order with Discord shows. */
+function notingStore(calls, store = createOmnifmRadioDmStore({ getDatabase: () => null, mongoRequested: () => false })) {
+  return {
+    ...store,
+    get: store.get,
+    async setSubscribed(...args) {
+      calls.order.push("store");
+      return store.setSubscribed(...args);
+    },
+  };
+}
+
 test("Abbestellen and Wieder abonnieren work without a session, also after a restart", async () => {
-  const store = createOmnifmRadioDmStore({ getDatabase: () => null, mongoRequested: () => false });
+  const base = createOmnifmRadioDmStore({ getDatabase: () => null, mongoRequested: () => false });
   const unsubscribe = click("omnifm:radiodm:unsub:en");
-  assert.equal(await handleRadioDmComponent(unsubscribe, { store, now: () => 1_000 }), true);
+  assert.equal(await handleRadioDmComponent(unsubscribe, { store: notingStore(unsubscribe.calls, base), now: () => 1_000 }), true);
+  assert.deepEqual(unsubscribe.calls.order, ["deferUpdate", "store", "editReply"], "Discord hears at once, before the database");
+  const store = base;
   assert.equal((await store.get(USER)).unsubscribed, true);
-  const unsubscribed = unsubscribe.calls.update[0];
+  const unsubscribed = unsubscribe.calls.editReply[0];
   assert.ok(unsubscribed, "the DM itself changes");
   assert.match(textOf(unsubscribed), /Unsubscribed/);
   assert.deepEqual(buttonsOf(unsubscribed).map((button) => button.custom_id), ["omnifm:radiodm:resub:en"]);
@@ -148,7 +165,7 @@ test("Abbestellen and Wieder abonnieren work without a session, also after a res
   assert.equal(await handleRadioDmComponent(resubscribe, { store, now: () => 2_000 }), true);
   const person = await store.get(USER);
   assert.deepEqual({ unsubscribed: person.unsubscribed, subscribed: person.subscribed }, { unsubscribed: false, subscribed: true });
-  const subscribed = resubscribe.calls.update[0];
+  const subscribed = resubscribe.calls.editReply[0];
   assert.deepEqual(buttonsOf(subscribed).map((button) => button.custom_id), ["omnifm:radiodm:unsub:en"]);
   assert.deepEqual(checkDiscordLimits(subscribed).problems, []);
 });
@@ -157,10 +174,9 @@ test("when the choice cannot be stored the DM stays and the person hears it did 
   const store = { setSubscribed: async () => { throw new Error("MongoDB ist nicht verbunden."); } };
   const interaction = click("omnifm:radiodm:unsub:de");
   assert.equal(await handleRadioDmComponent(interaction, { store }), true);
-  assert.equal(interaction.calls.update.length, 0);
-  assert.equal(interaction.calls.reply.length, 1);
-  assert.ok(interaction.calls.reply[0].flags & MessageFlags.Ephemeral, "only the person sees it");
-  assert.match(textOf(interaction.calls.reply[0]), /Hat nicht geklappt/);
+  assert.deepEqual(interaction.calls.order, ["deferUpdate", "followUp"], "the DM is not edited");
+  assert.ok(interaction.calls.followUp[0].flags & MessageFlags.Ephemeral, "only the person sees it");
+  assert.match(textOf(interaction.calls.followUp[0]), /Hat nicht geklappt/);
 });
 
 test("the commander's button routing hands the DM buttons to this handler", async () => {
@@ -170,7 +186,7 @@ test("the commander's button routing hands the DM buttons to this handler", asyn
   interaction.isModalSubmit = () => false;
   const handled = await menuMethods.handleComponentInteraction.call({ config: { name: "OmniFM 1" } }, interaction);
   assert.equal(handled, true);
-  assert.equal(interaction.calls.update.length, 1, "a DM has no server: no guild check stands in the way");
+  assert.equal(interaction.calls.editReply.length, 1, "a DM has no server: no guild check stands in the way");
 });
 
 test("other buttons are not this handler's", async () => {
