@@ -73,6 +73,8 @@ class WorkerBridgeService {
     this.commandLoopInFlight = false;
     this.tickRequested = false;
     this.stopDoorbell = null;
+    // "Listen now" (#593) tells the commander right away that this worker plays.
+    runtime.publishWorkerSnapshot = () => this.publishSnapshot();
   }
 
   async publishSnapshot() {

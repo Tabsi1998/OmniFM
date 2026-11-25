@@ -371,3 +371,65 @@ test("the button under the message reaches the Listen now handler", async () => 
   assert.equal(await menuMethods.handleComponentInteraction.call(runtime, { customId: RADIO_LISTEN_ID, isButton: () => true }), true);
   assert.equal(runtime.handled, 1);
 });
+
+// ---------------------------------------------------------------- races
+
+test("two Listen now clicks from different channels at once: OmniFM 1 plays in one, the other is told, nobody is switched", async () => {
+  const { BotRuntime } = await import("../src/bot/runtime.js");
+  const { guild } = fakeRuntime({ voiceMembers: { [VOICE]: [], [OTHER_VOICE]: [] } });
+  const runtime = Object.create(BotRuntime.prototype);
+  const connects = [];
+  const snapshots = [];
+  Object.assign(runtime, {
+    config: { id: "bot-2", name: "OmniFM 1" },
+    role: "worker",
+    workerSlot: 1,
+    client: { application: { id: ME }, user: { id: ME }, guilds: { cache: new Map([[TEST_GUILD, guild]]) } },
+    guildState: new Map(),
+    getState(guildId) {
+      if (!runtime.guildState.has(guildId)) runtime.guildState.set(guildId, { volume: 100, channelVolumes: {} });
+      return runtime.guildState.get(guildId);
+    },
+    resolveBotMember: async () => ({ id: ME }),
+    resolveGuildLanguage: () => "de",
+    createInteractionTranslator: () => ({ language: "de", isDe: true, t: botTranslator("de") }),
+    getGuildAccess: () => ({ allowed: true }),
+    checkCommandRolePermission: () => ({ ok: true }),
+    validateVoiceChannelAccess: async () => ({ ok: true }),
+    refreshVoiceGuardSettings: async () => null,
+    clearRestoreRetry: () => {},
+    clearScheduledEventPlayback: () => {},
+    updatePresence: () => {},
+    publishWorkerSnapshot: async () => { snapshots.push(Date.now()); },
+    // Joining a voice channel takes a moment: the second click arrives meanwhile.
+    async ensureVoiceConnectionForChannel(_guildId, channelId, state) {
+      connects.push(channelId);
+      await new Promise((resolve) => { setTimeout(resolve, 20); });
+      state.connection = { joinConfig: { channelId } };
+      return { channel: { type: ChannelType.GuildVoice } };
+    },
+    async playStation(state, _stations, key) {
+      state.currentStationKey = key;
+    },
+  });
+  const first = interaction({ guild, voiceChannelId: VOICE });
+  const second = interaction({ guild, voiceChannelId: OTHER_VOICE });
+  await Promise.all([runtime.handleRadioListenButton(first), runtime.handleRadioListenButton(second)]);
+  assert.deepEqual(connects, [VOICE], "one join, no switch to the second channel");
+  assert.equal(runtime.guildState.get(TEST_GUILD).connection.joinConfig.channelId, VOICE);
+  assert.match(lastAnswer(first), /spielt jetzt OmniFM Radio/);
+  assert.match(lastAnswer(second), new RegExp(`<#${VOICE}>`), "the second is told where OmniFM 1 plays");
+  assert.equal(snapshots.length, 1, "the commander learns at once that OmniFM 1 is busy");
+});
+
+test("split mode: the worker can publish its snapshot right after Listen now", async () => {
+  const { WorkerBridgeService } = await import("../src/bot/worker-bridge-service.js");
+  const published = [];
+  const runtime = { config: { id: "bot-2" }, buildStatusSnapshot: () => ({}), client: { guilds: { cache: new Map() } } };
+  new WorkerBridgeService(runtime, {
+    bridge: { publishWorkerSnapshot: async (id) => { published.push(id); } },
+    doorbell: { isDoorbellConnected: () => false, onDoorbell: () => () => {} },
+  });
+  await runtime.publishWorkerSnapshot();
+  assert.deepEqual(published, ["bot-2"]);
+});

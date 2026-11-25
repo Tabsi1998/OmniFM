@@ -137,17 +137,19 @@ const radioAnnounceMethods = {
       return true;
     }
     const bot = this.config?.name || "OmniFM 1";
-    const busyIn = streamingChannelId(this.guildState?.get?.(guildId));
-    if (busyIn === voiceChannelId && this.guildState.get(guildId).currentStationKey === radioKey) {
-      await answer("success", t("Läuft schon", "Already on"), t("OmniFM Radio läuft schon in deinem Sprachkanal.", "OmniFM Radio is already playing in your voice channel."));
-      return true;
-    }
-    if (busyIn) {
-      await answer("info", t("{bot} spielt schon", "{bot} is already playing", { bot }), t(
+    /** OmniFM 1 already plays: in the presser's channel, or for other listeners. */
+    const answerBusy = (busyIn, stationKey) => (busyIn === voiceChannelId && stationKey === radioKey
+      ? answer("success", t("Läuft schon", "Already on"), t("OmniFM Radio läuft schon in deinem Sprachkanal.", "OmniFM Radio is already playing in your voice channel."))
+      : answer("info", t("{bot} spielt schon", "{bot} is already playing", { bot }), t(
         "{bot} spielt gerade in {channel}. Damit dort niemand umgeschaltet wird, starte OmniFM Radio mit `/play` bei einem anderen Bot.",
         "{bot} is playing in {channel} right now. So nobody there is switched, start OmniFM Radio with `/play` on another bot.",
         { bot, channel: `<#${busyIn}>` }
-      ));
+      )));
+    // A quick answer here; the check that counts runs inside playInGuild's lock.
+    const state = this.guildState?.get?.(guildId);
+    const busyIn = streamingChannelId(state);
+    if (busyIn) {
+      await answerBusy(busyIn, state.currentStationKey);
       return true;
     }
     const voiceChannel = guild.channels.cache.get(voiceChannelId) || null;
@@ -168,13 +170,18 @@ const radioAnnounceMethods = {
       await answer("warning", t("Das geht gerade nicht", "That does not work right now"), voiceAccess.message);
       return true;
     }
-    this.clearScheduledEventPlaybackInGuild?.(guildId);
-    const result = await this.playInGuild(guildId, voiceChannelId, radioKey, stationsData);
+    const result = await this.playInGuild(guildId, voiceChannelId, radioKey, stationsData, undefined, { onlyWhenIdle: true });
+    if (result?.busy) {
+      await answerBusy(String(result.channelId || ""), result.stationKey);
+      return true;
+    }
     if (!result?.ok) {
       await answer("error", t("Start fehlgeschlagen", "Start failed"), result?.error || "");
       return true;
     }
     log("INFO", `[${bot}] OmniFM Radio per „Jetzt hören“ guild=${guildId} channel=${voiceChannelId}`);
+    // Split mode: the commander sees at once that this bot is busy now.
+    await this.publishWorkerSnapshot?.().catch(() => null);
     await answer("success", t("OmniFM Radio läuft", "OmniFM Radio is on"), t(
       "{bot} spielt jetzt OmniFM Radio in {channel}.",
       "{bot} is now playing OmniFM Radio in {channel}.",
