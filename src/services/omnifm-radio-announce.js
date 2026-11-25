@@ -239,8 +239,12 @@ export function createOmnifmRadioAnnouncer({
   }
 
   async function editOne(bot, entry, show) {
-    // A message of another bot cannot be edited by this one.
-    if (entry.botId && bot.config?.id && entry.botId !== bot.config.id) return;
+    // A message of another bot cannot be edited by this one: closed, not tried every round.
+    if (entry.botId && bot.config?.id && entry.botId !== bot.config.id) {
+      log("DEBUG", `${TAG} ${entry.guildId}: Nachricht von ${entry.botId}, nicht bearbeitbar, geschlossen.`);
+      await store.markEnded(entry, new Date(now()));
+      return;
+    }
     if (!entry.messageId) {
       // Still waiting for the worker to report its id after a timeout: later.
       if (now() - entry.claimedAt.getTime() < PENDING_ID_GRACE_MS) return;

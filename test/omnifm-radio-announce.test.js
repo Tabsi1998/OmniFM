@@ -186,6 +186,7 @@ test("the store claims, fills in and closes each announcement in MongoDB", { ski
     await exerciseStore(createOmnifmRadioAnnounceStore({ getDatabase: () => db, collectionName }));
     const indexes = (await db.collection(collectionName).indexes()).map((index) => index.name);
     assert.ok(indexes.includes("ttl"), "old entries expire");
+    assert.ok(indexes.includes("open"), "the open ones are found fast");
   } finally {
     await db.collection(collectionName).drop().catch(() => null);
   }
@@ -651,6 +652,26 @@ test("an end whose edits failed is caught up on the next round, without a double
   announcer.catchUp();
   await announcer.idle();
   assert.equal(bot.edits.length, 1, "caught up once");
+});
+
+test("an announcement of another bot is closed, not tried again every few minutes", async () => {
+  const store = createOmnifmRadioAnnounceStore({ getDatabase: () => null, mongoRequested: () => false });
+  const live = show();
+  const key = { showId: radioShowId(live), guildId: TEST_GUILD };
+  await store.claim({ ...key, botId: "bot-7", show: live, at: new Date(START) });
+  await store.setMessage(key, { channelId: "1", messageId: "2", at: new Date(START) });
+  const bot = fakeBot({ id: "bot-2", guilds: [TEST_GUILD] });
+  const announcer = createOmnifmRadioAnnouncer({
+    getAnnouncer: () => bot,
+    store,
+    getLiveState: liveState({ shows: [ended(live, START + MINUTE)] }),
+    getConfig: () => radioConfig(),
+    sleep: async () => {},
+  });
+  announcer.catchUp();
+  await announcer.idle();
+  assert.equal(bot.edits.length, 0, "OmniFM 1 cannot edit another bot's message");
+  assert.deepEqual(await store.listOpen(), [], "closed");
 });
 
 test("a claim still waiting for its message id is left for a while, then closed", async () => {

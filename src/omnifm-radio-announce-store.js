@@ -58,6 +58,7 @@ export function createOmnifmRadioAnnounceStore({
     indexed ||= Promise.all([
       announcements.createIndex({ guildId: 1, test: 1, claimedAt: -1 }, { name: "guild_claimed" }),
       announcements.createIndex({ showId: 1 }, { name: "show" }),
+      announcements.createIndex({ endedAt: 1 }, { name: "open" }),
       announcements.createIndex({ expiresAt: 1 }, { name: "ttl", expireAfterSeconds: 0 }),
     ]).catch(() => { indexed = null; });
     await indexed;
