@@ -75,6 +75,7 @@ test("nonsense intervals fall back to the defaults, polling never faster than 5 
 
 test("going live starts one show with DJ, title and start time", async () => {
   const { tracker, events, store } = setup();
+  await tracker.observe(OFFLINE, "poll");
   await tracker.observe(LIVE, "poll");
   const { current } = tracker.snapshot();
   assert.equal(current.isLive, true);
@@ -202,7 +203,8 @@ test("the test show starts and ends without streaming, marked as test", async ()
   assert.equal(ended.ok, true);
   assert.deepEqual(events.map((event) => [event.type, event.show.source]), [["start", "test"], ["end", "test"]]);
   assert.equal(events[1].show.durationMs, 6 * 60 * SECOND);
-  assert.equal(tracker.snapshot().shows[0].source, "test");
+  assert.equal(tracker.snapshot().testShows[0].source, "test");
+  assert.deepEqual(tracker.snapshot().shows, [], "a test never lands in the real history");
 });
 
 test("a test show never touches a real one", async () => {
@@ -254,7 +256,7 @@ test("the poll detects live and offline", async () => {
     { ok: true, isLive: true, streamerName: "DJ Tabsi", songText: "Abendshow", title: "Abendshow", liveSince: null },
     { ok: true, isLive: false, streamerName: "", songText: "Auto-DJ", title: "Auto-DJ", liveSince: null },
   ]);
-  const poller = createOmnifmRadioPoller({ tracker, fetchNowPlaying, intervalMs: 30 * SECOND });
+  const poller = createOmnifmRadioPoller({ tracker, fetchNowPlaying, intervalMs: 30 * SECOND, now });
   await poller.pollOnce();
   assert.equal(tracker.snapshot().current.isLive, true);
   assert.equal(fetchNowPlaying.calls[0].force, true, "the poll never reads the cache");
@@ -273,6 +275,7 @@ test("an API failure keeps the state", async () => {
     tracker,
     fetchNowPlaying: fakeNowPlaying([{ ok: false, reason: "http_502" }, () => { throw new Error("ECONNRESET"); }]),
     intervalMs: 30 * SECOND,
+    now,
   });
   for (let round = 0; round < 6; round += 1) {
     now.advance(30 * SECOND);
@@ -340,7 +343,7 @@ test("the store keeps the state in MongoDB, one document", async () => {
 test("without MongoDB the store keeps the state in memory", async () => {
   const store = createOmnifmRadioLiveStore({ getDatabase: () => null });
   await store.save({ current: { isLive: false }, shows: [] });
-  assert.deepEqual(await store.load(), { current: { isLive: false }, shows: [] });
+  assert.deepEqual(await store.load(), { current: { isLive: false }, shows: [], testShows: [], track: null });
 });
 
 test("a broken stored document is read as a clean offline state", async () => {

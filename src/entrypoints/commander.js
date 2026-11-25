@@ -121,7 +121,7 @@ installProcessHandlers({
       stopOperatorAlerts();
       stopRuntimeHealthReporter();
       stopStationHealthService();
-      stopOmnifmRadioLiveService();
+      await stopOmnifmRadioLiveService();
       await Promise.all([
         stopScheduledEventsStore(),
         stopCustomStationsStore(),

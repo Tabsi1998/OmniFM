@@ -614,7 +614,7 @@ async function shutdown(signal) {
   shuttingDown = true;
   log("INFO", `Shutdown via ${signal}...`);
   stopStationHealthService();
-  stopOmnifmRadioLiveService();
+  await stopOmnifmRadioLiveService();
 
   // Operator-Webhook: Shutdown-Benachrichtigung (nur bei externem Signal, nicht bei uncaughtException)
   if (signal === "SIGINT" || signal === "SIGTERM") {
