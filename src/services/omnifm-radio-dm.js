@@ -10,12 +10,15 @@
 //     test DMs have their own 10 minutes and use none of the 12 hours.
 //   - one global queue, one DM every few seconds, one attempt each: the DMs
 //     go through their own REST client without retries that rejects a
-//     rate limit (src/services/omnifm-radio-dm-sender.js). Closed DMs
-//     (50007, 10013, 403) leave the person alone for 30 days, but only in a
-//     run that is otherwise healthy.
-//   - emergency brake: Discord's spam signals (40003, 40004, a rate limit)
-//     or five failures in a row stop the run, switch the mode to "off" and
-//     tell the operator, always (no alert switch).
+//     rate limit (src/services/omnifm-radio-dm-sender.js); the kill switch
+//     cancels a DM in flight. A lock the client sets before asking Discord is
+//     waited out (at most a minute), nothing was sent then. Closed DMs
+//     (50007, 10013, 403) leave the person alone for 30 days, but only once
+//     the run has sent at least one DM and did not brake.
+//   - emergency brake: Discord's spam signals (40003, 40004, a real 429),
+//     five other failures in a row, or from 20 attempts more than 90 %
+//     failed (closed DMs included) stop the run, switch the mode to "off"
+//     and tell the operator, always (no alert switch).
 //   - "Abbestellen" in every DM, for good (src/bot/omnifm-radio-dm-message.js).
 //   - the mode in the owner console (owner_config.radioDm.mode), else
 //     OMNIFM_RADIO_DM_MODE, else "owners": owners | optin | off. It is read
@@ -27,7 +30,7 @@ import { getDb, isConnected, isMongoRequested } from "../lib/db.js";
 import { OWNER_CONFIG_ID } from "../lib/owner-config.js";
 import { sharedOmnifmRadioDmStore } from "../omnifm-radio-dm-store.js";
 import { buildRadioDmMessage } from "../bot/omnifm-radio-dm-message.js";
-import { createRadioDmSender, isRadioDmRateLimit, radioDmBody } from "./omnifm-radio-dm-sender.js";
+import { createRadioDmSender, isRadioDmRateLimit, radioDmBody, radioDmWaitMs } from "./omnifm-radio-dm-sender.js";
 import { alertRadioDmBrake } from "./operator-alerts.js";
 import { getOmnifmRadioConfig, isOmnifmRadioVisibleForGuild } from "./omnifm-radio-config.js";
 import { onOmnifmRadioLiveEvent } from "./omnifm-radio-live.js";
@@ -43,8 +46,14 @@ const DM_INTERVAL_MS = 5_000;
 const CLIENT_WAIT_MS = 2 * MINUTE;
 const CLIENT_POLL_MS = 1_000;
 const STOP_TIMEOUT_MS = 3_000;
-// Five failed DMs in a row look like a bot Discord no longer trusts.
+// Five failed DMs in a row (other than closed DMs) look like a bot Discord no longer trusts.
 const FAILURE_STREAK_LIMIT = 5;
+// Closed DMs are common (20-30 % of owners): they brake only when nearly everything fails.
+const FAILURE_RATE_MIN_ATTEMPTS = 20;
+const FAILURE_RATE_LIMIT = 0.9;
+// The REST client's own lock: waited out up to a minute, a few times per DM.
+const MAX_LOCK_WAIT_MS = MINUTE;
+const MAX_LOCK_WAITS = 3;
 // "Opening DMs too fast", "sending temporarily disabled".
 const SPAM_SIGNAL_CODES = new Set([40003, 40004]);
 const SNOWFLAKE = /^\d{17,22}$/;
@@ -218,13 +227,20 @@ export function createOmnifmRadioDmService({
     }));
   }
 
-  /** One attempt; no retry, a second try is exactly what looks like spam. */
-  async function sendOne(sender, recipient, body, run) {
+  /**
+   * One attempt; no retry, a second try is exactly what looks like spam.
+   * A cancelled send and a lock of the REST client (nothing reached Discord)
+   * count as neither sent nor failed.
+   */
+  async function sendOne(sender, recipient, body, run, signal) {
     try {
-      await sender.send(recipient.userId, body);
+      await sender.send(recipient.userId, body, { signal });
       run.sent += 1;
       return { ok: true };
     } catch (error) {
+      if (signal.aborted) return { ok: false, aborted: true };
+      const waitMs = radioDmWaitMs(error);
+      if (waitMs !== null) return { ok: false, waitMs, error };
       run.failed += 1;
       log("WARN", `[OmniFM Radio] DM an ${recipient.userId} fehlgeschlagen: ${error?.code || error?.status || ""} ${error?.message || error}`);
       return { ok: false, error, brake: isDiscordSpamSignal(error), closed: isDmClosedError(error) };
@@ -282,12 +298,33 @@ export function createOmnifmRadioDmService({
     }
   }
 
+  /** sendOne, waiting out a lock of the REST client; `stop` when the lock is too long or the run ends meanwhile. */
+  async function sendThroughLocks(sender, recipient, body, run, job) {
+    const { signal } = job.controller;
+    let outcome = await sendOne(sender, recipient, body, run, signal);
+    for (let waits = 0; outcome.waitMs !== undefined; waits += 1) {
+      if (outcome.waitMs > MAX_LOCK_WAIT_MS || waits >= MAX_LOCK_WAITS) {
+        run.error = `Rate-Limit: ${Math.ceil(outcome.waitMs / 1000)} s Wartezeit`;
+        return { stop: "ratelimit" };
+      }
+      // eslint-disable-next-line no-await-in-loop -- the wait is the point
+      await sleep(outcome.waitMs, signal);
+      if (signal.aborted) return { stop: job.reason };
+      // eslint-disable-next-line no-await-in-loop
+      run.mode = await currentMode();
+      if (run.mode === "off") return { stop: "off" };
+      // eslint-disable-next-line no-await-in-loop
+      outcome = await sendOne(sender, recipient, body, run, signal);
+    }
+    return outcome.aborted ? { stop: job.reason } : outcome;
+  }
+
   async function distributeTo(job, run, { runtime, sender, recipients, quota, config }) {
     const { signal } = job.controller;
     let pause = false;
     let streak = 0;
     let healthy = true;
-    // Closed DMs are marked once the run has shown it works; a failing streak proves nothing.
+    // Closed DMs are marked once the run has sent a DM; a run without one proves nothing.
     const closed = [];
     const markClosed = async () => {
       for (const entry of closed.splice(0)) {
@@ -324,7 +361,8 @@ export function createOmnifmRadioDmService({
           continue;
         }
         // eslint-disable-next-line no-await-in-loop
-        const outcome = await sendOne(sender, recipient, body, run);
+        const outcome = await sendThroughLocks(sender, recipient, body, run, job);
+        if (outcome.stop !== undefined) return outcome.stop;
         pause = true;
         if (outcome.ok) {
           streak = 0;
@@ -332,9 +370,12 @@ export function createOmnifmRadioDmService({
           await markClosed();
           continue;
         }
-        streak += 1;
+        // A closed DM is no sign of a sick bot by itself; other errors in a row are.
         if (outcome.closed) closed.push({ userId: recipient.userId, until: now() + CLOSED_FOR_MS });
-        if (outcome.brake || streak >= FAILURE_STREAK_LIMIT) {
+        else streak += 1;
+        const attempts = run.sent + run.failed;
+        const mostlyFailing = attempts >= FAILURE_RATE_MIN_ATTEMPTS && run.failed / attempts > FAILURE_RATE_LIMIT;
+        if (outcome.brake || streak >= FAILURE_STREAK_LIMIT || mostlyFailing) {
           healthy = false;
           run.error = errorText(outcome.error);
           return outcome.brake ? "discord" : "failures";
@@ -342,7 +383,7 @@ export function createOmnifmRadioDmService({
       }
       return null;
     } finally {
-      if (healthy) await markClosed();
+      if (healthy && run.sent > 0) await markClosed();
     }
   }
 

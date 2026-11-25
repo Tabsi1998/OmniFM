@@ -298,19 +298,19 @@ test("closed DMs: no retry, and the person is left alone for 30 days", async () 
   const closed = Object.assign(new Error("Cannot send messages to this user"), { code: 50007, status: 403 });
   const broken = Object.assign(new Error("Internal Server Error"), { code: 0, status: 500 });
   const runtime = fakeRuntime({ fail: { [A]: closed, [B]: broken } });
-  const context = setup({ runtime });
+  const context = setup({ runtime, config: PUBLIC });
   const run = await distribute(context);
-  assert.deepEqual({ sent: run.sent, failed: run.failed }, { sent: 0, failed: 2 });
-  assert.deepEqual(runtime.fetched, [A, B], "each tried once");
+  assert.deepEqual({ sent: run.sent, failed: run.failed }, { sent: 1, failed: 2 });
+  assert.deepEqual(runtime.fetched, [A, B, C], "each tried once");
   assert.equal((await context.store.get(A)).dmClosedUntil, T0 + 30 * DAY);
   assert.equal((await context.store.get(B)).dmClosedUntil, null, "another error closes nothing");
 
   context.now.advance(13 * HOUR);
   await distribute(context);
-  assert.deepEqual(runtime.fetched, [A, B, B]);
+  assert.deepEqual(runtime.fetched, [A, B, C, B, C]);
   context.now.set(T0 + 30 * DAY);
   await distribute(context);
-  assert.deepEqual(runtime.fetched, [A, B, B, A, B]);
+  assert.deepEqual(runtime.fetched, [A, B, C, B, C, A, B, C]);
 });
 
 test("before the bot is ready the distribution waits, and gives up after a while", async () => {
@@ -460,7 +460,7 @@ test("Discord's spam signals stop the run at once, switch the DMs off and tell t
     "40003 (opening DMs too fast)": apiError(40003, 403, "You are opening direct messages too fast."),
     "40004 (sending disabled)": apiError(40004, 403, "Send messages has been temporarily disabled."),
     "a 429": apiError(0, 429, "Too Many Requests"),
-    "a rate limit of the REST client": limited,
+    "a 429 the REST client rejected": Object.assign(limited, { radioDmTooManyRequests: true }),
   };
   for (const [name, error] of Object.entries(signals)) {
     const context = setup({ config: PUBLIC, runtime: fakeRuntime({ fail: { [A]: error } }) });
@@ -476,18 +476,101 @@ test("Discord's spam signals stop the run at once, switch the DMs off and tell t
   }
 });
 
-test("five failures in a row stop the run; a streak of closed DMs marks nobody", async () => {
+const closedOf = async (context, guilds) => (await Promise.all(guilds.map((guild) => context.store.get(guild.ownerId)))).map((person) => Boolean(person?.dmClosedUntil));
+const PUBLIC_ONLY = Object.freeze({ ...PUBLIC, testGuildIds: [] });
+
+test("five other failures in a row stop the run and switch the DMs off", async () => {
   const guilds = owners(7);
-  const fail = Object.fromEntries(guilds.map((guild) => [guild.ownerId, apiError(50007, 403, "Cannot send messages to this user")]));
-  const context = setup({ config: { ...PUBLIC, testGuildIds: [] }, runtime: fakeRuntime({ guilds, fail }) });
+  const fail = Object.fromEntries(guilds.map((guild) => [guild.ownerId, apiError(0, 500, "Internal Server Error")]));
+  const context = setup({ config: PUBLIC_ONLY, runtime: fakeRuntime({ guilds, fail }) });
   const run = await distribute(context);
   assert.equal(run.stoppedBy, "failures");
   assert.equal(context.runtime.fetched.length, 5);
   assert.deepEqual({ failed: run.failed, remaining: run.remaining }, { failed: 5, remaining: 2 });
   assert.equal(context.modeStore.value, "off");
   assert.equal(context.alerts[0].reason, "failures");
-  const marked = await Promise.all(guilds.map((guild) => context.store.get(guild.ownerId)));
-  assert.deepEqual(marked.map((person) => person?.dmClosedUntil ?? null), guilds.map(() => null), "a broken run is no proof that DMs are closed");
+});
+
+test("closed DMs in a row do not brake; without one success in the run nobody is marked", async () => {
+  const guilds = owners(7);
+  const fail = Object.fromEntries(guilds.map((guild) => [guild.ownerId, apiError(50007, 403, "Cannot send messages to this user")]));
+  const context = setup({ config: PUBLIC_ONLY, runtime: fakeRuntime({ guilds, fail }) });
+  const run = await distribute(context);
+  assert.equal(run.stoppedBy, null, "two test accounts with closed DMs are no reason to switch off");
+  assert.equal(context.runtime.fetched.length, 7);
+  assert.equal(context.modeStore.value, "");
+  assert.deepEqual(context.alerts, []);
+  assert.deepEqual(await closedOf(context, guilds), guilds.map(() => false), "a run without a success proves nothing");
+});
+
+test("five closed DMs in a row among successes do not brake and are remembered", async () => {
+  const guilds = owners(7);
+  const fail = Object.fromEntries(guilds.slice(1, 6).map((guild) => [guild.ownerId, apiError(50007, 403)]));
+  const context = setup({ config: PUBLIC_ONLY, runtime: fakeRuntime({ guilds, fail }) });
+  const run = await distribute(context);
+  assert.equal(run.stoppedBy, null);
+  assert.deepEqual({ sent: run.sent, failed: run.failed }, { sent: 2, failed: 5 });
+  assert.deepEqual(await closedOf(context, guilds), [false, true, true, true, true, true, false]);
+  assert.equal(context.modeStore.value, "");
+});
+
+test("closed DMs brake only from 20 attempts with more than 90 % failed", async () => {
+  const guilds = owners(30);
+  const fail = Object.fromEntries(guilds.slice(2).map((guild) => [guild.ownerId, apiError(50007, 403)]));
+  const context = setup({ config: PUBLIC_ONLY, runtime: fakeRuntime({ guilds, fail }) });
+  const run = await distribute(context);
+  assert.equal(run.stoppedBy, "failures");
+  assert.equal(context.runtime.fetched.length, 21, "20 attempts with 18 failed are 90 %, the 21st makes it more");
+  assert.equal(context.modeStore.value, "off");
+  assert.equal(context.alerts[0].reason, "failures");
+  assert.deepEqual(await closedOf(context, guilds), guilds.map(() => false), "a broken run marks nobody");
+});
+
+test("a run stopped before its first success marks nobody", async () => {
+  const context = setup({
+    runtime: fakeRuntime({ fail: { [A]: apiError(50007, 403) } }),
+    onSleep: ({ service }) => service.handleEvent(end()),
+  });
+  const run = await distribute(context);
+  assert.equal(run.stoppedBy, "end");
+  assert.equal((await context.store.get(A)).dmClosedUntil, null);
+});
+
+test("a preventive rate-limit lock waits and then sends that DM; a long one stops the run", async () => {
+  let locked = true;
+  const lock = (ms) => Object.assign(new Error("bucket locked"), { radioDmWaitMs: ms });
+  const short = setup({ runtime: fakeRuntime({ fail: { [A]: () => (locked ? ((locked = false), lock(2_000)) : null) } }) });
+  const run = await distribute(short);
+  assert.deepEqual(recipientsOf(short.runtime), [A, B], "the DM was never sent before the lock, so it goes out now");
+  assert.deepEqual(short.sleeps, [2_000, 5_000]);
+  assert.deepEqual({ stoppedBy: run.stoppedBy, failed: run.failed }, { stoppedBy: null, failed: 0 });
+  assert.deepEqual(short.alerts, [], "a lock of our own client is no brake");
+
+  const long = setup({ runtime: fakeRuntime({ fail: { [A]: () => lock(120_000) } }) });
+  const stopped = await distribute(long);
+  assert.equal(stopped.stoppedBy, "ratelimit");
+  assert.deepEqual(long.runtime.fetched, [A]);
+  assert.deepEqual(long.sleeps, [], "no wait over a minute");
+  assert.equal(long.modeStore.value, "", "and no switching off");
+});
+
+test("the kill switch cancels a DM that is being sent", async () => {
+  const context = setup();
+  const signals = [];
+  context.runtime.sender.send = async (id, body, options = {}) => {
+    context.runtime.fetched.push(id);
+    signals.push(options.signal);
+    const cancelled = new Promise((_resolve, reject) => {
+      options.signal?.addEventListener("abort", () => reject(Object.assign(new Error("This operation was aborted"), { name: "AbortError" })));
+    });
+    void context.service.setMode("off");
+    return cancelled;
+  };
+  const run = await distribute(context);
+  assert.ok(signals[0], "the send gets the run's signal");
+  assert.equal(signals[0].aborted, true);
+  assert.deepEqual({ stoppedBy: run.stoppedBy, failed: run.failed, sent: run.sent }, { stoppedBy: "off", failed: 0, sent: 0 });
+  assert.deepEqual(context.runtime.fetched, [A]);
 });
 
 test("single closed DMs (50007, also 10013) in a healthy run are remembered; a success breaks the streak", async () => {
