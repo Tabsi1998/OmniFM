@@ -49,6 +49,7 @@ export function getApiRateLimitSpec(pathname) {
     pathname === "/api/premium/webhook"
     || pathname === "/api/discordbotlist/vote"
     || pathname === "/api/topgg/webhook"
+    || pathname === "/api/radio/webhook"
   ) {
     return {
       scope: "webhook",
