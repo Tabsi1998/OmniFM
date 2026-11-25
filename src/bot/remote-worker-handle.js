@@ -485,6 +485,8 @@ class RemoteWorkerHandle {
       return {
         ok: false,
         error: "Worker ist offline oder kein Heartbeat verfügbar.",
+        // Never queued: the worker certainly did nothing.
+        notStarted: true,
       };
     }
     try {
@@ -501,6 +503,8 @@ class RemoteWorkerHandle {
       return {
         ok: false,
         error: err?.message || String(err),
+        // Cancelled while still pending: the worker never ran it.
+        ...(err?.notStarted === true ? { notStarted: true } : {}),
       };
     }
   }

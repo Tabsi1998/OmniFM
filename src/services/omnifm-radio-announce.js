@@ -188,9 +188,10 @@ export function createOmnifmRadioAnnouncer({
       await store.setMessage(claim, { channelId: result.channelId, messageId: result.messageId, at: new Date(now()) });
       return "posted";
     }
-    if (result?.reason) {
-      // OmniFM 1 says it sent nothing (no channel, no rights): free again.
-      log("DEBUG", `${TAG} ${guildId} übersprungen: ${result.reason}`);
+    if (result?.reason || result?.notStarted) {
+      // Certainly nothing sent: OmniFM 1 said so (no channel, no rights), or the
+      // command never reached it (offline, cancelled while pending). Free again.
+      log("DEBUG", `${TAG} ${guildId} übersprungen: ${result.reason || result.error}`);
       await store.release(claim);
       return "skipped";
     }

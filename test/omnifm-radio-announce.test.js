@@ -354,6 +354,18 @@ test("a bridge timeout while OmniFM 1 still posts: the worker's message id arriv
   assert.equal(bot.posts.length, 1, "the timed-out post counts for the two hours");
 });
 
+test("a command that certainly never reached OmniFM 1 releases its claim", async () => {
+  const store = createOmnifmRadioAnnounceStore({ getDatabase: () => null, mongoRequested: () => false });
+  const bot = fakeBot({ guilds: [TEST_GUILD] });
+  bot.postResult = () => ({ ok: false, error: "Worker ist offline oder kein Heartbeat verfügbar.", notStarted: true });
+  const { announcer } = setup({ store, bot });
+  announcer.handle({ type: "start", show: show() });
+  await announcer.idle();
+  assert.equal(bot.posts.length, 1);
+  assert.equal(await store.lastPostedAt(TEST_GUILD), null, "no limit for a message that never went out");
+  assert.deepEqual(await store.listOpen(), [], "nothing to edit later");
+});
+
 test("two commander processes at once: each server gets the show once", async () => {
   const store = createOmnifmRadioAnnounceStore({ getDatabase: () => null, mongoRequested: () => false });
   const bot = fakeBot({ guilds: [TEST_GUILD, OTHER_GUILD, THIRD_GUILD] });

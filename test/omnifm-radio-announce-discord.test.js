@@ -411,6 +411,12 @@ test("split mode: the commander's post and edit reach OmniFM 1 through the worke
   assert.deepEqual(await service.executeCommand({ type: "radioAnnounceCheck", payload: { guildId: TEST_GUILD, channelId: SYSTEM } }), { ok: true });
   assert.deepEqual(calls, [["post", TEST_GUILD, post], ["end", TEST_GUILD, end], ["check", TEST_GUILD, { channelId: SYSTEM }]]);
 
+  // Offline: the command was never even queued, so certainly nothing was sent.
+  const offline = new RemoteWorkerHandle({ id: "bot-9", name: "OmniFM 9" });
+  const notSent = await offline.postRadioAnnouncement(TEST_GUILD, post);
+  assert.equal(notSent.ok, false);
+  assert.equal(notSent.notStarted, true);
+
   const handle = new RemoteWorkerHandle({ id: "bot-2", name: "OmniFM 1" });
   const sent = [];
   handle.sendCommand = async (type, payload) => { sent.push([type, payload]); return { ok: true }; };
