@@ -70,3 +70,38 @@ test("the now playing answer is cached briefly and asked with a time limit", asy
   await fetchOmnifmRadioNowPlaying({ config, now: 20_000 });
   assert.equal(calls.length, 2, "after the cache time it asks again");
 });
+
+test("a hanging AzuraCast gives ok false within the time limit, before the answer and in the body", { timeout: 5_000 }, async () => {
+  clearOmnifmRadioApiCache();
+  let signal = null;
+  setOmnifmRadioFetchForTests((_url, options) => new Promise((_resolve, reject) => {
+    signal = options.signal;
+    options.signal.addEventListener("abort", () => reject(options.signal.reason), { once: true });
+  }));
+  let started = Date.now();
+  assert.deepEqual(await fetchOmnifmRadioNowPlaying({ config, force: true, timeoutMs: 50 }), { ok: false, reason: "timeout" });
+  assert.ok(signal instanceof AbortSignal, "safeFetch gets the signal, so connect and body are bounded too");
+  assert.ok(Date.now() - started < 2_000);
+
+  // The answer starts, but the body never ends.
+  setOmnifmRadioFetchForTests(async () => new Response(new ReadableStream({
+    start(controller) { controller.enqueue(new TextEncoder().encode("{")); },
+  }), { status: 200 }));
+  started = Date.now();
+  assert.deepEqual(await fetchOmnifmRadioNowPlaying({ config, force: true, timeoutMs: 50 }), { ok: false, reason: "timeout" });
+  assert.ok(Date.now() - started < 2_000);
+});
+
+test("an oversized AzuraCast answer is refused without reading it all", { timeout: 5_000 }, async () => {
+  clearOmnifmRadioApiCache();
+  setOmnifmRadioFetchForTests(async () => new Response("{}", { status: 200, headers: { "content-length": String(10 * 1024 * 1024) } }));
+  assert.deepEqual(await fetchOmnifmRadioNowPlaying({ config, force: true }), { ok: false, reason: "too_large" }, "the length header says so");
+
+  let chunks = 0;
+  const chunk = new Uint8Array(64 * 1024).fill(32);
+  setOmnifmRadioFetchForTests(async () => new Response(new ReadableStream({
+    pull(controller) { chunks += 1; controller.enqueue(chunk); },
+  }), { status: 200 }));
+  assert.deepEqual(await fetchOmnifmRadioNowPlaying({ config, force: true }), { ok: false, reason: "too_large" }, "an endless body without a length");
+  assert.ok(chunks <= 6, `stopped after ${chunks} chunks of 64 KB, the limit is 256 KB`);
+});

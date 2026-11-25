@@ -27,7 +27,8 @@ import {
   SONG_HISTORY_DEDUPE_WINDOW_MS,
   NOW_PLAYING_COVER_ENABLED,
 } from "../../lib/helpers.js";
-import { fetchStreamSnapshot, normalizeTrackSearchText } from "../../services/now-playing.js";
+import { normalizeTrackSearchText } from "../../services/now-playing.js";
+import { fetchStationSnapshot } from "../../services/omnifm-radio-now-playing.js";
 import { appendSongHistory, getSongHistory } from "../../song-history-store.js";
 import { STATIONS_COMPONENT_ID_OPEN } from "../runtime-links.js";
 import { getRuntimeConnectedChannelId, isRuntimePlaybackActive } from "../runtime-live-state.js";
@@ -312,6 +313,10 @@ const nowPlayingMethods = {
     } else if (metadataSource === "stream") {
       sourceLabel = t("Stream-Info", "Stream info");
       sourceDetail = sourceLabel;
+    } else if (metadataSource === "azuracast") {
+      // OmniFM Radio (#591): the title comes from the station's own AzuraCast API.
+      sourceLabel = t("Sender-API", "Station API");
+      sourceDetail = sourceLabel;
     }
 
     let metadataHint = null;
@@ -504,7 +509,8 @@ const nowPlayingMethods = {
     if (!station?.url) return;
 
     try {
-      const snapshot = await fetchStreamSnapshot(station.url, { includeCover: NOW_PLAYING_COVER_ENABLED });
+      // OmniFM Radio: title from AzuraCast, ICY when it does not answer (#591).
+      const snapshot = await fetchStationSnapshot(stationKey, station.url, { includeCover: NOW_PLAYING_COVER_ENABLED });
       if (state.currentStationKey !== stationKey) return;
 
       const previousMeta = state.currentMeta || {};

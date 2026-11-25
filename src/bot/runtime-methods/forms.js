@@ -6,7 +6,8 @@ import { MessageFlags } from "discord.js";
 
 import { log } from "../../lib/logging.js";
 import { getTier } from "../../core/entitlements.js";
-import { addGuildStation, countGuildStations, MAX_STATIONS_PER_GUILD, setGuildStationLogoVersion } from "../../custom-stations.js";
+import { addGuildStation, countGuildStations, MAX_STATIONS_PER_GUILD, OMNIFM_RADIO_URL_ERROR, setGuildStationLogoVersion } from "../../custom-stations.js";
+import { isOmnifmRadioUrl } from "../../services/omnifm-radio-station.js";
 import { processStationLogo, STATION_LOGO_MAX_BYTES } from "../../lib/station-logo-image.js";
 import { saveStationLogo } from "../../station-logos-store.js";
 import { testOwnerStationStream } from "../../lib/owner-station-test.js";
@@ -70,6 +71,14 @@ const formMethods = {
         "logo-wrong-type": t("Das Logo muss ein PNG-, JPG- oder WebP-Bild sein; nichts gespeichert.", "The logo has to be a PNG, JPG or WebP picture; nothing saved."),
       };
       await interaction.reply(buildNoticePayload({ t, language, tone: "warning", title: t("Bitte prüfen", "Please check"), description: messages[form.error] }));
+      return true;
+    }
+    // #591: refused before the test, so the own radio server is not asked for nothing.
+    if (isOmnifmRadioUrl(form.station.url)) {
+      await interaction.reply(buildNoticePayload({
+        t, language, tone: "warning", title: t("Nicht gespeichert", "Not saved"),
+        description: translateCustomStationErrorMessage(OMNIFM_RADIO_URL_ERROR, language),
+      }));
       return true;
     }
     // Testing the stream takes a few seconds: acknowledge first.

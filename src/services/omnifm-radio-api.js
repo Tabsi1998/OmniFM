@@ -53,10 +53,47 @@ export function normalizeAzuracastNowPlaying(payload, { now = Date.now() } = {})
   };
 }
 
+function tooLarge() {
+  return Object.assign(new Error("AzuraCast-Antwort zu groß"), { code: "too_large" });
+}
+
+// Reads at most MAX_BODY_BYTES: a longer answer is cut off, not read to the end.
 async function readJson(response) {
-  const body = await response.text();
-  if (body.length > MAX_BODY_BYTES) throw new Error("AzuraCast-Antwort zu groß");
-  return JSON.parse(body);
+  const declared = Number.parseInt(String(response.headers?.get?.("content-length") ?? ""), 10);
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+    response.body?.cancel?.().catch(() => {});
+    throw tooLarge();
+  }
+  const reader = response.body?.getReader?.();
+  if (!reader) return JSON.parse(await response.text());
+  const chunks = [];
+  let size = 0;
+  for (;;) {
+    // eslint-disable-next-line no-await-in-loop -- a body is read in order
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_BODY_BYTES) {
+      reader.cancel().catch(() => {});
+      throw tooLarge();
+    }
+    chunks.push(value);
+  }
+  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+}
+
+async function askAzuracast(config, { timeoutMs, signal, now }) {
+  const response = await fetchImpl(config.nowPlayingUrl, {
+    headers: { accept: "application/json" },
+    timeoutMs,
+    signal,
+    redirect: "error",
+  });
+  if (!response.ok) {
+    response.body?.cancel?.().catch(() => {});
+    return { ok: false, reason: `http_${response.status}` };
+  }
+  return normalizeAzuracastNowPlaying(await readJson(response), { now });
 }
 
 export async function fetchOmnifmRadioNowPlaying({
@@ -70,20 +107,25 @@ export async function fetchOmnifmRadioNowPlaying({
   if (!force && cached && cached.url === config.nowPlayingUrl && now - cached.at < cacheMs) {
     return cached.value;
   }
+  // One hard limit for everything: name lookup, connect, answer and body.
+  // safeFetch's own timeoutMs only starts once the socket is connected. The
+  // signal stops the request; the race also covers the name lookup before it.
+  const controller = new AbortController();
+  const { signal } = controller;
+  let timer = null;
+  const timedOut = new Promise((_resolve, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error("timeout"));
+    }, timeoutMs);
+  });
   let value;
   try {
-    const response = await fetchImpl(config.nowPlayingUrl, {
-      headers: { accept: "application/json" },
-      timeoutMs,
-      redirect: "error",
-    });
-    if (!response.ok) {
-      value = { ok: false, reason: `http_${response.status}` };
-    } else {
-      value = normalizeAzuracastNowPlaying(await readJson(response), { now });
-    }
+    value = await Promise.race([askAzuracast(config, { timeoutMs, signal, now }), timedOut]);
   } catch (error) {
-    value = { ok: false, reason: text(error?.code || error?.name || "error", 60) };
+    value = { ok: false, reason: signal.aborted ? "timeout" : text(error?.code || error?.name || "error", 60) };
+  } finally {
+    clearTimeout(timer);
   }
   cached = { url: config.nowPlayingUrl, at: now, value };
   return value;
