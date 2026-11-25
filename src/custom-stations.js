@@ -318,7 +318,7 @@ function parseCustomStationReference(rawReference) {
 }
 
 // #591: OmniFM Radio plays only as the fixed station, for the servers that may see it.
-const OMNIFM_RADIO_URL_ERROR = "Diese Adresse gehört zu OmniFM Radio und kann kein eigener Sender sein.";
+export const OMNIFM_RADIO_URL_ERROR = "Diese Adresse gehört zu OmniFM Radio und kann kein eigener Sender sein.";
 
 function validateCustomStationUrl(rawUrl) {
   const validation = validateOutboundUrl(rawUrl, {
