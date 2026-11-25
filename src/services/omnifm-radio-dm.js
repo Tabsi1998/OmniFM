@@ -106,15 +106,15 @@ export function createRadioDmModeStore({
 /**
  * The owners to ask, in server order, each person once with the first
  * server's language. A test show: only the owners of the test servers.
- * @param {{ guilds: Iterable<any>, config: any, test: boolean, resolveLanguage: (guildId: string) => string, selfId?: string }} input
+ * @param {{ guilds: Iterable<any>, config: any, test: boolean, resolveLanguage: (guildId: string) => string, selfId?: string, isBot?: (userId: string) => boolean }} input
  */
-export function collectRadioDmRecipients({ guilds, config, test, resolveLanguage, selfId = "" }) {
+export function collectRadioDmRecipients({ guilds, config, test, resolveLanguage, selfId = "", isBot = () => false }) {
   const recipients = new Map();
   if (!config?.enabled) return [];
   for (const guild of guilds || []) {
     const guildId = String(guild?.id || "");
     const ownerId = String(guild?.ownerId || "");
-    if (!SNOWFLAKE.test(guildId) || !SNOWFLAKE.test(ownerId) || ownerId === selfId || recipients.has(ownerId)) continue;
+    if (!SNOWFLAKE.test(guildId) || !SNOWFLAKE.test(ownerId) || ownerId === selfId || recipients.has(ownerId) || isBot(ownerId)) continue;
     const visible = test ? config.testGuildIds.includes(guildId) : isOmnifmRadioVisibleForGuild(guildId, config);
     if (!visible) continue;
     recipients.set(ownerId, { userId: ownerId, guildId, guildName: String(guild?.name || ""), language: resolveLanguage(guildId) || "de" });
@@ -262,6 +262,7 @@ export function createOmnifmRadioDmService({
       test: run.test,
       resolveLanguage: (guildId) => runtime.resolveGuildLanguage?.(guildId),
       selfId: String(runtime.client.user?.id || ""),
+      isBot: (userId) => runtime.client.users?.cache?.get?.(userId)?.bot === true,
     });
     run.total = recipients.length;
     run.remaining = recipients.length;

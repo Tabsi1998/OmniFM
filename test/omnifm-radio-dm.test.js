@@ -510,3 +510,9 @@ test("single closed DMs (50007, also 10013) in a healthy run are remembered; a s
   assert.equal(context.alerts.length, 0);
   assert.equal(context.modeStore.value, "", "a healthy run leaves the mode alone");
 });
+
+test("an owner Discord knows as a bot gets no DM", async () => {
+  const context = setup({ runtime: fakeRuntime({ bots: [B] }) });
+  await distribute(context);
+  assert.deepEqual(recipientsOf(context.runtime), [A]);
+});
