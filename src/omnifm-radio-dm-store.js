@@ -148,19 +148,24 @@ export function createOmnifmRadioDmStore({
       }
     },
 
-    /** "Abbestellen" (false) or "Wieder abonnieren" (true): a choice, kept without expiry. */
+    /**
+     * "Abbestellen" (false) or "Wieder abonnieren" (true): a choice, kept
+     * without expiry. Unsubscribing also drops the DM times: no DM comes
+     * any more, so OmniFM needs none of them.
+     */
     async setSubscribed(userId, subscribed, { now = Date.now() } = {}) {
       const id = validId(userId);
       const at = new Date(now);
       const fields = subscribed
         ? { unsubscribed: false, subscribed: true, subscribedAt: at, updatedAt: at }
         : { unsubscribed: true, subscribed: false, unsubscribedAt: at, updatedAt: at };
+      const dropped = subscribed ? ["expiresAt"] : ["expiresAt", "lastDmAt", "lastTestDmAt", "dmClosedUntil", "subscribedAt"];
       const people = collection();
       if (!people) {
-        memory.set(id, { ...memoryPerson(id), ...toMs(fields), expiresAt: null });
+        memory.set(id, { ...memoryPerson(id), ...toMs(fields), ...Object.fromEntries(dropped.map((key) => [key, null])) });
         return;
       }
-      await people.updateOne({ _id: id }, { $set: fields, $unset: { expiresAt: "" } }, { upsert: true });
+      await people.updateOne({ _id: id }, { $set: fields, $unset: Object.fromEntries(dropped.map((key) => [key, ""])) }, { upsert: true });
     },
 
     /** Discord does not deliver DMs to this person: no new try before `until`. */

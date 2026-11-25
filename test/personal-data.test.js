@@ -248,7 +248,7 @@ test("an unsubscribe from the OmniFM Radio DMs is in the file and is all that st
     subscribed: false,
     unsubscribedAt: "2026-11-25T20:01:00.000Z",
     subscribedAt: null,
-    lastDmAt: "2026-11-25T20:00:00.000Z",
+    lastDmAt: null,
     lastTestDmAt: null,
     dmsClosedUntil: null,
     updatedAt: "2026-11-25T20:01:00.000Z",

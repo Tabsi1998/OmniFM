@@ -143,6 +143,22 @@ for (const [name, make, options] of backends) {
   });
 }
 
+for (const [name, make, options] of backends) {
+  test(`${name}: unsubscribing keeps the choice and drops the DM times`, options, async () => {
+    const store = await make();
+    const user = nextUser();
+    await store.claim(user, { ...REAL, now: T0 });
+    await store.claim(user, { ...TEST, now: T0 });
+    await store.markDmsClosed(user, { until: T0 + 30 * DAY, now: T0 });
+    await store.setSubscribed(user, false, { now: T0 + HOUR });
+    const { unsubscribed, unsubscribedAt, updatedAt, lastDmAt, lastTestDmAt, dmClosedUntil, expiresAt } = await store.get(user);
+    assert.deepEqual(
+      { unsubscribed, unsubscribedAt, updatedAt, lastDmAt, lastTestDmAt, dmClosedUntil, expiresAt },
+      { unsubscribed: true, unsubscribedAt: T0 + HOUR, updatedAt: T0 + HOUR, lastDmAt: null, lastTestDmAt: null, dmClosedUntil: null, expiresAt: null },
+    );
+  });
+}
+
 test("MongoDB: the times expire through a TTL index", { skip: !hasMongoConfig }, async () => {
   const store = await mongoStore();
   await store.claim(nextUser(), { ...REAL, now: T0 });
