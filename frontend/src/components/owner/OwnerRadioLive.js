@@ -58,19 +58,21 @@ export default function OwnerRadioLive({ apiGet, apiSend }) {
             {radioDetectionText(data)}
             {data.observedAt ? ` · zuletzt gemeldet ${radioTime(data.observedAt)} (${radioSourceLabel(data.observedBy)})` : ''}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
-            <button type="button" className="oa-btn ghost" disabled={busy || realLive} onClick={testShow} data-testid="radio-live-test" style={{ height: 30, padding: '0 12px', fontSize: 12 }}>
-              {testRunning ? 'Test-Sendung beenden' : 'Test-Sendung starten'}
-            </button>
-            <span style={{ color: '#8190a8', fontSize: 12 }}>
-              {realLive ? 'Während einer echten Sendung geht kein Test.' : 'Spielt Beginn und Ende einer Sendung durch, mit Betreiber-Meldung, ohne zu senden.'}
-            </span>
-          </div>
+          {data.canTest && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
+              <button type="button" className="oa-btn ghost" disabled={busy || realLive} onClick={testShow} data-testid="radio-live-test" style={{ height: 30, padding: '0 12px', fontSize: 12 }}>
+                {testRunning ? 'Test-Sendung beenden' : 'Test-Sendung starten'}
+              </button>
+              <span style={{ color: '#8190a8', fontSize: 12 }}>
+                {realLive ? 'Während einer echten Sendung geht kein Test.' : 'Spielt Beginn und Ende einer Sendung durch, mit Betreiber-Meldung, ohne zu senden. Endet nach 10 Minuten von selbst.'}
+              </span>
+            </div>
+          )}
           <div data-testid="radio-live-shows" style={{ marginTop: 14 }}>
             <div style={{ color: '#cbd5e1', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Letzte Sendungen</div>
             {shows.length === 0 && <div style={{ color: '#8190a8', fontSize: 12 }}>Noch keine Sendung.</div>}
-            {shows.map((show) => (
-              <div key={`${show.startedAt}-${show.source}`} style={{ display: 'flex', gap: 10, fontSize: 12, color: '#cbd5e1', padding: '4px 0', borderTop: '1px solid #1e293b', flexWrap: 'wrap' }}>
+            {shows.map((show, index) => (
+              <div key={`${index}-${show.startedAt}`} style={{ display: 'flex', gap: 10, fontSize: 12, color: '#cbd5e1', padding: '4px 0', borderTop: '1px solid #1e293b', flexWrap: 'wrap' }}>
                 <span style={{ color: '#8190a8', minWidth: 92 }}>{radioTime(show.startedAt)}</span>
                 <span style={{ flex: '1 1 160px', minWidth: 0, overflowWrap: 'anywhere' }}>{radioShowLabel(show)}</span>
                 <span>{radioShowDuration(show.durationMs)}</span>
@@ -80,7 +82,7 @@ export default function OwnerRadioLive({ apiGet, apiSend }) {
           </div>
         </>
       )}
-      {error && <div style={{ color: '#fca5a5', fontSize: 13, marginTop: 10 }}>{error}</div>}
+      {error && <div role="alert" style={{ color: '#fca5a5', fontSize: 13, marginTop: 10 }}>{error}</div>}
     </div>
   );
 }

@@ -27,9 +27,9 @@ function seconds(ms) {
 export function radioDetectionText(data) {
   const poll = `alle ${seconds(data?.pollMs)} s`;
   const grace = `kurze Aussetzer bis ${seconds(data?.graceMs)} s zählen nicht`;
-  return data?.webhook
-    ? `Webhook an · Abfrage ${poll} als Rückfall · ${grace}`
-    : `Webhook aus: nur die Abfrage ${poll} · ${grace}`;
+  if (data?.webhook) return `Webhook an · Abfrage ${poll} als Rückfall · ${grace}`;
+  const off = data?.webhookSecretTooShort ? 'Webhook aus, Geheimnis zu kurz (mind. 16 Zeichen)' : 'Webhook aus';
+  return `${off}: nur die Abfrage ${poll} · ${grace}`;
 }
 
 export function radioTime(iso) {

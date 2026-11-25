@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import OwnerRadioLive from './OwnerRadioLive.js';
 import { radioShowDuration, radioDetectionText } from '../../lib/ownerRadio.js';
@@ -6,12 +6,23 @@ import { radioShowDuration, radioDetectionText } from '../../lib/ownerRadio.js';
 // OmniFM Radio in the cockpit (#592): is DJ Tabsi live, the last shows, and a
 // test show that runs start and end without sending anything.
 
-afterEach(() => cleanup());
+let consoleErrors = [];
+
+beforeEach(() => {
+  consoleErrors = [];
+  vi.spyOn(console, 'error').mockImplementation((...args) => { consoleErrors.push(args.map(String).join(' ')); });
+});
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 const OFFLINE = {
   enabled: true,
   station: 'omnifm_radio',
   webhook: true,
+  canTest: true,
   pollMs: 30000,
   graceMs: 60000,
   current: { isLive: false, streamerName: 'DJ Tabsi', title: 'Abendshow', startedAt: '2026-11-25T19:00:00.000Z', endedAt: '2026-11-25T20:12:00.000Z', source: 'webhook', offlineSince: null },
@@ -55,6 +66,28 @@ describe('OmniFM Radio in the owner cockpit', () => {
     await screen.findByTestId('radio-live');
     expect(screen.getByTestId('radio-live-state').textContent).toContain('Live: DJ Tabsi');
     expect(screen.getByTestId('radio-live-test').disabled).toBe(true);
+  });
+
+  it('shows the test button only to the owner role', async () => {
+    setup({ ...OFFLINE, canTest: false });
+    await screen.findByTestId('radio-live');
+    expect(screen.queryByTestId('radio-live-test')).toBeNull();
+  });
+
+  it('says why the webhook is off when the secret is too short', async () => {
+    setup({ ...OFFLINE, webhook: false, webhookSecretTooShort: true });
+    expect((await screen.findByTestId('radio-live-detection')).textContent).toContain('Geheimnis zu kurz (mind. 16 Zeichen)');
+  });
+
+  it('announces errors and keeps two shows with the same start apart', async () => {
+    const twin = OFFLINE.shows[0];
+    const apiGet = vi.fn(async () => ({ ...OFFLINE, shows: [twin, { ...twin }] }));
+    const apiSend = vi.fn(async () => { throw new Error('Gerade läuft eine echte Sendung.'); });
+    render(<OwnerRadioLive apiGet={apiGet} apiSend={apiSend} />);
+    await screen.findByTestId('radio-live');
+    await act(async () => { fireEvent.click(screen.getByTestId('radio-live-test')); });
+    expect(screen.getByRole('alert').textContent).toContain('echte Sendung');
+    expect(consoleErrors.some((line) => line.includes('same key'))).toBe(false);
   });
 
   it('says so when the live detection does not run', async () => {
