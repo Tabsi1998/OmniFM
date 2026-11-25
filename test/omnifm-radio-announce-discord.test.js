@@ -488,3 +488,40 @@ test("split mode: the worker can publish its snapshot right after Listen now", a
   await runtime.publishWorkerSnapshot();
   assert.deepEqual(published, ["bot-2"]);
 });
+
+test("split mode: the radio commands write no worker snapshot, a play still does", async () => {
+  const { WorkerBridgeService } = await import("../src/bot/worker-bridge-service.js");
+  const snapshots = [];
+  const completed = [];
+  const queue = [];
+  const runtime = {
+    config: { id: "bot-2", name: "OmniFM 1" },
+    buildStatusSnapshot: () => ({}),
+    client: { guilds: { cache: new Map() } },
+    checkRadioAnnouncement: async () => ({ ok: true }),
+    postRadioAnnouncement: async () => ({ ok: true, channelId: SYSTEM, messageId: "91" }),
+    endRadioAnnouncement: async () => ({ ok: true }),
+    playInGuild: async () => ({ ok: true }),
+  };
+  const service = new WorkerBridgeService(runtime, {
+    bridge: {
+      publishWorkerSnapshot: async () => { snapshots.push("snapshot"); },
+      claimNextWorkerCommand: async () => queue.shift() || null,
+      completeWorkerCommand: async (commandId) => { completed.push(commandId); },
+      failWorkerCommand: async () => {},
+    },
+    doorbell: { isDoorbellConnected: () => false, onDoorbell: () => () => {} },
+  });
+  queue.push(
+    { commandId: "c1", type: "radioAnnounceCheck", payload: { guildId: TEST_GUILD } },
+    { commandId: "c2", type: "radioAnnounce", payload: { guildId: TEST_GUILD } },
+    { commandId: "c3", type: "radioAnnounceEnd", payload: { guildId: TEST_GUILD } },
+  );
+  await service.tickCommands();
+  assert.deepEqual(completed, ["c1", "c2", "c3"]);
+  assert.deepEqual(snapshots, [], "announcing changes no playback: no snapshot write");
+
+  queue.push({ commandId: "c4", type: "play", payload: { guildId: TEST_GUILD, channelId: VOICE, stationKey: KEY } });
+  await service.tickCommands();
+  assert.ok(snapshots.length >= 1, "a play still publishes the snapshot");
+});
