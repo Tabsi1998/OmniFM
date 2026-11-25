@@ -201,6 +201,19 @@ test("OmniFM 1 posts to the system channel by default and says where", async () 
   assert.match(textOf(system.sent[0]), /DJ Tabsi ist live/);
 });
 
+test("OmniFM 1 writes the message id into the claim itself, so a post after a bridge timeout is still known", async () => {
+  const { createOmnifmRadioAnnounceStore } = await import("../src/omnifm-radio-announce-store.js");
+  const store = createOmnifmRadioAnnounceStore({ getDatabase: () => null, mongoRequested: () => false });
+  const claim = { showId: "live:2026-11-25T20:00:00.000Z", guildId: TEST_GUILD };
+  await store.claim({ ...claim, botId: "bot-2", test: false, show: SHOW, at: new Date() });
+  const system = textChannel(SYSTEM);
+  const { runtime } = fakeRuntime({ channels: [system] });
+  runtime.radioAnnounceStore = store;
+  await runtime.postRadioAnnouncement(TEST_GUILD, { show: SHOW, claim });
+  const [entry] = await store.listForShow(claim.showId);
+  assert.deepEqual([entry.channelId, entry.messageId], [SYSTEM, "91"]);
+});
+
 test("the chosen channel and role; a role that is gone is not mentioned", async () => {
   const chosen = textChannel(OTHER_TEXT, { type: ChannelType.GuildAnnouncement });
   const { runtime } = fakeRuntime({ channels: [textChannel(SYSTEM), chosen] });
@@ -351,7 +364,7 @@ test("split mode: the commander's post and edit reach OmniFM 1 through the worke
     postRadioAnnouncement: async (...args) => { calls.push(["post", ...args]); return { ok: true, channelId: SYSTEM, messageId: "91" }; },
     endRadioAnnouncement: async (...args) => { calls.push(["end", ...args]); return { ok: true }; },
   }, { bridge: {}, doorbell: { isDoorbellConnected: () => false, onDoorbell: () => () => {} } });
-  const post = { channelId: "", roleId: ROLE, show: SHOW };
+  const post = { channelId: "", roleId: ROLE, show: SHOW, claim: { showId: "live:x", guildId: TEST_GUILD } };
   assert.deepEqual(await service.executeCommand({ type: "radioAnnounce", payload: { guildId: TEST_GUILD, ...post } }), { ok: true, channelId: SYSTEM, messageId: "91" });
   const end = { channelId: SYSTEM, messageId: "91", show: SHOW };
   assert.deepEqual(await service.executeCommand({ type: "radioAnnounceEnd", payload: { guildId: TEST_GUILD, ...end } }), { ok: true });

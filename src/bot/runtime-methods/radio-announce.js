@@ -10,8 +10,13 @@ import * as ui from "../../discord/ui/index.js";
 import { botTranslator } from "../../lib/bot-i18n.js";
 import { log } from "../../lib/logging.js";
 import { getOmnifmRadioConfig } from "../../services/omnifm-radio-config.js";
+import { createOmnifmRadioAnnounceStore } from "../../omnifm-radio-announce-store.js";
 import { buildRadioEndedPayload, buildRadioLivePayload } from "../omnifm-radio-announce-messages.js";
 import { buildStationCatalog } from "../runtime-panels.js";
+
+let defaultStore = null;
+/** Where the claim lives (tests set runtime.radioAnnounceStore). */
+const announceStore = (runtime) => runtime.radioAnnounceStore || (defaultStore ||= createOmnifmRadioAnnounceStore());
 
 const POST_PERMISSIONS = [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks];
 
@@ -38,7 +43,7 @@ function streamingChannelId(state) {
 
 const radioAnnounceMethods = {
   /** Posts the live message: the chosen channel, else the system channel. */
-  async postRadioAnnouncement(guildId, { channelId = "", roleId = "", show = {} } = {}) {
+  async postRadioAnnouncement(guildId, { channelId = "", roleId = "", show = {}, claim = null } = {}) {
     const guild = this.client.guilds.cache.get(guildId);
     if (!guild) return { ok: false, reason: "not-in-guild" };
     const me = await this.resolveBotMember(guild);
@@ -61,6 +66,11 @@ const radioAnnounceMethods = {
     });
     try {
       const message = await channel.send(payload);
+      // Written here too: if the commander's wait timed out, the id still reaches the claim.
+      if (claim) {
+        await announceStore(this).setMessage(claim, { channelId: channel.id, messageId: message.id, at: new Date() })
+          .catch((error) => log("WARN", `[OmniFM Radio] Ankündigung ${guildId}: Nachricht nicht vermerkt: ${error?.message || error}`));
+      }
       return { ok: true, channelId: channel.id, messageId: message.id };
     } catch (error) {
       // Rights changed since the check, the channel is gone: skipped like the rest.

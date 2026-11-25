@@ -133,34 +133,62 @@ test("the stored \"off\" is read from guild_settings in MongoDB", { skip: !hasMo
 // ---------------------------------------------------------------- store
 
 async function exerciseStore(store) {
-  const showId = radioShowId(show());
+  const live = show();
+  const showId = radioShowId(live);
+  const key = { showId, guildId: TEST_GUILD };
   assert.equal(await store.lastPostedAt(TEST_GUILD), null);
-  await store.record({ showId, guildId: TEST_GUILD, botId: "bot-2", channelId: "1", messageId: "2", test: false, postedAt: new Date(START) });
-  await store.record({ showId: "test:x", guildId: TEST_GUILD, botId: "bot-2", channelId: "1", messageId: "3", test: true, postedAt: new Date(START + 5 * MINUTE) });
+
+  // Claimed before anything is sent: once only, also with two processes at once.
+  const claims = await Promise.all([1, 2, 3].map(() => store.claim({ ...key, botId: "bot-2", test: false, show: live, at: new Date(START) })));
+  assert.deepEqual(claims.filter(Boolean).length, 1, "exactly one claim wins");
+  assert.equal(await store.lastPostedAt(TEST_GUILD), START, "a claim counts for the limit before the message is out");
+
+  await store.setMessage(key, { channelId: "1", messageId: "2", at: new Date(START + 1000) });
+  await store.release(key);
+  let open = await store.listForShow(showId);
+  assert.deepEqual(open.map((entry) => [entry.guildId, entry.channelId, entry.messageId, entry.botId, entry.show.streamerName]), [[TEST_GUILD, "1", "2", "bot-2", "DJ Tabsi"]], "a posted message is never released");
+
+  // A test show is kept for its end, but does not count for the limit.
+  const testKey = { showId: "test:x", guildId: TEST_GUILD };
+  assert.equal(await store.claim({ ...testKey, botId: "bot-2", test: true, show: live, at: new Date(START + 5 * MINUTE) }), true);
   assert.equal(await store.lastPostedAt(TEST_GUILD), START, "a test show does not count");
-  const open = await store.listForShow(showId);
-  assert.deepEqual(open.map((entry) => [entry.guildId, entry.channelId, entry.messageId, entry.botId]), [[TEST_GUILD, "1", "2", "bot-2"]]);
+
+  // Nothing sent (no rights): the claim goes, it neither counts nor needs an edit.
+  const otherKey = { showId: "live:other", guildId: OTHER_GUILD };
+  await store.claim({ ...otherKey, botId: "bot-2", test: false, show: live, at: new Date(START) });
+  await store.release(otherKey);
+  assert.equal(await store.lastPostedAt(OTHER_GUILD), null);
+  assert.equal(await store.claim({ ...otherKey, botId: "bot-2", test: false, show: live, at: new Date(START) }), true, "free again");
+
+  assert.deepEqual((await store.listOpen()).map((entry) => entry.showId).sort(), ["live:other", showId, "test:x"].sort());
   await store.markEnded(open[0], new Date(START + 60 * MINUTE));
-  assert.deepEqual(await store.listForShow(showId), [], "an edited message is done");
+  open = await store.listForShow(showId);
+  assert.deepEqual(open, [], "an edited message is done");
 }
 
-test("the store keeps each posted message and when a server last got one (in memory)", async () => {
+test("the store claims, fills in and closes each announcement (in memory)", async () => {
   await exerciseStore(createOmnifmRadioAnnounceStore({ getDatabase: () => null, mongoRequested: () => false }));
 });
 
 test("the store refuses to forget while MongoDB is configured but away", async () => {
   const store = createOmnifmRadioAnnounceStore({ getDatabase: () => null, mongoRequested: () => true });
   await assert.rejects(store.lastPostedAt(TEST_GUILD), /MongoDB/);
+  await assert.rejects(store.claim({ showId: "live:x", guildId: TEST_GUILD, test: false, show: show(), at: new Date(START) }), /MongoDB/);
 });
 
-test("the store keeps each posted message in MongoDB", { skip: !hasMongoConfig }, async () => {
+test("the store claims, fills in and closes each announcement in MongoDB", { skip: !hasMongoConfig }, async () => {
   const { connect, getDb } = await import("../src/lib/db.js");
   await connect();
   const db = getDb();
-  await db.collection("omnifm_radio_announcements").deleteMany({});
-  await exerciseStore(createOmnifmRadioAnnounceStore({ getDatabase: () => db }));
-  const indexes = (await db.collection("omnifm_radio_announcements").indexes()).map((index) => index.name);
-  assert.ok(indexes.includes("ttl"), "old entries expire");
+  // Its own collection: the test never touches what the bot stores.
+  const collectionName = `omnifm_radio_announcements_test_${process.pid}`;
+  try {
+    await exerciseStore(createOmnifmRadioAnnounceStore({ getDatabase: () => db, collectionName }));
+    const indexes = (await db.collection(collectionName).indexes()).map((index) => index.name);
+    assert.ok(indexes.includes("ttl"), "old entries expire");
+  } finally {
+    await db.collection(collectionName).drop().catch(() => null);
+  }
 });
 
 // ---------------------------------------------------------------- who gets it
@@ -297,6 +325,60 @@ test("the messages go out one after the other, spaced", async () => {
   await announcer.idle();
   assert.equal(bot.posts.length, 3);
   assert.deepEqual(sleeps, [1500, 1500], "one message every 1.5 s");
+});
+
+// ---------------------------------------------------------------- claimed before sent
+
+test("a bridge timeout while OmniFM 1 still posts: the worker's message id arrives, the limit holds, the end edits it", async () => {
+  const now = clock();
+  const store = createOmnifmRadioAnnounceStore({ getDatabase: () => null, mongoRequested: () => false });
+  const bot = fakeBot({ guilds: [TEST_GUILD] });
+  // Like the worker behind the bridge: it posts and writes the id itself,
+  // but the commander only sees the timeout.
+  bot.postRadioAnnouncement = async (guildId, options) => {
+    bot.posts.push({ guildId, ...options });
+    await store.setMessage(options.claim, { channelId: "1", messageId: "77", at: new Date(now()) });
+    return { ok: false, error: "Worker-Command Timeout." };
+  };
+  const { announcer } = setup({ store, now, bot });
+  const live = show(now());
+  announcer.handle({ type: "start", show: live });
+  await announcer.idle();
+  announcer.handle({ type: "end", show: ended(live, now() + 30 * MINUTE) });
+  await announcer.idle();
+  assert.deepEqual(bot.edits.map((edit) => [edit.guildId, edit.channelId, edit.messageId]), [[TEST_GUILD, "1", "77"]]);
+
+  now.advance(60 * MINUTE);
+  announcer.handle({ type: "start", show: show(now()) });
+  await announcer.idle();
+  assert.equal(bot.posts.length, 1, "the timed-out post counts for the two hours");
+});
+
+test("two commander processes at once: each server gets the show once", async () => {
+  const store = createOmnifmRadioAnnounceStore({ getDatabase: () => null, mongoRequested: () => false });
+  const bot = fakeBot({ guilds: [TEST_GUILD, OTHER_GUILD, THIRD_GUILD] });
+  const one = setup({ store, bot, isPublic: true });
+  const two = setup({ store, bot, isPublic: true });
+  const live = show();
+  one.announcer.handle({ type: "start", show: live });
+  two.announcer.handle({ type: "start", show: live });
+  await Promise.all([one.announcer.idle(), two.announcer.idle()]);
+  assert.deepEqual(bot.posts.map((post) => post.guildId).sort(), [TEST_GUILD, OTHER_GUILD, THIRD_GUILD].sort());
+});
+
+test("a store write that fails after the message went out still holds the limit", async () => {
+  const now = clock();
+  const store = createOmnifmRadioAnnounceStore({ getDatabase: () => null, mongoRequested: () => false });
+  const flaky = { ...store, setMessage: async () => { throw new Error("write concern timeout"); } };
+  const bot = fakeBot({ guilds: [TEST_GUILD] });
+  const { announcer } = setup({ store: flaky, now, bot });
+  announcer.handle({ type: "start", show: show(now()) });
+  await announcer.idle();
+  announcer.handle({ type: "end", show: ended(show(START), START + 10 * MINUTE) });
+  now.advance(30 * MINUTE);
+  announcer.handle({ type: "start", show: show(now()) });
+  await announcer.idle();
+  assert.equal(bot.posts.length, 1, "no second message within two hours");
 });
 
 // ---------------------------------------------------------------- end

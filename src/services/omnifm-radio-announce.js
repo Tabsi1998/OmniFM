@@ -24,6 +24,8 @@ const SEND_INTERVAL_MS = 1_500;
 const READY_TIMEOUT_MS = 2 * 60 * 1000;
 const READY_POLL_MS = 2_000;
 const STOP_TIMEOUT_MS = 3_000;
+// How long a claim without message id waits for the worker to report one.
+const PENDING_ID_GRACE_MS = 10 * 60 * 1000;
 const TAG = "[OmniFM Radio] Ankündigung";
 
 /** One id per show: its start, and whether it is the console's test. */
@@ -133,21 +135,29 @@ export function createOmnifmRadioAnnouncer({
     // The show may have ended while this one waited for its turn.
     if (activeShowId !== showId || stopped) return "ended";
     if (!bot.client.guilds.cache.has(guildId)) return "gone";
-    const result = await bot.postRadioAnnouncement(guildId, { channelId: settings.channelId, roleId: settings.roleId, show: messageShow(show) });
-    if (!result?.ok) {
-      log("DEBUG", `${TAG} ${guildId} übersprungen: ${result?.reason || result?.error || "unbekannt"}`);
+    // Claimed before anything is sent: counts for the limit at once, and a
+    // second commander process cannot post the same show here again.
+    const claim = { showId, guildId };
+    if (!(await store.claim({ ...claim, botId: bot.config?.id || null, test, show, at: new Date(now()) }))) return "taken";
+    let result;
+    try {
+      result = await bot.postRadioAnnouncement(guildId, { channelId: settings.channelId, roleId: settings.roleId, show: messageShow(show), claim });
+    } catch (error) {
+      result = { ok: false, error: error?.message || String(error) };
+    }
+    if (result?.ok) {
+      await store.setMessage(claim, { channelId: result.channelId, messageId: result.messageId, at: new Date(now()) });
+      return "posted";
+    }
+    if (result?.reason) {
+      // OmniFM 1 says it sent nothing (no channel, no rights): free again.
+      log("DEBUG", `${TAG} ${guildId} übersprungen: ${result.reason}`);
+      await store.release(claim);
       return "skipped";
     }
-    await store.record({
-      showId,
-      guildId,
-      botId: bot.config?.id || null,
-      channelId: String(result.channelId),
-      messageId: String(result.messageId),
-      test,
-      postedAt: new Date(now()),
-    });
-    return "posted";
+    // A bridge timeout: maybe it went out. The claim stays; the worker fills in the id.
+    log("INFO", `${TAG} ${guildId}: Ausgang unklar (${result?.error || "unbekannt"}), bleibt reserviert.`);
+    return "unknown";
   }
 
   async function planPosts(show, showId) {
@@ -184,6 +194,12 @@ export function createOmnifmRadioAnnouncer({
   async function editOne(bot, entry, show) {
     // A message of another bot cannot be edited by this one.
     if (entry.botId && bot.config?.id && entry.botId !== bot.config.id) return;
+    if (!entry.messageId) {
+      // Still waiting for the worker to report its id after a timeout: later.
+      if (now() - entry.claimedAt.getTime() < PENDING_ID_GRACE_MS) return;
+      await store.markEnded(entry, new Date(now()));
+      return;
+    }
     await pace();
     const result = await bot.endRadioAnnouncement(entry.guildId, { channelId: entry.channelId, messageId: entry.messageId, show: messageShow(show) });
     if (!result?.ok) log("DEBUG", `${TAG} ${entry.guildId}: Ende nicht eingetragen (${result?.reason || result?.error || "unbekannt"})`);
