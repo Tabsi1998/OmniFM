@@ -121,8 +121,9 @@ test("only a now-playing payload of the own station counts", async () => {
   assert.deepEqual(events, []);
 });
 
-test("other methods and paths", async () => {
+test("other methods and paths; an unknown caller learns nothing about the method", async () => {
   const { call } = setup();
+  assert.equal((await call({ method: "GET" })).res.status, 401, "the secret is checked before the method");
   assert.equal((await call({ method: "GET", authorization: basic("azuracast", SECRET) })).res.status, 405);
   assert.equal((await call({ path: "/api/radio/other" })).handled, false);
 });
@@ -142,7 +143,7 @@ test("the webhook counts as a webhook for the rate limit and reaches the command
 function ownerSetup({ role = "owner", running = true } = {}) {
   const tracker = createOmnifmRadioLiveTracker({ store: { load: async () => null, save: async () => {} }, onEvent: () => {} });
   const handler = createOwnerRadioRoutesHandler({
-    getService: () => (running ? { tracker, settings: { webhookSecret: SECRET, pollMs: 30_000, graceMs: 60_000 }, config: { enabled: true, station: "omnifm_radio" } } : null),
+    getService: () => (running ? { tracker, settings: { webhookSecret: "", webhookSecretTooShort: true, pollMs: 30_000, graceMs: 60_000 }, config: { enabled: true, station: "omnifm_radio" } } : null),
     resolveIdentity: async (req) => (req.headers["x-test-role"] ? { via: "token", role: req.headers["x-test-role"] } : null),
   });
   const call = async (method, path, body = {}, headers = { "x-test-role": role }) => {
@@ -158,8 +159,10 @@ test("the owner console reads the live state and runs the test show", async () =
   const read = await call("GET", "/api/owner/radio");
   assert.equal(read.res.status, 200);
   assert.equal(read.res.body.current.isLive, false);
-  assert.equal(read.res.body.webhook, true, "says whether the webhook is set, never the secret");
-  assert.equal(JSON.stringify(read.res.body).includes(SECRET), false);
+  assert.equal(read.res.body.webhook, false, "says whether the webhook is set, never the secret");
+  assert.equal(read.res.body.webhookSecretTooShort, true, "the console can say why it is off");
+  assert.equal(read.res.body.canTest, true);
+  assert.equal(read.res.body.current.source, null);
 
   const started = await call("POST", "/api/owner/radio/test-show", { action: "start" });
   assert.equal(started.res.status, 200);
@@ -169,14 +172,17 @@ test("the owner console reads the live state and runs the test show", async () =
 
   const ended = await call("POST", "/api/owner/radio/test-show", { action: "end" });
   assert.equal(ended.res.status, 200);
-  assert.equal(ended.res.body.shows[0].source, "test");
+  assert.equal(ended.res.body.testShows[0].source, "test");
+  assert.deepEqual(ended.res.body.shows, [], "a test is no show in the history");
   assert.equal((await call("POST", "/api/owner/radio/test-show", { action: "wipe" })).res.status, 400);
 });
 
 test("the console's radio routes need an owner, and the test show the owner role", async () => {
   const { call } = ownerSetup({ role: "support" });
   assert.equal((await call("GET", "/api/owner/radio", {}, {})).res.status, 401);
-  assert.equal((await call("GET", "/api/owner/radio")).res.status, 200, "every role reads");
+  const read = await call("GET", "/api/owner/radio");
+  assert.equal(read.res.status, 200, "every role reads");
+  assert.equal(read.res.body.canTest, false, "the console hides the test button");
   assert.equal((await call("POST", "/api/owner/radio/test-show", { action: "start" })).res.status, 403);
   assert.equal((await ownerSetup({ running: false }).call("GET", "/api/owner/radio")).res.body.enabled, false);
 });

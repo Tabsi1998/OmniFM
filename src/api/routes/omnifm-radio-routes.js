@@ -54,14 +54,15 @@ export function createOmnifmRadioWebhookHandler({ getService, getSettings = defa
       sendJson(res, 404, { error: "Nicht gefunden." });
       return true;
     }
-    if (req.method !== "POST") {
-      methodNotAllowed(res, ["POST"]);
-      return true;
-    }
+    // The secret first: an unknown caller learns nothing, not even the method.
     const password = basicAuthPassword(req.headers?.authorization);
     if (!secretMatches(password, settings.webhookSecret)) {
       log("WARN", `[OmniFM Radio] Webhook abgelehnt (${password === null ? "ohne Basic-Auth" : "falsches Geheimnis"}) von ${getClientIp(req)}`);
       sendJson(res, 401, { error: "Nicht autorisiert." });
+      return true;
+    }
+    if (req.method !== "POST") {
+      methodNotAllowed(res, ["POST"]);
       return true;
     }
     const service = getService();
@@ -101,12 +102,18 @@ export function createOmnifmRadioWebhookHandler({ getService, getSettings = defa
 
 const resolveByOwnerAccess = (req) => resolveOwnerIdentity(req, { adminToken: getAdminApiToken() });
 
-function consoleView(service) {
-  if (!service) return { enabled: false, webhook: false, current: null, shows: [] };
+const TEST_SHOW_PATH = "/api/owner/radio/test-show";
+
+/** canTest: whether this role may run the test show (the owner only). */
+function consoleView(service, role) {
+  const canTest = roleAllows(role, "POST", TEST_SHOW_PATH);
+  if (!service) return { enabled: false, webhook: false, canTest, current: null, shows: [], testShows: [] };
   return {
     enabled: true,
+    canTest,
     station: service.config?.station || "",
     webhook: Boolean(service.settings?.webhookSecret),
+    webhookSecretTooShort: service.settings?.webhookSecretTooShort === true,
     pollMs: service.settings?.pollMs ?? null,
     graceMs: service.settings?.graceMs ?? null,
     ...service.tracker.snapshot(),
@@ -119,7 +126,7 @@ function consoleView(service) {
 export function createOwnerRadioRoutesHandler({ getService, resolveIdentity = resolveByOwnerAccess }) {
   return async function handleOwnerRadioRoutes({ req, res, requestUrl, readJsonBody }) {
     const path = requestUrl.pathname;
-    if (path !== "/api/owner/radio" && path !== "/api/owner/radio/test-show") return false;
+    if (path !== "/api/owner/radio" && path !== TEST_SHOW_PATH) return false;
     const identity = await resolveIdentity(req);
     if (!identity) {
       sendJson(res, 401, { error: "Owner-Anmeldung nötig." });
@@ -139,7 +146,7 @@ export function createOwnerRadioRoutesHandler({ getService, resolveIdentity = re
         methodNotAllowed(res, ["GET"]);
         return true;
       }
-      sendJson(res, 200, consoleView(service));
+      sendJson(res, 200, consoleView(service, identity.role));
       return true;
     }
     if (req.method !== "POST") {
@@ -162,7 +169,7 @@ export function createOwnerRadioRoutesHandler({ getService, resolveIdentity = re
       return true;
     }
     const result = action === "start" ? await service.tracker.startTestShow() : await service.tracker.endTestShow();
-    sendJson(res, result.ok ? 200 : 409, result.ok ? consoleView(service) : { error: result.error });
+    sendJson(res, result.ok ? 200 : 409, result.ok ? consoleView(service, identity.role) : { error: result.error });
     return true;
   };
 }
