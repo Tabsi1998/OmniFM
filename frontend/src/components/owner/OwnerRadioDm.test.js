@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import OwnerRadioDm from './OwnerRadioDm.js';
-import { radioDmRunText } from '../../lib/ownerRadioDm.js';
+import { radioDmRunText, radioDmSourceLabel } from '../../lib/ownerRadioDm.js';
 
 // OmniFM Radio DMs to server owners (#594) in the cockpit: the mode with
 // the kill switch, where the mode comes from and how the last run went.
@@ -86,5 +86,12 @@ describe('OmniFM Radio DMs in the owner cockpit', () => {
     expect(radioDmRunText(null)).toBe('Noch keine Verteilung.');
     expect(radioDmRunText({ ...LAST_RUN, test: true, stoppedBy: null, remaining: 0 })).toMatch(/^Test · .*3 gesendet · 1 übersprungen · 0 fehlgeschlagen$/);
     expect(radioDmRunText({ ...LAST_RUN, stoppedBy: 'off' })).toContain('Not-Aus');
+    const failed = radioDmRunText({ ...LAST_RUN, stoppedBy: 'error', error: 'Unknown claim error' });
+    expect(failed).toContain('gestoppt: Fehler (Unknown claim error)');
+    expect(failed).not.toContain('Datenbank');
+    expect(radioDmRunText({ ...LAST_RUN, stoppedBy: 'discord' })).toContain('Discord bremst, DMs ausgeschaltet');
+    expect(radioDmRunText({ ...LAST_RUN, stoppedBy: 'failures' })).toContain('5 Fehler in Folge, DMs ausgeschaltet');
+    expect(radioDmRunText({ ...LAST_RUN, stoppedBy: 'config', error: 'Invalid URL' })).toContain('Einstellung fehlerhaft (Invalid URL)');
+    expect(radioDmSourceLabel('memory')).toContain('nur im Speicher');
   });
 });
