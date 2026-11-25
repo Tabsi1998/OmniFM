@@ -376,6 +376,24 @@ export function createOmnifmRadioPoller({
 }) {
   let timer = null;
   let running = null;
+  // #599: a failing poll used to stay silent; the console and the log say it now.
+  const status = { lastOkAt: null, failingSince: null, lastError: null };
+
+  function noteResult(result, at) {
+    if (result?.ok === true) {
+      if (status.failingSince) log("INFO", "[OmniFM Radio] Abfrage klappt wieder.");
+      status.lastOkAt = new Date(at).toISOString();
+      status.failingSince = null;
+      status.lastError = null;
+      return;
+    }
+    const reason = String(result?.reason || "error").slice(0, 80);
+    if (!status.failingSince) {
+      status.failingSince = new Date(at).toISOString();
+      log("WARN", `[OmniFM Radio] Abfrage von AzuraCast fehlgeschlagen (${reason}). Erreicht der Server radio.omnifm.xyz? Sonst OMNIFM_RADIO_INTERNAL_URL setzen.`);
+    }
+    status.lastError = reason;
+  }
 
   async function poll() {
     const askedAt = now();
@@ -385,6 +403,7 @@ export function createOmnifmRadioPoller({
     } catch {
       result = null;
     }
+    noteResult(result, askedAt);
     if (result?.ok === true) {
       await tracker.observe({
         isLive: result.isLive === true,
@@ -407,6 +426,8 @@ export function createOmnifmRadioPoller({
 
   return {
     pollOnce,
+    /** When the last poll worked and since when it fails, for the console. */
+    status: () => ({ ...status }),
     start() {
       if (timer) return;
       timer = setIntervalFn(pollLogged, intervalMs);
@@ -456,6 +477,7 @@ export async function startOmnifmRadioLiveService({ env = process.env, store, fe
     tracker,
     config,
     settings,
+    pollStatus: () => poller.status(),
     async stop() {
       if (service === started) service = null;
       await poller.stop();

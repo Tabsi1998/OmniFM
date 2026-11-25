@@ -32,6 +32,16 @@ export function radioDetectionText(data) {
   return `${off}: nur die Abfrage ${poll} · ${grace}`;
 }
 
+/** #599: a failing poll, so it is not silent; null while it works. */
+export function radioPollProblemText(data) {
+  const poll = data?.poll;
+  if (!data?.enabled || !poll?.failingSince) return null;
+  const hint = data.internal
+    ? 'Ist OMNIFM_RADIO_INTERNAL_URL richtig?'
+    : 'Erreicht der Server radio.omnifm.xyz? Sonst OMNIFM_RADIO_INTERNAL_URL setzen (z. B. http://192.168.2.253:8080).';
+  return `Abfrage von AzuraCast scheitert seit ${radioTime(poll.failingSince)} (${poll.lastError || 'Fehler'}). ${hint}`;
+}
+
 export function radioTime(iso) {
   if (!iso) return '';
   return new Date(iso).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
