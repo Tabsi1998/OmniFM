@@ -17,6 +17,7 @@ import {
 
 import * as ui from "../discord/ui/index.js";
 import { TIER_RANK } from "../lib/helpers.js";
+import { omnifmRadioFirst } from "../services/omnifm-radio-station.js";
 
 export const BROWSER_PAGE_SIZE = 5;
 const CUSTOM_ID_MAX = 100;
@@ -81,13 +82,13 @@ export function buildBrowserEntries({ stations = {}, guildTier = "free", customS
     };
   });
   for (const custom of customStations) entries.push({ ...custom, locked: false, source: "custom" });
-  return entries.sort((left, right) => {
+  return omnifmRadioFirst(entries.sort((left, right) => {
     if (left.locked !== right.locked) return left.locked ? 1 : -1;
     if (Boolean(left.seasonal) !== Boolean(right.seasonal)) return left.seasonal ? -1 : 1;
     const tierDelta = (tierOrder[left.tier] ?? 9) - (tierOrder[right.tier] ?? 9);
     if (tierDelta) return tierDelta;
     return left.name.localeCompare(right.name);
-  });
+  }));
 }
 
 export function filterBrowserEntries(entries, { genre = null, query = "" } = {}) {

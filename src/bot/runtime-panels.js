@@ -29,6 +29,7 @@ import { normalizeFavoriteStations } from "../lib/favorite-stations.js";
 import { buildBrowserEntries, buildStationBrowserPayload } from "./station-browser.js";
 import { stationSeasonFor } from "../lib/seasons.js";
 import { botText } from "../lib/bot-i18n.js";
+import { omnifmRadioFirst, withOmnifmRadioStation } from "../services/omnifm-radio-station.js";
 
 const PANEL_TTL_MS = 15 * 60_000;
 const PLAY_STATION_OPTION_LIMIT = 25;
@@ -53,11 +54,11 @@ export function parsePanelCustomId(customId, prefix) {
 
 function sortStations(entries = []) {
   const tierOrder = { free: 0, pro: 1, ultimate: 2 };
-  return [...entries].sort((left, right) => {
+  return omnifmRadioFirst([...entries].sort((left, right) => {
     const tierDelta = (tierOrder[left?.tier] ?? 9) - (tierOrder[right?.tier] ?? 9);
     if (tierDelta !== 0) return tierDelta;
     return String(left?.name || left?.key || "").localeCompare(String(right?.name || right?.key || ""));
-  });
+  }));
 }
 
 function formatStationTierBadge(entry, language) {
@@ -71,7 +72,7 @@ function formatStationTierBadge(entry, language) {
 export function buildStationCatalog(guildId) {
   const stations = loadStations();
   const guildTier = getTier(guildId);
-  const available = filterStationsByTier(stations.stations, guildTier);
+  const available = filterStationsByTier(stations.stations, guildTier, { guildId });
   const mergedStations = { ...available };
   const entries = Object.entries(available).map(([key, station]) => ({
     key,
@@ -370,7 +371,7 @@ export function buildRuntimeStationsBrowserPayload(runtime, interaction, session
     t,
     prefix: STATIONS_COMPONENT_PREFIX,
     session,
-    entries: buildBrowserEntries({ stations: loadStations().stations, guildTier, customStations, seasonTag }),
+    entries: buildBrowserEntries({ stations: withOmnifmRadioStation(loadStations().stations, guildId), guildTier, customStations, seasonTag }),
     planName: getTierConfig(guildId).name,
     premiumUrl: withLanguageParam(BRAND.upgradeUrl || WEBSITE_URL, language),
     applicationId: interaction?.applicationId || runtime.client?.application?.id || null,

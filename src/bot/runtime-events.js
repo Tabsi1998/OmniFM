@@ -36,6 +36,8 @@ import {
   customStationLogoUrl,
 } from "../custom-stations.js";
 import { getTier } from "../core/entitlements.js";
+import { getOmnifmRadioConfig } from "../services/omnifm-radio-config.js";
+import { isOmnifmRadioKey } from "../services/omnifm-radio-station.js";
 import { BRAND } from "../config/plans.js";
 import { OMNI_COLORS, brandAuthor, brandFooter } from "./brand-embed.js";
 import {
@@ -151,7 +153,8 @@ export function normalizeStationReference(runtime, rawStationKey) {
     };
   }
 
-  const normalized = normalizeKey(rawStationKey);
+  // #591: the catalog key form drops the "-" of "omnifm-radio".
+  const normalized = isOmnifmRadioKey(rawStationKey) ? getOmnifmRadioConfig().stationKey : normalizeKey(rawStationKey);
   return {
     key: normalized,
     lookupKey: normalized,
@@ -165,7 +168,7 @@ export function resolveStationForGuild(runtime, guildId, rawStationKey, language
   const seasonWord = stationSeasonFromWord(rawStationKey);
   if (seasonWord) {
     const stations = loadStations();
-    const available = filterStationsByTier(stations.stations, getTier(guildId));
+    const available = filterStationsByTier(stations.stations, getTier(guildId), { guildId });
     const keys = Object.keys(available).filter((key) => (available[key]?.seasons || []).includes(seasonWord));
     if (!keys.length) {
       const anyInCatalog = Object.values(stations.stations || {}).some((station) => (station?.seasons || []).includes(seasonWord));
@@ -191,7 +194,7 @@ export function resolveStationForGuild(runtime, guildId, rawStationKey, language
 
   const stations = loadStations();
   const guildTier = getTier(guildId);
-  const available = filterStationsByTier(stations.stations, guildTier);
+  const available = filterStationsByTier(stations.stations, guildTier, { guildId });
   if (!stationRef.isCustom && available[stationRef.key]) {
     return {
       ok: true,

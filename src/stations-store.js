@@ -10,6 +10,8 @@ import { log, logStoreLoadError } from "./lib/logging.js";
 import { appRootDir, resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 import { normalizeStationCatalogFields } from "./lib/station-fields.js";
 import { CATALOG_549_MIGRATIONS, CATALOG_561_MIGRATIONS } from "./station-catalog-migrations.js";
+import { getOmnifmRadioConfig } from "./services/omnifm-radio-config.js";
+import { isOmnifmRadioKey, withOmnifmRadioStation } from "./services/omnifm-radio-station.js";
 
 /**
  * The tracked stations.json in the repository is the shipped seed and is never
@@ -211,11 +213,14 @@ function sanitizeKey(raw) {
 function sanitizeStations(stationsInput) {
   const out = {};
   if (!stationsInput || typeof stationsInput !== "object") return out;
+  const omnifmRadio = getOmnifmRadioConfig();
   for (const [rawKey, rawValue] of Object.entries(stationsInput)) {
     const key = sanitizeKey(rawKey);
     const name = String(rawValue?.name || "").trim();
     const url = String(rawValue?.url || "").trim();
     if (!key || !name || !url) continue;
+    // #591: the key of OmniFM Radio is reserved; no stored row stands in for it.
+    if (isOmnifmRadioKey(key, omnifmRadio)) continue;
     const tier = String(rawValue?.tier || "free").toLowerCase();
     out[key] = {
       name,
@@ -481,7 +486,12 @@ export function resolveStation(stations, key) {
 
 const TIER_RANK = { free: 0, pro: 1, ultimate: 2 };
 
-export function filterStationsByTier(stations, guildTier) {
+/**
+ * The catalog stations of a plan. With { guildId } it is that server's view:
+ * OmniFM Radio comes first where the server may see it (#591). Without a
+ * server (the automatic fallback) it is the catalog only.
+ */
+export function filterStationsByTier(stations, guildTier, { guildId = null } = {}) {
   const rank = TIER_RANK[guildTier] ?? 0;
   const filtered = {};
   for (const [key, station] of Object.entries(stations)) {
@@ -489,5 +499,5 @@ export function filterStationsByTier(stations, guildTier) {
     const stationRank = TIER_RANK[station.tier || "free"] ?? 0;
     if (stationRank <= rank) filtered[key] = station;
   }
-  return filtered;
+  return guildId ? withOmnifmRadioStation(filtered, guildId) : filtered;
 }
