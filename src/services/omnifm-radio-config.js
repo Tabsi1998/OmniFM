@@ -62,3 +62,29 @@ export function isOmnifmRadioVisibleForGuild(guildId, config = getOmnifmRadioCon
   const id = String(guildId || "").trim();
   return Boolean(id) && config.testGuildIds.includes(id);
 }
+
+// Live-Erkennung (#592): Webhook-Geheimnis, Abfrage-Takt und Gnadenfrist.
+// Ein Geheimnis unter 16 Zeichen schützt kaum; dann bleibt der Webhook aus.
+const MIN_WEBHOOK_SECRET_LENGTH = 16;
+const DEFAULT_POLL_MS = 30_000;
+const MIN_POLL_MS = 5_000;
+const DEFAULT_GRACE_MS = 60_000;
+
+function nonNegativeInt(value, fallback) {
+  const raw = String(value ?? "").trim();
+  if (!/^\d+$/.test(raw)) return fallback;
+  const number = Number.parseInt(raw, 10);
+  return Number.isSafeInteger(number) ? number : fallback;
+}
+
+export function getOmnifmRadioLiveSettings(env = process.env) {
+  const secret = String(env.OMNIFM_RADIO_WEBHOOK_SECRET || "").trim();
+  const tooShort = secret.length > 0 && secret.length < MIN_WEBHOOK_SECRET_LENGTH;
+  const pollMs = nonNegativeInt(env.OMNIFM_RADIO_POLL_MS, DEFAULT_POLL_MS);
+  return Object.freeze({
+    webhookSecret: tooShort ? "" : secret,
+    webhookSecretTooShort: tooShort,
+    pollMs: pollMs > 0 ? Math.max(MIN_POLL_MS, pollMs) : DEFAULT_POLL_MS,
+    graceMs: nonNegativeInt(env.OMNIFM_RADIO_LIVE_GRACE_MS, DEFAULT_GRACE_MS),
+  });
+}
