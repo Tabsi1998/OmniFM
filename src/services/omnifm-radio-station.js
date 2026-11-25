@@ -20,22 +20,31 @@ export function isOmnifmRadioKey(key, config = getOmnifmRadioConfig()) {
   return Boolean(compact) && compact === compactKey(config.stationKey);
 }
 
-function hostOf(url) {
+function hostAndPath(url) {
   try {
-    return new URL(String(url || "").trim()).hostname.toLowerCase().replace(/\.+$/, "");
+    const parsed = new URL(String(url || "").trim());
+    return {
+      host: parsed.hostname.toLowerCase().replace(/\.+$/, ""),
+      path: parsed.pathname.replace(/\/+$/, "").toLowerCase(),
+    };
   } catch {
-    return "";
+    return { host: "", path: "" };
   }
 }
 
 /**
- * Whether a stream address points at the OmniFM Radio server (any path,
- * port or query): only the fixed station may play it, never a custom
- * station or another catalog row.
+ * Whether a stream address is OmniFM Radio: only the fixed station may play
+ * it, never a custom station or another catalog row. The AzuraCast server
+ * (OMNIFM_RADIO_BASE_URL) is ours alone, so any path, port or query on it
+ * counts. A stream on another host (OMNIFM_RADIO_STREAM_URL, e.g. a CDN that
+ * also serves other stations) counts only with its own path.
  */
 export function isOmnifmRadioUrl(url, config = getOmnifmRadioConfig()) {
-  const host = hostOf(url);
-  return Boolean(host) && [config.streamUrl, config.baseUrl].some((own) => hostOf(own) === host);
+  const target = hostAndPath(url);
+  if (!target.host) return false;
+  if (target.host === hostAndPath(config.baseUrl).host) return true;
+  const stream = hostAndPath(config.streamUrl);
+  return target.host === stream.host && Boolean(stream.path) && target.path === stream.path;
 }
 
 export function buildOmnifmRadioStation(config = getOmnifmRadioConfig()) {

@@ -210,6 +210,15 @@ function sanitizeKey(raw) {
   return String(raw || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+// #591: a dropped row is said once per key in the log, not on every reload.
+const reportedOmnifmRadioRows = new Set();
+
+function reportDroppedOmnifmRadioRow(key, reason) {
+  if (reportedOmnifmRadioRows.has(key)) return;
+  reportedOmnifmRadioRows.add(key);
+  log("WARN", `Katalog-Sender "${key}" ausgeblendet: ${reason} gehört zu OmniFM Radio (OMNIFM_RADIO_STATION_KEY bzw. OMNIFM_RADIO_BASE_URL/STREAM_URL prüfen).`);
+}
+
 function sanitizeStations(stationsInput) {
   const out = {};
   if (!stationsInput || typeof stationsInput !== "object") return out;
@@ -220,7 +229,8 @@ function sanitizeStations(stationsInput) {
     const url = String(rawValue?.url || "").trim();
     if (!key || !name || !url) continue;
     // #591: the key and the server of OmniFM Radio are reserved; no stored row stands in for it.
-    if (isOmnifmRadioKey(key, omnifmRadio) || isOmnifmRadioUrl(url, omnifmRadio)) continue;
+    if (isOmnifmRadioKey(key, omnifmRadio)) { reportDroppedOmnifmRadioRow(key, "der Key"); continue; }
+    if (isOmnifmRadioUrl(url, omnifmRadio)) { reportDroppedOmnifmRadioRow(key, "die Adresse"); continue; }
     const tier = String(rawValue?.tier || "free").toLowerCase();
     out[key] = {
       name,

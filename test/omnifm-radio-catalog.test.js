@@ -266,6 +266,16 @@ test("nobody can play the OmniFM Radio server under another key: custom station,
   assert.notEqual(translateCustomStationErrorMessage(RADIO_URL_ERROR, "fr"), "This address belongs to OmniFM Radio and cannot be a custom station.");
 });
 
+test("a stream on a shared host blocks only its own path, the AzuraCast host stays blocked as a whole", () => withEnv({
+  OMNIFM_RADIO_STREAM_URL: "https://stream.laut.fm/omnifm",
+}, () => {
+  assert.equal(isOmnifmRadioUrl("https://stream.laut.fm/omnifm"), true);
+  assert.equal(isOmnifmRadioUrl("https://stream.laut.fm/omnifm/?ref=x"), true, "trailing slash and query do not matter");
+  assert.equal(isOmnifmRadioUrl("https://stream.laut.fm/drill"), false, "other stations on the shared host keep playing");
+  assert.equal(validateCustomStationUrl("https://stream.laut.fm/drill").ok, true);
+  assert.equal(isOmnifmRadioUrl("https://radio.omnifm.xyz/anything"), true, "the AzuraCast host is ours alone");
+}));
+
 const METAINT = 16;
 
 function icyFetcher(streamTitle, calls) {
