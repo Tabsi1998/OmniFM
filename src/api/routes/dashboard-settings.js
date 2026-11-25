@@ -25,6 +25,12 @@ import {
   seasonForServer,
 } from "../../lib/seasons.js";
 import { ownerSettings } from "../../lib/owner-settings-cache.js";
+import {
+  RADIO_ANNOUNCE_SETTINGS_KEY,
+  buildDashboardRadioAnnounceResponse,
+  normalizeRadioAnnounceSettings,
+} from "../../lib/omnifm-radio-announce-settings.js";
+import { isOmnifmRadioVisibleForGuild } from "../../services/omnifm-radio-config.js";
 
 // The favourite bar (#276): the stored stations and how many the plan shows.
 export function buildDashboardFavoritesResponse(settings = {}, tier = "free") {
@@ -98,6 +104,7 @@ export function createDashboardSettingsRouteHandler(deps) {
     normalizeWeeklyDigestConfig,
     resolveDashboardFailoverChain,
     resolveDashboardGuildForSession,
+    resolveRuntimeForGuild,
     sendJson,
     sendLocalizedError,
     serverHasCapability,
@@ -129,6 +136,10 @@ export function createDashboardSettingsRouteHandler(deps) {
       sendLocalizedError(res, 403, language, "Kein Zugriff.", "No access.");
       return true;
     }
+    // OmniFM Radio's live announcement (#593): roles and system channel as the bots see the server.
+    const radioAnnounce = (stored) => buildDashboardRadioAnnounceResponse(guildInfo.id, stored, {
+      guild: resolveRuntimeForGuild(runtimes || [], guildInfo.id).guild,
+    });
 
     if (req.method === "GET") {
       const settings = await loadDashboardGuildSettings(guildInfo.id);
@@ -161,6 +172,7 @@ export function createDashboardSettingsRouteHandler(deps) {
         serverLanguage: buildDashboardLanguageResponse(guildInfo.id),
         serverTimeZone: buildDashboardTimeZoneResponse(settings),
         seasonDecor: buildDashboardSeasonDecorResponse(guildInfo.id, settings),
+        omnifmRadioAnnounce: radioAnnounce(settings),
       });
       return true;
     }
@@ -340,6 +352,15 @@ export function createDashboardSettingsRouteHandler(deps) {
           else updates.timeZone = zone;
         }
 
+        // Every plan sets where OmniFM Radio's live show is announced (#593).
+        if (body?.[RADIO_ANNOUNCE_SETTINGS_KEY] && typeof body[RADIO_ANNOUNCE_SETTINGS_KEY] === "object") {
+          if (!isOmnifmRadioVisibleForGuild(guildInfo.id)) {
+            sendLocalizedError(res, 403, language, "OmniFM Radio gibt es auf diesem Server noch nicht.", "OmniFM Radio is not available on this server yet.");
+            return true;
+          }
+          updates[RADIO_ANNOUNCE_SETTINGS_KEY] = normalizeRadioAnnounceSettings(body[RADIO_ANNOUNCE_SETTINGS_KEY]);
+        }
+
         // Every plan may switch the seasonal decoration (#425).
         if (body?.seasonDecor && typeof body.seasonDecor === "object") {
           updates.seasonDecor = normalizeSeasonSettings(body.seasonDecor);
@@ -468,6 +489,9 @@ export function createDashboardSettingsRouteHandler(deps) {
           serverLanguage: buildDashboardLanguageResponse(guildInfo.id),
           serverTimeZone: buildDashboardTimeZoneResponse(seasonSource),
           seasonDecor: buildDashboardSeasonDecorResponse(guildInfo.id, seasonSource),
+          omnifmRadioAnnounce: radioAnnounce({
+            [RADIO_ANNOUNCE_SETTINGS_KEY]: updates[RADIO_ANNOUNCE_SETTINGS_KEY] ?? savedSettings[RADIO_ANNOUNCE_SETTINGS_KEY],
+          }),
         });
       } catch (err) {
         logError("[DashboardSettings] Save failed", err, {
