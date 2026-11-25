@@ -3,6 +3,8 @@
 //   POST /api/radio/webhook            AzuraCast "Generic Web Hook" (now-playing JSON)
 //   GET  /api/owner/radio              live state, last shows, webhook on/off
 //   POST /api/owner/radio/test-show    { action: "start" | "end" } the console's test show
+//   GET  /api/owner/radio/dm           DMs to server owners (#594): mode and last run
+//   POST /api/owner/radio/dm           { mode: "owners" | "optin" | "off" } (owner role; off is the kill switch)
 // The webhook exists only with OMNIFM_RADIO_WEBHOOK_SECRET: AzuraCast sends
 // it as the Basic-auth password (user name free). Checked before the body
 // is read, in constant time; the body may change nothing but the live state.
@@ -11,6 +13,8 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { getClientIp } from "../../lib/api-rate-limit.js";
 import { getAdminApiToken, methodNotAllowed, sendJson } from "../../lib/api-helpers.js";
 import { csrfSatisfied, resolveOwnerIdentity, roleAllows } from "../../lib/owner-access.js";
+import { recordOwnerAudit } from "../../lib/owner-audit-store.js";
+import { log as defaultLog } from "../../lib/logging.js";
 import { normalizeAzuracastNowPlaying } from "../../services/omnifm-radio-api.js";
 import { getOmnifmRadioConfig, getOmnifmRadioLiveSettings } from "../../services/omnifm-radio-config.js";
 
@@ -108,6 +112,59 @@ export function createOmnifmRadioWebhookHandler({ getService, getSettings = defa
 const resolveByOwnerAccess = (req) => resolveOwnerIdentity(req, { adminToken: getAdminApiToken() });
 
 const TEST_SHOW_PATH = "/api/owner/radio/test-show";
+const DM_PATH = "/api/owner/radio/dm";
+const RADIO_PATHS = new Set(["/api/owner/radio", TEST_SHOW_PATH, DM_PATH]);
+
+function auditSafely(event) {
+  try {
+    recordOwnerAudit(event);
+  } catch (error) {
+    defaultLog("WARN", `[Owner] Audit konnte nicht geschrieben werden: ${error?.message || error}`);
+  }
+}
+
+/** canChange: whether this role may switch the DMs (the owner only). */
+async function dmView(dmService, role) {
+  const canChange = roleAllows(role, "POST", DM_PATH);
+  if (!dmService) return { enabled: false, canChange, mode: null, modeSource: null, modeError: null, running: false, lastRun: null };
+  return { enabled: true, canChange, ...(await dmService.status()) };
+}
+
+async function handleDmRoute({ req, res, identity, dmService, readJsonBody, audit }) {
+  if (req.method === "GET") {
+    sendJson(res, 200, await dmView(dmService, identity.role));
+    return;
+  }
+  if (req.method !== "POST") {
+    methodNotAllowed(res, ["GET", "POST"]);
+    return;
+  }
+  if (!dmService) {
+    sendJson(res, 503, { error: "Die DMs laufen nicht (OmniFM Radio aus oder startet gerade)." });
+    return;
+  }
+  let body;
+  try {
+    body = (await readJsonBody({ maxBytes: 1024 })) || {};
+  } catch {
+    body = {};
+  }
+  const mode = typeof body?.mode === "string" ? body.mode.trim().toLowerCase() : "";
+  if (!["owners", "optin", "off"].includes(mode)) {
+    sendJson(res, 400, { error: "Unbekannter Modus (owners, optin oder off)." });
+    return;
+  }
+  const actor = identity.actor || "owner";
+  try {
+    await dmService.setMode(mode);
+  } catch (error) {
+    audit({ actor, action: "radio.dm.mode", status: "failed", target: mode, summary: String(error?.message || error).slice(0, 200) });
+    sendJson(res, 503, { error: "Nicht gespeichert, die Datenbank antwortet nicht." });
+    return;
+  }
+  audit({ actor, action: "radio.dm.mode", status: "success", target: mode, summary: `DMs an Server-Besitzer: ${mode}` });
+  sendJson(res, 200, await dmView(dmService, identity.role));
+}
 
 /** canTest: whether this role may run the test show (the owner only). */
 function consoleView(service, role) {
@@ -126,12 +183,12 @@ function consoleView(service, role) {
 }
 
 /**
- * @param {{ getService: () => any, resolveIdentity?: (req: any) => Promise<any> }} options
+ * @param {{ getService: () => any, getDmService?: () => any, resolveIdentity?: (req: any) => Promise<any>, audit?: (event: any) => void }} options
  */
-export function createOwnerRadioRoutesHandler({ getService, resolveIdentity = resolveByOwnerAccess }) {
+export function createOwnerRadioRoutesHandler({ getService, getDmService = () => null, resolveIdentity = resolveByOwnerAccess, audit = auditSafely }) {
   return async function handleOwnerRadioRoutes({ req, res, requestUrl, readJsonBody }) {
     const path = requestUrl.pathname;
-    if (path !== "/api/owner/radio" && path !== TEST_SHOW_PATH) return false;
+    if (!RADIO_PATHS.has(path)) return false;
     const identity = await resolveIdentity(req);
     if (!identity) {
       sendJson(res, 401, { error: "Owner-Anmeldung nötig." });
@@ -143,6 +200,10 @@ export function createOwnerRadioRoutesHandler({ getService, resolveIdentity = re
     }
     if (!roleAllows(identity.role, req.method, path)) {
       sendJson(res, 403, { error: "Deine Rolle darf das nicht." });
+      return true;
+    }
+    if (path === DM_PATH) {
+      await handleDmRoute({ req, res, identity, dmService: getDmService(), readJsonBody, audit });
       return true;
     }
     const service = getService();
