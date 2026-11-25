@@ -101,6 +101,8 @@ describe('legal pages', () => {
     expect(document.getElementById('privacy-transfers').textContent).toContain('Data Privacy Framework');
     // The OmniFM Radio DMs (#594): what is kept, and that an unsubscribe outlives "delete everything".
     expect(document.getElementById('privacy-radio-dm').textContent).toContain('bleibt nur diese Abmeldung ohne Zeitpunkt gespeichert');
+    expect(document.getElementById('privacy-radio-dm').textContent).toContain('30 Tage nach der letzten DM von selbst');
+    expect(document.getElementById('privacy-radio-dm').textContent).toContain('nur die Besitzer der Test-Server');
     // Art. 13 (1)(c) and (2)(e)/(f): consent as a legal basis, voluntary data, no automated decisions.
     expect(document.getElementById('privacy-basis').textContent).toContain('Art. 6 Abs. 1 lit. a DSGVO');
     expect(document.getElementById('privacy-voluntary').textContent).toContain('Art. 22 DSGVO');
