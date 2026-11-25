@@ -77,6 +77,7 @@ function PrivacySection({ legal, privacy }) {
     ['year-review', sections.yearReviewTitle, sections.yearReviewBody],
     ['suggestions', sections.suggestionsTitle, sections.suggestionsBody],
     ['reports', sections.reportsTitle, sections.reportsBody],
+    ['radio-dm', sections.radioDmTitle, sections.radioDmBody],
     ['egg-hunt', sections.eggHuntTitle, sections.eggHuntBody],
     ['jingles', sections.jinglesTitle, sections.jinglesBody],
     ['linked-roles', sections.linkedRolesTitle, sections.linkedRolesBody],
