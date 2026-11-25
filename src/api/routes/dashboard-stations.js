@@ -1,3 +1,5 @@
+import { omnifmRadioFirst } from "../../services/omnifm-radio-station.js";
+
 function sortCustomStations(stations) {
   return stations.sort((a, b) => {
     const folderCompare = String(a.folder || "").localeCompare(String(b.folder || ""));
@@ -7,7 +9,7 @@ function sortCustomStations(stations) {
 }
 
 function formatStationList(stationsByKey) {
-  return Object.entries(stationsByKey)
+  return omnifmRadioFirst(Object.entries(stationsByKey)
     .map(([key, station]) => ({
       key,
       name: station?.name || key,
@@ -15,7 +17,7 @@ function formatStationList(stationsByKey) {
       genre: station?.genre || "",
       country: station?.country || "",
     }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => a.name.localeCompare(b.name)));
 }
 
 export function createDashboardStationsRouteHandler(deps) {
@@ -63,7 +65,7 @@ export function createDashboardStationsRouteHandler(deps) {
     }
 
     const allStations = loadStations();
-    const tierStations = filterStationsByTier(allStations.stations || {}, guildInfo.tier);
+    const tierStations = filterStationsByTier(allStations.stations || {}, guildInfo.tier, { guildId: guildInfo.id });
     const freeStations = {};
     const proStations = {};
     const ultimateStations = {};

@@ -48,7 +48,7 @@ export async function handleRuntimeAutocomplete(runtime, interaction) {
 
     // /poll genre: the genres of the stations on the server's plan (#274).
     if (focused.name === "genre" && interaction.commandName === "poll") {
-      const available = filterStationsByTier(loadStations().stations, getTier(interaction.guildId));
+      const available = filterStationsByTier(loadStations().stations, getTier(interaction.guildId), { guildId: interaction.guildId });
       const query = String(focused.value || "").toLowerCase().trim();
       const genres = [...new Set(Object.values(available).map((station) => String(station?.genre || "").trim()).filter(Boolean))]
         .filter((genre) => !query || genre.toLowerCase().includes(query))
@@ -64,8 +64,8 @@ export async function handleRuntimeAutocomplete(runtime, interaction) {
       const guildTier = getTier(guildId);
       const query = String(focused.value || "").toLowerCase().trim();
 
-      // Standard-Stationen nach Tier gefiltert
-      const available = filterStationsByTier(stations.stations, guildTier);
+      // Standard-Stationen nach Tier gefiltert, OmniFM Radio zuerst (#591)
+      const available = filterStationsByTier(stations.stations, guildTier, { guildId });
       const allStations = Object.entries(available)
         .map(([key, value]) => {
           const badge = value.tier && value.tier !== "free" ? ` [${value.tier.toUpperCase()}]` : "";

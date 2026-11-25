@@ -10,6 +10,8 @@ import { log, logStoreLoadError } from "./lib/logging.js";
 import { appRootDir, resolveRuntimeDataPath } from "./lib/runtime-data-path.js";
 import { normalizeStationCatalogFields } from "./lib/station-fields.js";
 import { CATALOG_549_MIGRATIONS, CATALOG_561_MIGRATIONS } from "./station-catalog-migrations.js";
+import { getOmnifmRadioConfig } from "./services/omnifm-radio-config.js";
+import { isOmnifmRadioKey, isOmnifmRadioUrl, withOmnifmRadioStation } from "./services/omnifm-radio-station.js";
 
 /**
  * The tracked stations.json in the repository is the shipped seed and is never
@@ -208,14 +210,27 @@ function sanitizeKey(raw) {
   return String(raw || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+// #591: a dropped row is said once per key in the log, not on every reload.
+const reportedOmnifmRadioRows = new Set();
+
+function reportDroppedOmnifmRadioRow(key, reason) {
+  if (reportedOmnifmRadioRows.has(key)) return;
+  reportedOmnifmRadioRows.add(key);
+  log("WARN", `Katalog-Sender "${key}" ausgeblendet: ${reason} gehört zu OmniFM Radio (OMNIFM_RADIO_STATION_KEY bzw. OMNIFM_RADIO_BASE_URL/STREAM_URL prüfen).`);
+}
+
 function sanitizeStations(stationsInput) {
   const out = {};
   if (!stationsInput || typeof stationsInput !== "object") return out;
+  const omnifmRadio = getOmnifmRadioConfig();
   for (const [rawKey, rawValue] of Object.entries(stationsInput)) {
     const key = sanitizeKey(rawKey);
     const name = String(rawValue?.name || "").trim();
     const url = String(rawValue?.url || "").trim();
     if (!key || !name || !url) continue;
+    // #591: the key and the server of OmniFM Radio are reserved; no stored row stands in for it.
+    if (isOmnifmRadioKey(key, omnifmRadio)) { reportDroppedOmnifmRadioRow(key, "der Key"); continue; }
+    if (isOmnifmRadioUrl(url, omnifmRadio)) { reportDroppedOmnifmRadioRow(key, "die Adresse"); continue; }
     const tier = String(rawValue?.tier || "free").toLowerCase();
     out[key] = {
       name,
@@ -456,8 +471,10 @@ export function normalizeKey(rawKey) { return sanitizeKey(rawKey); }
 export function buildScopedStationsData(source, scopedStations = null) {
   const sourceData = source && typeof source === "object" ? source : emptyStationsData();
   const stations = cloneStationMap(scopedStations ?? sourceData.stations);
-  const stationKeys = Object.keys(stations);
-  const defaultStationKey = stations[sourceData.defaultStationKey] ? sourceData.defaultStationKey : (stationKeys[0] || null);
+  // #591: OmniFM Radio is never the default station; a server picks it on purpose.
+  const omnifmRadio = getOmnifmRadioConfig();
+  const stationKeys = Object.keys(stations).filter((key) => !isOmnifmRadioKey(key, omnifmRadio));
+  const defaultStationKey = stationKeys.includes(sourceData.defaultStationKey) ? sourceData.defaultStationKey : (stationKeys[0] || null);
   const qualityPreset = String(sourceData.qualityPreset || "custom").toLowerCase();
   const fallbackKeys = Array.isArray(sourceData.fallbackKeys)
     ? sourceData.fallbackKeys.filter((key, idx, arr) => stations[key] && arr.indexOf(key) === idx)
@@ -481,7 +498,12 @@ export function resolveStation(stations, key) {
 
 const TIER_RANK = { free: 0, pro: 1, ultimate: 2 };
 
-export function filterStationsByTier(stations, guildTier) {
+/**
+ * The catalog stations of a plan. With { guildId } it is that server's view:
+ * OmniFM Radio comes first where the server may see it (#591). Without a
+ * server (the automatic fallback) it is the catalog only.
+ */
+export function filterStationsByTier(stations, guildTier, { guildId = null } = {}) {
   const rank = TIER_RANK[guildTier] ?? 0;
   const filtered = {};
   for (const [key, station] of Object.entries(stations)) {
@@ -489,5 +511,5 @@ export function filterStationsByTier(stations, guildTier) {
     const stationRank = TIER_RANK[station.tier || "free"] ?? 0;
     if (stationRank <= rank) filtered[key] = station;
   }
-  return filtered;
+  return guildId ? withOmnifmRadioStation(filtered, guildId) : filtered;
 }

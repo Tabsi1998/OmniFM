@@ -7,7 +7,7 @@ import { getTier } from "../../core/entitlements.js";
 
 function buildDashboardSelectableStations(guildId) {
   const tier = getTier(guildId);
-  const scopedStations = filterStationsByTier(loadStations().stations || {}, tier);
+  const scopedStations = filterStationsByTier(loadStations().stations || {}, tier, { guildId });
   const customStations = getCustomStations(guildId) || {};
   const entries = [];
 

@@ -1,3 +1,5 @@
+import { omnifmRadioFirst, withOmnifmRadioStation } from "../services/omnifm-radio-station.js";
+
 function isOfficialPublicStation(key, station) {
   const stationKey = String(key || "").trim().toLowerCase();
   if (!stationKey || stationKey.startsWith("custom:")) return false;
@@ -12,17 +14,18 @@ function getPublicStationEntries(stationsMap) {
 
 function sortPublicStationEntries(entries) {
   const tierOrder = { free: 0, pro: 1 };
-  return [...entries].sort((a, b) => {
+  return omnifmRadioFirst([...entries].sort((a, b) => {
     const aTier = String(a?.tier || "free").toLowerCase();
     const bTier = String(b?.tier || "free").toLowerCase();
     const aRank = tierOrder[aTier] ?? 99;
     const bRank = tierOrder[bTier] ?? 99;
     return aRank - bRank || String(a?.name || "").localeCompare(String(b?.name || ""));
-  });
+  }));
 }
 
 function buildPublicStationCatalog(stationsData) {
-  const sourceMap = stationsData?.stations || {};
+  // #591: OmniFM Radio only once it is public (no server: the website).
+  const sourceMap = withOmnifmRadioStation(stationsData?.stations || {}, null);
   const entries = getPublicStationEntries(sourceMap).map(([key, station]) => ({
     key,
     name: station?.name || key,
