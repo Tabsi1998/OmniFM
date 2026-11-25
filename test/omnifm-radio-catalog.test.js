@@ -49,6 +49,9 @@ const { automaticFallbackKeysForGuild, resetDownStationKeysForTests } = await im
 const { buildStationDocument } = await import("../src/lib/owner-stations.js");
 const { addGuildStation, updateGuildStation } = await import("../src/custom-stations.js");
 const { isOmnifmRadioKey } = await import("../src/services/omnifm-radio-station.js");
+const { fetchStationSnapshot } = await import("../src/services/omnifm-radio-now-playing.js");
+const { setOmnifmRadioFetchForTests, clearOmnifmRadioApiCache } = await import("../src/services/omnifm-radio-api.js");
+const { setNowPlayingFetchImplementationForTests, clearNowPlayingSnapshotCache } = await import("../src/services/now-playing.js");
 
 setLicenseProvider(() => null);
 
@@ -210,4 +213,71 @@ test("nobody can put a station of their own under the OmniFM Radio key", async (
     false,
     "no catalog migration touches the key"
   );
+});
+
+const METAINT = 16;
+
+function icyFetcher(streamTitle, calls) {
+  return async (url) => {
+    calls.push(url);
+    const text = `StreamTitle='${streamTitle}';`;
+    const blocks = Math.ceil(text.length / 16);
+    const metadata = Buffer.alloc(blocks * 16, 0);
+    metadata.write(text, "utf8");
+    const bytes = Buffer.concat([Buffer.alloc(METAINT, 1), Buffer.from([blocks]), metadata, Buffer.alloc(METAINT, 1)]);
+    const headers = new Map([["icy-metaint", String(METAINT)]]);
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: (name) => headers.get(String(name).toLowerCase()) ?? null },
+      body: new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(bytes)); controller.close(); } }),
+    };
+  };
+}
+
+function azuracastAnswer(song) {
+  return new Response(JSON.stringify({
+    is_online: true,
+    listeners: { current: 2 },
+    live: { is_live: false, streamer_name: "", broadcast_start: null },
+    now_playing: { song },
+  }), { status: 200 });
+}
+
+test("now playing of OmniFM Radio comes from AzuraCast, from the stream's ICY title when the API fails", async (t) => {
+  t.after(() => {
+    setOmnifmRadioFetchForTests(null);
+    setNowPlayingFetchImplementationForTests(null);
+    clearNowPlayingSnapshotCache();
+  });
+  const streamCalls = [];
+  setNowPlayingFetchImplementationForTests(icyFetcher("ICY Artist - ICY Song", streamCalls));
+
+  clearNowPlayingSnapshotCache();
+  setOmnifmRadioFetchForTests(async () => azuracastAnswer({ text: "API Artist - API Song", artist: "API Artist", title: "API Song" }));
+  const fromApi = await fetchStationSnapshot(KEY, STREAM_URL, { includeCover: false });
+  assert.deepEqual(
+    [fromApi.artist, fromApi.title, fromApi.displayTitle, fromApi.metadataSource, fromApi.metadataStatus],
+    ["API Artist", "API Song", "API Artist - API Song", "azuracast", "ok"]
+  );
+  assert.equal(streamCalls.length, 0, "the API answered: no stream connection for the title");
+
+  clearNowPlayingSnapshotCache();
+  setOmnifmRadioFetchForTests(async () => new Response("down", { status: 503 }));
+  const fromIcy = await fetchStationSnapshot(KEY, STREAM_URL, { includeCover: false });
+  assert.deepEqual([fromIcy.artist, fromIcy.title, fromIcy.metadataSource], ["ICY Artist", "ICY Song", "icy"]);
+  assert.deepEqual(streamCalls, [STREAM_URL]);
+
+  clearNowPlayingSnapshotCache();
+  setOmnifmRadioFetchForTests(async () => azuracastAnswer({ text: "", artist: "", title: "" }));
+  const emptyApi = await fetchStationSnapshot(KEY, STREAM_URL, { includeCover: false });
+  assert.equal(emptyApi.title, "ICY Song", "an answer without a song falls back to ICY too");
+
+  clearNowPlayingSnapshotCache();
+  let apiCalls = 0;
+  setOmnifmRadioFetchForTests(async () => { apiCalls += 1; return azuracastAnswer({ text: "API Artist - API Song" }); });
+  const other = await fetchStationSnapshot("groove", "https://radio.example.test/groove.mp3", { includeCover: false });
+  assert.equal(apiCalls, 0, "other stations never ask AzuraCast");
+  assert.equal(other.title, "ICY Song");
+  clearOmnifmRadioApiCache();
 });
