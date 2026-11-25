@@ -53,6 +53,18 @@ function parseIdList(value) {
   )];
 }
 
+// #599: where the server reaches AzuraCast in its own network; only the origin counts.
+function internalOrigin(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.origin : "";
+  } catch {
+    return "";
+  }
+}
+
 export function getOmnifmRadioConfig(env = process.env) {
   const baseUrl = trimSlash(env.OMNIFM_RADIO_BASE_URL) || DEFAULT_BASE_URL;
   const station = String(env.OMNIFM_RADIO_STATION || "").trim() || DEFAULT_STATION;
@@ -65,6 +77,7 @@ export function getOmnifmRadioConfig(env = process.env) {
     streamUrl,
     stationKey: stationKeyFrom(env.OMNIFM_RADIO_STATION_KEY),
     nowPlayingUrl: `${baseUrl}/api/nowplaying/${encodeURIComponent(station)}`,
+    internalUrl: internalOrigin(env.OMNIFM_RADIO_INTERNAL_URL),
     isPublic: flag(env.OMNIFM_RADIO_PUBLIC, false),
     testGuildIds: Object.freeze(parseIdList(env.OMNIFM_RADIO_TEST_GUILD_IDS)),
   });

@@ -43,6 +43,8 @@ export function isOmnifmRadioUrl(url, config = getOmnifmRadioConfig()) {
   const target = hostAndPath(url);
   if (!target.host) return false;
   if (target.host === hostAndPath(config.baseUrl).host) return true;
+  // #599: the internal address of AzuraCast is never a station of its own either.
+  if (config.internalUrl && target.host === hostAndPath(config.internalUrl).host) return true;
   const stream = hostAndPath(config.streamUrl);
   return target.host === stream.host && Boolean(stream.path) && target.path === stream.path;
 }

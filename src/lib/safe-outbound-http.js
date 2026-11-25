@@ -92,10 +92,61 @@ function isTestStreamOrigin(parsedUrl) {
   }
 }
 
+// #599: the server may not reach its own public address (no hairpin NAT).
+// OMNIFM_RADIO_INTERNAL_URL names where it reaches AzuraCast in its own
+// network instead (e.g. http://192.168.2.253:8080). A request to the public
+// radio host (host of OMNIFM_RADIO_BASE_URL, default radio.omnifm.xyz) goes
+// there, path and query kept, like split DNS. Only such a rerouted request may
+// reach that one private origin: the mark is a symbol no caller can pass, so
+// a custom station or a webhook naming the internal address stays refused.
+const RADIO_INTERNAL_ROUTE = Symbol("omnifm-radio-internal-route");
+
+function radioInternalOrigin() {
+  const raw = String(process.env.OMNIFM_RADIO_INTERNAL_URL || "").trim();
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password) return null;
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+function radioPublicHostname() {
+  try {
+    return normalizeHostname(new URL(String(process.env.OMNIFM_RADIO_BASE_URL || "").trim() || "https://radio.omnifm.xyz").hostname);
+  } catch {
+    return "";
+  }
+}
+
+/** The internal address for a request to the public radio host, or null. */
+function radioInternalRoute(rawUrl) {
+  const internal = radioInternalOrigin();
+  if (!internal) return null;
+  let parsed;
+  try {
+    parsed = new URL(String(rawUrl || "").trim());
+  } catch {
+    return null;
+  }
+  const publicHost = radioPublicHostname();
+  if (!publicHost || normalizeHostname(parsed.hostname) !== publicHost) return null;
+  return new URL(`${parsed.pathname}${parsed.search}`, internal.origin).toString();
+}
+
+function isRadioInternalRequest(parsedUrl, options) {
+  if (options?.[RADIO_INTERNAL_ROUTE] !== true) return false;
+  const internal = radioInternalOrigin();
+  return Boolean(internal) && parsedUrl.origin === internal.origin;
+}
+
 function validateOutboundUrl(rawUrl, {
   allowedProtocols = DEFAULT_ALLOWED_PROTOCOLS,
   requireHttps = false,
   maxUrlLength = DEFAULT_MAX_URL_LENGTH,
+  [RADIO_INTERNAL_ROUTE]: radioInternal = false,
 } = {}) {
   const raw = String(rawUrl || "").trim();
   const maxLength = Math.max(1, Number.parseInt(String(maxUrlLength), 10) || DEFAULT_MAX_URL_LENGTH);
@@ -127,6 +178,10 @@ function validateOutboundUrl(rawUrl, {
   const hostname = normalizeHostname(parsed.hostname);
   if (!hostname) {
     return { ok: false, error: "URL-Host fehlt.", code: "OUTBOUND_HOST_INVALID" };
+  }
+  if (isRadioInternalRequest(parsed, { [RADIO_INTERNAL_ROUTE]: radioInternal })) {
+    parsed.hash = "";
+    return { ok: true, url: parsed.toString(), parsedUrl: parsed };
   }
   const address = normalizeOutboundIpAddress(hostname);
   if (address) {
@@ -220,7 +275,7 @@ async function resolveSafeOutboundTarget(rawUrl, options = {}) {
     : await resolveHostnameForOutboundRequest(hostname, options);
 
   const publicOnly = addresses.length && addresses.every((entry) => isPublicOutboundAddress(entry.address));
-  if (!publicOnly && !isTestStreamOrigin(validation.parsedUrl)) {
+  if (!publicOnly && !isTestStreamOrigin(validation.parsedUrl) && !isRadioInternalRequest(validation.parsedUrl, options)) {
     throw createSafeOutboundError("OUTBOUND_ADDRESS_NOT_ALLOWED", "Lokale/private Hosts sind nicht erlaubt.");
   }
 
@@ -410,8 +465,12 @@ async function safeFetch(rawUrl, {
   let requestHeaders = headers;
 
   for (let redirectCount = 0; ; redirectCount += 1) {
+    // #599: the public radio host is reached over the own network when configured.
+    const internalUrl = radioInternalRoute(currentUrl);
+    const hopUrl = internalUrl || currentUrl;
+    const hopPolicy = internalUrl ? { ...policyOptions, [RADIO_INTERNAL_ROUTE]: true } : policyOptions;
     // eslint-disable-next-line no-await-in-loop -- each redirect hop depends on the one before
-    const target = await resolveSafeOutboundTarget(currentUrl, policyOptions);
+    const target = await resolveSafeOutboundTarget(hopUrl, hopPolicy);
     let incoming;
     try {
       // eslint-disable-next-line no-await-in-loop -- each redirect hop depends on the one before
