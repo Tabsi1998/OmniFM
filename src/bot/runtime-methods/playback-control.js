@@ -125,9 +125,12 @@ const playbackControlMethods = {
   async stopInGuild(guildId) {
     return BotRuntime.prototype.runSerializedGuildOperation.call(this, guildId, "stop", async () => {
       const state = this.guildState.get(guildId);
+      // A stop also ends a saved target the restore has not reached yet, and
+      // its retry (#605).
+      this.clearRestoreRetry(guildId);
+      if (this.releasePendingRestoreTarget?.(guildId)) this.persistState();
       if (!state) return { ok: false, error: "Kein State für diesen Server." };
 
-      this.clearRestoreRetry(guildId);
       // A stop ends a sleep timer too (#275).
       this.clearSleepTimer?.(guildId);
       state.shouldReconnect = false;

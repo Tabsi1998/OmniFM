@@ -68,17 +68,7 @@ function normalizeStoredTimestampMs(rawValue) {
 }
 
 function isPersistableGuildState(state) {
-  // Fix #605: a connection that is stuck in signalling or was just destroyed
-  // during shutdown may have currentStationKey still null while desiredStationKey
-  // already reflects what the server should play.  Persist desiredStationKey +
-  // lastChannelId as the restore target so the bot resumes after a restart even
-  // when it never finished connecting on the previous run.
-  if (state?.currentStationKey && state?.lastChannelId) return true;
-  return Boolean(
-    state?.shouldReconnect
-    && state?.desiredStationKey
-    && state?.lastChannelId
-  );
+  return Boolean(state?.currentStationKey && state?.lastChannelId);
 }
 
 function readStateFile(filePath) {
@@ -457,8 +447,10 @@ function loadSplitBotState(botId) {
  * Persists the playback targets of one bot.
  * @param {string} botId
  * @param {Map<string, import("./lib/types.js").GuildPlaybackState>} guildStates
+ * @param {Record<string, object> | null} [pendingTargets] saved targets the
+ *   runtime has not taken over yet; they stay as they are (#605)
  */
-function saveBotState(botId, guildStates) {
+function saveBotState(botId, guildStates, pendingTargets = null) {
   const botData = {};
 
   for (const [guildId, state] of guildStates.entries()) {
@@ -478,11 +470,8 @@ function saveBotState(botId, guildStates) {
 
     if (persistPlaybackState) {
       entry.channelId = state.lastChannelId;
-      // Fix #605: when currentStationKey is not set yet (voice was still in
-      // signalling / restore in-flight at shutdown), fall back to desiredStationKey
-      // so the restore target survives a restart and the bot resumes after coming back.
-      entry.stationKey = state.currentStationKey || state.desiredStationKey;
-      entry.stationName = state.currentStationName || state.desiredStationName || null;
+      entry.stationKey = state.currentStationKey;
+      entry.stationName = state.currentStationName || null;
       entry.desiredStationKey = state.desiredStationKey || state.currentStationKey;
       entry.desiredStationName = state.desiredStationName || state.currentStationName || null;
       if (state.failoverActive === true && entry.desiredStationKey !== entry.stationKey) {
@@ -535,6 +524,12 @@ function saveBotState(botId, guildStates) {
     }
 
     botData[guildId] = entry;
+  }
+
+  for (const [guildId, savedEntry] of Object.entries(pendingTargets || {})) {
+    if (botData[guildId]?.stationKey) continue;
+    // A newer volume from memory wins, the saved target stays.
+    botData[guildId] = { ...savedEntry, ...(botData[guildId] || {}) };
   }
 
   if (mongoActive) {

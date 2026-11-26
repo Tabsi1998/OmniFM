@@ -492,6 +492,7 @@ const permissionMethods = {
 
   restrictGuildAccess(guildId) {
     if (!guildId) return;
+    this.releasePendingRestoreTarget?.(guildId);
     const state = this.guildState.get(guildId);
     if (state) {
       state.shouldReconnect = false;

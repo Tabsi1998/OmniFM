@@ -11,6 +11,7 @@ import { log, logError } from "../lib/logging.js";
 import { applyJitter, VOICE_RECONNECT_MAX_MS, VOICE_RECONNECT_EXP_STEPS } from "../lib/helpers.js";
 import { recordConnectionEvent } from "../listening-stats-store.js";
 import { recordPlaybackPhase } from "./playback-phase.js";
+import { noteVoiceConnectionStatus } from "./runtime-live-state.js";
 import {
   VOICE_NETWORK_ERROR_RETRY_JITTER,
   VOICE_NETWORK_ERROR_RETRY_MIN_MS,
@@ -52,6 +53,15 @@ export function attachRuntimeConnectionHandlers(runtime, guildId, connection) {
       runtime.invalidateVoiceStatus?.(state);
     }
   };
+
+  // @discordjs/voice waits in signalling or connecting without a timeout once
+  // a ready connection lost its voice server. The clock noted here is what the
+  // voice reconcile checks before it rebuilds the connection (#605). The
+  // handlers are attached to a ready connection: its clock starts at zero.
+  noteVoiceConnectionStatus(connection, VoiceConnectionStatus.Ready);
+  connection.on("stateChange", (_oldState, newState) => {
+    noteVoiceConnectionStatus(connection, newState?.status);
+  });
 
   connection.on(VoiceConnectionStatus.Disconnected, async () => {
     recordConnectionEvent(guildId, {
@@ -118,6 +128,11 @@ export function attachRuntimeConnectionHandlers(runtime, guildId, connection) {
 
 export async function tryRuntimeReconnect(runtime, guildId) {
   const state = runtime.getState(guildId);
+  // A join during the shutdown would leave the bot in the channel after the
+  // final save, and the restarted worker sees that ghost leave again (#605).
+  if (runtime.shuttingDown) {
+    return { attempted: false, retryRecommended: false, reason: "shutdown" };
+  }
   if (state.reconnectInFlight || state.voiceConnectInFlight) {
     return { attempted: false, retryRecommended: true, reason: "busy" };
   }
@@ -422,6 +437,9 @@ export function handleRuntimeNetworkRecovered(runtime, recoveryEvent = null) {
 }
 
 export function scheduleRuntimeReconnect(runtime, guildId, options = {}) {
+  // Shutting down: the connections are destroyed on purpose, the target is
+  // saved as it is, and the restarted worker restores it (#605).
+  if (runtime.shuttingDown) return;
   const state = runtime.getState(guildId);
   if (!state.shouldReconnect || !state.lastChannelId) return;
   if (runtime.isScheduledEventStopDue(state.activeScheduledEventStopAtMs)) {

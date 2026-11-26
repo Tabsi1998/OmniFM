@@ -193,6 +193,8 @@ const commanderRuntime = new BotRuntime(commanderConfig, { role: "commander", wo
 
 // All runtimes for shared operations
 const runtimes = [commanderRuntime, ...workerRuntimes];
+// Every runtime here restores after its start; saves before that keep the saved targets (#605).
+for (const runtime of runtimes) runtime.holdSavedRestoreTargets();
 
 log("INFO", `Bot-Architektur: Commander="${commanderConfig.name}", Worker=${workerConfigs.length} (${workerConfigs.map(c => c.name).join(", ") || "keine"})`);
 

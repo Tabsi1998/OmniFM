@@ -23,6 +23,8 @@ await initCommandPermissionsStore();
 
 // Slot as the commander counts it, not the BOT number (#520).
 const { runtime, workerConfig, workerIndex } = createWorkerRuntime(process.env, BotRuntime);
+// Saves before the restore below keep the saved targets (#605).
+runtime.holdSavedRestoreTargets();
 const bridgeService = new WorkerBridgeService(runtime);
 let autohealMonitor = null;
 
