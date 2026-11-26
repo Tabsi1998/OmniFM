@@ -50,8 +50,8 @@ AzuraCast schickt den ganzen Now-Playing-Stand als JSON, ohne Feld für den Ausl
 
 - Der Betreiber-Webhook meldet „🔴 Live gestartet: DJ Tabsi – Titel“ und „Sendung beendet nach 1 h 12 min“. Abschalten: Owner-Konsole → Einstellungen → Alarme → „OmniFM Radio: Sendung gestartet oder beendet“ (oder `OPERATOR_ALERT_RADIO_LIVE=0`).
 - Das Cockpit zeigt in der Karte „OmniFM Radio · Live-Erkennung“ den Zustand, wie erkannt wird und die letzten Sendungen.
-- **Test-Sendung** (nur Rolle Owner): Der Knopf spielt Beginn und Ende durch (Quelle „Test“). Ton wird keiner gesendet, aber OmniFM 1 schreibt die Ankündigung auf die Test-Server (#593). Die Betreiber-Meldung beginnt dann mit „🧪 Test-Sendung:“. Nach 10 Minuten endet ein Test von selbst. Tests stehen nicht im Verlauf der Sendungen. Während einer echten Sendung geht kein Test; geht DJ Tabsi während eines Tests live, endet der Test und die echte Sendung beginnt.
-- Für weitere Meldungen (#593, #594, #595): `onOmnifmRadioLiveEvent(({ type, show }) => …)` aus `src/services/omnifm-radio-live.js`. `type` ist `start` oder `end`, `show.source` ist `webhook`, `poll` oder `test`; im Zustand steht es unter `current.source`. Eine Test-Sendung bitte überspringen.
+- **Test-Sendung** (nur Rolle Owner): Der Knopf spielt Beginn und Ende durch (Quelle „Test“). Ton wird keiner gesendet, aber OmniFM 1 schreibt die Ankündigung auf die Test-Server (#593), und solange der DM-Modus nicht auf „Aus“ steht, gehen Test-DMs an die Besitzer der Test-Server (#594). Die Betreiber-Meldung beginnt dann mit „🧪 Test-Sendung:“. Nach 10 Minuten endet ein Test von selbst. Tests stehen nicht im Verlauf der Sendungen. Während einer echten Sendung geht kein Test; geht DJ Tabsi während eines Tests live, endet der Test und die echte Sendung beginnt.
+- Für weitere Meldungen (#593, #594, #595): `onOmnifmRadioLiveEvent(({ type, show }) => …)` aus `src/services/omnifm-radio-live.js`. `type` ist `start` oder `end`, `show.source` ist `webhook`, `poll` oder `test`; im Zustand steht es unter `current.source`. Eine Test-Sendung geht nur an die Test-Server: Ankündigungen (#593) und DMs (#594) nur dorthin bzw. an deren Besitzer.
 
 ## Ankündigung auf jedem Server (#593)
 
@@ -65,3 +65,28 @@ Geht eine Sendung live, schreibt **OmniFM 1** (der erste Worker, Slot 1) auf jed
 - **Übersprungen:** Ohne Kanal, ohne die Rechte Kanal ansehen, Nachrichten senden und Links einbetten oder bei „aus“ bleibt der Server still. Das prüft OmniFM 1 vorab aus seinem Speicher, so kostet ein solcher Server keine Wartezeit. Im Log steht je Sendung eine Zeile mit den Zahlen (`posted`, `off`, `limit`, `skipped` …).
 - **„Jetzt hören“:** OmniFM 1 kommt in den Sprachkanal der Person und spielt OmniFM Radio, mit denselben Regeln wie `/play` (Rollenrechte, Plan, Sichtbarkeit). Ohne Sprachkanal kommt ein kurzer Hinweis. Spielt OmniFM 1 schon woanders auf dem Server oder ist ein anderer OmniFM-Bot im Kanal, wird niemand umgeschaltet; der Hinweis nennt `/play`.
 - **Technik:** Der Commander (oder der Monolith) hört auf `onOmnifmRadioLiveEvent` (`src/services/omnifm-radio-announce.js`). OmniFM 1 prüft, schreibt und bearbeitet über die Worker-Bridge (`radioAnnounceCheck`, `radioAnnounce`, `radioAnnounceEnd`). Jede Ankündigung wird vor dem Senden in MongoDB reserviert (`omnifm_radio_announcements`, eine Woche lang), so gibt es auch bei zwei Commandern keine doppelte; die Nachrichten-ID trägt OmniFM 1 selbst nach. Ein verpasstes Ende holt der Commander beim Start und alle 5 Minuten nach, auch nach einem Neustart.
+
+## DMs an Server-Besitzer (#594)
+
+Geht DJ Tabsi live, bekommt der Besitzer jedes Servers mit OmniFM, auf dem OmniFM Radio sichtbar ist, eine kurze DM: „🔴 DJ Tabsi ist live auf OmniFM Radio“, der Titel, warum er sie bekommt, die Knöpfe „Jetzt hören“ (öffentlicher Player `<OMNIFM_RADIO_BASE_URL>/public/<OMNIFM_RADIO_STATION>`) und „Abbestellen“. Die Sprache ist die des Servers. Admins bekommen keine DM. Code: `src/services/omnifm-radio-dm.js`, Nachricht und Knöpfe in `src/bot/omnifm-radio-dm-message.js`, Zustand pro Person in `src/omnifm-radio-dm-store.js` (MongoDB `omnifm_radio_dm`).
+
+**Risiko:** Ungefragte Massen-DMs wertet Discord als Spam. Dafür werden Bots eingeschränkt oder gesperrt, und das träfe ganz OmniFM. Deshalb:
+
+- Nur beim Beginn einer Sendung, nie beim Ende. Wer mehrere Server besitzt, bekommt eine DM.
+- Höchstens **eine DM pro Person in 12 Stunden**, gespeichert, also auch über einen Neustart. Vor dem Senden wird der Platz belegt; scheitert das Senden, gibt es trotzdem keine zweite.
+- **Langsam:** eine Warteschlange für alle, eine DM alle 5 Sekunden. Gesendet wird über einen eigenen REST-Client mit dem Commander-Token, ohne Wiederholung (eine Anfrage, die in die Zeitüberschreitung läuft, könnte sonst doppelt ankommen) und ohne Warten auf ein echtes 429 (das ginge am Not-Aus vorbei). Sperrt der REST-Client selbst kurz, bevor er Discord fragt, wartet die Verteilung das ab (höchstens eine Minute, sonst stoppt sie mit „Rate-Limit zu lang“); gesendet war dann noch nichts. Not-Aus und Sendungsende brechen auch eine DM ab, die gerade rausgeht. Lehnt Discord ab (50007, 10013 oder 403, DMs geschlossen), lässt OmniFM die Person 30 Tage in Ruhe, aber nur, wenn in dieser Verteilung mindestens eine DM ankam und nicht gebremst wurde.
+- **Not-Bremse:** Meldet Discord 40003, 40004 oder ein echtes 429, schlagen fünf DMs hintereinander aus anderem Grund fehl, oder sind ab 20 Versuchen mehr als 90 % fehlgeschlagen (geschlossene DMs mitgezählt), stoppt die Verteilung, der Modus springt auf `off` und der Betreiber-Webhook meldet es, immer, unabhängig von den Alarm-Schaltern. Geschlossene DMs allein lösen die Fünf-in-Folge-Grenze nicht aus. Wieder einschalten nur von Hand.
+- **Abbestellen** löscht auch die Zeiten der letzten DMs und der geschlossenen DMs; gespeichert bleiben nur die Wahl und wann sie getroffen wurde.
+- Jede DM wird vor dem Belegen gebaut. Ist eine Einstellung kaputt (etwa `OMNIFM_RADIO_BASE_URL` ohne `https://`), stoppt die Verteilung mit „Einstellung fehlerhaft“, und niemandem werden die 12 Stunden angerechnet.
+- **„Abbestellen“** gilt dauerhaft, auch nach Neustarts. Die DM zeigt danach „Wieder abonnieren“.
+- **/meine-daten** zeigt den Zustand (abbestellt, letzte DM, DMs geschlossen bis) und schickt ihn in der Datei mit. „Alles löschen“ löscht ihn; wer abbestellt hat, behält nur `{ _id, unsubscribed: true }` ohne Zeiten, damit die Abmeldung weiter gilt. Wer weder abbestellt noch wieder abonniert hat, verliert den Eintrag 30 Tage nach der letzten DM von selbst (TTL-Index auf `expiresAt`). Steht so auch in der Datenschutzerklärung.
+- Endet die Sendung, während noch DMs ausstehen, gehen die restlichen nicht mehr raus.
+- **Test-Sendung:** DMs nur an die Besitzer der Server aus `OMNIFM_RADIO_TEST_GUILD_IDS`, mit dem Hinweis „🧪 Test-Sendung“. Eigene Grenze von einer DM in 10 Minuten, die 12 Stunden bleiben unberührt.
+
+**Not-Aus und Modus:** Owner-Konsole → Cockpit → Karte „OmniFM Radio · DMs an Server-Besitzer“ (nur Rolle Owner schaltet, gespeichert in `owner_config.radioDm.mode`). Ohne Wert dort gilt `OMNIFM_RADIO_DM_MODE`, sonst `owners`.
+
+- `owners`: alle Besitzer wie oben (Standard).
+- `optin`: nur wer nach dem Abbestellen „Wieder abonnieren“ gedrückt hat. Einen anderen Weg zum Anmelden gibt es vorerst bewusst nicht.
+- `off`: keine DMs. Der Modus wird vor **jeder einzelnen** DM gelesen, „Aus“ stoppt also auch eine laufende Verteilung sofort, noch bevor es gespeichert ist; antwortet die Datenbank nicht, bleibt „Aus“ im Speicher, bis das Speichern klappt. Ein unbekannter Wert und eine Datenbank, die nicht antwortet, zählen wie `off`.
+
+Die Karte zeigt außerdem die letzte Verteilung: gesendet, übersprungen, fehlgeschlagen, offen und warum sie gestoppt hat. Gesendet wird vom Commander („OmniFM DJ“, im Monolith ebenso), die Worker schicken nie DMs. Die Ankündigung im Kanal (#593) schreibt dagegen OmniFM 1, der erste Worker.

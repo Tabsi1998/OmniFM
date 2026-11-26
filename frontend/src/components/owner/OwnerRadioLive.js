@@ -69,7 +69,7 @@ export default function OwnerRadioLive({ apiGet, apiSend }) {
                 {testRunning ? 'Test-Sendung beenden' : 'Test-Sendung starten'}
               </button>
               <span style={{ color: '#8190a8', fontSize: 12 }}>
-                {realLive ? 'Während einer echten Sendung geht kein Test.' : 'Spielt Beginn und Ende einer Sendung durch, mit Betreiber-Meldung, ohne zu senden. Endet nach 10 Minuten von selbst.'}
+                {realLive ? 'Während einer echten Sendung geht kein Test.' : 'Spielt Beginn und Ende einer Sendung durch, ohne Ton: mit Betreiber-Meldung und, außer der DM-Modus steht auf „Aus“, Test-DMs an die Besitzer der Test-Server. Endet nach 10 Minuten von selbst.'}
               </span>
             </div>
           )}

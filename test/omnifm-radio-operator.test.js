@@ -66,3 +66,20 @@ test("the operator message goes out once per event and can be switched off", asy
   assert.equal(await alertRadioLive(start, off, send), false);
   assert.equal(sent.length, 2);
 });
+
+test("the DM emergency brake (#594) tells the operator why the DMs are off now", async () => {
+  const { buildRadioDmBrakeAlert, alertRadioDmBrake } = await import("../src/services/operator-alerts.js");
+  const run = { startedAt: "2026-11-25T20:00:05.000Z", sent: 12, failed: 5, remaining: 40, error: "You are opening direct messages too fast." };
+  const discord = buildRadioDmBrakeAlert({ reason: "discord", run });
+  assert.match(discord.embed.title, /DMs gestoppt/);
+  assert.match(discord.embed.title, /Discord bremst/);
+  assert.match(discord.embed.description, /12 gesendet/);
+  assert.match(discord.embed.description, /„Aus“/);
+  assert.match(buildRadioDmBrakeAlert({ reason: "failures", run }).embed.title, /Fehler/);
+  assert.notEqual(discord.key, buildRadioDmBrakeAlert({ reason: "discord", run: { ...run, startedAt: "2026-11-26T20:00:05.000Z" } }).key, "one per run");
+
+  const sent = [];
+  assert.equal(await alertRadioDmBrake({ reason: "discord", run }, {}, async (key, embed) => { sent.push(embed); return true; }), true);
+  assert.equal(await alertRadioDmBrake({ reason: "discord", run }, { OPERATOR_ALERT_RADIO_LIVE: "0" }, async (key, embed) => { sent.push(embed); return true; }), true, "the brake ignores the show messages' switch");
+  assert.equal(sent.length, 2);
+});

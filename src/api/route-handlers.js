@@ -40,6 +40,7 @@ import { createImageRoutesHandler } from "./routes/image-routes.js";
 import { createOwnerStatusRoutesHandler } from "./routes/owner-status-routes.js";
 import { createOmnifmRadioWebhookHandler, createOwnerRadioRoutesHandler } from "./routes/omnifm-radio-routes.js";
 import { getOmnifmRadioLiveService } from "../services/omnifm-radio-live.js";
+import { getOmnifmRadioDmService } from "../services/omnifm-radio-dm.js";
 import { getOwnerStatusService } from "../services/owner-status/service.js";
 import { WEBSITE_URL } from "../bot/runtime-links.js";
 import { log, webRootSource, frontendBuildStamp, rootDir } from "../lib/logging.js";
@@ -344,7 +345,8 @@ export const handleActivityRoutes = createActivityRoutes({ sendJson, methodNotAl
 export const handleOwnerStatusRoutes = createOwnerStatusRoutesHandler({ getService: getOwnerStatusService });
 // OmniFM Radio (#592): the AzuraCast webhook and the live state in the console.
 export const handleOmnifmRadioWebhook = createOmnifmRadioWebhookHandler({ getService: getOmnifmRadioLiveService, log });
-export const handleOwnerRadioRoutes = createOwnerRadioRoutesHandler({ getService: getOmnifmRadioLiveService });
+// The DMs to server owners (#594): mode and kill switch next to the live state.
+export const handleOwnerRadioRoutes = createOwnerRadioRoutesHandler({ getService: getOmnifmRadioLiveService, getDmService: getOmnifmRadioDmService });
 
 // Link previews for Discord (#279); the invite page links to the commander.
 export const handleShareRoutes = createShareRoutesHandler({

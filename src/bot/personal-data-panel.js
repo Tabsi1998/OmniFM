@@ -23,7 +23,7 @@ export function parsePersonalDataCustomId(customId) {
   return ACTIONS.has(action) ? action : null;
 }
 
-function rows({ t, counts }) {
+function rows({ t, counts, radioDmOptOut = false }) {
   return [
     [t("💾 Merkliste", "💾 Saved songs"), counts.savedSongs, t("Songs", "songs")],
     [t("🗳 Votes (top.gg, discordbotlist)", "🗳 Votes (top.gg, discordbotlist)"), counts.votes, t("Votes", "votes")],
@@ -37,6 +37,9 @@ function rows({ t, counts }) {
     counts.linkedRoles ? [t("🔗 Verknüpfte Rollen in Discord", "🔗 Linked roles in Discord"), t("verbunden", "connected"), ""] : null,
     counts.supportRoles ? [t("⭐ Premium-Rolle im OmniFM-Support-Server", "⭐ Premium role in the OmniFM support server"), t("ja", "yes"), ""] : null,
     counts.ownerConsoleLogins ? [t("🔐 Anmeldungen in der Owner-Konsole", "🔐 Owner console logins"), counts.ownerConsoleLogins, ""] : null,
+    counts.radioDms ? [t("🔴 OmniFM-Radio-DMs (letzte DM, Abmeldung)", "🔴 OmniFM Radio DMs (last DM, unsubscribe)"), t("ja", "yes"), ""] : null,
+    // A bare unsubscribe stays on purpose (#594): shown, but nothing to delete.
+    !counts.radioDms && radioDmOptOut ? [t("🔴 OmniFM-Radio-DMs", "🔴 OmniFM Radio DMs"), t("Abmeldung gespeichert", "unsubscribe stored"), ""] : null,
   ].filter(Boolean);
 }
 
@@ -48,8 +51,8 @@ export function totalCount(counts = {}) {
  * The overview: what is stored, the listening hours switch (#302) and the
  * two buttons. listening: { counting, hours } of the person.
  */
-export function buildPersonalDataPayload({ t, counts, applicationId = null, listening = { counting: false, hours: 0 } }) {
-  const lines = rows({ t, counts }).map(([label, count, unit]) => `${label}: **${count}**${unit ? ` ${unit}` : ""}`);
+export function buildPersonalDataPayload({ t, counts, applicationId = null, listening = { counting: false, hours: 0 }, radioDmOptOut = false }) {
+  const lines = rows({ t, counts, radioDmOptOut }).map(([label, count, unit]) => `${label}: **${count}**${unit ? ` ${unit}` : ""}`);
   lines.push(listening?.counting
     ? `${t("⏱ Hörstunden", "⏱ Listening hours")}: **${Number(listening.hours) || 0}** ${t("Std. (Zählen ist an)", "h (counting is on)")}`
     : `${t("⏱ Hörstunden", "⏱ Listening hours")}: **${t("aus", "off")}**`);
@@ -113,14 +116,23 @@ export function buildPersonalDataFileHere({ t, data }) {
   return { ...buildPersonalDataFile({ t, data }), flags: MessageFlags.Ephemeral };
 }
 
-export function buildErasePersonalDataConfirm({ t, counts }) {
+export function buildErasePersonalDataConfirm({ t, counts, radioDmOptOut = false }) {
   return ui.reply(ui.confirm({
     title: t("Alles löschen?", "Delete everything?"),
-    body: t(
-      "OmniFM löscht deine Merkliste, deine Votes, deine Anmeldungen (du wirst im Dashboard abgemeldet), deine Hörstunden und die verknüpften Rollen. Bei Umfragen, Events und Dashboard-Änderungen bleibt der Eintrag für den Server, dein Name wird entfernt. Insgesamt {count} Einträge. Das lässt sich nicht rückgängig machen.",
-      "OmniFM deletes your saved songs, your votes, your logins (you are signed out of the dashboard), your listening hours and the linked roles. Polls, events and dashboard changes stay with the server, your name is removed. {count} entries in all. This cannot be undone.",
-      { count: totalCount(counts) }
-    ),
+    body: [
+      t(
+        "OmniFM löscht deine Merkliste, deine Votes, deine Anmeldungen (du wirst im Dashboard abgemeldet), deine Hörstunden und die verknüpften Rollen. Bei Umfragen, Events und Dashboard-Änderungen bleibt der Eintrag für den Server, dein Name wird entfernt. Insgesamt {count} Einträge. Das lässt sich nicht rückgängig machen.",
+        "OmniFM deletes your saved songs, your votes, your logins (you are signed out of the dashboard), your listening hours and the linked roles. Polls, events and dashboard changes stay with the server, your name is removed. {count} entries in all. This cannot be undone.",
+        { count: totalCount(counts) }
+      ),
+      // The opt-out is the one thing kept, so the DMs stay off (#594).
+      counts.radioDms || radioDmOptOut
+        ? t(
+          "Hast du die DMs von OmniFM Radio abbestellt, bleibt nur diese Abmeldung gespeichert, damit du keine mehr bekommst.",
+          "If you unsubscribed from the OmniFM Radio DMs, only that unsubscribe is kept, so you do not get any again."
+        )
+        : "",
+    ].filter(Boolean).join("\n\n"),
     confirmId: personalDataCustomId("eraseyes"),
     cancelId: personalDataCustomId("eraseno"),
     confirmLabel: t("Ja, alles löschen", "Yes, delete everything"),

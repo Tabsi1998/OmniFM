@@ -95,10 +95,14 @@ describe('legal pages', () => {
     render(<I18nProvider><PrivacySection legal={LEGAL} privacy={PRIVACY} /></I18nProvider>);
     const text = pageText('privacy-section');
 
-    expect(screen.getByTestId('legal-updated').textContent).toBe('Stand: 13. November 2026');
+    expect(screen.getByTestId('legal-updated').textContent).toBe('Stand: 25. November 2026');
     const toc = screen.getByTestId('legal-toc');
     expect(toc.querySelector('a[href="#privacy-transfers"]').textContent).toBe('Übermittlung in Länder außerhalb der EU');
     expect(document.getElementById('privacy-transfers').textContent).toContain('Data Privacy Framework');
+    // The OmniFM Radio DMs (#594): what is kept, and that an unsubscribe outlives "delete everything".
+    expect(document.getElementById('privacy-radio-dm').textContent).toContain('bleibt nur diese Abmeldung ohne Zeitpunkt gespeichert');
+    expect(document.getElementById('privacy-radio-dm').textContent).toContain('30 Tage nach der letzten DM von selbst');
+    expect(document.getElementById('privacy-radio-dm').textContent).toContain('nur die Besitzer der Test-Server');
     // Art. 13 (1)(c) and (2)(e)/(f): consent as a legal basis, voluntary data, no automated decisions.
     expect(document.getElementById('privacy-basis').textContent).toContain('Art. 6 Abs. 1 lit. a DSGVO');
     expect(document.getElementById('privacy-voluntary').textContent).toContain('Art. 22 DSGVO');
@@ -123,7 +127,7 @@ describe('legal pages', () => {
     expect(text).not.toContain('Testmonat Aktiv');
     expect(text).not.toContain('Gültig ab');
     for (const phrase of OPERATOR_ONLY) expect(text).not.toContain(phrase);
-    expect(screen.getByTestId('legal-updated').textContent).toBe('Stand: 13. November 2026');
+    expect(screen.getByTestId('legal-updated').textContent).toBe('Stand: 25. November 2026');
     expect(screen.getByTestId('legal-toc')).toBeTruthy();
     unmount();
 

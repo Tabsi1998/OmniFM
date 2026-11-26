@@ -14,6 +14,8 @@
 //   listening hours, if switched on (#302)  -> deleted, counting off
 //   the linked roles connection (#302)    -> deleted; Discord gets empty values first
 //   the premium role in the support server -> forgotten (given again while premium)
+//   the OmniFM Radio DMs (#594)           -> deleted; an unsubscribe stays as a bare
+//                                            marker, so no DM comes again
 // Not part of it: premium purchases and invoices (kept by law for tax), the
 // server settings (they belong to the server) and what the owner team did
 // in the owner console (their audit trail).
@@ -32,6 +34,7 @@ import { forgetReporter, listReportsOfReporter } from "../problem-reports-store.
 import { forgetEggFinder, listEggsOfFinder } from "../easter-eggs-store.js";
 import { forgetListeningHours, getListeningHours } from "../listening-hours-store.js";
 import { countSupportRolesOf, forgetLinkedRoles, forgetSupportRolesOf, getLinkedRoleInfo } from "../linked-roles-store.js";
+import { sharedOmnifmRadioDmStore } from "../omnifm-radio-dm-store.js";
 
 export const ERASED_ACTOR = "dashboard:gelöscht";
 // Another process may hold the vote list or a login in its cache for a few seconds.
@@ -44,6 +47,32 @@ function cleanUserId(userId) {
 
 export function personalDataAvailable() {
   return isConnected() && Boolean(getDb());
+}
+
+const isoOrNull = (ms) => (ms === null || ms === undefined ? null : new Date(ms).toISOString());
+
+/** The OmniFM Radio DM state for the file, or null (#594). */
+function radioDmsFor(person) {
+  if (!person) return null;
+  return {
+    unsubscribed: person.unsubscribed,
+    subscribed: person.subscribed,
+    unsubscribedAt: isoOrNull(person.unsubscribedAt),
+    subscribedAt: isoOrNull(person.subscribedAt),
+    lastDmAt: isoOrNull(person.lastDmAt),
+    lastTestDmAt: isoOrNull(person.lastTestDmAt),
+    dmsClosedUntil: isoOrNull(person.dmClosedUntil),
+    updatedAt: isoOrNull(person.updatedAt),
+    // Without a choice (abbestellt/abonniert) the entry goes by itself then.
+    deletedAutomaticallyAt: isoOrNull(person.expiresAt),
+    onDelete: "Hast du die DMs von OmniFM Radio abbestellt, bleibt beim Löschen nur diese Abmeldung gespeichert (ohne Zeiten), damit du keine mehr bekommst. Alles andere wird gelöscht.",
+  };
+}
+
+/** Anything beyond a bare unsubscribe, which deleting keeps. */
+function radioDmsBeyondOptOut(state) {
+  if (!state) return false;
+  return Boolean(state.subscribed || state.unsubscribedAt || state.subscribedAt || state.lastDmAt || state.lastTestDmAt || state.dmsClosedUntil || state.updatedAt);
 }
 
 function eventsCreatedBy(id) {
@@ -62,7 +91,7 @@ export async function collectPersonalData(userId, { now = new Date() } = {}) {
   const id = cleanUserId(userId);
   if (!id) return { ok: false, error: "invalid_user" };
   if (!personalDataAvailable()) return { ok: false, error: "db_unavailable" };
-  const [savedSongs, votes, logins, ownerLogins, polls, changes, suggestions, reports, easterEggs, hours, linked, supportRoles] = await Promise.all([
+  const [savedSongs, votes, logins, ownerLogins, polls, changes, suggestions, reports, easterEggs, hours, linked, supportRoles, radioDms] = await Promise.all([
     listSavedSongs(id),
     listVoteEventsOfUser(id),
     listDashboardSessionsOfUser(id),
@@ -75,6 +104,7 @@ export async function collectPersonalData(userId, { now = new Date() } = {}) {
     getListeningHours(id),
     getLinkedRoleInfo(id),
     countSupportRolesOf(id),
+    sharedOmnifmRadioDmStore().get(id),
   ]);
   return {
     ok: true,
@@ -141,6 +171,8 @@ export async function collectPersonalData(userId, { now = new Date() } = {}) {
         }
         : null,
       supportServerPremiumRole: supportRoles > 0,
+      // The OmniFM Radio DMs (#594): whether you unsubscribed and when the last DM came.
+      radioDms: radioDmsFor(radioDms),
       notIncluded: [
         "Premium-Käufe und Rechnungen: Die müssen wir aus steuerlichen Gründen aufbewahren.",
         "Server-Einstellungen, eigene Sender und Events gehören dem Server, nicht einer Person.",
@@ -165,7 +197,16 @@ export function countPersonalData(data = {}) {
     listeningHours: data.listeningHours ? 1 : 0,
     linkedRoles: data.linkedRoles ? 1 : 0,
     supportRoles: data.supportServerPremiumRole ? 1 : 0,
+    radioDms: radioDmsBeyondOptOut(data.radioDms) ? 1 : 0,
   };
+}
+
+/** The DM state goes; an unsubscribe stays as a bare marker (#594). */
+async function forgetRadioDms(id) {
+  const store = sharedOmnifmRadioDmStore();
+  const before = radioDmsFor(await store.get(id));
+  await store.forget(id);
+  return radioDmsBeyondOptOut(before) ? 1 : 0;
 }
 
 async function eraseOnce(id) {
@@ -193,6 +234,7 @@ async function eraseOnce(id) {
     listeningHours: await forgetListeningHours(id),
     linkedRoles: await forgetLinkedRoles(id),
     supportRoles: await forgetSupportRolesOf(id),
+    radioDms: await forgetRadioDms(id),
   };
 }
 

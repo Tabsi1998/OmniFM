@@ -12,6 +12,7 @@ const hasMongoConfig = Boolean(String(process.env.MONGO_URL || "").trim());
 
 const {
   PERSONAL_DATA_PREFIX,
+  buildErasePersonalDataConfirm,
   buildPersonalDataPayload,
   parsePersonalDataCustomId,
   personalDataCustomId,
@@ -63,6 +64,37 @@ test("mydata panel: private, and nothing to delete means no delete button", () =
   assert.equal(buttons.find((button) => button.custom_id === personalDataCustomId("erase"))?.disabled, true);
   assert.equal(buttons.find((button) => button.custom_id === personalDataCustomId("export"))?.disabled, undefined);
   assert.equal(totalCount({ ...empty, savedSongs: 3, votes: 2 }), 5);
+});
+
+const textOf = (payload) => JSON.stringify(payload.components.map((component) => component.toJSON()));
+
+test("mydata panel: the OmniFM Radio DMs are listed, and deleting says an unsubscribe stays (#594)", () => {
+  const t = botTranslator("de");
+  const counts = { savedSongs: 0, votes: 0, dashboardLogins: 0, ownerConsoleLogins: 0, pollsStarted: 0, eventsCreated: 0, dashboardChanges: 0, radioDms: 1 };
+  assert.match(textOf(buildPersonalDataPayload({ t, counts })), /OmniFM-Radio-DMs/);
+  assert.doesNotMatch(textOf(buildPersonalDataPayload({ t, counts: { ...counts, radioDms: 0 } })), /OmniFM-Radio-DMs/);
+  assert.match(textOf(buildErasePersonalDataConfirm({ t, counts })), /bleibt nur diese Abmeldung gespeichert/);
+  assert.doesNotMatch(textOf(buildErasePersonalDataConfirm({ t, counts: { ...counts, radioDms: 0, savedSongs: 2 } })), /OmniFM Radio/, "no word about the DMs without DM data");
+});
+
+test("mydata panel: a bare unsubscribe is shown as stored, but there is nothing to delete (#594)", () => {
+  const t = botTranslator("de");
+  const counts = { savedSongs: 0, votes: 0, dashboardLogins: 0, ownerConsoleLogins: 0, pollsStarted: 0, eventsCreated: 0, dashboardChanges: 0, radioDms: 0 };
+  const payload = buildPersonalDataPayload({ t, counts, radioDmOptOut: true });
+  assert.match(textOf(payload), /OmniFM-Radio-DMs: \*\*Abmeldung gespeichert\*\*/);
+  const erase = payload.components.flatMap((component) => component.toJSON().components)
+    .filter((block) => block.type === 1).flatMap((row) => row.components)
+    .find((button) => button.custom_id === personalDataCustomId("erase"));
+  assert.equal(erase.disabled, true, "the opt-out is not deletable");
+  assert.match(textOf(buildErasePersonalDataConfirm({ t, counts: { ...counts, savedSongs: 1 }, radioDmOptOut: true })), /bleibt nur diese Abmeldung gespeichert/);
+});
+
+test("mydata counts the OmniFM Radio DMs only beyond a bare unsubscribe, which deleting keeps (#594)", async () => {
+  const { countPersonalData } = await import("../src/lib/personal-data.js");
+  const bare = { unsubscribed: true, subscribed: false, unsubscribedAt: null, subscribedAt: null, lastDmAt: null, lastTestDmAt: null, dmsClosedUntil: null, updatedAt: null, deletedAutomaticallyAt: null, onDelete: "…" };
+  assert.equal(countPersonalData({ radioDms: bare }).radioDms, 0);
+  assert.equal(countPersonalData({ radioDms: { ...bare, lastDmAt: "2026-11-25T20:00:00.000Z" } }).radioDms, 1);
+  assert.equal(countPersonalData({ radioDms: null }).radioDms, 0);
 });
 
 test("after 'delete everything' the Discord ID is in no collection", { skip: !hasMongoConfig }, async () => {
@@ -132,6 +164,9 @@ test("after 'delete everything' the Discord ID is in no collection", { skip: !ha
   const saved = await saveLinkedRoleTokens(person, { accessToken: "access", refreshToken: "refresh", expiresAt: new Date(Date.now() + 86_400_000) }, { key: Buffer.alloc(32, 7) });
   assert.equal(saved.ok, true, JSON.stringify(saved));
   await recordSupportRole(snowflake(), person, snowflake());
+  // The last OmniFM Radio DM (#594): without an unsubscribe nothing of it stays.
+  const { sharedOmnifmRadioDmStore } = await import("../src/omnifm-radio-dm-store.js");
+  assert.equal(await sharedOmnifmRadioDmStore().claim(person, { quota: "real", windowMs: 43_200_000, now: Date.now() }), true);
   assert.ok(await eventually(async () => (await listVoteEventsOfUser(person)).length === 1
     && Boolean(await db.collection("dashboard_auth_sessions").findOne({ "session.user.id": person }))
     && Boolean(await db.collection("scheduled_events").findOne({ createdByUserId: person }))), "seeded");
@@ -140,9 +175,13 @@ test("after 'delete everything' the Discord ID is in no collection", { skip: !ha
   assert.equal(collected.ok, true);
   assert.deepEqual(countPersonalData(collected.data), {
     savedSongs: 1, votes: 1, dashboardLogins: 1, ownerConsoleLogins: 1, pollsStarted: 1, eventsCreated: 1, dashboardChanges: 1, stationSuggestions: 1, reports: 1, easterEggs: 1,
-    listeningHours: 1, linkedRoles: 1, supportRoles: 1,
+    listeningHours: 1, linkedRoles: 1, supportRoles: 1, radioDms: 1,
   });
   assert.equal(collected.data.listeningHours.hours, 2);
+  assert.equal(collected.data.radioDms.unsubscribed, false);
+  assert.equal(typeof collected.data.radioDms.lastDmAt, "string");
+  assert.equal(typeof collected.data.radioDms.updatedAt, "string");
+  assert.equal(typeof collected.data.radioDms.deletedAutomaticallyAt, "string", "without a choice the file says when it goes by itself");
   assert.ok(!JSON.stringify(collected.data).includes("refresh"), "no Discord key in the file");
   assert.equal(collected.data.reports[0].text, "Mehr Jazz bitte");
   assert.deepEqual(
@@ -189,4 +228,38 @@ test("after 'delete everything' the Discord ID is in no collection", { skip: !ha
   // A sync reading the old vote again leaves it out; a new vote counts.
   assert.equal(mergeVoteEvents([{ provider: "topgg", userId: person, username: "person", votedAt: hourAgo }]).added, 0);
   assert.equal(recordVoteEvent({ provider: "topgg", userId: person, username: "person", votedAt: new Date(Date.now() + 1000).toISOString() }).added, true);
+});
+
+test("an unsubscribe from the OmniFM Radio DMs is in the file and is all that stays after deleting (#594)", { skip: !hasMongoConfig }, async () => {
+  const { connect, getDb } = await import("../src/lib/db.js");
+  await connect();
+  const { OMNIFM_RADIO_DM_COLLECTION, sharedOmnifmRadioDmStore } = await import("../src/omnifm-radio-dm-store.js");
+  const { collectPersonalData, countPersonalData, erasePersonalData } = await import("../src/lib/personal-data.js");
+  const person = snowflake();
+  const store = sharedOmnifmRadioDmStore();
+  const at = Date.parse("2026-11-25T20:00:00Z");
+  await store.claim(person, { quota: "real", windowMs: 43_200_000, now: at });
+  await store.setSubscribed(person, false, { now: at + 60_000 });
+
+  const collected = await collectPersonalData(person);
+  const { onDelete, ...state } = collected.data.radioDms;
+  assert.deepEqual(state, {
+    unsubscribed: true,
+    subscribed: false,
+    unsubscribedAt: "2026-11-25T20:01:00.000Z",
+    subscribedAt: null,
+    lastDmAt: null,
+    lastTestDmAt: null,
+    dmsClosedUntil: null,
+    updatedAt: "2026-11-25T20:01:00.000Z",
+    deletedAutomaticallyAt: null,
+  });
+  assert.match(onDelete, /Abmeldung/, "the file says what deleting keeps");
+  assert.equal(countPersonalData(collected.data).radioDms, 1);
+
+  const erased = await erasePersonalData(person, { secondPassMs: 0 });
+  assert.equal(erased.counts.radioDms, 1);
+  assert.deepEqual(await getDb().collection(OMNIFM_RADIO_DM_COLLECTION).findOne({ _id: person }), { _id: person, unsubscribed: true });
+  assert.equal(countPersonalData((await collectPersonalData(person)).data).radioDms, 0, "nothing left to delete");
+  assert.equal((await erasePersonalData(person, { secondPassMs: 0 })).counts.radioDms, 0);
 });

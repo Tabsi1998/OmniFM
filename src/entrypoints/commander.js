@@ -5,6 +5,7 @@ import { startWebServer } from "../api/server.js";
 import { startRuntimeHealthReporter } from "../services/runtime-health-reporter.js";
 import { startStationHealthService, stopStationHealthService } from "../services/station-health.js";
 import { startOmnifmRadioLiveService, stopOmnifmRadioLiveService } from "../services/omnifm-radio-live.js";
+import { startOmnifmRadioDmService, stopOmnifmRadioDmService } from "../services/omnifm-radio-dm.js";
 import { startOmnifmRadioAnnouncements, stopOmnifmRadioAnnouncements } from "../services/omnifm-radio-announce.js";
 import { listWorkerSnapshots } from "../core/worker-bridge.js";
 import { loadStations } from "../stations-store.js";
@@ -65,6 +66,8 @@ startStationHealthService(loadStations);
 // OmniFM Radio (#592): live detection by webhook and poll, in the commander only.
 await startOmnifmRadioLiveService().catch((err) => logError("[OmniFM Radio] Live-Erkennung nicht gestartet", err));
 startOmnifmRadioAnnouncements({ getWorkerManager: () => workerManager }); // #593: OmniFM 1 announces each show
+// DMs to the server owners (#594), sent by the commander below once it is logged in.
+startOmnifmRadioDmService({ getRuntime: () => commanderRuntime });
 const { commanderConfig, workerConfigs } = resolveBotTopology(process.env);
 
 const remoteWorkers = workerConfigs.map((config) => new RemoteWorkerHandle(config));
@@ -126,6 +129,7 @@ installProcessHandlers({
       // At most 3 s, alongside the stores: the radio never holds the bot state back.
       await Promise.all([
         stopOmnifmRadioLiveService(),
+        stopOmnifmRadioDmService(),
         stopOmnifmRadioAnnouncements(),
         stopScheduledEventsStore(),
         stopCustomStationsStore(),
