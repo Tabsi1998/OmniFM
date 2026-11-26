@@ -14,6 +14,13 @@ const scratchDir = fs.mkdtempSync(path.join(os.tmpdir(), "omnifm-605-"));
 process.env.OMNIFM_RUNTIME_DATA_DIR = scratchDir;
 process.env.LOGS_DIR = path.join(scratchDir, "logs");
 process.env.OMNIFM_BOT_STATE_FILE = path.join(scratchDir, "bot-state.json");
+process.on("exit", () => {
+  try {
+    fs.rmSync(scratchDir, { recursive: true, force: true, maxRetries: 3 });
+  } catch {
+    // left for the system's temp cleanup
+  }
+});
 
 const { BotRuntime } = await import("../src/bot/runtime.js");
 const { getBotState, saveBotState } = await import("../src/bot-state.js");
