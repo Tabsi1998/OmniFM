@@ -285,11 +285,56 @@ test("shutdown persists the target of a stuck connection and plans no rejoin aft
   }
 });
 
+test("a shutdown during the restore joins no further server and keeps their targets", async () => {
+  const botId = "bot-605-restore-shutdown";
+  saveTargets(botId, ["guild-1", "guild-2"]);
+  const runtime = createRuntime(botId);
+  try {
+    runtime.holdSavedRestoreTargets();
+    const calls = prepareRestore(runtime, {
+      reachableGuildIds: ["guild-1", "guild-2"],
+      onConnect: () => runtime.beginShutdown(),
+    });
+    await runtime.restoreState({});
+    await runtime.stop();
+
+    assert.deepEqual(calls.connect.map((row) => row.guildId), ["guild-1"], "guild-2 is not joined");
+    const saved = getBotState(botId);
+    assert.equal(saved["guild-1"]?.stationKey, "station-a");
+    assert.equal(saved["guild-2"]?.stationKey, "station-a", "the server not reached stays saved");
+  } finally {
+    disposeRuntime(runtime);
+  }
+});
+
+test("stop() ends a restore retry that is still waiting", async () => {
+  const botId = "bot-605-retry-shutdown";
+  saveTargets(botId, ["guild-1"]);
+  const runtime = createRuntime(botId);
+  try {
+    runtime.holdSavedRestoreTargets();
+    // guild-1 cannot be resolved yet: a retry waits.
+    prepareRestore(runtime, { reachableGuildIds: [] });
+    await runtime.restoreState({});
+    assert.equal(runtime.pendingRestoreTimers?.size, 1);
+
+    await runtime.stop();
+
+    assert.equal(runtime.pendingRestoreTimers.size, 0);
+    assert.equal(getBotState(botId)["guild-1"]?.stationKey, "station-a");
+  } finally {
+    disposeRuntime(runtime);
+  }
+});
+
+// ---- Restore targets across a restart ----
+
 test("after a restart an early save keeps the saved target and the restore brings the server back", async () => {
   const botId = "bot-605-restart";
   saveTargets(botId, ["guild-1"]);
   const runtime = createRuntime(botId);
   try {
+    runtime.holdSavedRestoreTargets();
     runtime.client.user = { id: "605605605605605605", setPresence() {} };
     // The bot's own voice state reaches the fresh worker before the restore:
     // Discord drops the channel the stuck connection left behind.
@@ -313,11 +358,26 @@ test("after a restart an early save keeps the saved target and the restore bring
   }
 });
 
+test("a runtime that never restores (the commander) holds no saved targets", () => {
+  const botId = "bot-605-commander";
+  saveTargets(botId, ["guild-1"]);
+  const runtime = createRuntime(botId);
+  try {
+    runtime.getState("guild-1");
+    runtime.persistState();
+
+    assert.equal(getBotState(botId)["guild-1"]?.stationKey, undefined);
+  } finally {
+    disposeRuntime(runtime);
+  }
+});
+
 test("an intentional stop clears only the stopped server's target, not the ones still being restored", async () => {
   const botId = "bot-605-stop";
   saveTargets(botId, ["guild-1", "guild-2"]);
   const runtime = createRuntime(botId);
   try {
+    runtime.holdSavedRestoreTargets();
     // guild-2 cannot be resolved yet: its restore waits for a retry.
     prepareRestore(runtime, { reachableGuildIds: ["guild-1"] });
     await runtime.restoreState({});
@@ -328,6 +388,74 @@ test("an intentional stop clears only the stopped server's target, not the ones 
     assert.equal(saved["guild-1"]?.stationKey, undefined, "the stopped server keeps no target");
     assert.equal(saved["guild-2"]?.stationKey, "station-a", "the server waiting for its restore keeps its target");
     assert.equal(saved["guild-2"]?.channelId, "voice-1");
+  } finally {
+    disposeRuntime(runtime);
+  }
+});
+
+test("the restore skips a server stopped or played anew while it ran", async () => {
+  const botId = "bot-605-skip";
+  saveTargets(botId, ["guild-1", "guild-2", "guild-3"]);
+  const runtime = createRuntime(botId);
+  try {
+    runtime.holdSavedRestoreTargets();
+    const calls = prepareRestore(runtime, {
+      reachableGuildIds: ["guild-1", "guild-2", "guild-3"],
+      onConnect: async (guildId) => {
+        if (guildId !== "guild-1") return;
+        // While guild-1 connects: guild-2 is stopped, guild-3 gets another station.
+        await runtime.stopInGuild("guild-2");
+        const replayed = runtime.getState("guild-3");
+        replayed.currentStationKey = "station-b";
+        replayed.currentStationName = "Station B";
+        replayed.lastChannelId = "voice-1";
+        replayed.shouldReconnect = true;
+      },
+    });
+    await runtime.restoreState({});
+    // The next save (in the worker the stream start saves) writes the memory.
+    runtime.persistState();
+
+    assert.deepEqual(calls.connect.map((row) => row.guildId), ["guild-1"]);
+    const saved = getBotState(botId);
+    assert.equal(saved["guild-2"]?.stationKey, undefined, "the stop holds");
+    assert.equal(saved["guild-3"]?.stationKey, "station-b", "the new station holds");
+    assert.equal(runtime.guildState.get("guild-3")?.currentStationKey, "station-b");
+  } finally {
+    disposeRuntime(runtime);
+  }
+});
+
+test("a target the restore gives up for good stays gone after the next save", async () => {
+  const botId = "bot-605-gone";
+  saveTargets(botId, ["guild-1"]);
+  const runtime = createRuntime(botId);
+  try {
+    runtime.holdSavedRestoreTargets();
+    prepareRestore(runtime, { reachableGuildIds: [], goneChannelGuildIds: ["guild-1"] });
+    await runtime.restoreState({});
+    runtime.persistState();
+
+    assert.equal(getBotState(botId)["guild-1"]?.stationKey, undefined);
+  } finally {
+    disposeRuntime(runtime);
+  }
+});
+
+test("lost access or leaving the server ends a held target for good", () => {
+  const botId = "bot-605-release";
+  saveTargets(botId, ["guild-1", "guild-2", "guild-3"]);
+  const runtime = createRuntime(botId);
+  try {
+    runtime.holdSavedRestoreTargets();
+    runtime.restrictGuildAccess("guild-1");
+    runtime.resetGuildRuntimeState("guild-2");
+    runtime.persistState();
+
+    const saved = getBotState(botId);
+    assert.equal(saved["guild-1"]?.stationKey, undefined, "lost access");
+    assert.equal(saved["guild-2"]?.stationKey, undefined, "left the server");
+    assert.equal(saved["guild-3"]?.stationKey, "station-a", "the others stay held");
   } finally {
     disposeRuntime(runtime);
   }

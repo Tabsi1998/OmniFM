@@ -29,7 +29,12 @@ import { isRuntimeVoiceConnected } from "./runtime-live-state.js";
 import { handleRuntimeAutocomplete, handleRuntimeInteraction } from "./runtime-interactions.js";
 import { shouldHandleRuntimeIdleEvent } from "./runtime-streams.js";
 import { restoreRuntimeState } from "./runtime-recovery.js";
-import { collectRuntimePendingRestoreTargets, releaseRuntimePendingRestoreTarget } from "./runtime-restore.js";
+import {
+  collectRuntimePendingRestoreTargets,
+  holdRuntimeSavedRestoreTargets,
+  releaseRuntimePendingRestoreTarget,
+  stopRuntimeRestoreRetries,
+} from "./runtime-restore.js";
 import { nowPlayingMethods } from "./now-playing/now-playing-methods.js";
 import { nowPlayingStatsMethods } from "./now-playing/stats-methods.js";
 import { nowPlayingEmbedMethods } from "./now-playing/embed-methods.js";
@@ -112,7 +117,7 @@ class BotRuntime extends RuntimeMixinBase {
     this.scheduledEventInFlight = new Set();
     this.lastPersistLoggedActiveCount = null;
     // The saved restore targets this process has not taken over yet (#605),
-    // read on the first save or by the restore.
+    // held by holdSavedRestoreTargets() or the restore; null holds none.
     /** @type {Map<string, object> | null} */
     this.pendingRestoreTargets = null;
     this.shuttingDown = false;
@@ -511,9 +516,18 @@ class BotRuntime extends RuntimeMixinBase {
     }
   }
 
+  /**
+   * Keeps the saved restore targets through every save until the restore has
+   * taken them over (#605). Entry points that restore after the start call it
+   * before the login.
+   */
+  holdSavedRestoreTargets() {
+    holdRuntimeSavedRestoreTargets(this);
+  }
+
   /** A stop, a leave or lost access ends the saved target of a server not restored yet (#605). */
   releasePendingRestoreTarget(guildId) {
-    releaseRuntimePendingRestoreTarget(this, guildId);
+    return releaseRuntimePendingRestoreTarget(this, guildId);
   }
 
   // === State Persistence: Speichert aktuellen Zustand für Auto-Reconnect nach Restart ===
@@ -566,6 +580,8 @@ class BotRuntime extends RuntimeMixinBase {
     this.stopVoiceStateReconciler();
     this.stopListenerStatsSampler();
     this.stopJingleClock();
+    // A restore retry after the destroy loop would join a channel again (#605).
+    stopRuntimeRestoreRetries(this);
     const sessionStopPromises = [];
 
     for (const [guildId, state] of this.guildState.entries()) {
