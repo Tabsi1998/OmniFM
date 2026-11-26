@@ -49,9 +49,27 @@ export function attachRuntimeConnectionHandlers(runtime, guildId, connection) {
   const markDisconnected = () => {
     if (state.connection === connection) {
       state.connection = null;
+      state.voiceNotReadySince = 0;
       runtime.invalidateVoiceStatus?.(state);
     }
   };
+
+  // @discordjs/voice waits in signalling or connecting without a timeout once
+  // a ready connection lost its voice server. The clock started here is what
+  // the voice reconcile checks before it rebuilds the connection (#605).
+  state.voiceNotReadySince = 0;
+  connection.on("stateChange", (_oldState, newState) => {
+    if (state.connection !== connection) return;
+    const status = newState?.status;
+    if (status === VoiceConnectionStatus.Ready) {
+      state.voiceNotReadySince = 0;
+    } else if (
+      (status === VoiceConnectionStatus.Signalling || status === VoiceConnectionStatus.Connecting)
+      && !state.voiceNotReadySince
+    ) {
+      state.voiceNotReadySince = Date.now();
+    }
+  });
 
   connection.on(VoiceConnectionStatus.Disconnected, async () => {
     recordConnectionEvent(guildId, {

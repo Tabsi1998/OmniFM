@@ -342,6 +342,7 @@ class BotRuntime extends RuntimeMixinBase {
         voiceConnectInFlight: false,
         reconnectInFlight: false,
         voiceDisconnectObservedAt: 0,
+        voiceNotReadySince: 0,
         restoreBlockedUntil: 0,
         restoreBlockedAt: 0,
         restoreBlockCount: 0,

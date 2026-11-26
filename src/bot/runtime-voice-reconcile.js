@@ -27,6 +27,46 @@ const VOICE_STATE_RECONCILE_MS = Math.max(15_000, toPositiveInt(process.env.VOIC
 
 const VOICE_STATE_MISSING_CONFIRMATIONS = Math.max(2, toPositiveInt(process.env.VOICE_STATE_MISSING_CONFIRMATIONS, 2));
 
+// How long a connection may wait in signalling or connecting before it is
+// rebuilt (#605). The reconcile runs every VOICE_STATE_RECONCILE_MS, so the
+// rebuild comes at most that much later.
+const VOICE_CONNECTION_STUCK_MS = Math.max(15_000, toPositiveInt(process.env.VOICE_CONNECTION_STUCK_MS, 45_000));
+const STUCK_VOICE_CONNECTION_STATUSES = new Set(["signalling", "connecting"]);
+
+/**
+ * @discordjs/voice waits in signalling or connecting without a timeout, while
+ * Discord still lists the bot in its channel: it looks connected and plays to
+ * nobody (#605). Past VOICE_CONNECTION_STUCK_MS the connection is taken down
+ * and the reconnect path, with its backoff, builds it anew. The target stays.
+ */
+function rebuildStuckRuntimeVoiceConnection(runtime, guildId, state, nowMs = Date.now()) {
+  const connection = state.connection;
+  const status = String(connection?.state?.status || "");
+  if (!STUCK_VOICE_CONNECTION_STATUSES.has(status)) return false;
+  // A connect or reconnect in flight has its own ready timeout.
+  if (state.voiceConnectInFlight || state.reconnectInFlight) return false;
+  if (!(state.shouldReconnect && state.currentStationKey && state.lastChannelId)) return false;
+  if (!state.voiceNotReadySince) {
+    // A connection without the handlers' clock: it starts now.
+    state.voiceNotReadySince = nowMs;
+    return false;
+  }
+  const stuckMs = nowMs - state.voiceNotReadySince;
+  if (stuckMs < VOICE_CONNECTION_STUCK_MS) return false;
+
+  log(
+    "WARN",
+    `[${runtime.config.name}] Voice-Verbindung hängt seit ${Math.round(stuckMs / 1000)}s im Zustand ${status} ` +
+    `guild=${guildId} channel=${state.lastChannelId} - wird neu aufgebaut.`
+  );
+  state.connection = null;
+  state.voiceNotReadySince = 0;
+  runtime.invalidateVoiceStatus?.(state);
+  runtime.scheduleReconnect(guildId, { reason: `voice-stuck-${status}` });
+  try { connection.destroy(); } catch {}
+  return true;
+}
+
 function syncObservedRuntimeChannel(runtime, state, actualChannelId) {
   const normalizedActualChannelId = String(actualChannelId || "").trim();
   if (!normalizedActualChannelId) return false;
@@ -122,6 +162,7 @@ async function reconcileRuntimeGuildVoiceState(runtime, guildId, { reason = "per
   const state = runtime.guildState.get(guildId);
   if (!state) return;
   if (!state.connection && !state.currentStationKey && !state.lastChannelId) return;
+  if (rebuildStuckRuntimeVoiceConnection(runtime, guildId, state)) return;
   const voiceGuardConfig = getRuntimeVoiceGuardConfig(state);
 
   const { channelId: actualChannelId } = await runtime.fetchBotVoiceState(guildId);
