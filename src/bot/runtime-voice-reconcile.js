@@ -4,6 +4,7 @@
 import { AudioPlayerStatus } from "@discordjs/voice";
 import { log, logError } from "../lib/logging.js";
 import { waitMs } from "../lib/helpers.js";
+import { noteVoiceConnectionStatus } from "./runtime-live-state.js";
 import {
   toPositiveInt,
   VOICE_TRANSIENT_RECHECK_MS,
@@ -31,7 +32,6 @@ const VOICE_STATE_MISSING_CONFIRMATIONS = Math.max(2, toPositiveInt(process.env.
 // rebuilt (#605). The reconcile runs every VOICE_STATE_RECONCILE_MS, so the
 // rebuild comes at most that much later.
 const VOICE_CONNECTION_STUCK_MS = Math.max(15_000, toPositiveInt(process.env.VOICE_CONNECTION_STUCK_MS, 45_000));
-const STUCK_VOICE_CONNECTION_STATUSES = new Set(["signalling", "connecting"]);
 
 /**
  * @discordjs/voice waits in signalling or connecting without a timeout, while
@@ -41,17 +41,16 @@ const STUCK_VOICE_CONNECTION_STATUSES = new Set(["signalling", "connecting"]);
  */
 function rebuildStuckRuntimeVoiceConnection(runtime, guildId, state, nowMs = Date.now()) {
   const connection = state.connection;
-  const status = String(connection?.state?.status || "");
-  if (!STUCK_VOICE_CONNECTION_STATUSES.has(status)) return false;
+  if (!connection) return false;
+  const status = String(connection.state?.status || "");
+  // Also starts the clock of a connection without the handlers, and a ready
+  // one stops it.
+  const notReadySince = noteVoiceConnectionStatus(connection, status, nowMs);
+  if (!notReadySince) return false;
   // A connect or reconnect in flight has its own ready timeout.
   if (state.voiceConnectInFlight || state.reconnectInFlight) return false;
   if (!(state.shouldReconnect && state.currentStationKey && state.lastChannelId)) return false;
-  if (!state.voiceNotReadySince) {
-    // A connection without the handlers' clock: it starts now.
-    state.voiceNotReadySince = nowMs;
-    return false;
-  }
-  const stuckMs = nowMs - state.voiceNotReadySince;
+  const stuckMs = nowMs - notReadySince;
   if (stuckMs < VOICE_CONNECTION_STUCK_MS) return false;
 
   log(
@@ -60,10 +59,13 @@ function rebuildStuckRuntimeVoiceConnection(runtime, guildId, state, nowMs = Dat
     `guild=${guildId} channel=${state.lastChannelId} - wird neu aufgebaut.`
   );
   state.connection = null;
-  state.voiceNotReadySince = 0;
   runtime.invalidateVoiceStatus?.(state);
-  runtime.scheduleReconnect(guildId, { reason: `voice-stuck-${status}` });
-  try { connection.destroy(); } catch {}
+  try {
+    runtime.scheduleReconnect(guildId, { reason: `voice-stuck-${status}` });
+  } finally {
+    // Whatever the scheduling does, the stuck connection does not stay behind.
+    try { connection.destroy(); } catch {}
+  }
   return true;
 }
 

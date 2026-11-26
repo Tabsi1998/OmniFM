@@ -51,7 +51,6 @@
  * @property {number} [restoreBlockedAt]      epoch ms
  * @property {number} [restoreBlockCount]
  * @property {string | null} [restoreBlockReason]
- * @property {number} [voiceNotReadySince]   epoch ms since the connection waits in signalling/connecting (#605)
  * @property {{ id: string, golden: boolean, year: number, song: string, shownAt: number, foundAt: number, finder: string } | null} [easterEgg]
  *   the song's egg in the Easter egg hunt (#429); lives in memory only
  * @property {import("./jingle-mixer.js").JingleMixer | null} [jingleMixer]  the running stream's jingle mixer (#309), null without PCM

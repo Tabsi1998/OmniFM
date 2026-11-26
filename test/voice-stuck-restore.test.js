@@ -29,23 +29,60 @@ const {
   reconcileRuntimeGuildVoiceState,
 } = await import("../src/bot/runtime-recovery.js");
 
+const START_MS = 1_800_000_000_000;
+
 /** A stand-in for a @discordjs/voice connection that emits its state changes. */
-function createConnection(channelId) {
+function createConnection(channelId, status = "ready") {
   const connection = new EventEmitter();
   connection.joinConfig = { channelId };
-  connection.state = { status: "ready" };
+  connection.state = { status };
   connection.destroyCount = 0;
-  connection.setStatus = (status) => {
+  connection.setStatus = (next) => {
     const oldState = connection.state;
-    connection.state = { status };
+    connection.state = { status: next };
     connection.emit("stateChange", oldState, connection.state);
-    if (oldState.status !== status) connection.emit(status, oldState, connection.state);
+    if (oldState.status !== next) connection.emit(next, oldState, connection.state);
   };
   connection.destroy = () => {
     connection.destroyCount += 1;
     connection.setStatus("destroyed");
   };
   return connection;
+}
+
+function createPlayingState(connection, extra = {}) {
+  return {
+    connection,
+    currentStationKey: "station-a",
+    currentStationName: "Station A",
+    lastChannelId: "voice-1",
+    shouldReconnect: true,
+    player: { state: { status: "playing" } },
+    transientVoiceIssues: {},
+    ...extra,
+  };
+}
+
+/** The voice reconcile's view of one server; Discord lists the bot in voice-1. */
+function createReconcileRuntime(state) {
+  const reconnects = [];
+  const runtime = {
+    config: { id: "bot-605", name: "OmniFM 605" },
+    client: { isReady: () => true },
+    guildState: new Map([["guild-1", state]]),
+    getState: () => state,
+    fetchBotVoiceState: async () => ({ guild: {}, voiceState: {}, channelId: "voice-1" }),
+    markNowPlayingTargetDirty() {},
+    persistState() {},
+    queueVoiceStateReconcile() {},
+    invalidateVoiceStatus() {},
+    scheduleReconnect(guildId, options) {
+      reconnects.push({ guildId, reason: options?.reason || "" });
+    },
+    scheduleStreamRestart() {},
+    syncVoiceChannelStatus: async () => {},
+  };
+  return { runtime, reconnects };
 }
 
 function createRuntime(botId) {
@@ -70,8 +107,12 @@ function disposeRuntime(runtime) {
   runtime.client.destroy().catch?.(() => null);
 }
 
-/** A worker that can restore guild-1 / voice-1 without Discord. */
-function prepareRestore(runtime, { reachableGuildIds = ["guild-1"] } = {}) {
+/**
+ * A worker that can restore its servers without Discord. Reachable servers
+ * have voice-1; the others are not resolvable yet (a retry waits). A server in
+ * goneChannelGuildIds answers Unknown Channel (10003).
+ */
+function prepareRestore(runtime, { reachableGuildIds = ["guild-1"], goneChannelGuildIds = [], onConnect = null } = {}) {
   const calls = { connect: [], play: [] };
   const channel = { id: "voice-1", name: "radio", type: 2, isVoiceBased: () => true };
   for (const guildId of reachableGuildIds) {
@@ -79,6 +120,20 @@ function prepareRestore(runtime, { reachableGuildIds = ["guild-1"] } = {}) {
       id: guildId,
       name: `Guild ${guildId}`,
       channels: { cache: new Map([[channel.id, channel]]), fetch: async () => channel },
+    });
+  }
+  for (const guildId of goneChannelGuildIds) {
+    runtime.client.guilds.cache.set(guildId, {
+      id: guildId,
+      name: `Guild ${guildId}`,
+      channels: {
+        cache: new Map(),
+        fetch: async () => {
+          const err = new Error("Unknown Channel");
+          err.code = 10003;
+          throw err;
+        },
+      },
     });
   }
   runtime.client.guilds.fetch = async () => {
@@ -99,6 +154,7 @@ function prepareRestore(runtime, { reachableGuildIds = ["guild-1"] } = {}) {
   runtime.armSleepTimer = () => {};
   runtime.ensureVoiceConnectionForChannel = async (guildId, channelId) => {
     calls.connect.push({ guildId, channelId });
+    await onConnect?.(guildId);
     return { connection: null };
   };
   runtime.playStation = async (state, _stations, key, guildId) => {
@@ -117,95 +173,90 @@ function saveTargets(botId, guildIds) {
   }])));
 }
 
-test("a connection stuck in signalling is rebuilt through the reconnect path after the timeout", (t) => {
-  t.mock.timers.enable({ apis: ["Date"], now: 1_800_000_000_000 });
-  const reconnects = [];
+// ---- Stuck connections ----
+
+test("a connection stuck in signalling is rebuilt through the reconnect path after the timeout", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: START_MS });
   const connection = createConnection("voice-1");
-  const state = {
-    connection,
-    currentStationKey: "station-a",
-    currentStationName: "Station A",
-    lastChannelId: "voice-1",
-    shouldReconnect: true,
-    player: { state: { status: "playing" } },
-    transientVoiceIssues: {},
-  };
-  const runtime = {
-    config: { id: "bot-605", name: "OmniFM 605" },
-    client: { isReady: () => true },
-    guildState: new Map([["guild-1", state]]),
-    getState: () => state,
-    // Discord still lists the bot in its channel: only the connection hangs.
-    fetchBotVoiceState: async () => ({ guild: {}, voiceState: {}, channelId: "voice-1" }),
-    markNowPlayingTargetDirty() {},
-    persistState() {},
-    queueVoiceStateReconcile() {},
-    invalidateVoiceStatus() {},
-    scheduleReconnect(guildId, options) {
-      reconnects.push({ guildId, reason: options?.reason || "" });
-    },
-    scheduleStreamRestart() {},
-    syncVoiceChannelStatus: async () => {},
-  };
+  const state = createPlayingState(connection);
+  const { runtime, reconnects } = createReconcileRuntime(state);
 
   attachRuntimeConnectionHandlers(runtime, "guild-1", connection);
   connection.setStatus("connecting");
   connection.setStatus("signalling");
 
-  return (async () => {
-    t.mock.timers.tick(10_000);
-    await reconcileRuntimeGuildVoiceState(runtime, "guild-1", { reason: "timer" });
-    assert.equal(connection.destroyCount, 0, "a short signalling phase is left alone");
-    assert.equal(reconnects.length, 0);
+  t.mock.timers.tick(10_000);
+  await reconcileRuntimeGuildVoiceState(runtime, "guild-1", { reason: "timer" });
+  assert.equal(connection.destroyCount, 0, "a short signalling phase is left alone");
+  assert.equal(reconnects.length, 0);
 
-    t.mock.timers.tick(50_000);
-    await reconcileRuntimeGuildVoiceState(runtime, "guild-1", { reason: "timer" });
-    assert.equal(connection.destroyCount, 1, "the stuck connection is destroyed");
-    assert.equal(state.connection, null);
-    assert.ok(reconnects.length >= 1, "a reconnect is scheduled");
-    assert.ok(reconnects.every((row) => row.guildId === "guild-1"));
-    assert.equal(state.currentStationKey, "station-a", "the restore target stays");
-    assert.equal(state.lastChannelId, "voice-1");
-  })();
+  t.mock.timers.tick(50_000);
+  await reconcileRuntimeGuildVoiceState(runtime, "guild-1", { reason: "timer" });
+  assert.equal(connection.destroyCount, 1, "the stuck connection is destroyed");
+  assert.equal(state.connection, null);
+  assert.ok(reconnects.some((row) => row.guildId === "guild-1" && row.reason === "voice-stuck-signalling"));
+  assert.equal(state.currentStationKey, "station-a", "the restore target stays");
+  assert.equal(state.lastChannelId, "voice-1");
 });
 
-test("a connection that comes back to ready in time is not rebuilt", async (t) => {
-  t.mock.timers.enable({ apis: ["Date"], now: 1_800_000_000_000 });
+test("ready in between restarts the clock: a new short signalling phase is not rebuilt", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: START_MS });
   const connection = createConnection("voice-1");
-  const state = {
-    connection,
-    currentStationKey: "station-a",
-    lastChannelId: "voice-1",
-    shouldReconnect: true,
-    player: { state: { status: "playing" } },
-    transientVoiceIssues: {},
-  };
-  const runtime = {
-    config: { id: "bot-605", name: "OmniFM 605" },
-    client: { isReady: () => true },
-    guildState: new Map([["guild-1", state]]),
-    getState: () => state,
-    fetchBotVoiceState: async () => ({ guild: {}, voiceState: {}, channelId: "voice-1" }),
-    markNowPlayingTargetDirty() {},
-    persistState() {},
-    queueVoiceStateReconcile() {},
-    scheduleReconnect() {
-      throw new Error("scheduleReconnect should not run");
-    },
-    scheduleStreamRestart() {},
-    syncVoiceChannelStatus: async () => {},
-  };
+  const state = createPlayingState(connection);
+  const { runtime, reconnects } = createReconcileRuntime(state);
 
   attachRuntimeConnectionHandlers(runtime, "guild-1", connection);
   connection.setStatus("signalling");
   t.mock.timers.tick(30_000);
   connection.setStatus("ready");
-  t.mock.timers.tick(60_000);
+  t.mock.timers.tick(10_000);
+  connection.setStatus("signalling");
+  t.mock.timers.tick(20_000);
   await reconcileRuntimeGuildVoiceState(runtime, "guild-1", { reason: "timer" });
 
   assert.equal(connection.destroyCount, 0);
   assert.equal(state.connection, connection);
+  assert.equal(reconnects.length, 0);
 });
+
+test("a stuck connection is left alone while a connect runs or the server should not play", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: START_MS });
+  for (const extra of [{ voiceConnectInFlight: true }, { reconnectInFlight: true }, { shouldReconnect: false }]) {
+    const connection = createConnection("voice-1");
+    const state = createPlayingState(connection, extra);
+    const { runtime, reconnects } = createReconcileRuntime(state);
+    attachRuntimeConnectionHandlers(runtime, "guild-1", connection);
+    connection.setStatus("signalling");
+    t.mock.timers.tick(120_000);
+    // eslint-disable-next-line no-await-in-loop -- one case after the other on the mocked clock
+    await reconcileRuntimeGuildVoiceState(runtime, "guild-1", { reason: "timer" });
+
+    assert.equal(connection.destroyCount, 0, JSON.stringify(extra));
+    assert.equal(state.connection, connection, JSON.stringify(extra));
+    assert.equal(reconnects.length, 0, JSON.stringify(extra));
+  }
+});
+
+test("the clock belongs to the connection: an earlier connection's wait does not make a new one look stuck", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: START_MS });
+  // A join without the handlers (as /play's own join) hangs and is noticed.
+  const failedJoin = createConnection("voice-1", "signalling");
+  const state = createPlayingState(failedJoin);
+  const { runtime, reconnects } = createReconcileRuntime(state);
+  await reconcileRuntimeGuildVoiceState(runtime, "guild-1", { reason: "timer" });
+
+  // 50 s later a new join replaces it and is still signalling.
+  t.mock.timers.tick(50_000);
+  const newJoin = createConnection("voice-1", "signalling");
+  state.connection = newJoin;
+  await reconcileRuntimeGuildVoiceState(runtime, "guild-1", { reason: "timer" });
+
+  assert.equal(newJoin.destroyCount, 0);
+  assert.equal(state.connection, newJoin);
+  assert.equal(reconnects.length, 0);
+});
+
+// ---- Shutdown ----
 
 test("shutdown persists the target of a stuck connection and plans no rejoin after it", async () => {
   const runtime = createRuntime("bot-605-shutdown");

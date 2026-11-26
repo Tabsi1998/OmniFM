@@ -11,6 +11,7 @@ import { log, logError } from "../lib/logging.js";
 import { applyJitter, VOICE_RECONNECT_MAX_MS, VOICE_RECONNECT_EXP_STEPS } from "../lib/helpers.js";
 import { recordConnectionEvent } from "../listening-stats-store.js";
 import { recordPlaybackPhase } from "./playback-phase.js";
+import { noteVoiceConnectionStatus } from "./runtime-live-state.js";
 import {
   VOICE_NETWORK_ERROR_RETRY_JITTER,
   VOICE_NETWORK_ERROR_RETRY_MIN_MS,
@@ -49,26 +50,17 @@ export function attachRuntimeConnectionHandlers(runtime, guildId, connection) {
   const markDisconnected = () => {
     if (state.connection === connection) {
       state.connection = null;
-      state.voiceNotReadySince = 0;
       runtime.invalidateVoiceStatus?.(state);
     }
   };
 
   // @discordjs/voice waits in signalling or connecting without a timeout once
-  // a ready connection lost its voice server. The clock started here is what
-  // the voice reconcile checks before it rebuilds the connection (#605).
-  state.voiceNotReadySince = 0;
+  // a ready connection lost its voice server. The clock noted here is what the
+  // voice reconcile checks before it rebuilds the connection (#605). The
+  // handlers are attached to a ready connection: its clock starts at zero.
+  noteVoiceConnectionStatus(connection, VoiceConnectionStatus.Ready);
   connection.on("stateChange", (_oldState, newState) => {
-    if (state.connection !== connection) return;
-    const status = newState?.status;
-    if (status === VoiceConnectionStatus.Ready) {
-      state.voiceNotReadySince = 0;
-    } else if (
-      (status === VoiceConnectionStatus.Signalling || status === VoiceConnectionStatus.Connecting)
-      && !state.voiceNotReadySince
-    ) {
-      state.voiceNotReadySince = Date.now();
-    }
+    noteVoiceConnectionStatus(connection, newState?.status);
   });
 
   connection.on(VoiceConnectionStatus.Disconnected, async () => {

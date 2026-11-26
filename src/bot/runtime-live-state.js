@@ -1,5 +1,27 @@
 import { AudioPlayerStatus } from "@discordjs/voice";
 
+// Since when a voice connection waits in signalling or connecting (#605), per
+// connection object: the stamp of an earlier connection, or of a join that
+// failed, never makes a later one look stuck.
+const voiceConnectionNotReadySince = new WeakMap();
+const NOT_READY_VOICE_STATUSES = new Set(["signalling", "connecting"]);
+
+/**
+ * Notes a connection's status and returns since when it is not ready (0 while
+ * it is ready or in another state). Ready stops the clock; signalling or
+ * connecting starts it once.
+ */
+export function noteVoiceConnectionStatus(connection, status, nowMs = Date.now()) {
+  if (!connection || typeof connection !== "object") return 0;
+  if (status === "ready") {
+    voiceConnectionNotReadySince.delete(connection);
+    return 0;
+  }
+  if (!NOT_READY_VOICE_STATUSES.has(status)) return 0;
+  if (!voiceConnectionNotReadySince.has(connection)) voiceConnectionNotReadySince.set(connection, nowMs);
+  return voiceConnectionNotReadySince.get(connection);
+}
+
 function normalizeChannelId(value) {
   const normalized = String(value || "").trim();
   return normalized || "";
