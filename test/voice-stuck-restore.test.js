@@ -16,7 +16,7 @@ process.env.LOGS_DIR = path.join(scratchDir, "logs");
 process.env.OMNIFM_BOT_STATE_FILE = path.join(scratchDir, "bot-state.json");
 
 const { BotRuntime } = await import("../src/bot/runtime.js");
-const { getBotState } = await import("../src/bot-state.js");
+const { getBotState, saveBotState } = await import("../src/bot-state.js");
 const {
   attachRuntimeConnectionHandlers,
   reconcileRuntimeGuildVoiceState,
@@ -61,6 +61,53 @@ function disposeRuntime(runtime) {
   runtime.unsubscribeNetworkRecovery?.();
   runtime.unsubscribeNetworkRecovery = null;
   runtime.client.destroy().catch?.(() => null);
+}
+
+/** A worker that can restore guild-1 / voice-1 without Discord. */
+function prepareRestore(runtime, { reachableGuildIds = ["guild-1"] } = {}) {
+  const calls = { connect: [], play: [] };
+  const channel = { id: "voice-1", name: "radio", type: 2, isVoiceBased: () => true };
+  for (const guildId of reachableGuildIds) {
+    runtime.client.guilds.cache.set(guildId, {
+      id: guildId,
+      name: `Guild ${guildId}`,
+      channels: { cache: new Map([[channel.id, channel]]), fetch: async () => channel },
+    });
+  }
+  runtime.client.guilds.fetch = async () => {
+    const err = new Error("temporary gateway outage");
+    err.code = "ECONNRESET";
+    throw err;
+  };
+  runtime.enforceGuildAccessForGuild = async () => true;
+  runtime.refreshVoiceGuardSettings = async () => null;
+  runtime.resolveGuildLanguage = () => "de";
+  runtime.resolveStationForGuild = (_guildId, key) => ({
+    ok: true,
+    key,
+    station: { name: "Station A" },
+    stations: { stations: { [key]: { name: "Station A" } } },
+  });
+  runtime.markScheduledEventPlayback = () => {};
+  runtime.armSleepTimer = () => {};
+  runtime.ensureVoiceConnectionForChannel = async (guildId, channelId) => {
+    calls.connect.push({ guildId, channelId });
+    return { connection: null };
+  };
+  runtime.playStation = async (state, _stations, key, guildId) => {
+    calls.play.push({ guildId, key });
+    state.currentStationKey = key;
+  };
+  return calls;
+}
+
+function saveTargets(botId, guildIds) {
+  saveBotState(botId, new Map(guildIds.map((guildId) => [guildId, {
+    currentStationKey: "station-a",
+    currentStationName: "Station A",
+    lastChannelId: "voice-1",
+    volume: 80,
+  }])));
 }
 
 test("a connection stuck in signalling is rebuilt through the reconnect path after the timeout", (t) => {
@@ -175,6 +222,54 @@ test("shutdown persists the target of a stuck connection and plans no rejoin aft
     assert.equal(saved?.stationKey, "station-a");
     assert.equal(saved?.channelId, "voice-1");
     assert.equal(state.reconnectTimer, null, "no reconnect (and no voice join) after the final save");
+  } finally {
+    disposeRuntime(runtime);
+  }
+});
+
+test("after a restart an early save keeps the saved target and the restore brings the server back", async () => {
+  const botId = "bot-605-restart";
+  saveTargets(botId, ["guild-1"]);
+  const runtime = createRuntime(botId);
+  try {
+    runtime.client.user = { id: "605605605605605605", setPresence() {} };
+    // The bot's own voice state reaches the fresh worker before the restore:
+    // Discord drops the channel the stuck connection left behind.
+    runtime.handleBotVoiceStateUpdate(
+      { channelId: "voice-1" },
+      { id: "605605605605605605", channelId: null, guild: { id: "guild-1" } }
+    );
+
+    const afterEarlySave = getBotState(botId)["guild-1"];
+    assert.equal(afterEarlySave?.stationKey, "station-a", "the early save keeps the target");
+    assert.equal(afterEarlySave?.channelId, "voice-1");
+
+    const calls = prepareRestore(runtime);
+    await runtime.restoreState({});
+
+    assert.deepEqual(calls.connect, [{ guildId: "guild-1", channelId: "voice-1" }]);
+    assert.deepEqual(calls.play, [{ guildId: "guild-1", key: "station-a" }]);
+    assert.equal(getBotState(botId)["guild-1"]?.stationKey, "station-a");
+  } finally {
+    disposeRuntime(runtime);
+  }
+});
+
+test("an intentional stop clears only the stopped server's target, not the ones still being restored", async () => {
+  const botId = "bot-605-stop";
+  saveTargets(botId, ["guild-1", "guild-2"]);
+  const runtime = createRuntime(botId);
+  try {
+    // guild-2 cannot be resolved yet: its restore waits for a retry.
+    prepareRestore(runtime, { reachableGuildIds: ["guild-1"] });
+    await runtime.restoreState({});
+
+    await runtime.stopInGuild("guild-1");
+
+    const saved = getBotState(botId);
+    assert.equal(saved["guild-1"]?.stationKey, undefined, "the stopped server keeps no target");
+    assert.equal(saved["guild-2"]?.stationKey, "station-a", "the server waiting for its restore keeps its target");
+    assert.equal(saved["guild-2"]?.channelId, "voice-1");
   } finally {
     disposeRuntime(runtime);
   }

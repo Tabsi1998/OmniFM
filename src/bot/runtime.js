@@ -29,6 +29,7 @@ import { isRuntimeVoiceConnected } from "./runtime-live-state.js";
 import { handleRuntimeAutocomplete, handleRuntimeInteraction } from "./runtime-interactions.js";
 import { shouldHandleRuntimeIdleEvent } from "./runtime-streams.js";
 import { restoreRuntimeState } from "./runtime-recovery.js";
+import { collectRuntimePendingRestoreTargets, releaseRuntimePendingRestoreTarget } from "./runtime-restore.js";
 import { nowPlayingMethods } from "./now-playing/now-playing-methods.js";
 import { nowPlayingStatsMethods } from "./now-playing/stats-methods.js";
 import { nowPlayingEmbedMethods } from "./now-playing/embed-methods.js";
@@ -110,6 +111,10 @@ class BotRuntime extends RuntimeMixinBase {
     this.listeningCountedAt = 0;
     this.scheduledEventInFlight = new Set();
     this.lastPersistLoggedActiveCount = null;
+    // The saved restore targets this process has not taken over yet (#605),
+    // read on the first save or by the restore.
+    /** @type {Map<string, object> | null} */
+    this.pendingRestoreTargets = null;
     this.shuttingDown = false;
     this.unsubscribeNetworkRecovery = networkRecoveryCoordinator.onRecovered((event) => {
       if (this.shuttingDown) return;
@@ -482,6 +487,7 @@ class BotRuntime extends RuntimeMixinBase {
     }
     deleteScheduledEventsByFilter({ guildId, botId: this.config.id });
     // The bot left the server: nothing of it stays, not even the volume (#285).
+    releaseRuntimePendingRestoreTarget(this, guildId);
     clearBotGuild(this.config.id, guildId, { keepVolume: false });
   }
 
@@ -506,15 +512,22 @@ class BotRuntime extends RuntimeMixinBase {
     }
   }
 
+  /** A stop, a leave or lost access ends the saved target of a server not restored yet (#605). */
+  releasePendingRestoreTarget(guildId) {
+    releaseRuntimePendingRestoreTarget(this, guildId);
+  }
+
   // === State Persistence: Speichert aktuellen Zustand für Auto-Reconnect nach Restart ===
   persistState({ forceLog = false } = {}) {
+    // The saved targets of servers not restored yet stay (#605).
+    const pendingRestoreTargets = collectRuntimePendingRestoreTargets(this);
     const persistableCount = [...this.guildState.entries()].filter(
       ([_, s]) => isPersistableGuildState(s)
-    ).length;
+    ).length + Object.keys(pendingRestoreTargets).length;
     const activeCount = [...this.guildState.entries()].filter(
       ([guildId, s]) => isPersistableGuildState(s) && isRuntimeVoiceConnected(this, guildId, s, { includeObserved: true })
     ).length;
-    saveBotState(this.config.id, this.guildState);
+    saveBotState(this.config.id, this.guildState, pendingRestoreTargets);
     const previousPersistableCount = Number.isFinite(this.lastPersistLoggedPersistableCount)
       ? this.lastPersistLoggedPersistableCount
       : null;

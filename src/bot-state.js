@@ -447,8 +447,10 @@ function loadSplitBotState(botId) {
  * Persists the playback targets of one bot.
  * @param {string} botId
  * @param {Map<string, import("./lib/types.js").GuildPlaybackState>} guildStates
+ * @param {Record<string, object> | null} [pendingTargets] saved targets the
+ *   runtime has not taken over yet; they stay as they are (#605)
  */
-function saveBotState(botId, guildStates) {
+function saveBotState(botId, guildStates, pendingTargets = null) {
   const botData = {};
 
   for (const [guildId, state] of guildStates.entries()) {
@@ -522,6 +524,12 @@ function saveBotState(botId, guildStates) {
     }
 
     botData[guildId] = entry;
+  }
+
+  for (const [guildId, savedEntry] of Object.entries(pendingTargets || {})) {
+    if (botData[guildId]?.stationKey) continue;
+    // A newer volume from memory wins, the saved target stays.
+    botData[guildId] = { ...savedEntry, ...(botData[guildId] || {}) };
   }
 
   if (mongoActive) {

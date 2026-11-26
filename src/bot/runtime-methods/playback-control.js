@@ -128,6 +128,7 @@ const playbackControlMethods = {
       if (!state) return { ok: false, error: "Kein State für diesen Server." };
 
       this.clearRestoreRetry(guildId);
+      this.releasePendingRestoreTarget?.(guildId);
       // A stop ends a sleep timer too (#275).
       this.clearSleepTimer?.(guildId);
       state.shouldReconnect = false;

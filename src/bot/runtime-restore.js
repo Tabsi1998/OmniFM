@@ -4,7 +4,7 @@
 import { log, logError } from "../lib/logging.js";
 import { resolveReplacementStationForGuild, notifyRuntimeStationUnavailable } from "./runtime-streams.js";
 import { applyJitter, waitMs } from "../lib/helpers.js";
-import { clearBotGuild, getBotState } from "../bot-state.js";
+import { clearBotGuild, getBotState, isPersistableGuildState } from "../bot-state.js";
 import {
   toPositiveInt,
   parseStoredTimestampMs,
@@ -20,6 +20,39 @@ import {
 const RESTORE_RETRY_BASE_MS = Math.max(5_000, toPositiveInt(process.env.RESTORE_RETRY_BASE_MS, 15_000));
 
 const RESTORE_RETRY_MAX_MS = Math.max(30_000, toPositiveInt(process.env.RESTORE_RETRY_MAX_MS, 5 * 60_000));
+
+function listSavedRestoreTargets(botId) {
+  return Object.entries(getBotState(botId)).filter(([_, data]) => data?.stationKey && data?.channelId);
+}
+
+/**
+ * The saved restore targets of the servers this process has not taken over
+ * yet (#605). A worker that just started knows none of them: without this,
+ * its first save (the bot's own voice state update, a command) writes the
+ * empty memory over the targets before the restore has read them. A server
+ * leaves the list once its memory holds a target or it is given up on purpose.
+ */
+function collectRuntimePendingRestoreTargets(runtime) {
+  if (!(runtime.pendingRestoreTargets instanceof Map)) {
+    runtime.pendingRestoreTargets = new Map(listSavedRestoreTargets(runtime.config.id));
+  }
+  for (const guildId of [...runtime.pendingRestoreTargets.keys()]) {
+    if (isPersistableGuildState(runtime.guildState?.get?.(guildId))) runtime.pendingRestoreTargets.delete(guildId);
+  }
+  return Object.fromEntries(runtime.pendingRestoreTargets);
+}
+
+function releaseRuntimePendingRestoreTarget(runtime, guildId) {
+  if (runtime?.pendingRestoreTargets instanceof Map) {
+    runtime.pendingRestoreTargets.delete(String(guildId || "").trim());
+  }
+}
+
+// The restore gives a saved target up for good.
+function dropSavedRestoreTarget(runtime, guildId) {
+  releaseRuntimePendingRestoreTarget(runtime, guildId);
+  clearBotGuild(runtime.config.id, guildId);
+}
 
 function getRuntimeRestoreTimers(runtime) {
   if (!(runtime.pendingRestoreTimers instanceof Map)) {
@@ -166,7 +199,7 @@ async function restoreRuntimeGuildEntry(runtime, guildId, data, stations, { sour
   if (sleepUntilMs > 0 && sleepUntilMs <= nowMs) {
     clearRuntimeRestoreRetry(runtime, guildId);
     log("INFO", `[${runtime.config.name}] Sleep-Timer lief während des Neustarts ab (guild=${guildId}); Stream bleibt aus.`);
-    clearBotGuild(runtime.config.id, guildId);
+    dropSavedRestoreTarget(runtime, guildId);
     return { ok: false, permanent: true, resource: "sleep" };
   }
 
@@ -175,7 +208,7 @@ async function restoreRuntimeGuildEntry(runtime, guildId, data, stations, { sour
     if (isPermanentRestoreResourceError(guildError, "guild")) {
       clearRuntimeRestoreRetry(runtime, guildId);
       log("INFO", `[${runtime.config.name}] Guild ${guildId} ist nicht mehr verfügbar. Entferne gespeicherten Restore-State.`);
-      clearBotGuild(runtime.config.id, guildId);
+      dropSavedRestoreTarget(runtime, guildId);
       return { ok: false, permanent: true, resource: "guild" };
     }
     log(
@@ -197,7 +230,7 @@ async function restoreRuntimeGuildEntry(runtime, guildId, data, stations, { sour
     if (isPermanentRestoreResourceError(channelError, "channel")) {
       clearRuntimeRestoreRetry(runtime, guildId);
       log("INFO", `[${runtime.config.name}] Channel ${data.channelId} in ${guild.name} existiert nicht mehr. Entferne gespeicherten Restore-State.`);
-      clearBotGuild(runtime.config.id, guildId);
+      dropSavedRestoreTarget(runtime, guildId);
       return { ok: false, permanent: true, resource: "channel" };
     }
     log(
@@ -211,7 +244,7 @@ async function restoreRuntimeGuildEntry(runtime, guildId, data, stations, { sour
   if (!channel.isVoiceBased()) {
     clearRuntimeRestoreRetry(runtime, guildId);
     log("INFO", `[${runtime.config.name}] Channel ${data.channelId} in ${guild.name} ist kein Voice-/Stage-Channel mehr.`);
-    clearBotGuild(runtime.config.id, guildId);
+    dropSavedRestoreTarget(runtime, guildId);
     return { ok: false, permanent: true, resource: "channel-type" };
   }
 
@@ -230,7 +263,7 @@ async function restoreRuntimeGuildEntry(runtime, guildId, data, stations, { sour
         stopped: true,
         channelId: data.channelId,
       }).catch(() => null);
-      clearBotGuild(runtime.config.id, guildId);
+      dropSavedRestoreTarget(runtime, guildId);
       return { ok: false, permanent: true, resource: "station" };
     }
     log(
@@ -337,12 +370,17 @@ async function restoreRuntimeGuildEntry(runtime, guildId, data, stations, { sour
 async function restoreRuntimeState(runtime, stations) {
   void stations;
   const saved = getBotState(runtime.config.id);
+  const restorableEntries = Object.entries(saved || {}).filter(([_, data]) => data?.stationKey && data?.channelId);
+  // Until the restore has handled a server, a save keeps its target (#605).
+  // A server whose memory already holds a target belongs to the runtime.
+  runtime.pendingRestoreTargets = new Map(
+    restorableEntries.filter(([guildId]) => !isPersistableGuildState(runtime.guildState?.get?.(guildId)))
+  );
   if (!saved || Object.keys(saved).length === 0) {
     log("INFO", `[${runtime.config.name}] Kein gespeicherter State gefunden (bot-id: ${runtime.config.id}).`);
     return;
   }
 
-  const restorableEntries = Object.entries(saved).filter(([_, data]) => data?.stationKey && data?.channelId);
   if (restorableEntries.length === 0) {
     log("INFO", `[${runtime.config.name}] Nur gespeicherte Guild-Einstellungen gefunden (kein aktives Restore-Ziel).`);
     return;
@@ -351,6 +389,8 @@ async function restoreRuntimeState(runtime, stations) {
   log("INFO", `[${runtime.config.name}] Stelle ${restorableEntries.length} Verbindung(en) wieder her...`);
 
   for (const [guildId, data] of restorableEntries) {
+    // Stopped, left or played anew since the restore started: the newer intent wins (#605).
+    if (!runtime.pendingRestoreTargets.has(guildId)) continue;
     try {
       // eslint-disable-next-line no-await-in-loop -- one server after the other, so a restart does not open every voice connection at once
       await restoreRuntimeGuildEntry(runtime, guildId, data, stations, { source: "restore" });
@@ -376,6 +416,8 @@ export {
   getRuntimeRestoreTimers,
   getRuntimeRestoreRetryCounts,
   clearRuntimeRestoreRetry,
+  collectRuntimePendingRestoreTargets,
+  releaseRuntimePendingRestoreTarget,
   getRestoreRetryDelay,
   scheduleRuntimeRestoreResume,
   scheduleRuntimeRestoreRetry,
