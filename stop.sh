@@ -97,7 +97,7 @@ stop_systemd_units() {
   local sudo_cmd="" unit
   [ "$(id -u)" -eq 0 ] || sudo_cmd="sudo"
   for unit in "$UNIT_PREFIX-bot" "$UNIT_PREFIX-frontend" "$UNIT_PREFIX-backend"; do
-    if systemctl list-unit-files "$unit.service" 2>/dev/null | grep -q "^$unit.service"; then
+    if systemctl list-unit-files "$unit.service" 2>/dev/null | grep "^$unit.service" >/dev/null; then
       log "Stoppe $unit (systemd)..."
       $sudo_cmd systemctl stop "$unit" 2>/dev/null || true
     fi
