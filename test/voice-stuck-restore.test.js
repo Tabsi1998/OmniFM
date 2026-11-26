@@ -15,6 +15,8 @@ process.env.OMNIFM_RUNTIME_DATA_DIR = scratchDir;
 process.env.LOGS_DIR = path.join(scratchDir, "logs");
 process.env.OMNIFM_BOT_STATE_FILE = path.join(scratchDir, "bot-state.json");
 
+const { BotRuntime } = await import("../src/bot/runtime.js");
+const { getBotState } = await import("../src/bot-state.js");
 const {
   attachRuntimeConnectionHandlers,
   reconcileRuntimeGuildVoiceState,
@@ -37,6 +39,28 @@ function createConnection(channelId) {
     connection.setStatus("destroyed");
   };
   return connection;
+}
+
+function createRuntime(botId) {
+  const runtime = new BotRuntime(
+    { id: botId, name: `OmniFM ${botId}`, clientId: "100000000000000605", token: "test-token" },
+    { role: "worker", workerSlot: 1 }
+  );
+  // No Discord in these tests: the voice channel status stays untouched.
+  runtime.syncVoiceChannelStatus = async () => {};
+  return runtime;
+}
+
+function disposeRuntime(runtime) {
+  for (const state of runtime.guildState.values()) {
+    if (state.reconnectTimer) clearTimeout(state.reconnectTimer);
+    state.reconnectTimer = null;
+  }
+  for (const timer of runtime.pendingRestoreTimers?.values?.() || []) clearTimeout(timer);
+  runtime.pendingRestoreTimers?.clear?.();
+  runtime.unsubscribeNetworkRecovery?.();
+  runtime.unsubscribeNetworkRecovery = null;
+  runtime.client.destroy().catch?.(() => null);
 }
 
 test("a connection stuck in signalling is rebuilt through the reconnect path after the timeout", (t) => {
@@ -127,4 +151,31 @@ test("a connection that comes back to ready in time is not rebuilt", async (t) =
 
   assert.equal(connection.destroyCount, 0);
   assert.equal(state.connection, connection);
+});
+
+test("shutdown persists the target of a stuck connection and plans no rejoin after it", async () => {
+  const runtime = createRuntime("bot-605-shutdown");
+  try {
+    const state = runtime.getState("guild-1");
+    state.currentStationKey = "station-a";
+    state.currentStationName = "Station A";
+    state.lastChannelId = "voice-1";
+    state.shouldReconnect = true;
+    const connection = createConnection("voice-1");
+    state.connection = connection;
+    runtime.attachConnectionHandlers("guild-1", connection);
+    connection.setStatus("connecting");
+    connection.setStatus("signalling");
+
+    runtime.beginShutdown();
+    await runtime.stop();
+
+    assert.equal(connection.destroyCount, 1);
+    const saved = getBotState("bot-605-shutdown")["guild-1"];
+    assert.equal(saved?.stationKey, "station-a");
+    assert.equal(saved?.channelId, "voice-1");
+    assert.equal(state.reconnectTimer, null, "no reconnect (and no voice join) after the final save");
+  } finally {
+    disposeRuntime(runtime);
+  }
 });

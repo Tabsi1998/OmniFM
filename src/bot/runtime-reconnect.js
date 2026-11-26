@@ -136,6 +136,11 @@ export function attachRuntimeConnectionHandlers(runtime, guildId, connection) {
 
 export async function tryRuntimeReconnect(runtime, guildId) {
   const state = runtime.getState(guildId);
+  // A join during the shutdown would leave the bot in the channel after the
+  // final save, and the restarted worker sees that ghost leave again (#605).
+  if (runtime.shuttingDown) {
+    return { attempted: false, retryRecommended: false, reason: "shutdown" };
+  }
   if (state.reconnectInFlight || state.voiceConnectInFlight) {
     return { attempted: false, retryRecommended: true, reason: "busy" };
   }
@@ -440,6 +445,9 @@ export function handleRuntimeNetworkRecovered(runtime, recoveryEvent = null) {
 }
 
 export function scheduleRuntimeReconnect(runtime, guildId, options = {}) {
+  // Shutting down: the connections are destroyed on purpose, the target is
+  // saved as it is, and the restarted worker restores it (#605).
+  if (runtime.shuttingDown) return;
   const state = runtime.getState(guildId);
   if (!state.shouldReconnect || !state.lastChannelId) return;
   if (runtime.isScheduledEventStopDue(state.activeScheduledEventStopAtMs)) {

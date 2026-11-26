@@ -158,6 +158,8 @@ async function fetchRuntimeBotVoiceState(runtime, guildId) {
 }
 
 async function reconcileRuntimeGuildVoiceState(runtime, guildId, { reason = "periodic" } = {}) {
+  // Shutting down: no repairs that could change the target after the final save (#605).
+  if (runtime.shuttingDown) return;
   if (!runtime.client.isReady()) return;
   const state = runtime.guildState.get(guildId);
   if (!state) return;
