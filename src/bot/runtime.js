@@ -345,9 +345,6 @@ class BotRuntime extends RuntimeMixinBase {
         sleepWarning: null,
         transientVoiceIssues: {},
         voiceConnectInFlight: false,
-        // Timestamp (ms) when this connection first entered signalling/connecting;
-        // used by the reconciler watchdog added in fix #605.
-        voiceConnectStuckSince: 0,
         reconnectInFlight: false,
         voiceDisconnectObservedAt: 0,
         voiceNotReadySince: 0,
