@@ -369,7 +369,7 @@ if [ -n "${PRE_PULL_REV:-}" ]; then
 fi
 
 bot_running() {
-  if has_systemd && systemctl list-unit-files "$UNIT_PREFIX-bot.service" 2>/dev/null | grep -q "^$UNIT_PREFIX-bot.service"; then
+  if has_systemd && systemctl list-unit-files "$UNIT_PREFIX-bot.service" 2>/dev/null | grep "^$UNIT_PREFIX-bot.service" >/dev/null; then
     systemctl is-active --quiet "$UNIT_PREFIX-bot"
     return $?
   fi
