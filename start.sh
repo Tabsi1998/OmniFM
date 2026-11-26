@@ -192,7 +192,7 @@ fi
 # systemd only when it runs: in a container or WSL systemctl exists without it,
 # and MongoDB would then never start (found by scripts/rehearse-public-switch.sh).
 if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ] \
-  && systemctl list-unit-files 2>/dev/null | grep -q '^mongod\.service'; then
+  && systemctl list-unit-files 2>/dev/null | grep '^mongod\.service' >/dev/null; then
   log "Starte MongoDB (systemd)..."
   $SUDO systemctl enable mongod >>"$LOG_DIR/setup.log" 2>&1 || true
   $SUDO systemctl start mongod  >>"$LOG_DIR/setup.log" 2>&1 || warn "MongoDB-Start via systemd meldete Fehler (siehe logs/setup.log)."
